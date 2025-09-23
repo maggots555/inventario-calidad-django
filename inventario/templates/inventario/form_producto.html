@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo|default:"Producto" }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">
+                    <i class="bi bi-box-seam"></i> {{ titulo|default:"Formulario de Producto" }}
+                </h1>
+                {% if producto %}
+                    <span class="badge bg-info">{{ producto.codigo_qr }}</span>
+                {% endif %}
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                
+                <!-- Información Básica -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Información Básica</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="{{ form.nombre.id_for_label }}" class="form-label">
+                                    <i class="bi bi-tag"></i> Nombre del Producto *
+                                </label>
+                                {{ form.nombre }}
+                                {% if form.nombre.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.nombre.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.categoria.id_for_label }}" class="form-label">
+                                    <i class="bi bi-grid"></i> Categoría *
+                                </label>
+                                {{ form.categoria }}
+                                {% if form.categoria.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.categoria.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="{{ form.descripcion.id_for_label }}" class="form-label">
+                                    <i class="bi bi-card-text"></i> Descripción
+                                </label>
+                                {{ form.descripcion }}
+                                {% if form.descripcion.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.descripcion.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.tipo.id_for_label }}" class="form-label">
+                                    <i class="bi bi-box"></i> Tipo de Producto *
+                                </label>
+                                {{ form.tipo }}
+                                {% if form.tipo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.tipo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Control de Inventario -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-boxes"></i> Control de Inventario</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.cantidad.id_for_label }}" class="form-label">
+                                    <i class="bi bi-123"></i> Cantidad Actual *
+                                </label>
+                                {{ form.cantidad }}
+                                <div class="form-text">Cantidad actual en inventario</div>
+                                {% if form.cantidad.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.cantidad.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.stock_minimo.id_for_label }}" class="form-label">
+                                    <i class="bi bi-exclamation-triangle"></i> Stock Mínimo *
+                                </label>
+                                {{ form.stock_minimo }}
+                                <div class="form-text">Cantidad mínima para alerta</div>
+                                {% if form.stock_minimo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.stock_minimo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.ubicacion.id_for_label }}" class="form-label">
+                                    <i class="bi bi-geo-alt"></i> Ubicación
+                                </label>
+                                {{ form.ubicacion }}
+                                <div class="form-text">Ubicación física en almacén</div>
+                                {% if form.ubicacion.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.ubicacion.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información Comercial -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-currency-dollar"></i> Información Comercial</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.proveedor.id_for_label }}" class="form-label">
+                                    <i class="bi bi-truck"></i> Proveedor
+                                </label>
+                                {{ form.proveedor }}
+                                {% if form.proveedor.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.proveedor.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="{{ form.costo_unitario.id_for_label }}" class="form-label">
+                                    <i class="bi bi-currency-dollar"></i> Costo Unitario
+                                </label>
+                                {{ form.costo_unitario }}
+                                <div class="form-text">Precio por unidad</div>
+                                {% if form.costo_unitario.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.costo_unitario.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="{{ form.estado_calidad.id_for_label }}" class="form-label">
+                                    <i class="bi bi-shield-check"></i> Estado de Calidad *
+                                </label>
+                                {{ form.estado_calidad }}
+                                {% if form.estado_calidad.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.estado_calidad.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <a href="{% url 'lista_productos' %}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-left"></i> Volver a Lista
+                                </a>
+                                {% if producto %}
+                                    <a href="{% url 'detalle_producto' producto.id %}" class="btn btn-outline-info ms-2">
+                                        <i class="bi bi-eye"></i> Ver Detalles
+                                    </a>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="bi bi-check-circle"></i> {{ boton_texto|default:"Guardar Producto" }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Información adicional para productos existentes -->
+            {% if producto %}
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-info-circle"></i> Información del Sistema</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <small class="text-muted">
+                                    <strong>Código QR:</strong><br>
+                                    <span class="badge bg-primary">{{ producto.codigo_qr }}</span>
+                                </small>
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted">
+                                    <strong>Fecha de Creación:</strong><br>
+                                    {{ producto.fecha_ingreso|date:"d/m/Y H:i" }}
+                                </small>
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted">
+                                    <strong>Última Actualización:</strong><br>
+                                    {{ producto.fecha_actualizacion|date:"d/m/Y H:i" }}
+                                </small>
+                            </div>
+                        </div>
+                        {% if producto.valor_total_stock > 0 %}
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    <strong>Valor Total en Stock:</strong> 
+                                    <span class="text-success">${{ producto.valor_total_stock|floatformat:2 }}</span>
+                                </small>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Cálculo automático del valor total
+    const cantidadInput = document.getElementById('{{ form.cantidad.id_for_label }}');
+    const costoInput = document.getElementById('{{ form.costo_unitario.id_for_label }}');
+    
+    function calcularValorTotal() {
+        const cantidad = parseFloat(cantidadInput.value) || 0;
+        const costo = parseFloat(costoInput.value) || 0;
+        const total = cantidad * costo;
+        
+        // Mostrar valor calculado (opcional)
+        console.log('Valor total calculado: $' + total.toFixed(2));
+    }
+    
+    cantidadInput.addEventListener('input', calcularValorTotal);
+    costoInput.addEventListener('input', calcularValorTotal);
+    
+    // Validación del formulario
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const nombre = document.getElementById('{{ form.nombre.id_for_label }}').value.trim();
+        const cantidad = document.getElementById('{{ form.cantidad.id_for_label }}').value;
+        const stockMinimo = document.getElementById('{{ form.stock_minimo.id_for_label }}').value;
+        
+        if (!nombre) {
+            e.preventDefault();
+            alert('El nombre del producto es obligatorio.');
+            return false;
+        }
+        
+        if (parseInt(cantidad) < 0) {
+            e.preventDefault();
+            alert('La cantidad no puede ser negativa.');
+            return false;
+        }
+        
+        if (parseInt(stockMinimo) < 1) {
+            e.preventDefault();
+            alert('El stock mínimo debe ser al menos 1.');
+            return false;
+        }
+    });
+    
+    // Auto-focus en el primer campo
+    document.getElementById('{{ form.nombre.id_for_label }}').focus();
+});
+</script>
+{% endblock %}

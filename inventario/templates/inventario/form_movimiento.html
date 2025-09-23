@@ -1,0 +1,408 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo|default:"Registrar Movimiento" }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">
+                    <i class="bi bi-arrow-left-right"></i> {{ titulo|default:"Registrar Movimiento" }}
+                </h1>
+                <a href="{% url 'movimiento_rapido' %}" class="btn btn-outline-success">
+                    <i class="bi bi-qr-code-scan"></i> Scanner QR Rápido
+                </a>
+            </div>
+
+            <form method="post" id="movimientoForm">
+                {% csrf_token %}
+                
+                <!-- Información del Producto -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-box-seam"></i> Selección del Producto</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="{{ form.producto.id_for_label }}" class="form-label">
+                                    <i class="bi bi-search"></i> Producto *
+                                </label>
+                                {{ form.producto }}
+                                <div class="form-text">Selecciona el producto para el movimiento</div>
+                                {% if form.producto.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.producto.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <!-- Información del producto seleccionado (se llena con JavaScript) -->
+                                <div id="productoInfo" class="d-none">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title mb-2">Información del Producto</h6>
+                                            <div id="productoDetalles"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detalles del Movimiento -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-gear"></i> Detalles del Movimiento</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.tipo.id_for_label }}" class="form-label">
+                                    <i class="bi bi-arrow-left-right"></i> Tipo de Movimiento *
+                                </label>
+                                {{ form.tipo }}
+                                {% if form.tipo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.tipo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.cantidad.id_for_label }}" class="form-label">
+                                    <i class="bi bi-123"></i> Cantidad *
+                                </label>
+                                {{ form.cantidad }}
+                                <div class="form-text">Cantidad del movimiento</div>
+                                {% if form.cantidad.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.cantidad.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.motivo.id_for_label }}" class="form-label">
+                                    <i class="bi bi-tag"></i> Motivo *
+                                </label>
+                                {{ form.motivo }}
+                                {% if form.motivo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.motivo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información del Destinatario -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-person-check"></i> Información del Destinatario</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.empleado_destinatario.id_for_label }}" class="form-label">
+                                    <i class="bi bi-person-circle"></i> Empleado Destinatario
+                                </label>
+                                {{ form.empleado_destinatario }}
+                                <div class="form-text">Selecciona el empleado que recibirá el producto</div>
+                                {% if form.empleado_destinatario.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.empleado_destinatario.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    <i class="bi bi-building"></i> Área de Destino
+                                </label>
+                                <input type="text" id="areaDestinoDisplay" class="form-control" readonly placeholder="Se llena automáticamente">
+                                <div class="form-text">Se completa automáticamente al seleccionar empleado</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.sucursal_destino.id_for_label }}" class="form-label">
+                                    <i class="bi bi-geo-alt"></i> Sucursal de Destino
+                                </label>
+                                {{ form.sucursal_destino }}
+                                <div class="form-text">Sucursal destino (opcional)</div>
+                                {% if form.sucursal_destino.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.sucursal_destino.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información Adicional -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-card-text"></i> Información Adicional</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.numero_proyecto.id_for_label }}" class="form-label">
+                                    <i class="bi bi-folder"></i> Número de Proyecto
+                                </label>
+                                {{ form.numero_proyecto }}
+                                <div class="form-text">Número de proyecto (opcional)</div>
+                                {% if form.numero_proyecto.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.numero_proyecto.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.usuario_registro_empleado.id_for_label }}" class="form-label">
+                                    <i class="bi bi-person-badge-fill"></i> Empleado que Registra
+                                </label>
+                                {{ form.usuario_registro_empleado }}
+                                <div class="form-text">Selecciona el empleado que registra el movimiento</div>
+                                {% if form.usuario_registro_empleado.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.usuario_registro_empleado.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.observaciones.id_for_label }}" class="form-label">
+                                    <i class="bi bi-chat-dots"></i> Observaciones
+                                </label>
+                                {{ form.observaciones }}
+                                <div class="form-text">Comentarios adicionales sobre el movimiento (opcional)</div>
+                                {% if form.observaciones.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.observaciones.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resumen del Movimiento -->
+                <div class="card mb-4" id="resumenMovimiento" style="display: none;">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Resumen del Movimiento</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="resumenContenido"></div>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <a href="{% url 'lista_movimientos' %}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-left"></i> Volver al Historial
+                                </a>
+                                <a href="{% url 'dashboard' %}" class="btn btn-outline-info ms-2">
+                                    <i class="bi bi-house"></i> Dashboard
+                                </a>
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="bi bi-check-circle"></i> {{ boton_texto|default:"Registrar Movimiento" }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos del formulario de productos
+    const productoSelect = document.getElementById('{{ form.producto.id_for_label }}');
+    const tipoSelect = document.getElementById('{{ form.tipo.id_for_label }}');
+    const cantidadInput = document.getElementById('{{ form.cantidad.id_for_label }}');
+    const productoInfo = document.getElementById('productoInfo');
+    const productoDetalles = document.getElementById('productoDetalles');
+    const resumenMovimiento = document.getElementById('resumenMovimiento');
+    const resumenContenido = document.getElementById('resumenContenido');
+    
+    // Elementos para funcionalidad de empleados
+    const empleadoSelect = document.getElementById('id_empleado_destinatario');
+    const areaDisplay = document.getElementById('areaDestinoDisplay');
+    
+    let productoSeleccionado = null;
+    
+    // Funcionalidad para empleados - auto-llenado de área
+    function actualizarAreaEmpleado() {
+        if (!empleadoSelect || !areaDisplay) return;
+        
+        const selectedOption = empleadoSelect.options[empleadoSelect.selectedIndex];
+        
+        if (selectedOption.value && selectedOption.dataset.area) {
+            const area = selectedOption.dataset.area;
+            areaDisplay.value = area;
+            areaDisplay.className = 'form-control text-success fw-bold';
+            areaDisplay.style.backgroundColor = '#d4edda';
+        } else if (selectedOption.value) {
+            areaDisplay.value = 'Área no especificada';
+            areaDisplay.className = 'form-control text-muted';
+            areaDisplay.style.backgroundColor = '#fff3cd';
+        } else {
+            areaDisplay.value = '';
+            areaDisplay.className = 'form-control';
+            areaDisplay.style.backgroundColor = '';
+        }
+    }
+    
+    // Event listeners para empleados
+    if (empleadoSelect && areaDisplay) {
+        empleadoSelect.addEventListener('change', actualizarAreaEmpleado);
+    }
+    
+    // Función para mostrar información del producto
+    function mostrarInfoProducto() {
+        const productoId = productoSelect.value;
+        
+        if (productoId) {
+            // Obtener información del producto del select option
+            const option = productoSelect.options[productoSelect.selectedIndex];
+            const productoNombre = option.text;
+            
+            // Aquí podrías hacer una llamada AJAX para obtener más detalles
+            // Por ahora, mostrar información básica
+            productoDetalles.innerHTML = `
+                <div>
+                    <strong>${productoNombre}</strong><br>
+                    <small class="text-muted">ID: ${productoId}</small>
+                </div>
+            `;
+            productoInfo.classList.remove('d-none');
+            productoSeleccionado = {
+                id: productoId,
+                nombre: productoNombre
+            };
+        } else {
+            productoInfo.classList.add('d-none');
+            productoSeleccionado = null;
+        }
+        
+        actualizarResumen();
+    }
+    
+    // Función para actualizar el resumen
+    function actualizarResumen() {
+        const tipo = tipoSelect.value;
+        const cantidad = cantidadInput.value;
+        
+        if (productoSeleccionado && tipo && cantidad) {
+            const tipoTexto = tipoSelect.options[tipoSelect.selectedIndex].text;
+            
+            resumenContenido.innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Producto:</strong><br>
+                        <span class="text-primary">${productoSeleccionado.nombre}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Tipo:</strong><br>
+                        <span class="badge ${tipo === 'entrada' ? 'bg-success' : tipo === 'salida' ? 'bg-danger' : 'bg-info'}">${tipoTexto}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Cantidad:</strong><br>
+                        <span class="fw-bold ${tipo === 'entrada' ? 'text-success' : tipo === 'salida' ? 'text-danger' : 'text-info'}">
+                            ${tipo === 'entrada' ? '+' : tipo === 'salida' ? '-' : ''}${cantidad}
+                        </span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Efecto:</strong><br>
+                        <small class="text-muted">
+                            ${tipo === 'entrada' ? 'Aumentará el stock' : 
+                              tipo === 'salida' ? 'Disminuirá el stock' : 
+                              'Ajustará el stock'}
+                        </small>
+                    </div>
+                </div>
+            `;
+            resumenMovimiento.style.display = 'block';
+        } else {
+            resumenMovimiento.style.display = 'none';
+        }
+    }
+    
+    // Event listeners
+    productoSelect.addEventListener('change', mostrarInfoProducto);
+    tipoSelect.addEventListener('change', actualizarResumen);
+    cantidadInput.addEventListener('input', actualizarResumen);
+    
+    // Validación del formulario
+    document.getElementById('movimientoForm').addEventListener('submit', function(e) {
+        const producto = productoSelect.value;
+        const tipo = tipoSelect.value;
+        const cantidad = cantidadInput.value;
+        const usuarioEmpleado = document.getElementById('{{ form.usuario_registro_empleado.id_for_label }}')?.value;
+        
+        if (!producto || !tipo || !cantidad) {
+            e.preventDefault();
+            alert('Por favor, completa los campos obligatorios: Producto, Tipo de Movimiento y Cantidad.');
+            return false;
+        }
+        
+        if (parseInt(cantidad) <= 0) {
+            e.preventDefault();
+            alert('La cantidad debe ser mayor que cero.');
+            return false;
+        }
+        
+        // Confirmación antes de registrar
+        const tipoTexto = tipoSelect.options[tipoSelect.selectedIndex].text;
+        const productoTexto = productoSelect.options[productoSelect.selectedIndex].text;
+        
+        if (!confirm(`¿Confirmas registrar ${tipoTexto} de ${cantidad} unidades de "${productoTexto}"?`)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    // Auto-focus en el primer campo
+    if (productoSelect) {
+        productoSelect.focus();
+    }
+    
+    // Mostrar/ocultar campos según el tipo de movimiento
+    if (tipoSelect) {
+        tipoSelect.addEventListener('change', function() {
+            const tipo = this.value;
+            const destinatarioFields = document.querySelectorAll('[id*="empleado_destinatario"], [id*="sucursal_destino"]');
+            
+            if (tipo === 'salida' || tipo === 'devolucion') {
+                // Mostrar campos de destinatario para salidas
+                destinatarioFields.forEach(field => {
+                    const container = field.closest('.mb-3');
+                    if (container) container.style.display = 'block';
+                });
+            } else {
+                // Mantener visible pero opcional para entradas y ajustes
+                destinatarioFields.forEach(field => {
+                    const container = field.closest('.mb-3');
+                    if (container) container.style.display = 'block';
+                });
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

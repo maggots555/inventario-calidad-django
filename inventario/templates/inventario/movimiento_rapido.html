@@ -1,0 +1,765 @@
+{% extends 'base.html' %}
+
+{% block title %}Scanner QR - Movimiento Rápido - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <h1 class="h3">
+                    <i class="bi bi-qr-code-scan text-primary"></i> Scanner QR - Movimiento Rápido
+                </h1>
+                <p class="text-muted">Escanea el código QR del producto o ingresa el código manualmente</p>
+            </div>
+
+            <!-- Formulario Principal -->
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-lightning-charge"></i> Registro Rápido de Movimiento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="movimientoRapidoForm">
+                        {% csrf_token %}
+                        
+                        <!-- Scanner QR Section -->
+                        <div class="row mb-4">
+                            <div class="col-md-8">
+                                <label for="{{ form.codigo_qr.id_for_label }}" class="form-label">
+                                    <i class="bi bi-qr-code"></i> Código de Barras/QR del Producto *
+                                </label>
+                                {{ form.codigo_qr }}
+                                {% if form.codigo_qr.help_text %}
+                                    <div class="form-text">{{ form.codigo_qr.help_text }}</div>
+                                {% endif %}
+                                {% if form.codigo_qr.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.codigo_qr.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button type="button" class="btn btn-outline-primary w-100" id="activarScannerBtn">
+                                    <i class="bi bi-camera"></i> Activar Scanner de Cámara
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Información del Producto (se llena automáticamente) -->
+                        <div id="productoInfo" class="alert alert-info d-none">
+                            <h6><i class="bi bi-info-circle"></i> Información del Producto</h6>
+                            <div id="productoDetalles"></div>
+                        </div>
+
+                        <!-- Detalles del Movimiento -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.tipo.id_for_label }}" class="form-label">
+                                    <i class="bi bi-arrow-left-right"></i> Tipo de Movimiento *
+                                </label>
+                                {{ form.tipo }}
+                                {% if form.tipo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.tipo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.cantidad.id_for_label }}" class="form-label">
+                                    <i class="bi bi-123"></i> Cantidad *
+                                </label>
+                                {{ form.cantidad }}
+                                {% if form.cantidad.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.cantidad.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.motivo.id_for_label }}" class="form-label">
+                                    <i class="bi bi-tag"></i> Motivo *
+                                </label>
+                                {{ form.motivo }}
+                                {% if form.motivo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.motivo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.usuario_registro_empleado.id_for_label }}" class="form-label">
+                                    <i class="bi bi-person-badge-fill"></i> Usuario que Registra
+                                </label>
+                                {{ form.usuario_registro_empleado }}
+                                <div class="form-text">Selecciona el empleado que registra el movimiento</div>
+                                {% if form.usuario_registro_empleado.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.usuario_registro_empleado.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.empleado_destinatario.id_for_label }}" class="form-label">
+                                    <i class="bi bi-person-check"></i> Destinatario
+                                </label>
+                                {{ form.empleado_destinatario }}
+                                <div class="form-text">Opcional: Empleado que recibe el producto</div>
+                                {% if form.empleado_destinatario.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.empleado_destinatario.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    <i class="bi bi-building"></i> Área de Destino
+                                </label>
+                                <input type="text" id="areaDestinoDisplay" class="form-control" readonly placeholder="Se llena automáticamente">
+                                <div class="form-text">Se completa automáticamente al seleccionar empleado destinatario</div>
+                            </div>
+                        </div>
+
+                        <!-- Campo de Observaciones -->
+                        <div class="mb-3">
+                            <label for="{{ form.observaciones.id_for_label }}" class="form-label">
+                                <i class="bi bi-chat-text"></i> Observaciones
+                            </label>
+                            {{ form.observaciones }}
+                            <div class="form-text">Información adicional sobre el movimiento (opcional)</div>
+                            {% if form.observaciones.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.observaciones.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Botones de Acción -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary me-md-2">
+                                <i class="bi bi-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-check-circle"></i> Registrar Movimiento
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Instrucciones de Uso -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-lightbulb"></i> Instrucciones de Uso</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>📱 Con Scanner de Cámara:</h6>
+                            <ol class="small">
+                                <li>Haz clic en "Activar Scanner de Cámara"</li>
+                                <li>Permite acceso a la cámara cuando se solicite</li>
+                                <li>Coloca el código de barras/QR dentro del marco azul</li>
+                                <li>El código se detectará y completará automáticamente</li>
+                                <li>El modal se cerrará automáticamente al detectar el código</li>
+                            </ol>
+                            <div class="alert alert-warning alert-sm">
+                                <small><i class="bi bi-exclamation-triangle"></i> 
+                                <strong>Android/iOS:</strong> Para usar la cámara necesitas conexión HTTPS. 
+                                Si no funciona, usa entrada manual.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>⌨️ Entrada Manual:</h6>
+                            <ol class="small">
+                                <li>Escribe el código QR/barras en el campo de texto</li>
+                                <li>El sistema verificará que exista en el inventario</li>
+                                <li>Completa los datos del movimiento</li>
+                                <li>Haz clic en "Registrar Movimiento"</li>
+                            </ol>
+                            <div class="alert alert-success alert-sm">
+                                <small><i class="bi bi-check-circle"></i> 
+                                <strong>Recomendado:</strong> Funciona en todos los navegadores y dispositivos.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mt-3 mb-0">
+                        <small>
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Scanner Universal:</strong> Detecta automáticamente códigos QR y códigos de barras 
+                            (EAN-13, EAN-8, UPC-A, UPC-E, Code 128, Code 39, Codabar, ITF). 
+                            Para dispositivos móviles se requiere HTTPS para usar la cámara.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Área del Scanner de Video -->
+<div class="modal fade" id="scannerModal" tabindex="-1" aria-labelledby="scannerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="scannerModalLabel">
+                    <i class="bi bi-camera"></i> Scanner Universal - QR y Códigos de Barras
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <!-- Área de estado/mensajes -->
+                <div id="scanner-status" class="mb-3"></div>
+                
+                <div class="scanner-container">
+                    <div id="qr-video"></div>
+                    <div class="scanner-overlay">
+                        <div class="scanner-frame"></div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Scanner Universal:</strong> Detecta automáticamente códigos QR y códigos de barras. 
+                        Coloca el código dentro del marco azul para escanearlo.
+                    </div>
+                    <div class="row text-start">
+                        <div class="col-6">
+                            <small class="text-muted">
+                                <strong>📱 Códigos QR:</strong><br>
+                                • Cuadrados con puntos<br>
+                                • Datos de texto/URL<br>
+                                • Lectura 360°
+                            </small>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">
+                                <strong>📊 Códigos de Barras:</strong><br>
+                                • Líneas verticales<br>
+                                • EAN, UPC, Code 128<br>
+                                • Lectura horizontal
+                            </small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary mt-3" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cerrar Scanner
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Librerías para Scanner Universal -->
+<!-- QuaggaJS para códigos de barras (EAN, UPC, Code 128, etc.) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<!-- jsQR para códigos QR -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const codigoQRInput = document.getElementById('{{ form.codigo_qr.id_for_label }}');
+    const productoInfo = document.getElementById('productoInfo');
+    const productoDetalles = document.getElementById('productoDetalles');
+    const activarScannerBtn = document.getElementById('activarScannerBtn');
+    
+    // Variables del scanner universal
+    let scannerActivo = false;
+    let videoElement = null;
+    let canvasElement = null;
+    let canvasContext = null;
+    let intervalId = null;
+    
+    // Función para buscar producto por código QR
+    function buscarProducto(codigoQR) {
+        if (codigoQR.length > 5) { // Solo buscar si el código tiene longitud mínima
+            fetch(`{% url 'buscar_producto_qr' %}?codigo_qr=${encodeURIComponent(codigoQR)}`)
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    } else {
+                        throw new Error('Producto no encontrado');
+                    }
+                })
+                .then(data => {
+                    // Mostrar información del producto
+                    productoDetalles.innerHTML = `
+                        <div class="row">
+                            <div class="col-md-8">
+                                <strong>${data.nombre}</strong><br>
+                                <small class="text-muted">
+                                    Categoría: ${data.categoria} | 
+                                    Stock actual: ${data.cantidad_actual} unidades
+                                    ${data.ubicacion ? ' | Ubicación: ' + data.ubicacion : ''}
+                                </small>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <span class="badge bg-success">✓ Producto Encontrado</span>
+                            </div>
+                        </div>
+                    `;
+                    productoInfo.classList.remove('d-none');
+                    productoInfo.classList.remove('alert-danger');
+                    productoInfo.classList.add('alert-success');
+                })
+                .catch(error => {
+                    // Mostrar error
+                    productoDetalles.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-exclamation-triangle text-warning me-2"></i> 
+                            <div>
+                                <strong>Código no encontrado en inventario</strong><br>
+                                <small>Verifica que el código sea correcto o que el producto esté registrado.</small>
+                            </div>
+                        </div>
+                    `;
+                    productoInfo.classList.remove('d-none');
+                    productoInfo.classList.remove('alert-success');
+                    productoInfo.classList.add('alert-warning');
+                });
+        } else {
+            // Ocultar información si el código es muy corto
+            productoInfo.classList.add('d-none');
+        }
+    }
+    
+    // Buscar producto cuando se escriba en el campo
+    codigoQRInput.addEventListener('input', function() {
+        const codigo = this.value.trim();
+        buscarProducto(codigo);
+    });
+    
+    // ========================================================================
+    // FUNCIONALIDAD DE AUTO-LLENADO DE ÁREA PARA EMPLEADOS
+    // ========================================================================
+    
+    // Elementos para funcionalidad de empleados
+    const empleadoDestinatarioSelect = document.getElementById('{{ form.empleado_destinatario.id_for_label }}');
+    const areaDestinoDisplay = document.getElementById('areaDestinoDisplay');
+    
+    // Función para actualizar área automáticamente al seleccionar empleado destinatario
+    function actualizarAreaEmpleado() {
+        if (!empleadoDestinatarioSelect || !areaDestinoDisplay) return;
+        
+        const selectedOption = empleadoDestinatarioSelect.options[empleadoDestinatarioSelect.selectedIndex];
+        
+        if (selectedOption.value && selectedOption.dataset.area) {
+            const area = selectedOption.dataset.area;
+            areaDestinoDisplay.value = area;
+            areaDestinoDisplay.className = 'form-control text-success fw-bold';
+            areaDestinoDisplay.style.backgroundColor = '#d4edda';
+        } else if (selectedOption.value) {
+            areaDestinoDisplay.value = 'Área no especificada';
+            areaDestinoDisplay.className = 'form-control text-muted';
+            areaDestinoDisplay.style.backgroundColor = '#fff3cd';
+        } else {
+            areaDestinoDisplay.value = '';
+            areaDestinoDisplay.className = 'form-control';
+            areaDestinoDisplay.style.backgroundColor = '';
+        }
+    }
+    
+    // Event listener para empleado destinatario
+    if (empleadoDestinatarioSelect && areaDestinoDisplay) {
+        empleadoDestinatarioSelect.addEventListener('change', actualizarAreaEmpleado);
+        // Ejecutar al cargar para casos de edición
+        actualizarAreaEmpleado();
+    }
+    
+    // ========================================================================
+    // SCANNER UNIVERSAL - HÍBRIDO PARA QR Y CÓDIGOS DE BARRAS
+    // ========================================================================
+    
+    // Activar scanner universal
+    activarScannerBtn.addEventListener('click', function() {
+        const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
+        scannerModal.show();
+        
+        // Inicializar scanner cuando se abra el modal
+        document.getElementById('scannerModal').addEventListener('shown.bs.modal', function() {
+            iniciarScannerUniversal();
+        });
+        
+        // Detener scanner cuando se cierre el modal
+        document.getElementById('scannerModal').addEventListener('hidden.bs.modal', function() {
+            detenerScannerUniversal();
+        });
+    });
+    
+    // Función principal del scanner universal
+    async function iniciarScannerUniversal() {
+        // Verificar compatibilidad del navegador
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            mostrarError('Tu navegador no soporta acceso a la cámara. Usa entrada manual.');
+            return;
+        }
+        
+        // Verificar HTTPS (requerido para cámara en móviles)
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            mostrarErrorHTTPS();
+            return;
+        }
+        
+        try {
+            // Configurar elementos de video y canvas
+            setupVideoCanvas();
+            
+            // Solicitar acceso a la cámara con configuración optimizada
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment', // Cámara trasera en móviles
+                    width: { ideal: 1280, min: 640, max: 1920 },
+                    height: { ideal: 720, min: 480, max: 1080 },
+                    aspectRatio: { ideal: 16/9 },
+                    frameRate: { ideal: 30, min: 15 }
+                }
+            });
+            
+            videoElement.srcObject = stream;
+            
+            // Esperar a que el video se cargue completamente
+            await new Promise((resolve) => {
+                videoElement.addEventListener('loadedmetadata', () => {
+                    // Ajustar canvas al tamaño real del video
+                    canvasElement.width = videoElement.videoWidth;
+                    canvasElement.height = videoElement.videoHeight;
+                    resolve();
+                });
+            });
+            
+            await videoElement.play();
+            scannerActivo = true;
+            
+            mostrarMensaje('success', '📹 Scanner activo - Enfoca el código hacia la cámara');
+            
+            // Inicializar Quagga para códigos de barras
+            iniciarQuaggaScanner();
+            
+            // Inicializar jsQR para códigos QR (en paralelo)
+            iniciarQRScanner();
+            
+        } catch (error) {
+            console.error('Error al iniciar scanner:', error);
+            
+            if (error.name === 'NotAllowedError') {
+                mostrarError('Permisos de cámara denegados. Permite el acceso en la configuración del navegador.');
+            } else if (error.name === 'NotFoundError') {
+                mostrarError('No se encontró cámara en tu dispositivo.');
+            } else if (error.name === 'NotSupportedError') {
+                mostrarError('Tu navegador no soporta esta funcionalidad.');
+            } else {
+                mostrarError(`Error del scanner: ${error.message}`);
+            }
+        }
+    }
+    
+    // Configurar elementos de video y canvas
+    function setupVideoCanvas() {
+        const videoContainer = document.getElementById('qr-video');
+        videoContainer.innerHTML = '';
+        
+        // Crear elemento de video
+        videoElement = document.createElement('video');
+        videoElement.style.cssText = `
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #000;
+            border: none;
+            outline: none;
+            display: block;
+            margin: 0;
+            padding: 0;
+        `;
+        videoElement.setAttribute('autoplay', '');
+        videoElement.setAttribute('muted', '');
+        videoElement.setAttribute('playsinline', ''); // iOS compatibility
+        videoContainer.appendChild(videoElement);
+        
+        // Crear canvas para jsQR (completamente oculto)
+        canvasElement = document.createElement('canvas');
+        canvasContext = canvasElement.getContext('2d');
+        canvasElement.style.cssText = 'display: none; position: absolute; top: -9999px; left: -9999px;';
+        document.body.appendChild(canvasElement); // Agregar al body en lugar del contenedor
+    }
+    
+    // Inicializar Quagga para códigos de barras
+    function iniciarQuaggaScanner() {
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: videoElement,
+                constraints: {
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }
+            },
+            decoder: {
+                readers: [
+                    "code_128_reader",    // Code 128 (común en inventarios)
+                    "ean_reader",         // EAN-13 (productos comerciales)
+                    "ean_8_reader",       // EAN-8 (productos pequeños)
+                    "code_39_reader",     // Code 39 (uso industrial)
+                    "upc_reader",         // UPC-A (productos USA)
+                    "upc_e_reader",       // UPC-E (productos pequeños USA)
+                    "codabar_reader",     // Codabar (bibliotecas, bancos)
+                    "i2of5_reader"        // Interleaved 2 of 5
+                ]
+            },
+            locator: {
+                patchSize: "medium",
+                halfSample: true
+            },
+            numOfWorkers: 2,
+            frequency: 10, // Verificar cada 100ms
+            debug: false   // Sin debug en producción
+        }, function(err) {
+            if (err) {
+                console.error('Error Quagga:', err);
+                return;
+            }
+            
+            Quagga.start();
+            console.log('✅ Scanner de códigos de barras iniciado');
+        });
+        
+        // Detectar códigos de barras
+        Quagga.onDetected(function(result) {
+            const codigo = result.codeResult.code;
+            const confianza = result.codeResult.confidence || 0;
+            
+            // Solo aceptar códigos con buena confianza
+            if (confianza > 70) {
+                console.log(`📊 Código de barras detectado: ${codigo} (confianza: ${confianza.toFixed(1)}%)`);
+                procesarCodigoDetectado(codigo, 'Código de Barras');
+            }
+        });
+    }
+    
+    // Inicializar jsQR para códigos QR
+    function iniciarQRScanner() {
+        intervalId = setInterval(() => {
+            if (scannerActivo && videoElement && videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                escanearQR();
+            }
+        }, 100); // Verificar cada 100ms
+        
+        console.log('✅ Scanner de códigos QR iniciado');
+    }
+    
+    // Función para escanear códigos QR con jsQR
+    function escanearQR() {
+        if (!videoElement || !canvasElement || !canvasContext) return;
+        
+        // Ajustar canvas al video
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        
+        // Dibujar frame actual del video en canvas
+        canvasContext.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        
+        // Obtener datos de imagen
+        const imageData = canvasContext.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        
+        // Buscar código QR
+        const qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert"
+        });
+        
+        if (qrCode) {
+            console.log(`📱 Código QR detectado: ${qrCode.data}`);
+            procesarCodigoDetectado(qrCode.data, 'Código QR');
+        }
+    }
+    
+    // Procesar código detectado (común para QR y barras)
+    function procesarCodigoDetectado(codigo, tipo) {
+        if (!scannerActivo) return; // Evitar detecciones múltiples
+        
+        scannerActivo = false; // Pausar scanner temporalmente
+        
+        // Sonido de confirmación
+        reproducirSonidoConfirmacion();
+        
+        // Feedback visual
+        mostrarMensaje('success', `✅ ${tipo} detectado: ${codigo}`);
+        
+        // Llenar campo de entrada
+        codigoQRInput.value = codigo;
+        
+        // **NUEVO: Disparar eventos de validación para que Bootstrap reconozca el cambio**
+        // Primero limpiar cualquier estado de validación previo
+        codigoQRInput.classList.remove('is-invalid', 'is-valid');
+        
+        // Disparar evento 'input' para activar validación de Bootstrap
+        const inputEvent = new Event('input', { 
+            bubbles: true, 
+            cancelable: true 
+        });
+        codigoQRInput.dispatchEvent(inputEvent);
+        
+        // Disparar evento 'change' para asegurar que se registre el cambio
+        const changeEvent = new Event('change', { 
+            bubbles: true, 
+            cancelable: true 
+        });
+        codigoQRInput.dispatchEvent(changeEvent);
+        
+        // **ADICIONAL: Hacer focus y blur para asegurar validación completa**
+        const originalFocus = document.activeElement;
+        codigoQRInput.focus();
+        
+        // Después de un pequeño retraso, aplicar validación visual y restaurar focus
+        setTimeout(() => {
+            // Forzar validación visual de Bootstrap
+            if (codigo.trim() !== '') {
+                codigoQRInput.classList.add('is-valid');
+                codigoQRInput.setCustomValidity(''); // Limpiar errores de validación HTML5
+            }
+            
+            // Hacer blur para activar cualquier validación onblur
+            codigoQRInput.blur();
+            
+            // Restaurar el focus original si es necesario
+            if (originalFocus && originalFocus !== codigoQRInput) {
+                originalFocus.focus();
+            }
+        }, 100);
+        
+        // Buscar producto automáticamente
+        buscarProducto(codigo);
+        
+        // Cerrar modal después de un momento
+        setTimeout(() => {
+            bootstrap.Modal.getInstance(document.getElementById('scannerModal')).hide();
+            
+            // Hacer foco en el siguiente campo
+            document.getElementById('{{ form.tipo.id_for_label }}').focus();
+        }, 1000);
+    }
+    
+    // Detener scanner universal
+    function detenerScannerUniversal() {
+        scannerActivo = false;
+        
+        // Detener Quagga
+        if (typeof Quagga !== 'undefined') {
+            Quagga.stop();
+        }
+        
+        // Detener jsQR
+        if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+        
+        // Detener video stream
+        if (videoElement && videoElement.srcObject) {
+            const tracks = videoElement.srcObject.getTracks();
+            tracks.forEach(track => track.stop());
+            videoElement.srcObject = null;
+        }
+        
+        console.log('🛑 Scanner universal detenido');
+    }
+    
+    // Funciones de utilidad
+    function mostrarMensaje(tipo, mensaje) {
+        const iconos = {
+            success: '✅',
+            warning: '⚠️', 
+            error: '❌',
+            info: 'ℹ️'
+        };
+        
+        const clases = {
+            success: 'alert-success',
+            warning: 'alert-warning',
+            error: 'alert-danger', 
+            info: 'alert-info'
+        };
+        
+        document.getElementById('scanner-status').innerHTML = 
+            `<div class="alert ${clases[tipo]}">
+                ${iconos[tipo]} ${mensaje}
+            </div>`;
+    }
+    
+    function mostrarError(mensaje) {
+        mostrarMensaje('error', mensaje);
+    }
+    
+    function mostrarErrorHTTPS() {
+        mostrarMensaje('warning', 
+            'Para usar la cámara necesitas conexión HTTPS. Mientras tanto, escribe el código manualmente.');
+    }
+    
+    function reproducirSonidoConfirmacion() {
+        try {
+            // Crear sonido de beep de confirmación
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800; // Frecuencia del beep
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+            // Silenciosamente ignorar errores de audio
+        }
+    }
+    
+    // ========================================================================
+    // VALIDACIÓN DEL FORMULARIO
+    // ========================================================================
+    
+    document.getElementById('movimientoRapidoForm').addEventListener('submit', function(e) {
+        const codigoQR = codigoQRInput.value.trim();
+        const tipo = document.getElementById('{{ form.tipo.id_for_label }}').value;
+        const cantidad = document.getElementById('{{ form.cantidad.id_for_label }}').value;
+        const motivo = document.getElementById('{{ form.motivo.id_for_label }}').value;
+        
+        if (!codigoQR || !tipo || !cantidad || !motivo) {
+            e.preventDefault();
+            alert('⚠️ Por favor, completa todos los campos obligatorios: Código QR, Tipo, Cantidad y Motivo.');
+            return false;
+        }
+        
+        if (parseInt(cantidad) <= 0) {
+            e.preventDefault();
+            alert('⚠️ La cantidad debe ser mayor que cero.');
+            return false;
+        }
+        
+        // Confirmación antes de registrar
+        const tipoTexto = document.getElementById('{{ form.tipo.id_for_label }}').options[document.getElementById('{{ form.tipo.id_for_label }}').selectedIndex].text;
+        if (!confirm(`¿Confirmas registrar ${tipoTexto} de ${cantidad} unidades del producto con código: ${codigoQR}?`)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    // Auto-focus en el campo de código QR
+    codigoQRInput.focus();
+});
+</script>
+{% endblock %}

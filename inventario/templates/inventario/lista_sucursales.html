@@ -1,0 +1,526 @@
+{% extends 'base.html' %}
+
+{% block title %}Sucursales - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3">
+            <i class="bi bi-building"></i> Gestión de Sucursales
+        </h1>
+        <div>
+            <a href="{% url 'crear_sucursal' %}" class="btn btn-success">
+                <i class="bi bi-plus-circle"></i> Nueva Sucursal
+            </a>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-primary ms-2">
+                <i class="bi bi-house"></i> Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Estadísticas Rápidas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Total Sucursales</h5>
+                            <h2 class="mb-0">{{ total_sucursales }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-building fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Sucursales Activas</h5>
+                            <h2 class="mb-0">{{ sucursales_activas }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-check-circle fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Sucursales Inactivas</h5>
+                            <h2 class="mb-0">{{ sucursales_inactivas }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-x-circle fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h5 class="card-title">Con Encargado</h5>
+                            <h2 class="mb-0">{{ sucursales_con_encargado }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-person-check fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros y Búsqueda -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" id="filtroForm">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="busqueda" class="form-label">
+                            <i class="bi bi-search"></i> Buscar Sucursal
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="busqueda" 
+                               name="busqueda" 
+                               value="{{ request.GET.busqueda }}"
+                               placeholder="Nombre, código, ciudad...">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="estado" class="form-label">
+                            <i class="bi bi-filter"></i> Estado
+                        </label>
+                        <select class="form-select" id="estado" name="estado">
+                            <option value="">Todas</option>
+                            <option value="activa" {% if request.GET.estado == 'activa' %}selected{% endif %}>Activas</option>
+                            <option value="inactiva" {% if request.GET.estado == 'inactiva' %}selected{% endif %}>Inactivas</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="ciudad" class="form-label">
+                            <i class="bi bi-geo-alt"></i> Ciudad
+                        </label>
+                        <select class="form-select" id="ciudad" name="ciudad">
+                            <option value="">Todas las ciudades</option>
+                            {% for ciudad in ciudades_disponibles %}
+                                <option value="{{ ciudad }}" {% if request.GET.ciudad == ciudad %}selected{% endif %}>
+                                    {{ ciudad }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search"></i> Filtrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Sucursales -->
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-list"></i> Lista de Sucursales
+                    {% if sucursales %}
+                        <span class="badge bg-secondary ms-2">{{ sucursales|length }} encontrada{{ sucursales|length|pluralize:"s" }}</span>
+                    {% endif %}
+                </h5>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleVista('tabla')">
+                        <i class="bi bi-table"></i> Tabla
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleVista('tarjetas')">
+                        <i class="bi bi-grid"></i> Tarjetas
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if sucursales %}
+                <!-- Vista de Tabla -->
+                <div id="vistaTabla" class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Código</th>
+                                <th>Ciudad</th>
+                                <th>Encargado</th>
+                                <th>Contacto</th>
+                                <th>Estado</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sucursal in sucursales %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">{{ sucursal.nombre }}</div>
+                                        {% if sucursal.direccion %}
+                                            <small class="text-muted">{{ sucursal.direccion|truncatechars:50 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if sucursal.codigo %}
+                                            <span class="badge bg-secondary">{{ sucursal.codigo }}</span>
+                                        {% else %}
+                                            <span class="text-muted">Sin código</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ sucursal.ciudad|default:"No especificada" }}
+                                        {% if sucursal.estado_provincia %}
+                                            <br><small class="text-muted">{{ sucursal.estado_provincia }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ sucursal.responsable|default:"Sin asignar" }}
+                                    </td>
+                                    <td>
+                                        {% if sucursal.telefono %}
+                                            <i class="bi bi-phone"></i> {{ sucursal.telefono }}<br>
+                                        {% endif %}
+                                        {% if sucursal.email %}
+                                            <i class="bi bi-envelope"></i> {{ sucursal.email }}
+                                        {% endif %}
+                                        {% if not sucursal.telefono and not sucursal.email %}
+                                            <span class="text-muted">Sin contacto</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if sucursal.activa %}bg-success{% else %}bg-secondary{% endif %}">
+                                            {% if sucursal.activa %}Activa{% else %}Inactiva{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'editar_sucursal' sucursal.id %}" 
+                                               class="btn btn-outline-primary btn-sm" 
+                                               title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <button type="button" 
+                                                    class="btn btn-outline-danger btn-sm" 
+                                                    onclick="confirmarEliminacion({{ sucursal.id }}, '{{ sucursal.nombre|escapejs }}')"
+                                                    title="Eliminar">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Vista de Tarjetas -->
+                <div id="vistaTarjetas" style="display: none;">
+                    <div class="row">
+                        {% for sucursal in sucursales %}
+                            <div class="col-md-6 col-lg-4 mb-4">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">{{ sucursal.nombre }}</h6>
+                                        <span class="badge {% if sucursal.activa %}bg-success{% else %}bg-secondary{% endif %}">
+                                            {% if sucursal.activa %}Activa{% else %}Inactiva{% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if sucursal.codigo %}
+                                            <p class="mb-2">
+                                                <strong>Código:</strong> 
+                                                <span class="badge bg-secondary">{{ sucursal.codigo }}</span>
+                                            </p>
+                                        {% endif %}
+                                        
+                                        {% if sucursal.ciudad %}
+                                            <p class="mb-2">
+                                                <i class="bi bi-geo-alt text-primary"></i>
+                                                {{ sucursal.ciudad }}{% if sucursal.estado_provincia %}, {{ sucursal.estado_provincia }}{% endif %}
+                                            </p>
+                                        {% endif %}
+                                        
+                                        {% if sucursal.direccion %}
+                                            <p class="mb-2">
+                                                <i class="bi bi-house text-muted"></i>
+                                                <small>{{ sucursal.direccion }}</small>
+                                            </p>
+                                        {% endif %}
+                                        
+                                        {% if sucursal.responsable %}
+                                            <p class="mb-2">
+                                                <i class="bi bi-person text-info"></i>
+                                                {{ sucursal.responsable }}
+                                            </p>
+                                        {% endif %}
+                                        
+                                        {% if sucursal.telefono %}
+                                            <p class="mb-2">
+                                                <i class="bi bi-phone text-success"></i>
+                                                {{ sucursal.telefono }}
+                                            </p>
+                                        {% endif %}
+                                        
+                                        {% if sucursal.email %}
+                                            <p class="mb-2">
+                                                <i class="bi bi-envelope text-warning"></i>
+                                                <small>{{ sucursal.email }}</small>
+                                            </p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="card-footer">
+                                        <div class="d-flex justify-content-between">
+                                            <a href="{% url 'editar_sucursal' sucursal.id %}" class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-pencil"></i> Editar
+                                            </a>
+                                            <button type="button" 
+                                                    class="btn btn-outline-danger btn-sm" 
+                                                    onclick="confirmarEliminacion({{ sucursal.id }}, '{{ sucursal.nombre|escapejs }}')">
+                                                <i class="bi bi-trash"></i> Eliminar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <!-- Estado Vacío -->
+                <div class="text-center py-5">
+                    <i class="bi bi-building text-muted" style="font-size: 4rem;"></i>
+                    <h4 class="text-muted mt-3">No se encontraron sucursales</h4>
+                    {% if request.GET.busqueda or request.GET.estado or request.GET.ciudad %}
+                        <p class="text-muted">
+                            No hay sucursales que coincidan con los filtros aplicados.
+                        </p>
+                        <a href="{% url 'lista_sucursales' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Limpiar Filtros
+                        </a>
+                    {% else %}
+                        <p class="text-muted">
+                            Comienza creando tu primera sucursal para organizar tu inventario.
+                        </p>
+                        <a href="{% url 'crear_sucursal' %}" class="btn btn-success">
+                            <i class="bi bi-plus-circle"></i> Crear Primera Sucursal
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Paginación -->
+    {% if sucursales.has_other_pages %}
+        <nav aria-label="Navegación de páginas" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if sucursales.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if request.GET.busqueda %}&busqueda={{ request.GET.busqueda }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.ciudad %}&ciudad={{ request.GET.ciudad }}{% endif %}">
+                            <i class="bi bi-chevron-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ sucursales.previous_page_number }}{% if request.GET.busqueda %}&busqueda={{ request.GET.busqueda }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.ciudad %}&ciudad={{ request.GET.ciudad }}{% endif %}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                {% endif %}
+                
+                <li class="page-item active">
+                    <span class="page-link">
+                        Página {{ sucursales.number }} de {{ sucursales.paginator.num_pages }}
+                    </span>
+                </li>
+                
+                {% if sucursales.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ sucursales.next_page_number }}{% if request.GET.busqueda %}&busqueda={{ request.GET.busqueda }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.ciudad %}&ciudad={{ request.GET.ciudad }}{% endif %}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ sucursales.paginator.num_pages }}{% if request.GET.busqueda %}&busqueda={{ request.GET.busqueda }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}{% if request.GET.ciudad %}&ciudad={{ request.GET.ciudad }}{% endif %}">
+                            <i class="bi bi-chevron-double-right"></i>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+
+<!-- Modal de Confirmación para Eliminar -->
+<div class="modal fade" id="modalConfirmacion" tabindex="-1" aria-labelledby="modalConfirmacionLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalConfirmacionLabel">
+                    <i class="bi bi-exclamation-triangle text-warning"></i> Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas eliminar la sucursal <strong id="nombreSucursal"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Advertencia:</strong> Esta acción no se puede deshacer. Si la sucursal tiene movimientos asociados, no podrá ser eliminada.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form method="post" id="formEliminar" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Eliminar Sucursal
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Alternar entre vista de tabla y tarjetas
+function toggleVista(tipo) {
+    const vistaTabla = document.getElementById('vistaTabla');
+    const vistaTarjetas = document.getElementById('vistaTarjetas');
+    const botones = document.querySelectorAll('.btn-group button');
+    
+    botones.forEach(btn => btn.classList.remove('active'));
+    
+    if (tipo === 'tabla') {
+        vistaTabla.style.display = 'block';
+        vistaTarjetas.style.display = 'none';
+        event.target.classList.add('active');
+    } else {
+        vistaTabla.style.display = 'none';
+        vistaTarjetas.style.display = 'block';
+        event.target.classList.add('active');
+    }
+    
+    // Guardar preferencia en localStorage
+    localStorage.setItem('vistaSucursales', tipo);
+}
+
+// Confirmar eliminación
+function confirmarEliminacion(sucursalId, nombreSucursal) {
+    console.log('=== DEBUGGING ELIMINACIÓN ===');
+    console.log('ID de sucursal:', sucursalId);
+    console.log('Nombre de sucursal:', nombreSucursal);
+    console.log('Tipo de ID:', typeof sucursalId);
+    console.log('Tipo de nombre:', typeof nombreSucursal);
+    
+    // Verificar que Bootstrap existe
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap no está cargado!');
+        alert('Error: Bootstrap no está disponible');
+        return;
+    }
+    
+    // Buscar elementos del modal
+    const nombreElement = document.getElementById('nombreSucursal');
+    const formElement = document.getElementById('formEliminar');
+    const modalElement = document.getElementById('modalConfirmacion');
+    
+    console.log('Elemento nombre:', nombreElement);
+    console.log('Elemento form:', formElement);
+    console.log('Elemento modal:', modalElement);
+    
+    if (!nombreElement) {
+        console.error('No se encontró el elemento nombreSucursal');
+        return;
+    }
+    
+    if (!formElement) {
+        console.error('No se encontró el elemento formEliminar');
+        return;
+    }
+    
+    if (!modalElement) {
+        console.error('No se encontró el elemento modalConfirmacion');
+        return;
+    }
+    
+    // Configurar el modal
+    try {
+        nombreElement.textContent = nombreSucursal;
+        console.log('Nombre configurado en modal:', nombreElement.textContent);
+        
+        const url = '/sucursales/' + sucursalId + '/eliminar/';
+        formElement.action = url;
+        console.log('URL configurada:', url);
+        console.log('Action del form:', formElement.action);
+        
+        // Crear y mostrar el modal
+        const modal = new bootstrap.Modal(modalElement);
+        console.log('Modal creado:', modal);
+        
+        modal.show();
+        console.log('Modal mostrado');
+        
+    } catch (error) {
+        console.error('Error configurando el modal:', error);
+        alert('Error técnico: ' + error.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Restaurar vista preferida
+    const vistaPreferida = localStorage.getItem('vistaSucursales') || 'tabla';
+    toggleVista(vistaPreferida);
+    
+    // Auto-submit del formulario de filtros
+    const filtroForm = document.getElementById('filtroForm');
+    const busquedaInput = document.getElementById('busqueda');
+    const estadoSelect = document.getElementById('estado');
+    const ciudadSelect = document.getElementById('ciudad');
+    
+    let timeoutId;
+    
+    busquedaInput.addEventListener('input', function() {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(function() {
+            filtroForm.submit();
+        }, 500); // Esperar 500ms después de que el usuario deje de escribir
+    });
+    
+    estadoSelect.addEventListener('change', function() {
+        filtroForm.submit();
+    });
+    
+    ciudadSelect.addEventListener('change', function() {
+        filtroForm.submit();
+    });
+    
+    // Limpiar filtros con Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && (busquedaInput.value || estadoSelect.value || ciudadSelect.value)) {
+            window.location.href = '{% url "lista_sucursales" %}';
+        }
+    });
+});
+</script>
+{% endblock %}

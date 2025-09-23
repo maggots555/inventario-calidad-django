@@ -1,0 +1,414 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ producto.nombre }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Hero Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 bg-gradient-primary text-white">
+                <div class="card-body py-4">
+                    <div class="row align-items-center">
+                        <div class="col-lg-8">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="me-3">
+                                    <i class="bi bi-box-seam display-4"></i>
+                                </div>
+                                <div>
+                                    <h1 class="h2 mb-2 fw-bold">{{ producto.nombre }}</h1>
+                                    <div class="d-flex align-items-center gap-3 mb-2">
+                                        <span class="badge bg-white text-dark fs-6 px-3 py-2">
+                                            <i class="bi bi-qr-code me-1"></i>{{ producto.codigo_qr }}
+                                        </span>
+                                        <span class="badge bg-light bg-opacity-25 text-white fs-6 px-3 py-2">
+                                            <i class="bi bi-tag me-1"></i>{{ producto.get_categoria_display }}
+                                        </span>
+                                    </div>
+                                    {% if producto.descripcion %}
+                                        <p class="mb-0 text-white-50 fs-5">
+                                            <i class="bi bi-info-circle me-1"></i>{{ producto.descripcion }}
+                                        </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 text-end">
+                            <div class="btn-group">
+                                <a href="{% url 'editar_producto' producto.id %}" class="btn btn-light btn-lg">
+                                    <i class="bi bi-pencil"></i> Editar
+                                </a>
+                                <a href="{% url 'crear_movimiento' %}" class="btn btn-success btn-lg">
+                                    <i class="bi bi-arrow-left-right"></i> Registrar Movimiento
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de información principal -->
+    <div class="row mb-4">
+        <!-- Panel de Stock - Movido a primera posición -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom-0 pt-4">
+                    <h5 class="mb-0 text-center">
+                        <i class="bi bi-boxes text-primary"></i> Control de Stock
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="row mb-4">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <div class="display-6 fw-bold {% if producto.stock_bajo %}text-danger{% else %}text-success{% endif %}">
+                                    {{ producto.cantidad }}
+                                </div>
+                                <small class="text-muted fw-semibold">Stock Actual</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="display-6 fw-bold text-warning">{{ producto.stock_minimo }}</div>
+                            <small class="text-muted fw-semibold">Stock Mínimo</small>
+                        </div>
+                    </div>
+                    
+                    {% if producto.stock_bajo %}
+                        <div class="alert alert-warning border-0 shadow-sm">
+                            <i class="bi bi-exclamation-triangle fs-4"></i>
+                            <div class="mt-2">
+                                <strong>¡Stock Bajo!</strong><br>
+                                <small>Se requiere reabastecer este producto</small>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-success border-0 shadow-sm">
+                            <i class="bi bi-check-circle fs-4"></i>
+                            <div class="mt-2">
+                                <strong>Stock Suficiente</strong><br>
+                                <small>Nivel de inventario adecuado</small>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <strong class="text-success">Valor Total: ${{ producto.valor_total_stock }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Código QR -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom-0 pt-4 text-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-qr-code text-primary"></i> Código QR
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <img src="{{ qr_image }}" alt="QR Code" class="img-fluid qr-code rounded shadow-sm" style="max-width: 200px;">
+                    </div>
+                    <p class="badge bg-light text-dark fs-6 px-3 py-2 mb-3">{{ producto.codigo_qr }}</p>
+                    <div>
+                        <a href="{% url 'generar_qr_producto' producto.id %}" class="btn btn-outline-primary" target="_blank">
+                            <i class="bi bi-download"></i> Descargar QR
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estado y Calidad -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom-0 pt-4 text-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-shield-check text-primary"></i> Estado y Calidad
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <div class="mb-3">
+                            <label class="small text-muted fw-semibold">ESTADO DE CALIDAD</label>
+                            <div class="mt-1">
+                                {% if producto.estado_calidad == 'bueno' %}
+                                    <span class="badge bg-success fs-6 px-3 py-2">
+                                        <i class="bi bi-check-circle"></i> {{ producto.get_estado_calidad_display }}
+                                    </span>
+                                {% elif producto.estado_calidad == 'regular' %}
+                                    <span class="badge bg-warning fs-6 px-3 py-2">
+                                        <i class="bi bi-exclamation-triangle"></i> {{ producto.get_estado_calidad_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger fs-6 px-3 py-2">
+                                        <i class="bi bi-x-circle"></i> {{ producto.get_estado_calidad_display }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="small text-muted fw-semibold">TIPO DE PRODUCTO</label>
+                            <div class="mt-1">
+                                <span class="badge bg-secondary fs-6 px-3 py-2">{{ producto.get_tipo_display }}</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="small text-muted fw-semibold">UBICACIÓN</label>
+                            <div class="mt-1">
+                                <span class="badge bg-info fs-6 px-3 py-2">
+                                    <i class="bi bi-geo-alt"></i> {{ producto.ubicacion|default:"No especificada" }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información Adicional -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle text-primary"></i> Información Comercial y Fechas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center p-3 border-end">
+                                <i class="bi bi-shop text-primary fs-3 mb-2"></i>
+                                <h6 class="text-muted small fw-semibold">PROVEEDOR</h6>
+                                <p class="mb-0 fw-semibold">{{ producto.proveedor|default:"No especificado" }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 border-end">
+                                <i class="bi bi-currency-dollar text-success fs-3 mb-2"></i>
+                                <h6 class="text-muted small fw-semibold">COSTO UNITARIO</h6>
+                                <p class="mb-0 fw-semibold text-success">${{ producto.costo_unitario }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 border-end">
+                                <i class="bi bi-calendar-plus text-info fs-3 mb-2"></i>
+                                <h6 class="text-muted small fw-semibold">FECHA INGRESO</h6>
+                                <p class="mb-0 fw-semibold">{{ producto.fecha_ingreso|date:"d/m/Y" }}</p>
+                                <small class="text-muted">{{ producto.fecha_ingreso|date:"H:i" }}</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3">
+                                <i class="bi bi-arrow-clockwise text-warning fs-3 mb-2"></i>
+                                <h6 class="text-muted small fw-semibold">ÚLTIMA ACTUALIZACIÓN</h6>
+                                <p class="mb-0 fw-semibold">{{ producto.fecha_actualizacion|date:"d/m/Y" }}</p>
+                                <small class="text-muted">{{ producto.fecha_actualizacion|date:"H:i" }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historial de Movimientos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history"></i> Historial de Movimientos
+                    </h5>
+                    <a href="{% url 'crear_movimiento' %}" class="btn btn-light btn-sm">
+                        <i class="bi bi-plus-circle"></i> Nuevo Movimiento
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if movimientos %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="border-0 fw-semibold">
+                                            <i class="bi bi-calendar3 text-primary"></i> Fecha
+                                        </th>
+                                        <th class="border-0 fw-semibold">
+                                            <i class="bi bi-arrow-left-right text-primary"></i> Tipo
+                                        </th>
+                                        <th class="border-0 fw-semibold">
+                                            <i class="bi bi-123 text-primary"></i> Cantidad
+                                        </th>
+                                        <th class="border-0 fw-semibold">
+                                            <i class="bi bi-tag text-primary"></i> Motivo
+                                        </th>
+                                        <th class="border-0 fw-semibold">
+                                            <i class="bi bi-person-check text-primary"></i> Destinatario
+                                        </th>
+                                        <th class="border-0 fw-semibold">
+                                            <i class="bi bi-boxes text-primary"></i> Stock Resultante
+                                        </th>
+                                        <th class="border-0 fw-semibold">
+                                            <i class="bi bi-person-badge text-primary"></i> Usuario
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for movimiento in movimientos %}
+                                    <tr class="border-bottom">
+                                        <td class="py-3">
+                                            <div class="fw-semibold">{{ movimiento.fecha_movimiento|date:"d/m/Y" }}</div>
+                                            <small class="text-muted">{{ movimiento.fecha_movimiento|date:"H:i" }}</small>
+                                        </td>
+                                        <td class="py-3">
+                                            {% if movimiento.tipo == 'entrada' %}
+                                                <span class="badge bg-success fs-6 px-3 py-2">
+                                                    <i class="bi bi-arrow-down"></i> {{ movimiento.get_tipo_display }}
+                                                </span>
+                                            {% elif movimiento.tipo == 'salida' %}
+                                                <span class="badge bg-danger fs-6 px-3 py-2">
+                                                    <i class="bi bi-arrow-up"></i> {{ movimiento.get_tipo_display }}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-info fs-6 px-3 py-2">
+                                                    <i class="bi bi-arrow-left-right"></i> {{ movimiento.get_tipo_display }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-3">
+                                            <span class="fs-5 fw-bold">{{ movimiento.cantidad }}</span>
+                                        </td>
+                                        <td class="py-3">
+                                            <span class="badge bg-light text-dark px-3 py-2">{{ movimiento.get_motivo_display }}</span>
+                                        </td>
+                                        <td class="py-3">
+                                            {% if movimiento.empleado_destinatario %}
+                                                <div class="fw-semibold text-dark">{{ movimiento.empleado_destinatario.nombre_completo }}</div>
+                                                {% if movimiento.empleado_destinatario.area %}
+                                                    <small class="text-muted">
+                                                        <i class="bi bi-building"></i> {{ movimiento.empleado_destinatario.area }}
+                                                    </small>
+                                                {% endif %}
+                                            {% elif movimiento.destinatario %}
+                                                <div class="fw-semibold text-dark">{{ movimiento.destinatario }}</div>
+                                                {% if movimiento.area_destino %}
+                                                    <small class="text-muted">{{ movimiento.area_destino }}</small>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted fst-italic">Sin destinatario</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-3">
+                                            <span class="badge bg-primary fs-6 px-3 py-2">{{ movimiento.stock_posterior }}</span>
+                                        </td>
+                                        <td class="py-3">
+                                            {% if movimiento.usuario_registro_empleado %}
+                                                <div class="fw-semibold text-dark">{{ movimiento.usuario_registro_empleado.nombre_completo }}</div>
+                                                {% if movimiento.usuario_registro_empleado.area %}
+                                                    <small class="text-muted">{{ movimiento.usuario_registro_empleado.area }}</small>
+                                                {% endif %}
+                                            {% elif movimiento.usuario_registro %}
+                                                <div class="fw-semibold text-dark">{{ movimiento.usuario_registro }}</div>
+                                            {% else %}
+                                                <span class="text-muted fst-italic">Sin usuario</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5 my-4">
+                            <div class="mb-4">
+                                <i class="bi bi-inbox display-1 text-muted"></i>
+                            </div>
+                            <h4 class="text-muted mb-3">No hay movimientos registrados</h4>
+                            <p class="text-muted mb-4">Este producto aún no tiene historial de movimientos</p>
+                            <a href="{% url 'crear_movimiento' %}" class="btn btn-primary btn-lg">
+                                <i class="bi bi-plus-circle"></i> Registrar Primer Movimiento
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botones de navegación -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card border-0 bg-light">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{% url 'lista_productos' %}" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-arrow-left"></i> Volver a Lista de Productos
+                        </a>
+                        <div class="btn-group">
+                            <a href="{% url 'editar_producto' producto.id %}" class="btn btn-primary btn-lg">
+                                <i class="bi bi-pencil"></i> Editar Producto
+                            </a>
+                            <button type="button" class="btn btn-outline-danger btn-lg" data-bs-toggle="modal" data-bs-target="#eliminarModal">
+                                <i class="bi bi-trash"></i> Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmación para eliminar -->
+<div class="modal fade" id="eliminarModal" tabindex="-1" aria-labelledby="eliminarModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title" id="eliminarModalLabel">
+                    <i class="bi bi-exclamation-triangle"></i> Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <i class="bi bi-trash display-1 text-danger"></i>
+                </div>
+                <h5 class="text-center mb-3">¿Estás seguro de eliminar este producto?</h5>
+                <div class="text-center mb-4">
+                    <strong class="text-dark fs-5">"{{ producto.nombre }}"</strong>
+                    <br>
+                    <span class="badge bg-primary mt-2">{{ producto.codigo_qr }}</span>
+                </div>
+                <div class="alert alert-warning border-0">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-exclamation-triangle text-warning fs-4 me-3 mt-1"></i>
+                        <div>
+                            <strong>¡Atención!</strong> Esta acción no se puede deshacer.
+                            <ul class="mb-0 mt-2">
+                                <li>Se eliminará permanentemente el producto</li>
+                                <li>Se borrará todo el historial de movimientos</li>
+                                <li>Los datos no se podrán recuperar</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <button type="button" class="btn btn-secondary btn-lg me-3" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <a href="{% url 'eliminar_producto' producto.id %}" class="btn btn-danger btn-lg">
+                    <i class="bi bi-trash"></i> Eliminar Definitivamente
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

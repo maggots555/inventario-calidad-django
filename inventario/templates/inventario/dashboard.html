@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3">
+            <i class="bi bi-speedometer2"></i> Dashboard del Inventario
+        </h1>
+        <div class="btn-group">
+            <a href="{% url 'movimiento_rapido' %}" class="btn btn-primary">
+                <i class="bi bi-qr-code-scan"></i> Scanner QR
+            </a>
+            <a href="{% url 'crear_movimiento' %}" class="btn btn-outline-primary">
+                <i class="bi bi-plus-circle"></i> Nuevo Movimiento
+            </a>
+        </div>
+    </div>
+
+    <!-- Tarjetas de Estadísticas Principales -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total de Productos
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_productos }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-box-seam card-icon text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Productos con Stock Bajo
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ productos_stock_bajo }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-exclamation-triangle card-icon text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Valor Total del Inventario
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">${{ valor_total_inventario|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-currency-dollar card-icon text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Movimientos del Mes
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ movimientos_recientes|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-arrow-left-right card-icon text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Alertas de Stock Bajo -->
+        <div class="col-xl-6 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="bi bi-exclamation-triangle"></i> Alertas de Stock Bajo
+                    </h6>
+                    <a href="{% url 'lista_productos' %}?stock_bajo=true" class="btn btn-sm btn-outline-warning">
+                        Ver Todos
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if alertas_stock %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Stock Actual</th>
+                                        <th>Stock Mínimo</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for producto in alertas_stock %}
+                                    <tr>
+                                        <td>
+                                            <div>
+                                                <small class="text-muted">{{ producto.codigo_qr }}</small><br>
+                                                <strong>{{ producto.nombre }}</strong>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger">{{ producto.cantidad }}</span>
+                                        </td>
+                                        <td>{{ producto.stock_minimo }}</td>
+                                        <td>
+                                            <a href="{% url 'detalle_producto' producto.id %}" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                            <p class="mt-2">¡Todos los productos tienen stock suficiente!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Movimientos Recientes -->
+        <div class="col-xl-6 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="bi bi-clock-history"></i> Movimientos Recientes
+                    </h6>
+                    <a href="{% url 'lista_movimientos' %}" class="btn btn-sm btn-outline-primary">
+                        Ver Todos
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if movimientos_recientes %}
+                        {% for movimiento in movimientos_recientes %}
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                {% if movimiento.tipo == 'entrada' %}
+                                    <i class="bi bi-arrow-down-circle text-success"></i>
+                                {% elif movimiento.tipo == 'salida' %}
+                                    <i class="bi bi-arrow-up-circle text-danger"></i>
+                                {% else %}
+                                    <i class="bi bi-arrow-left-right text-info"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold">{{ movimiento.producto.nombre }}</div>
+                                <small class="text-muted">
+                                    {{ movimiento.tipo|title }} - {{ movimiento.cantidad }} unidades
+                                    {% if movimiento.empleado_destinatario %}
+                                        → {{ movimiento.empleado_destinatario.nombre_completo }}
+                                        {% if movimiento.empleado_destinatario.area %}
+                                            ({{ movimiento.empleado_destinatario.area }})
+                                        {% endif %}
+                                    {% elif movimiento.destinatario %}
+                                        → {{ movimiento.destinatario }}
+                                    {% endif %}
+                                </small>
+                                <div class="text-muted">
+                                    <small>{{ movimiento.fecha_movimiento|date:"d/m/Y H:i" }}</small>
+                                    {% if movimiento.usuario_registro_empleado %}
+                                        <span class="text-info">
+                                            • Registrado por: {{ movimiento.usuario_registro_empleado.nombre_completo }}
+                                        </span>
+                                    {% elif movimiento.usuario_registro %}
+                                        <span class="text-info">
+                                            • Registrado por: {{ movimiento.usuario_registro }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                            <p class="mt-2">No hay movimientos registrados</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Productos Más Utilizados -->
+    {% if productos_mas_usados %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-info">
+                        <i class="bi bi-graph-up"></i> Productos Más Utilizados (Últimos 30 días)
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for producto in productos_mas_usados %}
+                        <div class="col-md-2 col-sm-4 col-6 mb-3">
+                            <div class="text-center">
+                                <div class="h4 text-primary">{{ producto.total_usado }}</div>
+                                <small class="text-muted">{{ producto.producto__nombre|truncatechars:20 }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Accesos Rápidos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-dark">
+                        <i class="bi bi-lightning-charge"></i> Accesos Rápidos
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3 col-6 mb-3">
+                            <a href="{% url 'crear_producto' %}" class="btn btn-outline-primary btn-lg w-100">
+                                <i class="bi bi-plus-circle d-block mb-2" style="font-size: 2rem;"></i>
+                                Agregar Producto
+                            </a>
+                        </div>
+                        <div class="col-md-3 col-6 mb-3">
+                            <a href="{% url 'movimiento_rapido' %}" class="btn btn-outline-success btn-lg w-100">
+                                <i class="bi bi-qr-code-scan d-block mb-2" style="font-size: 2rem;"></i>
+                                Scanner QR
+                            </a>
+                        </div>
+                        <div class="col-md-3 col-6 mb-3">
+                            <a href="{% url 'lista_productos' %}" class="btn btn-outline-info btn-lg w-100">
+                                <i class="bi bi-search d-block mb-2" style="font-size: 2rem;"></i>
+                                Buscar Productos
+                            </a>
+                        </div>
+                        <div class="col-md-3 col-6 mb-3">
+                            <a href="{% url 'lista_movimientos' %}" class="btn btn-outline-secondary btn-lg w-100">
+                                <i class="bi bi-clock-history d-block mb-2" style="font-size: 2rem;"></i>
+                                Historial
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Segunda fila de accesos rápidos -->
+                    <div class="row text-center">
+                        <div class="col-md-4 col-6 mb-3 mx-auto">
+                            <a href="{% url 'descargar_reporte_excel' %}" class="btn btn-outline-warning btn-lg w-100" title="Descarga un reporte completo en Excel con estadísticas del inventario">
+                                <i class="bi bi-file-earmark-excel d-block mb-2" style="font-size: 2rem;"></i>
+                                Reporte Excel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Actualizar datos cada 5 minutos (opcional)
+    setInterval(function() {
+        // Aquí podrías añadir funcionalidad para actualizar stats en tiempo real
+        console.log('Actualizando dashboard...');
+    }, 300000); // 5 minutos
+</script>
+{% endblock %}

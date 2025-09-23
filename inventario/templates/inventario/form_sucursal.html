@@ -1,0 +1,406 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo|default:"Gestionar Sucursal" }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">
+                    <i class="bi bi-building"></i> {{ titulo|default:"Gestionar Sucursal" }}
+                </h1>
+                <a href="{% url 'lista_sucursales' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-list"></i> Ver Todas las Sucursales
+                </a>
+            </div>
+
+            <!-- Formulario de Sucursal -->
+            <form method="post" id="sucursalForm">
+                {% csrf_token %}
+                
+                <!-- Información Básica -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Información Básica</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="{{ form.nombre.id_for_label }}" class="form-label">
+                                    <i class="bi bi-building"></i> Nombre de la Sucursal *
+                                </label>
+                                {{ form.nombre }}
+                                <div class="form-text">Nombre identificativo de la sucursal</div>
+                                {% if form.nombre.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.nombre.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.codigo.id_for_label }}" class="form-label">
+                                    <i class="bi bi-tag"></i> Código
+                                </label>
+                                {{ form.codigo }}
+                                <div class="form-text">Código único (ej: SUC001)</div>
+                                {% if form.codigo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.codigo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información de Contacto -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-telephone"></i> Información de Contacto</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.telefono.id_for_label }}" class="form-label">
+                                    <i class="bi bi-phone"></i> Teléfono
+                                </label>
+                                {{ form.telefono }}
+                                <div class="form-text">Número de contacto de la sucursal</div>
+                                {% if form.telefono.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.telefono.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.email.id_for_label }}" class="form-label">
+                                    <i class="bi bi-envelope"></i> Email
+                                </label>
+                                {{ form.email }}
+                                <div class="form-text">Correo electrónico de contacto</div>
+                                {% if form.email.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.email.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ubicación -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Ubicación</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label for="{{ form.direccion.id_for_label }}" class="form-label">
+                                    <i class="bi bi-house"></i> Dirección
+                                </label>
+                                {{ form.direccion }}
+                                <div class="form-text">Dirección completa de la sucursal</div>
+                                {% if form.direccion.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.direccion.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.ciudad.id_for_label }}" class="form-label">
+                                    <i class="bi bi-building"></i> Ciudad
+                                </label>
+                                {{ form.ciudad }}
+                                <div class="form-text">Ciudad donde se ubica la sucursal</div>
+                                {% if form.ciudad.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.ciudad.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.estado_provincia.id_for_label }}" class="form-label">
+                                    <i class="bi bi-map"></i> Estado/Provincia
+                                </label>
+                                {{ form.estado_provincia }}
+                                <div class="form-text">Estado o provincia</div>
+                                {% if form.estado_provincia.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.estado_provincia.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información Adicional -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-person-badge"></i> Información Adicional</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.responsable.id_for_label }}" class="form-label">
+                                    <i class="bi bi-person"></i> Encargado
+                                </label>
+                                {{ form.responsable }}
+                                <div class="form-text">Nombre del responsable de la sucursal</div>
+                                {% if form.responsable.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.responsable.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check mt-4 pt-2">
+                                    {{ form.activa }}
+                                    <label class="form-check-label" for="{{ form.activa.id_for_label }}">
+                                        <i class="bi bi-check-circle"></i> Sucursal Activa
+                                    </label>
+                                    <div class="form-text">Marcar si la sucursal está operativa</div>
+                                    {% if form.activa.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.activa.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label for="{{ form.observaciones.id_for_label }}" class="form-label">
+                                    <i class="bi bi-chat-dots"></i> Observaciones
+                                </label>
+                                {{ form.observaciones }}
+                                <div class="form-text">Información adicional sobre la sucursal</div>
+                                {% if form.observaciones.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.observaciones.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resumen de la Sucursal -->
+                <div class="card mb-4" id="resumenSucursal" style="display: none;">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Resumen de la Sucursal</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="resumenContenido"></div>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <a href="{% url 'lista_sucursales' %}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-left"></i> Volver a Sucursales
+                                </a>
+                                <a href="{% url 'dashboard' %}" class="btn btn-outline-info ms-2">
+                                    <i class="bi bi-house"></i> Dashboard
+                                </a>
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-primary btn-lg" id="btnGuardar">
+                                    <i class="bi bi-check-circle"></i> {{ boton_texto|default:"Guardar Sucursal" }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const nombreInput = document.getElementById('{{ form.nombre.id_for_label }}');
+    const codigoInput = document.getElementById('{{ form.codigo.id_for_label }}');
+    const ciudadInput = document.getElementById('{{ form.ciudad.id_for_label }}');
+    const encargadoInput = document.getElementById('{{ form.responsable.id_for_label }}');
+    const activaCheck = document.getElementById('{{ form.activa.id_for_label }}');
+    const resumenSucursal = document.getElementById('resumenSucursal');
+    const resumenContenido = document.getElementById('resumenContenido');
+    
+    // Función para generar código automático basado en el nombre
+    function generarCodigo() {
+        const nombre = nombreInput.value.trim();
+        if (nombre && (!codigoInput.value || codigoInput.value.startsWith('SUC'))) {
+            // Tomar las primeras letras del nombre y agregar número
+            const palabras = nombre.toUpperCase().split(' ');
+            let codigo = 'SUC';
+            
+            if (palabras.length >= 2) {
+                codigo += palabras[0].substring(0, 2) + palabras[1].substring(0, 2);
+            } else {
+                codigo += palabras[0].substring(0, 4);
+            }
+            
+            // Agregar número aleatorio pequeño
+            codigo += String(Math.floor(Math.random() * 99) + 1).padStart(2, '0');
+            
+            codigoInput.value = codigo;
+        }
+    }
+    
+    // Función para actualizar el resumen
+    function actualizarResumen() {
+        const nombre = nombreInput.value.trim();
+        const codigo = codigoInput.value.trim();
+        const ciudad = ciudadInput.value.trim();
+        const encargado = encargadoInput.value.trim();
+        const activa = activaCheck.checked;
+        
+        if (nombre) {
+            resumenContenido.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <strong><i class="bi bi-building"></i> Nombre:</strong><br>
+                            <span class="text-primary fs-5">${nombre}</span>
+                        </div>
+                        ${codigo ? `
+                        <div class="mb-3">
+                            <strong><i class="bi bi-tag"></i> Código:</strong><br>
+                            <span class="badge bg-secondary">${codigo}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="col-md-6">
+                        ${ciudad ? `
+                        <div class="mb-3">
+                            <strong><i class="bi bi-geo-alt"></i> Ciudad:</strong><br>
+                            <span class="text-muted">${ciudad}</span>
+                        </div>
+                        ` : ''}
+                        ${encargado ? `
+                        <div class="mb-3">
+                            <strong><i class="bi bi-person"></i> Encargado:</strong><br>
+                            <span class="text-muted">${encargado}</span>
+                        </div>
+                        ` : ''}
+                        <div class="mb-3">
+                            <strong><i class="bi bi-check-circle"></i> Estado:</strong><br>
+                            <span class="badge ${activa ? 'bg-success' : 'bg-secondary'}">
+                                ${activa ? 'Activa' : 'Inactiva'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            resumenSucursal.style.display = 'block';
+        } else {
+            resumenSucursal.style.display = 'none';
+        }
+    }
+    
+    // Event listeners
+    nombreInput.addEventListener('input', function() {
+        generarCodigo();
+        actualizarResumen();
+    });
+    
+    nombreInput.addEventListener('blur', function() {
+        // Generar código si está vacío
+        if (!codigoInput.value.trim()) {
+            generarCodigo();
+        }
+    });
+    
+    codigoInput.addEventListener('input', actualizarResumen);
+    ciudadInput.addEventListener('input', actualizarResumen);
+    encargadoInput.addEventListener('input', actualizarResumen);
+    activaCheck.addEventListener('change', actualizarResumen);
+    
+    // Validación del formulario
+    document.getElementById('sucursalForm').addEventListener('submit', function(e) {
+        const nombre = nombreInput.value.trim();
+        
+        if (!nombre) {
+            e.preventDefault();
+            alert('El nombre de la sucursal es obligatorio.');
+            nombreInput.focus();
+            return false;
+        }
+        
+        if (nombre.length < 3) {
+            e.preventDefault();
+            alert('El nombre de la sucursal debe tener al menos 3 caracteres.');
+            nombreInput.focus();
+            return false;
+        }
+        
+        // Confirmación antes de guardar
+        const accion = document.getElementById('btnGuardar').textContent.includes('Actualizar') ? 'actualizar' : 'crear';
+        
+        if (!confirm(`¿Confirmas ${accion} la sucursal "${nombre}"?`)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    // Auto-focus en el primer campo
+    nombreInput.focus();
+    
+    // Formatear campos automáticamente
+    codigoInput.addEventListener('input', function() {
+        // Convertir a mayúsculas
+        this.value = this.value.toUpperCase();
+    });
+    
+    nombreInput.addEventListener('input', function() {
+        // Capitalizar primera letra de cada palabra
+        const words = this.value.split(' ');
+        const capitalizedWords = words.map(word => {
+            if (word.length > 0) {
+                return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+            }
+            return word;
+        });
+        this.value = capitalizedWords.join(' ');
+    });
+    
+    ciudadInput.addEventListener('input', function() {
+        // Capitalizar primera letra de cada palabra
+        const words = this.value.split(' ');
+        const capitalizedWords = words.map(word => {
+            if (word.length > 0) {
+                return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+            }
+            return word;
+        });
+        this.value = capitalizedWords.join(' ');
+    });
+    
+    encargadoInput.addEventListener('input', function() {
+        // Capitalizar primera letra de cada palabra
+        const words = this.value.split(' ');
+        const capitalizedWords = words.map(word => {
+            if (word.length > 0) {
+                return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+            }
+            return word;
+        });
+        this.value = capitalizedWords.join(' ');
+    });
+    
+    // Mostrar resumen inicial si hay datos
+    actualizarResumen();
+});
+</script>
+{% endblock %}

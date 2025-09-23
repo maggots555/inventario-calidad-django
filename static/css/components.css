@@ -1,0 +1,553 @@
+/* =============================================================================
+   COMPONENTES DE INVENTARIO MODERNOS
+   Descripción: Estilos específicos para componentes del sistema de inventario
+   con diseño moderno y minimalista
+   ============================================================================= */
+
+/* ===== ALERTAS Y NOTIFICACIONES MODERNAS ===== */
+.alert-stock-bajo {
+    background: linear-gradient(135deg, var(--warning-light) 0%, #fef3c7 100%);
+    border: 1px solid var(--warning-color);
+    color: #92400e;
+    border-left: 4px solid var(--warning-color);
+    border-radius: var(--border-radius-md);
+    padding: var(--space-4) var(--space-5);
+    position: relative;
+    overflow: hidden;
+}
+
+.alert-stock-bajo::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, var(--warning-color), #f59e0b, var(--warning-color));
+    animation: alertGlow 2s infinite;
+}
+
+@keyframes alertGlow {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+.alert {
+    border-radius: var(--border-radius-md);
+    border: none;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+    position: relative;
+}
+
+/* ===== INDICADORES DE STOCK MODERNOS ===== */
+.stock-bajo {
+    color: var(--danger-color);
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--danger-light), #fecaca);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--danger-color);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    animation: pulse 2s infinite;
+}
+
+.stock-bajo::before {
+    content: '⚠';
+    font-size: var(--text-sm);
+}
+
+.stock-normal {
+    color: var(--success-color);
+    font-weight: 500;
+    background: linear-gradient(135deg, var(--success-light), #bbf7d0);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--success-color);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stock-normal::before {
+    content: '✓';
+    font-size: var(--text-sm);
+}
+
+.stock-critico {
+    color: #dc2626;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--border-radius);
+    border: 2px solid #dc2626;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    animation: blink 1.5s infinite;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.3);
+}
+
+.stock-critico::before {
+    content: '🚨';
+    font-size: var(--text-base);
+}
+
+/* ===== CÓDIGOS QR MODERNOS ===== */
+.qr-code {
+    max-width: 200px;
+    height: auto;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-4);
+    background: linear-gradient(135deg, white 0%, var(--gray-50) 100%);
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.qr-code::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+}
+
+.qr-code:hover {
+    transform: scale(1.05);
+    box-shadow: var(--shadow-xl);
+    border-color: var(--primary-color);
+}
+
+.qr-container {
+    text-align: center;
+    padding: var(--space-6);
+    background: linear-gradient(135deg, var(--gray-50) 0%, white 100%);
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow);
+}
+
+/* ===== SCANNER QR MODERNO ===== */
+.scanner-container {
+    background: #000;
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    position: relative;
+    box-shadow: var(--shadow-xl);
+    border: 2px solid var(--primary-color);
+    width: 100%;
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+}
+
+.scanner-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #000;
+    border: none;
+    outline: none;
+    margin: 0;
+    padding: 0;
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.scanner-frame {
+    width: 250px;
+    height: 250px;
+    border: 3px solid var(--primary-color);
+    border-radius: var(--border-radius-xl);
+    position: relative;
+    background: transparent;
+    animation: scanner-glow 2s infinite ease-in-out;
+}
+
+.scanner-frame::before,
+.scanner-frame::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--accent-color);
+}
+
+.scanner-frame::before {
+    top: -3px;
+    left: -3px;
+    border-right: none;
+    border-bottom: none;
+    border-radius: var(--border-radius) 0 0 0;
+}
+
+.scanner-frame::after {
+    bottom: -3px;
+    right: -3px;
+    border-left: none;
+    border-top: none;
+    border-radius: 0 0 var(--border-radius) 0;
+}
+
+@keyframes scanner-glow {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(37, 99, 235, 0.5);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 40px rgba(37, 99, 235, 0.8);
+        transform: scale(1.02);
+    }
+}
+
+/* ===== BOTONES ESPECIALES MODERNOS ===== */
+.btn-scanner {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border: none;
+    color: white;
+    padding: var(--space-4) var(--space-6);
+    border-radius: var(--border-radius-xl);
+    font-weight: 600;
+    font-size: var(--text-base);
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+    text-transform: none;
+    letter-spacing: 0.025em;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-scanner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left var(--transition-normal);
+}
+
+.btn-scanner:hover::before {
+    left: 100%;
+}
+
+.btn-scanner:hover {
+    background: linear-gradient(135deg, var(--primary-dark), var(--accent-color));
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+    color: white;
+}
+
+.btn-scanner:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow);
+}
+
+/* ===== ICONOS MEJORADOS ===== */
+.icon-dashboard {
+    color: var(--primary-color);
+    font-size: 2.5rem;
+    margin-bottom: var(--space-4);
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.icon-small {
+    font-size: var(--text-lg);
+    margin-right: var(--space-2);
+    opacity: 0.8;
+}
+
+/* ===== ESTADÍSTICAS Y MÉTRICAS ===== */
+.metric-card {
+    background: linear-gradient(135deg, white 0%, var(--gray-50) 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-6);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-normal);
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+}
+
+.metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
+}
+
+.metric-number {
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: var(--space-2);
+    display: block;
+}
+
+.metric-label {
+    font-size: var(--text-sm);
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+}
+
+/* ===== ANIMACIONES ===== */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.02);
+    }
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.5; }
+}
+
+@keyframes scanner-glow {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(37, 99, 235, 0.5);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 40px rgba(37, 99, 235, 0.8);
+        transform: scale(1.02);
+    }
+}
+
+@keyframes scanner-pulse {
+    0%, 100% { 
+        opacity: 0.6;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    50% { 
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.05);
+    }
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ===== COMPONENTES DE NAVEGACIÓN ===== */
+.breadcrumb {
+    background-color: transparent;
+    padding: var(--space-4) 0;
+    margin-bottom: var(--space-6);
+}
+
+.breadcrumb-item {
+    font-size: var(--text-sm);
+    color: var(--gray-500);
+}
+
+.breadcrumb-item.active {
+    color: var(--gray-800);
+    font-weight: 500;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    content: "→";
+    color: var(--gray-400);
+}
+
+/* ===== ESTADOS DE CARGA ===== */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--gray-300);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===== RESPONSIVE COMPONENTS ===== */
+@media (max-width: 768px) {
+    .scanner-frame {
+        width: 200px;
+        height: 200px;
+    }
+    
+    .btn-scanner {
+        padding: var(--space-3) var(--space-5);
+        font-size: var(--text-sm);
+    }
+    
+    .metric-card {
+        padding: var(--space-4);
+    }
+    
+    .metric-number {
+        font-size: var(--text-2xl);
+    }
+}
+
+@media (max-width: 576px) {
+    .qr-code {
+        max-width: 150px;
+        padding: var(--space-3);
+    }
+    
+    .scanner-frame {
+        width: 180px;
+        height: 180px;
+    }
+    
+    .metric-number {
+        font-size: var(--text-xl);
+    }
+}
+
+/* ===== TABLAS DE INVENTARIO ===== */
+.table-inventario {
+    background-color: white;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--box-shadow);
+}
+
+.table-inventario th {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: 500;
+    border: none;
+    padding: 15px 12px;
+}
+
+.table-inventario td {
+    padding: 12px;
+    vertical-align: middle;
+    border-color: #e9ecef;
+}
+
+.table-inventario tbody tr:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.2s ease;
+}
+
+/* ===== ANIMACIONES ===== */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.3; }
+}
+
+@keyframes scanner-glow {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(0,123,255,0.5);
+        border-color: var(--primary-color);
+    }
+    50% { 
+        box-shadow: 0 0 30px rgba(0,123,255,0.8);
+        border-color: #80bdff;
+    }
+}
+
+/* ===== BADGES Y ETIQUETAS ===== */
+.badge-stock {
+    font-size: 0.8rem;
+    padding: 6px 12px;
+    border-radius: 20px;
+}
+
+.badge-disponible {
+    background-color: var(--success-color);
+}
+
+.badge-agotado {
+    background-color: var(--danger-color);
+}
+
+.badge-bajo-stock {
+    background-color: #ffc107;
+    color: #000;
+}
+
+/* ===== RESPONSIVE PARA COMPONENTES ===== */
+@media (max-width: 768px) {
+    .qr-code {
+        max-width: 150px;
+    }
+    
+    .scanner-frame {
+        width: 200px;
+        height: 200px;
+    }
+    
+    .table-inventario {
+        font-size: 0.9rem;
+    }
+    
+    .btn-scanner {
+        padding: 10px 20px;
+        font-size: 0.9rem;
+    }
+}
