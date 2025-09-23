@@ -365,25 +365,82 @@ def eliminar_sucursal(request, sucursal_id):
 def buscar_producto_qr(request):
     """
     API endpoint para buscar producto por código QR (AJAX)
+    Con limpieza de caracteres invisibles del scanner
     """
-    codigo_qr = request.GET.get('codigo_qr')
+    codigo_qr_raw = request.GET.get('codigo_qr')
     
-    if not codigo_qr:
+    if not codigo_qr_raw:
         return JsonResponse({'error': 'Código QR requerido'}, status=400)
     
+    # Limpiar código de caracteres invisibles y problemáticos
+    import re
+    codigo_qr = re.sub(r'[\r\n\t\x00-\x1f\x7f-\x9f]', '', codigo_qr_raw)  # Remover caracteres de control
+    codigo_qr = codigo_qr.strip()  # Remover espacios al inicio y final
+    codigo_qr = re.sub(r'\s+', '', codigo_qr)  # Remover espacios internos
+    
+    if not codigo_qr:
+        return JsonResponse({
+            'error': 'Código QR vacío después de limpieza',
+            'codigo_recibido': repr(codigo_qr_raw),
+            'debug': f'Código original tenía {len(codigo_qr_raw)} caracteres'
+        }, status=400)
+    
     try:
-        producto = Producto.objects.get(codigo_qr=codigo_qr)
-        data = {
-            'id': producto.id,
-            'nombre': producto.nombre,
-            'codigo_qr': producto.codigo_qr,
-            'cantidad_actual': producto.cantidad,
-            'categoria': producto.get_categoria_display(),
-            'ubicacion': producto.ubicacion,
-        }
-        return JsonResponse(data)
+        # Búsqueda insensible a mayúsculas/minúsculas
+        producto = Producto.objects.get(codigo_qr__iexact=codigo_qr)
     except Producto.DoesNotExist:
-        return JsonResponse({'error': 'Producto no encontrado'}, status=404)
+        return JsonResponse({
+            'error': 'Producto no encontrado',
+            'codigo_buscado': codigo_qr,
+            'codigo_original': repr(codigo_qr_raw),
+            'debug': f'Buscando: "{codigo_qr}" (longitud: {len(codigo_qr)})'
+        }, status=404)
+    
+    data = {
+        'id': producto.id,
+        'nombre': producto.nombre,
+        'codigo_qr': producto.codigo_qr,
+        'cantidad_actual': producto.cantidad,
+        'categoria': producto.get_categoria_display(),
+        'ubicacion': producto.ubicacion,
+    }
+    return JsonResponse(data)
+
+
+# def limpiar_codigo_scanner(codigo):
+#     """
+#     Limpia códigos QR que pueden venir corruptos de scanners físicos
+#     """
+#     import re
+#     
+#     # Remover caracteres problemáticos comunes
+#     codigo_limpio = codigo.replace('"', '').replace('=', '').replace('%', '')
+#     codigo_limpio = codigo_limpio.replace(')', '').replace('#', '').replace('!', '')
+#     codigo_limpio = codigo_limpio.replace('$', '').replace('&', '')
+#     
+#     # Solo mantener caracteres alfanuméricos válidos
+#     codigo_limpio = re.sub(r'[^A-Z0-9]', '', codigo_limpio)
+#     
+#     return codigo_limpio
+
+
+# def buscar_producto_fuzzy(codigo_corrupto):
+#     """
+#     Búsqueda aproximada para códigos muy corruptos
+#     """
+#     codigo_limpio = limpiar_codigo_scanner(codigo_corrupto)
+#     
+#     # Buscar productos que contengan la parte "INV" + números
+#     if 'INV' in codigo_limpio:
+#         parte_numerica = codigo_limpio.replace('INV', '')
+#         if len(parte_numerica) >= 8:  # Al menos 8 dígitos (fecha parcial)
+#             productos = Producto.objects.filter(
+#                 codigo_qr__contains=parte_numerica[:8]
+#             )
+#             if productos.exists():
+#                 return productos.first()
+#     
+#     raise Producto.DoesNotExist("No se pudo encontrar el producto")
 
 def generar_qr_producto(request, producto_id):
     """

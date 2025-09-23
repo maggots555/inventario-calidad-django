@@ -214,10 +214,13 @@ class MovimientoRapidoForm(forms.ModelForm):
         max_length=50,
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Usar scanner de cámara o escribir código manualmente',
-            'id': 'codigo_qr_input'
+            'placeholder': 'INV202509231914... (scanner o manual)',
+            'id': 'codigo_qr_input',
+            'autocomplete': 'off',
+            'style': 'text-transform: uppercase;'  # Auto-convertir a mayúsculas mientras escribe
         }),
-        help_text="Use el scanner de cámara o escriba el código manualmente"
+        help_text="Use el scanner de cámara o escriba el código manualmente. No importa si usa mayúsculas o minúsculas.",
+        label="Código de Barras/QR del Producto"
     )
     
     class Meta:
@@ -267,12 +270,23 @@ class MovimientoRapidoForm(forms.ModelForm):
     
     def clean_codigo_qr(self):
         """
-        Validar que el código QR existe
+        Validar que el código QR existe con limpieza de caracteres invisibles
         """
-        codigo = self.cleaned_data['codigo_qr']
+        import re
+        codigo_raw = self.cleaned_data['codigo_qr']
+        
+        # Limpiar código de caracteres invisibles y problemáticos del scanner
+        codigo = re.sub(r'[\r\n\t\x00-\x1f\x7f-\x9f]', '', codigo_raw)  # Remover caracteres de control
+        codigo = codigo.strip()  # Remover espacios al inicio y final
+        codigo = re.sub(r'\s+', '', codigo)  # Remover espacios internos
+        
+        if not codigo:
+            raise forms.ValidationError(f"Código QR inválido (solo contenía caracteres invisibles)")
+        
+        # Búsqueda insensible a mayúsculas/minúsculas
         try:
-            producto = Producto.objects.get(codigo_qr=codigo)
-            return codigo
+            producto = Producto.objects.get(codigo_qr__iexact=codigo)
+            return codigo  # Devolver el código limpio
         except Producto.DoesNotExist:
             raise forms.ValidationError("Código QR no encontrado en el inventario")
     

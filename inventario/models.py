@@ -100,28 +100,47 @@ class Producto(models.Model):
         Genera automáticamente el código QR único cuando se crea un producto nuevo
         """
         if not self.codigo_qr:
-            # Generar código único: INV + timestamp + random
+            # Generar código único: INV + timestamp + random (solo alfanumérico)
             timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
-            random_part = str(uuid.uuid4())[:6].upper()
+            # Usar solo números para evitar problemas con scanners físicos
+            random_part = str(uuid.uuid4().int)[:4]  # Solo números del UUID
             self.codigo_qr = f"INV{timestamp}{random_part}"
         super().save(*args, **kwargs)
     
     def generar_qr_image(self):
         """
         Genera la imagen QR como base64 para mostrar en templates
+        Optimizado para compatibilidad con scanners físicos
         """
-        qr = qrcode.QRCode(version=1, box_size=10, border=5)
-        qr.add_data(self.codigo_qr)
-        qr.make(fit=True)
-        
-        img = qr.make_image(fill_color="black", back_color="white")
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        buffer.seek(0)
-        
-        # Convertir a base64 para uso en templates
-        img_str = base64.b64encode(buffer.getvalue()).decode()
-        return f"data:image/png;base64,{img_str}"
+        try:
+            import qrcode
+            from PIL import Image
+            
+            # Configuración optimizada para scanners físicos
+            qr = qrcode.QRCode(
+                version=2,  # Versión 2 para mejor legibilidad
+                error_correction=qrcode.constants.ERROR_CORRECT_M,  # Corrección media
+                box_size=12,  # Cajas más grandes
+                border=6,     # Borde más amplio
+            )
+            qr.add_data(self.codigo_qr)
+            qr.make(fit=True)
+            
+            # Crear imagen directamente con PIL - mayor contraste
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            buffer = BytesIO()
+            img.save(buffer, format='PNG')
+            buffer.seek(0)
+            
+            # Convertir a base64 para uso en templates
+            img_str = base64.b64encode(buffer.getvalue()).decode()
+            return f"data:image/png;base64,{img_str}"
+            
+        except Exception as e:
+            # En caso de error, devolver un mensaje de error en lugar de fallar
+            print(f"Error generando QR: {e}")
+            return None
     
     def stock_bajo(self):
         """

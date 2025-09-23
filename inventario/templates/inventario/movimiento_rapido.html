@@ -284,26 +284,33 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Función para buscar producto por código QR
     function buscarProducto(codigoQR) {
-        if (codigoQR.length > 5) { // Solo buscar si el código tiene longitud mínima
+        if (codigoQR.length > 2) { // Reducir longitud mínima para mejor UX
             fetch(`{% url 'buscar_producto_qr' %}?codigo_qr=${encodeURIComponent(codigoQR)}`)
                 .then(response => {
                     if (response.ok) {
                         return response.json();
                     } else {
-                        throw new Error('Producto no encontrado');
+                        return response.json().then(data => Promise.reject(data));
                     }
                 })
                 .then(data => {
-                    // Mostrar información del producto
+                    // Mostrar información del producto con mensaje de normalización si aplica
+                    let mensajeExtra = '';
+                    if (data.mensaje && data.mensaje.includes('normalizado')) {
+                        mensajeExtra = `<br><small class="text-info"><i class="bi bi-info-circle"></i> ${data.mensaje}</small>`;
+                    }
+                    
                     productoDetalles.innerHTML = `
                         <div class="row">
                             <div class="col-md-8">
                                 <strong>${data.nombre}</strong><br>
                                 <small class="text-muted">
+                                    Código: ${data.codigo_qr} | 
                                     Categoría: ${data.categoria} | 
                                     Stock actual: ${data.cantidad_actual} unidades
                                     ${data.ubicacion ? ' | Ubicación: ' + data.ubicacion : ''}
                                 </small>
+                                ${mensajeExtra}
                             </div>
                             <div class="col-md-4 text-end">
                                 <span class="badge bg-success">✓ Producto Encontrado</span>
@@ -311,22 +318,26 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     `;
                     productoInfo.classList.remove('d-none');
-                    productoInfo.classList.remove('alert-danger');
+                    productoInfo.classList.remove('alert-danger', 'alert-warning');
                     productoInfo.classList.add('alert-success');
                 })
                 .catch(error => {
-                    // Mostrar error
+                    // Mostrar error con más detalle
+                    const mensajeError = error.error || 'Producto no encontrado';
+                    const codigoRecibido = error.codigo_recibido || codigoQR;
+                    const sugerencia = error.sugerencia || 'Verifica que el código sea correcto';
+                    
                     productoDetalles.innerHTML = `
                         <div class="d-flex align-items-center">
                             <i class="bi bi-exclamation-triangle text-warning me-2"></i> 
                             <div>
-                                <strong>Código no encontrado en inventario</strong><br>
-                                <small>Verifica que el código sea correcto o que el producto esté registrado.</small>
+                                <strong>${mensajeError}</strong><br>
+                                <small>Código: "${codigoRecibido}"</small><br>
+                                <small class="text-muted">${sugerencia}</small>
                             </div>
                         </div>
                     `;
-                    productoInfo.classList.remove('d-none');
-                    productoInfo.classList.remove('alert-success');
+                    productoInfo.classList.remove('d-none', 'alert-success');
                     productoInfo.classList.add('alert-warning');
                 });
         } else {
@@ -335,10 +346,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Buscar producto cuando se escriba en el campo
+    // Buscar producto cuando se escriba en el campo con mejoras
+    // Buscar producto cuando se escriba en el campo con limpieza automática
     codigoQRInput.addEventListener('input', function() {
-        const codigo = this.value.trim();
-        buscarProducto(codigo);
+        // Limpiar código de caracteres invisibles (común en scanners físicos)
+        let codigo = this.value;
+        let codigoLimpio = codigo.replace(/[\r\n\t\x00-\x1f\x7f-\x9f]/g, '').trim();
+        codigoLimpio = codigoLimpio.replace(/\s+/g, ''); // Remover espacios internos
+        
+        // Si el código fue limpiado, actualizar el campo
+        if (codigo !== codigoLimpio && codigoLimpio.length > 0) {
+            const cursorPos = this.selectionStart;
+            this.value = codigoLimpio;
+            // Restaurar cursor al final si es un scanner automático
+            this.setSelectionRange(codigoLimpio.length, codigoLimpio.length);
+        }
+        
+        if (codigoLimpio.length > 5) { // Solo buscar si el código tiene longitud mínima
+            buscarProducto(codigoLimpio);
+        } else {
+            // Ocultar información si el código es muy corto
+            productoInfo.classList.add('d-none');
+        }
+    });
+    
+    // También buscar cuando se haga paste
+    codigoQRInput.addEventListener('paste', function(e) {
+        // Esperar un momento para que el paste se complete
+        setTimeout(() => {
+            const codigo = this.value.trim().toUpperCase();
+            this.value = codigo;
+            if (codigo.length >= 3) {
+                buscarProducto(codigo);
+            }
+        }, 10);
     });
     
     // ========================================================================
@@ -600,44 +641,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Llenar campo de entrada
         codigoQRInput.value = codigo;
         
-        // **NUEVO: Disparar eventos de validación para que Bootstrap reconozca el cambio**
-        // Primero limpiar cualquier estado de validación previo
-        codigoQRInput.classList.remove('is-invalid', 'is-valid');
-        
-        // Disparar evento 'input' para activar validación de Bootstrap
-        const inputEvent = new Event('input', { 
-            bubbles: true, 
-            cancelable: true 
-        });
+        // Disparar evento 'input' para activar la búsqueda del producto
+        const inputEvent = new Event('input', { bubbles: true });
         codigoQRInput.dispatchEvent(inputEvent);
-        
-        // Disparar evento 'change' para asegurar que se registre el cambio
-        const changeEvent = new Event('change', { 
-            bubbles: true, 
-            cancelable: true 
-        });
-        codigoQRInput.dispatchEvent(changeEvent);
-        
-        // **ADICIONAL: Hacer focus y blur para asegurar validación completa**
-        const originalFocus = document.activeElement;
-        codigoQRInput.focus();
-        
-        // Después de un pequeño retraso, aplicar validación visual y restaurar focus
-        setTimeout(() => {
-            // Forzar validación visual de Bootstrap
-            if (codigo.trim() !== '') {
-                codigoQRInput.classList.add('is-valid');
-                codigoQRInput.setCustomValidity(''); // Limpiar errores de validación HTML5
-            }
-            
-            // Hacer blur para activar cualquier validación onblur
-            codigoQRInput.blur();
-            
-            // Restaurar el focus original si es necesario
-            if (originalFocus && originalFocus !== codigoQRInput) {
-                originalFocus.focus();
-            }
-        }, 100);
         
         // Buscar producto automáticamente
         buscarProducto(codigo);
