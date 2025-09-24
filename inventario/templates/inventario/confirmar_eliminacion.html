@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirmar Eliminación - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> Confirmar Eliminación
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>¿Estás seguro de que deseas eliminar el producto?</h6>
+                    <div class="bg-light p-3 rounded mb-3">
+                        <strong>{{ producto.nombre }}</strong><br>
+                        {% if producto.descripcion %}
+                            <small class="text-muted">{{ producto.descripcion }}</small><br>
+                        {% endif %}
+                        <div class="mt-2">
+                            <span class="badge bg-info">Cantidad actual: {{ producto.cantidad }}</span>
+                            {% if producto.categoria %}
+                                <span class="badge bg-secondary">{{ producto.categoria }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% if movimientos_count > 0 %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Atención:</strong> Este producto tiene {{ movimientos_count }} movimiento(s) asociado(s) en el historial.
+                            Al eliminarlo, estos registros se mantendrán para efectos de auditoría.
+                        </div>
+                    {% endif %}
+                    
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Advertencia:</strong> Esta acción no se puede deshacer. El producto será eliminado permanentemente del inventario.
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'lista_productos' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        <form method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Confirmar Eliminación
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

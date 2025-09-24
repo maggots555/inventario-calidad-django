@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ titulo|default:"Registrar Movimiento" }} - {{ block.super }}{% endblock %}
+{% block title %}{{ titulo|default:"Envío por Mensajería" }} - {{ block.super }}{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -9,11 +9,16 @@
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h3">
-                    <i class="bi bi-arrow-left-right"></i> {{ titulo|default:"Registrar Movimiento" }}
+                    <i class="bi bi-truck"></i> {{ titulo|default:"Envío por Mensajería" }}
                 </h1>
-                <a href="{% url 'movimiento_rapido' %}" class="btn btn-outline-success">
-                    <i class="bi bi-qr-code-scan"></i> Scanner QR Rápido
-                </a>
+                <div>
+                    <a href="{% url 'movimiento_rapido' %}" class="btn btn-outline-success me-2">
+                        <i class="bi bi-qr-code-scan"></i> Scanner QR Rápido
+                    </a>
+                    <a href="{% url 'lista_movimientos' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-list"></i> Ver Envíos
+                    </a>
+                </div>
             </div>
 
             <form method="post" id="movimientoForm">
@@ -22,7 +27,7 @@
                 <!-- Información del Producto -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-box-seam"></i> Selección del Producto</h5>
+                        <h5 class="mb-0"><i class="bi bi-box-seam"></i> Producto a Enviar</h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
@@ -107,10 +112,10 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="{{ form.empleado_destinatario.id_for_label }}" class="form-label">
-                                    <i class="bi bi-person-circle"></i> Empleado Destinatario
+                                    <i class="bi bi-person-circle"></i> Empleado Destinatario *
                                 </label>
                                 {{ form.empleado_destinatario }}
-                                <div class="form-text">Selecciona el empleado que recibirá el producto</div>
+                                <div class="form-text">Empleado que recibirá el envío en la sucursal destino</div>
                                 {% if form.empleado_destinatario.errors %}
                                     <div class="invalid-feedback d-block">
                                         {% for error in form.empleado_destinatario.errors %}{{ error }}{% endfor %}
@@ -122,17 +127,17 @@
                                     <i class="bi bi-building"></i> Área de Destino
                                 </label>
                                 <input type="text" id="areaDestinoDisplay" class="form-control" readonly placeholder="Se llena automáticamente">
-                                <div class="form-text">Se completa automáticamente al seleccionar empleado</div>
+                                <div class="form-text">Se completa automáticamente al seleccionar empleado destinatario</div>
                             </div>
                         </div>
                         
                         <div class="row">
                             <div class="col-md-12 mb-3">
                                 <label for="{{ form.sucursal_destino.id_for_label }}" class="form-label">
-                                    <i class="bi bi-geo-alt"></i> Sucursal de Destino
+                                    <i class="bi bi-geo-alt"></i> Sucursal de Destino *
                                 </label>
                                 {{ form.sucursal_destino }}
-                                <div class="form-text">Sucursal destino (opcional)</div>
+                                <div class="form-text">Sucursal donde se entregará el envío por mensajería</div>
                                 {% if form.sucursal_destino.errors %}
                                     <div class="invalid-feedback d-block">
                                         {% for error in form.sucursal_destino.errors %}{{ error }}{% endfor %}
@@ -143,19 +148,19 @@
                     </div>
                 </div>
 
-                <!-- Información Adicional -->
+                <!-- Información del Envío -->
                 <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-card-text"></i> Información Adicional</h5>
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-truck"></i> Información del Envío por Mensajería</h5>
                     </div>
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="{{ form.numero_proyecto.id_for_label }}" class="form-label">
-                                    <i class="bi bi-folder"></i> Número de Proyecto
+                                    <i class="bi bi-receipt"></i> Número de Guía de Mensajería *
                                 </label>
                                 {{ form.numero_proyecto }}
-                                <div class="form-text">Número de proyecto (opcional)</div>
+                                <div class="form-text">Número de seguimiento proporcionado por la empresa de mensajería</div>
                                 {% if form.numero_proyecto.errors %}
                                     <div class="invalid-feedback d-block">
                                         {% for error in form.numero_proyecto.errors %}{{ error }}{% endfor %}
@@ -164,10 +169,10 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="{{ form.usuario_registro_empleado.id_for_label }}" class="form-label">
-                                    <i class="bi bi-person-badge-fill"></i> Empleado que Registra
+                                    <i class="bi bi-person-badge-fill"></i> Empleado que Registra *
                                 </label>
                                 {{ form.usuario_registro_empleado }}
-                                <div class="form-text">Selecciona el empleado que registra el movimiento</div>
+                                <div class="form-text">Empleado que procesa el envío por mensajería</div>
                                 {% if form.usuario_registro_empleado.errors %}
                                     <div class="invalid-feedback d-block">
                                         {% for error in form.usuario_registro_empleado.errors %}{{ error }}{% endfor %}
@@ -216,7 +221,7 @@
                             </div>
                             <div>
                                 <button type="submit" class="btn btn-success btn-lg">
-                                    <i class="bi bi-check-circle"></i> {{ boton_texto|default:"Registrar Movimiento" }}
+                                    <i class="bi bi-truck"></i> {{ boton_texto|default:"Registrar Envío por Mensajería" }}
                                 </button>
                             </div>
                         </div>

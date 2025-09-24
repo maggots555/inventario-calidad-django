@@ -75,7 +75,7 @@ class ProductoForm(forms.ModelForm):
 
 class MovimientoForm(forms.ModelForm):
     """
-    Formulario para registrar movimientos de inventario con empleados
+    Formulario para registrar envíos por mensajería con trazabilidad completa
     """
     class Meta:
         model = Movimiento
@@ -94,7 +94,7 @@ class MovimientoForm(forms.ModelForm):
             'cantidad': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'min': 1,
-                'placeholder': 'Cantidad del movimiento'
+                'placeholder': 'Cantidad a enviar'
             }),
             'motivo': forms.Select(attrs={'class': 'form-control'}),
             'sucursal_destino': forms.Select(attrs={
@@ -107,7 +107,7 @@ class MovimientoForm(forms.ModelForm):
             }),
             'numero_proyecto': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Número de proyecto (opcional)'
+                'placeholder': 'Ej: GUIA123456789 - Número de guía de mensajería'
             }),
             # Widgets para empleados
             'usuario_registro_empleado': forms.Select(attrs={
@@ -117,26 +117,41 @@ class MovimientoForm(forms.ModelForm):
                 'class': 'form-control'
             }),
         }
+        
+        labels = {
+            'numero_proyecto': 'Número de Guía de Mensajería',
+        }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Configurar campos obligatorios para envíos por mensajería
+        self.fields['sucursal_destino'].required = True
+        self.fields['usuario_registro_empleado'].required = True
+        self.fields['empleado_destinatario'].required = True
+        self.fields['numero_proyecto'].required = True  # Número de guía obligatorio
+        
         # Filtrar solo sucursales activas
         self.fields['sucursal_destino'].queryset = Sucursal.objects.filter(activa=True)
-        self.fields['sucursal_destino'].empty_label = "Seleccionar sucursal (opcional)"
-        self.fields['sucursal_destino'].required = False
+        self.fields['sucursal_destino'].empty_label = "Seleccionar sucursal de destino *"
         
         # Configurar campos de empleados con atributos de área
         empleados_activos = Empleado.objects.filter(activo=True)
         
         # Para empleado que registra
         self.fields['usuario_registro_empleado'].queryset = empleados_activos
-        self.fields['usuario_registro_empleado'].empty_label = "Seleccionar empleado que registra"
-        self.fields['usuario_registro_empleado'].required = False
+        self.fields['usuario_registro_empleado'].empty_label = "Seleccionar empleado que registra *"
         
         # Para empleado destinatario - agregar atributos de área mediante JavaScript personalizado
         self.fields['empleado_destinatario'].queryset = empleados_activos
-        self.fields['empleado_destinatario'].empty_label = "Seleccionar empleado destinatario"
-        self.fields['empleado_destinatario'].required = False
+        self.fields['empleado_destinatario'].empty_label = "Seleccionar empleado destinatario *"
+        
+        # Actualizar label del número de guía
+        self.fields['numero_proyecto'].label = 'Número de Guía de Mensajería'
+        self.fields['numero_proyecto'].help_text = 'Número de seguimiento proporcionado por la empresa de mensajería'
+        
+        # Observaciones sigue siendo opcional
+        self.fields['observaciones'].required = False
 
 class SucursalForm(forms.ModelForm):
     """
@@ -226,7 +241,7 @@ class MovimientoRapidoForm(forms.ModelForm):
     class Meta:
         model = Movimiento
         fields = [
-            'tipo', 'cantidad', 'motivo',
+            'tipo', 'cantidad', 'motivo', 'sucursal_destino',
             'empleado_destinatario', 'usuario_registro_empleado', 'observaciones'
         ]
         widgets = {
@@ -237,6 +252,9 @@ class MovimientoRapidoForm(forms.ModelForm):
                 'placeholder': 'Cantidad'
             }),
             'motivo': forms.Select(attrs={'class': 'form-control'}),
+            'sucursal_destino': forms.Select(attrs={
+                'class': 'form-control'
+            }),
             'empleado_destinatario': EmpleadoSelectWidget(attrs={
                 'class': 'form-control'
             }),
@@ -254,16 +272,27 @@ class MovimientoRapidoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Configurar campos de empleados con empleados activos
         empleados_activos = Empleado.objects.filter(activo=True)
+        sucursales_activas = Sucursal.objects.all()
+        
+        # Configurar campos obligatorios
+        self.fields['tipo'].required = True
+        self.fields['cantidad'].required = True
+        self.fields['motivo'].required = True
+        self.fields['sucursal_destino'].required = True
+        self.fields['usuario_registro_empleado'].required = True
+        
+        # Para sucursal destino
+        self.fields['sucursal_destino'].queryset = sucursales_activas
+        self.fields['sucursal_destino'].empty_label = "Seleccionar sucursal destino *"
         
         # Para empleado destinatario con widget personalizado para área
         self.fields['empleado_destinatario'].queryset = empleados_activos
-        self.fields['empleado_destinatario'].empty_label = "Seleccionar destinatario (opcional)"
-        self.fields['empleado_destinatario'].required = False
+        self.fields['empleado_destinatario'].empty_label = "Seleccionar empleado destinatario *"
+        self.fields['empleado_destinatario'].required = True
         
         # Para empleado que registra
         self.fields['usuario_registro_empleado'].queryset = empleados_activos
-        self.fields['usuario_registro_empleado'].empty_label = "Seleccionar empleado que registra"
-        self.fields['usuario_registro_empleado'].required = False
+        self.fields['usuario_registro_empleado'].empty_label = "Seleccionar empleado que registra *"
         
         # Observaciones no requeridas
         self.fields['observaciones'].required = False

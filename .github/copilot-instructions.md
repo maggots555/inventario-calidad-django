@@ -17,7 +17,7 @@ These are Django 5.2.5 projects following Django best practices with proper sepa
 ## 🏆 Django Best Practices & Recommended Structure
 
 ### ✅ Proper Django Project Structure (Follow This Pattern)
-**Example: `inventario_calidad` project**
+**Example: `inventario` project**
 ```
 project_name/
 ├── config/                    # Project configuration (settings, main URLs, WSGI)

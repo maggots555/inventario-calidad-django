@@ -95,8 +95,23 @@
                                 {% endif %}
                             </div>
                             <div class="col-md-6 mb-3">
+                                <label for="{{ form.sucursal_destino.id_for_label }}" class="form-label">
+                                    <i class="bi bi-building"></i> Sucursal Destino *
+                                </label>
+                                {{ form.sucursal_destino }}
+                                <div class="form-text">Selecciona la sucursal donde se entrega el producto</div>
+                                {% if form.sucursal_destino.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.sucursal_destino.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
                                 <label for="{{ form.usuario_registro_empleado.id_for_label }}" class="form-label">
-                                    <i class="bi bi-person-badge-fill"></i> Usuario que Registra
+                                    <i class="bi bi-person-badge-fill"></i> Usuario que Registra *
                                 </label>
                                 {{ form.usuario_registro_empleado }}
                                 <div class="form-text">Selecciona el empleado que registra el movimiento</div>
@@ -106,24 +121,25 @@
                                     </div>
                                 {% endif %}
                             </div>
-                        </div>
-
-                        <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="{{ form.empleado_destinatario.id_for_label }}" class="form-label">
-                                    <i class="bi bi-person-check"></i> Destinatario
+                                    <i class="bi bi-person-check"></i> Empleado Destinatario *
                                 </label>
                                 {{ form.empleado_destinatario }}
-                                <div class="form-text">Opcional: Empleado que recibe el producto</div>
+                                <div class="form-text">Selecciona el empleado que recibe el producto</div>
                                 {% if form.empleado_destinatario.errors %}
                                     <div class="invalid-feedback d-block">
                                         {% for error in form.empleado_destinatario.errors %}{{ error }}{% endfor %}
                                     </div>
                                 {% endif %}
                             </div>
+                        </div>
+
+                        <!-- Área de Destino automática (mantener funcionalidad existente) -->
+                        <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">
-                                    <i class="bi bi-building"></i> Área de Destino
+                                    <i class="bi bi-geo-alt"></i> Área de Destino (Empleado)
                                 </label>
                                 <input type="text" id="areaDestinoDisplay" class="form-control" readonly placeholder="Se llena automáticamente">
                                 <div class="form-text">Se completa automáticamente al seleccionar empleado destinatario</div>
@@ -282,104 +298,290 @@ document.addEventListener('DOMContentLoaded', function() {
     let canvasContext = null;
     let intervalId = null;
     
-    // Función para buscar producto por código QR
-    function buscarProducto(codigoQR) {
-        if (codigoQR.length > 2) { // Reducir longitud mínima para mejor UX
-            fetch(`{% url 'buscar_producto_qr' %}?codigo_qr=${encodeURIComponent(codigoQR)}`)
-                .then(response => {
-                    if (response.ok) {
-                        return response.json();
-                    } else {
-                        return response.json().then(data => Promise.reject(data));
-                    }
-                })
-                .then(data => {
-                    // Mostrar información del producto con mensaje de normalización si aplica
-                    let mensajeExtra = '';
-                    if (data.mensaje && data.mensaje.includes('normalizado')) {
-                        mensajeExtra = `<br><small class="text-info"><i class="bi bi-info-circle"></i> ${data.mensaje}</small>`;
-                    }
-                    
-                    productoDetalles.innerHTML = `
-                        <div class="row">
-                            <div class="col-md-8">
-                                <strong>${data.nombre}</strong><br>
-                                <small class="text-muted">
-                                    Código: ${data.codigo_qr} | 
-                                    Categoría: ${data.categoria} | 
-                                    Stock actual: ${data.cantidad_actual} unidades
-                                    ${data.ubicacion ? ' | Ubicación: ' + data.ubicacion : ''}
-                                </small>
-                                ${mensajeExtra}
-                            </div>
-                            <div class="col-md-4 text-end">
-                                <span class="badge bg-success">✓ Producto Encontrado</span>
-                            </div>
-                        </div>
-                    `;
-                    productoInfo.classList.remove('d-none');
-                    productoInfo.classList.remove('alert-danger', 'alert-warning');
-                    productoInfo.classList.add('alert-success');
-                })
-                .catch(error => {
-                    // Mostrar error con más detalle
-                    const mensajeError = error.error || 'Producto no encontrado';
-                    const codigoRecibido = error.codigo_recibido || codigoQR;
-                    const sugerencia = error.sugerencia || 'Verifica que el código sea correcto';
-                    
-                    productoDetalles.innerHTML = `
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-exclamation-triangle text-warning me-2"></i> 
-                            <div>
-                                <strong>${mensajeError}</strong><br>
-                                <small>Código: "${codigoRecibido}"</small><br>
-                                <small class="text-muted">${sugerencia}</small>
-                            </div>
-                        </div>
-                    `;
-                    productoInfo.classList.remove('d-none', 'alert-success');
-                    productoInfo.classList.add('alert-warning');
-                });
-        } else {
+    // Variables para detección de scanner físico
+    let ultimaTecla = 0;
+    let tiempoScanner = [];
+    let timeoutBusqueda = null;
+    let intentosReintentar = 0;
+    const MAX_REINTENTOS = 2;
+    
+    // Función mejorada para buscar producto por código QR con reintentos automáticos
+    function buscarProducto(codigoQR, esReintento = false) {
+        if (codigoQR.length < 3) {
             // Ocultar información si el código es muy corto
             productoInfo.classList.add('d-none');
+            actualizarValidacionVisual('neutro');
+            return;
+        }
+        
+        // Mostrar estado de carga
+        if (!esReintento) {
+            actualizarValidacionVisual('buscando');
+            productoInfo.classList.remove('d-none');
+            productoInfo.classList.remove('alert-success', 'alert-warning', 'alert-danger');
+            productoInfo.classList.add('alert-info');
+            productoDetalles.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                    <span>Buscando producto: "${codigoQR}"...</span>
+                </div>
+            `;
+        }
+        
+        fetch(`{% url 'buscar_producto_qr' %}?codigo_qr=${encodeURIComponent(codigoQR)}`)
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    return response.json().then(data => Promise.reject(data));
+                }
+            })
+            .then(data => {
+                // Éxito: producto encontrado
+                intentosReintentar = 0; // Resetear contador de reintentos
+                
+                let mensajeExtra = '';
+                if (data.mensaje && data.mensaje.includes('normalizado')) {
+                    mensajeExtra = `<br><small class="text-info"><i class="bi bi-info-circle"></i> ${data.mensaje}</small>`;
+                }
+                
+                productoDetalles.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-8">
+                            <strong>${data.nombre}</strong><br>
+                            <small class="text-muted">
+                                Código: ${data.codigo_qr} | 
+                                Categoría: ${data.categoria} | 
+                                Stock actual: ${data.cantidad_actual} unidades
+                                ${data.ubicacion ? ' | Ubicación: ' + data.ubicacion : ''}
+                            </small>
+                            ${mensajeExtra}
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <span class="badge bg-success">✓ Producto Encontrado</span>
+                        </div>
+                    </div>
+                `;
+                productoInfo.classList.remove('d-none');
+                productoInfo.classList.remove('alert-danger', 'alert-warning', 'alert-info');
+                productoInfo.classList.add('alert-success');
+                
+                // Actualizar validación visual a éxito
+                actualizarValidacionVisual('exito');
+                
+                // Hacer foco en el siguiente campo
+                setTimeout(() => {
+                    document.getElementById('{{ form.tipo.id_for_label }}').focus();
+                }, 200);
+            })
+            .catch(error => {
+                // Error: producto no encontrado
+                const mensajeError = error.error || 'Producto no encontrado';
+                const codigoRecibido = error.codigo_recibido || codigoQR;
+                const sugerencia = error.sugerencia || 'Verifica que el código sea correcto';
+                
+                // Si no es un reintento y quedan intentos, reintentar automáticamente
+                if (!esReintento && intentosReintentar < MAX_REINTENTOS) {
+                    intentosReintentar++;
+                    console.log(`🔄 Reintentando búsqueda (intento ${intentosReintentar}/${MAX_REINTENTOS}): ${codigoQR}`);
+                    
+                    // Reintento con una versión más limpia del código
+                    const codigoMasLimpio = limpiarCodigoAvanzado(codigoQR);
+                    setTimeout(() => {
+                        buscarProducto(codigoMasLimpio, true);
+                    }, 300);
+                    return;
+                }
+                
+                // Mostrar error definitivo
+                intentosReintentar = 0;
+                productoDetalles.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-exclamation-triangle text-warning me-2"></i> 
+                        <div>
+                            <strong>${mensajeError}</strong><br>
+                            <small>Código: "${codigoRecibido}"</small><br>
+                            <small class="text-muted">${sugerencia}</small>
+                        </div>
+                    </div>
+                `;
+                productoInfo.classList.remove('d-none', 'alert-success', 'alert-info');
+                productoInfo.classList.add('alert-warning');
+                
+                // Actualizar validación visual a error
+                actualizarValidacionVisual('error');
+            });
+    }
+    
+    // Función para limpiar código con múltiples estrategias
+    function limpiarCodigoAvanzado(codigo) {
+        if (!codigo) return '';
+        
+        // Estrategia 1: Limpieza básica
+        let codigoLimpio = codigo.toString().trim();
+        
+        // Estrategia 2: Remover caracteres invisibles comunes de scanners
+        codigoLimpio = codigoLimpio.replace(/[\r\n\t\x00-\x08\x0B\x0C\x0E-\x1f\x7f-\x9f]/g, '');
+        
+        // Estrategia 3: Remover espacios internos y externos
+        codigoLimpio = codigoLimpio.replace(/\s+/g, '');
+        
+        // Estrategia 4: Normalizar caracteres especiales
+        codigoLimpio = codigoLimpio.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        
+        // Estrategia 5: Convertir a mayúsculas para consistencia
+        codigoLimpio = codigoLimpio.toUpperCase();
+        
+        return codigoLimpio;
+    }
+    
+    // Función para actualizar la validación visual del campo
+    function actualizarValidacionVisual(estado) {
+        const campo = codigoQRInput;
+        
+        // Remover todas las clases de estado previas
+        campo.classList.remove('is-valid', 'is-invalid');
+        campo.style.borderColor = '';
+        campo.style.backgroundColor = '';
+        
+        switch(estado) {
+            case 'exito':
+                campo.classList.add('is-valid');
+                campo.style.borderColor = '#28a745';
+                campo.style.backgroundColor = '#d4edda';
+                break;
+            case 'error':
+                campo.classList.add('is-invalid');
+                campo.style.borderColor = '#dc3545';
+                campo.style.backgroundColor = '#f8d7da';
+                break;
+            case 'buscando':
+                campo.style.borderColor = '#007bff';
+                campo.style.backgroundColor = '#e3f2fd';
+                break;
+            case 'neutro':
+            default:
+                // Estado neutro - sin colores especiales
+                campo.style.borderColor = '#ced4da';
+                campo.style.backgroundColor = '#fff';
+                break;
         }
     }
     
-    // Buscar producto cuando se escriba en el campo con mejoras
-    // Buscar producto cuando se escriba en el campo con limpieza automática
-    codigoQRInput.addEventListener('input', function() {
-        // Limpiar código de caracteres invisibles (común en scanners físicos)
-        let codigo = this.value;
-        let codigoLimpio = codigo.replace(/[\r\n\t\x00-\x1f\x7f-\x9f]/g, '').trim();
-        codigoLimpio = codigoLimpio.replace(/\s+/g, ''); // Remover espacios internos
+    // Función para detectar si es un scanner físico
+    function detectarScannerFisico() {
+        const ahora = Date.now();
+        tiempoScanner.push(ahora);
+        
+        // Mantener solo los últimos 10 eventos
+        if (tiempoScanner.length > 10) {
+            tiempoScanner = tiempoScanner.slice(-10);
+        }
+        
+        // Si hay varios caracteres en menos de 100ms, probablemente es scanner físico
+        if (tiempoScanner.length >= 3) {
+            const tiempoTotal = tiempoScanner[tiempoScanner.length - 1] - tiempoScanner[0];
+            const caracteresporMs = tiempoScanner.length / tiempoTotal;
+            
+            // Si escribe más de 10 caracteres por segundo, es probable que sea scanner
+            return caracteresporMs > 0.01; // 10 chars/segundo
+        }
+        
+        return false;
+    }
+    
+    // Función principal para manejar cambios en el campo con debouncing inteligente
+    function manejarCambioCodigo(event) {
+        const esScanner = detectarScannerFisico();
+        let codigo = codigoQRInput.value;
+        
+        // Limpiar código automáticamente
+        const codigoLimpio = limpiarCodigoAvanzado(codigo);
         
         // Si el código fue limpiado, actualizar el campo
         if (codigo !== codigoLimpio && codigoLimpio.length > 0) {
-            const cursorPos = this.selectionStart;
-            this.value = codigoLimpio;
-            // Restaurar cursor al final si es un scanner automático
-            this.setSelectionRange(codigoLimpio.length, codigoLimpio.length);
+            codigoQRInput.value = codigoLimpio;
+            // Mantener cursor al final
+            codigoQRInput.setSelectionRange(codigoLimpio.length, codigoLimpio.length);
         }
         
-        if (codigoLimpio.length > 5) { // Solo buscar si el código tiene longitud mínima
-            buscarProducto(codigoLimpio);
-        } else {
-            // Ocultar información si el código es muy corto
-            productoInfo.classList.add('d-none');
+        // Cancelar búsqueda anterior si existe
+        if (timeoutBusqueda) {
+            clearTimeout(timeoutBusqueda);
+        }
+        
+        // Debouncing inteligente: menos tiempo para scanners, más para escritura manual
+        const tiempoEspera = esScanner ? 100 : 500;
+        
+        timeoutBusqueda = setTimeout(() => {
+            if (codigoLimpio.length >= 3) {
+                console.log(`🔍 Buscando producto: "${codigoLimpio}" (Scanner: ${esScanner})`);
+                buscarProducto(codigoLimpio);
+            } else if (codigoLimpio.length === 0) {
+                // Campo vacío
+                productoInfo.classList.add('d-none');
+                actualizarValidacionVisual('neutro');
+            } else {
+                // Código muy corto
+                actualizarValidacionVisual('neutro');
+            }
+        }, tiempoEspera);
+    }
+    
+    // ========================================================================
+    // EVENTOS MEJORADOS PARA SCANNER FÍSICO Y MANUAL
+    // ========================================================================
+    
+    // Evento principal: input (escritura en tiempo real)
+    codigoQRInput.addEventListener('input', manejarCambioCodigo);
+    
+    // Evento de cambio (cuando el campo pierde foco o Enter)
+    codigoQRInput.addEventListener('change', function() {
+        console.log('📝 Evento change disparado');
+        manejarCambioCodigo();
+    });
+    
+    // Evento keyup (útil para scanners que no disparan input correctamente)
+    codigoQRInput.addEventListener('keyup', function(e) {
+        // Solo procesar si es una tecla significativa (no flechas, ctrl, etc.)
+        if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+            manejarCambioCodigo();
         }
     });
     
-    // También buscar cuando se haga paste
+    // Evento paste (copiar y pegar)
     codigoQRInput.addEventListener('paste', function(e) {
-        // Esperar un momento para que el paste se complete
+        console.log('📋 Evento paste disparado');
+        // Esperar a que el paste se complete
         setTimeout(() => {
-            const codigo = this.value.trim().toUpperCase();
-            this.value = codigo;
-            if (codigo.length >= 3) {
-                buscarProducto(codigo);
+            manejarCambioCodigo();
+        }, 50);
+    });
+    
+    // Evento para Internet Explorer (compatibilidad legacy)
+    if (codigoQRInput.attachEvent) {
+        codigoQRInput.attachEvent('onpropertychange', function() {
+            if (event.propertyName === 'value') {
+                manejarCambioCodigo();
             }
-        }, 10);
+        });
+    }
+    
+    // Evento focus - resetear estado visual
+    codigoQRInput.addEventListener('focus', function() {
+        if (this.value.length === 0) {
+            actualizarValidacionVisual('neutro');
+        }
+    });
+    
+    // Evento blur - validar una vez más al salir del campo
+    codigoQRInput.addEventListener('blur', function() {
+        if (this.value.length >= 3) {
+            // Forzar una última búsqueda al salir del campo
+            setTimeout(() => {
+                buscarProducto(limpiarCodigoAvanzado(this.value));
+            }, 100);
+        }
     });
     
     // ========================================================================
@@ -743,10 +945,25 @@ document.addEventListener('DOMContentLoaded', function() {
         const tipo = document.getElementById('{{ form.tipo.id_for_label }}').value;
         const cantidad = document.getElementById('{{ form.cantidad.id_for_label }}').value;
         const motivo = document.getElementById('{{ form.motivo.id_for_label }}').value;
+        const sucursalDestino = document.getElementById('{{ form.sucursal_destino.id_for_label }}').value;
+        const usuarioRegistro = document.getElementById('{{ form.usuario_registro_empleado.id_for_label }}').value;
+        const empleadoDestinatario = document.getElementById('{{ form.empleado_destinatario.id_for_label }}').value;
         
-        if (!codigoQR || !tipo || !cantidad || !motivo) {
+        // Validar campos obligatorios
+        if (!codigoQR || !tipo || !cantidad || !motivo || !sucursalDestino || !usuarioRegistro || !empleadoDestinatario) {
             e.preventDefault();
-            alert('⚠️ Por favor, completa todos los campos obligatorios: Código QR, Tipo, Cantidad y Motivo.');
+            
+            // Identificar qué campo específico falta
+            const camposFaltantes = [];
+            if (!codigoQR) camposFaltantes.push('Código QR');
+            if (!tipo) camposFaltantes.push('Tipo de Movimiento');
+            if (!cantidad) camposFaltantes.push('Cantidad');
+            if (!motivo) camposFaltantes.push('Motivo');
+            if (!sucursalDestino) camposFaltantes.push('Sucursal Destino');
+            if (!usuarioRegistro) camposFaltantes.push('Usuario que Registra');
+            if (!empleadoDestinatario) camposFaltantes.push('Empleado Destinatario');
+            
+            alert(`⚠️ Por favor, completa los siguientes campos obligatorios:\n• ${camposFaltantes.join('\n• ')}`);
             return false;
         }
         
@@ -756,9 +973,15 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
         
-        // Confirmación antes de registrar
+        // Confirmación antes de registrar con información más completa
         const tipoTexto = document.getElementById('{{ form.tipo.id_for_label }}').options[document.getElementById('{{ form.tipo.id_for_label }}').selectedIndex].text;
-        if (!confirm(`¿Confirmas registrar ${tipoTexto} de ${cantidad} unidades del producto con código: ${codigoQR}?`)) {
+        const sucursalTexto = document.getElementById('{{ form.sucursal_destino.id_for_label }}').options[document.getElementById('{{ form.sucursal_destino.id_for_label }}').selectedIndex].text;
+        
+        if (!confirm(`¿Confirmas registrar el siguiente movimiento?\n\n` +
+                    `• Tipo: ${tipoTexto}\n` +
+                    `• Cantidad: ${cantidad} unidades\n` +
+                    `• Producto: ${codigoQR}\n` +
+                    `• Sucursal destino: ${sucursalTexto}`)) {
             e.preventDefault();
             return false;
         }
