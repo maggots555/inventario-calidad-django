@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Dashboard - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/components.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -96,196 +101,195 @@
         </div>
     </div>
 
-    <div class="row">
-        <!-- Alertas de Stock Bajo -->
-        <div class="col-xl-6 col-lg-7">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 font-weight-bold text-warning">
-                        <i class="bi bi-exclamation-triangle"></i> Alertas de Stock Bajo
+    <!-- SECCIÓN REDISEÑADA: Grid de 3 columnas equilibradas -->
+    <div class="row dashboard-main-content">
+        <!-- Columna 1: Alertas de Stock Bajo -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card shadow h-100 card-dashboard">
+                <div class="card-header bg-gradient-warning text-white py-3">
+                    <h6 class="m-0 font-weight-bold d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="bi bi-exclamation-triangle me-2"></i> 
+                            Alertas de Stock
+                        </span>
+                        <span class="badge bg-light text-warning">{{ alertas_stock|length }}</span>
                     </h6>
-                    <a href="{% url 'lista_productos' %}?stock_bajo=true" class="btn btn-sm btn-outline-warning">
-                        Ver Todos
-                    </a>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0">
                     {% if alertas_stock %}
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Producto</th>
-                                        <th>Stock Actual</th>
-                                        <th>Stock Mínimo</th>
-                                        <th>Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for producto in alertas_stock %}
-                                    <tr>
-                                        <td>
-                                            <div>
-                                                <small class="text-muted">{{ producto.codigo_qr }}</small><br>
-                                                <strong>{{ producto.nombre }}</strong>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-danger">{{ producto.cantidad }}</span>
-                                        </td>
-                                        <td>{{ producto.stock_minimo }}</td>
-                                        <td>
-                                            <a href="{% url 'detalle_producto' producto.id %}" class="btn btn-sm btn-outline-primary">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                        <div class="alert-stock-container">
+                            {% for producto in alertas_stock %}
+                            <div class="alert-stock-item border-start border-danger border-3 p-3 border-bottom">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1 me-3">
+                                        <div class="fw-bold mb-1" title="{{ producto.nombre }}">
+                                            {{ producto.nombre }}
+                                        </div>
+                                        <small class="text-muted">{{ producto.codigo_qr }}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge bg-danger mb-1">{{ producto.cantidad }}</span>
+                                        <div class="text-muted small">mín: {{ producto.stock_minimo }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="card-footer bg-light text-center py-2">
+                            <a href="{% url 'lista_productos' %}?stock_bajo=true" class="btn btn-warning btn-sm">
+                                <i class="bi bi-eye"></i> Ver Todos ({{ alertas_stock|length }})
+                            </a>
                         </div>
                     {% else %}
-                        <div class="text-center text-muted py-4">
-                            <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
-                            <p class="mt-2">¡Todos los productos tienen stock suficiente!</p>
+                        <div class="text-center text-success py-5">
+                            <i class="bi bi-check-circle-fill" style="font-size: 3rem;"></i>
+                            <p class="mt-3 mb-0 fw-bold">¡Stock Suficiente!</p>
+                            <small class="text-muted">Todos los productos están bien abastecidos</small>
                         </div>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- Alertas de Productos Fraccionables -->
-        {% if alertas_fraccionables %}
-        <div class="col-xl-6 col-lg-7">
-            <div class="card shadow mb-4 border-left-info">
-                <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 font-weight-bold text-info">
-                        <i class="bi bi-droplet"></i> Alertas de Productos Fraccionables
+        <!-- Columna 2: Productos Fraccionables -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card shadow h-100 card-dashboard">
+                <div class="card-header bg-gradient-info text-white py-3">
+                    <h6 class="m-0 font-weight-bold d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="bi bi-droplet me-2"></i> 
+                            Productos Fraccionables
+                        </span>
+                        <span class="badge bg-light text-info">{{ alertas_fraccionables|length|default:0 }}</span>
                     </h6>
-                    <span class="badge bg-info">{{ alertas_fraccionables|length }}</span>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Producto</th>
-                                    <th>Nivel Actual</th>
-                                    <th>Disponible</th>
-                                    <th>Estado</th>
-                                    <th>Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for producto in alertas_fraccionables %}
-                                <tr>
-                                    <td>
-                                        <div>
-                                            <small class="text-muted">{{ producto.codigo_qr }}</small><br>
-                                            <strong>{{ producto.nombre }}</strong>
-                                            <span class="badge badge-fraccionable ms-2">Fraccionable</span>
+                <div class="card-body p-0">
+                    {% if alertas_fraccionables %}
+                        <div class="list-group list-group-flush">
+                            {% for producto in alertas_fraccionables %}
+                            <div class="list-group-item border-0 py-3">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1 me-2">
+                                        <div class="fw-bold text-truncate mb-1" title="{{ producto.nombre }}">
+                                            {{ producto.nombre|truncatechars:25 }}
                                         </div>
-                                    </td>
-                                    <td>
-                                        <div class="progress-fraccionario" style="height: 16px; width: 100px;">
-                                            <div class="progress-bar-fraccionario 
-                                                {% if producto.porcentaje_disponible <= 30 %}nivel-bajo
-                                                {% elif producto.porcentaje_disponible <= 70 %}nivel-medio
-                                                {% else %}nivel-alto{% endif %}"
+                                        <small class="text-muted d-block mb-2">{{ producto.codigo_qr }}</small>
+                                        
+                                        <!-- Barra de progreso mejorada -->
+                                        <div class="progress mb-1" style="height: 8px;">
+                                            <div class="progress-bar 
+                                                {% if producto.porcentaje_disponible <= 30 %}bg-danger
+                                                {% elif producto.porcentaje_disponible <= 70 %}bg-warning
+                                                {% else %}bg-success{% endif %}"
                                                 style="width: {{ producto.porcentaje_disponible }}%">
                                             </div>
                                         </div>
-                                        <small class="text-muted">{{ producto.porcentaje_disponible|floatformat:1 }}%</small>
-                                    </td>
-                                    <td>
-                                        <strong>{{ producto.cantidad_actual|floatformat:2 }}</strong> {{ producto.unidad_base }}<br>
-                                        <small class="text-muted">de {{ producto.cantidad_unitaria|floatformat:0 }} {{ producto.unidad_base }}</small>
-                                    </td>
-                                    <td>
-                                        <span class="indicador-nivel 
-                                            {% if producto.porcentaje_disponible <= 30 %}bajo
-                                            {% elif producto.porcentaje_disponible <= 70 %}medio
-                                            {% else %}alto{% endif %}">
+                                        <div class="d-flex justify-content-between">
+                                            <small class="text-muted">
+                                                {{ producto.cantidad_actual|floatformat:0 }} {{ producto.unidad_base }}
+                                            </small>
+                                            <small class="fw-bold 
+                                                {% if producto.porcentaje_disponible <= 30 %}text-danger
+                                                {% elif producto.porcentaje_disponible <= 70 %}text-warning
+                                                {% else %}text-success{% endif %}">
+                                                {{ producto.porcentaje_disponible|floatformat:1 }}%
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge 
+                                            {% if producto.porcentaje_disponible <= 30 %}bg-danger
+                                            {% elif producto.porcentaje_disponible <= 70 %}bg-warning
+                                            {% else %}bg-success{% endif %} mb-2">
                                             {% if producto.porcentaje_disponible <= 30 %}Crítico
                                             {% elif producto.porcentaje_disponible <= 70 %}Medio
                                             {% else %}Normal{% endif %}
                                         </span>
-                                    </td>
-                                    <td>
-                                        <a href="{% url 'detalle_producto' producto.id %}" class="btn btn-sm btn-outline-primary" title="Ver detalles">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="mt-3 text-center">
-                        <a href="{% url 'movimiento_fraccionario' %}" class="btn btn-info btn-sm">
-                            <i class="bi bi-droplet-half"></i> Registrar Consumo Fraccionario
-                        </a>
-                    </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="card-footer bg-light text-center py-2">
+                            <a href="{% url 'movimiento_fraccionario' %}" class="btn btn-info btn-sm">
+                                <i class="bi bi-droplet-half"></i> Registrar Consumo
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-info py-5">
+                            <i class="bi bi-droplet-half" style="font-size: 3rem;"></i>
+                            <p class="mt-3 mb-0 fw-bold">Sin Alertas Fraccionables</p>
+                            <small class="text-muted">Todos los niveles están normales</small>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
-        {% endif %}
 
-        <!-- Movimientos Recientes -->
-        <div class="col-xl-6 col-lg-5">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 font-weight-bold text-primary">
-                        <i class="bi bi-clock-history"></i> Movimientos Recientes
+        <!-- Columna 3: Movimientos Recientes -->
+        <div class="col-lg-4 col-md-12 mb-4">
+            <div class="card shadow h-100 card-dashboard">
+                <div class="card-header bg-gradient-primary text-white py-3">
+                    <h6 class="m-0 font-weight-bold d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="bi bi-clock-history me-2"></i> 
+                            Actividad Reciente
+                        </span>
+                        <span class="badge bg-light text-primary">{{ movimientos_recientes|length }}</span>
                     </h6>
-                    <a href="{% url 'lista_movimientos' %}" class="btn btn-sm btn-outline-primary">
-                        Ver Todos
-                    </a>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
                     {% if movimientos_recientes %}
-                        {% for movimiento in movimientos_recientes %}
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="me-3">
-                                {% if movimiento.tipo == 'entrada' %}
-                                    <i class="bi bi-arrow-down-circle text-success"></i>
-                                {% elif movimiento.tipo == 'salida' %}
-                                    <i class="bi bi-arrow-up-circle text-danger"></i>
-                                {% else %}
-                                    <i class="bi bi-arrow-left-right text-info"></i>
-                                {% endif %}
-                            </div>
-                            <div class="flex-grow-1">
-                                <div class="fw-bold">{{ movimiento.producto.nombre }}</div>
-                                <small class="text-muted">
-                                    {{ movimiento.tipo|title }} - {{ movimiento.cantidad }} unidades
-                                    {% if movimiento.empleado_destinatario %}
-                                        → {{ movimiento.empleado_destinatario.nombre_completo }}
-                                        {% if movimiento.empleado_destinatario.area %}
-                                            ({{ movimiento.empleado_destinatario.area }})
+                        <div class="timeline-container">
+                            {% for movimiento in movimientos_recientes %}
+                            <div class="timeline-item border-bottom py-3 px-3">
+                                <div class="d-flex align-items-start">
+                                    <div class="timeline-icon me-3 mt-1">
+                                        {% if movimiento.tipo == 'entrada' %}
+                                            <i class="bi bi-arrow-down-circle text-success fs-5"></i>
+                                        {% elif movimiento.tipo == 'salida' %}
+                                            <i class="bi bi-arrow-up-circle text-danger fs-5"></i>
+                                        {% else %}
+                                            <i class="bi bi-arrow-left-right text-info fs-5"></i>
                                         {% endif %}
-                                    {% elif movimiento.destinatario %}
-                                        → {{ movimiento.destinatario }}
-                                    {% endif %}
-                                </small>
-                                <div class="text-muted">
-                                    <small>{{ movimiento.fecha_movimiento|date:"d/m/Y H:i" }}</small>
-                                    {% if movimiento.usuario_registro_empleado %}
-                                        <span class="text-info">
-                                            • Registrado por: {{ movimiento.usuario_registro_empleado.nombre_completo }}
-                                        </span>
-                                    {% elif movimiento.usuario_registro %}
-                                        <span class="text-info">
-                                            • Registrado por: {{ movimiento.usuario_registro }}
-                                        </span>
-                                    {% endif %}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold text-truncate mb-1" title="{{ movimiento.producto.nombre }}">
+                                            {{ movimiento.producto.nombre|truncatechars:25 }}
+                                        </div>
+                                        <div class="text-muted small mb-1">
+                                            <span class="badge 
+                                                {% if movimiento.tipo == 'entrada' %}bg-success
+                                                {% elif movimiento.tipo == 'salida' %}bg-danger
+                                                {% else %}bg-info{% endif %} me-1">
+                                                {{ movimiento.tipo|title }}
+                                            </span>
+                                            {{ movimiento.cantidad }} unidades
+                                        </div>
+                                        {% if movimiento.empleado_destinatario %}
+                                        <div class="text-muted small">
+                                            → {{ movimiento.empleado_destinatario.nombre_completo|truncatechars:20 }}
+                                        </div>
+                                        {% endif %}
+                                        <div class="text-muted small">
+                                            <i class="bi bi-clock me-1"></i>
+                                            {{ movimiento.fecha_movimiento|date:"d/m H:i" }}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
+                        <div class="card-footer bg-light text-center py-2">
+                            <a href="{% url 'lista_movimientos' %}" class="btn btn-primary btn-sm">
+                                <i class="bi bi-list"></i> Ver Historial Completo
+                            </a>
+                        </div>
                     {% else %}
-                        <div class="text-center text-muted py-4">
+                        <div class="text-center text-primary py-5">
                             <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-                            <p class="mt-2">No hay movimientos registrados</p>
+                            <p class="mt-3 mb-0 fw-bold">Sin Movimientos</p>
+                            <small class="text-muted">No hay actividad reciente registrada</small>
                         </div>
                     {% endif %}
                 </div>
@@ -320,49 +324,69 @@
     </div>
     {% endif %}
 
-    <!-- Accesos Rápidos -->
+    <!-- ACCESOS RÁPIDOS REDISEÑADOS -->
     <div class="row">
         <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-dark">
-                        <i class="bi bi-lightning-charge"></i> Accesos Rápidos
+            <div class="card shadow border-0">
+                <div class="card-header bg-gradient-dark text-white py-3">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="bi bi-lightning-charge me-2"></i> Accesos Rápidos
                     </h6>
                 </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-md-3 col-6 mb-3">
-                            <a href="{% url 'crear_producto' %}" class="btn btn-outline-primary btn-lg w-100">
-                                <i class="bi bi-plus-circle d-block mb-2" style="font-size: 2rem;"></i>
-                                Agregar Producto
+                <div class="card-body py-4">
+                    <!-- Primera fila: Acciones principales -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'movimiento_rapido' %}" class="btn btn-success btn-lg w-100 h-100 d-flex flex-column justify-content-center action-card">
+                                <i class="bi bi-qr-code-scan mb-2" style="font-size: 2.5rem;"></i>
+                                <span class="fw-bold">Scanner QR</span>
+                                <small class="text-light opacity-75 mt-1">Registro rápido</small>
                             </a>
                         </div>
-                        <div class="col-md-3 col-6 mb-3">
-                            <a href="{% url 'movimiento_rapido' %}" class="btn btn-outline-success btn-lg w-100">
-                                <i class="bi bi-qr-code-scan d-block mb-2" style="font-size: 2rem;"></i>
-                                Scanner QR
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'movimiento_fraccionario' %}" class="btn btn-info btn-lg w-100 h-100 d-flex flex-column justify-content-center action-card">
+                                <i class="bi bi-droplet-half mb-2" style="font-size: 2.5rem;"></i>
+                                <span class="fw-bold">Fraccionario</span>
+                                <small class="text-light opacity-75 mt-1">Consumo parcial</small>
                             </a>
                         </div>
-                        <div class="col-md-3 col-6 mb-3">
-                            <a href="{% url 'lista_productos' %}" class="btn btn-outline-info btn-lg w-100">
-                                <i class="bi bi-search d-block mb-2" style="font-size: 2rem;"></i>
-                                Buscar Productos
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'crear_producto' %}" class="btn btn-primary btn-lg w-100 h-100 d-flex flex-column justify-content-center action-card">
+                                <i class="bi bi-plus-circle mb-2" style="font-size: 2.5rem;"></i>
+                                <span class="fw-bold">Nuevo Producto</span>
+                                <small class="text-light opacity-75 mt-1">Agregar inventario</small>
                             </a>
                         </div>
-                        <div class="col-md-3 col-6 mb-3">
-                            <a href="{% url 'lista_movimientos' %}" class="btn btn-outline-secondary btn-lg w-100">
-                                <i class="bi bi-clock-history d-block mb-2" style="font-size: 2rem;"></i>
-                                Historial
+                        <div class="col-lg-3 col-md-6">
+                            <a href="{% url 'crear_movimiento' %}" class="btn btn-outline-primary btn-lg w-100 h-100 d-flex flex-column justify-content-center action-card">
+                                <i class="bi bi-arrow-left-right mb-2" style="font-size: 2.5rem;"></i>
+                                <span class="fw-bold">Movimiento Manual</span>
+                                <small class="opacity-75 mt-1">Registro completo</small>
                             </a>
                         </div>
                     </div>
                     
-                    <!-- Segunda fila de accesos rápidos -->
-                    <div class="row text-center">
-                        <div class="col-md-4 col-6 mb-3 mx-auto">
-                            <a href="{% url 'descargar_reporte_excel' %}" class="btn btn-outline-warning btn-lg w-100" title="Descarga un reporte completo en Excel con estadísticas del inventario">
-                                <i class="bi bi-file-earmark-excel d-block mb-2" style="font-size: 2rem;"></i>
-                                Reporte Excel
+                    <!-- Segunda fila: Consultas y reportes -->
+                    <div class="row g-3">
+                        <div class="col-lg-4 col-md-6">
+                            <a href="{% url 'lista_productos' %}" class="btn btn-outline-info btn-lg w-100 h-100 d-flex flex-column justify-content-center action-card">
+                                <i class="bi bi-search mb-2" style="font-size: 2rem;"></i>
+                                <span class="fw-bold">Buscar Productos</span>
+                                <small class="opacity-75 mt-1">Consultar inventario</small>
+                            </a>
+                        </div>
+                        <div class="col-lg-4 col-md-6">
+                            <a href="{% url 'lista_movimientos' %}" class="btn btn-outline-secondary btn-lg w-100 h-100 d-flex flex-column justify-content-center action-card">
+                                <i class="bi bi-clock-history mb-2" style="font-size: 2rem;"></i>
+                                <span class="fw-bold">Historial</span>
+                                <small class="opacity-75 mt-1">Ver movimientos</small>
+                            </a>
+                        </div>
+                        <div class="col-lg-4 col-md-12">
+                            <a href="{% url 'descargar_reporte_excel' %}" class="btn btn-outline-warning btn-lg w-100 h-100 d-flex flex-column justify-content-center action-card" title="Descarga un reporte completo en Excel con estadísticas del inventario">
+                                <i class="bi bi-file-earmark-excel mb-2" style="font-size: 2rem;"></i>
+                                <span class="fw-bold">Reporte Excel</span>
+                                <small class="opacity-75 mt-1">Exportar datos</small>
                             </a>
                         </div>
                     </div>

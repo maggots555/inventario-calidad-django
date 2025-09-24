@@ -27,12 +27,22 @@ def dashboard(request):
     # Productos con stock bajo (alertas tradicionales)
     alertas_stock = Producto.objects.filter(cantidad__lte=F('stock_minimo'))[:10]
     
-    # Alertas específicas para productos fraccionables
+    # Alertas específicas para productos fraccionables (lógica mejorada)
     alertas_fraccionables = []
     productos_fraccionables = Producto.objects.filter(es_fraccionable=True)
     for producto in productos_fraccionables:
-        if producto.stock_fraccionario_bajo():
+        # Verificar múltiples condiciones de alerta
+        porcentaje = producto.porcentaje_disponible()
+        
+        # Condiciones de alerta:
+        # 1. Stock fraccionario bajo (método original)
+        # 2. Porcentaje disponible <= 70% (medio/bajo)
+        # 3. Cantidad mínima de alerta específica
+        if (producto.stock_fraccionario_bajo() or 
+            porcentaje <= 70 or
+            (producto.cantidad_minima_alerta > 0 and producto.cantidad_actual <= producto.cantidad_minima_alerta)):
             alertas_fraccionables.append(producto)
+    
     alertas_fraccionables = alertas_fraccionables[:10]
     
     # Movimientos recientes
