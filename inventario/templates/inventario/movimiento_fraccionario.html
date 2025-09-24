@@ -74,23 +74,38 @@
                             </div>
                             
                             <div class="row">
-                                <div class="col-md-8">
+                                <div class="col-md-6">
                                     <label for="{{ form.codigo_qr.id_for_label }}" class="form-label fw-bold">
-                                        {{ form.codigo_qr.label }}
+                                        <i class="bi bi-qr-code"></i> {{ form.codigo_qr.label }}
                                     </label>
                                     {{ form.codigo_qr }}
                                     {% if form.codigo_qr.help_text %}
                                         <div class="form-text">{{ form.codigo_qr.help_text }}</div>
                                     {% endif %}
                                     {% if form.codigo_qr.errors %}
-                                        <div class="text-danger small mt-1">{{ form.codigo_qr.errors.0 }}</div>
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.codigo_qr.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
                                     {% endif %}
                                 </div>
-                                <div class="col-md-4 d-flex align-items-end">
-                                    <button type="button" class="btn btn-outline-primary" id="btn-buscar-producto">
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button type="button" class="btn btn-outline-primary w-100" id="btn-buscar-producto">
                                         <i class="fas fa-search"></i> Buscar
                                     </button>
                                 </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button type="button" class="btn btn-scanner w-100" id="activarScannerBtn">
+                                        <i class="bi bi-camera"></i> Scanner
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Información del Producto buscado (se llena automáticamente) -->
+                            <div id="productoInfoBusqueda" class="alert alert-info d-none mt-3">
+                                <h6><i class="bi bi-info-circle"></i> Resultado de Búsqueda</h6>
+                                <div id="productoDetallesBusqueda"></div>
                             </div>
                         </div>
 
@@ -143,38 +158,69 @@
                         <!-- Sección 4: Destino -->
                         <div class="row mt-3">
                             <div class="col-md-6">
-                                <label for="{{ form.sucursal_destino.id_for_label }}" class="form-label fw-bold">{{ form.sucursal_destino.label }}</label>
+                                <label for="{{ form.sucursal_destino.id_for_label }}" class="form-label fw-bold">
+                                    <i class="bi bi-building"></i> {{ form.sucursal_destino.label }}
+                                </label>
                                 {{ form.sucursal_destino }}
+                                <div class="form-text">Selecciona la sucursal donde se utiliza el producto</div>
                                 {% if form.sucursal_destino.errors %}
-                                    <div class="text-danger small mt-1">{{ form.sucursal_destino.errors.0 }}</div>
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.sucursal_destino.errors %}{{ error }}{% endfor %}
+                                    </div>
                                 {% endif %}
                             </div>
                             <div class="col-md-6">
-                                <label for="{{ form.empleado_destinatario.id_for_label }}" class="form-label fw-bold">{{ form.empleado_destinatario.label }}</label>
+                                <label for="{{ form.empleado_destinatario.id_for_label }}" class="form-label fw-bold">
+                                    <i class="bi bi-person-check"></i> {{ form.empleado_destinatario.label }}
+                                </label>
                                 {{ form.empleado_destinatario }}
+                                <div class="form-text">Selecciona el empleado que utiliza el producto</div>
                                 {% if form.empleado_destinatario.errors %}
-                                    <div class="text-danger small mt-1">{{ form.empleado_destinatario.errors.0 }}</div>
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.empleado_destinatario.errors %}{{ error }}{% endfor %}
+                                    </div>
                                 {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Área de Destino automática (se llena al seleccionar empleado) -->
+                        <div class="row mt-3">
+                            <div class="col-md-6 area-destino-container">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-geo-alt"></i> Área de Destino
+                                </label>
+                                <input type="text" id="areaDestinoDisplay" class="form-control" readonly placeholder="Se llena automáticamente">
+                                <div class="form-text">Se completa automáticamente al seleccionar empleado destinatario</div>
                             </div>
                         </div>
 
                         <!-- Sección 5: Registro -->
                         <div class="row mt-3">
                             <div class="col-md-12">
-                                <label for="{{ form.usuario_registro_empleado.id_for_label }}" class="form-label fw-bold">{{ form.usuario_registro_empleado.label }}</label>
+                                <label for="{{ form.usuario_registro_empleado.id_for_label }}" class="form-label fw-bold">
+                                    <i class="bi bi-person-badge-fill"></i> {{ form.usuario_registro_empleado.label }}
+                                </label>
                                 {{ form.usuario_registro_empleado }}
+                                <div class="form-text">Selecciona el empleado que registra el movimiento fraccionario</div>
                                 {% if form.usuario_registro_empleado.errors %}
-                                    <div class="text-danger small mt-1">{{ form.usuario_registro_empleado.errors.0 }}</div>
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.usuario_registro_empleado.errors %}{{ error }}{% endfor %}
+                                    </div>
                                 {% endif %}
                             </div>
                         </div>
 
                         <!-- Observaciones -->
                         <div class="mt-3">
-                            <label for="{{ form.observaciones.id_for_label }}" class="form-label fw-bold">{{ form.observaciones.label }}</label>
+                            <label for="{{ form.observaciones.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-chat-text"></i> {{ form.observaciones.label }}
+                            </label>
                             {{ form.observaciones }}
+                            <div class="form-text">Información adicional sobre el consumo fraccionario (opcional)</div>
                             {% if form.observaciones.errors %}
-                                <div class="text-danger small mt-1">{{ form.observaciones.errors.0 }}</div>
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.observaciones.errors %}{{ error }}{% endfor %}
+                                </div>
                             {% endif %}
                         </div>
 
@@ -197,21 +243,420 @@
                     </form>
                 </div>
             </div>
+            
+            <!-- Instrucciones de Uso del Scanner -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-lightbulb"></i> Instrucciones de Uso del Scanner</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>📱 Con Scanner de Cámara:</h6>
+                            <ol class="small">
+                                <li>Haz clic en "Scanner" junto al campo código QR</li>
+                                <li>Permite acceso a la cámara cuando se solicite</li>
+                                <li>Coloca el código de barras/QR dentro del marco azul</li>
+                                <li>El código se detectará y completará automáticamente</li>
+                                <li>Se buscará automáticamente el producto fraccionario</li>
+                            </ol>
+                            <div class="alert alert-warning alert-sm">
+                                <small><i class="bi bi-exclamation-triangle"></i> 
+                                <strong>Android/iOS:</strong> Para usar la cámara necesitas conexión HTTPS. 
+                                Si no funciona, usa entrada manual.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>⌨️ Entrada Manual o Scanner Físico:</h6>
+                            <ol class="small">
+                                <li>Escribe o escanea el código QR/barras en el campo</li>
+                                <li>El sistema buscará automáticamente mientras escribes</li>
+                                <li>Verifica la información del producto fraccionario</li>
+                                <li>Completa los datos del consumo</li>
+                                <li>Haz clic en "Registrar Movimiento Fraccionario"</li>
+                            </ol>
+                            <div class="alert alert-success alert-sm">
+                                <small><i class="bi bi-check-circle"></i> 
+                                <strong>Recomendado:</strong> Funciona con scanners físicos automáticamente.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mt-3 mb-0">
+                        <small>
+                            <i class="bi bi-droplet-half"></i>
+                            <strong>Productos Fraccionarios:</strong> Solo productos configurados como fraccionarios 
+                            (líquidos, granulados, etc.) pueden ser procesados aquí. 
+                            Los productos normales se redirigen automáticamente al movimiento estándar.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Área del Scanner de Video -->
+<div class="modal fade" id="scannerModal" tabindex="-1" aria-labelledby="scannerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="scannerModalLabel">
+                    <i class="bi bi-camera"></i> Scanner Universal - QR y Códigos de Barras
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <!-- Área de estado/mensajes -->
+                <div id="scanner-status" class="mb-3"></div>
+                
+                <div class="scanner-container">
+                    <div id="qr-video"></div>
+                    <div class="scanner-overlay">
+                        <div class="scanner-frame"></div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Scanner para Productos Fraccionarios:</strong> Detecta automáticamente códigos QR y códigos de barras. 
+                        Coloca el código dentro del marco azul para escanearlo.
+                    </div>
+                    <div class="row text-start">
+                        <div class="col-6">
+                            <small class="text-muted">
+                                <strong>📱 Códigos QR:</strong><br>
+                                • Cuadrados con puntos<br>
+                                • Datos de texto/URL<br>
+                                • Lectura 360°
+                            </small>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">
+                                <strong>📊 Códigos de Barras:</strong><br>
+                                • Líneas verticales<br>
+                                • EAN, UPC, Code 128<br>
+                                • Lectura horizontal
+                            </small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary mt-3" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cerrar Scanner
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<!-- Librerías para Scanner Universal -->
+<!-- QuaggaJS para códigos de barras (EAN, UPC, Code 128, etc.) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<!-- jsQR para códigos QR -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ========================================================================
+    // VARIABLES PRINCIPALES PARA MOVIMIENTO FRACCIONARIO
+    // ========================================================================
+    
     const codigoQrInput = document.getElementById('codigo_qr_fraccionario');
     const btnBuscar = document.getElementById('btn-buscar-producto');
+    const activarScannerBtn = document.getElementById('activarScannerBtn');
     const infoContainer = document.getElementById('info-producto-container');
     const alertasContainer = document.getElementById('alertas-container');
-    const unidadUtilizadaInput = document.getElementById('unidad_utilizada');
+    const unidadUtilizadaInput = document.getElementById('{{ form.unidad_utilizada.id_for_label }}');
     
-    // Función para buscar producto
+    // Variables para validación visual y búsqueda de productos
+    const productoInfoBusqueda = document.getElementById('productoInfoBusqueda');
+    const productoDetallesBusqueda = document.getElementById('productoDetallesBusqueda');
+    
+    // Variables del scanner universal
+    let scannerActivo = false;
+    let videoElement = null;
+    let canvasElement = null;
+    let canvasContext = null;
+    let intervalId = null;
+    
+    // Variables para detección de scanner físico
+    let ultimaTecla = 0;
+    let tiempoScanner = [];
+    let timeoutBusqueda = null;
+    let intentosReintentar = 0;
+    const MAX_REINTENTOS = 2;
+    
+    // ========================================================================
+    // FUNCIONES DE BÚSQUEDA DE PRODUCTOS FRACCIONARIOS CON VALIDACIÓN ROBUSTA
+    // ========================================================================
+    
+    // Función mejorada para buscar producto fraccionario con reintentos automáticos
+    function buscarProductoFraccionario(codigoQR, esReintento = false) {
+        if (codigoQR.length < 3) {
+            // Ocultar información si el código es muy corto
+            productoInfoBusqueda.classList.add('d-none');
+            actualizarValidacionVisual('neutro');
+            return;
+        }
+        
+        // Mostrar estado de carga
+        if (!esReintento) {
+            actualizarValidacionVisual('buscando');
+            productoInfoBusqueda.classList.remove('d-none');
+            productoInfoBusqueda.classList.remove('alert-success', 'alert-warning', 'alert-danger');
+            productoInfoBusqueda.classList.add('alert-info');
+            productoDetallesBusqueda.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                    <span>Buscando producto fraccionario: "${codigoQR}"...</span>
+                </div>
+            `;
+        }
+        
+        fetch(`{% url 'buscar_producto_fraccionable_qr' %}?codigo_qr=${encodeURIComponent(codigoQR)}`)
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    return response.json().then(data => Promise.reject(data));
+                }
+            })
+            .then(data => {
+                // Éxito: producto fraccionario encontrado
+                intentosReintentar = 0; // Resetear contador de reintentos
+                
+                let mensajeExtra = '';
+                if (data.mensaje && data.mensaje.includes('normalizado')) {
+                    mensajeExtra = `<br><small class="text-info"><i class="bi bi-info-circle"></i> ${data.mensaje}</small>`;
+                }
+                
+                productoDetallesBusqueda.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-8">
+                            <strong>${data.nombre}</strong><br>
+                            <small class="text-muted">
+                                Código: ${data.codigo_qr} | 
+                                Unidad Base: ${data.unidad_base} | 
+                                Capacidad: ${data.cantidad_unitaria} ${data.unidad_base} | 
+                                Disponible: ${data.cantidad_total_disponible.toFixed(2)} ${data.unidad_base}
+                            </small>
+                            ${mensajeExtra}
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <span class="badge bg-success">✓ Producto Fraccionario</span>
+                        </div>
+                    </div>
+                `;
+                productoInfoBusqueda.classList.remove('d-none');
+                productoInfoBusqueda.classList.remove('alert-danger', 'alert-warning', 'alert-info');
+                productoInfoBusqueda.classList.add('alert-success');
+                
+                // Actualizar validación visual a éxito
+                actualizarValidacionVisual('exito');
+                
+                // Mostrar información detallada del producto fraccionario
+                mostrarInfoProductoFraccionario(data);
+                limpiarAlertas();
+                
+                // Hacer foco en el siguiente campo
+                setTimeout(() => {
+                    document.getElementById('{{ form.tipo.id_for_label }}').focus();
+                }, 200);
+            })
+            .catch(error => {
+                // Verificar si es un producto NO fraccionario
+                if (error.es_no_fraccionable) {
+                    // PRODUCTO NORMAL: Mostrar mensaje de redirección
+                    intentosReintentar = 0;
+                    productoDetallesBusqueda.innerHTML = `
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-box text-warning me-2 fs-4"></i>
+                                    <div>
+                                        <strong class="text-warning">Producto Normal Detectado</strong><br>
+                                        <span class="fw-semibold">${error.nombre}</span>
+                                    </div>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle"></i> Este producto NO es fraccionario y debe procesarse 
+                                    en el <strong>Movimiento Rápido estándar</strong>.
+                                </small>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <a href="${error.url_movimiento_normal}" class="btn btn-warning">
+                                    <i class="bi bi-arrow-right"></i> Ir a Movimiento Rápido
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                    productoInfoBusqueda.classList.remove('d-none', 'alert-success', 'alert-danger');
+                    productoInfoBusqueda.classList.add('alert-warning');
+                    
+                    // Actualizar validación visual
+                    actualizarValidacionVisual('info');
+                    return;
+                }
+                
+                // Error: producto no encontrado u otro error
+                const mensajeError = error.error || 'Producto fraccionario no encontrado';
+                const codigoRecibido = error.codigo_recibido || codigoQR;
+                const sugerencia = error.sugerencia || 'Verifica que el código pertenezca a un producto fraccionario';
+                
+                // Si no es un reintento y quedan intentos, reintentar automáticamente
+                if (!esReintento && intentosReintentar < MAX_REINTENTOS) {
+                    intentosReintentar++;
+                    console.log(`🔄 Reintentando búsqueda fraccionaria (intento ${intentosReintentar}/${MAX_REINTENTOS}): ${codigoQR}`);
+                    
+                    // Reintento con una versión más limpia del código
+                    const codigoMasLimpio = limpiarCodigoAvanzado(codigoQR);
+                    setTimeout(() => {
+                        buscarProductoFraccionario(codigoMasLimpio, true);
+                    }, 300);
+                    return;
+                }
+                
+                // Mostrar error definitivo
+                intentosReintentar = 0;
+                productoDetallesBusqueda.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-exclamation-triangle text-warning me-2"></i> 
+                        <div>
+                            <strong>${mensajeError}</strong><br>
+                            <small>Código: "${codigoRecibido}"</small><br>
+                            <small class="text-muted">${sugerencia}</small>
+                        </div>
+                    </div>
+                `;
+                productoInfoBusqueda.classList.remove('d-none', 'alert-success', 'alert-info');
+                productoInfoBusqueda.classList.add('alert-warning');
+                
+                // Ocultar información detallada del producto
+                ocultarInfoProducto();
+                
+                // Actualizar validación visual a error
+                actualizarValidacionVisual('error');
+            });
+    }
+    
+    // Función para limpiar código con múltiples estrategias (igual que en movimiento rápido)
+    function limpiarCodigoAvanzado(codigo) {
+        if (!codigo) return '';
+        
+        // Estrategia 1: Limpieza básica
+        let codigoLimpio = codigo.toString().trim();
+        
+        // Estrategia 2: Remover caracteres invisibles comunes de scanners
+        codigoLimpio = codigoLimpio.replace(/[\r\n\t\x00-\x08\x0B\x0C\x0E-\x1f\x7f-\x9f]/g, '');
+        
+        // Estrategia 3: Remover espacios internos y externos
+        codigoLimpio = codigoLimpio.replace(/\s+/g, '');
+        
+        // Estrategia 4: Normalizar caracteres especiales
+        codigoLimpio = codigoLimpio.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        
+        // Estrategia 5: Convertir a mayúsculas para consistencia
+        codigoLimpio = codigoLimpio.toUpperCase();
+        
+        return codigoLimpio;
+    }
+    
+    // Función para actualizar la validación visual del campo
+    function actualizarValidacionVisual(estado) {
+        const campo = codigoQrInput;
+        
+        // Remover todas las clases de estado previas
+        campo.classList.remove('is-valid', 'is-invalid', 'field-searching', 'field-success', 'field-error', 'field-info');
+        campo.style.borderColor = '';
+        campo.style.backgroundColor = '';
+        
+        switch(estado) {
+            case 'exito':
+                campo.classList.add('is-valid', 'field-success');
+                break;
+            case 'info':
+                campo.classList.add('field-info');
+                break;
+            case 'error':
+                campo.classList.add('is-invalid', 'field-error');
+                break;
+            case 'buscando':
+                campo.classList.add('field-searching');
+                break;
+            case 'neutro':
+            default:
+                // Estado neutro - sin colores especiales
+                break;
+        }
+    }
+    
+    // Función para detectar si es un scanner físico
+    function detectarScannerFisico() {
+        const ahora = Date.now();
+        tiempoScanner.push(ahora);
+        
+        // Mantener solo los últimos 10 eventos
+        if (tiempoScanner.length > 10) {
+            tiempoScanner = tiempoScanner.slice(-10);
+        }
+        
+        // Si hay varios caracteres en menos de 100ms, probablemente es scanner físico
+        if (tiempoScanner.length >= 3) {
+            const tiempoTotal = tiempoScanner[tiempoScanner.length - 1] - tiempoScanner[0];
+            const caracteresporMs = tiempoScanner.length / tiempoTotal;
+            
+            // Si escribe más de 10 caracteres por segundo, es probable que sea scanner
+            return caracteresporMs > 0.01; // 10 chars/segundo
+        }
+        
+        return false;
+    }
+    
+    // Función principal para manejar cambios en el campo con debouncing inteligente
+    function manejarCambioCodigo(event) {
+        const esScanner = detectarScannerFisico();
+        let codigo = codigoQrInput.value;
+        
+        // Limpiar código automáticamente
+        const codigoLimpio = limpiarCodigoAvanzado(codigo);
+        
+        // Si el código fue limpiado, actualizar el campo
+        if (codigo !== codigoLimpio && codigoLimpio.length > 0) {
+            codigoQrInput.value = codigoLimpio;
+            // Mantener cursor al final
+            codigoQrInput.setSelectionRange(codigoLimpio.length, codigoLimpio.length);
+        }
+        
+        // Cancelar búsqueda anterior si existe
+        if (timeoutBusqueda) {
+            clearTimeout(timeoutBusqueda);
+        }
+        
+        // Debouncing inteligente: menos tiempo para scanners, más para escritura manual
+        const tiempoEspera = esScanner ? 100 : 500;
+        
+        timeoutBusqueda = setTimeout(() => {
+            if (codigoLimpio.length >= 3) {
+                console.log(`🔍 Buscando producto fraccionario: "${codigoLimpio}" (Scanner: ${esScanner})`);
+                buscarProductoFraccionario(codigoLimpio);
+            } else if (codigoLimpio.length === 0) {
+                // Campo vacío
+                productoInfoBusqueda.classList.add('d-none');
+                actualizarValidacionVisual('neutro');
+                ocultarInfoProducto();
+            } else {
+                // Código muy corto
+                actualizarValidacionVisual('neutro');
+            }
+        }, tiempoEspera);
+    }
+    
+    // ========================================================================
+    // FUNCIONES EXISTENTES PARA PRODUCTOS FRACCIONARIOS (PRESERVADAS)
+    // ========================================================================
+    
+    // Función para buscar producto (botón manual - preservada)
     function buscarProducto() {
         const codigo = codigoQrInput.value.trim();
         if (!codigo) {
@@ -219,34 +664,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Mostrar indicador de carga
-        btnBuscar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando...';
-        btnBuscar.disabled = true;
-        
-        fetch(`{% url 'buscar_producto_fraccionable_qr' %}?codigo_qr=${encodeURIComponent(codigo)}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    mostrarAlerta(data.error, 'danger');
-                    ocultarInfoProducto();
-                } else {
-                    mostrarInfoProducto(data);
-                    limpiarAlertas();
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                mostrarAlerta('Error al buscar el producto', 'danger');
-                ocultarInfoProducto();
-            })
-            .finally(() => {
-                btnBuscar.innerHTML = '<i class="fas fa-search"></i> Buscar';
-                btnBuscar.disabled = false;
-            });
+        // Usar la nueva función robusta
+        buscarProductoFraccionario(codigo);
     }
     
-    // Función para mostrar información del producto
-    function mostrarInfoProducto(producto) {
+    // Función para mostrar información del producto fraccionario (preservada y mejorada)
+    function mostrarInfoProductoFraccionario(producto) {
         const infoContent = document.getElementById('info-producto-content');
         const progressBar = document.getElementById('progress-bar-nivel');
         const progressText = document.getElementById('progress-text');
@@ -296,7 +719,9 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         
         // Auto-completar unidad utilizada
-        unidadUtilizadaInput.value = producto.unidad_base;
+        if (unidadUtilizadaInput) {
+            unidadUtilizadaInput.value = producto.unidad_base;
+        }
         
         // Mostrar alerta si stock bajo
         if (producto.stock_fraccionario_bajo) {
@@ -332,7 +757,439 @@ document.addEventListener('DOMContentLoaded', function() {
         alertasContainer.innerHTML = '';
     }
     
-    // Event listeners
+    // ========================================================================
+    // EVENTOS MEJORADOS PARA SCANNER FÍSICO Y MANUAL (MOVIMIENTO FRACCIONARIO)
+    // ========================================================================
+    
+    // Evento principal: input (escritura en tiempo real)
+    codigoQrInput.addEventListener('input', manejarCambioCodigo);
+    
+    // Evento de cambio (cuando el campo pierde foco o Enter)
+    codigoQrInput.addEventListener('change', function() {
+        console.log('📝 Evento change disparado (fraccionario)');
+        manejarCambioCodigo();
+    });
+    
+    // Evento keyup (útil para scanners que no disparan input correctamente)
+    codigoQrInput.addEventListener('keyup', function(e) {
+        // Solo procesar si es una tecla significativa (no flechas, ctrl, etc.)
+        if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+            manejarCambioCodigo();
+        }
+    });
+    
+    // Evento paste (copiar y pegar)
+    codigoQrInput.addEventListener('paste', function(e) {
+        console.log('📋 Evento paste disparado (fraccionario)');
+        // Esperar a que el paste se complete
+        setTimeout(() => {
+            manejarCambioCodigo();
+        }, 50);
+    });
+    
+    // Evento para Internet Explorer (compatibilidad legacy)
+    if (codigoQrInput.attachEvent) {
+        codigoQrInput.attachEvent('onpropertychange', function() {
+            if (event.propertyName === 'value') {
+                manejarCambioCodigo();
+            }
+        });
+    }
+    
+    // Evento focus - resetear estado visual
+    codigoQrInput.addEventListener('focus', function() {
+        if (this.value.length === 0) {
+            actualizarValidacionVisual('neutro');
+        }
+    });
+    
+    // Evento blur - validar una vez más al salir del campo
+    codigoQrInput.addEventListener('blur', function() {
+        if (this.value.length >= 3) {
+            // Forzar una última búsqueda al salir del campo
+            setTimeout(() => {
+                buscarProductoFraccionario(limpiarCodigoAvanzado(this.value));
+            }, 100);
+        }
+    });
+    
+    // ========================================================================
+    // FUNCIONALIDAD DE AUTO-LLENADO DE ÁREA PARA EMPLEADOS
+    // ========================================================================
+    
+    // Elementos para funcionalidad de empleados
+    const empleadoDestinatarioSelect = document.getElementById('{{ form.empleado_destinatario.id_for_label }}');
+    const areaDestinoDisplay = document.getElementById('areaDestinoDisplay');
+    
+    // Función para actualizar área automáticamente al seleccionar empleado destinatario
+    function actualizarAreaEmpleado() {
+        if (!empleadoDestinatarioSelect || !areaDestinoDisplay) {
+            console.warn('🚨 Elementos de área no encontrados:', {
+                empleadoSelect: !!empleadoDestinatarioSelect,
+                areaDisplay: !!areaDestinoDisplay
+            });
+            return;
+        }
+        
+        const selectedOption = empleadoDestinatarioSelect.options[empleadoDestinatarioSelect.selectedIndex];
+        
+        if (selectedOption && selectedOption.value && selectedOption.dataset.area) {
+            const area = selectedOption.dataset.area;
+            areaDestinoDisplay.value = area;
+            areaDestinoDisplay.className = 'form-control area-destino-success';
+            console.log(`✅ Área actualizada: ${area}`);
+        } else if (selectedOption && selectedOption.value) {
+            areaDestinoDisplay.value = 'Área no especificada';
+            areaDestinoDisplay.className = 'form-control area-destino-warning';
+            console.log('⚠️ Empleado sin área especificada');
+        } else {
+            areaDestinoDisplay.value = '';
+            areaDestinoDisplay.className = 'form-control';
+            console.log('📝 Campo área limpiado');
+        }
+    }
+    
+    // Event listener para empleado destinatario con debugging
+    if (empleadoDestinatarioSelect && areaDestinoDisplay) {
+        console.log('✅ Elementos de área encontrados correctamente');
+        console.log('ID empleado select:', empleadoDestinatarioSelect.id);
+        console.log('ID área display:', areaDestinoDisplay.id);
+        
+        empleadoDestinatarioSelect.addEventListener('change', function() {
+            console.log('📝 Evento change disparado en empleado destinatario');
+            actualizarAreaEmpleado();
+        });
+        
+        // Ejecutar al cargar para casos de edición
+        actualizarAreaEmpleado();
+    } else {
+        console.error('🚨 Error: No se encontraron los elementos de área');
+        console.log('Empleado select:', empleadoDestinatarioSelect);
+        console.log('Área display:', areaDestinoDisplay);
+    }
+    
+    // ========================================================================
+    // SCANNER UNIVERSAL - HÍBRIDO PARA QR Y CÓDIGOS DE BARRAS
+    // ========================================================================
+    
+    // Activar scanner universal
+    if (activarScannerBtn) {
+        activarScannerBtn.addEventListener('click', function() {
+            const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
+            scannerModal.show();
+            
+            // Inicializar scanner cuando se abra el modal
+            document.getElementById('scannerModal').addEventListener('shown.bs.modal', function() {
+                iniciarScannerUniversal();
+            });
+            
+            // Detener scanner cuando se cierre el modal
+            document.getElementById('scannerModal').addEventListener('hidden.bs.modal', function() {
+                detenerScannerUniversal();
+            });
+        });
+    }
+    
+    // Función principal del scanner universal (igual que en movimiento rápido)
+    async function iniciarScannerUniversal() {
+        // Verificar compatibilidad del navegador
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            mostrarError('Tu navegador no soporta acceso a la cámara. Usa entrada manual.');
+            return;
+        }
+        
+        // Verificar HTTPS (requerido para cámara en móviles)
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            mostrarErrorHTTPS();
+            return;
+        }
+        
+        try {
+            // Configurar elementos de video y canvas
+            setupVideoCanvas();
+            
+            // Solicitar acceso a la cámara con configuración optimizada
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment', // Cámara trasera en móviles
+                    width: { ideal: 1280, min: 640, max: 1920 },
+                    height: { ideal: 720, min: 480, max: 1080 },
+                    aspectRatio: { ideal: 16/9 },
+                    frameRate: { ideal: 30, min: 15 }
+                }
+            });
+            
+            videoElement.srcObject = stream;
+            
+            // Esperar a que el video se cargue completamente
+            await new Promise((resolve) => {
+                videoElement.addEventListener('loadedmetadata', () => {
+                    // Ajustar canvas al tamaño real del video
+                    canvasElement.width = videoElement.videoWidth;
+                    canvasElement.height = videoElement.videoHeight;
+                    resolve();
+                });
+            });
+            
+            await videoElement.play();
+            scannerActivo = true;
+            
+            mostrarMensaje('success', '📹 Scanner activo - Enfoca el código hacia la cámara');
+            
+            // Inicializar Quagga para códigos de barras
+            iniciarQuaggaScanner();
+            
+            // Inicializar jsQR para códigos QR (en paralelo)
+            iniciarQRScanner();
+            
+        } catch (error) {
+            console.error('Error al iniciar scanner:', error);
+            
+            if (error.name === 'NotAllowedError') {
+                mostrarError('Permisos de cámara denegados. Permite el acceso en la configuración del navegador.');
+            } else if (error.name === 'NotFoundError') {
+                mostrarError('No se encontró cámara en tu dispositivo.');
+            } else if (error.name === 'NotSupportedError') {
+                mostrarError('Tu navegador no soporta esta funcionalidad.');
+            } else {
+                mostrarError(`Error del scanner: ${error.message}`);
+            }
+        }
+    }
+    
+    // Configurar elementos de video y canvas
+    function setupVideoCanvas() {
+        const videoContainer = document.getElementById('qr-video');
+        videoContainer.innerHTML = '';
+        
+        // Crear elemento de video
+        videoElement = document.createElement('video');
+        videoElement.style.cssText = `
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #000;
+            border: none;
+            outline: none;
+            display: block;
+            margin: 0;
+            padding: 0;
+        `;
+        videoElement.setAttribute('autoplay', '');
+        videoElement.setAttribute('muted', '');
+        videoElement.setAttribute('playsinline', ''); // iOS compatibility
+        videoContainer.appendChild(videoElement);
+        
+        // Crear canvas para jsQR (completamente oculto)
+        canvasElement = document.createElement('canvas');
+        canvasContext = canvasElement.getContext('2d');
+        canvasElement.style.cssText = 'display: none; position: absolute; top: -9999px; left: -9999px;';
+        document.body.appendChild(canvasElement); // Agregar al body en lugar del contenedor
+    }
+    
+    // Inicializar Quagga para códigos de barras
+    function iniciarQuaggaScanner() {
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: videoElement,
+                constraints: {
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }
+            },
+            decoder: {
+                readers: [
+                    "code_128_reader",    // Code 128 (común en inventarios)
+                    "ean_reader",         // EAN-13 (productos comerciales)
+                    "ean_8_reader",       // EAN-8 (productos pequeños)
+                    "code_39_reader",     // Code 39 (uso industrial)
+                    "upc_reader",         // UPC-A (productos USA)
+                    "upc_e_reader",       // UPC-E (productos pequeños USA)
+                    "codabar_reader",     // Codabar (bibliotecas, bancos)
+                    "i2of5_reader"        // Interleaved 2 of 5
+                ]
+            },
+            locator: {
+                patchSize: "medium",
+                halfSample: true
+            },
+            numOfWorkers: 2,
+            frequency: 10, // Verificar cada 100ms
+            debug: false   // Sin debug en producción
+        }, function(err) {
+            if (err) {
+                console.error('Error Quagga:', err);
+                return;
+            }
+            
+            Quagga.start();
+            console.log('✅ Scanner de códigos de barras iniciado (fraccionario)');
+        });
+        
+        // Detectar códigos de barras
+        Quagga.onDetected(function(result) {
+            const codigo = result.codeResult.code;
+            const confianza = result.codeResult.confidence || 0;
+            
+            // Solo aceptar códigos con buena confianza
+            if (confianza > 70) {
+                console.log(`📊 Código de barras detectado (fraccionario): ${codigo} (confianza: ${confianza.toFixed(1)}%)`);
+                procesarCodigoDetectado(codigo, 'Código de Barras');
+            }
+        });
+    }
+    
+    // Inicializar jsQR para códigos QR
+    function iniciarQRScanner() {
+        intervalId = setInterval(() => {
+            if (scannerActivo && videoElement && videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                escanearQR();
+            }
+        }, 100); // Verificar cada 100ms
+        
+        console.log('✅ Scanner de códigos QR iniciado (fraccionario)');
+    }
+    
+    // Función para escanear códigos QR con jsQR
+    function escanearQR() {
+        if (!videoElement || !canvasElement || !canvasContext) return;
+        
+        // Ajustar canvas al video
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        
+        // Dibujar frame actual del video en canvas
+        canvasContext.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        
+        // Obtener datos de imagen
+        const imageData = canvasContext.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        
+        // Buscar código QR
+        const qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert"
+        });
+        
+        if (qrCode) {
+            console.log(`📱 Código QR detectado (fraccionario): ${qrCode.data}`);
+            procesarCodigoDetectado(qrCode.data, 'Código QR');
+        }
+    }
+    
+    // Procesar código detectado (común para QR y barras) - adaptado para fraccionario
+    function procesarCodigoDetectado(codigo, tipo) {
+        if (!scannerActivo) return; // Evitar detecciones múltiples
+        
+        scannerActivo = false; // Pausar scanner temporalmente
+        
+        // Sonido de confirmación
+        reproducirSonidoConfirmacion();
+        
+        // Feedback visual
+        mostrarMensaje('success', `✅ ${tipo} detectado: ${codigo}`);
+        
+        // Llenar campo de entrada
+        codigoQrInput.value = codigo;
+        
+        // Disparar evento 'input' para activar la búsqueda del producto fraccionario
+        const inputEvent = new Event('input', { bubbles: true });
+        codigoQrInput.dispatchEvent(inputEvent);
+        
+        // Buscar producto fraccionario automáticamente
+        buscarProductoFraccionario(codigo);
+        
+        // Cerrar modal después de un momento
+        setTimeout(() => {
+            bootstrap.Modal.getInstance(document.getElementById('scannerModal')).hide();
+            
+            // Hacer foco en el siguiente campo
+            document.getElementById('{{ form.tipo.id_for_label }}').focus();
+        }, 1000);
+    }
+    
+    // Detener scanner universal
+    function detenerScannerUniversal() {
+        scannerActivo = false;
+        
+        // Detener Quagga
+        if (typeof Quagga !== 'undefined') {
+            Quagga.stop();
+        }
+        
+        // Detener jsQR
+        if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+        
+        // Detener video stream
+        if (videoElement && videoElement.srcObject) {
+            const tracks = videoElement.srcObject.getTracks();
+            tracks.forEach(track => track.stop());
+            videoElement.srcObject = null;
+        }
+        
+        console.log('🛑 Scanner universal detenido (fraccionario)');
+    }
+    
+    // Funciones de utilidad para el scanner
+    function mostrarMensaje(tipo, mensaje) {
+        const iconos = {
+            success: '✅',
+            warning: '⚠️', 
+            error: '❌',
+            info: 'ℹ️'
+        };
+        
+        const clases = {
+            success: 'alert-success',
+            warning: 'alert-warning',
+            error: 'alert-danger', 
+            info: 'alert-info'
+        };
+        
+        document.getElementById('scanner-status').innerHTML = 
+            `<div class="alert ${clases[tipo]}">
+                ${iconos[tipo]} ${mensaje}
+            </div>`;
+    }
+    
+    function mostrarError(mensaje) {
+        mostrarMensaje('error', mensaje);
+    }
+    
+    function mostrarErrorHTTPS() {
+        mostrarMensaje('warning', 
+            'Para usar la cámara necesitas conexión HTTPS. Mientras tanto, escribe el código manualmente.');
+    }
+    
+    function reproducirSonidoConfirmacion() {
+        try {
+            // Crear sonido de beep de confirmación
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800; // Frecuencia del beep
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch (e) {
+            // Silenciosamente ignorar errores de audio
+        }
+    }
+    
+    // ========================================================================
+    // EVENTOS LEGACY (preservados para compatibilidad)
+    // ========================================================================
+    
+    // Event listeners preservados para compatibilidad
     btnBuscar.addEventListener('click', buscarProducto);
     
     // Buscar automáticamente cuando se presiona Enter en el campo de código QR
@@ -343,10 +1200,57 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Buscar automáticamente cuando el campo pierde el foco y tiene contenido
-    codigoQrInput.addEventListener('blur', function() {
-        if (this.value.trim()) {
-            buscarProducto();
+    // Auto-focus en el campo de código QR
+    codigoQrInput.focus();
+    
+    // ========================================================================
+    // VALIDACIÓN DEL FORMULARIO FRACCIONARIO
+    // ========================================================================
+    
+    document.getElementById('form-fraccionario').addEventListener('submit', function(e) {
+        const codigoQR = codigoQrInput.value.trim();
+        const tipo = document.getElementById('{{ form.tipo.id_for_label }}').value;
+        const cantidadFraccionaria = document.getElementById('{{ form.cantidad_fraccionaria.id_for_label }}').value;
+        const unidadUtilizada = document.getElementById('{{ form.unidad_utilizada.id_for_label }}').value;
+        const sucursalDestino = document.getElementById('{{ form.sucursal_destino.id_for_label }}').value;
+        const usuarioRegistro = document.getElementById('{{ form.usuario_registro_empleado.id_for_label }}').value;
+        const empleadoDestinatario = document.getElementById('{{ form.empleado_destinatario.id_for_label }}').value;
+        
+        // Validar campos obligatorios
+        if (!codigoQR || !tipo || !cantidadFraccionaria || !unidadUtilizada || !sucursalDestino || !usuarioRegistro || !empleadoDestinatario) {
+            e.preventDefault();
+            
+            // Identificar qué campo específico falta
+            const camposFaltantes = [];
+            if (!codigoQR) camposFaltantes.push('Código QR');
+            if (!tipo) camposFaltantes.push('Tipo de Movimiento');
+            if (!cantidadFraccionaria) camposFaltantes.push('Cantidad Fraccionaria');
+            if (!unidadUtilizada) camposFaltantes.push('Unidad Utilizada');
+            if (!sucursalDestino) camposFaltantes.push('Sucursal Destino');
+            if (!usuarioRegistro) camposFaltantes.push('Usuario que Registra');
+            if (!empleadoDestinatario) camposFaltantes.push('Empleado Destinatario');
+            
+            alert(`⚠️ Por favor, completa los siguientes campos obligatorios:\n• ${camposFaltantes.join('\n• ')}`);
+            return false;
+        }
+        
+        if (parseFloat(cantidadFraccionaria) <= 0) {
+            e.preventDefault();
+            alert('⚠️ La cantidad fraccionaria debe ser mayor que cero.');
+            return false;
+        }
+        
+        // Confirmación antes de registrar con información específica para fraccionarios
+        const tipoTexto = document.getElementById('{{ form.tipo.id_for_label }}').options[document.getElementById('{{ form.tipo.id_for_label }}').selectedIndex].text;
+        const sucursalTexto = document.getElementById('{{ form.sucursal_destino.id_for_label }}').options[document.getElementById('{{ form.sucursal_destino.id_for_label }}').selectedIndex].text;
+        
+        if (!confirm(`¿Confirmas registrar el siguiente movimiento fraccionario?\n\n` +
+                    `• Tipo: ${tipoTexto}\n` +
+                    `• Cantidad: ${cantidadFraccionaria} ${unidadUtilizada}\n` +
+                    `• Producto: ${codigoQR}\n` +
+                    `• Sucursal destino: ${sucursalTexto}`)) {
+            e.preventDefault();
+            return false;
         }
     });
 });
