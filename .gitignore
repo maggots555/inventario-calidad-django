@@ -53,3 +53,7 @@ ssl_certs/
 .coverage
 .pytest_cache/
 .tox/
+
+# Other projects (not part of inventario-calidad-django)
+inventario_calidad_backup/
+mi_sitio_descontinuado/
