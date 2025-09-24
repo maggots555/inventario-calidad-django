@@ -551,3 +551,251 @@
         font-size: 0.9rem;
     }
 }
+
+/* =============================================================================
+   COMPONENTES PARA PRODUCTOS FRACCIONABLES
+   Descripción: Barras de progreso, alertas y elementos visuales para
+   productos que se pueden consumir en porciones (líquidos, granulados)
+   ============================================================================= */
+
+/* ===== BARRA DE PROGRESO FRACCIONARIO ===== */
+.progress-fraccionario {
+    height: 24px;
+    background-color: #e5e7eb;
+    border-radius: var(--border-radius-lg);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-2);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.progress-bar-fraccionario {
+    height: 100%;
+    border-radius: var(--border-radius-lg);
+    transition: all 0.3s ease;
+    position: relative;
+    background: linear-gradient(135deg, var(--success-color), #34d399);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* Estados de la barra según porcentaje */
+.progress-bar-fraccionario.nivel-alto {
+    background: linear-gradient(135deg, var(--success-color), #34d399);
+}
+
+.progress-bar-fraccionario.nivel-medio {
+    background: linear-gradient(135deg, var(--warning-color), #fbbf24);
+}
+
+.progress-bar-fraccionario.nivel-bajo {
+    background: linear-gradient(135deg, var(--danger-color), #f87171);
+    animation: pulseWarning 2s infinite;
+}
+
+@keyframes pulseWarning {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+
+/* ===== INFORMACIÓN DEL PRODUCTO FRACCIONABLE ===== */
+.info-fraccionario {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.info-fraccionario .titulo {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.info-fraccionario .titulo::before {
+    content: '💧';
+    font-size: 1.2rem;
+}
+
+.info-fraccionario .detalle {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
+.info-fraccionario .item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2);
+    background: white;
+    border-radius: var(--border-radius);
+    border: 1px solid #e5e7eb;
+}
+
+.info-fraccionario .label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.info-fraccionario .valor {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* ===== ALERTAS ESPECÍFICAS PARA FRACCIONABLES ===== */
+.alerta-fraccionario {
+    background: linear-gradient(135deg, #fef2f2 0%, #fed7d7 100%);
+    border: 1px solid var(--danger-color);
+    border-left: 4px solid var(--danger-color);
+    border-radius: var(--border-radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+    position: relative;
+}
+
+.alerta-fraccionario::before {
+    content: '⚠️';
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-3);
+    font-size: 1.2rem;
+    animation: bounce 2s infinite;
+}
+
+.alerta-fraccionario .titulo {
+    font-weight: 600;
+    color: #dc2626;
+    margin-bottom: var(--space-2);
+}
+
+.alerta-fraccionario .mensaje {
+    color: #7f1d1d;
+    font-size: 0.875rem;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+}
+
+/* ===== BADGE PARA TIPO DE PRODUCTO ===== */
+.badge-fraccionable {
+    background: linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%);
+    color: #5b21b6;
+    border: 1px solid #a855f7;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--border-radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-normal {
+    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+    color: #374151;
+    border: 1px solid #9ca3af;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--border-radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ===== FORMULARIO FRACCIONARIO ===== */
+.form-fraccionario {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #0ea5e9;
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-4);
+}
+
+.form-fraccionario .titulo-seccion {
+    color: #0c4a6e;
+    font-weight: 600;
+    margin-bottom: var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.form-fraccionario .titulo-seccion::before {
+    content: '🧪';
+    font-size: 1.2rem;
+}
+
+/* Campos específicos para cantidad fraccionaria */
+.input-fraccionario {
+    border: 2px solid #0ea5e9 !important;
+    background: rgba(240, 249, 255, 0.5);
+    transition: all 0.3s ease;
+}
+
+.input-fraccionario:focus {
+    border-color: #0284c7 !important;
+    box-shadow: 0 0 0 0.2rem rgba(14, 165, 233, 0.15) !important;
+    background: white;
+}
+
+/* ===== INDICADORES VISUALES ===== */
+.indicador-nivel {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--border-radius-full);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.indicador-nivel.alto {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #34d399;
+}
+
+.indicador-nivel.medio {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fbbf24;
+}
+
+.indicador-nivel.bajo {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #f87171;
+}
+
+/* ===== RESPONSIVE PARA COMPONENTES FRACCIONABLES ===== */
+@media (max-width: 768px) {
+    .info-fraccionario .detalle {
+        grid-template-columns: 1fr;
+    }
+    
+    .progress-fraccionario {
+        height: 20px;
+    }
+    
+    .progress-bar-fraccionario {
+        font-size: 0.7rem;
+    }
+    
+    .form-fraccionario {
+        padding: var(--space-4);
+    }
+}

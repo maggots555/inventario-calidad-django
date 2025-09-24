@@ -17,6 +17,7 @@ urlpatterns = [
     path('movimientos/', views.lista_movimientos, name='lista_movimientos'),
     path('movimientos/crear/', views.crear_movimiento, name='crear_movimiento'),
     path('movimientos/rapido/', views.movimiento_rapido, name='movimiento_rapido'),
+    path('movimientos/fraccionario/', views.movimiento_fraccionario, name='movimiento_fraccionario'),
     
     # Gestión de sucursales
     path('sucursales/', views.lista_sucursales, name='lista_sucursales'),
@@ -32,6 +33,7 @@ urlpatterns = [
     
     # API endpoints
     path('api/buscar-producto-qr/', views.buscar_producto_qr, name='buscar_producto_qr'),
+    path('api/buscar-producto-fraccionable-qr/', views.buscar_producto_fraccionable_qr, name='buscar_producto_fraccionable_qr'),
     
     # Reportes
     path('reportes/excel/', views.descargar_reporte_excel, name='descargar_reporte_excel'),

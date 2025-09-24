@@ -375,7 +375,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 200);
             })
             .catch(error => {
-                // Error: producto no encontrado
+                // Verificar si es un producto fraccionario
+                if (error.es_fraccionable) {
+                    // PRODUCTO FRACCIONARIO: Mostrar mensaje de redirección
+                    intentosReintentar = 0;
+                    productoDetalles.innerHTML = `
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-droplet-half text-info me-2 fs-4"></i>
+                                    <div>
+                                        <strong class="text-info">Producto Fraccionario Detectado</strong><br>
+                                        <span class="fw-semibold">${error.nombre}</span>
+                                    </div>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle"></i> Este producto requiere manejo fraccionario en <strong>${error.unidad_base}</strong> 
+                                    (${error.cantidad_unitaria} ${error.unidad_base} por unidad).
+                                </small>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <a href="${error.url_fraccionario}" class="btn btn-info">
+                                    <i class="bi bi-arrow-right"></i> Ir a Movimiento Fraccionario
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                    productoInfo.classList.remove('d-none', 'alert-success', 'alert-warning');
+                    productoInfo.classList.add('alert-info');
+                    
+                    // Actualizar validación visual
+                    actualizarValidacionVisual('info');
+                    return;
+                }
+                
+                // Error: producto no encontrado u otro error
                 const mensajeError = error.error || 'Producto no encontrado';
                 const codigoRecibido = error.codigo_recibido || codigoQR;
                 const sugerencia = error.sugerencia || 'Verifica que el código sea correcto';
@@ -449,6 +483,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 campo.classList.add('is-valid');
                 campo.style.borderColor = '#28a745';
                 campo.style.backgroundColor = '#d4edda';
+                break;
+            case 'info':
+                campo.style.borderColor = '#17a2b8';
+                campo.style.backgroundColor = '#d1ecf1';
                 break;
             case 'error':
                 campo.classList.add('is-invalid');

@@ -86,6 +86,29 @@ class Producto(models.Model):
     stock_minimo = models.PositiveIntegerField(default=5, help_text="Cantidad mínima antes de alerta")
     ubicacion = models.CharField(max_length=100, blank=True, help_text="Ubicación física en almacén")
     
+    # Campos para manejo fraccionario (productos líquidos, granulados, etc.)
+    es_fraccionable = models.BooleanField(
+        default=False, 
+        help_text="¿Se puede consumir en porciones? (ej: líquidos, granulados)"
+    )
+    unidad_base = models.CharField(
+        max_length=20, 
+        default='unidades', 
+        help_text="Unidad de medida (ml, litros, kg, gramos, etc.)"
+    )
+    cantidad_unitaria = models.FloatField(
+        default=1.0, 
+        help_text="Cantidad por unidad completa (ej: 1000ml por botella)"
+    )
+    cantidad_actual = models.FloatField(
+        default=0.0, 
+        help_text="Cantidad real disponible en la unidad base"
+    )
+    cantidad_minima_alerta = models.FloatField(
+        default=0.0, 
+        help_text="Alerta cuando esté por debajo de este nivel"
+    )
+    
     # Información adicional
     proveedor = models.CharField(max_length=100, blank=True, help_text="Proveedor del producto")
     costo_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Costo por unidad")
@@ -154,6 +177,51 @@ class Producto(models.Model):
         """
         return self.cantidad * self.costo_unitario
     
+    # Métodos para manejo de productos fraccionables
+    def porcentaje_disponible(self):
+        """
+        Calcula el porcentaje disponible del producto fraccionable
+        Retorna 0-100 representando el porcentaje de la unidad actual
+        """
+        if not self.es_fraccionable or self.cantidad_unitaria == 0:
+            return 100 if self.cantidad > 0 else 0
+        
+        # Asegurar que cantidad_actual no sea negativa
+        cantidad_actual_segura = max(0, self.cantidad_actual)
+        porcentaje = (cantidad_actual_segura / self.cantidad_unitaria) * 100
+        
+        # Retornar entre 0 y 100
+        return max(0, min(100, porcentaje))
+    
+    def stock_fraccionario_bajo(self):
+        """
+        Verifica si el stock fraccionario está bajo el mínimo
+        """
+        if not self.es_fraccionable:
+            return self.stock_bajo()
+        
+        return self.cantidad_actual <= self.cantidad_minima_alerta
+    
+    def cantidad_total_disponible(self):
+        """
+        Calcula la cantidad total disponible incluyendo unidades completas y fraccionarias
+        """
+        if not self.es_fraccionable:
+            return self.cantidad
+        
+        # Unidades completas en stock (sin contar la actual) + cantidad actual
+        unidades_completas = max(0, self.cantidad - 1) * self.cantidad_unitaria if self.cantidad > 0 else 0
+        return unidades_completas + self.cantidad_actual
+    
+    def puede_consumir(self, cantidad_solicitada):
+        """
+        Verifica si se puede consumir la cantidad solicitada
+        """
+        if not self.es_fraccionable:
+            return self.cantidad >= cantidad_solicitada
+        
+        return self.cantidad_total_disponible() >= cantidad_solicitada
+    
     def __str__(self):
         return f"{self.codigo_qr} - {self.nombre}"
     
@@ -188,6 +256,22 @@ class Movimiento(models.Model):
     tipo = models.CharField(max_length=15, choices=TIPO_CHOICES, help_text="Tipo de movimiento")
     cantidad = models.PositiveIntegerField(help_text="Cantidad del movimiento")
     motivo = models.CharField(max_length=20, choices=MOTIVO_CHOICES, help_text="Motivo del movimiento")
+    
+    # Campos para movimientos fraccionarios
+    es_movimiento_fraccionario = models.BooleanField(
+        default=False,
+        help_text="Indica si este movimiento es fraccionario (consumo parcial)"
+    )
+    cantidad_fraccionaria = models.FloatField(
+        null=True, 
+        blank=True, 
+        help_text="Cantidad exacta en unidad base (ej: 600ml)"
+    )
+    unidad_utilizada = models.CharField(
+        max_length=20, 
+        blank=True, 
+        help_text="Unidad de medida utilizada (ml, gramos, etc.)"
+    )
     
     # Información del destinatario (cuando aplique)
     destinatario = models.CharField(max_length=100, blank=True, help_text="Nombre del destinatario")
@@ -236,29 +320,114 @@ class Movimiento(models.Model):
     def save(self, *args, **kwargs):
         """
         Actualiza automáticamente el stock del producto y registra stocks de auditoría
+        Incluye lógica para movimientos fraccionarios
         """
         # Si es un movimiento nuevo, registrar stock anterior
         if not self.pk:
             self.stock_anterior = self.producto.cantidad
             
-            # Calcular nuevo stock según el tipo de movimiento
-            if self.tipo in ['entrada', 'devolucion']:
-                nuevo_stock = self.producto.cantidad + self.cantidad
-            elif self.tipo == 'salida':
-                nuevo_stock = max(0, self.producto.cantidad - self.cantidad)
-            else:  # ajuste
-                nuevo_stock = self.cantidad
+            if self.es_movimiento_fraccionario and self.producto.es_fraccionable:
+                # Manejo de movimientos fraccionarios
+                self._procesar_movimiento_fraccionario()
+            else:
+                # Manejo de movimientos tradicionales (unidades completas)
+                self._procesar_movimiento_tradicional()
             
-            self.stock_posterior = nuevo_stock
-            
-            # Actualizar el stock del producto
-            self.producto.cantidad = nuevo_stock
-            self.producto.save()
-        
         super().save(*args, **kwargs)
     
+    def _procesar_movimiento_fraccionario(self):
+        """
+        Procesa movimientos fraccionarios (consumo parcial de productos)
+        """
+        cantidad_solicitada = self.cantidad_fraccionaria or 0
+        
+        if self.tipo == 'salida':
+            # Verificar si hay suficiente cantidad disponible
+            if self.producto.cantidad_actual >= cantidad_solicitada:
+                # Consumir solo de la unidad actual
+                self.producto.cantidad_actual -= cantidad_solicitada
+            else:
+                # Enfoque simplificado: trabajar con cantidades totales
+                total_disponible_actual = self.producto.cantidad_total_disponible()
+                total_despues_consumo = total_disponible_actual - cantidad_solicitada
+                
+                if total_despues_consumo >= 0:
+                    # Calcular nuevas unidades y cantidad actual
+                    nuevas_unidades_completas = int(total_despues_consumo / self.producto.cantidad_unitaria)
+                    nueva_cantidad_actual = total_despues_consumo % self.producto.cantidad_unitaria
+                    
+                    # Si hay resto, significa que hay una unidad parcial
+                    if nueva_cantidad_actual > 0:
+                        self.producto.cantidad = nuevas_unidades_completas + 1
+                        self.producto.cantidad_actual = nueva_cantidad_actual
+                    else:
+                        # No hay resto, todo son unidades completas
+                        if nuevas_unidades_completas > 0:
+                            self.producto.cantidad = nuevas_unidades_completas
+                            self.producto.cantidad_actual = self.producto.cantidad_unitaria
+                        else:
+                            # No queda nada
+                            self.producto.cantidad = 0
+                            self.producto.cantidad_actual = 0
+                else:
+                    # No hay suficiente stock (no debería pasar por validación previa)
+                    self.producto.cantidad_actual = 0
+                    self.producto.cantidad = 0
+                    
+        elif self.tipo in ['entrada', 'devolucion']:
+            # Para entradas fraccionarias, agregar a la cantidad actual
+            self.producto.cantidad_actual += cantidad_solicitada
+            
+            # Si excede la cantidad unitaria, crear unidades completas
+            while self.producto.cantidad_actual >= self.producto.cantidad_unitaria:
+                self.producto.cantidad_actual -= self.producto.cantidad_unitaria
+                self.producto.cantidad += 1
+                
+        # Registrar el stock posterior
+        self.stock_posterior = self.producto.cantidad
+        
+        # Guardar los cambios en el producto
+        self.producto.save()
+    
+    def _procesar_movimiento_tradicional(self):
+        """
+        Procesa movimientos tradicionales (unidades completas)
+        """
+        # Calcular nuevo stock según el tipo de movimiento
+        if self.tipo in ['entrada', 'devolucion']:
+            nuevo_stock = self.producto.cantidad + self.cantidad
+            
+            # Si es un producto fraccionable y no tiene cantidad_actual, inicializar
+            if self.producto.es_fraccionable and self.producto.cantidad_actual == 0:
+                self.producto.cantidad_actual = self.producto.cantidad_unitaria
+                
+        elif self.tipo == 'salida':
+            nuevo_stock = max(0, self.producto.cantidad - self.cantidad)
+            
+            # Si es fraccionable y se queda sin stock, resetear cantidad_actual
+            if self.producto.es_fraccionable and nuevo_stock == 0:
+                self.producto.cantidad_actual = 0
+                
+        else:  # ajuste
+            nuevo_stock = self.cantidad
+            
+        self.stock_posterior = nuevo_stock
+        
+        # Actualizar el stock del producto
+        self.producto.cantidad = nuevo_stock
+        self.producto.save()
+    
+    def cantidad_display(self):
+        """
+        Retorna la representación correcta de la cantidad según el tipo de movimiento
+        """
+        if self.es_movimiento_fraccionario:
+            return f"{self.cantidad_fraccionaria} {self.unidad_utilizada}"
+        return f"{self.cantidad} unidades"
+    
     def __str__(self):
-        return f"{self.tipo.title()} - {self.producto.nombre} ({self.cantidad} unidades)"
+        cantidad_texto = self.cantidad_display()
+        return f"{self.tipo.title()} - {self.producto.nombre} ({cantidad_texto})"
     
     class Meta:
         ordering = ['-fecha_movimiento']

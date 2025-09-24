@@ -1,12 +1,13 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
+from django.urls import reverse
 from django.db.models import Q, Sum, Count, F
 from django.db import models
 from django.utils import timezone
 from datetime import datetime, timedelta
 from .models import Producto, Movimiento, Sucursal, Empleado
-from .forms import ProductoForm, MovimientoForm, SucursalForm, MovimientoRapidoForm, EmpleadoForm
+from .forms import ProductoForm, MovimientoForm, SucursalForm, MovimientoRapidoForm, EmpleadoForm, MovimientoFraccionarioForm
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
@@ -23,8 +24,16 @@ def dashboard(request):
         total=Sum(F('cantidad') * F('costo_unitario'))
     )['total'] or 0
     
-    # Productos con stock bajo (alertas)
+    # Productos con stock bajo (alertas tradicionales)
     alertas_stock = Producto.objects.filter(cantidad__lte=F('stock_minimo'))[:10]
+    
+    # Alertas específicas para productos fraccionables
+    alertas_fraccionables = []
+    productos_fraccionables = Producto.objects.filter(es_fraccionable=True)
+    for producto in productos_fraccionables:
+        if producto.stock_fraccionario_bajo():
+            alertas_fraccionables.append(producto)
+    alertas_fraccionables = alertas_fraccionables[:10]
     
     # Movimientos recientes
     movimientos_recientes = Movimiento.objects.select_related('producto', 'sucursal_destino')[:10]
@@ -53,6 +62,7 @@ def dashboard(request):
         'productos_stock_bajo': productos_stock_bajo,
         'valor_total_inventario': valor_total_inventario,
         'alertas_stock': alertas_stock,
+        'alertas_fraccionables': alertas_fraccionables,  # Nuevas alertas fraccionables
         'movimientos_recientes': movimientos_recientes,
         'productos_mas_usados': productos_mas_usados,
         'movimientos_por_categoria': movimientos_por_categoria,
@@ -205,6 +215,7 @@ def lista_movimientos(request):
     producto_id = request.GET.get('producto')
     fecha_desde = request.GET.get('fecha_desde')
     fecha_hasta = request.GET.get('fecha_hasta')
+    fraccionario = request.GET.get('fraccionario')
     
     if tipo:
         movimientos = movimientos.filter(tipo=tipo)
@@ -217,6 +228,11 @@ def lista_movimientos(request):
     
     if fecha_hasta:
         movimientos = movimientos.filter(fecha_movimiento__lte=fecha_hasta)
+    
+    if fraccionario == 'true':
+        movimientos = movimientos.filter(es_movimiento_fraccionario=True)
+    elif fraccionario == 'false':
+        movimientos = movimientos.filter(es_movimiento_fraccionario=False)
     
     # Paginación (opcional: mostrar solo los primeros 50)
     movimientos_limitados = movimientos[:50]
@@ -278,6 +294,38 @@ def movimiento_rapido(request):
     return render(request, 'inventario/movimiento_rapido.html', {
         'form': form,
         'titulo': 'Movimiento Rápido (Scanner QR)'
+    })
+
+def movimiento_fraccionario(request):
+    """
+    Vista para movimientos fraccionarios (consumo parcial de productos)
+    """
+    if request.method == 'POST':
+        form = MovimientoFraccionarioForm(request.POST)
+        if form.is_valid():
+            movimiento = form.save()
+            producto = movimiento.producto
+            
+            # Mensaje personalizado para movimientos fraccionarios
+            if movimiento.es_movimiento_fraccionario:
+                cantidad_restante = producto.cantidad_actual
+                porcentaje = producto.porcentaje_disponible()
+                messages.success(
+                    request, 
+                    f'Movimiento fraccionario registrado: {producto.nombre}. '
+                    f'Consumido: {movimiento.cantidad_fraccionaria} {movimiento.unidad_utilizada}. '
+                    f'Restante: {cantidad_restante:.2f} {producto.unidad_base} ({porcentaje:.1f}%)'
+                )
+            else:
+                messages.success(request, f'Movimiento registrado: {producto.nombre}')
+                
+            return redirect('movimiento_fraccionario')
+    else:
+        form = MovimientoFraccionarioForm()
+    
+    return render(request, 'inventario/movimiento_fraccionario.html', {
+        'form': form,
+        'titulo': 'Movimiento Fraccionario (Consumo Parcial)'
     })
 
 # ===== GESTIÓN DE SUCURSALES =====
@@ -396,6 +444,19 @@ def buscar_producto_qr(request):
             'debug': f'Buscando: "{codigo_qr}" (longitud: {len(codigo_qr)})'
         }, status=404)
     
+    # VALIDACIÓN: Verificar si es un producto fraccionario
+    if producto.es_fraccionable:
+        return JsonResponse({
+            'error': 'Producto fraccionable detectado',
+            'es_fraccionable': True,
+            'nombre': producto.nombre,
+            'codigo_qr': producto.codigo_qr,
+            'unidad_base': producto.unidad_base,
+            'cantidad_unitaria': producto.cantidad_unitaria,
+            'mensaje': f'Este producto ({producto.nombre}) requiere manejo fraccionario en {producto.unidad_base}. Use el formulario de movimientos fraccionarios.',
+            'url_fraccionario': reverse('movimiento_fraccionario')
+        }, status=400)
+    
     data = {
         'id': producto.id,
         'nombre': producto.nombre,
@@ -404,6 +465,65 @@ def buscar_producto_qr(request):
         'categoria': producto.get_categoria_display(),
         'ubicacion': producto.ubicacion,
     }
+    return JsonResponse(data)
+
+
+def buscar_producto_fraccionable_qr(request):
+    """
+    API endpoint para buscar producto fraccionable por código QR
+    Proporciona información detallada sobre el estado fraccionario
+    """
+    codigo_qr_raw = request.GET.get('codigo_qr')
+    
+    if not codigo_qr_raw:
+        return JsonResponse({'error': 'Código QR requerido'}, status=400)
+    
+    # Limpiar código de caracteres invisibles y problemáticos
+    import re
+    codigo_qr = re.sub(r'[\r\n\t\x00-\x1f\x7f-\x9f]', '', codigo_qr_raw)
+    codigo_qr = codigo_qr.strip()
+    codigo_qr = re.sub(r'\s+', '', codigo_qr)
+    
+    if not codigo_qr:
+        return JsonResponse({
+            'error': 'Código QR vacío después de limpieza',
+            'codigo_recibido': repr(codigo_qr_raw)
+        }, status=400)
+    
+    try:
+        producto = Producto.objects.get(codigo_qr__iexact=codigo_qr)
+    except Producto.DoesNotExist:
+        return JsonResponse({
+            'error': 'Producto no encontrado',
+            'codigo_buscado': codigo_qr
+        }, status=404)
+    
+    # Verificar si el producto es fraccionable
+    if not producto.es_fraccionable:
+        return JsonResponse({
+            'error': 'Este producto no es fraccionable',
+            'producto_nombre': producto.nombre,
+            'es_fraccionable': False
+        }, status=400)
+    
+    # Preparar datos específicos para productos fraccionables
+    data = {
+        'id': producto.id,
+        'nombre': producto.nombre,
+        'codigo_qr': producto.codigo_qr,
+        'es_fraccionable': producto.es_fraccionable,
+        'unidad_base': producto.unidad_base,
+        'cantidad_unitaria': producto.cantidad_unitaria,
+        'cantidad_actual': producto.cantidad_actual,
+        'cantidad_minima_alerta': producto.cantidad_minima_alerta,
+        'cantidad_total_disponible': producto.cantidad_total_disponible(),
+        'porcentaje_disponible': producto.porcentaje_disponible(),
+        'stock_fraccionario_bajo': producto.stock_fraccionario_bajo(),
+        'unidades_completas': producto.cantidad,
+        'categoria': producto.get_categoria_display(),
+        'ubicacion': producto.ubicacion,
+    }
+    
     return JsonResponse(data)
 
 

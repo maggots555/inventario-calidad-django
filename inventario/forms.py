@@ -32,7 +32,10 @@ class ProductoForm(forms.ModelForm):
         fields = [
             'nombre', 'descripcion', 'categoria', 'tipo',
             'cantidad', 'stock_minimo', 'ubicacion',
-            'proveedor', 'costo_unitario', 'estado_calidad'
+            'proveedor', 'costo_unitario', 'estado_calidad',
+            # Nuevos campos fraccionarios
+            'es_fraccionable', 'unidad_base', 'cantidad_unitaria', 
+            'cantidad_actual', 'cantidad_minima_alerta'
         ]
         widgets = {
             'nombre': forms.TextInput(attrs={
@@ -71,7 +74,53 @@ class ProductoForm(forms.ModelForm):
                 'placeholder': '0.00'
             }),
             'estado_calidad': forms.Select(attrs={'class': 'form-control'}),
+            # Nuevos widgets para campos fraccionarios
+            'es_fraccionable': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'id_es_fraccionable'
+            }),
+            'unidad_base': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: ml, litros, kg, gramos',
+                'id': 'id_unidad_base'
+            }),
+            'cantidad_unitaria': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0.01',
+                'placeholder': 'Ej: 1000 (ml por botella)',
+                'id': 'id_cantidad_unitaria'
+            }),
+            'cantidad_actual': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0',
+                'placeholder': 'Cantidad disponible actualmente',
+                'id': 'id_cantidad_actual'
+            }),
+            'cantidad_minima_alerta': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0',
+                'placeholder': 'Alerta cuando esté por debajo de este nivel',
+                'id': 'id_cantidad_minima_alerta'
+            }),
         }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Configurar campos fraccionarios como opcionales inicialmente
+        self.fields['unidad_base'].required = False
+        self.fields['cantidad_unitaria'].required = False
+        self.fields['cantidad_actual'].required = False
+        self.fields['cantidad_minima_alerta'].required = False
+        
+        # Agregar ayuda contextual
+        self.fields['es_fraccionable'].help_text = "Marque si el producto se puede consumir en porciones (ej: líquidos, granulados)"
+        self.fields['unidad_base'].help_text = "Unidad de medida base (ml, litros, gramos, kg)"
+        self.fields['cantidad_unitaria'].help_text = "Cantidad que contiene cada unidad completa (ej: 1000ml por botella)"
+        self.fields['cantidad_actual'].help_text = "Cantidad disponible en la unidad abierta actualmente"
+        self.fields['cantidad_minima_alerta'].help_text = "Nivel mínimo antes de mostrar alerta de stock bajo"
 
 class MovimientoForm(forms.ModelForm):
     """
@@ -356,3 +405,174 @@ class EmpleadoForm(forms.ModelForm):
                 'class': 'form-check-input'
             }),
         }
+
+
+class MovimientoFraccionarioForm(forms.ModelForm):
+    """
+    Formulario especializado para movimientos fraccionarios (consumo parcial)
+    """
+    codigo_qr = forms.CharField(
+        max_length=50,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'INV202509231914... (scanner o manual)',
+            'id': 'codigo_qr_fraccionario',
+            'autocomplete': 'off',
+            'style': 'text-transform: uppercase;'
+        }),
+        help_text="Escanee o escriba el código del producto fraccionable",
+        label="Código de Barras/QR del Producto"
+    )
+    
+    class Meta:
+        model = Movimiento
+        fields = [
+            'tipo', 'motivo', 'cantidad_fraccionaria', 'unidad_utilizada',
+            'sucursal_destino', 'empleado_destinatario', 'usuario_registro_empleado', 
+            'observaciones'
+        ]
+        widgets = {
+            'tipo': forms.Select(attrs={'class': 'form-control'}),
+            'motivo': forms.Select(attrs={'class': 'form-control'}),
+            'cantidad_fraccionaria': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0.01',
+                'placeholder': 'Ej: 600 (ml)',
+                'id': 'cantidad_fraccionaria'
+            }),
+            'unidad_utilizada': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: ml, gramos',
+                'id': 'unidad_utilizada'
+            }),
+            'sucursal_destino': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'empleado_destinatario': EmpleadoSelectWidget(attrs={
+                'class': 'form-control'
+            }),
+            'usuario_registro_empleado': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'observaciones': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Observaciones adicionales (opcional)'
+            }),
+        }
+        
+        labels = {
+            'cantidad_fraccionaria': 'Cantidad Exacta',
+            'unidad_utilizada': 'Unidad de Medida',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Configurar campos obligatorios
+        self.fields['tipo'].required = True
+        self.fields['motivo'].required = True
+        self.fields['cantidad_fraccionaria'].required = True
+        self.fields['unidad_utilizada'].required = True
+        self.fields['sucursal_destino'].required = True
+        self.fields['empleado_destinatario'].required = True
+        self.fields['usuario_registro_empleado'].required = True
+        
+        # Configurar empleados y sucursales activos
+        empleados_activos = Empleado.objects.filter(activo=True)
+        sucursales_activas = Sucursal.objects.filter(activa=True)
+        
+        self.fields['sucursal_destino'].queryset = sucursales_activas
+        self.fields['sucursal_destino'].empty_label = "Seleccionar sucursal destino *"
+        
+        self.fields['empleado_destinatario'].queryset = empleados_activos
+        self.fields['empleado_destinatario'].empty_label = "Seleccionar empleado destinatario *"
+        
+        self.fields['usuario_registro_empleado'].queryset = empleados_activos
+        self.fields['usuario_registro_empleado'].empty_label = "Seleccionar empleado que registra *"
+        
+        # Observaciones opcional
+        self.fields['observaciones'].required = False
+        
+        # Ayuda contextual
+        self.fields['cantidad_fraccionaria'].help_text = "Cantidad exacta a consumir del producto"
+        self.fields['unidad_utilizada'].help_text = "Debe coincidir con la unidad base del producto"
+    
+    def clean_codigo_qr(self):
+        """
+        Validar que el código QR corresponde a un producto fraccionable
+        """
+        import re
+        codigo_raw = self.cleaned_data['codigo_qr']
+        
+        # Limpiar código
+        codigo = re.sub(r'[\r\n\t\x00-\x1f\x7f-\x9f]', '', codigo_raw)
+        codigo = codigo.strip()
+        codigo = re.sub(r'\s+', '', codigo)
+        
+        if not codigo:
+            raise forms.ValidationError("Código QR inválido")
+        
+        try:
+            producto = Producto.objects.get(codigo_qr__iexact=codigo)
+            if not producto.es_fraccionable:
+                raise forms.ValidationError("Este producto no es fraccionable. Use el formulario de movimientos normales.")
+            return codigo
+        except Producto.DoesNotExist:
+            raise forms.ValidationError("Código QR no encontrado en el inventario")
+    
+    def clean(self):
+        """
+        Validaciones adicionales para movimientos fraccionarios
+        """
+        cleaned_data = super().clean()
+        codigo_qr = cleaned_data.get('codigo_qr')
+        cantidad_fraccionaria = cleaned_data.get('cantidad_fraccionaria')
+        unidad_utilizada = cleaned_data.get('unidad_utilizada')
+        tipo = cleaned_data.get('tipo')
+        
+        if codigo_qr and cantidad_fraccionaria and tipo:
+            try:
+                producto = Producto.objects.get(codigo_qr__iexact=codigo_qr)
+                
+                # Solo validar disponibilidad para SALIDAS
+                if tipo == 'salida':
+                    if not producto.puede_consumir(cantidad_fraccionaria):
+                        raise forms.ValidationError(
+                            f"No hay suficiente cantidad disponible. "
+                            f"Disponible: {producto.cantidad_total_disponible():.2f} {producto.unidad_base}, "
+                            f"Solicitado: {cantidad_fraccionaria}"
+                        )
+                
+                # Para ENTRADAS, no validamos disponibilidad (podemos agregar todo lo que queramos)
+                # Solo verificamos que sea una cantidad positiva (ya se valida en el campo)
+                
+                # Verificar que la unidad coincida
+                if unidad_utilizada and unidad_utilizada.lower() != producto.unidad_base.lower():
+                    raise forms.ValidationError(
+                        f"La unidad debe ser '{producto.unidad_base}' para este producto"
+                    )
+                    
+            except Producto.DoesNotExist:
+                pass  # Ya se maneja en clean_codigo_qr
+        
+        return cleaned_data
+    
+    def save(self, commit=True):
+        """
+        Guardar movimiento fraccionario con campos específicos
+        """
+        movimiento = super().save(commit=False)
+        codigo_qr = self.cleaned_data['codigo_qr']
+        movimiento.producto = Producto.objects.get(codigo_qr__iexact=codigo_qr)
+        
+        # Marcar como movimiento fraccionario
+        movimiento.es_movimiento_fraccionario = True
+        
+        # Establecer cantidad en 1 para compatibilidad con el sistema existente
+        movimiento.cantidad = 1
+        
+        if commit:
+            movimiento.save()
+        return movimiento

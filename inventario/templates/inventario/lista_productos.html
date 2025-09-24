@@ -78,7 +78,7 @@
                                 <th>Código QR</th>
                                 <th>Producto</th>
                                 <th>Categoría</th>
-                                <th>Stock</th>
+                                <th>Stock / Nivel</th>
                                 <th>Ubicación</th>
                                 <th>Estado</th>
                                 <th>Valor</th>
@@ -103,15 +103,39 @@
                                     <span class="badge bg-info">{{ producto.get_categoria_display }}</span>
                                 </td>
                                 <td>
-                                    <div class="d-flex align-items-center">
-                                        {% if producto.stock_bajo %}
-                                            <i class="bi bi-exclamation-triangle text-warning me-1"></i>
-                                            <span class="text-danger fw-bold">{{ producto.cantidad }}</span>
-                                        {% else %}
-                                            <span class="text-success fw-bold">{{ producto.cantidad }}</span>
-                                        {% endif %}
-                                        <small class="text-muted ms-1">/ {{ producto.stock_minimo }}</small>
-                                    </div>
+                                    {% if producto.es_fraccionable %}
+                                        <!-- Producto Fraccionable -->
+                                        <div class="mb-2">
+                                            <span class="badge badge-fraccionable">Fraccionable</span>
+                                        </div>
+                                        <div class="progress-fraccionario mb-1" style="height: 16px;">
+                                            <div class="progress-bar-fraccionario 
+                                                {% if producto.porcentaje_disponible <= 30 %}nivel-bajo
+                                                {% elif producto.porcentaje_disponible <= 70 %}nivel-medio
+                                                {% else %}nivel-alto{% endif %}"
+                                                style="width: {{ producto.porcentaje_disponible }}%">
+                                                <small style="font-size: 0.7rem;">{{ producto.porcentaje_disponible|floatformat:0 }}%</small>
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">
+                                            {{ producto.cantidad_actual|floatformat:1 }}/{{ producto.cantidad_unitaria|floatformat:0 }} {{ producto.unidad_base }}
+                                            ({{ producto.cantidad }} unidades)
+                                        </small>
+                                    {% else %}
+                                        <!-- Producto Normal -->
+                                        <div class="d-flex align-items-center">
+                                            {% if producto.stock_bajo %}
+                                                <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+                                                <span class="text-danger fw-bold">{{ producto.cantidad }}</span>
+                                            {% else %}
+                                                <span class="text-success fw-bold">{{ producto.cantidad }}</span>
+                                            {% endif %}
+                                            <small class="text-muted ms-1">/ {{ producto.stock_minimo }}</small>
+                                        </div>
+                                        <div class="mt-1">
+                                            <span class="badge badge-normal">Normal</span>
+                                        </div>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <small class="text-muted">{{ producto.ubicacion|default:"-" }}</small>

@@ -13,6 +13,9 @@
             <a href="{% url 'crear_movimiento' %}" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> Registrar Movimiento
             </a>
+            <a href="{% url 'movimiento_fraccionario' %}" class="btn btn-info">
+                <i class="bi bi-droplet-half"></i> Fraccionario
+            </a>
             <a href="{% url 'movimiento_rapido' %}" class="btn btn-outline-success">
                 <i class="bi bi-qr-code-scan"></i> Scanner QR
             </a>
@@ -23,7 +26,7 @@
     <div class="card mb-4">
         <div class="card-body">
             <form method="get" class="row g-3">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="tipo" class="form-label">Tipo de Movimiento</label>
                     <select class="form-control" id="tipo" name="tipo">
                         <option value="">Todos los tipos</option>
@@ -34,7 +37,15 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <label for="fraccionario" class="form-label">Modalidad</label>
+                    <select class="form-control" id="fraccionario" name="fraccionario">
+                        <option value="">Todos</option>
+                        <option value="true" {% if request.GET.fraccionario == 'true' %}selected{% endif %}>Solo Fraccionarios</option>
+                        <option value="false" {% if request.GET.fraccionario == 'false' %}selected{% endif %}>Solo Normales</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label for="producto" class="form-label">Producto</label>
                     <select class="form-control" id="producto" name="producto">
                         <option value="">Todos los productos</option>
@@ -71,7 +82,7 @@
                 <h6 class="mb-0">
                     <i class="bi bi-list-ul"></i> 
                     {{ total_movimientos }} movimiento{{ total_movimientos|pluralize }}
-                    {% if request.GET.tipo or request.GET.producto or request.GET.fecha_desde or request.GET.fecha_hasta %}
+                    {% if request.GET.tipo or request.GET.producto or request.GET.fraccionario or request.GET.fecha_desde or request.GET.fecha_hasta %}
                         (filtrado{{ total_movimientos|pluralize }})
                         <a href="{% url 'lista_movimientos' %}" class="btn btn-sm btn-outline-secondary ms-2">
                             <i class="bi bi-x"></i> Limpiar filtros
@@ -116,28 +127,56 @@
                                     </div>
                                 </td>
                                 <td>
-                                    {% if movimiento.tipo == 'entrada' %}
-                                        <span class="badge bg-success">
-                                            <i class="bi bi-arrow-down"></i> {{ movimiento.get_tipo_display }}
-                                        </span>
-                                    {% elif movimiento.tipo == 'salida' %}
-                                        <span class="badge bg-danger">
-                                            <i class="bi bi-arrow-up"></i> {{ movimiento.get_tipo_display }}
-                                        </span>
-                                    {% elif movimiento.tipo == 'devolucion' %}
-                                        <span class="badge bg-info">
-                                            <i class="bi bi-arrow-return-left"></i> {{ movimiento.get_tipo_display }}
-                                        </span>
-                                    {% else %}
-                                        <span class="badge bg-warning">
-                                            <i class="bi bi-arrow-left-right"></i> {{ movimiento.get_tipo_display }}
-                                        </span>
-                                    {% endif %}
+                                    <div class="d-flex flex-column gap-1">
+                                        {% if movimiento.tipo == 'entrada' %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-arrow-down"></i> {{ movimiento.get_tipo_display }}
+                                            </span>
+                                        {% elif movimiento.tipo == 'salida' %}
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-arrow-up"></i> {{ movimiento.get_tipo_display }}
+                                            </span>
+                                        {% elif movimiento.tipo == 'devolucion' %}
+                                            <span class="badge bg-info">
+                                                <i class="bi bi-arrow-return-left"></i> {{ movimiento.get_tipo_display }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning">
+                                                <i class="bi bi-arrow-left-right"></i> {{ movimiento.get_tipo_display }}
+                                            </span>
+                                        {% endif %}
+                                        
+                                        {% if movimiento.es_movimiento_fraccionario %}
+                                            <span class="badge bg-purple" style="background-color: #6f42c1 !important;">
+                                                <i class="bi bi-droplet-half"></i> Parcial
+                                            </span>
+                                        {% endif %}
+                                    </div>
                                 </td>
                                 <td>
-                                    <strong class="{% if movimiento.tipo == 'entrada' %}text-success{% elif movimiento.tipo == 'salida' %}text-danger{% else %}text-info{% endif %}">
-                                        {% if movimiento.tipo == 'entrada' %}+{% elif movimiento.tipo == 'salida' %}-{% endif %}{{ movimiento.cantidad }}
-                                    </strong>
+                                    {% if movimiento.es_movimiento_fraccionario %}
+                                        <!-- Movimiento Fraccionario -->
+                                        <div class="mb-1">
+                                            <span class="badge badge-fraccionable">
+                                                <i class="bi bi-droplet"></i> Fraccionario
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <strong class="{% if movimiento.tipo == 'entrada' %}text-success{% elif movimiento.tipo == 'salida' %}text-danger{% else %}text-info{% endif %}">
+                                                {% if movimiento.tipo == 'entrada' %}+{% elif movimiento.tipo == 'salida' %}-{% endif %}{{ movimiento.cantidad_fraccionaria|floatformat:1 }} {{ movimiento.unidad_utilizada }}
+                                            </strong>
+                                        </div>
+                                        {% if movimiento.producto.es_fraccionable %}
+                                            <small class="text-muted">
+                                                Restante: {{ movimiento.producto.cantidad_actual|floatformat:1 }} {{ movimiento.producto.unidad_base }}
+                                            </small>
+                                        {% endif %}
+                                    {% else %}
+                                        <!-- Movimiento Normal -->
+                                        <strong class="{% if movimiento.tipo == 'entrada' %}text-success{% elif movimiento.tipo == 'salida' %}text-danger{% else %}text-info{% endif %}">
+                                            {% if movimiento.tipo == 'entrada' %}+{% elif movimiento.tipo == 'salida' %}-{% endif %}{{ movimiento.cantidad }} unidad{{ movimiento.cantidad|pluralize:"es" }}
+                                        </strong>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <span class="badge bg-light text-dark">{{ movimiento.get_motivo_display }}</span>
@@ -169,11 +208,30 @@
                                 </td>
                                 <td>
                                     <div class="text-center">
-                                        <span class="badge bg-secondary">{{ movimiento.stock_posterior }}</span>
-                                        {% if movimiento.stock_anterior != movimiento.stock_posterior %}
-                                            <br><small class="text-muted">
-                                                ({{ movimiento.stock_anterior }} → {{ movimiento.stock_posterior }})
+                                        {% if movimiento.es_movimiento_fraccionario and movimiento.producto.es_fraccionable %}
+                                            <!-- Stock fraccionario -->
+                                            <div class="mb-2">
+                                                <span class="badge bg-secondary">{{ movimiento.stock_posterior }} unidades</span>
+                                            </div>
+                                            <div class="progress-fraccionario mb-1" style="height: 12px; width: 80px; margin: 0 auto;">
+                                                <div class="progress-bar-fraccionario 
+                                                    {% if movimiento.producto.porcentaje_disponible <= 30 %}nivel-bajo
+                                                    {% elif movimiento.producto.porcentaje_disponible <= 70 %}nivel-medio
+                                                    {% else %}nivel-alto{% endif %}"
+                                                    style="width: {{ movimiento.producto.porcentaje_disponible }}%">
+                                                </div>
+                                            </div>
+                                            <small class="text-muted">
+                                                {{ movimiento.producto.cantidad_actual|floatformat:1 }}/{{ movimiento.producto.cantidad_unitaria|floatformat:0 }} {{ movimiento.producto.unidad_base }}
                                             </small>
+                                        {% else %}
+                                            <!-- Stock normal -->
+                                            <span class="badge bg-secondary">{{ movimiento.stock_posterior }}</span>
+                                            {% if movimiento.stock_anterior != movimiento.stock_posterior %}
+                                                <br><small class="text-muted">
+                                                    ({{ movimiento.stock_anterior }} → {{ movimiento.stock_posterior }})
+                                                </small>
+                                            {% endif %}
                                         {% endif %}
                                     </div>
                                 </td>
@@ -243,7 +301,7 @@
         <!-- Estado vacío -->
         <div class="card">
             <div class="card-body text-center py-5">
-                {% if request.GET.tipo or request.GET.producto or request.GET.fecha_desde or request.GET.fecha_hasta %}
+                {% if request.GET.tipo or request.GET.producto or request.GET.fraccionario or request.GET.fecha_desde or request.GET.fecha_hasta %}
                     <i class="bi bi-search text-muted" style="font-size: 4rem;"></i>
                     <h4 class="mt-3">No se encontraron movimientos</h4>
                     <p class="text-muted">No hay movimientos que coincidan con los filtros aplicados.</p>
@@ -257,6 +315,9 @@
                     <div class="btn-group">
                         <a href="{% url 'crear_movimiento' %}" class="btn btn-primary">
                             <i class="bi bi-plus-circle"></i> Registrar Movimiento
+                        </a>
+                        <a href="{% url 'movimiento_fraccionario' %}" class="btn btn-info">
+                            <i class="bi bi-droplet-half"></i> Fraccionario
                         </a>
                         <a href="{% url 'movimiento_rapido' %}" class="btn btn-outline-success">
                             <i class="bi bi-qr-code-scan"></i> Scanner QR
@@ -275,10 +336,11 @@
 document.addEventListener('DOMContentLoaded', function() {
     const tipoSelect = document.getElementById('tipo');
     const productoSelect = document.getElementById('producto');
+    const fraccionarioSelect = document.getElementById('fraccionario');
     const fechaDesde = document.getElementById('fecha_desde');
     const fechaHasta = document.getElementById('fecha_hasta');
     
-    [tipoSelect, productoSelect, fechaDesde, fechaHasta].forEach(element => {
+    [tipoSelect, productoSelect, fraccionarioSelect, fechaDesde, fechaHasta].forEach(element => {
         element.addEventListener('change', function() {
             this.form.submit();
         });

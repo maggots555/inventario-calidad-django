@@ -124,6 +124,119 @@
                     </div>
                 </div>
 
+                <!-- Configuración de Producto Fraccionable -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-droplet"></i> Configuración de Producto Fraccionable
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Checkbox principal para activar modo fraccionable -->
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <div class="form-check">
+                                    {{ form.es_fraccionable }}
+                                    <label class="form-check-label fw-bold" for="{{ form.es_fraccionable.id_for_label }}">
+                                        <i class="bi bi-flask text-info me-1"></i>
+                                        Este producto se puede consumir en porciones (líquidos, granulados, etc.)
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Marque esta opción si el producto se puede usar parcialmente, como líquidos medidos en ml, polvos en gramos, etc.
+                                </div>
+                                {% if form.es_fraccionable.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.es_fraccionable.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Campos específicos para productos fraccionables (se muestran/ocultan dinámicamente) -->
+                        <div id="campos-fraccionables" style="display: none;">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Configuración Fraccionaria:</strong> Configure los detalles para el manejo de consumo parcial.
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.unidad_base.id_for_label }}" class="form-label fw-bold">
+                                        <i class="bi bi-rulers"></i> Unidad de Medida Base *
+                                    </label>
+                                    {{ form.unidad_base }}
+                                    <div class="form-text">Ejemplo: ml, litros, gramos, kg</div>
+                                    {% if form.unidad_base.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.unidad_base.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cantidad_unitaria.id_for_label }}" class="form-label fw-bold">
+                                        <i class="bi bi-cup"></i> Cantidad por Unidad Completa *
+                                    </label>
+                                    {{ form.cantidad_unitaria }}
+                                    <div class="form-text">Ejemplo: 1000 ml por botella, 500 gramos por paquete</div>
+                                    {% if form.cantidad_unitaria.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.cantidad_unitaria.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cantidad_actual.id_for_label }}" class="form-label fw-bold">
+                                        <i class="bi bi-thermometer-half"></i> Cantidad Actual Disponible
+                                    </label>
+                                    {{ form.cantidad_actual }}
+                                    <div class="form-text">Cantidad disponible en la unidad abierta actualmente</div>
+                                    {% if form.cantidad_actual.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.cantidad_actual.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.cantidad_minima_alerta.id_for_label }}" class="form-label fw-bold">
+                                        <i class="bi bi-exclamation-triangle"></i> Nivel Mínimo de Alerta
+                                    </label>
+                                    {{ form.cantidad_minima_alerta }}
+                                    <div class="form-text">Mostrar alerta cuando esté por debajo de este nivel</div>
+                                    {% if form.cantidad_minima_alerta.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.cantidad_minima_alerta.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Ejemplo visual para ayudar al usuario -->
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <i class="bi bi-lightbulb text-warning"></i> Ejemplo:
+                                            </h6>
+                                            <p class="card-text small mb-0">
+                                                <strong>Producto:</strong> Agua destilada<br>
+                                                <strong>Unidad Base:</strong> ml<br>
+                                                <strong>Cantidad por Unidad:</strong> 1000 ml (1 botella completa)<br>
+                                                <strong>Cantidad Actual:</strong> 600 ml (lo que queda en la botella abierta)<br>
+                                                <strong>Alerta:</strong> 100 ml (avisar cuando queden menos de 100ml)
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Información Comercial -->
                 <div class="card mb-4">
                     <div class="card-header">
@@ -282,6 +395,91 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Auto-focus en el primer campo
     document.getElementById('{{ form.nombre.id_for_label }}').focus();
+    
+    // Manejo de campos fraccionables
+    const esFraccionableCheckbox = document.getElementById('{{ form.es_fraccionable.id_for_label }}');
+    const camposFraccionables = document.getElementById('campos-fraccionables');
+    const unidadBaseInput = document.getElementById('{{ form.unidad_base.id_for_label }}');
+    const cantidadUnitariaInput = document.getElementById('{{ form.cantidad_unitaria.id_for_label }}');
+    const cantidadActualInput = document.getElementById('{{ form.cantidad_actual.id_for_label }}');
+    const cantidadMinimaAlertaInput = document.getElementById('{{ form.cantidad_minima_alerta.id_for_label }}');
+    
+    function toggleCamposFraccionables() {
+        if (esFraccionableCheckbox.checked) {
+            camposFraccionables.style.display = 'block';
+            // Hacer campos requeridos
+            unidadBaseInput.required = true;
+            cantidadUnitariaInput.required = true;
+            
+            // Valores por defecto si están vacíos
+            if (!unidadBaseInput.value) {
+                unidadBaseInput.value = 'ml';
+            }
+            if (!cantidadUnitariaInput.value) {
+                cantidadUnitariaInput.value = '1000';
+            }
+            if (!cantidadActualInput.value) {
+                cantidadActualInput.value = cantidadUnitariaInput.value;
+            }
+            if (!cantidadMinimaAlertaInput.value) {
+                cantidadMinimaAlertaInput.value = '100';
+            }
+        } else {
+            camposFraccionables.style.display = 'none';
+            // Quitar requerimientos
+            unidadBaseInput.required = false;
+            cantidadUnitariaInput.required = false;
+            
+            // Limpiar valores
+            unidadBaseInput.value = 'unidades';
+            cantidadUnitariaInput.value = '1';
+            cantidadActualInput.value = '0';
+            cantidadMinimaAlertaInput.value = '0';
+        }
+    }
+    
+    // Inicializar estado
+    toggleCamposFraccionables();
+    
+    // Event listener para el checkbox
+    esFraccionableCheckbox.addEventListener('change', toggleCamposFraccionables);
+    
+    // Auto-completar cantidad actual cuando cambia la cantidad unitaria
+    cantidadUnitariaInput.addEventListener('input', function() {
+        if (esFraccionableCheckbox.checked && !cantidadActualInput.value) {
+            cantidadActualInput.value = this.value;
+        }
+    });
+    
+    // Validación adicional para campos fraccionables
+    document.querySelector('form').addEventListener('submit', function(e) {
+        if (esFraccionableCheckbox.checked) {
+            const unidadBase = unidadBaseInput.value.trim();
+            const cantidadUnitaria = parseFloat(cantidadUnitariaInput.value);
+            const cantidadActual = parseFloat(cantidadActualInput.value);
+            
+            if (!unidadBase) {
+                e.preventDefault();
+                alert('La unidad base es obligatoria para productos fraccionables.');
+                unidadBaseInput.focus();
+                return false;
+            }
+            
+            if (cantidadUnitaria <= 0) {
+                e.preventDefault();
+                alert('La cantidad unitaria debe ser mayor a 0.');
+                cantidadUnitariaInput.focus();
+                return false;
+            }
+            
+            if (cantidadActual > cantidadUnitaria) {
+                e.preventDefault();
+                alert('La cantidad actual no puede ser mayor a la cantidad unitaria.');
+                cantidadActualInput.focus();
+                return false;
+            }
+        }
+    });
 });
 </script>
 {% endblock %}

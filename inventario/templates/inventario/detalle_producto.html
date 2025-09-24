@@ -296,7 +296,29 @@
                                             {% endif %}
                                         </td>
                                         <td class="py-3">
-                                            <span class="fs-5 fw-bold">{{ movimiento.cantidad }}</span>
+                                            {% if movimiento.es_movimiento_fraccionario %}
+                                                <!-- Movimiento Fraccionario -->
+                                                <div class="mb-1">
+                                                    <span class="badge badge-fraccionable">
+                                                        <i class="bi bi-droplet"></i> Fraccionario
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span class="fs-5 fw-bold {% if movimiento.tipo == 'entrada' %}text-success{% elif movimiento.tipo == 'salida' %}text-danger{% else %}text-info{% endif %}">
+                                                        {% if movimiento.tipo == 'entrada' %}+{% elif movimiento.tipo == 'salida' %}-{% endif %}{{ movimiento.cantidad_fraccionaria|floatformat:1 }} {{ movimiento.unidad_utilizada }}
+                                                    </span>
+                                                </div>
+                                                {% if movimiento.producto.es_fraccionable %}
+                                                    <small class="text-muted">
+                                                        <i class="bi bi-info-circle"></i> Restante: {{ movimiento.producto.cantidad_actual|floatformat:1 }} {{ movimiento.producto.unidad_base }}
+                                                    </small>
+                                                {% endif %}
+                                            {% else %}
+                                                <!-- Movimiento Normal -->
+                                                <span class="fs-5 fw-bold {% if movimiento.tipo == 'entrada' %}text-success{% elif movimiento.tipo == 'salida' %}text-danger{% else %}text-info{% endif %}">
+                                                    {% if movimiento.tipo == 'entrada' %}+{% elif movimiento.tipo == 'salida' %}-{% endif %}{{ movimiento.cantidad }} unidad{{ movimiento.cantidad|pluralize:"es" }}
+                                                </span>
+                                            {% endif %}
                                         </td>
                                         <td class="py-3">
                                             <span class="badge bg-light text-dark px-3 py-2">{{ movimiento.get_motivo_display }}</span>
@@ -319,7 +341,21 @@
                                             {% endif %}
                                         </td>
                                         <td class="py-3">
-                                            <span class="badge bg-primary fs-6 px-3 py-2">{{ movimiento.stock_posterior }}</span>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge bg-primary fs-6 px-3 py-2">{{ movimiento.stock_posterior }}</span>
+                                                {% if movimiento.es_movimiento_fraccionario and movimiento.producto.es_fraccionable %}
+                                                    <!-- Información adicional fraccionaria -->
+                                                    <div class="progress" style="width: 60px; height: 8px;">
+                                                        <div class="progress-bar progress-bar-fraccionario 
+                                                            {% if movimiento.producto.porcentaje_disponible <= 30 %}nivel-bajo
+                                                            {% elif movimiento.producto.porcentaje_disponible <= 70 %}nivel-medio
+                                                            {% else %}nivel-alto{% endif %}"
+                                                            style="width: {{ movimiento.producto.porcentaje_disponible }}%">
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted">{{ movimiento.producto.porcentaje_disponible|floatformat:0 }}%</small>
+                                                {% endif %}
+                                            </div>
                                         </td>
                                         <td class="py-3">
                                             {% if movimiento.usuario_registro_empleado %}
