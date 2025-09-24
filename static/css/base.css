@@ -15,12 +15,16 @@
     /* Colores de Estado */
     --success-color: #10b981;        /* Verde más moderno */
     --success-light: #ecfdf5;        /* Verde claro para fondos */
+    --success-dark: #047857;         /* Verde oscuro para texto */
     --danger-color: #ef4444;         /* Rojo más suave */
     --danger-light: #fef2f2;         /* Rojo claro para fondos */
+    --danger-dark: #b91c1c;          /* Rojo oscuro para texto */
     --warning-color: #f59e0b;        /* Amarillo dorado */
     --warning-light: #fffbeb;        /* Amarillo claro para fondos */
+    --warning-dark: #d97706;         /* Amarillo oscuro para texto */
     --info-color: #06b6d4;           /* Cian moderno */
     --info-light: #f0fdfa;           /* Cian claro para fondos */
+    --info-dark: #0891b2;            /* Cian oscuro para texto */
     
     /* Colores Neutros */
     --white: #ffffff;

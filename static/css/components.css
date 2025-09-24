@@ -598,6 +598,609 @@
     animation: pulseWarning 2s infinite;
 }
 
+/* ===== INFORMACIÓN DEL PRODUCTO FRACCIONABLE - DISEÑO PROFESIONAL ===== */
+.info-fraccionario {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: var(--border-radius-xl);
+    padding: var(--space-6);
+    margin-bottom: var(--space-6);
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    overflow: hidden;
+    animation: slideInUp 0.6s ease-out;
+}
+
+.info-fraccionario::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, var(--info-color), var(--primary-color), var(--info-color));
+    animation: shimmer 3s infinite;
+}
+
+.info-fraccionario .titulo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: clamp(1rem, 3vw, 1.25rem); /* Responsivo: min 16px, max 20px */
+    font-weight: 700;
+    color: var(--gray-800);
+    margin-bottom: var(--space-5);
+    padding-bottom: var(--space-3);
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.info-fraccionario .titulo::before {
+    content: '💧';
+    font-size: var(--text-2xl);
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+/* Grid de detalles del producto */
+.info-fraccionario .detalle,
+.detalle {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+}
+
+.info-fraccionario .item,
+.detalle .item {
+    background: linear-gradient(135deg, #ffffff, #f1f5f9);
+    border: 1px solid #cbd5e1;
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.info-fraccionario .item:hover,
+.detalle .item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-color);
+}
+
+.info-fraccionario .item::after,
+.detalle .item::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--info-color);
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.info-fraccionario .item:hover::after,
+.detalle .item:hover::after {
+    opacity: 1;
+}
+
+/* FORZAR tamaños más pequeños con selectores específicos */
+#info-producto-content .detalle .label,
+.detalle .label,
+.info-fraccionario .detalle .label {
+    font-weight: 600;
+    color: var(--gray-700);
+    font-size: 0.7rem !important; /* 20% más pequeño que el original (0.875rem) */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+#info-producto-content .detalle .valor,
+.detalle .valor,
+.info-fraccionario .detalle .valor {
+    font-weight: 700;
+    color: var(--primary-color);
+    font-size: 0.88rem !important; /* 20% más pequeño que el original (1.1rem) */
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Selectores MUY específicos para el contenido generado dinámicamente */
+#info-producto-content span.label,
+#info-producto-content .item span.label {
+    font-size: 0.7rem !important;
+}
+
+#info-producto-content span.valor,
+#info-producto-content .item span.valor {
+    font-size: 0.88rem !important;
+}
+
+/* Aún más específico - por si acaso hay conflictos de Bootstrap */
+.info-fraccionario #info-producto-content .detalle .item span {
+    line-height: 1.4;
+}
+
+.info-fraccionario #info-producto-content .detalle .item span.label {
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+}
+
+.info-fraccionario #info-producto-content .detalle .item span.valor {
+    font-size: 0.88rem !important;
+    font-weight: 700 !important;
+}
+
+/* Estilos finales optimizados */
+#info-producto-content .detalle .item span {
+    font-size: 0.7rem !important; /* Tamaño reducido para mejor balance visual */
+}
+
+/* ===== ESTILOS ESPECÍFICOS PARA DASHBOARD ===== */
+
+/* Layout principal del dashboard */
+.dashboard-main-content {
+    margin-bottom: var(--space-6);
+}
+
+/* Tarjetas del dashboard con altura uniforme */
+.card-dashboard {
+    transition: all var(--transition-normal);
+    border: none;
+    border-radius: var(--border-radius-xl);
+    overflow: hidden;
+}
+
+.card-dashboard:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-xl);
+}
+
+/* Headers con gradientes */
+.bg-gradient-warning {
+    background: linear-gradient(135deg, var(--warning-color), #f59e0b) !important;
+}
+
+.bg-gradient-info {
+    background: linear-gradient(135deg, var(--info-color), #0891b2) !important;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, var(--primary-color), #1d4ed8) !important;
+}
+
+.bg-gradient-dark {
+    background: linear-gradient(135deg, #374151, #1f2937) !important;
+}
+
+/* Timeline para movimientos recientes */
+.timeline-container {
+    position: relative;
+}
+
+.timeline-item {
+    position: relative;
+    border-left: 3px solid transparent;
+    transition: all var(--transition-normal);
+}
+
+.timeline-item:hover {
+    border-left-color: var(--primary-color);
+    background-color: #f8fafc;
+}
+
+.timeline-icon {
+    min-width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Barra de progreso personalizada para fraccionables */
+.progress {
+    background-color: #e5e7eb;
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+}
+
+.progress .progress-bar {
+    transition: width 0.6s ease;
+    border-radius: var(--border-radius-md);
+}
+
+/* Botones de acceso rápido */
+.action-card {
+    min-height: 120px;
+    border-radius: var(--border-radius-xl) !important;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none !important;
+    padding: var(--space-4) !important;
+}
+
+.action-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1), transparent);
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.action-card:hover::before {
+    opacity: 1;
+}
+
+.action-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: var(--shadow-xl);
+}
+
+/* Badges especiales */
+.badge-fraccionable {
+    background: linear-gradient(135deg, var(--info-color), #0891b2);
+    color: white;
+    font-size: 0.65rem;
+    padding: 0.25em 0.5em;
+    border-radius: var(--border-radius-md);
+}
+
+/* Estados de nivel para productos fraccionables */
+.indicador-nivel {
+    padding: 0.25em 0.75em;
+    border-radius: var(--border-radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.indicador-nivel.alto {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.indicador-nivel.medio {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.indicador-nivel.bajo {
+    background-color: #fee2e2;
+    color: #991b1b;
+    animation: pulseWarning 2s infinite;
+}
+
+/* Lista de productos fraccionables */
+.list-group-flush .list-group-item {
+    border-left: none !important;
+    border-right: none !important;
+    border-radius: 0 !important;
+    transition: background-color var(--transition-normal);
+}
+
+.list-group-flush .list-group-item:hover {
+    background-color: #f8fafc;
+}
+
+/* Tarjetas de estadísticas mejoradas */
+.border-left-primary {
+    border-left: 4px solid var(--primary-color) !important;
+}
+
+.border-left-warning {
+    border-left: 4px solid var(--warning-color) !important;
+}
+
+.border-left-success {
+    border-left: 4px solid var(--success-color) !important;
+}
+
+.border-left-info {
+    border-left: 4px solid var(--info-color) !important;
+}
+
+/* Iconos de tarjetas de estadísticas */
+.card-icon {
+    font-size: 2rem;
+    opacity: 0.7;
+}
+
+/* Mejoras responsivas para el dashboard */
+@media (max-width: 768px) {
+    .card-dashboard {
+        margin-bottom: var(--space-4);
+    }
+    
+    .action-card {
+        min-height: 100px;
+        padding: var(--space-3) !important;
+    }
+    
+    .action-card i {
+        font-size: 2rem !important;
+    }
+    
+    .timeline-item {
+        padding: var(--space-2) var(--space-3);
+    }
+}
+
+@media (max-width: 576px) {
+    .dashboard-main-content .col-lg-4 {
+        margin-bottom: var(--space-3);
+    }
+    
+    .action-card {
+        min-height: 80px;
+    }
+    
+    .card-header h6 {
+        font-size: 0.9rem;
+    }
+}
+
+/* ===== ESTILOS ESPECÍFICOS PARA ALERTAS DE STOCK ===== */
+.alert-stock-container {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.alert-stock-item {
+    transition: all var(--transition-normal);
+    background-color: white;
+}
+
+.alert-stock-item:hover {
+    background-color: #fef2f2;
+    border-left-color: #dc2626 !important;
+    border-left-width: 5px !important;
+}
+
+.alert-stock-item:last-child {
+    border-bottom: none !important;
+}
+
+/* Asegurar que el texto del título sea blanco en headers oscuros */
+.bg-gradient-dark h6,
+.bg-gradient-dark .font-weight-bold {
+    color: white !important;
+}
+
+.bg-gradient-dark i {
+    color: white !important;
+}
+
+/* Mantener también las clases originales para otros usos */
+.info-fraccionario .label {
+    font-weight: 600;
+    color: var(--gray-700);
+    font-size: clamp(0.7rem, 1.8vw, 0.875rem); /* Etiquetas más pequeñas y responsivas */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.info-fraccionario .valor {
+    font-weight: 700;
+    color: var(--primary-color);
+    font-size: clamp(0.9rem, 2.2vw, 1.1rem); /* Valores más equilibrados */
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Iconos específicos para cada tipo de información */
+.info-fraccionario .item:nth-child(1) .label::before,
+.detalle .item:nth-child(1) .label::before {
+    content: '📦';
+    font-size: var(--text-base);
+}
+
+.info-fraccionario .item:nth-child(2) .label::before,
+.detalle .item:nth-child(2) .label::before {
+    content: '📏';
+    font-size: var(--text-base);
+}
+
+.info-fraccionario .item:nth-child(3) .label::before,
+.detalle .item:nth-child(3) .label::before {
+    content: '🧪';
+    font-size: var(--text-base);
+}
+
+.info-fraccionario .item:nth-child(4) .label::before,
+.detalle .item:nth-child(4) .label::before {
+    content: '📊';
+    font-size: var(--text-base);
+}
+
+/* Sección de nivel actual mejorada */
+.nivel-actual-section {
+    background: linear-gradient(135deg, #f0f9ff, #ecfeff);
+    border: 1px solid #0891b2;
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-5);
+    margin-top: var(--space-4);
+}
+
+.nivel-actual-section .form-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: clamp(0.875rem, 2vw, 1rem); /* Tamaño responsivo para etiqueta */
+    font-weight: 700;
+    color: var(--info-dark);
+    margin-bottom: var(--space-3);
+}
+
+.nivel-actual-section .form-label::before {
+    content: '📈';
+    font-size: var(--text-lg);
+}
+
+/* Barra de progreso mejorada */
+.progress-fraccionario {
+    height: 32px;
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    border: 1px solid #cbd5e1;
+    border-radius: var(--border-radius-xl);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-3);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.progress-bar-fraccionario {
+    height: 100%;
+    border-radius: var(--border-radius-xl);
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: clamp(0.75rem, 1.5vw, 0.875rem); /* Texto de progreso responsivo */
+    color: white;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    overflow: hidden;
+}
+
+.progress-bar-fraccionario::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: progressShine 3s infinite;
+}
+
+/* Información de cantidad mejorada */
+#info-cantidad {
+    background: linear-gradient(135deg, #fefefe, #f8fafc);
+    border: 1px solid #e2e8f0;
+    border-radius: var(--border-radius-md);
+    padding: var(--space-3) var(--space-4);
+    font-size: clamp(0.75rem, 1.8vw, 0.875rem); /* Info más compacta */
+    color: var(--gray-600);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+#info-cantidad::before {
+    content: 'ℹ️';
+    font-size: var(--text-base);
+    opacity: 0.8;
+}
+
+/* Estados específicos según el nivel */
+.progress-bar-fraccionario.nivel-alto {
+    background: linear-gradient(135deg, var(--success-color), #34d399, #10b981);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+.progress-bar-fraccionario.nivel-medio {
+    background: linear-gradient(135deg, var(--warning-color), #fbbf24, #f59e0b);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+.progress-bar-fraccionario.nivel-bajo {
+    background: linear-gradient(135deg, var(--danger-color), #f87171, #ef4444);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    animation: pulseWarning 2s infinite;
+}
+
+/* Animaciones específicas */
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+@keyframes progressShine {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+@keyframes pulseWarning {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+        opacity: 1;
+    }
+    50% { 
+        box-shadow: 0 0 30px rgba(239, 68, 68, 0.6);
+        opacity: 0.8;
+    }
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ===== RESPONSIVE PARA INFORMACIÓN FRACCIONABLE ===== */
+@media (max-width: 768px) {
+    .info-fraccionario {
+        padding: var(--space-4);
+    }
+    
+    .info-fraccionario .detalle,
+    .detalle {
+        grid-template-columns: 1fr;
+        gap: var(--space-3);
+    }
+    
+    .progress-fraccionario {
+        height: 28px;
+    }
+}
+
+@media (max-width: 576px) {
+    .info-fraccionario .item,
+    .detalle .item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-2);
+        text-align: left;
+    }
+    
+    .info-fraccionario .valor,
+    .detalle .valor {
+        align-self: flex-end;
+    }
+    
+    /* En móviles, reducir un poco más el espaciado */
+    .info-fraccionario {
+        padding: var(--space-3);
+        margin-bottom: var(--space-4);
+    }
+}
+
 @keyframes pulseWarning {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.02); }
@@ -781,6 +1384,142 @@
     border: 1px solid #f87171;
 }
 
+/* ===== SCANNER UNIVERSAL - ESTILOS PARA QR Y CÓDIGOS DE BARRAS ===== */
+.scanner-container {
+    position: relative;
+    max-width: 500px;
+    margin: 0 auto;
+    background: #000;
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.scanner-frame {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60%;
+    height: 40%;
+    border: 3px solid var(--primary-color);
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    animation: scannerPulse 2s infinite;
+}
+
+@keyframes scannerPulse {
+    0%, 100% {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(13, 110, 253, 0.3);
+    }
+    50% {
+        border-color: var(--success-color);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(40, 167, 69, 0.3);
+    }
+}
+
+#qr-video video {
+    width: 100%;
+    height: 300px;
+    object-fit: cover;
+    background: #000;
+    border-radius: var(--border-radius-lg);
+}
+
+/* Estados visuales del campo código QR - Validación robusta */
+.field-searching {
+    border-color: var(--primary-color) !important;
+    background-color: var(--primary-light) !important;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15) !important;
+    transition: all 0.3s ease;
+}
+
+.field-success {
+    border-color: var(--success-color) !important;
+    background-color: var(--success-light) !important;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.15) !important;
+    transition: all 0.3s ease;
+}
+
+.field-error {
+    border-color: var(--danger-color) !important;
+    background-color: var(--danger-light) !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.15) !important;
+    transition: all 0.3s ease;
+}
+
+.field-info {
+    border-color: var(--info-color) !important;
+    background-color: var(--info-light) !important;
+    box-shadow: 0 0 0 0.2rem rgba(23, 162, 184, 0.15) !important;
+    transition: all 0.3s ease;
+}
+
+/* Área de destino empleado - Auto-relleno visual */
+.area-destino-container {
+    margin-top: var(--space-4);
+}
+
+.area-destino-success {
+    border-color: var(--success-color) !important;
+    background-color: var(--success-light) !important;
+    color: var(--success-dark) !important;
+    font-weight: 600;
+}
+
+.area-destino-warning {
+    border-color: var(--warning-color) !important;
+    background-color: var(--warning-light) !important;
+    color: var(--warning-dark) !important;
+}
+
+/* Botón scanner mejorado */
+.btn-scanner {
+    background: linear-gradient(135deg, var(--success-color), #20c997);
+    border: none;
+    color: white;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-scanner:hover {
+    background: linear-gradient(135deg, #218838, #1e7e34);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.btn-scanner:focus {
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+.btn-scanner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-scanner:hover::before {
+    left: 100%;
+}
+
 /* ===== RESPONSIVE PARA COMPONENTES FRACCIONABLES ===== */
 @media (max-width: 768px) {
     .info-fraccionario .detalle {
@@ -797,5 +1536,20 @@
     
     .form-fraccionario {
         padding: var(--space-4);
+    }
+    
+    /* Scanner responsivo */
+    .scanner-container {
+        max-width: 100%;
+        margin: 0;
+    }
+    
+    #qr-video video {
+        height: 250px;
+    }
+    
+    .scanner-frame {
+        width: 70%;
+        height: 50%;
     }
 }
