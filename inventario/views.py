@@ -710,18 +710,30 @@ def descargar_reporte_excel(request):
     ws_resumen['A4'].font = header_font
     ws_resumen['A4'].fill = header_fill
     
-    # Calcular estadísticas
+    # Calcular estadísticas generales
     total_productos = Producto.objects.count()
-    productos_stock_bajo = Producto.objects.filter(cantidad__lte=F('stock_minimo')).count()
+    productos_normales = Producto.objects.filter(es_fraccionable=False)
+    productos_fraccionarios = Producto.objects.filter(es_fraccionable=True)
+    
+    # Stock bajo tradicional y fraccionario
+    productos_stock_bajo_normal = productos_normales.filter(cantidad__lte=F('stock_minimo')).count()
+    productos_stock_bajo_fraccionario = sum(1 for p in productos_fraccionarios if p.stock_fraccionario_bajo())
+    productos_stock_bajo = productos_stock_bajo_normal + productos_stock_bajo_fraccionario
+    
+    # Cálculos de inventario
     valor_total_inventario = Producto.objects.aggregate(
         total=Sum(F('cantidad') * F('costo_unitario'))
     )['total'] or 0
     total_unidades = Producto.objects.aggregate(total=Sum('cantidad'))['total'] or 0
     
-    # Escribir estadísticas
+    # Escribir estadísticas mejoradas
     estadisticas = [
         ['Total de Productos:', total_productos],
+        ['  - Productos Normales:', productos_normales.count()],
+        ['  - Productos Fraccionarios:', productos_fraccionarios.count()],
         ['Productos con Stock Bajo:', productos_stock_bajo],
+        ['  - Stock Bajo Normal:', productos_stock_bajo_normal],
+        ['  - Stock Bajo Fraccionario:', productos_stock_bajo_fraccionario],
         ['Total de Unidades en Stock:', total_unidades],
         ['Valor Total del Inventario:', f'${valor_total_inventario:,.2f}']
     ]
@@ -734,34 +746,62 @@ def descargar_reporte_excel(request):
     # === HOJA 2: PRODUCTOS CON STOCK BAJO ===
     ws_stock_bajo = wb.create_sheet("Stock Bajo")
     
-    # Encabezados
-    headers_stock = ['Código QR', 'Nombre', 'Categoría', 'Stock Actual', 'Stock Mínimo', 'Diferencia', 'Costo Unitario', 'Valor en Stock']
+    # Encabezados mejorados
+    headers_stock = ['Código QR', 'Nombre', 'Categoría', 'Tipo', 'Stock Actual', 'Stock Mínimo', 'Diferencia', 'Estado', 'Costo Unitario', 'Valor en Stock']
     for col, header in enumerate(headers_stock, start=1):
         cell = ws_stock_bajo.cell(row=1, column=col, value=header)
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal='center')
     
-    # Obtener productos con stock bajo
-    productos_stock_bajo_list = Producto.objects.filter(cantidad__lte=F('stock_minimo')).order_by('cantidad')
+    # Obtener productos con stock bajo (normales y fraccionarios)
+    productos_stock_bajo_list = []
+    
+    # Productos normales con stock bajo
+    for producto in Producto.objects.filter(es_fraccionable=False, cantidad__lte=F('stock_minimo')).order_by('cantidad'):
+        productos_stock_bajo_list.append(producto)
+    
+    # Productos fraccionarios con stock bajo
+    for producto in Producto.objects.filter(es_fraccionable=True):
+        if producto.stock_fraccionario_bajo():
+            productos_stock_bajo_list.append(producto)
     
     for row, producto in enumerate(productos_stock_bajo_list, start=2):
-        diferencia = producto.stock_minimo - producto.cantidad
         valor_stock = producto.cantidad * producto.costo_unitario
+        
+        if producto.es_fraccionable:
+            # Información para productos fraccionarios
+            tipo_producto = f"Fraccionario ({producto.unidad_base})"
+            stock_actual = f"{producto.cantidad_actual:.1f} {producto.unidad_base} ({producto.porcentaje_disponible():.0f}%)"
+            stock_minimo = f"{producto.cantidad_minima_alerta:.1f} {producto.unidad_base}"
+            diferencia = f"{max(0, producto.cantidad_minima_alerta - producto.cantidad_actual):.1f} {producto.unidad_base}"
+            estado = "Crítico Fraccionario" if producto.cantidad_actual <= producto.cantidad_minima_alerta else "Bajo Fraccionario"
+        else:
+            # Información para productos normales
+            tipo_producto = "Normal (unidades)"
+            stock_actual = f"{producto.cantidad} unidades"
+            stock_minimo = f"{producto.stock_minimo} unidades"
+            diferencia = f"{max(0, producto.stock_minimo - producto.cantidad)} unidades"
+            estado = "Crítico" if producto.cantidad == 0 else "Bajo"
         
         datos = [
             producto.codigo_qr,
             producto.nombre,
             producto.get_categoria_display(),
-            producto.cantidad,
-            producto.stock_minimo,
+            tipo_producto,
+            stock_actual,
+            stock_minimo,
             diferencia,
+            estado,
             f'${producto.costo_unitario:.2f}',
             f'${valor_stock:.2f}'
         ]
         
         for col, dato in enumerate(datos, start=1):
-            ws_stock_bajo.cell(row=row, column=col, value=dato)
+            cell = ws_stock_bajo.cell(row=row, column=col, value=dato)
+            # Resaltar productos fraccionarios críticos
+            if producto.es_fraccionable and producto.cantidad_actual <= producto.cantidad_minima_alerta:
+                cell.fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
     
     # === HOJA 3: PRODUCTOS MÁS UTILIZADOS ===
     ws_mas_usados = wb.create_sheet("Productos Más Utilizados")
@@ -801,8 +841,8 @@ def descargar_reporte_excel(request):
     # === HOJA 4: TODOS LOS PRODUCTOS ===
     ws_todos = wb.create_sheet("Inventario Completo")
     
-    # Encabezados
-    headers_todos = ['Código QR', 'Nombre', 'Descripción', 'Categoría', 'Stock Actual', 'Stock Mínimo', 'Estado Calidad', 'Costo Unitario', 'Valor Total', 'Fecha Ingreso']
+    # Encabezados ampliados para incluir información fraccionaria
+    headers_todos = ['Código QR', 'Nombre', 'Descripción', 'Categoría', 'Tipo', 'Stock Actual', 'Stock Disponible', 'Stock Mínimo', 'Estado Stock', 'Estado Calidad', 'Costo Unitario', 'Valor Total', 'Fecha Ingreso']
     for col, header in enumerate(headers_todos, start=1):
         cell = ws_todos.cell(row=1, column=col, value=header)
         cell.font = header_font
@@ -815,13 +855,31 @@ def descargar_reporte_excel(request):
     for row, producto in enumerate(todos_productos, start=2):
         valor_total = producto.cantidad * producto.costo_unitario
         
+        if producto.es_fraccionable:
+            # Información detallada para productos fraccionarios
+            tipo_producto = f"Fraccionario ({producto.unidad_base})"
+            stock_actual = f"{producto.cantidad} unidades × {producto.cantidad_unitaria} {producto.unidad_base}"
+            stock_disponible = f"{producto.cantidad_total_disponible():.1f} {producto.unidad_base} (Actual: {producto.cantidad_actual:.1f} {producto.unidad_base} - {producto.porcentaje_disponible():.0f}%)"
+            stock_minimo = f"{producto.cantidad_minima_alerta:.1f} {producto.unidad_base}"
+            estado_stock = "Crítico Fraccionario" if producto.stock_fraccionario_bajo() else "Normal"
+        else:
+            # Información para productos normales
+            tipo_producto = "Normal"
+            stock_actual = f"{producto.cantidad} unidades"
+            stock_disponible = f"{producto.cantidad} unidades"
+            stock_minimo = f"{producto.stock_minimo} unidades"
+            estado_stock = "Bajo" if producto.stock_bajo() else "Normal"
+        
         datos = [
             producto.codigo_qr,
             producto.nombre,
             producto.descripcion[:50] + '...' if len(producto.descripcion) > 50 else producto.descripcion,
             producto.get_categoria_display(),
-            producto.cantidad,
-            producto.stock_minimo,
+            tipo_producto,
+            stock_actual,
+            stock_disponible,
+            stock_minimo,
+            estado_stock,
             producto.get_estado_calidad_display(),
             f'${producto.costo_unitario:.2f}',
             f'${valor_total:.2f}',
@@ -829,13 +887,16 @@ def descargar_reporte_excel(request):
         ]
         
         for col, dato in enumerate(datos, start=1):
-            ws_todos.cell(row=row, column=col, value=dato)
+            cell = ws_todos.cell(row=row, column=col, value=dato)
+            # Resaltar productos fraccionarios
+            if producto.es_fraccionable:
+                cell.fill = PatternFill(start_color="E7F3FF", end_color="E7F3FF", fill_type="solid")
     
     # === HOJA 5: MOVIMIENTOS RECIENTES ===
     ws_movimientos = wb.create_sheet("Movimientos Recientes")
     
-    # Encabezados
-    headers_mov = ['Fecha', 'Tipo', 'Producto', 'Cantidad', 'Destinatario/Área', 'Usuario Registro', 'Observaciones']
+    # Encabezados mejorados para incluir información fraccionaria
+    headers_mov = ['Fecha', 'Tipo Movimiento', 'Tipo Producto', 'Producto', 'Cantidad/Detalle', 'Destinatario/Área', 'Usuario Registro', 'Observaciones']
     for col, header in enumerate(headers_mov, start=1):
         cell = ws_movimientos.cell(row=1, column=col, value=header)
         cell.font = header_font
@@ -860,18 +921,96 @@ def descargar_reporte_excel(request):
         elif mov.usuario_registro:
             usuario_registro = mov.usuario_registro
         
+        # Información de cantidad diferenciada
+        if mov.es_movimiento_fraccionario:
+            tipo_producto = f"Fraccionario ({mov.unidad_utilizada})"
+            detalle_cantidad = f"{mov.cantidad_fraccionaria:.1f} {mov.unidad_utilizada}"
+            if mov.tipo == 'entrada':
+                detalle_cantidad = f"+{detalle_cantidad}"
+            elif mov.tipo == 'salida':
+                detalle_cantidad = f"-{detalle_cantidad}"
+        else:
+            tipo_producto = "Normal"
+            detalle_cantidad = f"{mov.cantidad} unidades"
+            if mov.tipo == 'entrada':
+                detalle_cantidad = f"+{detalle_cantidad}"
+            elif mov.tipo == 'salida':
+                detalle_cantidad = f"-{detalle_cantidad}"
+        
         datos = [
             mov.fecha_movimiento.strftime('%d/%m/%Y %H:%M'),
             mov.get_tipo_display(),
+            tipo_producto,
             mov.producto.nombre,
-            mov.cantidad,
+            detalle_cantidad,
             destinatario,
             usuario_registro,
             mov.observaciones[:100] + '...' if len(mov.observaciones) > 100 else mov.observaciones
         ]
         
         for col, dato in enumerate(datos, start=1):
-            ws_movimientos.cell(row=row, column=col, value=dato)
+            cell = ws_movimientos.cell(row=row, column=col, value=dato)
+            # Resaltar movimientos fraccionarios
+            if mov.es_movimiento_fraccionario:
+                cell.fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    
+    # === HOJA 6: PRODUCTOS FRACCIONARIOS (DETALLE) ===
+    ws_fraccionarios = wb.create_sheet("Productos Fraccionarios")
+    
+    # Encabezados específicos para productos fraccionarios
+    headers_frac = ['Código QR', 'Nombre', 'Categoría', 'Unidad Base', 'Cantidad por Unidad', 'Unidades en Stock', 'Cantidad Actual', 'Total Disponible', 'Porcentaje Actual', 'Mínimo Alerta', 'Estado', 'Costo Unitario', 'Valor Total']
+    for col, header in enumerate(headers_frac, start=1):
+        cell = ws_fraccionarios.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")  # Azul para fraccionarios
+        cell.alignment = Alignment(horizontal='center')
+    
+    # Obtener solo productos fraccionarios
+    productos_fraccionarios_list = Producto.objects.filter(es_fraccionable=True).order_by('nombre')
+    
+    for row, producto in enumerate(productos_fraccionarios_list, start=2):
+        valor_total = producto.cantidad * producto.costo_unitario
+        estado_fraccionario = ""
+        
+        if producto.cantidad_actual <= 0:
+            estado_fraccionario = "Sin Stock"
+        elif producto.stock_fraccionario_bajo():
+            estado_fraccionario = "Crítico"
+        elif producto.porcentaje_disponible() <= 30:
+            estado_fraccionario = "Bajo"
+        elif producto.porcentaje_disponible() <= 70:
+            estado_fraccionario = "Medio"
+        else:
+            estado_fraccionario = "Óptimo"
+        
+        datos = [
+            producto.codigo_qr,
+            producto.nombre,
+            producto.get_categoria_display(),
+            producto.unidad_base,
+            f"{producto.cantidad_unitaria:.1f} {producto.unidad_base}",
+            producto.cantidad,
+            f"{producto.cantidad_actual:.1f} {producto.unidad_base}",
+            f"{producto.cantidad_total_disponible():.1f} {producto.unidad_base}",
+            f"{producto.porcentaje_disponible():.1f}%",
+            f"{producto.cantidad_minima_alerta:.1f} {producto.unidad_base}",
+            estado_fraccionario,
+            f'${producto.costo_unitario:.2f}',
+            f'${valor_total:.2f}'
+        ]
+        
+        for col, dato in enumerate(datos, start=1):
+            cell = ws_fraccionarios.cell(row=row, column=col, value=dato)
+            
+            # Colorear según el estado
+            if estado_fraccionario == "Sin Stock":
+                cell.fill = PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid")  # Rojo
+            elif estado_fraccionario == "Crítico":
+                cell.fill = PatternFill(start_color="FFCC99", end_color="FFCC99", fill_type="solid")  # Naranja
+            elif estado_fraccionario == "Bajo":
+                cell.fill = PatternFill(start_color="FFFF99", end_color="FFFF99", fill_type="solid")  # Amarillo
+            elif estado_fraccionario == "Óptimo":
+                cell.fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")  # Verde claro
     
     # Ajustar ancho de columnas para todas las hojas
     for ws in wb.worksheets:
