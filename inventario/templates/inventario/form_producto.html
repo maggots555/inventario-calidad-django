@@ -101,7 +101,13 @@
                                     <i class="bi bi-exclamation-triangle"></i> Stock Mínimo *
                                 </label>
                                 {{ form.stock_minimo }}
-                                <div class="form-text">Cantidad mínima para alerta</div>
+                                <div class="form-text stock-minimo-help-normal" id="stock-help-normal">
+                                    Cantidad mínima antes de mostrar alerta de stock bajo
+                                </div>
+                                <div class="form-text stock-minimo-help-unico" id="stock-help-unico" style="display: none;">
+                                    <i class="bi bi-info-circle"></i>
+                                    Para objetos únicos, puedes usar 0. La alerta aparecerá solo cuando no esté disponible (cantidad = 0)
+                                </div>
                                 {% if form.stock_minimo.errors %}
                                     <div class="invalid-feedback d-block">
                                         {% for error in form.stock_minimo.errors %}{{ error }}{% endfor %}
@@ -119,6 +125,32 @@
                                         {% for error in form.ubicacion.errors %}{{ error }}{% endfor %}
                                     </div>
                                 {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Configuración de Objeto Único -->
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <div class="card border-info">
+                                    <div class="card-body">
+                                        <div class="form-check">
+                                            {{ form.es_objeto_unico }}
+                                            <label class="form-check-label" for="{{ form.es_objeto_unico.id_for_label }}">
+                                                <strong>Objeto único</strong>
+                                            </label>
+                                        </div>
+                                        <div class="form-text mt-2">
+                                            <i class="bi bi-info-circle"></i>
+                                            Solo se alerta cuando no están disponibles (cantidad = 0).
+                                            Puedes usar stock mínimo = 0 para estos productos.
+                                        </div>
+                                        {% if form.es_objeto_unico.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.es_objeto_unico.errors %}{{ error }}{% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -351,6 +383,49 @@
 
 {% block extra_js %}
 <script>
+// Función global para manejar el toggle de stock mínimo (llamada desde el widget)
+function toggleStockMinimoUnico() {
+    const esObjetoUnico = document.getElementById('{{ form.es_objeto_unico.id_for_label }}').checked;
+    const stockMinimoInput = document.getElementById('{{ form.stock_minimo.id_for_label }}');
+    const helpNormal = document.getElementById('stock-help-normal');
+    const helpUnico = document.getElementById('stock-help-unico');
+    const objetoUnicoCard = document.getElementById('objeto-unico-card');
+    
+    if (esObjetoUnico) {
+        // Mostrar tarjeta de objeto único
+        objetoUnicoCard.style.display = 'block';
+        
+        // Cambiar validación del stock mínimo
+        stockMinimoInput.setAttribute('min', '0');
+        
+        // Cambiar textos de ayuda
+        helpNormal.style.display = 'none';
+        helpUnico.style.display = 'block';
+        
+        // Si el stock mínimo es mayor que 0, sugerir cambiar a 0
+        if (parseInt(stockMinimoInput.value) > 0) {
+            if (confirm('Para objetos únicos se recomienda usar stock mínimo 0. ¿Deseas cambiarlo automáticamente?')) {
+                stockMinimoInput.value = '0';
+            }
+        }
+    } else {
+        // Ocultar tarjeta de objeto único
+        objetoUnicoCard.style.display = 'none';
+        
+        // Restaurar validación del stock mínimo
+        stockMinimoInput.setAttribute('min', '1');
+        
+        // Cambiar textos de ayuda
+        helpNormal.style.display = 'block';
+        helpUnico.style.display = 'none';
+        
+        // Si el stock mínimo es 0, cambiarlo a 1
+        if (parseInt(stockMinimoInput.value) === 0) {
+            stockMinimoInput.value = '1';
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Cálculo automático del valor total
     const cantidadInput = document.getElementById('{{ form.cantidad.id_for_label }}');
@@ -386,9 +461,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
         
-        if (parseInt(stockMinimo) < 1) {
+        // Validación condicional de stock mínimo
+        const esObjetoUnico = document.getElementById('{{ form.es_objeto_unico.id_for_label }}').checked;
+        if (!esObjetoUnico && parseInt(stockMinimo) < 1) {
             e.preventDefault();
-            alert('El stock mínimo debe ser al menos 1.');
+            alert('El stock mínimo debe ser al menos 1 para productos normales.');
+            return false;
+        }
+        if (esObjetoUnico && parseInt(stockMinimo) < 0) {
+            e.preventDefault();
+            alert('El stock mínimo no puede ser negativo.');
             return false;
         }
     });
@@ -443,6 +525,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Event listener para el checkbox
     esFraccionableCheckbox.addEventListener('change', toggleCamposFraccionables);
+    
+    // Manejo de objetos únicos
+    const esObjetoUnicoCheckbox = document.getElementById('{{ form.es_objeto_unico.id_for_label }}');
+    
+    // Inicializar estado del objeto único
+    toggleStockMinimoUnico();
+    
+    // Event listener para el checkbox de objeto único
+    esObjetoUnicoCheckbox.addEventListener('change', toggleStockMinimoUnico);
     
     // Auto-completar cantidad actual cuando cambia la cantidad unitaria
     cantidadUnitariaInput.addEventListener('input', function() {

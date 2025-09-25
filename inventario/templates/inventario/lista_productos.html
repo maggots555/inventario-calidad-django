@@ -87,7 +87,7 @@
                         </thead>
                         <tbody>
                             {% for producto in productos %}
-                            <tr {% if producto.stock_bajo %}class="table-warning"{% endif %}>
+                            <tr class="{% if producto.es_objeto_unico %}tabla-producto-unico{% endif %}{% if producto.stock_bajo %}{% if producto.es_objeto_unico %} tabla-producto-no-disponible{% else %} table-warning{% endif %}{% endif %}">
                                 <td>
                                     <span class="badge bg-secondary">{{ producto.codigo_qr }}</span>
                                 </td>
@@ -100,7 +100,7 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="badge bg-info">{{ producto.get_categoria_display }}</span>
+                                    <span class="badge badge-categoria-{{ producto.categoria }}">{{ producto.get_categoria_display }}</span>
                                 </td>
                                 <td>
                                     {% if producto.es_fraccionable %}
@@ -133,7 +133,11 @@
                                             <small class="text-muted ms-1">/ {{ producto.stock_minimo }}</small>
                                         </div>
                                         <div class="mt-1">
-                                            <span class="badge badge-normal">Normal</span>
+                                            {% if producto.es_objeto_unico %}
+                                                <span class="badge badge-unico">Único</span>
+                                            {% else %}
+                                                <span class="badge badge-normal">Normal</span>
+                                            {% endif %}
                                         </div>
                                     {% endif %}
                                 </td>

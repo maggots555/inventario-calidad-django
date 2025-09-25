@@ -6,11 +6,25 @@ from django.db.models import Q, Sum, Count, F
 from django.db import models
 from django.utils import timezone
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from .models import Producto, Movimiento, Sucursal, Empleado
 from .forms import ProductoForm, MovimientoForm, SucursalForm, MovimientoRapidoForm, EmpleadoForm, MovimientoFraccionarioForm
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
+
+# Función auxiliar para convertir fechas a zona horaria local
+def fecha_local(fecha_utc):
+    """
+    Convierte una fecha UTC a la zona horaria local de Ciudad de México.
+    """
+    tz_local = ZoneInfo('America/Mexico_City')
+    if timezone.is_aware(fecha_utc):
+        return fecha_utc.astimezone(tz_local)
+    else:
+        # Si la fecha no tiene timezone, asumir UTC y convertir
+        fecha_utc = timezone.make_aware(fecha_utc, timezone.utc)
+        return fecha_utc.astimezone(tz_local)
 
 # ===== DASHBOARD PRINCIPAL =====
 def dashboard(request):
@@ -713,7 +727,7 @@ def descargar_reporte_excel(request):
     # Título del reporte
     ws_resumen['A1'] = 'REPORTE DE INVENTARIO'
     ws_resumen['A1'].font = Font(bold=True, size=16)
-    ws_resumen['A2'] = f'Generado el: {timezone.now().strftime("%d/%m/%Y %H:%M")}'
+    ws_resumen['A2'] = f'Generado el: {fecha_local(timezone.now()).strftime("%d/%m/%Y %H:%M")}'
     
     # Estadísticas generales
     ws_resumen['A4'] = 'ESTADÍSTICAS GENERALES'
@@ -722,13 +736,15 @@ def descargar_reporte_excel(request):
     
     # Calcular estadísticas generales
     total_productos = Producto.objects.count()
-    productos_normales = Producto.objects.filter(es_fraccionable=False)
+    productos_normales = Producto.objects.filter(es_fraccionable=False, es_objeto_unico=False)
     productos_fraccionarios = Producto.objects.filter(es_fraccionable=True)
+    productos_objetos_unicos = Producto.objects.filter(es_objeto_unico=True)
     
-    # Stock bajo tradicional y fraccionario
+    # Stock bajo por tipo de producto
     productos_stock_bajo_normal = productos_normales.filter(cantidad__lte=F('stock_minimo')).count()
     productos_stock_bajo_fraccionario = sum(1 for p in productos_fraccionarios if p.stock_fraccionario_bajo())
-    productos_stock_bajo = productos_stock_bajo_normal + productos_stock_bajo_fraccionario
+    productos_objetos_unicos_no_disponibles = productos_objetos_unicos.filter(cantidad=0).count()
+    productos_stock_bajo = productos_stock_bajo_normal + productos_stock_bajo_fraccionario + productos_objetos_unicos_no_disponibles
     
     # Cálculos de inventario
     valor_total_inventario = Producto.objects.aggregate(
@@ -741,9 +757,11 @@ def descargar_reporte_excel(request):
         ['Total de Productos:', total_productos],
         ['  - Productos Normales:', productos_normales.count()],
         ['  - Productos Fraccionarios:', productos_fraccionarios.count()],
-        ['Productos con Stock Bajo:', productos_stock_bajo],
+        ['  - Objetos Únicos:', productos_objetos_unicos.count()],
+        ['Productos con Alertas:', productos_stock_bajo],
         ['  - Stock Bajo Normal:', productos_stock_bajo_normal],
         ['  - Stock Bajo Fraccionario:', productos_stock_bajo_fraccionario],
+        ['  - Objetos Únicos No Disponibles:', productos_objetos_unicos_no_disponibles],
         ['Total de Unidades en Stock:', total_unidades],
         ['Valor Total del Inventario:', f'${valor_total_inventario:,.2f}']
     ]
@@ -764,17 +782,21 @@ def descargar_reporte_excel(request):
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal='center')
     
-    # Obtener productos con stock bajo (normales y fraccionarios)
+    # Obtener productos con stock bajo (normales, fraccionarios y objetos únicos)
     productos_stock_bajo_list = []
     
-    # Productos normales con stock bajo
-    for producto in Producto.objects.filter(es_fraccionable=False, cantidad__lte=F('stock_minimo')).order_by('cantidad'):
+    # Productos normales con stock bajo (excluyendo objetos únicos)
+    for producto in Producto.objects.filter(es_fraccionable=False, es_objeto_unico=False, cantidad__lte=F('stock_minimo')).order_by('cantidad'):
         productos_stock_bajo_list.append(producto)
     
     # Productos fraccionarios con stock bajo
     for producto in Producto.objects.filter(es_fraccionable=True):
         if producto.stock_fraccionario_bajo():
             productos_stock_bajo_list.append(producto)
+    
+    # Objetos únicos no disponibles (cantidad = 0)
+    for producto in Producto.objects.filter(es_objeto_unico=True, cantidad=0).order_by('nombre'):
+        productos_stock_bajo_list.append(producto)
     
     for row, producto in enumerate(productos_stock_bajo_list, start=2):
         valor_stock = producto.cantidad * producto.costo_unitario
@@ -786,6 +808,13 @@ def descargar_reporte_excel(request):
             stock_minimo = f"{producto.cantidad_minima_alerta:.1f} {producto.unidad_base}"
             diferencia = f"{max(0, producto.cantidad_minima_alerta - producto.cantidad_actual):.1f} {producto.unidad_base}"
             estado = "Crítico Fraccionario" if producto.cantidad_actual <= producto.cantidad_minima_alerta else "Bajo Fraccionario"
+        elif producto.es_objeto_unico:
+            # Información para objetos únicos
+            tipo_producto = "Objeto Único"
+            stock_actual = f"{producto.cantidad} unidades"
+            stock_minimo = f"{producto.stock_minimo} unidades (permite 0)"
+            diferencia = f"N/A (solo alerta cuando = 0)"
+            estado = "No Disponible" if producto.cantidad == 0 else "Disponible"
         else:
             # Información para productos normales
             tipo_producto = "Normal (unidades)"
@@ -872,6 +901,13 @@ def descargar_reporte_excel(request):
             stock_disponible = f"{producto.cantidad_total_disponible():.1f} {producto.unidad_base} (Actual: {producto.cantidad_actual:.1f} {producto.unidad_base} - {producto.porcentaje_disponible():.0f}%)"
             stock_minimo = f"{producto.cantidad_minima_alerta:.1f} {producto.unidad_base}"
             estado_stock = "Crítico Fraccionario" if producto.stock_fraccionario_bajo() else "Normal"
+        elif producto.es_objeto_unico:
+            # Información para objetos únicos
+            tipo_producto = "Objeto Único"
+            stock_actual = f"{producto.cantidad} unidades"
+            stock_disponible = f"{producto.cantidad} unidades ({'Disponible' if producto.cantidad > 0 else 'No Disponible'})"
+            stock_minimo = f"{producto.stock_minimo} unidades (alerta solo en 0)"
+            estado_stock = "No Disponible" if producto.cantidad == 0 else "Disponible"
         else:
             # Información para productos normales
             tipo_producto = "Normal"
@@ -893,14 +929,19 @@ def descargar_reporte_excel(request):
             producto.get_estado_calidad_display(),
             f'${producto.costo_unitario:.2f}',
             f'${valor_total:.2f}',
-            producto.fecha_ingreso.strftime('%d/%m/%Y')
+            fecha_local(producto.fecha_ingreso).strftime('%d/%m/%Y')
         ]
         
         for col, dato in enumerate(datos, start=1):
             cell = ws_todos.cell(row=row, column=col, value=dato)
-            # Resaltar productos fraccionarios
+            # Resaltar diferentes tipos de productos
             if producto.es_fraccionable:
-                cell.fill = PatternFill(start_color="E7F3FF", end_color="E7F3FF", fill_type="solid")
+                cell.fill = PatternFill(start_color="E7F3FF", end_color="E7F3FF", fill_type="solid")  # Azul claro
+            elif producto.es_objeto_unico:
+                cell.fill = PatternFill(start_color="F3E7FF", end_color="F3E7FF", fill_type="solid")  # Morado claro
+                # Resaltar especialmente si no está disponible
+                if producto.cantidad == 0:
+                    cell.fill = PatternFill(start_color="FFE7E7", end_color="FFE7E7", fill_type="solid")  # Rojo claro
     
     # === HOJA 5: MOVIMIENTOS RECIENTES ===
     ws_movimientos = wb.create_sheet("Movimientos Recientes")
@@ -1022,6 +1063,48 @@ def descargar_reporte_excel(request):
             elif estado_fraccionario == "Óptimo":
                 cell.fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")  # Verde claro
     
+    # === HOJA 7: OBJETOS ÚNICOS (DETALLE) ===
+    ws_objetos_unicos = wb.create_sheet("Objetos Únicos")
+    
+    # Encabezados específicos para objetos únicos
+    headers_unicos = ['Código QR', 'Nombre', 'Descripción', 'Categoría', 'Stock Actual', 'Stock Mínimo', 'Estado Disponibilidad', 'Estado Calidad', 'Costo Unitario', 'Valor Total', 'Fecha Ingreso', 'Ubicación']
+    for col, header in enumerate(headers_unicos, start=1):
+        cell = ws_objetos_unicos.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = PatternFill(start_color="8B5CF6", end_color="8B5CF6", fill_type="solid")  # Morado para objetos únicos
+        cell.alignment = Alignment(horizontal='center')
+    
+    # Obtener solo objetos únicos
+    objetos_unicos_list = Producto.objects.filter(es_objeto_unico=True).order_by('nombre')
+    
+    for row, producto in enumerate(objetos_unicos_list, start=2):
+        valor_total = producto.cantidad * producto.costo_unitario
+        estado_disponibilidad = producto.estado_disponibilidad()
+        
+        datos = [
+            producto.codigo_qr,
+            producto.nombre,
+            producto.descripcion[:50] + '...' if len(producto.descripcion) > 50 else producto.descripcion,
+            producto.get_categoria_display(),
+            f"{producto.cantidad} unidades",
+            f"{producto.stock_minimo} unidades (permite 0)",
+            estado_disponibilidad,
+            producto.get_estado_calidad_display(),
+            f'${producto.costo_unitario:.2f}',
+            f'${valor_total:.2f}',
+            fecha_local(producto.fecha_ingreso).strftime('%d/%m/%Y'),
+            producto.ubicacion or "No especificada"
+        ]
+        
+        for col, dato in enumerate(datos, start=1):
+            cell = ws_objetos_unicos.cell(row=row, column=col, value=dato)
+            
+            # Colorear según disponibilidad
+            if estado_disponibilidad == "No Disponible":
+                cell.fill = PatternFill(start_color="FFB3B3", end_color="FFB3B3", fill_type="solid")  # Rojo claro
+            else:
+                cell.fill = PatternFill(start_color="D4EDDA", end_color="D4EDDA", fill_type="solid")  # Verde claro
+    
     # Ajustar ancho de columnas para todas las hojas
     for ws in wb.worksheets:
         for column in ws.columns:
@@ -1040,7 +1123,7 @@ def descargar_reporte_excel(request):
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    response['Content-Disposition'] = f'attachment; filename="Reporte_Inventario_{timezone.now().strftime("%Y%m%d_%H%M")}.xlsx"'
+    response['Content-Disposition'] = f'attachment; filename="Reporte_Inventario_{fecha_local(timezone.now()).strftime("%Y%m%d_%H%M")}.xlsx"'
     
     # Guardar el workbook en la respuesta
     wb.save(response)
