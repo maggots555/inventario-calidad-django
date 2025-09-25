@@ -33,6 +33,8 @@ class ProductoForm(forms.ModelForm):
             'nombre', 'descripcion', 'categoria', 'tipo',
             'cantidad', 'stock_minimo', 'ubicacion',
             'proveedor', 'costo_unitario', 'estado_calidad',
+            # Campo para objetos únicos
+            'es_objeto_unico',
             # Nuevos campos fraccionarios
             'es_fraccionable', 'unidad_base', 'cantidad_unitaria', 
             'cantidad_actual', 'cantidad_minima_alerta'
@@ -56,8 +58,9 @@ class ProductoForm(forms.ModelForm):
             }),
             'stock_minimo': forms.NumberInput(attrs={
                 'class': 'form-control', 
-                'min': 1,
-                'placeholder': 'Cantidad mínima para alerta'
+                'min': 0,
+                'placeholder': 'Cantidad mínima para alerta',
+                'id': 'id_stock_minimo'
             }),
             'ubicacion': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -74,6 +77,12 @@ class ProductoForm(forms.ModelForm):
                 'placeholder': '0.00'
             }),
             'estado_calidad': forms.Select(attrs={'class': 'form-control'}),
+            # Widget para objetos únicos
+            'es_objeto_unico': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'id_es_objeto_unico',
+                'onchange': 'toggleStockMinimoUnico()'
+            }),
             # Nuevos widgets para campos fraccionarios
             'es_fraccionable': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',

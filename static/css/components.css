@@ -849,14 +849,7 @@
     box-shadow: var(--shadow-xl);
 }
 
-/* Badges especiales */
-.badge-fraccionable {
-    background: linear-gradient(135deg, var(--info-color), #0891b2);
-    color: white;
-    font-size: 0.65rem;
-    padding: 0.25em 0.5em;
-    border-radius: var(--border-radius-md);
-}
+/* Badges especiales - definición eliminada (duplicado) */
 
 /* Estados de nivel para productos fraccionables */
 .indicador-nivel {
@@ -1294,30 +1287,9 @@
     60% { transform: translateY(-5px); }
 }
 
-/* ===== BADGE PARA TIPO DE PRODUCTO ===== */
-.badge-fraccionable {
-    background: linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%);
-    color: #5b21b6;
-    border: 1px solid #a855f7;
-    padding: var(--space-1) var(--space-3);
-    border-radius: var(--border-radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
+/* ===== BADGE PARA TIPO DE PRODUCTO - definición eliminada (duplicado) ===== */
 
-.badge-normal {
-    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
-    color: #374151;
-    border: 1px solid #9ca3af;
-    padding: var(--space-1) var(--space-3);
-    border-radius: var(--border-radius-full);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
+/* Definición eliminada - duplicado */
 
 /* ===== FORMULARIO FRACCIONARIO ===== */
 .form-fraccionario {
@@ -1552,4 +1524,436 @@
         width: 70%;
         height: 50%;
     }
+}
+
+/* ===== ESTILOS PARA BADGES DE PRODUCTOS ===== */
+
+/* ===== BADGES DE CATEGORÍAS ===== */
+.badge-categoria-limpieza {
+    background: linear-gradient(135deg, #3b82f6, #60a5fa) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-seguridad {
+    background: linear-gradient(135deg, #8b5cf6, #a78bfa) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-oficina {
+    background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-etiquetas {
+    background: linear-gradient(135deg, #ec4899, #f472b6) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(236, 72, 153, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-envases {
+    background: linear-gradient(135deg, #14b8a6, #2dd4bf) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(20, 184, 166, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-herramientas {
+    background: linear-gradient(135deg, #f97316, #fb923c) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(249, 115, 22, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-otros {
+    background: linear-gradient(135deg, #6b7280, #9ca3af) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(107, 114, 128, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Efectos hover para badges de categoría */
+.badge-categoria-limpieza:hover { background: linear-gradient(135deg, #2563eb, #3b82f6) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4) !important; }
+.badge-categoria-seguridad:hover { background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4) !important; }
+.badge-categoria-oficina:hover { background: linear-gradient(135deg, #3730a3, #4f46e5) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(79, 70, 229, 0.4) !important; }
+.badge-categoria-etiquetas:hover { background: linear-gradient(135deg, #db2777, #ec4899) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(236, 72, 153, 0.4) !important; }
+.badge-categoria-envases:hover { background: linear-gradient(135deg, #0f766e, #14b8a6) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(20, 184, 166, 0.4) !important; }
+.badge-categoria-herramientas:hover { background: linear-gradient(135deg, #ea580c, #f97316) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(249, 115, 22, 0.4) !important; }
+.badge-categoria-otros:hover { background: linear-gradient(135deg, #4b5563, #6b7280) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(107, 114, 128, 0.4) !important; }
+
+/* ===== BADGES DE TIPO DE PRODUCTO ===== */
+
+/* Badge para objetos únicos (morado) */
+.badge-unico {
+    background: linear-gradient(135deg, #8b5cf6, #a855f7);
+    color: white;
+    font-weight: 600;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: none;
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+    transition: all 0.2s ease;
+}
+
+.badge-unico:hover {
+    background: linear-gradient(135deg, #7c3aed, #9333ea);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
+}
+
+/* Badge para productos normales (gris) */
+.badge-normal {
+    background: linear-gradient(135deg, #9ca3af, #6b7280) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(156, 163, 175, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-normal:hover {
+    background: linear-gradient(135deg, #6b7280, #4b5563) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(107, 114, 128, 0.4) !important;
+}
+
+/* Badge para productos fraccionables (azul) */
+.badge-fraccionable {
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-fraccionable:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+}
+
+.icono-objeto-unico {
+    font-size: 0.8rem;
+    margin-right: 0.1rem;
+}
+
+@keyframes rotateIcon {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Estilos para filas de tabla de objetos únicos */
+.tabla-producto-unico {
+    background-color: #faf5ff;
+    border-left: 3px solid #8b5cf6;
+}
+
+.tabla-producto-no-disponible {
+    background-color: #fef2f2;
+    border-left: 3px solid #ef4444;
+    animation: pulseAlert 2s infinite;
+}
+
+@keyframes pulseAlert {
+    0%, 100% { 
+        background-color: #fef2f2; 
+        border-left-color: #ef4444;
+    }
+    50% { 
+        background-color: #fee2e2; 
+        border-left-color: #dc2626;
+    }
+}
+
+/* Mejoras para formularios de objetos únicos */
+.objeto-unico-check {
+    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+    padding: var(--space-4);
+    border-radius: var(--border-radius-md);
+    border: 2px solid #e5e7eb;
+    transition: all 0.3s ease;
+}
+
+.objeto-unico-check:hover {
+    border-color: #8b5cf6;
+    background: linear-gradient(135deg, #faf5ff, #f3e8ff);
+}
+
+.objeto-unico-label {
+    font-weight: 600;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.objeto-unico-help {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: var(--border-radius-sm);
+    padding: var(--space-3);
+    margin-top: var(--space-2);
+    font-size: 0.875rem;
+    color: #1e40af;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.stock-minimo-help-unico {
+    background: #f0f9ff;
+    border: 1px solid #7dd3fc;
+    border-radius: var(--border-radius-sm);
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.875rem;
+    color: #0369a1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* =============================================================================
+   OBJETOS ÚNICOS - NUEVOS ESTILOS
+   Descripción: Estilos específicos para productos únicos (que se prestan)
+   ============================================================================= */
+
+/* ===== BADGES PARA OBJETOS ÚNICOS ===== */
+.badge-unico {
+    background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #9333ea 100%);
+    color: white;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Definición eliminada - duplicado que sobreescribía el gris */
+
+/* ===== ESTADOS DE DISPONIBILIDAD ÚNICOS ===== */
+.estado-disponible {
+    color: #047857;
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    border: 1px solid #10b981;
+}
+
+.estado-no-disponible {
+    color: #dc2626;
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    border: 1px solid #ef4444;
+    animation: pulse-warning 1.5s infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); 
+    }
+    50% { 
+        box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); 
+    }
+}
+
+/* ===== FILAS DE TABLA PARA OBJETOS ÚNICOS ===== */
+.tabla-producto-unico {
+    border-left: 4px solid #8b5cf6;
+}
+
+.tabla-producto-no-disponible {
+    background-color: rgba(220, 38, 38, 0.05) !important;
+    border-left: 4px solid #dc2626;
+}
+
+.tabla-producto-no-disponible td {
+    position: relative;
+}
+
+.tabla-producto-no-disponible td::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #dc2626, transparent);
+    animation: scanLine 2s infinite;
+}
+
+@keyframes scanLine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* ===== FORMULARIO - OBJETO ÚNICO ===== */
+.objeto-unico-container {
+    background: linear-gradient(135deg, #faf5ff, #f3e8ff);
+    border: 2px solid #c4b5fd;
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-5);
+    margin: var(--space-4) 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.objeto-unico-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #8b5cf6, #a855f7, #9333ea);
+}
+
+.objeto-unico-check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.objeto-unico-check input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #8b5cf6;
+    cursor: pointer;
+}
+
+.objeto-unico-label {
+    font-weight: 600;
+    color: #6d28d9;
+    cursor: pointer;
+}
+
+.objeto-unico-help {
+    color: #7c3aed;
+    font-size: 0.9rem;
+    margin-top: var(--space-2);
+    font-style: italic;
+}
+
+/* ===== STOCK MÍNIMO CONDICIONAL ===== */
+.stock-minimo-help-normal {
+    color: #065f46;
+    font-size: 0.85rem;
+}
+
+.stock-minimo-help-unico {
+    color: #7c3aed;
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+/* ===== ICONOS PARA OBJETOS ÚNICOS ===== */
+.icono-objeto-unico {
+    color: #8b5cf6;
+    margin-right: var(--space-2);
+}
+
+.icono-prestado {
+    color: #f59e0b;
+    animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ===== CARDS ESPECIALES PARA OBJETOS ÚNICOS ===== */
+.card-objeto-unico {
+    border: 2px solid #c4b5fd;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(168, 85, 247, 0.05));
+    position: relative;
+}
+
+.card-objeto-unico::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #8b5cf6, #a855f7, #9333ea);
 }

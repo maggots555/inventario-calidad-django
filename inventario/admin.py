@@ -3,8 +3,8 @@ from .models import Producto, Sucursal, Movimiento, Empleado
 
 @admin.register(Producto)
 class ProductoAdmin(admin.ModelAdmin):
-    list_display = ('codigo_qr', 'nombre', 'categoria', 'es_fraccionable', 'cantidad', 'nivel_fraccionario', 'stock_bajo', 'estado_calidad', 'fecha_ingreso')
-    list_filter = ('categoria', 'tipo', 'es_fraccionable', 'estado_calidad', 'fecha_ingreso')
+    list_display = ('codigo_qr', 'nombre', 'categoria', 'es_objeto_unico', 'es_fraccionable', 'cantidad', 'nivel_fraccionario', 'stock_bajo', 'estado_calidad', 'fecha_ingreso')
+    list_filter = ('categoria', 'tipo', 'es_objeto_unico', 'es_fraccionable', 'estado_calidad', 'fecha_ingreso')
     search_fields = ('codigo_qr', 'nombre', 'descripcion', 'proveedor', 'unidad_base')
     ordering = ['-fecha_ingreso']
     readonly_fields = ('codigo_qr', 'fecha_ingreso', 'fecha_actualizacion')
@@ -14,7 +14,7 @@ class ProductoAdmin(admin.ModelAdmin):
             'fields': ('codigo_qr', 'nombre', 'descripcion', 'categoria', 'tipo')
         }),
         ('Control de Inventario', {
-            'fields': ('cantidad', 'stock_minimo', 'ubicacion')
+            'fields': ('cantidad', 'stock_minimo', 'ubicacion', 'es_objeto_unico')
         }),
         ('Configuración Fraccionaria', {
             'fields': ('es_fraccionable', 'unidad_base', 'cantidad_unitaria', 'cantidad_actual', 'cantidad_minima_alerta'),

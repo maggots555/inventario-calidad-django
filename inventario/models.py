@@ -86,6 +86,13 @@ class Producto(models.Model):
     stock_minimo = models.PositiveIntegerField(default=5, help_text="Cantidad mínima antes de alerta")
     ubicacion = models.CharField(max_length=100, blank=True, help_text="Ubicación física en almacén")
     
+    # Objeto único - para productos que se prestan y regresan
+    es_objeto_unico = models.BooleanField(
+        default=False,
+        verbose_name="Objeto Único",
+        help_text="Marcar si es un producto único que se presta (permite stock mínimo 0, alerta solo cuando cantidad = 0)"
+    )
+    
     # Campos para manejo fraccionario (productos líquidos, granulados, etc.)
     es_fraccionable = models.BooleanField(
         default=False, 
@@ -130,6 +137,23 @@ class Producto(models.Model):
             self.codigo_qr = f"INV{timestamp}{random_part}"
         super().save(*args, **kwargs)
     
+    def clean(self):
+        """
+        Validaciones personalizadas para el modelo
+        """
+        from django.core.exceptions import ValidationError
+        
+        # Validación para stock_minimo basado en es_objeto_unico
+        if not self.es_objeto_unico and self.stock_minimo <= 0:
+            raise ValidationError({
+                'stock_minimo': 'El stock mínimo debe ser mayor a 0 para productos normales.'
+            })
+        
+        if self.es_objeto_unico and self.stock_minimo < 0:
+            raise ValidationError({
+                'stock_minimo': 'El stock mínimo no puede ser negativo.'
+            })
+    
     def generar_qr_image(self):
         """
         Genera la imagen QR como base64 para mostrar en templates
@@ -168,14 +192,33 @@ class Producto(models.Model):
     def stock_bajo(self):
         """
         Verifica si el producto tiene stock bajo
+        Para objetos únicos: alerta solo cuando cantidad = 0 (no disponible)
+        Para productos normales: alerta cuando cantidad <= stock_minimo
         """
-        return self.cantidad <= self.stock_minimo
+        if self.es_objeto_unico:
+            return self.cantidad == 0  # Solo alerta cuando no hay ninguno disponible
+        else:
+            return self.cantidad <= self.stock_minimo  # Lógica normal
     
     def valor_total_stock(self):
         """
         Calcula el valor total del stock actual
         """
         return self.cantidad * self.costo_unitario
+    
+    def estado_disponibilidad(self):
+        """
+        Retorna el estado de disponibilidad del producto
+        """
+        if self.es_objeto_unico:
+            return "Disponible" if self.cantidad > 0 else "No Disponible"
+        else:
+            if self.cantidad == 0:
+                return "Agotado"
+            elif self.cantidad <= self.stock_minimo:
+                return "Stock Bajo"
+            else:
+                return "Disponible"
     
     # Métodos para manejo de productos fraccionables
     def porcentaje_disponible(self):
