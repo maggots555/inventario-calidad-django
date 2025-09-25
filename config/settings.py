@@ -30,8 +30,10 @@ DEBUG = True
 ALLOWED_HOSTS = [
     'localhost', 
     '127.0.0.1',
-    '192.168.100.3',     # Tu IP actual
-    '192.168.100.*',     # Cualquier IP en tu red local 192.168.100.x
+    '192.168.10.244',    # Tu IP actual principal
+    '192.168.137.1',     # Tu IP de punto de acceso móvil
+    '192.168.10.*',      # Cualquier IP en tu red local principal
+    '192.168.137.*',     # Cualquier IP en tu red de punto de acceso
     '192.168.*.*',       # Cualquier IP en redes locales 192.168.x.x
     '10.*.*.*',          # Redes privadas clase A
     '*'                  # Permitir cualquier host (solo para desarrollo)
