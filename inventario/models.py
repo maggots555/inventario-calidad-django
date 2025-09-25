@@ -350,6 +350,15 @@ class Movimiento(models.Model):
     # Stock después del movimiento (para auditoría)
     stock_anterior = models.PositiveIntegerField(help_text="Stock antes del movimiento")
     stock_posterior = models.PositiveIntegerField(help_text="Stock después del movimiento")
+    # Campos históricos para estados fraccionarios después del movimiento
+    cantidad_fraccionaria_resultante = models.FloatField(
+        null=True, blank=True,
+        help_text="Cantidad fraccionaria restante en unidad base después del movimiento"
+    )
+    porcentaje_resultante = models.FloatField(
+        null=True, blank=True,
+        help_text="Porcentaje (0-100) restante de la unidad actual después del movimiento"
+    )
     
     @property
     def area_destino_automatica(self):
@@ -428,7 +437,15 @@ class Movimiento(models.Model):
                 
         # Registrar el stock posterior
         self.stock_posterior = self.producto.cantidad
-        
+
+        # Guardar valores resultantes fraccionarios en el movimiento (histórico)
+        # cantidad_actual representa la cantidad restante en la unidad actual
+        self.cantidad_fraccionaria_resultante = self.producto.cantidad_actual
+        try:
+            self.porcentaje_resultante = self.producto.porcentaje_disponible()
+        except Exception:
+            self.porcentaje_resultante = None
+
         # Guardar los cambios en el producto
         self.producto.save()
     
@@ -458,6 +475,20 @@ class Movimiento(models.Model):
         
         # Actualizar el stock del producto
         self.producto.cantidad = nuevo_stock
+        # Para productos fraccionables, registrar también el estado fraccionario resultante
+        if self.producto.es_fraccionable:
+            # Asegurar que cantidad_actual esté inicializada correctamente
+            # Si no hay unidad parcial, mantener la existente
+            self.cantidad_fraccionaria_resultante = self.producto.cantidad_actual
+            try:
+                self.porcentaje_resultante = self.producto.porcentaje_disponible()
+            except Exception:
+                self.porcentaje_resultante = None
+        else:
+            # No aplica para productos no fraccionables
+            self.cantidad_fraccionaria_resultante = None
+            self.porcentaje_resultante = None
+
         self.producto.save()
     
     def cantidad_display(self):

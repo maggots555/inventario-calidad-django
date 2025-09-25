@@ -54,11 +54,15 @@ class SucursalAdmin(admin.ModelAdmin):
 
 @admin.register(Movimiento)
 class MovimientoAdmin(admin.ModelAdmin):
-    list_display = ('fecha_movimiento', 'producto', 'tipo', 'cantidad_display_admin', 'motivo', 'destinatario', 'usuario_registro')
+    list_display = (
+        'fecha_movimiento', 'producto', 'tipo', 'cantidad_display_admin', 'motivo', 'destinatario',
+        'stock_posterior', 'cantidad_fraccionaria_resultante_display', 'porcentaje_resultante_display',
+        'usuario_registro'
+    )
     list_filter = ('tipo', 'motivo', 'es_movimiento_fraccionario', 'fecha_movimiento', 'sucursal_destino')
     search_fields = ('producto__nombre', 'producto__codigo_qr', 'destinatario', 'area_destino', 'usuario_registro', 'unidad_utilizada')
     ordering = ['-fecha_movimiento']
-    readonly_fields = ('stock_anterior', 'stock_posterior', 'fecha_movimiento')
+    readonly_fields = ('stock_anterior', 'stock_posterior', 'fecha_movimiento', 'cantidad_fraccionaria_resultante', 'porcentaje_resultante')
     
     fieldsets = (
         ('Información del Movimiento', {
@@ -75,7 +79,7 @@ class MovimientoAdmin(admin.ModelAdmin):
             'fields': ('observaciones', 'numero_proyecto', 'usuario_registro')
         }),
         ('Control de Stock', {
-            'fields': ('stock_anterior', 'stock_posterior'),
+            'fields': ('stock_anterior', 'stock_posterior', 'cantidad_fraccionaria_resultante', 'porcentaje_resultante'),
             'classes': ('collapse',)
         }),
         ('Fechas', {
@@ -90,6 +94,25 @@ class MovimientoAdmin(admin.ModelAdmin):
             return f"{obj.cantidad_fraccionaria} {obj.unidad_utilizada}"
         return f"{obj.cantidad} unidades"
     cantidad_display_admin.short_description = 'Cantidad'
+
+    def cantidad_fraccionaria_resultante_display(self, obj):
+        """Muestra la cantidad fraccionaria resultante (histórica) de forma amigable"""
+        if obj.cantidad_fraccionaria_resultante is None:
+            return '-'
+        try:
+            return f"{obj.cantidad_fraccionaria_resultante:.1f} {obj.producto.unidad_base}"
+        except Exception:
+            return str(obj.cantidad_fraccionaria_resultante)
+    cantidad_fraccionaria_resultante_display.short_description = 'Restante (post)'
+
+    def porcentaje_resultante_display(self, obj):
+        if obj.porcentaje_resultante is None:
+            return '-'
+        try:
+            return f"{obj.porcentaje_resultante:.0f}%"
+        except Exception:
+            return str(obj.porcentaje_resultante)
+    porcentaje_resultante_display.short_description = 'Porcentaje (post)'
 
 
 @admin.register(Empleado)

@@ -310,7 +310,13 @@
                                                 </div>
                                                 {% if movimiento.producto.es_fraccionable %}
                                                     <small class="text-muted">
-                                                        <i class="bi bi-info-circle"></i> Restante: {{ movimiento.producto.cantidad_actual|floatformat:1 }} {{ movimiento.producto.unidad_base }}
+                                                        <i class="bi bi-info-circle"></i>
+                                                        Restante:
+                                                        {% if movimiento.cantidad_fraccionaria_resultante is not None %}
+                                                            {{ movimiento.cantidad_fraccionaria_resultante|floatformat:1 }} {{ movimiento.producto.unidad_base }}
+                                                        {% else %}
+                                                            {{ movimiento.producto.cantidad_actual|floatformat:1 }} {{ movimiento.producto.unidad_base }}
+                                                        {% endif %}
                                                     </small>
                                                 {% endif %}
                                             {% else %}
@@ -344,16 +350,29 @@
                                             <div class="d-flex align-items-center gap-2">
                                                 <span class="badge bg-primary fs-6 px-3 py-2">{{ movimiento.stock_posterior }}</span>
                                                 {% if movimiento.es_movimiento_fraccionario and movimiento.producto.es_fraccionable %}
-                                                    <!-- Información adicional fraccionaria -->
-                                                    <div class="progress" style="width: 60px; height: 8px;">
-                                                        <div class="progress-bar progress-bar-fraccionario 
-                                                            {% if movimiento.producto.porcentaje_disponible <= 30 %}nivel-bajo
-                                                            {% elif movimiento.producto.porcentaje_disponible <= 70 %}nivel-medio
-                                                            {% else %}nivel-alto{% endif %}"
-                                                            style="width: {{ movimiento.producto.porcentaje_disponible }}%">
+                                                    <!-- Información adicional fraccionaria (histórica por movimiento) -->
+                                                    <div class="d-flex flex-column align-items-start">
+                                                        <div class="progress mb-1" style="width: 60px; height: 8px;">
+                                                            {% with pct=movimiento.porcentaje_resultante %}
+                                                                {% if pct is not None %}
+                                                                    {% if pct <= 30 %}
+                                                                        <div class="progress-bar progress-bar-fraccionario nivel-bajo" style="width: {{ pct }}%;"></div>
+                                                                    {% elif pct <= 70 %}
+                                                                        <div class="progress-bar progress-bar-fraccionario nivel-medio" style="width: {{ pct }}%;"></div>
+                                                                    {% else %}
+                                                                        <div class="progress-bar progress-bar-fraccionario nivel-alto" style="width: {{ pct }}%;"></div>
+                                                                    {% endif %}
+                                                                {% else %}
+                                                                    <div class="progress-bar bg-secondary" style="width: 0%"></div>
+                                                                {% endif %}
+                                                            {% endwith %}
                                                         </div>
+                                                        {% if movimiento.cantidad_fraccionaria_resultante is not None %}
+                                                            <small class="text-muted">Restante: {{ movimiento.cantidad_fraccionaria_resultante|floatformat:1 }} {{ movimiento.producto.unidad_base }}</small>
+                                                        {% elif movimiento.porcentaje_resultante is not None %}
+                                                            <small class="text-muted">{{ movimiento.porcentaje_resultante|floatformat:0 }}%</small>
+                                                        {% endif %}
                                                     </div>
-                                                    <small class="text-muted">{{ movimiento.producto.porcentaje_disponible|floatformat:0 }}%</small>
                                                 {% endif %}
                                             </div>
                                         </td>

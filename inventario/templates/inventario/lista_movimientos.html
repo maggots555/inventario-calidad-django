@@ -168,7 +168,12 @@
                                         </div>
                                         {% if movimiento.producto.es_fraccionable %}
                                             <small class="text-muted">
-                                                Restante: {{ movimiento.producto.cantidad_actual|floatformat:1 }} {{ movimiento.producto.unidad_base }}
+                                                Restante:
+                                                {% if movimiento.cantidad_fraccionaria_resultante is not None %}
+                                                    {{ movimiento.cantidad_fraccionaria_resultante|floatformat:1 }} {{ movimiento.producto.unidad_base }}
+                                                {% else %}
+                                                    {{ movimiento.producto.cantidad_actual|floatformat:1 }} {{ movimiento.producto.unidad_base }}
+                                                {% endif %}
                                             </small>
                                         {% endif %}
                                     {% else %}
@@ -214,15 +219,26 @@
                                                 <span class="badge bg-secondary">{{ movimiento.stock_posterior }} unidades</span>
                                             </div>
                                             <div class="progress-fraccionario mb-1" style="height: 12px; width: 80px; margin: 0 auto;">
-                                                <div class="progress-bar-fraccionario 
-                                                    {% if movimiento.producto.porcentaje_disponible <= 30 %}nivel-bajo
-                                                    {% elif movimiento.producto.porcentaje_disponible <= 70 %}nivel-medio
-                                                    {% else %}nivel-alto{% endif %}"
-                                                    style="width: {{ movimiento.producto.porcentaje_disponible }}%">
-                                                </div>
+                                                {% with pct=movimiento.porcentaje_resultante %}
+                                                    {% if pct is not None %}
+                                                        {% if pct <= 30 %}
+                                                            <div class="progress-bar-fraccionario nivel-bajo" style="width: {{ pct }}%;"></div>
+                                                        {% elif pct <= 70 %}
+                                                            <div class="progress-bar-fraccionario nivel-medio" style="width: {{ pct }}%;"></div>
+                                                        {% else %}
+                                                            <div class="progress-bar-fraccionario nivel-alto" style="width: {{ pct }}%;"></div>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        <div class="progress-bar-fraccionario bg-secondary" style="width: 0%;"></div>
+                                                    {% endif %}
+                                                {% endwith %}
                                             </div>
                                             <small class="text-muted">
-                                                {{ movimiento.producto.cantidad_actual|floatformat:1 }}/{{ movimiento.producto.cantidad_unitaria|floatformat:0 }} {{ movimiento.producto.unidad_base }}
+                                                {% if movimiento.cantidad_fraccionaria_resultante is not None %}
+                                                    Restante: {{ movimiento.cantidad_fraccionaria_resultante|floatformat:1 }} {{ movimiento.producto.unidad_base }}
+                                                {% else %}
+                                                    {{ movimiento.producto.cantidad_actual|floatformat:1 }}/{{ movimiento.producto.cantidad_unitaria|floatformat:0 }} {{ movimiento.producto.unidad_base }}
+                                                {% endif %}
                                             </small>
                                         {% else %}
                                             <!-- Stock normal -->
