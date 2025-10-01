@@ -74,6 +74,8 @@
                                 <th>Nombre</th>
                                 <th>Cargo</th>
                                 <th>Área</th>
+                                <th><i class="bi bi-envelope"></i> Email</th>
+                                <th><i class="bi bi-building"></i> Sucursal</th>
                                 <th>Estado</th>
                                 <th>Fecha Ingreso</th>
                                 <th>Acciones</th>
@@ -90,6 +92,27 @@
                                 </td>
                                 <td>
                                     <span class="badge bg-info">{{ empleado.area }}</span>
+                                </td>
+                                <td>
+                                    {% if empleado.email %}
+                                        <small>
+                                            <i class="bi bi-envelope-fill text-primary"></i>
+                                            {{ empleado.email }}
+                                        </small>
+                                    {% else %}
+                                        <small class="text-muted">
+                                            <i class="bi bi-envelope text-muted"></i> Sin email
+                                        </small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if empleado.sucursal %}
+                                        <span class="badge bg-primary">
+                                            <i class="bi bi-building"></i> {{ empleado.sucursal.nombre }}
+                                        </span>
+                                    {% else %}
+                                        <small class="text-muted">Sin asignar</small>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% if empleado.activo %}

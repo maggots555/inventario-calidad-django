@@ -516,6 +516,15 @@ class Empleado(models.Model):
     nombre_completo = models.CharField(max_length=100, help_text="Nombre completo del empleado")
     cargo = models.CharField(max_length=50, help_text="Cargo o puesto del empleado")
     area = models.CharField(max_length=50, help_text="Área donde trabaja (ej: Laboratorio, Oficina)")
+    sucursal = models.ForeignKey(
+        'Sucursal',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='empleados',
+        help_text="Sucursal a la que pertenece el empleado"
+    )
+    email = models.EmailField(blank=True, null=True, help_text="Correo electrónico del empleado (para notificaciones)")
     activo = models.BooleanField(default=True, help_text="Empleado activo en la empresa")
     
     # Fechas de control

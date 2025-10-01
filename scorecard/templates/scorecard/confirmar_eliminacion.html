@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirmar Eliminación - Score Card - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> Confirmar Eliminación
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="lead">¿Estás seguro de que deseas eliminar esta incidencia?</p>
+                    
+                    <div class="alert alert-warning">
+                        <p><strong>Folio:</strong> {{ incidencia.folio }}</p>
+                        <p><strong>Equipo:</strong> {{ incidencia.tipo_equipo }} {{ incidencia.marca }}</p>
+                        <p><strong>Fecha:</strong> {{ incidencia.fecha_deteccion|date:"d/m/Y" }}</p>
+                        <p class="mb-0"><strong>Técnico:</strong> {{ incidencia.tecnico_responsable.nombre_completo }}</p>
+                    </div>
+
+                    <p class="text-danger">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Esta acción no se puede deshacer.</strong> Se eliminarán también todas las evidencias asociadas.
+                    </p>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="bi bi-trash"></i> Sí, Eliminar Incidencia
+                            </button>
+                            <a href="{% url 'scorecard:lista_incidencias' %}" class="btn btn-secondary btn-lg">
+                                <i class="bi bi-x-circle"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -393,10 +393,11 @@ class MovimientoRapidoForm(forms.ModelForm):
 class EmpleadoForm(forms.ModelForm):
     """
     Formulario para crear y editar empleados
+    Incluye correo electrónico y asignación de sucursal
     """
     class Meta:
         model = Empleado
-        fields = ['nombre_completo', 'cargo', 'area', 'activo']
+        fields = ['nombre_completo', 'cargo', 'area', 'email', 'sucursal', 'activo']
         widgets = {
             'nombre_completo': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -410,10 +411,53 @@ class EmpleadoForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'Ej: Laboratorio, Oficina, Almacén'
             }),
+            'email': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: juan.perez@empresa.com'
+            }),
+            'sucursal': forms.Select(attrs={
+                'class': 'form-control'
+            }),
             'activo': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
         }
+    
+    def __init__(self, *args, **kwargs):
+        """
+        Inicialización del formulario con filtros personalizados
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar solo sucursales activas
+        self.fields['sucursal'].queryset = Sucursal.objects.filter(activa=True)
+        
+        # Hacer el campo sucursal opcional
+        self.fields['sucursal'].required = False
+        
+        # Hacer el campo email opcional
+        self.fields['email'].required = False
+    
+    def clean_email(self):
+        """
+        Validar que el email sea único si se proporciona
+        """
+        email = self.cleaned_data.get('email')
+        
+        if email:
+            # Verificar si ya existe otro empleado con ese email
+            empleados_con_email = Empleado.objects.filter(email=email)
+            
+            # Si estamos editando, excluir el empleado actual
+            if self.instance.pk:
+                empleados_con_email = empleados_con_email.exclude(pk=self.instance.pk)
+            
+            if empleados_con_email.exists():
+                raise forms.ValidationError(
+                    'Ya existe un empleado registrado con este correo electrónico.'
+                )
+        
+        return email
 
 
 class MovimientoFraccionarioForm(forms.ModelForm):

@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ incidencia.folio }} - Score Card - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h1 class="display-6">
+                <i class="bi bi-file-earmark-text text-info"></i>
+                {{ incidencia.folio }}
+            </h1>
+            <p class="text-muted">Detalle de la incidencia</p>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" class="btn btn-warning">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+        </div>
+    </div>
+
+    <!-- Información básica -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-info-circle"></i> Información General</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Folio:</strong> {{ incidencia.folio }}</p>
+                    <p><strong>Fecha Detección:</strong> {{ incidencia.fecha_deteccion|date:"d/m/Y" }}</p>
+                    <p><strong>Estado:</strong> 
+                        {% if incidencia.estado == 'abierta' %}
+                            <span class="badge bg-primary">Abierta</span>
+                        {% elif incidencia.estado == 'cerrada' %}
+                            <span class="badge bg-success">Cerrada</span>
+                        {% else %}
+                            <span class="badge bg-warning">{{ incidencia.get_estado_display }}</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Severidad:</strong> 
+                        <span class="badge bg-{{ incidencia.grado_severidad == 'critico'|yesno:'danger,warning' }}">
+                            {{ incidencia.get_grado_severidad_display }}
+                        </span>
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Tipo de Equipo:</strong> {{ incidencia.get_tipo_equipo_display }}</p>
+                    <p><strong>Marca:</strong> {{ incidencia.marca }}</p>
+                    <p><strong>Modelo:</strong> {{ incidencia.modelo|default:"N/A" }}</p>
+                    <p><strong>Número de Serie:</strong> <code>{{ incidencia.numero_serie }}</code></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Responsables -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="bi bi-people"></i> Responsables</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Sucursal:</strong> {{ incidencia.sucursal.nombre }}</p>
+                    <p><strong>Área Detectora:</strong> {{ incidencia.get_area_detectora_display }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Técnico Responsable:</strong> {{ incidencia.tecnico_responsable.nombre_completo }}</p>
+                    <p><strong>Inspector de Calidad:</strong> {{ incidencia.inspector_calidad.nombre_completo }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Descripción -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-warning">
+            <h5 class="mb-0"><i class="bi bi-file-text"></i> Descripción</h5>
+        </div>
+        <div class="card-body">
+            <p><strong>Descripción de la Incidencia:</strong></p>
+            <p class="text-justify">{{ incidencia.descripcion_incidencia }}</p>
+            
+            {% if incidencia.acciones_tomadas %}
+            <hr>
+            <p><strong>Acciones Tomadas:</strong></p>
+            <p class="text-justify">{{ incidencia.acciones_tomadas }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Evidencias -->
+    {% if evidencias %}
+    <div class="card shadow mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-images"></i> Evidencias ({{ evidencias.count }})</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for evidencia in evidencias %}
+                <div class="col-md-3 mb-3">
+                    <img src="{{ evidencia.imagen.url }}" class="img-fluid rounded" alt="Evidencia">
+                    {% if evidencia.descripcion %}
+                    <p class="small text-muted mt-1">{{ evidencia.descripcion }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Botones de acción -->
+    <div class="mt-3">
+        <a href="{% url 'scorecard:lista_incidencias' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver a la Lista
+        </a>
+        <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" class="btn btn-warning">
+            <i class="bi bi-pencil"></i> Editar
+        </a>
+    </div>
+</div>
+{% endblock %}

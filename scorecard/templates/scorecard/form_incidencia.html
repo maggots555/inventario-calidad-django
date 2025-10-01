@@ -1,0 +1,789 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if editando %}Editar{% else %}Registrar{% endif %} Incidencia - Score Card - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: white;
+        border-radius: 8px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .form-section-header {
+        border-bottom: 2px solid #0d6efd;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+    }
+    
+    .drag-drop-area {
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 40px;
+        text-align: center;
+        background: #f8f9fa;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    
+    .drag-drop-area:hover {
+        border-color: #0d6efd;
+        background: #e7f3ff;
+    }
+    
+    .drag-drop-area.dragover {
+        border-color: #28a745;
+        background: #d4edda;
+    }
+    
+    .image-preview {
+        display: inline-block;
+        position: relative;
+        margin: 10px;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .image-preview img {
+        width: 150px;
+        height: 150px;
+        object-fit: cover;
+    }
+    
+    .image-preview .remove-btn {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 25px;
+        height: 25px;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+    }
+    
+    .alert-reincidencia {
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    .auto-filled {
+        background-color: #d4edda !important;
+        border-color: #28a745 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Encabezado -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-6">
+                <i class="bi bi-{% if editando %}pencil{% else %}plus-circle{% endif %} text-{% if editando %}warning{% else %}success{% endif %}"></i>
+                {% if editando %}Editar Incidencia - {{ incidencia.folio }}{% else %}Registrar Nueva Incidencia{% endif %}
+            </h1>
+            <p class="text-muted">
+                {% if editando %}
+                    Actualiza la información de la incidencia
+                {% else %}
+                    Completa todos los campos obligatorios (<span class="text-danger">*</span>)
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Alerta de reincidencias (se muestra dinámicamente) -->
+    <div id="alerta-reincidencias" class="alert alert-warning alert-reincidencia" style="display: none;">
+        <h5><i class="bi bi-exclamation-triangle"></i> ¡Atención! Posibles Reincidencias Detectadas</h5>
+        <p>Se encontraron <span id="count-reincidencias">0</span> incidencia(s) previa(s) con este número de serie:</p>
+        <div id="lista-reincidencias"></div>
+        <hr>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="marcar-reincidencia">
+            <label class="form-check-label" for="marcar-reincidencia">
+                <strong>Marcar esta incidencia como reincidencia</strong>
+            </label>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="form-incidencia">
+        {% csrf_token %}
+
+        <!-- Sección 1: Información del Equipo -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <h4><i class="bi bi-laptop"></i> Información del Equipo</h4>
+            </div>
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.fecha_deteccion.id_for_label }}" class="form-label required-field">
+                        {{ form.fecha_deteccion.label }}
+                    </label>
+                    {{ form.fecha_deteccion }}
+                    {% if form.fecha_deteccion.errors %}
+                        <div class="invalid-feedback d-block">{{ form.fecha_deteccion.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.tipo_equipo.id_for_label }}" class="form-label required-field">
+                        {{ form.tipo_equipo.label }}
+                    </label>
+                    {{ form.tipo_equipo }}
+                    {% if form.tipo_equipo.errors %}
+                        <div class="invalid-feedback d-block">{{ form.tipo_equipo.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="{{ form.marca.id_for_label }}" class="form-label required-field">
+                        {{ form.marca.label }}
+                    </label>
+                    {{ form.marca }}
+                    <datalist id="marcas-list">
+                        {% for marca in marcas_comunes %}
+                            <option value="{{ marca }}">
+                        {% endfor %}
+                    </datalist>
+                    {% if form.marca.errors %}
+                        <div class="invalid-feedback d-block">{{ form.marca.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="{{ form.modelo.id_for_label }}" class="form-label">
+                        {{ form.modelo.label }}
+                    </label>
+                    {{ form.modelo }}
+                    {% if form.modelo.errors %}
+                        <div class="invalid-feedback d-block">{{ form.modelo.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="{{ form.numero_serie.id_for_label }}" class="form-label required-field">
+                        {{ form.numero_serie.label }}
+                    </label>
+                    {{ form.numero_serie }}
+                    <small class="form-text text-muted">Se verificará automáticamente si hay reincidencias</small>
+                    {% if form.numero_serie.errors %}
+                        <div class="invalid-feedback d-block">{{ form.numero_serie.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-12">
+                    <label for="{{ form.servicio_realizado.id_for_label }}" class="form-label">
+                        {{ form.servicio_realizado.label }}
+                    </label>
+                    {{ form.servicio_realizado }}
+                    {% if form.servicio_realizado.errors %}
+                        <div class="invalid-feedback d-block">{{ form.servicio_realizado.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 2: Ubicación y Responsables -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <h4><i class="bi bi-people"></i> Ubicación y Responsables</h4>
+            </div>
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.sucursal.id_for_label }}" class="form-label required-field">
+                        {{ form.sucursal.label }}
+                    </label>
+                    {{ form.sucursal }}
+                    <small class="form-text text-muted" id="sucursal-info"></small>
+                    {% if form.sucursal.errors %}
+                        <div class="invalid-feedback d-block">{{ form.sucursal.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.area_detectora.id_for_label }}" class="form-label required-field">
+                        {{ form.area_detectora.label }}
+                    </label>
+                    {{ form.area_detectora }}
+                    {% if form.area_detectora.errors %}
+                        <div class="invalid-feedback d-block">{{ form.area_detectora.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.tecnico_responsable.id_for_label }}" class="form-label required-field">
+                        {{ form.tecnico_responsable.label }}
+                    </label>
+                    {{ form.tecnico_responsable }}
+                    <small class="form-text text-muted" id="tecnico-info"></small>
+                    {% if form.tecnico_responsable.errors %}
+                        <div class="invalid-feedback d-block">{{ form.tecnico_responsable.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.inspector_calidad.id_for_label }}" class="form-label required-field">
+                        {{ form.inspector_calidad.label }}
+                    </label>
+                    {{ form.inspector_calidad }}
+                    <small class="form-text text-muted" id="inspector-info"></small>
+                    {% if form.inspector_calidad.errors %}
+                        <div class="invalid-feedback d-block">{{ form.inspector_calidad.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 3: Clasificación del Fallo -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <h4><i class="bi bi-tags"></i> Clasificación del Fallo</h4>
+            </div>
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.tipo_incidencia.id_for_label }}" class="form-label required-field">
+                        {{ form.tipo_incidencia.label }}
+                    </label>
+                    {{ form.tipo_incidencia }}
+                    {% if form.tipo_incidencia.errors %}
+                        <div class="invalid-feedback d-block">{{ form.tipo_incidencia.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.categoria_fallo.id_for_label }}" class="form-label required-field">
+                        {{ form.categoria_fallo.label }}
+                    </label>
+                    {{ form.categoria_fallo }}
+                    {% if form.categoria_fallo.errors %}
+                        <div class="invalid-feedback d-block">{{ form.categoria_fallo.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.grado_severidad.id_for_label }}" class="form-label required-field">
+                        {{ form.grado_severidad.label }}
+                    </label>
+                    {{ form.grado_severidad }}
+                    {% if form.grado_severidad.errors %}
+                        <div class="invalid-feedback d-block">{{ form.grado_severidad.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.componente_afectado.id_for_label }}" class="form-label">
+                        {{ form.componente_afectado.label }}
+                    </label>
+                    {{ form.componente_afectado }}
+                    <small class="form-text text-muted">Se filtra según el tipo de equipo</small>
+                    {% if form.componente_afectado.errors %}
+                        <div class="invalid-feedback d-block">{{ form.componente_afectado.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 4: Descripción -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <h4><i class="bi bi-file-text"></i> Descripción y Seguimiento</h4>
+            </div>
+            
+            <div class="row g-3">
+                <div class="col-12">
+                    <label for="{{ form.descripcion_incidencia.id_for_label }}" class="form-label required-field">
+                        {{ form.descripcion_incidencia.label }}
+                    </label>
+                    {{ form.descripcion_incidencia }}
+                    {% if form.descripcion_incidencia.errors %}
+                        <div class="invalid-feedback d-block">{{ form.descripcion_incidencia.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-12">
+                    <label for="{{ form.acciones_tomadas.id_for_label }}" class="form-label">
+                        {{ form.acciones_tomadas.label }}
+                    </label>
+                    {{ form.acciones_tomadas }}
+                    {% if form.acciones_tomadas.errors %}
+                        <div class="invalid-feedback d-block">{{ form.acciones_tomadas.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-12">
+                    <label for="{{ form.causa_raiz.id_for_label }}" class="form-label">
+                        {{ form.causa_raiz.label }}
+                    </label>
+                    {{ form.causa_raiz }}
+                    {% if form.causa_raiz.errors %}
+                        <div class="invalid-feedback d-block">{{ form.causa_raiz.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 5: Estado y Reincidencia -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <h4><i class="bi bi-flag"></i> Estado y Reincidencia</h4>
+            </div>
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.estado.id_for_label }}" class="form-label required-field">
+                        {{ form.estado.label }}
+                    </label>
+                    {{ form.estado }}
+                    {% if form.estado.errors %}
+                        <div class="invalid-feedback d-block">{{ form.estado.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="form-check mt-4">
+                        {{ form.es_reincidencia }}
+                        <label class="form-check-label" for="{{ form.es_reincidencia.id_for_label }}">
+                            {{ form.es_reincidencia.label }}
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="col-12" id="campo-incidencia-relacionada" style="display: none;">
+                    <label for="{{ form.incidencia_relacionada.id_for_label }}" class="form-label required-field">
+                        {{ form.incidencia_relacionada.label }}
+                    </label>
+                    {{ form.incidencia_relacionada }}
+                    {% if form.incidencia_relacionada.errors %}
+                        <div class="invalid-feedback d-block">{{ form.incidencia_relacionada.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 6: Evidencias (Imágenes) -->
+        <div class="form-section">
+            <div class="form-section-header">
+                <h4><i class="bi bi-images"></i> Evidencias Fotográficas</h4>
+            </div>
+            
+            <div class="drag-drop-area" id="drag-drop-area">
+                <i class="bi bi-cloud-upload" style="font-size: 3rem; color: #6c757d;"></i>
+                <p class="mt-3"><strong>Arrastra imágenes aquí o haz clic para seleccionar</strong></p>
+                <p class="text-muted">Formatos permitidos: JPG, PNG, GIF | Máximo 5MB por imagen</p>
+                <input type="file" id="input-evidencias" name="evidencias" multiple accept="image/*" style="display: none;">
+            </div>
+            
+            <div id="preview-container" class="mt-3"></div>
+            
+            {% if editando and evidencias %}
+            <div class="mt-3">
+                <h5>Evidencias Existentes:</h5>
+                <div class="row">
+                    {% for evidencia in evidencias %}
+                    <div class="col-md-3 mb-3">
+                        <div class="card">
+                            <img src="{{ evidencia.imagen.url }}" class="card-img-top" alt="Evidencia">
+                            <div class="card-body">
+                                <p class="card-text small">{{ evidencia.descripcion }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Errores generales del formulario -->
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        <!-- Botones de acción -->
+        <div class="form-section">
+            <div class="d-grid gap-2 d-md-flex justify-content-md-between">
+                <a href="{% url 'scorecard:lista_incidencias' %}" class="btn btn-outline-secondary btn-lg">
+                    <i class="bi bi-arrow-left"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-{% if editando %}warning{% else %}success{% endif %} btn-lg">
+                    <i class="bi bi-{% if editando %}pencil{% else %}check-circle{% endif %}"></i>
+                    {% if editando %}Actualizar Incidencia{% else %}Registrar Incidencia{% endif %}
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ==========================================
+// SCRIPT PARA FORMULARIO INTELIGENTE
+// ==========================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // ====================================
+    // 1. AUTOCOMPLETADO DE DATOS DE EMPLEADO
+    // ====================================
+    
+    // Función para cargar datos del empleado
+    function cargarDatosEmpleado(empleadoId, tipoEmpleado) {
+        if (!empleadoId) return;
+        
+        fetch(`/scorecard/api/empleado/${empleadoId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const empleado = data.empleado;
+                    
+                    // Mostrar información del empleado
+                    const infoElement = document.getElementById(`${tipoEmpleado}-info`);
+                    if (infoElement) {
+                        infoElement.innerHTML = `
+                            <i class="bi bi-person-badge"></i> ${empleado.cargo} | 
+                            <i class="bi bi-briefcase"></i> ${empleado.area}
+                            ${empleado.email ? ` | <i class="bi bi-envelope"></i> ${empleado.email}` : ''}
+                        `;
+                        infoElement.style.color = '#28a745';
+                    }
+                    
+                    // Auto-llenar sucursal si el empleado tiene una asignada
+                    if (tipoEmpleado === 'tecnico' && empleado.sucursal_id) {
+                        const sucursalSelect = document.getElementById('id_sucursal');
+                        if (sucursalSelect && sucursalSelect.value === '') {
+                            sucursalSelect.value = empleado.sucursal_id;
+                            sucursalSelect.classList.add('auto-filled');
+                            
+                            // Mostrar mensaje
+                            const sucursalInfo = document.getElementById('sucursal-info');
+                            if (sucursalInfo) {
+                                sucursalInfo.innerHTML = `<i class="bi bi-check-circle text-success"></i> Auto-completado desde empleado: ${empleado.sucursal_nombre}`;
+                            }
+                            
+                            // Remover el efecto después de 3 segundos
+                            setTimeout(() => {
+                                sucursalSelect.classList.remove('auto-filled');
+                            }, 3000);
+                        }
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+    
+    // Event listeners para técnico e inspector
+    const tecnicoSelect = document.getElementById('id_tecnico_responsable');
+    const inspectorSelect = document.getElementById('id_inspector_calidad');
+    
+    if (tecnicoSelect) {
+        tecnicoSelect.addEventListener('change', function() {
+            cargarDatosEmpleado(this.value, 'tecnico');
+        });
+        
+        // Cargar datos si ya hay un valor seleccionado (modo edición)
+        if (tecnicoSelect.value) {
+            cargarDatosEmpleado(tecnicoSelect.value, 'tecnico');
+        }
+    }
+    
+    if (inspectorSelect) {
+        inspectorSelect.addEventListener('change', function() {
+            cargarDatosEmpleado(this.value, 'inspector');
+        });
+        
+        // Cargar datos si ya hay un valor seleccionado (modo edición)
+        if (inspectorSelect.value) {
+            cargarDatosEmpleado(inspectorSelect.value, 'inspector');
+        }
+    }
+    
+    // ====================================
+    // 2. DETECCIÓN DE REINCIDENCIAS
+    // ====================================
+    
+    const numeroSerieInput = document.getElementById('id_numero_serie');
+    let busquedaTimeout;
+    
+    if (numeroSerieInput) {
+        numeroSerieInput.addEventListener('input', function() {
+            const numeroSerie = this.value.trim();
+            
+            // Limpiar timeout anterior
+            clearTimeout(busquedaTimeout);
+            
+            // Ocultar alerta si el campo está vacío
+            if (numeroSerie.length < 3) {
+                document.getElementById('alerta-reincidencias').style.display = 'none';
+                return;
+            }
+            
+            // Buscar después de 1 segundo de inactividad
+            busquedaTimeout = setTimeout(() => {
+                buscarReincidencias(numeroSerie);
+            }, 1000);
+        });
+    }
+    
+    function buscarReincidencias(numeroSerie) {
+        fetch(`/scorecard/api/buscar-reincidencias/?numero_serie=${encodeURIComponent(numeroSerie)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.count > 0) {
+                    mostrarAlertaReincidencias(data.incidencias);
+                } else {
+                    document.getElementById('alerta-reincidencias').style.display = 'none';
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+    
+    function mostrarAlertaReincidencias(incidencias) {
+        const alerta = document.getElementById('alerta-reincidencias');
+        const countElement = document.getElementById('count-reincidencias');
+        const listaElement = document.getElementById('lista-reincidencias');
+        
+        countElement.textContent = incidencias.length;
+        
+        let html = '<ul class="list-group">';
+        incidencias.forEach(inc => {
+            html += `
+                <li class="list-group-item">
+                    <strong>${inc.folio}</strong> - ${inc.fecha} | 
+                    ${inc.tipo_equipo} ${inc.marca} | 
+                    Técnico: ${inc.tecnico} | 
+                    <span class="badge bg-secondary">${inc.categoria}</span>
+                    <span class="badge bg-warning">${inc.severidad}</span>
+                </li>
+            `;
+        });
+        html += '</ul>';
+        
+        listaElement.innerHTML = html;
+        alerta.style.display = 'block';
+    }
+    
+    // Checkbox de marcar como reincidencia
+    const marcarReincidenciaCheck = document.getElementById('marcar-reincidencia');
+    const esReincidenciaCheck = document.getElementById('id_es_reincidencia');
+    
+    if (marcarReincidenciaCheck && esReincidenciaCheck) {
+        marcarReincidenciaCheck.addEventListener('change', function() {
+            esReincidenciaCheck.checked = this.checked;
+            toggleCampoReincidencia();
+        });
+    }
+    
+    // ====================================
+    // 3. MOSTRAR/OCULTAR CAMPO DE INCIDENCIA RELACIONADA
+    // ====================================
+    
+    function toggleCampoReincidencia() {
+        const checkbox = document.getElementById('id_es_reincidencia');
+        const campoRelacionada = document.getElementById('campo-incidencia-relacionada');
+        
+        if (checkbox && campoRelacionada) {
+            campoRelacionada.style.display = checkbox.checked ? 'block' : 'none';
+        }
+    }
+    
+    if (esReincidenciaCheck) {
+        esReincidenciaCheck.addEventListener('change', toggleCampoReincidencia);
+        toggleCampoReincidencia(); // Verificar estado inicial
+    }
+    
+    // ====================================
+    // 4. FILTRAR COMPONENTES POR TIPO DE EQUIPO
+    // ====================================
+    
+    const tipoEquipoSelect = document.getElementById('id_tipo_equipo');
+    const componenteSelect = document.getElementById('id_componente_afectado');
+    
+    if (tipoEquipoSelect && componenteSelect) {
+        tipoEquipoSelect.addEventListener('change', function() {
+            const tipoEquipo = this.value;
+            
+            if (!tipoEquipo) return;
+            
+            fetch(`/scorecard/api/componentes-por-tipo/?tipo=${tipoEquipo}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Guardar valor actual
+                        const currentValue = componenteSelect.value;
+                        
+                        // Limpiar opciones
+                        componenteSelect.innerHTML = '<option value="">---------</option>';
+                        
+                        // Agregar nuevas opciones
+                        data.componentes.forEach(comp => {
+                            const option = document.createElement('option');
+                            option.value = comp.id;
+                            option.textContent = comp.nombre;
+                            componenteSelect.appendChild(option);
+                        });
+                        
+                        // Restaurar valor si aún existe
+                        if (currentValue) {
+                            componenteSelect.value = currentValue;
+                        }
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        });
+    }
+    
+    // ====================================
+    // 5. DRAG & DROP DE IMÁGENES
+    // ====================================
+    
+    const dragDropArea = document.getElementById('drag-drop-area');
+    const inputEvidencias = document.getElementById('input-evidencias');
+    const previewContainer = document.getElementById('preview-container');
+    let archivosSeleccionados = [];
+    
+    // Click para abrir selector de archivos
+    dragDropArea.addEventListener('click', () => {
+        inputEvidencias.click();
+    });
+    
+    // Prevenir comportamiento predeterminado del navegador
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dragDropArea.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Resaltar al arrastrar
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dragDropArea.addEventListener(eventName, () => {
+            dragDropArea.classList.add('dragover');
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dragDropArea.addEventListener(eventName, () => {
+            dragDropArea.classList.remove('dragover');
+        }, false);
+    });
+    
+    // Manejar drop
+    dragDropArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        manejarArchivos(files);
+    });
+    
+    // Manejar selección de archivos
+    inputEvidencias.addEventListener('change', (e) => {
+        manejarArchivos(e.target.files);
+    });
+    
+    function manejarArchivos(files) {
+        // Convertir FileList a Array
+        const archivosArray = Array.from(files);
+        
+        // Validar y agregar archivos
+        archivosArray.forEach(archivo => {
+            if (validarArchivo(archivo)) {
+                archivosSeleccionados.push(archivo);
+            }
+        });
+        
+        // Actualizar previsualizaciones
+        actualizarPrevisualizaciones();
+    }
+    
+    function validarArchivo(archivo) {
+        // Validar tipo
+        const tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!tiposPermitidos.includes(archivo.type)) {
+            alert(`El archivo "${archivo.name}" no es una imagen válida.`);
+            return false;
+        }
+        
+        // Validar tamaño (5MB)
+        if (archivo.size > 5 * 1024 * 1024) {
+            alert(`El archivo "${archivo.name}" supera los 5MB permitidos.`);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    function actualizarPrevisualizaciones() {
+        previewContainer.innerHTML = '';
+        
+        archivosSeleccionados.forEach((archivo, index) => {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                const div = document.createElement('div');
+                div.className = 'image-preview';
+                div.innerHTML = `
+                    <img src="${e.target.result}" alt="${archivo.name}">
+                    <button type="button" class="remove-btn" onclick="eliminarImagen(${index})">&times;</button>
+                `;
+                previewContainer.appendChild(div);
+            };
+            
+            reader.readAsDataURL(archivo);
+        });
+        
+        // Actualizar el input file con los archivos seleccionados
+        actualizarInputFile();
+    }
+    
+    function actualizarInputFile() {
+        // Crear un nuevo DataTransfer para actualizar el input
+        const dt = new DataTransfer();
+        archivosSeleccionados.forEach(archivo => {
+            dt.items.add(archivo);
+        });
+        inputEvidencias.files = dt.files;
+    }
+    
+    // Función global para eliminar imagen (llamada desde HTML)
+    window.eliminarImagen = function(index) {
+        archivosSeleccionados.splice(index, 1);
+        actualizarPrevisualizaciones();
+    };
+    
+    // ====================================
+    // 6. VALIDACIÓN DE FORMULARIO
+    // ====================================
+    
+    const form = document.getElementById('form-incidencia');
+    
+    form.addEventListener('submit', function(e) {
+        // Aquí puedes agregar validaciones adicionales si es necesario
+        // Por ahora, Django maneja las validaciones en el backend
+    });
+});
+</script>
+{% endblock %}

@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'inventario',
+    'scorecard',  # Nueva app para Score Card de Calidad
 ]
 
 MIDDLEWARE = [
@@ -136,6 +137,11 @@ STATICFILES_DIRS = [
 # Directorio donde se recopilarán todos los archivos estáticos en producción
 # Descomenta esto para producción:
 # STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Media files (User uploaded content - imágenes de evidencias)
+# https://docs.djangoproject.com/en/5.2/topics/files/
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
