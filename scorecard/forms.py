@@ -21,6 +21,7 @@ class IncidenciaForm(forms.ModelForm):
             'marca',
             'modelo',
             'numero_serie',
+            'numero_orden',
             'servicio_realizado',
             'sucursal',
             'area_detectora',
@@ -68,8 +69,15 @@ class IncidenciaForm(forms.ModelForm):
             'numero_serie': forms.TextInput(
                 attrs={
                     'class': 'form-control',
-                    'placeholder': 'Número de serie del equipo',
+                    'placeholder': 'Número de serie del equipo (Service Tag)',
                     'id': 'id_numero_serie',
+                    'autocomplete': 'off'
+                }
+            ),
+            'numero_orden': forms.TextInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'Número de orden interno (opcional)',
                     'autocomplete': 'off'
                 }
             ),

@@ -180,9 +180,15 @@
                         <value>{{ incidencia.modelo }}</value>
                     </div>
                     <div class="info-item">
-                        <label>Número de Serie</label>
+                        <label>Número de Serie (Service Tag)</label>
                         <value><strong>{{ incidencia.numero_serie }}</strong></value>
                     </div>
+                    {% if incidencia.numero_orden %}
+                    <div class="info-item">
+                        <label>Número de Orden Interno</label>
+                        <value><strong>{{ incidencia.numero_orden }}</strong></value>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             

@@ -168,7 +168,7 @@
                     {% endif %}
                 </div>
                 
-                <div class="col-md-4">
+                <div class="col-md-8">
                     <label for="{{ form.modelo.id_for_label }}" class="form-label">
                         {{ form.modelo.label }}
                     </label>
@@ -178,14 +178,25 @@
                     {% endif %}
                 </div>
                 
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label for="{{ form.numero_serie.id_for_label }}" class="form-label required-field">
                         {{ form.numero_serie.label }}
                     </label>
                     {{ form.numero_serie }}
-                    <small class="form-text text-muted">Se verificará automáticamente si hay reincidencias</small>
+                    <small class="form-text text-muted">Service Tag - Se verificará automáticamente si hay reincidencias</small>
                     {% if form.numero_serie.errors %}
                         <div class="invalid-feedback d-block">{{ form.numero_serie.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.numero_orden.id_for_label }}" class="form-label">
+                        {{ form.numero_orden.label }}
+                    </label>
+                    {{ form.numero_orden }}
+                    <small class="form-text text-muted">Número de orden interno del servicio</small>
+                    {% if form.numero_orden.errors %}
+                        <div class="invalid-feedback d-block">{{ form.numero_orden.errors }}</div>
                     {% endif %}
                 </div>
                 

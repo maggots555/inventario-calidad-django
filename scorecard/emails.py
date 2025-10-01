@@ -116,7 +116,8 @@ def enviar_notificacion_incidencia(incidencia, destinatarios_seleccionados, mens
     - Tipo: {incidencia.get_tipo_equipo_display()}
     - Marca: {incidencia.marca}
     - Modelo: {incidencia.modelo}
-    - Número de Serie: {incidencia.numero_serie}
+    - Número de Serie (Service Tag): {incidencia.numero_serie}
+    {f'- Número de Orden: {incidencia.numero_orden}' if incidencia.numero_orden else ''}
     
     RESPONSABLES:
     - Técnico: {incidencia.tecnico_responsable.nombre_completo}

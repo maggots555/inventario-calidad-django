@@ -163,7 +163,12 @@ class Incidencia(models.Model):
     )
     numero_serie = models.CharField(
         max_length=100,
-        help_text="Número de serie del equipo"
+        help_text="Número de serie del equipo (Service Tag)"
+    )
+    numero_orden = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Número de orden interna del servicio"
     )
     servicio_realizado = models.CharField(
         max_length=200,

@@ -78,6 +78,7 @@ class IncidenciaAdmin(admin.ModelAdmin):
     search_fields = [
         'folio',
         'numero_serie',
+        'numero_orden',
         'marca',
         'modelo',
         'descripcion_incidencia',
@@ -104,6 +105,7 @@ class IncidenciaAdmin(admin.ModelAdmin):
                 'marca',
                 'modelo',
                 'numero_serie',
+                'numero_orden',
                 'servicio_realizado'
             )
         }),

@@ -62,7 +62,10 @@
                     <p><strong>Tipo de Equipo:</strong> {{ incidencia.get_tipo_equipo_display }}</p>
                     <p><strong>Marca:</strong> {{ incidencia.marca }}</p>
                     <p><strong>Modelo:</strong> {{ incidencia.modelo|default:"N/A" }}</p>
-                    <p><strong>Número de Serie:</strong> <code>{{ incidencia.numero_serie }}</code></p>
+                    <p><strong>Número de Serie (Service Tag):</strong> <code>{{ incidencia.numero_serie }}</code></p>
+                    {% if incidencia.numero_orden %}
+                        <p><strong>Número de Orden:</strong> <code>{{ incidencia.numero_orden }}</code></p>
+                    {% endif %}
                 </div>
             </div>
         </div>
