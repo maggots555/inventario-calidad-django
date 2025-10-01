@@ -525,6 +525,15 @@ class Empleado(models.Model):
         help_text="Sucursal a la que pertenece el empleado"
     )
     email = models.EmailField(blank=True, null=True, help_text="Correo electrónico del empleado (para notificaciones)")
+    jefe_directo = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='subordinados',
+        verbose_name='Jefe Directo',
+        help_text="Jefe directo del empleado en la jerarquía organizacional"
+    )
     activo = models.BooleanField(default=True, help_text="Empleado activo en la empresa")
     
     # Fechas de control

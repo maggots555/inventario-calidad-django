@@ -393,11 +393,11 @@ class MovimientoRapidoForm(forms.ModelForm):
 class EmpleadoForm(forms.ModelForm):
     """
     Formulario para crear y editar empleados
-    Incluye correo electrónico y asignación de sucursal
+    Incluye correo electrónico, asignación de sucursal y jefe directo
     """
     class Meta:
         model = Empleado
-        fields = ['nombre_completo', 'cargo', 'area', 'email', 'sucursal', 'activo']
+        fields = ['nombre_completo', 'cargo', 'area', 'email', 'sucursal', 'jefe_directo', 'activo']
         widgets = {
             'nombre_completo': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -418,6 +418,9 @@ class EmpleadoForm(forms.ModelForm):
             'sucursal': forms.Select(attrs={
                 'class': 'form-control'
             }),
+            'jefe_directo': forms.Select(attrs={
+                'class': 'form-control'
+            }),
             'activo': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
             }),
@@ -432,11 +435,20 @@ class EmpleadoForm(forms.ModelForm):
         # Filtrar solo sucursales activas
         self.fields['sucursal'].queryset = Sucursal.objects.filter(activa=True)
         
-        # Hacer el campo sucursal opcional
-        self.fields['sucursal'].required = False
+        # Filtrar solo empleados activos para jefe directo
+        # Excluir al empleado actual para que no pueda ser su propio jefe
+        jefe_queryset = Empleado.objects.filter(activo=True).order_by('nombre_completo')
+        if self.instance and self.instance.pk:
+            jefe_queryset = jefe_queryset.exclude(pk=self.instance.pk)
+        self.fields['jefe_directo'].queryset = jefe_queryset
         
-        # Hacer el campo email opcional
+        # Hacer campos opcionales
+        self.fields['sucursal'].required = False
         self.fields['email'].required = False
+        self.fields['jefe_directo'].required = False
+        
+        # Agregar texto de ayuda
+        self.fields['jefe_directo'].help_text = 'Selecciona el jefe directo de este empleado en la jerarquía organizacional'
     
     def clean_email(self):
         """

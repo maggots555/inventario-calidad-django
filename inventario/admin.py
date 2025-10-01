@@ -117,15 +117,19 @@ class MovimientoAdmin(admin.ModelAdmin):
 
 @admin.register(Empleado)
 class EmpleadoAdmin(admin.ModelAdmin):
-    list_display = ('nombre_completo', 'cargo', 'area', 'activo', 'fecha_ingreso')
-    list_filter = ('area', 'cargo', 'activo', 'fecha_ingreso')
-    search_fields = ('nombre_completo', 'cargo', 'area')
+    list_display = ('nombre_completo', 'cargo', 'area', 'sucursal', 'jefe_directo', 'email', 'activo', 'fecha_ingreso')
+    list_filter = ('area', 'cargo', 'sucursal', 'activo', 'fecha_ingreso')
+    search_fields = ('nombre_completo', 'cargo', 'area', 'email')
     ordering = ['nombre_completo']
     readonly_fields = ('fecha_ingreso', 'fecha_actualizacion')
     
     fieldsets = (
         ('Información Personal', {
-            'fields': ('nombre_completo', 'cargo', 'area')
+            'fields': ('nombre_completo', 'cargo', 'area', 'email')
+        }),
+        ('Ubicación y Jerarquía', {
+            'fields': ('sucursal', 'jefe_directo'),
+            'description': 'Sucursal donde trabaja el empleado y su jefe directo en la estructura organizacional'
         }),
         ('Estado', {
             'fields': ('activo',)
@@ -135,3 +139,14 @@ class EmpleadoAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """
+        Personaliza el campo jefe_directo para mostrar solo empleados activos
+        y evitar que un empleado sea su propio jefe
+        """
+        if db_field.name == "jefe_directo":
+            kwargs["queryset"] = Empleado.objects.filter(activo=True).order_by('nombre_completo')
+        if db_field.name == "sucursal":
+            kwargs["queryset"] = Sucursal.objects.filter(activa=True).order_by('nombre')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)

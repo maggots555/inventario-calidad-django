@@ -220,12 +220,17 @@ Se ha creado exitosamente la aplicación **Score Card** como un módulo independ
 - [x] Heatmap por sucursal
 - [x] Exportación a Excel/PDF
 
-### **Fase 4: Alertas y Notificaciones**
-- [ ] Sistema de alertas por email
-- [ ] Notificación cuando técnico supera umbral
-- [ ] Alerta automática de reincidencia
-- [ ] Resumen semanal por email
-- [ ] Integración con modelo Empleado.email
+### **Fase 4: Alertas y Notificaciones** ✅ COMPLETADA
+- [x] Sistema de notificaciones por email con SMTP
+- [x] Modal interactivo para seleccionar destinatarios
+- [x] Detección automática de jefe directo
+- [x] Template HTML profesional para emails
+- [x] Registro de notificaciones enviadas
+- [x] Campo jefe_directo en modelo Empleado
+- [x] APIs REST para envío de notificaciones
+- [x] Admin mejorado para gestionar notificaciones
+- [x] Historial visual de envíos en detalle de incidencia
+- [x] Adjuntar imágenes de evidencia comprimidas (60% quality)
 
 ### **Fase 5: Análisis Avanzado**
 - [ ] Indicadores de calidad (KPIs)

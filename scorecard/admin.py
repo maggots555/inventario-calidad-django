@@ -3,7 +3,7 @@ Configuración del Django Admin para Score Card
 """
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import CategoriaIncidencia, ComponenteEquipo, Incidencia, EvidenciaIncidencia
+from .models import CategoriaIncidencia, ComponenteEquipo, Incidencia, EvidenciaIncidencia, NotificacionIncidencia
 
 
 @admin.register(CategoriaIncidencia)
@@ -225,6 +225,67 @@ class EvidenciaIncidenciaAdmin(admin.ModelAdmin):
             )
         return '-'
     imagen_preview_large.short_description = 'Imagen'
+
+
+@admin.register(NotificacionIncidencia)
+class NotificacionIncidenciaAdmin(admin.ModelAdmin):
+    """
+    Administración de Notificaciones enviadas
+    """
+    list_display = [
+        'incidencia',
+        'asunto',
+        'fecha_envio',
+        'enviado_por',
+        'exitoso_badge',
+        'num_destinatarios'
+    ]
+    list_filter = ['exitoso', 'fecha_envio']
+    search_fields = ['incidencia__folio', 'asunto', 'destinatarios']
+    readonly_fields = ['fecha_envio']
+    ordering = ['-fecha_envio']
+    date_hierarchy = 'fecha_envio'
+    
+    fieldsets = (
+        ('Información General', {
+            'fields': ('incidencia', 'asunto', 'fecha_envio', 'enviado_por')
+        }),
+        ('Destinatarios', {
+            'fields': ('destinatarios',)
+        }),
+        ('Contenido', {
+            'fields': ('mensaje_adicional',)
+        }),
+        ('Estado del Envío', {
+            'fields': ('exitoso', 'mensaje_error')
+        }),
+    )
+    
+    def exitoso_badge(self, obj):
+        """
+        Muestra el estado del envío con badge de color
+        """
+        if obj.exitoso:
+            return format_html(
+                '<span style="background-color: #28a745; color: white; padding: 3px 10px; border-radius: 3px;">✓ Exitoso</span>'
+            )
+        else:
+            return format_html(
+                '<span style="background-color: #dc3545; color: white; padding: 3px 10px; border-radius: 3px;">✗ Fallido</span>'
+            )
+    exitoso_badge.short_description = 'Estado'
+    
+    def num_destinatarios(self, obj):
+        """
+        Cuenta el número de destinatarios en el JSON
+        """
+        import json
+        try:
+            destinatarios = json.loads(obj.destinatarios)
+            return len(destinatarios)
+        except:
+            return '-'
+    num_destinatarios.short_description = 'Destinatarios'
 
 
 # Personalización del sitio admin

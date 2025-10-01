@@ -6,8 +6,10 @@ from django.contrib import messages
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
+from django.views.decorators.http import require_http_methods
 from .models import Incidencia, CategoriaIncidencia, ComponenteEquipo, EvidenciaIncidencia
 from .forms import IncidenciaForm, EvidenciaIncidenciaForm
+from .emails import enviar_notificacion_incidencia, obtener_destinatarios_disponibles
 from inventario.models import Empleado, Sucursal
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -69,9 +71,16 @@ def detalle_incidencia(request, incidencia_id):
     # Obtener evidencias
     evidencias = incidencia.evidencias.all()
     
+    # Obtener historial de notificaciones enviadas (ordenadas por más reciente)
+    from .models import NotificacionIncidencia
+    notificaciones_enviadas = NotificacionIncidencia.objects.filter(
+        incidencia=incidencia
+    ).order_by('-fecha_envio')
+    
     context = {
         'incidencia': incidencia,
         'evidencias': evidencias,
+        'notificaciones_enviadas': notificaciones_enviadas,
     }
     
     return render(request, 'scorecard/detalle_incidencia.html', context)
@@ -525,4 +534,88 @@ def api_exportar_excel(request):
     
     wb.save(response)
     return response
+
+
+# ==========================================
+# SISTEMA DE NOTIFICACIONES POR EMAIL
+# ==========================================
+
+@require_http_methods(["GET"])
+def api_obtener_destinatarios(request, incidencia_id):
+    """
+    API: Obtiene la lista de destinatarios disponibles para una incidencia
+    GET /scorecard/api/incidencias/<id>/destinatarios/
+    
+    Retorna JSON con lista de destinatarios disponibles
+    """
+    try:
+        incidencia = get_object_or_404(Incidencia, id=incidencia_id)
+        destinatarios = obtener_destinatarios_disponibles(incidencia)
+        
+        return JsonResponse({
+            'success': True,
+            'destinatarios': destinatarios
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al obtener destinatarios: {str(e)}'
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+def api_enviar_notificacion(request, incidencia_id):
+    """
+    API: Envía notificación por email sobre una incidencia
+    POST /scorecard/api/incidencias/<id>/enviar-notificacion/
+    
+    Body (JSON):
+    {
+        "destinatarios": [
+            {"nombre": "Juan Pérez", "email": "juan@email.com", "rol": "Técnico"},
+            ...
+        ],
+        "mensaje_adicional": "Texto opcional"
+    }
+    
+    Retorna JSON con resultado del envío
+    """
+    try:
+        incidencia = get_object_or_404(Incidencia, id=incidencia_id)
+        
+        # Parsear el body JSON
+        data = json.loads(request.body)
+        destinatarios_seleccionados = data.get('destinatarios', [])
+        mensaje_adicional = data.get('mensaje_adicional', '')
+        
+        # Validar que hay destinatarios
+        if not destinatarios_seleccionados:
+            return JsonResponse({
+                'success': False,
+                'message': 'Debe seleccionar al menos un destinatario'
+            }, status=400)
+        
+        # Enviar la notificación
+        resultado = enviar_notificacion_incidencia(
+            incidencia=incidencia,
+            destinatarios_seleccionados=destinatarios_seleccionados,
+            mensaje_adicional=mensaje_adicional,
+            enviado_por=request.user.username if request.user.is_authenticated else 'Sistema'
+        )
+        
+        if resultado['success']:
+            return JsonResponse(resultado)
+        else:
+            return JsonResponse(resultado, status=500)
+            
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'message': 'Error al parsear JSON del request'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error inesperado: {str(e)}'
+        }, status=500)
 

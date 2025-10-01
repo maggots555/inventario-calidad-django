@@ -143,6 +143,22 @@ STATICFILES_DIRS = [
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Email Configuration (SMTP)
+# https://docs.djangoproject.com/en/5.2/topics/email/
+# Configuración para envío de notificaciones de Score Card
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'jorgemahos@gmail.com'  # Usuario de Gmail
+EMAIL_HOST_PASSWORD = 'sysyzuiempnhtrbz'  # App Password de Google
+DEFAULT_FROM_EMAIL = 'Score Card System <j.alvarez@sic.com.mx>'
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Email del Jefe de Calidad (usado en notificaciones de Score Card)
+JEFE_CALIDAD_EMAIL = 'amartel@sic.com.mx'
+JEFE_CALIDAD_NOMBRE = 'Jefe de Calidad'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

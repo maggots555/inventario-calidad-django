@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notificación de Incidencia - Score Card</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 700px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .email-header {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .email-header p {
+            margin: 10px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .email-body {
+            padding: 30px;
+        }
+        .alert-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .alert-box.critical {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .alert-box.high {
+            background-color: #fff3cd;
+            border-left-color: #fd7e14;
+        }
+        .info-section {
+            margin-bottom: 25px;
+        }
+        .info-section h2 {
+            color: #0d6efd;
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .info-item {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+        }
+        .info-item label {
+            display: block;
+            font-size: 12px;
+            color: #6c757d;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .info-item value {
+            display: block;
+            font-size: 14px;
+            color: #212529;
+            font-weight: 500;
+        }
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+        .badge-critico { background-color: #dc3545; }
+        .badge-alto { background-color: #fd7e14; }
+        .badge-medio { background-color: #ffc107; color: #333; }
+        .badge-bajo { background-color: #28a745; }
+        .description-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #0d6efd;
+            margin-bottom: 15px;
+        }
+        .description-box h3 {
+            margin-top: 0;
+            font-size: 14px;
+            color: #0d6efd;
+            font-weight: 600;
+        }
+        .description-box p {
+            margin: 0;
+            font-size: 14px;
+            color: #495057;
+        }
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+            border-top: 1px solid #dee2e6;
+        }
+        .divider {
+            height: 1px;
+            background-color: #dee2e6;
+            margin: 20px 0;
+        }
+        /* Responsive */
+        @media only screen and (max-width: 600px) {
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+            .email-body {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="email-header">
+            <h1>🔔 Notificación de Incidencia</h1>
+            <p>Sistema de Control de Calidad - Score Card</p>
+        </div>
+        
+        <!-- Body -->
+        <div class="email-body">
+            <!-- Alert Box según severidad -->
+            <div class="alert-box {% if incidencia.grado_severidad == 'critico' %}critical{% elif incidencia.grado_severidad == 'alto' %}high{% endif %}">
+                <strong>⚠️ Incidencia Registrada:</strong> {{ incidencia.folio }}<br>
+                <strong>Severidad:</strong> 
+                <span class="badge badge-{{ incidencia.grado_severidad }}">
+                    {{ incidencia.get_grado_severidad_display|upper }}
+                </span>
+            </div>
+            
+            <!-- Información del Equipo -->
+            <div class="info-section">
+                <h2>📱 Información del Equipo</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Tipo de Equipo</label>
+                        <value>{{ incidencia.get_tipo_equipo_display }}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Marca</label>
+                        <value>{{ incidencia.marca }}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Modelo</label>
+                        <value>{{ incidencia.modelo }}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Número de Serie</label>
+                        <value><strong>{{ incidencia.numero_serie }}</strong></value>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Ubicación y Responsables -->
+            <div class="info-section">
+                <h2>👥 Ubicación y Responsables</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Sucursal</label>
+                        <value>{{ incidencia.sucursal.nombre }}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Área Detectora</label>
+                        <value>{{ incidencia.area_detectora }}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Técnico Responsable</label>
+                        <value>{{ incidencia.tecnico_responsable.nombre_completo }}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Inspector de Calidad</label>
+                        <value>{{ incidencia.inspector_calidad }}</value>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Clasificación del Fallo -->
+            <div class="info-section">
+                <h2>🔍 Clasificación del Fallo</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Tipo de Incidencia</label>
+                        <value>{{ incidencia.tipo_incidencia.nombre }}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Categoría del Fallo</label>
+                        <value>{{ incidencia.get_categoria_fallo_display }}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Componente Afectado</label>
+                        <value>{{ incidencia.componente_afectado.nombre|default:"N/A" }}</value>
+                    </div>
+                    <div class="info-item">
+                        <label>Fecha de Detección</label>
+                        <value>{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</value>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Descripción -->
+            <div class="info-section">
+                <h2>📝 Descripción de la Incidencia</h2>
+                <div class="description-box">
+                    <h3>Descripción:</h3>
+                    <p>{{ incidencia.descripcion_incidencia }}</p>
+                </div>
+                
+                {% if incidencia.acciones_tomadas %}
+                <div class="description-box">
+                    <h3>Acciones Tomadas:</h3>
+                    <p>{{ incidencia.acciones_tomadas }}</p>
+                </div>
+                {% endif %}
+                
+                {% if incidencia.causa_raiz %}
+                <div class="description-box">
+                    <h3>Causa Raíz:</h3>
+                    <p>{{ incidencia.causa_raiz }}</p>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Mensaje Adicional -->
+            {% if mensaje_adicional %}
+            <div class="divider"></div>
+            <div class="info-section">
+                <h2>💬 Mensaje Adicional</h2>
+                <div class="description-box">
+                    <p>{{ mensaje_adicional }}</p>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Evidencias Fotográficas -->
+            {% if evidencias %}
+            <div class="divider"></div>
+            <div class="info-section">
+                <h2>📷 Evidencias Fotográficas</h2>
+                <div class="alert-box">
+                    <strong>📎 Imágenes Adjuntas:</strong> Este correo incluye {{ evidencias|length }} imagen(es) adjunta(s) que muestran la incidencia reportada.
+                    <br><small style="margin-top: 8px; display: block;">Las imágenes se encuentran al final del correo o en la sección de archivos adjuntos.</small>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Reincidencia -->
+            {% if incidencia.es_reincidencia %}
+            <div class="divider"></div>
+            <div class="alert-box critical">
+                <strong>⚠️ ATENCIÓN:</strong> Esta es una incidencia reincidente relacionada con: 
+                <strong>{{ incidencia.incidencia_relacionada.folio }}</strong>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Footer -->
+        <div class="email-footer">
+            <p><strong>Score Card System - Control de Calidad</strong></p>
+            <p>Este es un mensaje automático. Por favor no responda a este correo.</p>
+            <p style="margin-top: 10px; font-size: 11px; color: #adb5bd;">
+                © 2025 Score Card System. Todos los derechos reservados.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

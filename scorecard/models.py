@@ -409,3 +409,62 @@ class EvidenciaIncidencia(models.Model):
         ordering = ['fecha_subida']
         verbose_name = "Evidencia"
         verbose_name_plural = "Evidencias"
+
+
+class NotificacionIncidencia(models.Model):
+    """
+    Modelo para registrar el historial de notificaciones enviadas por email
+    Permite rastrear qué notificaciones se han enviado, a quién y cuándo
+    """
+    incidencia = models.ForeignKey(
+        Incidencia,
+        on_delete=models.CASCADE,
+        related_name='notificaciones',
+        help_text="Incidencia sobre la que se envió la notificación"
+    )
+    destinatarios = models.TextField(
+        help_text="Lista de destinatarios (JSON con nombres y emails)"
+    )
+    asunto = models.CharField(
+        max_length=255,
+        help_text="Asunto del email enviado"
+    )
+    mensaje_adicional = models.TextField(
+        blank=True,
+        help_text="Mensaje adicional incluido en el email (opcional)"
+    )
+    fecha_envio = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Fecha y hora en que se envió la notificación"
+    )
+    enviado_por = models.CharField(
+        max_length=100,
+        default='Sistema',
+        help_text="Usuario que envió la notificación"
+    )
+    exitoso = models.BooleanField(
+        default=True,
+        help_text="Si el envío fue exitoso"
+    )
+    mensaje_error = models.TextField(
+        blank=True,
+        help_text="Mensaje de error si el envío falló"
+    )
+    
+    def get_destinatarios_list(self):
+        """
+        Parsea el JSON de destinatarios y retorna una lista de diccionarios
+        """
+        import json
+        try:
+            return json.loads(self.destinatarios)
+        except:
+            return []
+    
+    def __str__(self):
+        return f"Notificación {self.incidencia.folio} - {self.fecha_envio.strftime('%d/%m/%Y %H:%M')}"
+    
+    class Meta:
+        ordering = ['-fecha_envio']
+        verbose_name = "Notificación de Incidencia"
+        verbose_name_plural = "Notificaciones de Incidencias"

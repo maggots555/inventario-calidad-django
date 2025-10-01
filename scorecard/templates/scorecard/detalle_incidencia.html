@@ -125,8 +125,112 @@
     </div>
     {% endif %}
 
+    <!-- Notificaciones -->
+    <div class="card shadow mb-4 border-primary">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-envelope"></i> Notificaciones</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <!-- Columna izquierda: Enviar nueva notificación -->
+                <div class="col-md-5 border-end">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-send"></i> Enviar Nueva Notificación
+                    </h6>
+                    <p class="text-muted small mb-3">
+                        Envía un correo electrónico a los responsables sobre esta incidencia.
+                    </p>
+                    <button type="button" class="btn btn-primary btn-lg w-100" id="btnAbrirModalNotificacion">
+                        <i class="bi bi-send"></i> Enviar Notificación
+                    </button>
+                </div>
+                
+                <!-- Columna derecha: Historial de envíos -->
+                <div class="col-md-7">
+                    <h6 class="fw-bold mb-3">
+                        <i class="bi bi-clock-history"></i> Historial de Envíos
+                    </h6>
+                    
+                    {% if notificaciones_enviadas %}
+                        <div class="timeline">
+                            {% for notif in notificaciones_enviadas %}
+                            <div class="timeline-item mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}">
+                                <div class="d-flex align-items-start">
+                                    <div class="flex-shrink-0 me-3">
+                                        {% if notif.exitoso %}
+                                            <span class="badge bg-success rounded-circle p-2">
+                                                <i class="bi bi-check-lg"></i>
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger rounded-circle p-2">
+                                                <i class="bi bi-x-lg"></i>
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong class="d-block">
+                                                    {% if notif.exitoso %}
+                                                        <span class="text-success">Enviado exitosamente</span>
+                                                    {% else %}
+                                                        <span class="text-danger">Error en envío</span>
+                                                    {% endif %}
+                                                </strong>
+                                                <small class="text-muted">
+                                                    <i class="bi bi-calendar"></i> {{ notif.fecha_envio|date:"d/m/Y H:i" }}
+                                                    <br>
+                                                    <i class="bi bi-person"></i> Por: {{ notif.enviado_por }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Destinatarios -->
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="bi bi-people"></i> <strong>Destinatarios:</strong>
+                                            </small>
+                                            <div class="mt-1">
+                                                {% for dest in notif.get_destinatarios_list %}
+                                                    <span class="badge bg-secondary me-1 mb-1">
+                                                        {{ dest.nombre }}
+                                                    </span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Asunto del email -->
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="bi bi-envelope"></i> {{ notif.asunto }}
+                                            </small>
+                                        </div>
+                                        
+                                        <!-- Mensaje de error si existe -->
+                                        {% if not notif.exitoso and notif.mensaje_error %}
+                                        <div class="alert alert-danger alert-sm mt-2 mb-0 py-1 px-2">
+                                            <small><i class="bi bi-exclamation-triangle"></i> {{ notif.mensaje_error }}</small>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                            <p class="mb-0">No se han enviado notificaciones aún</p>
+                            <small>Las notificaciones enviadas aparecerán aquí</small>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Botones de acción -->
-    <div class="mt-3">
+    <div class="mt-3 mb-5">
         <a href="{% url 'scorecard:lista_incidencias' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Volver a la Lista
         </a>
@@ -135,4 +239,301 @@
         </a>
     </div>
 </div>
+
+<!-- Modal para Enviar Notificación -->
+<div class="modal fade" id="modalNotificacion" tabindex="-1" aria-labelledby="modalNotificacionLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalNotificacionLabel">
+                    <i class="bi bi-envelope"></i> Enviar Notificación - {{ incidencia.folio }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading spinner -->
+                <div id="loadingDestinatarios" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-2">Cargando destinatarios...</p>
+                </div>
+
+                <!-- Formulario de notificación -->
+                <form id="formEnviarNotificacion" style="display: none;">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-people"></i> Seleccionar Destinatarios:
+                        </label>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> 
+                            Selecciona las personas que recibirán esta notificación por correo electrónico.
+                        </div>
+                        
+                        <!-- Lista de destinatarios (se llena dinámicamente) -->
+                        <div id="listaDestinatarios" class="border rounded p-3 bg-light">
+                            <!-- Se llenará con JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mensajeAdicional" class="form-label fw-bold">
+                            <i class="bi bi-chat-text"></i> Mensaje Adicional (Opcional):
+                        </label>
+                        <textarea 
+                            class="form-control" 
+                            id="mensajeAdicional" 
+                            rows="4" 
+                            placeholder="Agrega un mensaje personalizado que se incluirá en el email (opcional)..."></textarea>
+                        <div class="form-text">
+                            Este mensaje se incluirá al final del email, junto con toda la información de la incidencia.
+                        </div>
+                    </div>
+
+                    <!-- Preview de destinatarios seleccionados -->
+                    <div id="previewDestinatarios" class="alert alert-secondary" style="display: none;">
+                        <strong><i class="bi bi-check-circle"></i> Destinatarios seleccionados:</strong>
+                        <ul id="listaPreviewDestinatarios" class="mb-0 mt-2"></ul>
+                    </div>
+                </form>
+
+                <!-- Mensajes de resultado -->
+                <div id="mensajeExito" class="alert alert-success" style="display: none;">
+                    <i class="bi bi-check-circle-fill"></i> 
+                    <strong>¡Notificación enviada!</strong>
+                    <p class="mb-0 mt-2" id="textoExito"></p>
+                </div>
+
+                <div id="mensajeError" class="alert alert-danger" style="display: none;">
+                    <i class="bi bi-exclamation-triangle-fill"></i> 
+                    <strong>Error al enviar</strong>
+                    <p class="mb-0 mt-2" id="textoError"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="btnEnviarNotificacion">
+                    <span id="btnEnviarTexto">
+                        <i class="bi bi-send"></i> Enviar Notificación
+                    </span>
+                    <span id="btnEnviarSpinner" style="display: none;">
+                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                        Enviando...
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// JavaScript para manejar el modal de notificaciones
+document.addEventListener('DOMContentLoaded', function() {
+    const modalNotificacion = new bootstrap.Modal(document.getElementById('modalNotificacion'));
+    const btnAbrirModal = document.getElementById('btnAbrirModalNotificacion');
+    const btnEnviar = document.getElementById('btnEnviarNotificacion');
+    const formNotificacion = document.getElementById('formEnviarNotificacion');
+    const loadingDestinatarios = document.getElementById('loadingDestinatarios');
+    const listaDestinatarios = document.getElementById('listaDestinatarios');
+    const previewDestinatarios = document.getElementById('previewDestinatarios');
+    const listaPreviewDestinatarios = document.getElementById('listaPreviewDestinatarios');
+    
+    let destinatariosDisponibles = [];
+    
+    // Abrir modal y cargar destinatarios
+    btnAbrirModal.addEventListener('click', function() {
+        modalNotificacion.show();
+        cargarDestinatarios();
+    });
+    
+    // Cargar destinatarios desde la API
+    function cargarDestinatarios() {
+        loadingDestinatarios.style.display = 'block';
+        formNotificacion.style.display = 'none';
+        
+        fetch('/scorecard/api/incidencias/{{ incidencia.id }}/destinatarios/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    destinatariosDisponibles = data.destinatarios;
+                    mostrarDestinatarios(data.destinatarios);
+                    loadingDestinatarios.style.display = 'none';
+                    formNotificacion.style.display = 'block';
+                } else {
+                    mostrarError('No se pudieron cargar los destinatarios');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarError('Error de conexión al cargar destinatarios');
+            });
+    }
+    
+    // Mostrar lista de destinatarios con checkboxes
+    function mostrarDestinatarios(destinatarios) {
+        listaDestinatarios.innerHTML = '';
+        
+        if (destinatarios.length === 0) {
+            listaDestinatarios.innerHTML = '<p class="text-muted">No hay destinatarios disponibles.</p>';
+            return;
+        }
+        
+        destinatarios.forEach((dest, index) => {
+            const divDestinatario = document.createElement('div');
+            divDestinatario.className = 'form-check mb-2 p-3 border-bottom';
+            
+            const checkbox = document.createElement('input');
+            checkbox.className = 'form-check-input';
+            checkbox.type = 'checkbox';
+            checkbox.id = `dest_${index}`;
+            checkbox.value = index;
+            checkbox.checked = dest.seleccionado_default;
+            checkbox.addEventListener('change', actualizarPreview);
+            
+            const label = document.createElement('label');
+            label.className = 'form-check-label w-100';
+            label.htmlFor = `dest_${index}`;
+            label.innerHTML = `
+                <strong>${dest.nombre}</strong>
+                <br>
+                <small class="text-muted">
+                    <i class="bi bi-envelope"></i> ${dest.email}
+                    <br>
+                    <i class="bi bi-person-badge"></i> ${dest.rol}
+                </small>
+            `;
+            
+            divDestinatario.appendChild(checkbox);
+            divDestinatario.appendChild(label);
+            listaDestinatarios.appendChild(divDestinatario);
+        });
+        
+        // Actualizar preview inicial
+        actualizarPreview();
+    }
+    
+    // Actualizar preview de destinatarios seleccionados
+    function actualizarPreview() {
+        const checkboxes = document.querySelectorAll('#listaDestinatarios input[type="checkbox"]:checked');
+        
+        if (checkboxes.length === 0) {
+            previewDestinatarios.style.display = 'none';
+            return;
+        }
+        
+        listaPreviewDestinatarios.innerHTML = '';
+        checkboxes.forEach(checkbox => {
+            const index = checkbox.value;
+            const dest = destinatariosDisponibles[index];
+            const li = document.createElement('li');
+            li.textContent = `${dest.nombre} (${dest.email}) - ${dest.rol}`;
+            listaPreviewDestinatarios.appendChild(li);
+        });
+        
+        previewDestinatarios.style.display = 'block';
+    }
+    
+    // Enviar notificación
+    btnEnviar.addEventListener('click', function() {
+        // Obtener destinatarios seleccionados
+        const checkboxes = document.querySelectorAll('#listaDestinatarios input[type="checkbox"]:checked');
+        
+        if (checkboxes.length === 0) {
+            alert('Debe seleccionar al menos un destinatario');
+            return;
+        }
+        
+        const destinatariosSeleccionados = [];
+        checkboxes.forEach(checkbox => {
+            const index = checkbox.value;
+            const dest = destinatariosDisponibles[index];
+            destinatariosSeleccionados.push({
+                nombre: dest.nombre,
+                email: dest.email,
+                rol: dest.rol
+            });
+        });
+        
+        const mensajeAdicional = document.getElementById('mensajeAdicional').value;
+        
+        // Mostrar spinner
+        document.getElementById('btnEnviarTexto').style.display = 'none';
+        document.getElementById('btnEnviarSpinner').style.display = 'inline-block';
+        btnEnviar.disabled = true;
+        
+        // Enviar request
+        fetch('/scorecard/api/incidencias/{{ incidencia.id }}/enviar-notificacion/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                destinatarios: destinatariosSeleccionados,
+                mensaje_adicional: mensajeAdicional
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Ocultar spinner
+            document.getElementById('btnEnviarTexto').style.display = 'inline-block';
+            document.getElementById('btnEnviarSpinner').style.display = 'none';
+            btnEnviar.disabled = false;
+            
+            if (data.success) {
+                mostrarExito(data.message);
+                formNotificacion.style.display = 'none';
+                
+                // Cerrar modal después de 3 segundos
+                setTimeout(() => {
+                    modalNotificacion.hide();
+                    location.reload(); // Recargar para mostrar historial actualizado
+                }, 3000);
+            } else {
+                mostrarError(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('btnEnviarTexto').style.display = 'inline-block';
+            document.getElementById('btnEnviarSpinner').style.display = 'none';
+            btnEnviar.disabled = false;
+            mostrarError('Error de conexión al enviar notificación');
+        });
+    });
+    
+    // Mostrar mensaje de éxito
+    function mostrarExito(mensaje) {
+        document.getElementById('textoExito').textContent = mensaje;
+        document.getElementById('mensajeExito').style.display = 'block';
+        document.getElementById('mensajeError').style.display = 'none';
+    }
+    
+    // Mostrar mensaje de error
+    function mostrarError(mensaje) {
+        document.getElementById('textoError').textContent = mensaje;
+        document.getElementById('mensajeError').style.display = 'block';
+        document.getElementById('mensajeExito').style.display = 'none';
+    }
+    
+    // Obtener CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+
 {% endblock %}

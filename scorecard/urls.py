@@ -33,4 +33,8 @@ urlpatterns = [
     # APIs para gráficos y reportes (Fase 3)
     path('api/datos-dashboard/', views.api_datos_dashboard, name='api_datos_dashboard'),
     path('api/exportar-excel/', views.api_exportar_excel, name='api_exportar_excel'),
+    
+    # APIs para notificaciones por email (Fase 4)
+    path('api/incidencias/<int:incidencia_id>/destinatarios/', views.api_obtener_destinatarios, name='api_obtener_destinatarios'),
+    path('api/incidencias/<int:incidencia_id>/enviar-notificacion/', views.api_enviar_notificacion, name='api_enviar_notificacion'),
 ]

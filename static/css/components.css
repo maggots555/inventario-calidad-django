@@ -1957,3 +1957,67 @@
     height: 3px;
     background: linear-gradient(90deg, #8b5cf6, #a855f7, #9333ea);
 }
+
+/* ===== TIMELINE PARA HISTORIAL DE NOTIFICACIONES ===== */
+.timeline {
+    position: relative;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+/* Scrollbar personalizado para el timeline */
+.timeline::-webkit-scrollbar {
+    width: 6px;
+}
+
+.timeline::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 10px;
+}
+
+.timeline::-webkit-scrollbar-thumb {
+    background: #0d6efd;
+    border-radius: 10px;
+}
+
+.timeline::-webkit-scrollbar-thumb:hover {
+    background: #0b5ed7;
+}
+
+.timeline-item {
+    position: relative;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.timeline-item .badge.rounded-circle {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.timeline-item:hover {
+    background-color: #f9fafb;
+    border-radius: 8px;
+    transition: background-color 0.3s ease;
+}
+
+.alert-sm {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+}
+
+/* Animación para nuevos items del timeline */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
