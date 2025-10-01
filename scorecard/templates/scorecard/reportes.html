@@ -1,35 +1,546 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Reportes - Score Card - {{ block.super }}{% endblock %}
+{% block title %}Reportes Avanzados - Score Card - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .chart-container-report {
+        background: white;
+        border-radius: 8px;
+        padding: 25px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 25px;
+    }
+    
+    .chart-wrapper-report {
+        position: relative;
+        height: 400px;
+    }
+    
+    .report-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 20px;
+        border-bottom: 3px solid #0d6efd;
+        padding-bottom: 10px;
+    }
+    
+    .stat-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    
+    .stat-box h3 {
+        font-size: 2rem;
+        margin: 10px 0;
+    }
+    
+    .stat-box p {
+        margin: 0;
+        opacity: 0.9;
+    }
+    
+    .export-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        .chart-container-report {
+            page-break-inside: avoid;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
+    <!-- Encabezado -->
     <div class="row mb-4">
-        <div class="col-12">
+        <div class="col-md-8">
             <h1 class="display-6">
                 <i class="bi bi-file-earmark-bar-graph text-info"></i>
-                Reportes y Análisis
+                Reportes Avanzados
             </h1>
-            <p class="text-muted">Análisis estadístico de incidencias de calidad</p>
+            <p class="text-muted">Análisis detallado de incidencias de calidad</p>
+        </div>
+        <div class="col-md-4 text-end no-print">
+            <div class="export-buttons">
+                <a href="{% url 'scorecard:api_exportar_excel' %}" class="btn btn-success" download>
+                    <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+                </a>
+                <button onclick="window.print()" class="btn btn-secondary">
+                    <i class="bi bi-printer"></i> Imprimir
+                </button>
+                <a href="{% url 'scorecard:dashboard' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Dashboard
+                </a>
+            </div>
         </div>
     </div>
 
-    <div class="alert alert-info">
-        <h4 class="alert-heading"><i class="bi bi-info-circle"></i> Próximamente</h4>
-        <p>Esta sección contendrá:</p>
-        <ul>
-            <li>Gráficos interactivos de tendencias</li>
-            <li>Top 10 técnicos con más incidencias</li>
-            <li>Análisis por sucursal y componente</li>
-            <li>Exportación a Excel y PDF</li>
-            <li>Filtros por fecha, sucursal y tipo</li>
-        </ul>
+    <!-- Filtros (Placeholder para futura implementación) -->
+    <div class="row mb-4 no-print">
+        <div class="col-12">
+            <div class="filter-card">
+                <h5 class="mb-3"><i class="bi bi-funnel"></i> Filtros</h5>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Fecha Inicio</label>
+                        <input type="date" class="form-control" id="filtroFechaInicio">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Fecha Fin</label>
+                        <input type="date" class="form-control" id="filtroFechaFin">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Sucursal</label>
+                        <select class="form-select" id="filtroSucursal">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary w-100" onclick="aplicarFiltros()">
+                            <i class="bi bi-search"></i> Aplicar Filtros
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="mt-3">
-        <a href="{% url 'scorecard:dashboard' %}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Volver al Dashboard
-        </a>
+    <!-- Resumen Ejecutivo -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3 class="report-title">
+                <i class="bi bi-clipboard-data"></i> Resumen Ejecutivo
+            </h3>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+                <h3 id="report-total">-</h3>
+                <p>Total Incidencias</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <i class="bi bi-exclamation-octagon" style="font-size: 2rem;"></i>
+                <h3 id="report-criticas">-</h3>
+                <p>Incidencias Críticas</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-box" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <i class="bi bi-arrow-repeat" style="font-size: 2rem;"></i>
+                <h3 id="report-reincidencias">-</h3>
+                <p>Reincidencias</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-box" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <i class="bi bi-calendar-check" style="font-size: 2rem;"></i>
+                <h3 id="report-promedio">-</h3>
+                <p>Días Promedio Cierre</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico de Pareto -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="chart-container-report">
+                <h4 class="mb-3">
+                    <i class="bi bi-bar-chart-line text-primary"></i> Gráfico de Pareto - Fallos Más Frecuentes
+                    <small class="text-muted">(Principio 80/20)</small>
+                </h4>
+                <div class="chart-wrapper-report">
+                    <canvas id="paretoChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tendencia Trimestral -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="chart-container-report">
+                <h4 class="mb-3">
+                    <i class="bi bi-graph-up text-success"></i> Tendencia Trimestral
+                </h4>
+                <div class="chart-wrapper-report">
+                    <canvas id="tendenciaTriChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="chart-container-report">
+                <h4 class="mb-3">
+                    <i class="bi bi-pie-chart text-warning"></i> Por Tipo de Fallo
+                </h4>
+                <div class="chart-wrapper-report">
+                    <canvas id="tipoFalloChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Heatmap por Sucursal -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="chart-container-report">
+                <h4 class="mb-3">
+                    <i class="bi bi-thermometer-half text-danger"></i> Análisis por Sucursal (Heatmap)
+                </h4>
+                <div class="chart-wrapper-report">
+                    <canvas id="heatmapChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comparativa Mensual vs Trimestral -->
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="chart-container-report">
+                <h4 class="mb-3">
+                    <i class="bi bi-calendar-month text-info"></i> Comparativa Mensual
+                </h4>
+                <div class="chart-wrapper-report">
+                    <canvas id="comparativaMensualChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="chart-container-report">
+                <h4 class="mb-3">
+                    <i class="bi bi-speedometer2 text-primary"></i> Métricas de Calidad
+                </h4>
+                <div class="chart-wrapper-report">
+                    <canvas id="metricasChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Volver al Dashboard -->
+    <div class="row mt-4 mb-5 no-print">
+        <div class="col-12 text-center">
+            <a href="{% url 'scorecard:dashboard' %}" class="btn btn-outline-primary btn-lg">
+                <i class="bi bi-arrow-left"></i> Volver al Dashboard
+            </a>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js desde CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+let reportCharts = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Cargando reportes avanzados...');
+    cargarDatosReportes();
+});
+
+function cargarDatosReportes() {
+    fetch("{% url 'scorecard:api_datos_dashboard' %}")
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                actualizarResumenEjecutivo(data.kpis);
+                crearGraficoPareto(data.distribucion_categorias);
+                crearTendenciaTrimestral(data.tendencia_mensual);
+                crearTipoFallo();
+                crearHeatmapSucursales(data.analisis_sucursales);
+                crearComparativaMensual(data.tendencia_mensual);
+                crearMetricasCalidad(data.kpis);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function actualizarResumenEjecutivo(kpis) {
+    document.getElementById('report-total').textContent = kpis.total_incidencias;
+    document.getElementById('report-criticas').textContent = kpis.incidencias_criticas;
+    document.getElementById('report-reincidencias').textContent = 
+        `${kpis.reincidencias} (${kpis.porcentaje_reincidencias}%)`;
+    document.getElementById('report-promedio').textContent = `${kpis.promedio_dias_cierre} días`;
+}
+
+function crearGraficoPareto(datos) {
+    const ctx = document.getElementById('paretoChart');
+    
+    // Calcular porcentajes acumulados
+    const total = datos.data.reduce((a, b) => a + b, 0);
+    let acumulado = 0;
+    const porcentajesAcum = datos.data.map(val => {
+        acumulado += (val / total) * 100;
+        return acumulado;
+    });
+    
+    reportCharts.paretoChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                type: 'bar',
+                label: 'Cantidad',
+                data: datos.data,
+                backgroundColor: '#0d6efd',
+                borderWidth: 1,
+                yAxisID: 'y',
+                order: 2
+            }, {
+                type: 'line',
+                label: '% Acumulado',
+                data: porcentajesAcum,
+                borderColor: '#dc3545',
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                borderWidth: 3,
+                fill: false,
+                yAxisID: 'y1',
+                order: 1,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Cantidad de Incidencias'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    min: 0,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: '% Acumulado'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+function crearTendenciaTrimestral(datos) {
+    const ctx = document.getElementById('tendenciaTriChart');
+    
+    reportCharts.tendenciaTriChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'Incidencias',
+                data: datos.data,
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 6,
+                pointHoverRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+}
+
+function crearTipoFallo() {
+    const ctx = document.getElementById('tipoFalloChart');
+    
+    const tipos = ['Hardware', 'Software', 'Cosmético', 'Funcional'];
+    const valores = [45, 25, 15, 15]; // Datos de ejemplo
+    
+    reportCharts.tipoFalloChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: tipos,
+            datasets: [{
+                data: valores,
+                backgroundColor: ['#dc3545', '#ffc107', '#17a2b8', '#28a745'],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function crearHeatmapSucursales(datos) {
+    const ctx = document.getElementById('heatmapChart');
+    
+    // Generar colores degradados según cantidad
+    const maxVal = Math.max(...datos.data);
+    const colores = datos.data.map(val => {
+        const intensity = val / maxVal;
+        return `rgba(220, 53, 69, ${0.3 + intensity * 0.7})`;
+    });
+    
+    reportCharts.heatmapChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'Incidencias por Sucursal',
+                data: datos.data,
+                backgroundColor: colores,
+                borderWidth: 1,
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+}
+
+function crearComparativaMensual(datos) {
+    const ctx = document.getElementById('comparativaMensualChart');
+    
+    reportCharts.comparativaMensualChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'Incidencias',
+                data: datos.data,
+                backgroundColor: '#17a2b8',
+                borderWidth: 1,
+                borderRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+}
+
+function crearMetricasCalidad(kpis) {
+    const ctx = document.getElementById('metricasChart');
+    
+    const tasaCierre = kpis.total_incidencias > 0 
+        ? ((kpis.incidencias_cerradas / kpis.total_incidencias) * 100).toFixed(1)
+        : 0;
+    
+    const tasaCriticas = kpis.total_incidencias > 0
+        ? ((kpis.incidencias_criticas / kpis.total_incidencias) * 100).toFixed(1)
+        : 0;
+    
+    reportCharts.metricasChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['Tasa Cierre', 'Reincidencias', 'Críticas', 'Tiempo Resolución', 'Eficiencia'],
+            datasets: [{
+                label: 'Métricas de Calidad (%)',
+                data: [tasaCierre, 100 - kpis.porcentaje_reincidencias, 100 - tasaCriticas, 75, 80],
+                backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                borderColor: '#0d6efd',
+                borderWidth: 2,
+                pointBackgroundColor: '#0d6efd',
+                pointBorderColor: '#fff',
+                pointRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+}
+
+function aplicarFiltros() {
+    alert('Funcionalidad de filtros en desarrollo. Próximamente disponible.');
+}
+</script>
 {% endblock %}

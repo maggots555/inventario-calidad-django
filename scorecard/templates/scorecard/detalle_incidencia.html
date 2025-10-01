@@ -39,9 +39,23 @@
                         {% endif %}
                     </p>
                     <p><strong>Severidad:</strong> 
-                        <span class="badge bg-{{ incidencia.grado_severidad == 'critico'|yesno:'danger,warning' }}">
-                            {{ incidencia.get_grado_severidad_display }}
-                        </span>
+                        {% if incidencia.grado_severidad == 'critico' %}
+                            <span class="badge bg-danger">
+                                {{ incidencia.get_grado_severidad_display }}
+                            </span>
+                        {% elif incidencia.grado_severidad == 'alto' %}
+                            <span class="badge bg-warning">
+                                {{ incidencia.get_grado_severidad_display }}
+                            </span>
+                        {% elif incidencia.grado_severidad == 'medio' %}
+                            <span class="badge bg-info">
+                                {{ incidencia.get_grado_severidad_display }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">
+                                {{ incidencia.get_grado_severidad_display }}
+                            </span>
+                        {% endif %}
                     </p>
                 </div>
                 <div class="col-md-6">
@@ -66,7 +80,7 @@
                     <p><strong>Área Detectora:</strong> {{ incidencia.get_area_detectora_display }}</p>
                 </div>
                 <div class="col-md-6">
-                    <p><strong>Técnico Responsable:</strong> {{ incidencia.tecnico_responsable.nombre_completo }}</p>
+                    <p><strong>Técnico/Personal Responsable:</strong> {{ incidencia.tecnico_responsable.nombre_completo }}</p>
                     <p><strong>Inspector de Calidad:</strong> {{ incidencia.inspector_calidad.nombre_completo }}</p>
                 </div>
             </div>

@@ -29,4 +29,8 @@ urlpatterns = [
     path('api/empleado/<int:empleado_id>/', views.api_empleado_data, name='api_empleado_data'),
     path('api/buscar-reincidencias/', views.api_buscar_reincidencias, name='api_buscar_reincidencias'),
     path('api/componentes-por-tipo/', views.api_componentes_por_tipo, name='api_componentes_por_tipo'),
+    
+    # APIs para gráficos y reportes (Fase 3)
+    path('api/datos-dashboard/', views.api_datos_dashboard, name='api_datos_dashboard'),
+    path('api/exportar-excel/', views.api_exportar_excel, name='api_exportar_excel'),
 ]

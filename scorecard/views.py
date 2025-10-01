@@ -5,10 +5,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Count, Q
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from .models import Incidencia, CategoriaIncidencia, ComponenteEquipo, EvidenciaIncidencia
 from .forms import IncidenciaForm, EvidenciaIncidenciaForm
 from inventario.models import Empleado, Sucursal
+from datetime import datetime, timedelta
+from collections import defaultdict
+import json
 
 
 def dashboard(request):
@@ -291,3 +294,235 @@ def api_componentes_por_tipo(request):
     }
     
     return JsonResponse(data)
+
+
+# === APIs para Gráficos y Reportes (Fase 3) ===
+
+def api_datos_dashboard(request):
+    """
+    API que proporciona todos los datos para gráficos del dashboard
+    Retorna: tendencias, distribuciones, rankings, etc.
+    """
+    # 1. Tendencia mensual (últimos 6 meses)
+    hoy = timezone.now()
+    hace_6_meses = hoy - timedelta(days=180)
+    
+    incidencias_recientes = Incidencia.objects.filter(
+        fecha_deteccion__gte=hace_6_meses
+    )
+    
+    # Agrupar por mes
+    meses_data = defaultdict(int)
+    for inc in incidencias_recientes:
+        mes_key = inc.fecha_deteccion.strftime('%Y-%m')
+        meses_data[mes_key] += 1
+    
+    # Ordenar por fecha
+    meses_ordenados = sorted(meses_data.items())
+    
+    tendencia_mensual = {
+        'labels': [datetime.strptime(mes, '%Y-%m').strftime('%b %Y') for mes, _ in meses_ordenados],
+        'data': [count for _, count in meses_ordenados]
+    }
+    
+    # 2. Distribución por severidad
+    severidad_counts = Incidencia.objects.values('grado_severidad').annotate(
+        count=Count('id')
+    ).order_by('grado_severidad')
+    
+    severidad_labels = {
+        'critico': 'Crítico',
+        'alto': 'Alto',
+        'medio': 'Medio',
+        'bajo': 'Bajo'
+    }
+    
+    severidad_colors = {
+        'critico': '#dc3545',
+        'alto': '#fd7e14',
+        'medio': '#ffc107',
+        'bajo': '#28a745'
+    }
+    
+    distribucion_severidad = {
+        'labels': [severidad_labels.get(item['grado_severidad'], item['grado_severidad']) 
+                   for item in severidad_counts],
+        'data': [item['count'] for item in severidad_counts],
+        'colors': [severidad_colors.get(item['grado_severidad'], '#6c757d') 
+                   for item in severidad_counts]
+    }
+    
+    # 3. Top 10 técnicos con más incidencias
+    top_tecnicos = Incidencia.objects.values(
+        'tecnico_responsable__nombre_completo'
+    ).annotate(
+        total=Count('id')
+    ).order_by('-total')[:10]
+    
+    ranking_tecnicos = {
+        'labels': [item['tecnico_responsable__nombre_completo'] or 'Sin técnico' 
+                   for item in top_tecnicos],
+        'data': [item['total'] for item in top_tecnicos]
+    }
+    
+    # 4. Distribución por categoría
+    categorias_counts = Incidencia.objects.values(
+        'tipo_incidencia__nombre',
+        'tipo_incidencia__color'
+    ).annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    distribucion_categorias = {
+        'labels': [item['tipo_incidencia__nombre'] or 'Sin categoría' 
+                   for item in categorias_counts],
+        'data': [item['count'] for item in categorias_counts],
+        'colors': [item['tipo_incidencia__color'] or '#6c757d' 
+                   for item in categorias_counts]
+    }
+    
+    # 5. Análisis por sucursal
+    sucursales_counts = Incidencia.objects.values(
+        'sucursal__nombre'
+    ).annotate(
+        total=Count('id')
+    ).order_by('-total')
+    
+    analisis_sucursales = {
+        'labels': [item['sucursal__nombre'] or 'Sin sucursal' 
+                   for item in sucursales_counts],
+        'data': [item['total'] for item in sucursales_counts]
+    }
+    
+    # 6. Componentes más afectados
+    componentes_counts = Incidencia.objects.values(
+        'componente_afectado__nombre'
+    ).annotate(
+        count=Count('id')
+    ).order_by('-count')[:10]
+    
+    componentes_afectados = {
+        'labels': [item['componente_afectado__nombre'] or 'Sin componente' 
+                   for item in componentes_counts],
+        'data': [item['count'] for item in componentes_counts]
+    }
+    
+    # 7. KPIs adicionales
+    total_incidencias = Incidencia.objects.count()
+    incidencias_abiertas = Incidencia.objects.filter(estado='abierta').count()
+    incidencias_criticas = Incidencia.objects.filter(grado_severidad='critico').count()
+    incidencias_cerradas = Incidencia.objects.filter(estado='cerrada').count()
+    reincidencias = Incidencia.objects.filter(es_reincidencia=True).count()
+    
+    # Calcular porcentaje de reincidencias
+    porcentaje_reincidencias = round((reincidencias / total_incidencias * 100), 2) if total_incidencias > 0 else 0
+    
+    # Promedio de días para cerrar incidencias
+    incidencias_cerradas_obj = Incidencia.objects.filter(estado='cerrada')
+    if incidencias_cerradas_obj.exists():
+        dias_totales = sum([inc.dias_abierta for inc in incidencias_cerradas_obj])
+        promedio_dias_cierre = round(dias_totales / incidencias_cerradas_obj.count(), 1)
+    else:
+        promedio_dias_cierre = 0
+    
+    kpis = {
+        'total_incidencias': total_incidencias,
+        'incidencias_abiertas': incidencias_abiertas,
+        'incidencias_criticas': incidencias_criticas,
+        'incidencias_cerradas': incidencias_cerradas,
+        'reincidencias': reincidencias,
+        'porcentaje_reincidencias': porcentaje_reincidencias,
+        'promedio_dias_cierre': promedio_dias_cierre
+    }
+    
+    # Retornar todos los datos
+    data = {
+        'success': True,
+        'kpis': kpis,
+        'tendencia_mensual': tendencia_mensual,
+        'distribucion_severidad': distribucion_severidad,
+        'ranking_tecnicos': ranking_tecnicos,
+        'distribucion_categorias': distribucion_categorias,
+        'analisis_sucursales': analisis_sucursales,
+        'componentes_afectados': componentes_afectados
+    }
+    
+    return JsonResponse(data)
+
+
+def api_exportar_excel(request):
+    """
+    API para exportar incidencias a Excel
+    Requiere: openpyxl instalado (pip install openpyxl)
+    """
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Librería openpyxl no instalada. Ejecuta: pip install openpyxl'
+        })
+    
+    # Crear workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Incidencias"
+    
+    # Encabezados
+    headers = [
+        'Folio', 'Fecha Detección', 'Tipo Equipo', 'Marca', 'Modelo',
+        'No. Serie', 'Sucursal', 'Técnico', 'Inspector', 'Categoría',
+        'Severidad', 'Estado', 'Componente', 'Descripción', 'Días Abierta'
+    ]
+    
+    # Estilo de encabezados
+    header_fill = PatternFill(start_color="0d6efd", end_color="0d6efd", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Obtener incidencias
+    incidencias = Incidencia.objects.all().select_related(
+        'sucursal', 'tecnico_responsable', 'inspector_calidad',
+        'tipo_incidencia', 'componente_afectado'
+    ).order_by('-fecha_deteccion')
+    
+    # Escribir datos
+    for row_num, inc in enumerate(incidencias, 2):
+        ws.cell(row=row_num, column=1).value = inc.folio
+        ws.cell(row=row_num, column=2).value = inc.fecha_deteccion.strftime('%d/%m/%Y')
+        ws.cell(row=row_num, column=3).value = inc.get_tipo_equipo_display()
+        ws.cell(row=row_num, column=4).value = inc.marca
+        ws.cell(row=row_num, column=5).value = inc.modelo
+        ws.cell(row=row_num, column=6).value = inc.numero_serie
+        ws.cell(row=row_num, column=7).value = inc.sucursal.nombre if inc.sucursal else ''
+        ws.cell(row=row_num, column=8).value = inc.tecnico_responsable.nombre_completo if inc.tecnico_responsable else ''
+        ws.cell(row=row_num, column=9).value = inc.inspector_calidad.nombre_completo if inc.inspector_calidad else ''
+        ws.cell(row=row_num, column=10).value = inc.tipo_incidencia.nombre if inc.tipo_incidencia else ''
+        ws.cell(row=row_num, column=11).value = inc.get_grado_severidad_display()
+        ws.cell(row=row_num, column=12).value = inc.get_estado_display()
+        ws.cell(row=row_num, column=13).value = inc.componente_afectado.nombre if inc.componente_afectado else ''
+        ws.cell(row=row_num, column=14).value = inc.descripcion_incidencia[:100]  # Truncar para Excel
+        ws.cell(row=row_num, column=15).value = inc.dias_abierta
+    
+    # Ajustar anchos de columna
+    for col_num in range(1, len(headers) + 1):
+        column_letter = get_column_letter(col_num)
+        ws.column_dimensions[column_letter].width = 15
+    
+    # Crear respuesta HTTP
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename=incidencias_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    
+    wb.save(response)
+    return response
+
