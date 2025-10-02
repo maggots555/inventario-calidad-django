@@ -27,9 +27,19 @@ git push origin master             # Subir a GitHub
 
 ### 🔽 **1. Antes de Trabajar**
 ```powershell
-# Obtener los cambios más recientes de GitHub
+# OPCIÓN 1: Solo REVISAR si hay cambios nuevos (sin descargar)
+git fetch
+
+# Ver si hay cambios después del fetch
+git status
+
+# OPCIÓN 2: Descargar e integrar cambios directamente
 git pull origin master
 ```
+**¿Cuál usar?**
+- **`git fetch`**: Solo pregunta "¿hay algo nuevo?" pero NO descarga los archivos a tu proyecto. Útil para verificar antes de descargar.
+- **`git pull`**: Descarga Y aplica los cambios automáticamente. Es más directo.
+
 **¿Por qué?** Asegura que tienes la versión más actualizada antes de hacer cambios.
 
 ### 🔍 **2. Durante el Trabajo**

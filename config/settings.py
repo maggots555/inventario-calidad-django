@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,10 +21,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-c^$$m7)o4(**%esnl3ao&z^n&pn3*r=^qxu-!cmczpe#wdi372'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-c^$$m7)o4(**%esnl3ao&z^n&pn3*r=^qxu-!cmczpe#wdi372')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
 # Permitir conexiones desde cualquier host para desarrollo (celular, otros dispositivos)
 # IMPORTANTE: Cambiar esto en producción por seguridad
@@ -147,17 +148,17 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.2/topics/email/
 # Configuración para envío de notificaciones de Score Card
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'jorgemahos@gmail.com'  # Usuario de Gmail
-EMAIL_HOST_PASSWORD = 'sysyzuiempnhtrbz'  # App Password de Google
-DEFAULT_FROM_EMAIL = 'Score Card System <j.alvarez@sic.com.mx>'
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')  # Leer desde .env
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')  # Leer desde .env
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Score Card System <noreply@example.com>')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 # Email del Jefe de Calidad (usado en notificaciones de Score Card)
-JEFE_CALIDAD_EMAIL = 'amartel@sic.com.mx'
-JEFE_CALIDAD_NOMBRE = 'Jefe de Calidad'
+JEFE_CALIDAD_EMAIL = config('JEFE_CALIDAD_EMAIL', default='calidad@example.com')
+JEFE_CALIDAD_NOMBRE = config('JEFE_CALIDAD_NOMBRE', default='Jefe de Calidad')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
