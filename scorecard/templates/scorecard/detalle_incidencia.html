@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load scorecard_filters %}
 
 {% block title %}{{ incidencia.folio }} - Score Card - {{ block.super }}{% endblock %}
 
@@ -135,23 +136,12 @@
                         {% endif %}
                     </p>
                     <p><strong>Severidad:</strong> 
-                        {% if incidencia.grado_severidad == 'critico' %}
-                            <span class="badge bg-danger">
-                                {{ incidencia.get_grado_severidad_display }}
-                            </span>
-                        {% elif incidencia.grado_severidad == 'alto' %}
-                            <span class="badge bg-warning">
-                                {{ incidencia.get_grado_severidad_display }}
-                            </span>
-                        {% elif incidencia.grado_severidad == 'medio' %}
-                            <span class="badge bg-info">
-                                {{ incidencia.get_grado_severidad_display }}
-                            </span>
-                        {% else %}
-                            <span class="badge bg-secondary">
-                                {{ incidencia.get_grado_severidad_display }}
-                            </span>
-                        {% endif %}
+                        <span class="badge badge-categoria" 
+                              style="background-color: {{ incidencia.grado_severidad|color_severidad }}; 
+                                     color: {{ incidencia.grado_severidad|color_severidad|text_color_for_bg }};">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            {{ incidencia.get_grado_severidad_display }}
+                        </span>
                     </p>
                 </div>
                 <div class="col-md-6">
@@ -181,8 +171,10 @@
                 <div class="col-md-6">
                     <p><strong>Técnico/Personal Responsable:</strong> {{ incidencia.tecnico_responsable.nombre_completo }}</p>
                     {% if incidencia.area_tecnico %}
-                        <p><strong>Área del Técnico:</strong> 
-                            <span class="badge bg-secondary">
+                        <p><strong>Área:</strong> 
+                            <span class="badge badge-categoria" 
+                                  style="background-color: {{ incidencia.area_tecnico|color_area }}; 
+                                         color: {{ incidencia.area_tecnico|color_area|text_color_for_bg }};">
                                 <i class="bi bi-briefcase"></i> {{ incidencia.area_tecnico }}
                             </span>
                         </p>

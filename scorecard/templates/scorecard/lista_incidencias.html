@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load scorecard_filters %}
 
 {% block title %}Incidencias - Score Card - {{ block.super }}{% endblock %}
 
@@ -34,9 +35,10 @@
                             <th>Equipo</th>
                             <th>Número de Serie</th>
                             <th>Orden Interna</th>
-                            <th>Técnico</th>
+                            <th>Técnico/Personal responsable</th>
                             <th>Categoría</th>
                             <th>Severidad</th>
+                            <th>Atribuibilidad</th>
                             <th>Estado</th>
                             <th style="width: 150px;">Acciones</th>
                         </tr>
@@ -64,19 +66,31 @@
                             </td>
                             <td>{{ incidencia.tecnico_responsable.nombre_completo }}</td>
                             <td>
-                                <span class="badge bg-secondary">
+                                <span class="badge badge-categoria" 
+                                      style="background-color: {{ incidencia.tipo_incidencia.color }}; 
+                                             color: {{ incidencia.tipo_incidencia.color|text_color_for_bg }};">
                                     {{ incidencia.tipo_incidencia.nombre }}
                                 </span>
                             </td>
                             <td>
-                                {% if incidencia.grado_severidad == 'critico' %}
-                                    <span class="badge bg-danger">Crítico</span>
-                                {% elif incidencia.grado_severidad == 'alto' %}
-                                    <span class="badge bg-warning text-dark">Alto</span>
-                                {% elif incidencia.grado_severidad == 'medio' %}
-                                    <span class="badge bg-info text-dark">Medio</span>
+                                <span class="badge badge-categoria" 
+                                      style="background-color: {{ incidencia.grado_severidad|color_severidad }}; 
+                                             color: {{ incidencia.grado_severidad|color_severidad|text_color_for_bg }};">
+                                    {{ incidencia.get_grado_severidad_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if incidencia.es_atribuible %}
+                                    <span class="badge bg-danger" title="Esta incidencia es atribuible al técnico">
+                                        <i class="bi bi-person-x"></i> Atribuible
+                                    </span>
                                 {% else %}
-                                    <span class="badge bg-success">Bajo</span>
+                                    <span class="badge bg-secondary" 
+                                          title="No Atribuible: {{ incidencia.justificacion_no_atribuible|default:'Sin justificación registrada' }}"
+                                          data-bs-toggle="tooltip" 
+                                          data-bs-placement="left">
+                                        <i class="bi bi-shield-check"></i> No Atribuible
+                                    </span>
                                 {% endif %}
                             </td>
                             <td>
@@ -134,4 +148,20 @@
         </a>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Inicializar tooltips de Bootstrap para mostrar justificaciones de no atribuibilidad
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar todos los tooltips en la página
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl, {
+                html: true,
+                delay: { show: 300, hide: 100 }
+            });
+        });
+    });
+</script>
 {% endblock %}

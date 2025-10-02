@@ -96,7 +96,8 @@ class IncidenciaForm(forms.ModelForm):
             ),
             'area_detectora': forms.Select(
                 attrs={
-                    'class': 'form-select'
+                    'class': 'form-select',
+                    'id': 'id_area_detectora'
                 }
             ),
             'tecnico_responsable': forms.Select(
@@ -209,7 +210,12 @@ class IncidenciaForm(forms.ModelForm):
         
         # Filtrar solo empleados activos
         self.fields['tecnico_responsable'].queryset = Empleado.objects.filter(activo=True)
-        self.fields['inspector_calidad'].queryset = Empleado.objects.filter(activo=True)
+        
+        # Filtrar solo empleados activos del área de Calidad para inspector
+        self.fields['inspector_calidad'].queryset = Empleado.objects.filter(
+            activo=True,
+            area__icontains='calidad'  # Solo empleados del área de Calidad
+        )
         
         # Filtrar solo categorías activas
         self.fields['tipo_incidencia'].queryset = CategoriaIncidencia.objects.filter(activo=True)

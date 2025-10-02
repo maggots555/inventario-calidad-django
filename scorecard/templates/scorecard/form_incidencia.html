@@ -132,27 +132,7 @@
             </div>
             
             <div class="row g-3">
-                <div class="col-md-6">
-                    <label for="{{ form.sucursal.id_for_label }}" class="form-label required-field">
-                        {{ form.sucursal.label }}
-                    </label>
-                    {{ form.sucursal }}
-                    <small class="form-text text-muted" id="sucursal-info"></small>
-                    {% if form.sucursal.errors %}
-                        <div class="invalid-feedback d-block">{{ form.sucursal.errors }}</div>
-                    {% endif %}
-                </div>
-                
-                <div class="col-md-6">
-                    <label for="{{ form.area_detectora.id_for_label }}" class="form-label required-field">
-                        {{ form.area_detectora.label }}
-                    </label>
-                    {{ form.area_detectora }}
-                    {% if form.area_detectora.errors %}
-                        <div class="invalid-feedback d-block">{{ form.area_detectora.errors }}</div>
-                    {% endif %}
-                </div>
-                
+                <!-- 1. TÉCNICO RESPONSABLE (Primero para autocompletar) -->
                 <div class="col-md-6">
                     <label for="{{ form.tecnico_responsable.id_for_label }}" class="form-label required-field">
                         {{ form.tecnico_responsable.label }}
@@ -164,6 +144,7 @@
                     {% endif %}
                 </div>
                 
+                <!-- 2. ÁREA DEL TÉCNICO (Auto-completado) -->
                 <div class="col-md-6">
                     <label for="{{ form.area_tecnico.id_for_label }}" class="form-label">
                         {{ form.area_tecnico.label }}
@@ -177,12 +158,37 @@
                     {% endif %}
                 </div>
                 
+                <!-- 3. SUCURSAL (Auto-completado) -->
+                <div class="col-md-6">
+                    <label for="{{ form.sucursal.id_for_label }}" class="form-label required-field">
+                        {{ form.sucursal.label }}
+                    </label>
+                    {{ form.sucursal }}
+                    <small class="form-text text-muted" id="sucursal-info"></small>
+                    {% if form.sucursal.errors %}
+                        <div class="invalid-feedback d-block">{{ form.sucursal.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <!-- 4. ÁREA DETECTORA -->
+                <div class="col-md-6">
+                    <label for="{{ form.area_detectora.id_for_label }}" class="form-label required-field">
+                        {{ form.area_detectora.label }}
+                    </label>
+                    {{ form.area_detectora }}
+                    <small class="form-text text-muted" id="area-detectora-info"></small>
+                    {% if form.area_detectora.errors %}
+                        <div class="invalid-feedback d-block">{{ form.area_detectora.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <!-- 5. INSPECTOR DE CALIDAD -->
                 <div class="col-md-6">
                     <label for="{{ form.inspector_calidad.id_for_label }}" class="form-label required-field">
                         {{ form.inspector_calidad.label }}
                     </label>
                     {{ form.inspector_calidad }}
-                    <small class="form-text text-muted" id="inspector-info"></small>
+                    <small class="form-text text-muted" id="inspector-info">Solo empleados del área de Calidad</small>
                     {% if form.inspector_calidad.errors %}
                         <div class="invalid-feedback d-block">{{ form.inspector_calidad.errors }}</div>
                     {% endif %}
@@ -463,6 +469,24 @@ document.addEventListener('DOMContentLoaded', function() {
     if (inspectorSelect) {
         inspectorSelect.addEventListener('change', function() {
             cargarDatosEmpleado(this.value, 'inspector');
+            
+            // Auto-seleccionar "Control de Calidad" en área detectora cuando se elige inspector
+            const areaDetectoraSelect = document.getElementById('id_area_detectora');
+            if (this.value && areaDetectoraSelect) {
+                areaDetectoraSelect.value = 'calidad';  // 'calidad' es el valor para "Control de Calidad"
+                
+                // Mostrar mensaje informativo
+                const areaDetectoraInfo = document.getElementById('area-detectora-info');
+                if (areaDetectoraInfo) {
+                    areaDetectoraInfo.innerHTML = '<i class="bi bi-check-circle text-success"></i> Auto-seleccionado: Control de Calidad';
+                    areaDetectoraInfo.style.color = '#28a745';
+                    
+                    // Remover mensaje después de 3 segundos
+                    setTimeout(() => {
+                        areaDetectoraInfo.innerHTML = '';
+                    }, 3000);
+                }
+            }
         });
         
         // Cargar datos si ya hay un valor seleccionado (modo edición)
