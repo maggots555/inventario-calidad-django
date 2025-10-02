@@ -9,15 +9,111 @@
             <h1 class="display-6">
                 <i class="bi bi-file-earmark-text text-info"></i>
                 {{ incidencia.folio }}
+                {% if not incidencia.es_atribuible %}
+                <span class="badge bg-info ms-2" title="Esta incidencia NO es atribuible al técnico">
+                    <i class="bi bi-shield-x"></i> No Atribuible
+                </span>
+                {% endif %}
             </h1>
             <p class="text-muted">Detalle de la incidencia</p>
         </div>
         <div class="col-md-6 text-end">
-            <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" class="btn btn-warning">
-                <i class="bi bi-pencil"></i> Editar
-            </a>
+            <div class="btn-group" role="group">
+                <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" class="btn btn-warning">
+                    <i class="bi bi-pencil"></i> Editar
+                </a>
+            </div>
         </div>
     </div>
+
+    <!-- Botones de Acción Rápida -->
+    <div class="card shadow mb-4 border-primary">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-lightning"></i> Acciones Rápidas</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Cambiar Estado -->
+                <div class="col-md-3">
+                    <a href="{% url 'scorecard:cambiar_estado_incidencia' incidencia.id %}" class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3">
+                        <i class="bi bi-arrow-left-right fs-3 mb-2"></i>
+                        <strong>Cambiar Estado</strong>
+                        <small class="text-muted">Actual: {{ incidencia.get_estado_display }}</small>
+                    </a>
+                </div>
+                
+                <!-- Marcar NO Atribuible -->
+                {% if incidencia.es_atribuible and incidencia.estado != 'cerrada' %}
+                <div class="col-md-3">
+                    <a href="{% url 'scorecard:marcar_no_atribuible' incidencia.id %}" class="btn btn-outline-info w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3">
+                        <i class="bi bi-shield-x fs-3 mb-2"></i>
+                        <strong>Marcar NO Atribuible</strong>
+                        <small class="text-muted">No cuenta en scorecard</small>
+                    </a>
+                </div>
+                {% elif not incidencia.es_atribuible %}
+                <div class="col-md-3">
+                    <div class="alert alert-info mb-0 h-100 d-flex flex-column align-items-center justify-content-center p-3">
+                        <i class="bi bi-shield-check fs-3 mb-2"></i>
+                        <strong>Ya NO es Atribuible</strong>
+                        <small class="text-muted">Marcado el {{ incidencia.fecha_marcado_no_atribuible|date:"d/m/Y" }}</small>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Cerrar Incidencia -->
+                {% if incidencia.estado != 'cerrada' %}
+                <div class="col-md-3">
+                    <a href="{% url 'scorecard:cerrar_incidencia' incidencia.id %}" class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3">
+                        <i class="bi bi-check-circle fs-3 mb-2"></i>
+                        <strong>Cerrar Incidencia</strong>
+                        <small class="text-muted">Con notificación automática</small>
+                    </a>
+                </div>
+                {% else %}
+                <div class="col-md-3">
+                    <div class="alert alert-success mb-0 h-100 d-flex flex-column align-items-center justify-content-center p-3">
+                        <i class="bi bi-check-circle-fill fs-3 mb-2"></i>
+                        <strong>Cerrada</strong>
+                        <small class="text-muted">{{ incidencia.fecha_cierre|date:"d/m/Y H:i" }}</small>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Enviar Notificación Manual -->
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3" id="btnAbrirModalNotificacion">
+                        <i class="bi bi-send fs-3 mb-2"></i>
+                        <strong>Enviar Notificación</strong>
+                        <small class="text-muted">Manual a destinatarios</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Justificación NO Atribuible (si aplica) -->
+    {% if not incidencia.es_atribuible %}
+    <div class="alert alert-info border-info shadow-sm mb-4">
+        <h5 class="alert-heading">
+            <i class="bi bi-shield-x"></i> Incidencia Marcada como NO Atribuible
+        </h5>
+        <hr>
+        <p class="mb-2"><strong>Justificación:</strong></p>
+        <p style="white-space: pre-line;" class="mb-2">{{ incidencia.justificacion_no_atribuible }}</p>
+        <hr>
+        <p class="mb-0 small text-muted">
+            <i class="bi bi-person"></i> Marcado por: 
+            {% if incidencia.marcado_no_atribuible_por %}
+                {{ incidencia.marcado_no_atribuible_por.nombre_completo }}
+            {% else %}
+                Sistema
+            {% endif %}
+            | 
+            <i class="bi bi-calendar"></i> {{ incidencia.fecha_marcado_no_atribuible|date:"d/m/Y H:i" }}
+        </p>
+    </div>
+    {% endif %}
 
     <!-- Información básica -->
     <div class="card shadow mb-4">
@@ -138,28 +234,9 @@
     <!-- Notificaciones -->
     <div class="card shadow mb-4 border-primary">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0"><i class="bi bi-envelope"></i> Notificaciones</h5>
+            <h5 class="mb-0"><i class="bi bi-clock-history"></i> Historial de Envíos</h5>
         </div>
         <div class="card-body">
-            <div class="row">
-                <!-- Columna izquierda: Enviar nueva notificación -->
-                <div class="col-md-5 border-end">
-                    <h6 class="fw-bold mb-3">
-                        <i class="bi bi-send"></i> Enviar Nueva Notificación
-                    </h6>
-                    <p class="text-muted small mb-3">
-                        Envía un correo electrónico a los responsables sobre esta incidencia.
-                    </p>
-                    <button type="button" class="btn btn-primary btn-lg w-100" id="btnAbrirModalNotificacion">
-                        <i class="bi bi-send"></i> Enviar Notificación
-                    </button>
-                </div>
-                
-                <!-- Columna derecha: Historial de envíos -->
-                <div class="col-md-7">
-                    <h6 class="fw-bold mb-3">
-                        <i class="bi bi-clock-history"></i> Historial de Envíos
-                    </h6>
                     
                     {% if notificaciones_enviadas %}
                         <div class="timeline">
@@ -167,7 +244,7 @@
                             <div class="timeline-item mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}">
                                 <div class="d-flex align-items-start">
                                     <div class="flex-shrink-0 me-3">
-                                        {% if notif.exitoso %}
+                                        {% if notif.exitoso or notif.enviado_exitoso %}
                                             <span class="badge bg-success rounded-circle p-2">
                                                 <i class="bi bi-check-lg"></i>
                                             </span>
@@ -181,10 +258,21 @@
                                         <div class="d-flex justify-content-between align-items-start">
                                             <div>
                                                 <strong class="d-block">
-                                                    {% if notif.exitoso %}
+                                                    {% if notif.exitoso or notif.enviado_exitoso %}
                                                         <span class="text-success">Enviado exitosamente</span>
                                                     {% else %}
                                                         <span class="text-danger">Error en envío</span>
+                                                    {% endif %}
+                                                    
+                                                    <!-- Badge del tipo de notificación -->
+                                                    {% if notif.tipo_notificacion == 'no_atribuible' %}
+                                                        <span class="badge bg-info ms-2">No Atribuible</span>
+                                                    {% elif notif.tipo_notificacion == 'cierre' %}
+                                                        <span class="badge bg-success ms-2">Cierre</span>
+                                                    {% elif notif.tipo_notificacion == 'cierre_no_atribuible' %}
+                                                        <span class="badge bg-info ms-2">Cierre (No Atribuible)</span>
+                                                    {% elif notif.tipo_notificacion == 'manual' %}
+                                                        <span class="badge bg-secondary ms-2">Manual</span>
                                                     {% endif %}
                                                 </strong>
                                                 <small class="text-muted">
@@ -202,9 +290,11 @@
                                             </small>
                                             <div class="mt-1">
                                                 {% for dest in notif.get_destinatarios_list %}
-                                                    <span class="badge bg-secondary me-1 mb-1">
+                                                    <span class="badge bg-warning text-dark me-1 mb-1">
                                                         {{ dest.nombre }}
                                                     </span>
+                                                {% empty %}
+                                                    <span class="text-muted small">Sin destinatarios</span>
                                                 {% endfor %}
                                             </div>
                                         </div>
@@ -217,7 +307,7 @@
                                         </div>
                                         
                                         <!-- Mensaje de error si existe -->
-                                        {% if not notif.exitoso and notif.mensaje_error %}
+                                        {% if not notif.exitoso and not notif.enviado_exitoso and notif.mensaje_error %}
                                         <div class="alert alert-danger alert-sm mt-2 mb-0 py-1 px-2">
                                             <small><i class="bi bi-exclamation-triangle"></i> {{ notif.mensaje_error }}</small>
                                         </div>
@@ -234,8 +324,6 @@
                             <small>Las notificaciones enviadas aparecerán aquí</small>
                         </div>
                     {% endif %}
-                </div>
-            </div>
         </div>
     </div>
 

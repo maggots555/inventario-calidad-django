@@ -633,3 +633,199 @@ def api_enviar_notificacion(request, incidencia_id):
             'message': f'Error inesperado: {str(e)}'
         }, status=500)
 
+
+def cambiar_estado_incidencia(request, incidencia_id):
+    """
+    Vista para cambiar el estado de una incidencia desde el detalle
+    No envía notificaciones automáticas (solo cuando se cierra)
+    """
+    incidencia = get_object_or_404(Incidencia, id=incidencia_id)
+    
+    if request.method == 'POST':
+        from .forms import CambiarEstadoIncidenciaForm
+        form = CambiarEstadoIncidenciaForm(request.POST)
+        
+        if form.is_valid():
+            nuevo_estado = form.cleaned_data['estado']
+            notas = form.cleaned_data.get('notas', '')
+            
+            # Guardar estado anterior
+            estado_anterior = incidencia.get_estado_display()
+            
+            # Actualizar estado
+            incidencia.estado = nuevo_estado
+            
+            # Si hay notas, agregarlas a acciones_tomadas
+            if notas:
+                if incidencia.acciones_tomadas:
+                    incidencia.acciones_tomadas += f"\n\n--- Cambio de estado ({timezone.now().strftime('%d/%m/%Y %H:%M')}) ---\n{notas}"
+                else:
+                    incidencia.acciones_tomadas = notas
+            
+            incidencia.save()
+            
+            # Solo notificar si se está cerrando
+            if nuevo_estado == 'cerrada':
+                from .emails import enviar_notificacion_cierre_incidencia
+                resultado = enviar_notificacion_cierre_incidencia(
+                    incidencia=incidencia,
+                    mensaje_adicional=notas,
+                    enviado_por=request.user.username if request.user.is_authenticated else 'Sistema'
+                )
+                
+                if resultado['success']:
+                    messages.success(request, f'Estado cambiado de "{estado_anterior}" a "{incidencia.get_estado_display()}" y notificación enviada.')
+                else:
+                    messages.warning(request, f'Estado cambiado, pero hubo un error al enviar notificación: {resultado["message"]}')
+            else:
+                messages.success(request, f'Estado cambiado de "{estado_anterior}" a "{incidencia.get_estado_display()}"')
+            
+            return redirect('scorecard:detalle_incidencia', incidencia_id=incidencia.id)
+    else:
+        from .forms import CambiarEstadoIncidenciaForm
+        form = CambiarEstadoIncidenciaForm(initial={'estado': incidencia.estado})
+    
+    context = {
+        'incidencia': incidencia,
+        'form': form,
+    }
+    
+    return render(request, 'scorecard/cambiar_estado.html', context)
+
+
+def marcar_no_atribuible(request, incidencia_id):
+    """
+    Vista para marcar una incidencia como NO atribuible al técnico
+    Requiere justificación y envía notificación automática
+    """
+    incidencia = get_object_or_404(Incidencia, id=incidencia_id)
+    
+    # Validar que no esté ya marcada como no atribuible
+    if not incidencia.es_atribuible:
+        messages.warning(request, 'Esta incidencia ya está marcada como NO atribuible.')
+        return redirect('scorecard:detalle_incidencia', incidencia_id=incidencia.id)
+    
+    if request.method == 'POST':
+        from .forms import MarcarNoAtribuibleForm
+        form = MarcarNoAtribuibleForm(request.POST)
+        
+        if form.is_valid():
+            justificacion = form.cleaned_data['justificacion']
+            
+            # Actualizar la incidencia
+            incidencia.es_atribuible = False
+            incidencia.justificacion_no_atribuible = justificacion
+            incidencia.fecha_marcado_no_atribuible = timezone.now()
+            
+            # Intentar obtener el empleado que marca (si está logueado)
+            if request.user.is_authenticated:
+                try:
+                    from inventario.models import Empleado
+                    empleado = Empleado.objects.filter(email=request.user.email).first()
+                    if empleado:
+                        incidencia.marcado_no_atribuible_por = empleado
+                except:
+                    pass
+            
+            incidencia.save()
+            
+            # Enviar notificación automática al técnico
+            from .emails import enviar_notificacion_no_atribuible
+            resultado = enviar_notificacion_no_atribuible(
+                incidencia=incidencia,
+                justificacion=justificacion,
+                marcado_por=request.user.username if request.user.is_authenticated else 'Sistema'
+            )
+            
+            if resultado['success']:
+                messages.success(request, f'Incidencia marcada como NO atribuible y técnico notificado: {resultado["message"]}')
+            else:
+                messages.warning(request, f'Incidencia marcada como NO atribuible, pero hubo un error en la notificación: {resultado["message"]}')
+            
+            return redirect('scorecard:detalle_incidencia', incidencia_id=incidencia.id)
+    else:
+        from .forms import MarcarNoAtribuibleForm
+        form = MarcarNoAtribuibleForm()
+    
+    # Obtener destinatarios históricos para mostrar en el formulario
+    from .emails import obtener_destinatarios_historicos
+    destinatarios_historicos = obtener_destinatarios_historicos(incidencia)
+    
+    context = {
+        'incidencia': incidencia,
+        'form': form,
+        'destinatarios_historicos': destinatarios_historicos,
+    }
+    
+    return render(request, 'scorecard/marcar_no_atribuible.html', context)
+
+
+def cerrar_incidencia(request, incidencia_id):
+    """
+    Vista para cerrar una incidencia con formulario de cierre
+    Envía notificación automática (diferente según sea atribuible o no)
+    """
+    incidencia = get_object_or_404(Incidencia, id=incidencia_id)
+    
+    # Validar que no esté ya cerrada
+    if incidencia.estado == 'cerrada':
+        messages.warning(request, 'Esta incidencia ya está cerrada.')
+        return redirect('scorecard:detalle_incidencia', incidencia_id=incidencia.id)
+    
+    if request.method == 'POST':
+        from .forms import CerrarIncidenciaForm
+        form = CerrarIncidenciaForm(request.POST)
+        
+        if form.is_valid():
+            acciones_tomadas = form.cleaned_data['acciones_tomadas']
+            causa_raiz = form.cleaned_data.get('causa_raiz', '')
+            
+            # Actualizar la incidencia
+            incidencia.estado = 'cerrada'
+            incidencia.acciones_tomadas = acciones_tomadas
+            if causa_raiz:
+                incidencia.causa_raiz = causa_raiz
+            incidencia.fecha_cierre = timezone.now()
+            incidencia.save()
+            
+            # Enviar notificación de cierre
+            from .emails import enviar_notificacion_cierre_incidencia
+            mensaje_adicional = acciones_tomadas
+            if causa_raiz:
+                mensaje_adicional += f"\n\nCausa Raíz:\n{causa_raiz}"
+            
+            resultado = enviar_notificacion_cierre_incidencia(
+                incidencia=incidencia,
+                mensaje_adicional=mensaje_adicional,
+                enviado_por=request.user.username if request.user.is_authenticated else 'Sistema'
+            )
+            
+            if resultado['success']:
+                tipo_cierre = "NO atribuible" if not incidencia.es_atribuible else "normal"
+                messages.success(request, f'Incidencia cerrada ({tipo_cierre}) y técnico notificado: {resultado["message"]}')
+            else:
+                messages.warning(request, f'Incidencia cerrada, pero hubo un error en la notificación: {resultado["message"]}')
+            
+            return redirect('scorecard:detalle_incidencia', incidencia_id=incidencia.id)
+    else:
+        from .forms import CerrarIncidenciaForm
+        # Pre-cargar con los datos existentes si los hay
+        initial_data = {}
+        if incidencia.acciones_tomadas:
+            initial_data['acciones_tomadas'] = incidencia.acciones_tomadas
+        if incidencia.causa_raiz:
+            initial_data['causa_raiz'] = incidencia.causa_raiz
+        
+        form = CerrarIncidenciaForm(initial=initial_data)
+    
+    # Obtener destinatarios históricos para mostrar en el formulario
+    from .emails import obtener_destinatarios_historicos
+    destinatarios_historicos = obtener_destinatarios_historicos(incidencia)
+    
+    context = {
+        'incidencia': incidencia,
+        'form': form,
+        'destinatarios_historicos': destinatarios_historicos,
+    }
+    
+    return render(request, 'scorecard/cerrar_incidencia.html', context)

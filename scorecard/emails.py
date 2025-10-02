@@ -5,6 +5,7 @@ Este módulo maneja todo lo relacionado con el envío de notificaciones por corr
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
+from django.utils import timezone
 from .models import NotificacionIncidencia
 from PIL import Image
 from io import BytesIO
@@ -193,11 +194,14 @@ def enviar_notificacion_incidencia(incidencia, destinatarios_seleccionados, mens
         # Registrar la notificación en la base de datos
         NotificacionIncidencia.objects.create(
             incidencia=incidencia,
-            destinatarios=json.dumps(destinatarios_seleccionados, ensure_ascii=False),
+            tipo_notificacion='manual',
+            destinatarios_json=json.dumps(destinatarios_seleccionados, ensure_ascii=False),
+            destinatarios=json.dumps(destinatarios_seleccionados, ensure_ascii=False),  # Legacy
             asunto=asunto,
             mensaje_adicional=mensaje_adicional,
             enviado_por=enviado_por,
             exitoso=True,
+            enviado_exitoso=True,
             mensaje_error=''
         )
         
@@ -210,11 +214,14 @@ def enviar_notificacion_incidencia(incidencia, destinatarios_seleccionados, mens
         # Registrar el error en la base de datos
         NotificacionIncidencia.objects.create(
             incidencia=incidencia,
-            destinatarios=json.dumps(destinatarios_seleccionados, ensure_ascii=False),
+            tipo_notificacion='manual',
+            destinatarios_json=json.dumps(destinatarios_seleccionados, ensure_ascii=False),
+            destinatarios=json.dumps(destinatarios_seleccionados, ensure_ascii=False),  # Legacy
             asunto=asunto,
             mensaje_adicional=mensaje_adicional,
             enviado_por=enviado_por,
             exitoso=False,
+            enviado_exitoso=False,
             mensaje_error=str(e)
         )
         
@@ -281,3 +288,302 @@ def obtener_destinatarios_disponibles(incidencia):
         })
     
     return destinatarios
+
+
+def obtener_destinatarios_historicos(incidencia):
+    """
+    Obtiene todos los destinatarios únicos que han recibido notificaciones manuales
+    exitosas previas de esta incidencia.
+    
+    Esta función busca en el historial de notificaciones MANUALES y extrae todos
+    los destinatarios para incluirlos en notificaciones automáticas futuras.
+    
+    Parámetros:
+    - incidencia: Objeto Incidencia del cual obtener historial
+    
+    Retorna:
+    - Lista de diccionarios con estructura {'nombre': str, 'email': str, 'rol': str}
+    - Lista vacía si no hay notificaciones previas
+    """
+    import json
+    
+    destinatarios_unicos = {}  # Usamos dict para evitar duplicados por email
+    
+    try:
+        # Buscar notificaciones manuales exitosas de esta incidencia
+        notificaciones_manuales = incidencia.notificaciones.filter(
+            tipo_notificacion='manual',
+            enviado_exitoso=True
+        ) | incidencia.notificaciones.filter(
+            tipo_notificacion='manual',
+            exitoso=True  # Campo legacy
+        )
+        
+        # Extraer destinatarios de cada notificación
+        for notif in notificaciones_manuales:
+            destinatarios_list = notif.get_destinatarios_list()
+            
+            for dest in destinatarios_list:
+                email = dest.get('email', '').strip().lower()
+                
+                # Solo agregar si tiene email válido y no está ya en la lista
+                if email and email not in destinatarios_unicos:
+                    destinatarios_unicos[email] = {
+                        'nombre': dest.get('nombre', 'Sin nombre'),
+                        'email': email,
+                        'rol': dest.get('rol', 'Previamente notificado')
+                    }
+        
+        # Convertir dict a lista
+        return list(destinatarios_unicos.values())
+        
+    except Exception as e:
+        # En caso de error, retornar lista vacía para no romper el flujo
+        print(f"Error al obtener destinatarios históricos: {e}")
+        return []
+
+
+def enviar_notificacion_no_atribuible(incidencia, justificacion, marcado_por='Sistema'):
+    """
+    Envía notificación al técnico cuando una incidencia se marca como NO atribuible
+    
+    Esta notificación explica al técnico que la incidencia NO afectará su scorecard
+    y proporciona la justificación de por qué no se le atribuye.
+    
+    IMPORTANTE: También incluye automáticamente a todos los destinatarios que
+    recibieron notificaciones manuales previas de esta incidencia.
+    
+    Parámetros:
+    - incidencia: Objeto Incidencia que se marcó como no atribuible
+    - justificacion: Texto explicando por qué no es atribuible
+    - marcado_por: Nombre del usuario que marcó como no atribuible
+    
+    Retorna:
+    - Diccionario con 'success' (bool) y 'message' (str)
+    """
+    
+    # Verificar que el técnico tiene email
+    if not incidencia.tecnico_responsable.email:
+        return {
+            'success': False,
+            'message': f'El técnico {incidencia.tecnico_responsable.nombre_completo} no tiene email registrado'
+        }
+    
+    # Lista de destinatarios
+    destinatarios = []
+    emails_destinatarios = []
+    
+    # 1. Destinatario principal: el técnico responsable
+    email_tecnico = incidencia.tecnico_responsable.email.strip().lower()
+    destinatarios.append({
+        'nombre': incidencia.tecnico_responsable.nombre_completo,
+        'email': email_tecnico,
+        'rol': 'Técnico Responsable'
+    })
+    emails_destinatarios.append(email_tecnico)
+    
+    # 2. Obtener destinatarios del historial de notificaciones manuales
+    destinatarios_historicos = obtener_destinatarios_historicos(incidencia)
+    
+    for dest_hist in destinatarios_historicos:
+        email_hist = dest_hist['email'].strip().lower()
+        
+        # Solo agregar si no está ya en la lista (evitar duplicados)
+        if email_hist not in emails_destinatarios:
+            destinatarios.append(dest_hist)
+            emails_destinatarios.append(email_hist)
+    
+    # Asunto del email
+    asunto = f"[INFO] {incidencia.folio} - Incidencia NO Atribuible"
+    
+    # Contexto para el template
+    context = {
+        'incidencia': incidencia,
+        'tecnico': incidencia.tecnico_responsable,
+        'justificacion': justificacion,
+        'marcado_por': marcado_por,
+        'fecha_actual': timezone.now(),
+        'destinatarios_adicionales': len(destinatarios) - 1  # Todos menos el técnico
+    }
+    
+    try:
+        # Renderizar template HTML
+        html_content = render_to_string('scorecard/emails/no_atribuible.html', context)
+        
+        # Crear email con todos los destinatarios
+        email = EmailMultiAlternatives(
+            subject=asunto,
+            body=f"Incidencia {incidencia.folio} - Marcada como NO Atribuible",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=emails_destinatarios  # Lista completa de emails
+        )
+        
+        # Adjuntar versión HTML
+        email.attach_alternative(html_content, "text/html")
+        
+        # Enviar
+        email.send(fail_silently=False)
+        
+        # Mensaje de éxito
+        mensaje_exito = f'Notificación enviada a {len(emails_destinatarios)} destinatario(s)'
+        if len(destinatarios) > 1:
+            mensaje_exito += f' (incluye {len(destinatarios) - 1} del historial)'
+        
+        # Registrar en base de datos
+        from .models import NotificacionIncidencia
+        NotificacionIncidencia.objects.create(
+            incidencia=incidencia,
+            tipo_notificacion='no_atribuible',
+            destinatarios_json=json.dumps(destinatarios, ensure_ascii=False),
+            asunto=asunto,
+            enviado_exitoso=True
+        )
+        
+        return {
+            'success': True,
+            'message': mensaje_exito
+        }
+        
+    except Exception as e:
+        # Registrar error en base de datos
+        from .models import NotificacionIncidencia
+        NotificacionIncidencia.objects.create(
+            incidencia=incidencia,
+            tipo_notificacion='no_atribuible',
+            destinatarios_json=json.dumps(destinatarios, ensure_ascii=False),
+            asunto=asunto,
+            enviado_exitoso=False,
+            mensaje_error=str(e)
+        )
+        
+        return {
+            'success': False,
+            'message': f'Error al enviar notificación: {str(e)}'
+        }
+
+
+def enviar_notificacion_cierre_incidencia(incidencia, mensaje_adicional='', enviado_por='Sistema'):
+    """
+    Envía notificación cuando se cierra una incidencia (atribuible o no)
+    
+    - Si es ATRIBUIBLE: Notifica que la incidencia fue cerrada (estándar)
+    - Si es NO ATRIBUIBLE: Notifica con conclusión final para conocimiento del técnico
+    
+    IMPORTANTE: También incluye automáticamente a todos los destinatarios que
+    recibieron notificaciones manuales previas de esta incidencia.
+    
+    Parámetros:
+    - incidencia: Objeto Incidencia que se está cerrando
+    - mensaje_adicional: Texto adicional con conclusiones o notas finales
+    - enviado_por: Nombre del usuario que cierra la incidencia
+    
+    Retorna:
+    - Diccionario con 'success' (bool) y 'message' (str)
+    """
+    
+    # Verificar que el técnico tiene email
+    if not incidencia.tecnico_responsable.email:
+        return {
+            'success': False,
+            'message': f'El técnico {incidencia.tecnico_responsable.nombre_completo} no tiene email registrado'
+        }
+    
+    # Lista de destinatarios
+    destinatarios = []
+    emails_destinatarios = []
+    
+    # 1. Destinatario principal: el técnico responsable
+    email_tecnico = incidencia.tecnico_responsable.email.strip().lower()
+    destinatarios.append({
+        'nombre': incidencia.tecnico_responsable.nombre_completo,
+        'email': email_tecnico,
+        'rol': 'Técnico Responsable'
+    })
+    emails_destinatarios.append(email_tecnico)
+    
+    # 2. Obtener destinatarios del historial de notificaciones manuales
+    destinatarios_historicos = obtener_destinatarios_historicos(incidencia)
+    
+    for dest_hist in destinatarios_historicos:
+        email_hist = dest_hist['email'].strip().lower()
+        
+        # Solo agregar si no está ya en la lista (evitar duplicados)
+        if email_hist not in emails_destinatarios:
+            destinatarios.append(dest_hist)
+            emails_destinatarios.append(email_hist)
+    
+    # Asunto según si es atribuible o no
+    if incidencia.es_atribuible:
+        asunto = f"[CERRADA] {incidencia.folio} - Incidencia Cerrada"
+        tipo_notif = 'cierre'
+        template = 'scorecard/emails/cierre_incidencia.html'
+    else:
+        asunto = f"[INFO] {incidencia.folio} - Conclusión Final (No Atribuible)"
+        tipo_notif = 'cierre_no_atribuible'
+        template = 'scorecard/emails/cierre_no_atribuible.html'
+    
+    # Contexto para el template
+    context = {
+        'incidencia': incidencia,
+        'tecnico': incidencia.tecnico_responsable,
+        'mensaje_adicional': mensaje_adicional,
+        'enviado_por': enviado_por,
+        'fecha_cierre': incidencia.fecha_cierre or timezone.now(),
+        'es_atribuible': incidencia.es_atribuible,
+        'destinatarios_adicionales': len(destinatarios) - 1  # Todos menos el técnico
+    }
+    
+    try:
+        # Renderizar template HTML
+        html_content = render_to_string(template, context)
+        
+        # Crear email con todos los destinatarios
+        email = EmailMultiAlternatives(
+            subject=asunto,
+            body=f"Incidencia {incidencia.folio} - Cerrada",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=emails_destinatarios  # Lista completa de emails
+        )
+        
+        # Adjuntar versión HTML
+        email.attach_alternative(html_content, "text/html")
+        
+        # Enviar
+        email.send(fail_silently=False)
+        
+        # Mensaje de éxito
+        mensaje_exito = f'Notificación enviada a {len(emails_destinatarios)} destinatario(s)'
+        if len(destinatarios) > 1:
+            mensaje_exito += f' (incluye {len(destinatarios) - 1} del historial)'
+        
+        # Registrar en base de datos
+        from .models import NotificacionIncidencia
+        NotificacionIncidencia.objects.create(
+            incidencia=incidencia,
+            tipo_notificacion=tipo_notif,
+            destinatarios_json=json.dumps(destinatarios, ensure_ascii=False),
+            asunto=asunto,
+            enviado_exitoso=True
+        )
+        
+        return {
+            'success': True,
+            'message': mensaje_exito
+        }
+        
+    except Exception as e:
+        # Registrar error en base de datos
+        from .models import NotificacionIncidencia
+        NotificacionIncidencia.objects.create(
+            incidencia=incidencia,
+            tipo_notificacion=tipo_notif,
+            destinatarios_json=json.dumps(destinatarios, ensure_ascii=False),
+            asunto=asunto,
+            enviado_exitoso=False,
+            mensaje_error=str(e)
+        )
+        
+        return {
+            'success': False,
+            'message': f'Error al enviar notificación: {str(e)}'
+        }

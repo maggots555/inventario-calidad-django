@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incidencia NO Atribuible</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            margin: -30px -30px 20px -30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .info-badge {
+            display: inline-block;
+            background-color: #17a2b8;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #17a2b8;
+            border-radius: 4px;
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #17a2b8;
+            font-size: 18px;
+        }
+        .info-grid {
+            display: table;
+            width: 100%;
+            margin: 15px 0;
+        }
+        .info-row {
+            display: table-row;
+        }
+        .info-label {
+            display: table-cell;
+            font-weight: bold;
+            padding: 8px 10px 8px 0;
+            color: #666;
+            width: 40%;
+        }
+        .info-value {
+            display: table-cell;
+            padding: 8px 0;
+            color: #333;
+        }
+        .highlight-box {
+            background-color: #d1ecf1;
+            border: 2px solid #17a2b8;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .highlight-box h3 {
+            margin-top: 0;
+            color: #0c5460;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #6c757d;
+            font-size: 12px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #17a2b8;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Información Importante</h1>
+            <div class="info-badge">INCIDENCIA NO ATRIBUIBLE</div>
+        </div>
+
+        <p>Hola <strong>{{ tecnico.nombre_completo }}</strong>,</p>
+
+        <p>Te informamos que la incidencia <strong>{{ incidencia.folio }}</strong> ha sido marcada como <strong>NO ATRIBUIBLE</strong> a tu persona.</p>
+
+        <div class="highlight-box">
+            <h3>✅ ¿Qué significa esto?</h3>
+            <p>Esta incidencia <strong>NO afectará tu Score Card</strong> ni se contabilizará en tus métricas de desempeño. Se ha determinado que no fue causada por el servicio que realizaste.</p>
+        </div>
+
+        <div class="section">
+            <h2>📄 Información de la Incidencia</h2>
+            <div class="info-grid">
+                <div class="info-row">
+                    <div class="info-label">Folio:</div>
+                    <div class="info-value">{{ incidencia.folio }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Equipo:</div>
+                    <div class="info-value">{{ incidencia.get_tipo_equipo_display }} - {{ incidencia.marca }} {{ incidencia.modelo }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Número de Serie:</div>
+                    <div class="info-value">{{ incidencia.numero_serie }}</div>
+                </div>
+                {% if incidencia.numero_orden %}
+                <div class="info-row">
+                    <div class="info-label">Número de Orden:</div>
+                    <div class="info-value">{{ incidencia.numero_orden }}</div>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <div class="info-label">Fecha Detección:</div>
+                    <div class="info-value">{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Tipo:</div>
+                    <div class="info-value">{{ incidencia.tipo_incidencia.nombre }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📝 Justificación</h2>
+            <p style="white-space: pre-line; background-color: white; padding: 15px; border-radius: 4px;">{{ justificacion }}</p>
+        </div>
+
+        <p><strong>Nota:</strong> Aunque no sea atribuible, mantente informado ya que recibirás una notificación cuando se cierre la incidencia con las conclusiones finales.</p>
+
+        <div class="footer">
+            <p><strong>Sistema de Score Card - Control de Calidad</strong></p>
+            <p>Marcado como no atribuible por: {{ marcado_por }}</p>
+            <p>Fecha: {{ fecha_actual|date:"d/m/Y H:i" }}</p>
+            <p style="margin-top: 15px; font-size: 11px;">
+                Este es un mensaje automático, por favor no responder a este correo.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

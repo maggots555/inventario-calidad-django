@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Cambiar Estado - {{ incidencia.folio }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'scorecard:dashboard' %}">Score Card</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'scorecard:lista_incidencias' %}">Incidencias</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}">{{ incidencia.folio }}</a></li>
+            <li class="breadcrumb-item active">Cambiar Estado</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-arrow-left-right"></i> Cambiar Estado de Incidencia
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Incidencia:</strong> {{ incidencia.folio }} - {{ incidencia.tipo_incidencia.nombre }}
+                    </div>
+
+                    <div class="mb-3">
+                        <strong>Estado Actual:</strong> 
+                        <span class="badge 
+                            {% if incidencia.estado == 'abierta' %}bg-warning{% elif incidencia.estado == 'en_revision' %}bg-info{% elif incidencia.estado == 'cerrada' %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ incidencia.get_estado_display }}
+                        </span>
+                    </div>
+
+                    {% if incidencia.estado == 'cerrada' %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> Esta incidencia ya está cerrada. 
+                        Si deseas reabrirla, selecciona otro estado.
+                    </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.estado.id_for_label }}" class="form-label">
+                                <strong>Nuevo Estado:</strong>
+                            </label>
+                            {{ form.estado }}
+                            {% if form.estado.errors %}
+                                <div class="text-danger">{{ form.estado.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.notas.id_for_label }}" class="form-label">
+                                <strong>Notas sobre el cambio (opcional):</strong>
+                            </label>
+                            {{ form.notas }}
+                            <div class="form-text">
+                                Agrega comentarios adicionales sobre este cambio de estado
+                            </div>
+                            {% if form.notas.errors %}
+                                <div class="text-danger">{{ form.notas.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="bi bi-bell"></i> <strong>Notificaciones:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Si cambias a <strong>"Cerrada"</strong>, se enviará notificación automática al técnico</li>
+                                <li>Para otros estados, NO se envían notificaciones automáticas</li>
+                            </ul>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Cambiar Estado
+                            </button>
+                            <a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar con información -->
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> Información del Equipo</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1"><strong>Tipo:</strong> {{ incidencia.get_tipo_equipo_display }}</p>
+                    <p class="mb-1"><strong>Marca:</strong> {{ incidencia.marca }}</p>
+                    <p class="mb-1"><strong>Modelo:</strong> {{ incidencia.modelo }}</p>
+                    <p class="mb-0"><strong>S/N:</strong> {{ incidencia.numero_serie }}</p>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="bi bi-person"></i> Técnico Responsable</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1">{{ incidencia.tecnico_responsable.nombre_completo }}</p>
+                    <p class="mb-0 text-muted small">{{ incidencia.area_tecnico }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

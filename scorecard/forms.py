@@ -317,3 +317,86 @@ class EvidenciaIncidenciaForm(forms.ModelForm):
                 raise ValidationError('Solo se permiten imágenes JPG, PNG, GIF o WebP.')
         
         return imagen
+
+
+class CambiarEstadoIncidenciaForm(forms.Form):
+    """
+    Formulario simple para cambiar el estado de una incidencia
+    Se usa desde el detalle de la incidencia para cambios rápidos
+    """
+    estado = forms.ChoiceField(
+        choices=Incidencia.ESTADO_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    notas = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Notas adicionales sobre el cambio de estado (opcional)'
+        })
+    )
+
+
+class MarcarNoAtribuibleForm(forms.Form):
+    """
+    Formulario para marcar una incidencia como NO atribuible al técnico
+    Requiere justificación obligatoria
+    """
+    justificacion = forms.CharField(
+        label='Justificación',
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 4,
+            'placeholder': 'Explica por qué esta incidencia NO es atribuible al técnico responsable...\nEjemplo: El cliente rechazó una pieza que no fue reemplazada en el servicio.'
+        }),
+        help_text='Explica claramente por qué no se atribuye al técnico'
+    )
+    
+    def clean_justificacion(self):
+        """
+        Validar que la justificación tenga contenido significativo
+        """
+        justificacion = self.cleaned_data.get('justificacion', '').strip()
+        
+        if len(justificacion) < 20:
+            raise ValidationError('La justificación debe tener al menos 20 caracteres.')
+        
+        return justificacion
+
+
+class CerrarIncidenciaForm(forms.Form):
+    """
+    Formulario para cerrar una incidencia
+    Requiere información de cierre
+    """
+    acciones_tomadas = forms.CharField(
+        label='Acciones Correctivas Tomadas',
+        required=True,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 4,
+            'placeholder': 'Describe las acciones correctivas realizadas para resolver esta incidencia...'
+        })
+    )
+    causa_raiz = forms.CharField(
+        label='Causa Raíz (Análisis)',
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Análisis de la causa raíz del problema (opcional pero recomendado)'
+        })
+    )
+    
+    def clean_acciones_tomadas(self):
+        """
+        Validar que las acciones tomadas tengan contenido
+        """
+        acciones = self.cleaned_data.get('acciones_tomadas', '').strip()
+        
+        if len(acciones) < 20:
+            raise ValidationError('Las acciones tomadas deben tener al menos 20 caracteres.')
+        
+        return acciones

@@ -18,6 +18,11 @@ urlpatterns = [
     path('incidencias/<int:incidencia_id>/editar/', views.editar_incidencia, name='editar_incidencia'),
     path('incidencias/<int:incidencia_id>/eliminar/', views.eliminar_incidencia, name='eliminar_incidencia'),
     
+    # Gestión de estado y atribuibilidad
+    path('incidencias/<int:incidencia_id>/cambiar-estado/', views.cambiar_estado_incidencia, name='cambiar_estado_incidencia'),
+    path('incidencias/<int:incidencia_id>/marcar-no-atribuible/', views.marcar_no_atribuible, name='marcar_no_atribuible'),
+    path('incidencias/<int:incidencia_id>/cerrar/', views.cerrar_incidencia, name='cerrar_incidencia'),
+    
     # Reportes y análisis
     path('reportes/', views.reportes, name='reportes'),
     

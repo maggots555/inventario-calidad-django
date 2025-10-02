@@ -266,6 +266,29 @@ class Incidencia(models.Model):
         help_text="Incidencia original si es reincidencia"
     )
     
+    # ATRIBUIBILIDAD AL TÉCNICO
+    es_atribuible = models.BooleanField(
+        default=True,
+        help_text="¿Esta incidencia es atribuible al técnico responsable?"
+    )
+    justificacion_no_atribuible = models.TextField(
+        blank=True,
+        help_text="Justificación de por qué no es atribuible al técnico"
+    )
+    fecha_marcado_no_atribuible = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha en que se marcó como no atribuible"
+    )
+    marcado_no_atribuible_por = models.ForeignKey(
+        Empleado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='incidencias_marcadas_no_atribuibles',
+        help_text="Usuario que marcó la incidencia como no atribuible"
+    )
+    
     # CAMPOS AUTOMÁTICOS (calculados al guardar)
     año = models.IntegerField(
         editable=False,
@@ -426,14 +449,34 @@ class NotificacionIncidencia(models.Model):
     Modelo para registrar el historial de notificaciones enviadas por email
     Permite rastrear qué notificaciones se han enviado, a quién y cuándo
     """
+    TIPO_NOTIFICACION_CHOICES = [
+        ('manual', 'Notificación Manual'),
+        ('no_atribuible', 'Marcada como No Atribuible'),
+        ('cierre', 'Cierre de Incidencia'),
+        ('cierre_no_atribuible', 'Cierre de Incidencia No Atribuible'),
+    ]
+    
     incidencia = models.ForeignKey(
         Incidencia,
         on_delete=models.CASCADE,
         related_name='notificaciones',
         help_text="Incidencia sobre la que se envió la notificación"
     )
-    destinatarios = models.TextField(
+    tipo_notificacion = models.CharField(
+        max_length=30,
+        choices=TIPO_NOTIFICACION_CHOICES,
+        default='manual',
+        help_text="Tipo de notificación enviada"
+    )
+    destinatarios_json = models.TextField(
+        default='[]',
         help_text="Lista de destinatarios (JSON con nombres y emails)"
+    )
+    # Campo legacy para compatibilidad
+    destinatarios = models.TextField(
+        blank=True,
+        default='',
+        help_text="Lista de destinatarios (JSON con nombres y emails) - legacy"
     )
     asunto = models.CharField(
         max_length=255,
@@ -456,6 +499,11 @@ class NotificacionIncidencia(models.Model):
         default=True,
         help_text="Si el envío fue exitoso"
     )
+    # Campo renombrado para mayor claridad
+    enviado_exitoso = models.BooleanField(
+        default=True,
+        help_text="Si el envío fue exitoso"
+    )
     mensaje_error = models.TextField(
         blank=True,
         help_text="Mensaje de error si el envío falló"
@@ -467,12 +515,18 @@ class NotificacionIncidencia(models.Model):
         """
         import json
         try:
-            return json.loads(self.destinatarios)
+            # Intentar con nuevo campo primero
+            if self.destinatarios_json:
+                return json.loads(self.destinatarios_json)
+            # Fallback a campo legacy
+            elif self.destinatarios:
+                return json.loads(self.destinatarios)
+            return []
         except:
             return []
     
     def __str__(self):
-        return f"Notificación {self.incidencia.folio} - {self.fecha_envio.strftime('%d/%m/%Y %H:%M')}"
+        return f"Notificación {self.incidencia.folio} - {self.get_tipo_notificacion_display()} - {self.fecha_envio.strftime('%d/%m/%Y %H:%M')}"
     
     class Meta:
         ordering = ['-fecha_envio']
