@@ -180,7 +180,7 @@ class IncidenciaForm(forms.ModelForm):
             'servicio_realizado': 'Servicio Realizado',
             'sucursal': 'Sucursal',
             'area_detectora': 'Área que Detectó',
-            'tecnico_responsable': 'Técnico Responsable',
+            'tecnico_responsable': 'Técnico/Personal responsable',
             'inspector_calidad': 'Inspector de Calidad',
             'tipo_incidencia': 'Tipo de Incidencia',
             'categoria_fallo': 'Categoría del Fallo',

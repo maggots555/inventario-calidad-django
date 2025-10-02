@@ -246,7 +246,7 @@ def obtener_destinatarios_disponibles(incidencia):
         destinatarios.append({
             'nombre': incidencia.tecnico_responsable.nombre_completo,
             'email': incidencia.tecnico_responsable.email,
-            'rol': 'Técnico Responsable',
+            'rol': 'Técnico/Personal Responsable',
             'seleccionado_default': True
         })
         
@@ -255,8 +255,8 @@ def obtener_destinatarios_disponibles(incidencia):
             destinatarios.append({
                 'nombre': incidencia.tecnico_responsable.jefe_directo.nombre_completo,
                 'email': incidencia.tecnico_responsable.jefe_directo.email,
-                'rol': 'Jefe Directo del Técnico',
-                'seleccionado_default': False
+                'rol': 'Jefe Directo',
+                'seleccionado_default': True
             })
     
     # 3. Inspector de calidad (opcional)
@@ -267,8 +267,8 @@ def obtener_destinatarios_disponibles(incidencia):
     destinatarios.append({
         'nombre': settings.JEFE_CALIDAD_NOMBRE,
         'email': settings.JEFE_CALIDAD_EMAIL,
-        'rol': 'Jefe de Calidad',
-        'seleccionado_default': False
+        'rol': 'Inspector de Calidad',
+        'seleccionado_default': True
     })
     
     return destinatarios

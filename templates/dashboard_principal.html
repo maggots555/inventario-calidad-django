@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Principal - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<!-- Estilos específicos del Dashboard Principal -->
+<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="container text-center">
+            <h1 class="hero-title">
+                <i class="bi bi-grid-3x3-gap-fill"></i> Sistema Integral de Gestión
+            </h1>
+            <p class="hero-subtitle">
+                Gestión completa de Inventario y Control de Calidad en un solo lugar
+            </p>
+        </div>
+    </div>
+
+    <!-- Module Cards -->
+    <div class="row g-4 mb-4">
+        <!-- Módulo Inventario -->
+        <div class="col-lg-6">
+            <div class="module-card">
+                <div class="text-center">
+                    <div class="module-icon text-primary">
+                        <i class="bi bi-box-seam"></i>
+                    </div>
+                    <h2 class="module-title">Módulo de Inventario</h2>
+                    <p class="module-description">
+                        Gestiona productos, movimientos y stock en tiempo real con control total sobre tu inventario
+                    </p>
+                </div>
+                
+                <div class="module-stats">
+                    <div class="stat-item">
+                        <span class="stat-number">{{ total_productos }}</span>
+                        <span class="stat-label">Productos Totales</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number text-warning">{{ productos_stock_bajo }}</span>
+                        <span class="stat-label">Stock Bajo</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{ movimientos_hoy }}</span>
+                        <span class="stat-label">Movimientos Hoy</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">${{ valor_inventario|floatformat:0 }}</span>
+                        <span class="stat-label">Valor Inventario</span>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    <a href="{% url 'dashboard_inventario' %}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-arrow-right-circle"></i> Ir al Dashboard de Inventario
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Módulo Control de Calidad -->
+        <div class="col-lg-6">
+            <div class="module-card calidad-card">
+                <div class="text-center">
+                    <div class="module-icon text-success">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                    <h2 class="module-title">Control de Calidad</h2>
+                    <p class="module-description">
+                        Supervisa y registra incidencias de calidad con análisis detallado y reportes completos
+                    </p>
+                </div>
+                
+                <div class="module-stats">
+                    <div class="stat-item">
+                        <span class="stat-number">{{ incidencias_totales }}</span>
+                        <span class="stat-label">Incidencias Totales</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number text-primary">{{ incidencias_abiertas }}</span>
+                        <span class="stat-label">Abiertas</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number text-danger">{{ incidencias_criticas }}</span>
+                        <span class="stat-label">Críticas</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{ tasa_exito }}%</span>
+                        <span class="stat-label">Tasa de Éxito</span>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    <a href="{% url 'scorecard:dashboard' %}" class="btn btn-success btn-lg">
+                        <i class="bi bi-arrow-right-circle"></i> Ir al Dashboard de Calidad
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <h3 class="mb-4">
+            <i class="bi bi-lightning-charge text-warning"></i> Acciones Rápidas
+        </h3>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <a href="{% url 'movimiento_rapido' %}" class="action-btn">
+                    <i class="bi bi-qr-code-scan"></i>
+                    <strong>Scanner QR</strong>
+                    <small class="text-muted">Movimiento rápido</small>
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a href="{% url 'crear_producto' %}" class="action-btn">
+                    <i class="bi bi-plus-circle"></i>
+                    <strong>Nuevo Producto</strong>
+                    <small class="text-muted">Agregar al inventario</small>
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a href="{% url 'scorecard:crear_incidencia' %}" class="action-btn">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Nueva Incidencia</strong>
+                    <small class="text-muted">Registrar problema</small>
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a href="{% url 'movimiento_fraccionario' %}" class="action-btn">
+                    <i class="bi bi-droplet-half"></i>
+                    <strong>Fraccionario</strong>
+                    <small class="text-muted">Mov. fraccionario</small>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Overview -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-card-icon text-primary">
+                <i class="bi bi-building"></i>
+            </div>
+            <div class="stat-card-value">{{ total_sucursales }}</div>
+            <div class="stat-card-label">Sucursales Activas</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-icon text-info">
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="stat-card-value">{{ total_empleados }}</div>
+            <div class="stat-card-label">Empleados Registrados</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-icon text-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+            </div>
+            <div class="stat-card-value">{{ productos_stock_bajo }}</div>
+            <div class="stat-card-label">Alertas de Stock</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-card-icon text-success">
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <div class="stat-card-value">{{ tasa_exito }}%</div>
+            <div class="stat-card-label">Tasa de Éxito</div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="activity-feed">
+                <h3 class="mb-4">
+                    <i class="bi bi-clock-history text-primary"></i> Movimientos Recientes
+                </h3>
+                {% if movimientos_recientes %}
+                    {% for movimiento in movimientos_recientes %}
+                    <div class="activity-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>
+                                    {% if movimiento.tipo == 'entrada' %}
+                                        <i class="bi bi-arrow-down-circle text-success"></i>
+                                    {% else %}
+                                        <i class="bi bi-arrow-up-circle text-danger"></i>
+                                    {% endif %}
+                                    {{ movimiento.producto.nombre }}
+                                </strong>
+                                <p class="mb-1 text-muted">
+                                    {{ movimiento.tipo|title }} - 
+                                    {% if movimiento.cantidad_fraccionaria %}
+                                        {{ movimiento.cantidad_fraccionaria|floatformat:2 }} {{ movimiento.producto.unidad_medida_fraccionaria }}
+                                    {% else %}
+                                        {{ movimiento.cantidad }} unidades
+                                    {% endif %}
+                                </p>
+                                <small class="activity-time">
+                                    <i class="bi bi-building"></i> {{ movimiento.sucursal_destino.nombre }} |
+                                    <i class="bi bi-person"></i> {{ movimiento.empleado.nombre_completo }}
+                                </small>
+                            </div>
+                            <span class="badge bg-secondary">
+                                {{ movimiento.fecha_movimiento|date:"d/m H:i" }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center py-4">No hay movimientos registrados</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <div class="activity-feed">
+                <h3 class="mb-4">
+                    <i class="bi bi-exclamation-triangle text-warning"></i> Incidencias Recientes
+                </h3>
+                {% if scorecard_disponible and incidencias_recientes %}
+                    {% for incidencia in incidencias_recientes %}
+                    <div class="activity-item calidad">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ incidencia.folio }}</strong>
+                                <p class="mb-1 text-muted">
+                                    {{ incidencia.tipo_incidencia.nombre }} - 
+                                    {{ incidencia.marca }} {{ incidencia.modelo }}
+                                </p>
+                                <small class="activity-time">
+                                    <i class="bi bi-person"></i> {{ incidencia.tecnico_responsable.nombre_completo }}
+                                </small>
+                            </div>
+                            <span class="badge 
+                                {% if incidencia.grado_severidad == 'critico' %}bg-danger
+                                {% elif incidencia.grado_severidad == 'alto' %}bg-warning
+                                {% else %}bg-info{% endif %}">
+                                {{ incidencia.get_grado_severidad_display }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center py-4">No hay incidencias registradas</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Links -->
+    <div class="text-center mt-4 mb-4">
+        <p class="text-muted mb-2">Configuración del Sistema</p>
+        <div class="btn-group" role="group">
+            <a href="{% url 'lista_sucursales' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-building"></i> Sucursales
+            </a>
+            <a href="{% url 'lista_empleados' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-people"></i> Empleados
+            </a>
+            <a href="/admin/" class="btn btn-outline-secondary">
+                <i class="bi bi-gear"></i> Administración
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -18,11 +18,13 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from inventario import views as inventario_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('inventario.urls')),
-    path('scorecard/', include('scorecard.urls')),  # URLs de Score Card
+    path('', inventario_views.dashboard_principal, name='home'),  # Dashboard principal unificado
+    path('inventario/', include('inventario.urls')),  # URLs del módulo de inventario
+    path('scorecard/', include('scorecard.urls')),  # URLs del módulo de control de calidad
 ]
 
 # Servir archivos media en desarrollo

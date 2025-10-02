@@ -5,13 +5,20 @@ from django.urls import reverse
 from django.db.models import Q, Sum, Count, F
 from django.db import models
 from django.utils import timezone
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 from .models import Producto, Movimiento, Sucursal, Empleado
 from .forms import ProductoForm, MovimientoForm, SucursalForm, MovimientoRapidoForm, EmpleadoForm, MovimientoFraccionarioForm
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
+
+# Importar modelos de scorecard para el dashboard principal
+try:
+    from scorecard.models import Incidencia
+    SCORECARD_AVAILABLE = True
+except ImportError:
+    SCORECARD_AVAILABLE = False
 
 # Función auxiliar para convertir fechas a zona horaria local
 def fecha_local(fecha_utc):
@@ -26,10 +33,82 @@ def fecha_local(fecha_utc):
         fecha_utc = timezone.make_aware(fecha_utc, timezone.utc)
         return fecha_utc.astimezone(tz_local)
 
-# ===== DASHBOARD PRINCIPAL =====
-def dashboard(request):
+# ===== DASHBOARD PRINCIPAL UNIFICADO =====
+def dashboard_principal(request):
     """
-    Vista del dashboard principal con métricas e información resumida
+    Dashboard principal del sistema - Punto de entrada unificado
+    Muestra resumen de ambos módulos: Inventario y Control de Calidad
+    """
+    # ========== ESTADÍSTICAS DE INVENTARIO ==========
+    total_productos = Producto.objects.count()
+    productos_stock_bajo = Producto.objects.filter(cantidad__lte=F('stock_minimo')).count()
+    movimientos_hoy = Movimiento.objects.filter(fecha_movimiento__date=date.today()).count()
+    valor_inventario = Producto.objects.aggregate(
+        total=Sum(F('cantidad') * F('costo_unitario'))
+    )['total'] or 0
+    
+    # ========== ESTADÍSTICAS DE CONTROL DE CALIDAD ==========
+    incidencias_totales = 0
+    incidencias_abiertas = 0
+    incidencias_criticas = 0
+    incidencias_recientes = []
+    
+    if SCORECARD_AVAILABLE:
+        incidencias_totales = Incidencia.objects.count()
+        incidencias_abiertas = Incidencia.objects.filter(estado='abierta').count()
+        incidencias_criticas = Incidencia.objects.filter(
+            grado_severidad='critico',
+            estado__in=['abierta', 'en_revision']
+        ).count()
+        incidencias_recientes = Incidencia.objects.select_related(
+            'tecnico_responsable', 'tipo_incidencia'
+        ).order_by('-fecha_registro')[:5]
+    
+    # ========== ACTIVIDADES RECIENTES ==========
+    # Últimos 5 movimientos
+    movimientos_recientes = Movimiento.objects.select_related(
+        'producto', 'sucursal_destino', 'usuario_registro_empleado', 'empleado_destinatario'
+    ).order_by('-fecha_movimiento')[:5]
+    
+    # ========== ESTADÍSTICAS RÁPIDAS ==========
+    total_sucursales = Sucursal.objects.count()
+    total_empleados = Empleado.objects.count()
+    
+    # Calcular porcentaje de éxito (incidencias cerradas vs totales)
+    if incidencias_totales > 0 and SCORECARD_AVAILABLE:
+        incidencias_cerradas = Incidencia.objects.filter(estado='cerrada').count()
+        tasa_exito = round((incidencias_cerradas / incidencias_totales) * 100, 1)
+    else:
+        tasa_exito = 100
+    
+    context = {
+        # Inventario
+        'total_productos': total_productos,
+        'productos_stock_bajo': productos_stock_bajo,
+        'movimientos_hoy': movimientos_hoy,
+        'valor_inventario': valor_inventario,
+        
+        # Control de Calidad
+        'incidencias_totales': incidencias_totales,
+        'incidencias_abiertas': incidencias_abiertas,
+        'incidencias_criticas': incidencias_criticas,
+        'incidencias_recientes': incidencias_recientes,
+        
+        # General
+        'total_sucursales': total_sucursales,
+        'total_empleados': total_empleados,
+        'tasa_exito': tasa_exito,
+        'movimientos_recientes': movimientos_recientes,
+        'scorecard_disponible': SCORECARD_AVAILABLE,
+    }
+    
+    return render(request, 'dashboard_principal.html', context)
+
+
+# ===== DASHBOARD DE INVENTARIO =====
+def dashboard_inventario(request):
+    """
+    Vista del dashboard de inventario con métricas e información resumida
     """
     # Estadísticas generales
     total_productos = Producto.objects.count()

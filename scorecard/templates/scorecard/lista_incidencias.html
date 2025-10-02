@@ -33,11 +33,12 @@
                             <th>Fecha</th>
                             <th>Equipo</th>
                             <th>Número de Serie</th>
+                            <th>Orden Interna</th>
                             <th>Técnico</th>
                             <th>Categoría</th>
                             <th>Severidad</th>
                             <th>Estado</th>
-                            <th>Acciones</th>
+                            <th style="width: 150px;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -52,6 +53,15 @@
                                 {{ incidencia.get_tipo_equipo_display }} {{ incidencia.marca }}
                             </td>
                             <td><code>{{ incidencia.numero_serie }}</code></td>
+                            <td>
+                                {% if incidencia.numero_orden %}
+                                    <span class="badge bg-dark">
+                                        <i class="bi bi-hash"></i> {{ incidencia.numero_orden }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                             <td>{{ incidencia.tecnico_responsable.nombre_completo }}</td>
                             <td>
                                 <span class="badge bg-secondary">
@@ -81,16 +91,23 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}" 
-                                   class="btn btn-sm btn-info" 
-                                   title="Ver detalles">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" 
-                                   class="btn btn-sm btn-warning" 
-                                   title="Editar">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}" 
+                                       class="btn btn-sm btn-info" 
+                                       title="Ver detalles">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" 
+                                       class="btn btn-sm btn-warning" 
+                                       title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'scorecard:eliminar_incidencia' incidencia.id %}" 
+                                       class="btn btn-sm btn-danger" 
+                                       title="Eliminar">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}

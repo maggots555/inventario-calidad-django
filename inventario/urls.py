@@ -2,8 +2,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # Dashboard principal
-    path('', views.dashboard, name='dashboard'),
+    # Dashboard de inventario (renombrado para claridad)
+    path('', views.dashboard_inventario, name='dashboard'),
+    path('dashboard/', views.dashboard_inventario, name='dashboard_inventario'),
     
     # Gestión de productos
     path('productos/', views.lista_productos, name='lista_productos'),

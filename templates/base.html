@@ -14,6 +14,7 @@
     <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/components.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/forms.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/scorecard.css' %}">
     
     <!-- CSS específico por página (opcional) -->
     {% block extra_css %}
@@ -23,8 +24,8 @@
     <!-- Navbar Superior -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{% url 'dashboard' %}">
-                <i class="bi bi-boxes"></i> Sistema de Inventario
+            <a class="navbar-brand" href="{% url 'home' %}">
+                <i class="bi bi-grid-3x3-gap-fill"></i> Sistema Integral de Gestión
             </a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -33,36 +34,34 @@
             
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'dashboard' %}">
-                            <i class="bi bi-speedometer2"></i> Dashboard
-                        </a>
-                    </li>
+                    <!-- MÓDULO: INVENTARIO -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-                            <i class="bi bi-box-seam"></i> Productos
+                        <a class="nav-link dropdown-toggle fw-bold" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-box-seam"></i> Inventario
                         </a>
                         <ul class="dropdown-menu">
+                            <li><h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'dashboard_inventario' %}">
+                                <i class="bi bi-bar-chart-line"></i> Dashboard Inventario
+                            </a></li>
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header"><i class="bi bi-box"></i> Productos</h6></li>
                             <li><a class="dropdown-item" href="{% url 'lista_productos' %}">
                                 <i class="bi bi-list-ul"></i> Lista de Productos
                             </a></li>
                             <li><a class="dropdown-item" href="{% url 'crear_producto' %}">
                                 <i class="bi bi-plus-circle"></i> Agregar Producto
                             </a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-                            <i class="bi bi-arrow-left-right"></i> Movimientos
-                        </a>
-                        <ul class="dropdown-menu">
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header"><i class="bi bi-arrow-left-right"></i> Movimientos</h6></li>
                             <li><a class="dropdown-item" href="{% url 'lista_movimientos' %}">
                                 <i class="bi bi-list-ul"></i> Historial de Movimientos
                             </a></li>
                             <li><a class="dropdown-item" href="{% url 'crear_movimiento' %}">
                                 <i class="bi bi-plus-circle"></i> Registrar Movimiento
                             </a></li>
-                            <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'movimiento_rapido' %}">
                                 <i class="bi bi-qr-code-scan"></i> Scanner QR Rápido
                             </a></li>
@@ -71,52 +70,32 @@
                             </a></li>
                         </ul>
                     </li>
+                    
+                    <!-- MÓDULO: CONTROL DE CALIDAD -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-                            <i class="bi bi-building"></i> Sucursales
+                        <a class="nav-link dropdown-toggle fw-bold" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-shield-check"></i> Control de Calidad
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'lista_sucursales' %}">
-                                <i class="bi bi-list-ul"></i> Lista de Sucursales
-                            </a></li>
-                            <li><a class="dropdown-item" href="{% url 'crear_sucursal' %}">
-                                <i class="bi bi-plus-circle"></i> Agregar Sucursal
-                            </a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-                            <i class="bi bi-people"></i> Empleados
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'lista_empleados' %}">
-                                <i class="bi bi-list-ul"></i> Lista de Empleados
-                            </a></li>
-                            <li><a class="dropdown-item" href="{% url 'crear_empleado' %}">
-                                <i class="bi bi-person-plus"></i> Agregar Empleado
-                            </a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-                            <i class="bi bi-shield-check"></i> Score Card
-                        </a>
-                        <ul class="dropdown-menu">
+                            <li><h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6></li>
                             <li><a class="dropdown-item" href="{% url 'scorecard:dashboard' %}">
                                 <i class="bi bi-bar-chart-line"></i> Dashboard Calidad
                             </a></li>
+                            <li><a class="dropdown-item" href="{% url 'scorecard:reportes' %}">
+                                <i class="bi bi-file-earmark-bar-graph"></i> Reportes y Análisis
+                            </a></li>
+                            
                             <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header"><i class="bi bi-exclamation-triangle"></i> Incidencias</h6></li>
                             <li><a class="dropdown-item" href="{% url 'scorecard:lista_incidencias' %}">
-                                <i class="bi bi-exclamation-triangle"></i> Incidencias
+                                <i class="bi bi-list-ul"></i> Lista de Incidencias
                             </a></li>
                             <li><a class="dropdown-item" href="{% url 'scorecard:crear_incidencia' %}">
                                 <i class="bi bi-plus-circle"></i> Registrar Incidencia
                             </a></li>
+                            
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'scorecard:reportes' %}">
-                                <i class="bi bi-file-earmark-bar-graph"></i> Reportes y Análisis
-                            </a></li>
-                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6></li>
                             <li><a class="dropdown-item" href="{% url 'scorecard:lista_categorias' %}">
                                 <i class="bi bi-tags"></i> Categorías
                             </a></li>
@@ -125,12 +104,37 @@
                             </a></li>
                         </ul>
                     </li>
+                    
+                    <!-- MÓDULO: CONFIGURACIÓN -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                            <i class="bi bi-gear"></i> Configuración
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><h6 class="dropdown-header"><i class="bi bi-building"></i> Sucursales</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_sucursales' %}">
+                                <i class="bi bi-list-ul"></i> Lista de Sucursales
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'crear_sucursal' %}">
+                                <i class="bi bi-plus-circle"></i> Agregar Sucursal
+                            </a></li>
+                            
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header"><i class="bi bi-people"></i> Empleados</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_empleados' %}">
+                                <i class="bi bi-list-ul"></i> Lista de Empleados
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'crear_empleado' %}">
+                                <i class="bi bi-person-plus"></i> Agregar Empleado
+                            </a></li>
+                        </ul>
+                    </li>
                 </ul>
                 
-                <!-- Botones de acceso rápido -->
+                <!-- Acciones Rápidas -->
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link btn btn-outline-light me-2" href="{% url 'movimiento_rapido' %}">
+                        <a class="nav-link btn btn-outline-light me-2" href="{% url 'movimiento_rapido' %}" title="Scanner QR para movimientos rápidos">
                             <i class="bi bi-qr-code-scan"></i> Scanner QR
                         </a>
                     </li>
@@ -140,7 +144,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/admin/">
+                        <a class="nav-link" href="/admin/" title="Panel de administración Django">
                             <i class="bi bi-gear"></i> Admin
                         </a>
                     </li>
@@ -191,8 +195,9 @@
     <footer class="bg-light text-center text-muted py-3 mt-5">
         <div class="container">
             <small>
-                © 2025 Sistema de Inventario - 
-                <span class="text-primary">Gestión Inteligente de Inventarios</span>
+                © 2025 Sistema Integral de Gestión - 
+                <span class="text-primary">Inventario</span> & 
+                <span class="text-success">Control de Calidad</span>
             </small>
         </div>
     </footer>
