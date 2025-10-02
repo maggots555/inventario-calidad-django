@@ -84,6 +84,13 @@
                 </div>
                 <div class="col-md-6">
                     <p><strong>Técnico/Personal Responsable:</strong> {{ incidencia.tecnico_responsable.nombre_completo }}</p>
+                    {% if incidencia.area_tecnico %}
+                        <p><strong>Área del Técnico:</strong> 
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-briefcase"></i> {{ incidencia.area_tecnico }}
+                            </span>
+                        </p>
+                    {% endif %}
                     <p><strong>Inspector de Calidad:</strong> {{ incidencia.inspector_calidad.nombre_completo }}</p>
                 </div>
             </div>

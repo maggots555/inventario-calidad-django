@@ -61,6 +61,7 @@ class IncidenciaAdmin(admin.ModelAdmin):
         'marca',
         'numero_serie',
         'tecnico_responsable',
+        'area_tecnico',
         'grado_severidad_badge',
         'estado_badge',
         'dias_abierta'
@@ -87,6 +88,7 @@ class IncidenciaAdmin(admin.ModelAdmin):
     readonly_fields = [
         'folio',
         'fecha_registro',
+        'area_tecnico',
         'año',
         'mes',
         'semana',
@@ -114,6 +116,7 @@ class IncidenciaAdmin(admin.ModelAdmin):
                 'sucursal',
                 'area_detectora',
                 'tecnico_responsable',
+                'area_tecnico',
                 'inspector_calidad'
             )
         }),
@@ -147,6 +150,16 @@ class IncidenciaAdmin(admin.ModelAdmin):
     )
     
     inlines = [EvidenciaIncidenciaInline]
+    
+    def save_model(self, request, obj, form, change):
+        """
+        Sobrescribir save_model para auto-completar el área del técnico
+        """
+        # Auto-completar área del técnico si existe
+        if obj.tecnico_responsable and obj.tecnico_responsable.area:
+            obj.area_tecnico = obj.tecnico_responsable.area
+        
+        super().save_model(request, obj, form, change)
     
     ordering = ['-fecha_registro']
     date_hierarchy = 'fecha_deteccion'

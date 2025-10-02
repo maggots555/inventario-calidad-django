@@ -209,6 +209,10 @@
                         <value>{{ incidencia.tecnico_responsable.nombre_completo }}</value>
                     </div>
                     <div class="info-item">
+                        <label>Área del Técnico</label>
+                        <value>{{ incidencia.area_tecnico|default:"N/A" }}</value>
+                    </div>
+                    <div class="info-item">
                         <label>Inspector de Calidad</label>
                         <value>{{ incidencia.inspector_calidad }}</value>
                     </div>
@@ -299,7 +303,7 @@
             <p><strong>Score Card System - Control de Calidad</strong></p>
             <p>Este es un mensaje automático. Por favor no responda a este correo.</p>
             <p style="margin-top: 10px; font-size: 11px; color: #adb5bd;">
-                © 2025 Score Card System. Todos los derechos reservados.
+                © 2025 Score Card System. Todos los derechos reservados. Hecho por Jorge Magos
             </p>
         </div>
     </div>

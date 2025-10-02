@@ -26,6 +26,7 @@ class IncidenciaForm(forms.ModelForm):
             'sucursal',
             'area_detectora',
             'tecnico_responsable',
+            'area_tecnico',
             'inspector_calidad',
             'tipo_incidencia',
             'categoria_fallo',
@@ -102,6 +103,14 @@ class IncidenciaForm(forms.ModelForm):
                 attrs={
                     'class': 'form-select',
                     'id': 'id_tecnico_responsable'
+                }
+            ),
+            'area_tecnico': forms.TextInput(
+                attrs={
+                    'class': 'form-control',
+                    'id': 'id_area_tecnico',
+                    'readonly': 'readonly',
+                    'placeholder': 'Se completa automáticamente al seleccionar técnico'
                 }
             ),
             'inspector_calidad': forms.Select(
@@ -181,6 +190,7 @@ class IncidenciaForm(forms.ModelForm):
             'sucursal': 'Sucursal',
             'area_detectora': 'Área que Detectó',
             'tecnico_responsable': 'Técnico/Personal responsable',
+            'area_tecnico': 'Área del Técnico',
             'inspector_calidad': 'Inspector de Calidad',
             'tipo_incidencia': 'Tipo de Incidencia',
             'categoria_fallo': 'Categoría del Fallo',

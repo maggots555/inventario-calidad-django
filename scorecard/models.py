@@ -194,6 +194,11 @@ class Incidencia(models.Model):
         related_name='incidencias_tecnico',
         help_text="Técnico responsable del servicio"
     )
+    area_tecnico = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Área del técnico responsable (auto-completado)"
+    )
     inspector_calidad = models.ForeignKey(
         Empleado,
         on_delete=models.PROTECT,

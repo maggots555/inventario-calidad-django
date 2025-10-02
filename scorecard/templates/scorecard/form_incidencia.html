@@ -165,6 +165,19 @@
                 </div>
                 
                 <div class="col-md-6">
+                    <label for="{{ form.area_tecnico.id_for_label }}" class="form-label">
+                        {{ form.area_tecnico.label }}
+                    </label>
+                    {{ form.area_tecnico }}
+                    <small class="form-text text-muted">
+                        <i class="bi bi-info-circle"></i> Auto-completado desde datos del técnico
+                    </small>
+                    {% if form.area_tecnico.errors %}
+                        <div class="invalid-feedback d-block">{{ form.area_tecnico.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
                     <label for="{{ form.inspector_calidad.id_for_label }}" class="form-label required-field">
                         {{ form.inspector_calidad.label }}
                     </label>
@@ -392,6 +405,20 @@ document.addEventListener('DOMContentLoaded', function() {
                             ${empleado.email ? ` | <i class="bi bi-envelope"></i> ${empleado.email}` : ''}
                         `;
                         infoElement.style.color = '#28a745';
+                    }
+                    
+                    // Auto-llenar área del técnico si es el técnico responsable
+                    if (tipoEmpleado === 'tecnico' && empleado.area) {
+                        const areaTecnicoInput = document.getElementById('id_area_tecnico');
+                        if (areaTecnicoInput) {
+                            areaTecnicoInput.value = empleado.area;
+                            areaTecnicoInput.classList.add('auto-filled');
+                            
+                            // Remover el efecto después de 3 segundos
+                            setTimeout(() => {
+                                areaTecnicoInput.classList.remove('auto-filled');
+                            }, 3000);
+                        }
                     }
                     
                     // Auto-llenar sucursal si el empleado tiene una asignada

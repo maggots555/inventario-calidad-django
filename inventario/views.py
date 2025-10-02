@@ -715,6 +715,9 @@ def lista_empleados(request):
     elif activo == 'false':
         empleados = empleados.filter(activo=False)
     
+    # Ordenar por área y luego por nombre
+    empleados = empleados.order_by('area', 'nombre_completo')
+    
     # Obtener áreas únicas para filtro
     areas_disponibles = Empleado.objects.values_list('area', flat=True).distinct().order_by('area')
     

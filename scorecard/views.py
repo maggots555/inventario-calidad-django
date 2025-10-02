@@ -94,7 +94,14 @@ def crear_incidencia(request):
         form = IncidenciaForm(request.POST)
         
         if form.is_valid():
-            incidencia = form.save()
+            incidencia = form.save(commit=False)
+            
+            # Auto-completar el área del técnico desde el empleado seleccionado
+            tecnico = form.cleaned_data['tecnico_responsable']
+            if tecnico and tecnico.area:
+                incidencia.area_tecnico = tecnico.area
+            
+            incidencia.save()
             
             # Manejar las imágenes subidas
             imagenes = request.FILES.getlist('evidencias')
@@ -139,7 +146,14 @@ def editar_incidencia(request, incidencia_id):
         form = IncidenciaForm(request.POST, instance=incidencia)
         
         if form.is_valid():
-            incidencia = form.save()
+            incidencia = form.save(commit=False)
+            
+            # Auto-completar el área del técnico desde el empleado seleccionado
+            tecnico = form.cleaned_data['tecnico_responsable']
+            if tecnico and tecnico.area:
+                incidencia.area_tecnico = tecnico.area
+            
+            incidencia.save()
             
             # Manejar nuevas imágenes si se suben
             imagenes = request.FILES.getlist('evidencias')

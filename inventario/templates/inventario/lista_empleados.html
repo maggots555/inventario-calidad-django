@@ -76,6 +76,7 @@
                                 <th>Área</th>
                                 <th><i class="bi bi-envelope"></i> Email</th>
                                 <th><i class="bi bi-building"></i> Sucursal</th>
+                                <th><i class="bi bi-person-check"></i> Jefe Directo</th>
                                 <th>Estado</th>
                                 <th>Fecha Ingreso</th>
                                 <th>Acciones</th>
@@ -112,6 +113,19 @@
                                         </span>
                                     {% else %}
                                         <small class="text-muted">Sin asignar</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if empleado.jefe_directo %}
+                                        <span class="badge bg-success" title="Jefe: {{ empleado.jefe_directo.nombre_completo }}">
+                                            <i class="bi bi-check-circle-fill"></i> Asignado
+                                        </span>
+                                        <br>
+                                        <small class="text-muted">{{ empleado.jefe_directo.nombre_completo }}</small>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark" title="Sin jefe directo asignado">
+                                            <i class="bi bi-exclamation-triangle-fill"></i> Sin asignar
+                                        </span>
                                     {% endif %}
                                 </td>
                                 <td>
