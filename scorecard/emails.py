@@ -263,12 +263,21 @@ def obtener_destinatarios_disponibles(incidencia):
     # El inspector es un CharField, no ForeignKey, así que no tiene email directo
     # Se podría buscar por nombre si existe como empleado
     
-    # 4. Jefe de Calidad (opcional, desde settings)
+    # 4. Jefe de Calidad 1 (opcional, desde settings)
     destinatarios.append({
         'nombre': settings.JEFE_CALIDAD_NOMBRE,
         'email': settings.JEFE_CALIDAD_EMAIL,
         'rol': 'Inspector de Calidad',
         'seleccionado_default': True
     })
+    
+    # 5. Jefe de Calidad 2 (opcional, desde settings)
+    if hasattr(settings, 'JEFE_CALIDAD_2_EMAIL') and settings.JEFE_CALIDAD_2_EMAIL:
+        destinatarios.append({
+            'nombre': settings.JEFE_CALIDAD_2_NOMBRE,
+            'email': settings.JEFE_CALIDAD_2_EMAIL,
+            'rol': 'Jefe de calidad',
+            'seleccionado_default': True
+        })
     
     return destinatarios

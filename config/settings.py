@@ -160,6 +160,10 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 JEFE_CALIDAD_EMAIL = config('JEFE_CALIDAD_EMAIL', default='calidad@example.com')
 JEFE_CALIDAD_NOMBRE = config('JEFE_CALIDAD_NOMBRE', default='Jefe de Calidad')
 
+# Email del Segundo Jefe de Calidad (también recibe copia de todas las notificaciones)
+JEFE_CALIDAD_2_EMAIL = config('JEFE_CALIDAD_2_EMAIL', default='')
+JEFE_CALIDAD_2_NOMBRE = config('JEFE_CALIDAD_2_NOMBRE', default='Segundo Jefe de Calidad')
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
