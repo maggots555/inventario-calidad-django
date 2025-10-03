@@ -701,48 +701,37 @@
         <div id="tab-componentes" class="tab-pane">
             <!-- KPIs de Componentes -->
             <div class="row mb-4">
+                <div class="col-12">
+                    <h3 class="report-title">
+                        <i class="bi bi-gear-fill"></i> Análisis de Componentes Defectuosos
+                    </h3>
+                </div>
                 <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-icon bg-info">
-                            <i class="bi bi-gear-fill"></i>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-value" id="total-con-componente">-</div>
-                            <div class="metric-label">Incidencias con Componente</div>
-                        </div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
+                        <i class="bi bi-gear-fill" style="font-size: 2rem;"></i>
+                        <h3 id="total-con-componente">-</h3>
+                        <p>Incidencias con Componente</p>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-icon bg-primary">
-                            <i class="bi bi-percent"></i>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-value" id="porcentaje-con-componente">-</div>
-                            <div class="metric-label">% Con Componente Identificado</div>
-                        </div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);">
+                        <i class="bi bi-percent" style="font-size: 2rem;"></i>
+                        <h3 id="porcentaje-con-componente">-</h3>
+                        <p>% Con Componente Identificado</p>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-icon bg-warning">
-                            <i class="bi bi-collection"></i>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-value" id="componentes-unicos">-</div>
-                            <div class="metric-label">Componentes Únicos</div>
-                        </div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);">
+                        <i class="bi bi-collection" style="font-size: 2rem;"></i>
+                        <h3 id="componentes-unicos">-</h3>
+                        <p>Componentes Únicos</p>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-icon bg-danger">
-                            <i class="bi bi-exclamation-triangle-fill"></i>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-value" id="componente-mas-frecuente">-</div>
-                            <div class="metric-label">Componente Más Frecuente</div>
-                        </div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+                        <i class="bi bi-exclamation-triangle-fill" style="font-size: 2rem;"></i>
+                        <h3 id="componente-mas-frecuente">-</h3>
+                        <p>Componente Más Frecuente</p>
                     </div>
                 </div>
             </div>
@@ -755,7 +744,9 @@
                         <h5 class="chart-title">
                             <i class="bi bi-bar-chart"></i> Top 10 Componentes con Más Fallas
                         </h5>
-                        <canvas id="graficoTopComponentes" height="300"></canvas>
+                        <div style="position: relative; min-height: 300px; max-height: 600px; overflow-y: auto;">
+                            <canvas id="graficoTopComponentes"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -765,7 +756,9 @@
                         <h5 class="chart-title">
                             <i class="bi bi-layers"></i> Severidad por Componente (Top 10)
                         </h5>
-                        <canvas id="graficoSeveridadComponentes" height="300"></canvas>
+                        <div style="position: relative; min-height: 300px; max-height: 600px; overflow-y: auto;">
+                            <canvas id="graficoSeveridadComponentes"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -777,7 +770,9 @@
                         <h5 class="chart-title">
                             <i class="bi bi-graph-up"></i> Tendencia Últimos 6 Meses (Top 5 Componentes)
                         </h5>
-                        <canvas id="tendenciaComponentes" height="120"></canvas>
+                        <div style="position: relative; height: 400px;">
+                            <canvas id="tendenciaComponentes"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -803,48 +798,37 @@
         <div id="tab-notificaciones" class="tab-pane">
             <!-- KPIs de Notificaciones -->
             <div class="row mb-4">
+                <div class="col-12">
+                    <h3 class="report-title">
+                        <i class="bi bi-envelope-fill"></i> Análisis de Notificaciones del Sistema
+                    </h3>
+                </div>
                 <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-icon bg-info">
-                            <i class="bi bi-envelope-fill"></i>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-value" id="total-notificaciones">-</div>
-                            <div class="metric-label">Total Notificaciones</div>
-                        </div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
+                        <i class="bi bi-envelope-fill" style="font-size: 2rem;"></i>
+                        <h3 id="total-notificaciones">-</h3>
+                        <p>Total Notificaciones</p>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-icon bg-success">
-                            <i class="bi bi-check-circle-fill"></i>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-value" id="tasa-exito">-</div>
-                            <div class="metric-label">Tasa de Éxito</div>
-                        </div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #28a745 0%, #218838 100%);">
+                        <i class="bi bi-check-circle-fill" style="font-size: 2rem;"></i>
+                        <h3 id="tasa-exito">-</h3>
+                        <p>Tasa de Éxito</p>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-icon bg-warning">
-                            <i class="bi bi-clock-fill"></i>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-value" id="tiempo-promedio-notif">-</div>
-                            <div class="metric-label">Tiempo Promedio (min)</div>
-                        </div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);">
+                        <i class="bi bi-clock-fill" style="font-size: 2rem;"></i>
+                        <h3 id="tiempo-promedio-notif">-</h3>
+                        <p>Tiempo Promedio (min)</p>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="metric-card">
-                        <div class="metric-icon bg-danger">
-                            <i class="bi bi-x-circle-fill"></i>
-                        </div>
-                        <div class="metric-content">
-                            <div class="metric-value" id="notificaciones-fallidas">-</div>
-                            <div class="metric-label">Notificaciones Fallidas</div>
-                        </div>
+                    <div class="stat-box" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+                        <i class="bi bi-x-circle-fill" style="font-size: 2rem;"></i>
+                        <h3 id="notificaciones-fallidas">-</h3>
+                        <p>Notificaciones Fallidas</p>
                     </div>
                 </div>
             </div>
@@ -857,7 +841,9 @@
                         <h5 class="chart-title">
                             <i class="bi bi-pie-chart"></i> Distribución por Tipo de Notificación
                         </h5>
-                        <canvas id="graficoTiposNotificacion" height="250"></canvas>
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="graficoTiposNotificacion"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -867,7 +853,9 @@
                         <h5 class="chart-title">
                             <i class="bi bi-graph-up"></i> Tendencia Últimos 6 Meses
                         </h5>
-                        <canvas id="tendenciaNotificaciones" height="250"></canvas>
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="tendenciaNotificaciones"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -880,7 +868,9 @@
                         <h5 class="chart-title">
                             <i class="bi bi-person-circle"></i> Top 10 Destinatarios Más Frecuentes
                         </h5>
-                        <canvas id="graficoTopDestinatarios" height="300"></canvas>
+                        <div style="position: relative; min-height: 300px; max-height: 600px; overflow-y: auto;">
+                            <canvas id="graficoTopDestinatarios"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -890,7 +880,9 @@
                         <h5 class="chart-title">
                             <i class="bi bi-calendar-week"></i> Distribución por Día de la Semana
                         </h5>
-                        <canvas id="graficoDiasSemana" height="300"></canvas>
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="graficoDiasSemana"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -902,7 +894,9 @@
                         <h5 class="chart-title">
                             <i class="bi bi-exclamation-diamond"></i> Notificaciones por Severidad de Incidencia
                         </h5>
-                        <canvas id="graficoSeveridadNotificaciones" height="150"></canvas>
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="graficoSeveridadNotificaciones"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>

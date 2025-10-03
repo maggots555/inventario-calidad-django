@@ -1439,11 +1439,11 @@ function cargarAnalisisComponentes() {
                 datosReportes.componentes = data;
                 
                 // Actualizar KPIs
-                document.getElementById('kpi-total-componentes').textContent = data.kpis.total_con_componente;
-                document.getElementById('kpi-porcentaje-componentes').textContent = 
+                document.getElementById('total-con-componente').textContent = data.kpis.total_con_componente;
+                document.getElementById('porcentaje-con-componente').textContent = 
                     `${data.kpis.porcentaje_con_componente}%`;
-                document.getElementById('kpi-componentes-unicos').textContent = data.kpis.total_componentes_unicos;
-                document.getElementById('kpi-componente-frecuente').textContent = data.kpis.componente_mas_frecuente;
+                document.getElementById('componentes-unicos').textContent = data.kpis.total_componentes_unicos;
+                document.getElementById('componente-mas-frecuente').textContent = data.kpis.componente_mas_frecuente;
                 
                 // Crear gráficos
                 crearGraficoTopComponentes(data.top_componentes);
@@ -1470,6 +1470,16 @@ function crearGraficoTopComponentes(datos) {
         reportCharts.graficoTopComponentes.destroy();
     }
     
+    // CORRECCIÓN: Calcular altura dinámica basada en cantidad de datos
+    // Cada barra necesita aproximadamente 40px de espacio vertical
+    const alturaMinima = 300; // Altura mínima para gráficos pequeños
+    const alturaCalculada = datos.labels.length * 40; // 40px por barra
+    const alturaFinal = Math.max(alturaMinima, alturaCalculada);
+    
+    // Aplicar altura al canvas
+    ctx.style.height = alturaFinal + 'px';
+    ctx.height = alturaFinal;
+    
     reportCharts.graficoTopComponentes = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1491,12 +1501,27 @@ function crearGraficoTopComponentes(datos) {
                 title: {
                     display: true,
                     text: 'Top 10 Componentes con Más Fallos'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Total: ' + context.parsed.x + ' incidencias';
+                        }
+                    }
                 }
             },
             scales: {
                 x: {
                     beginAtZero: true,
-                    ticks: { stepSize: 1 }
+                    ticks: { 
+                        stepSize: 1,
+                        precision: 0  // Solo números enteros
+                    }
+                },
+                y: {
+                    ticks: {
+                        autoSkip: false  // Mostrar todas las etiquetas
+                    }
                 }
             }
         }
@@ -1510,6 +1535,16 @@ function crearGraficoSeveridadComponentes(datos) {
         reportCharts.graficoSeveridadComponentes.destroy();
     }
     
+    // CORRECCIÓN: Calcular altura dinámica basada en cantidad de datos
+    // Cada barra apilada necesita aproximadamente 45px de espacio vertical
+    const alturaMinima = 300; // Altura mínima
+    const alturaCalculada = datos.labels.length * 45; // 45px por barra apilada
+    const alturaFinal = Math.max(alturaMinima, alturaCalculada);
+    
+    // Aplicar altura al canvas
+    ctx.style.height = alturaFinal + 'px';
+    ctx.height = alturaFinal;
+    
     reportCharts.graficoSeveridadComponentes = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1517,25 +1552,45 @@ function crearGraficoSeveridadComponentes(datos) {
             datasets: datos.datasets
         },
         options: {
+            indexAxis: 'y',  // Barras horizontales
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        boxWidth: 15,
+                        padding: 10
+                    }
                 },
                 title: {
                     display: true,
                     text: 'Distribución de Severidad por Componente'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.x || 0;
+                            return label + ': ' + value + ' incidencias';
+                        }
+                    }
                 }
             },
             scales: {
                 x: {
-                    stacked: true
+                    stacked: true,
+                    beginAtZero: true,
+                    ticks: { 
+                        stepSize: 1,
+                        precision: 0  // Solo números enteros
+                    }
                 },
                 y: {
                     stacked: true,
-                    beginAtZero: true,
-                    ticks: { stepSize: 1 }
+                    ticks: {
+                        autoSkip: false  // Mostrar todas las etiquetas
+                    }
                 }
             }
         }
@@ -1549,6 +1604,7 @@ function crearTendenciaComponentes(datos) {
         reportCharts.tendenciaComponentes.destroy();
     }
     
+    // CORRECCIÓN: Mejorar visualización del gráfico de líneas
     reportCharts.tendenciaComponentes = new Chart(ctx, {
         type: 'line',
         data: {
@@ -1558,19 +1614,65 @@ function crearTendenciaComponentes(datos) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
             plugins: {
                 legend: {
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        boxWidth: 15,
+                        padding: 15,
+                        usePointStyle: true
+                    }
                 },
                 title: {
                     display: true,
-                    text: 'Tendencia de Componentes Principales (6 Meses)'
+                    text: 'Tendencia de Componentes Principales (6 Meses)',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return 'Mes: ' + context[0].label;
+                        },
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            return label + ': ' + value + ' incidencias';
+                        }
+                    }
                 }
             },
             scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Mes'
+                    },
+                    grid: {
+                        display: false
+                    }
+                },
                 y: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Cantidad de Incidencias'
+                    },
                     beginAtZero: true,
-                    ticks: { stepSize: 1 }
+                    ticks: { 
+                        stepSize: 1,
+                        precision: 0  // Solo números enteros
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
                 }
             }
         }
@@ -1623,11 +1725,11 @@ function cargarAnalisisNotificaciones() {
                 datosReportes.notificaciones = data;
                 
                 // Actualizar KPIs
-                document.getElementById('kpi-total-notificaciones').textContent = data.kpis.total_notificaciones;
-                document.getElementById('kpi-tasa-exito').textContent = `${data.kpis.tasa_exito}%`;
-                document.getElementById('kpi-tiempo-promedio-notif').textContent = 
+                document.getElementById('total-notificaciones').textContent = data.kpis.total_notificaciones;
+                document.getElementById('tasa-exito').textContent = `${data.kpis.tasa_exito}%`;
+                document.getElementById('tiempo-promedio-notif').textContent = 
                     `${data.kpis.tiempo_promedio_minutos} min`;
-                document.getElementById('kpi-notificaciones-fallidas').textContent = data.kpis.fallidas;
+                document.getElementById('notificaciones-fallidas').textContent = data.kpis.fallidas;
                 
                 // Crear gráficos
                 crearGraficoTiposNotificacion(data.distribucion_tipos);
@@ -1696,19 +1798,57 @@ function crearTendenciaNotificaciones(datos) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
             plugins: {
                 legend: {
-                    position: 'top'
+                    position: 'top',
+                    labels: {
+                        boxWidth: 15,
+                        padding: 10,
+                        usePointStyle: true
+                    }
                 },
                 title: {
                     display: true,
-                    text: 'Tendencia Mensual de Notificaciones'
+                    text: 'Tendencia Mensual de Notificaciones',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return 'Mes: ' + context[0].label;
+                        },
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            return label + ': ' + value + ' notificaciones';
+                        }
+                    }
                 }
             },
             scales: {
+                x: {
+                    display: true,
+                    grid: {
+                        display: false
+                    }
+                },
                 y: {
+                    display: true,
                     beginAtZero: true,
-                    ticks: { stepSize: 1 }
+                    ticks: { 
+                        stepSize: 1,
+                        precision: 0
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
                 }
             }
         }
@@ -1721,6 +1861,15 @@ function crearGraficoTopDestinatarios(datos) {
     if (reportCharts.graficoTopDestinatarios) {
         reportCharts.graficoTopDestinatarios.destroy();
     }
+    
+    // CORRECCIÓN: Calcular altura dinámica para barras horizontales
+    const alturaMinima = 300;
+    const alturaCalculada = datos.labels.length * 40; // 40px por barra
+    const alturaFinal = Math.max(alturaMinima, alturaCalculada);
+    
+    // Aplicar altura al canvas
+    ctx.style.height = alturaFinal + 'px';
+    ctx.height = alturaFinal;
     
     reportCharts.graficoTopDestinatarios = new Chart(ctx, {
         type: 'bar',
@@ -1743,12 +1892,27 @@ function crearGraficoTopDestinatarios(datos) {
                 title: {
                     display: true,
                     text: 'Top 10 Destinatarios Más Frecuentes'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Notificaciones: ' + context.parsed.x;
+                        }
+                    }
                 }
             },
             scales: {
                 x: {
                     beginAtZero: true,
-                    ticks: { stepSize: 1 }
+                    ticks: { 
+                        stepSize: 1,
+                        precision: 0
+                    }
+                },
+                y: {
+                    ticks: {
+                        autoSkip: false
+                    }
                 }
             }
         }
@@ -1781,13 +1945,35 @@ function crearGraficoDiasSemana(datos) {
                 legend: { display: false },
                 title: {
                     display: true,
-                    text: 'Distribución por Día de la Semana'
+                    text: 'Distribución por Día de la Semana',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Notificaciones: ' + context.parsed.y;
+                        }
+                    }
                 }
             },
             scales: {
+                x: {
+                    grid: {
+                        display: false
+                    }
+                },
                 y: {
                     beginAtZero: true,
-                    ticks: { stepSize: 1 }
+                    ticks: { 
+                        stepSize: 1,
+                        precision: 0
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
                 }
             }
         }

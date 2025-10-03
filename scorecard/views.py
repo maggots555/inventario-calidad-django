@@ -880,7 +880,7 @@ def aplicar_filtros_reporte(queryset, request):
     # Filtro por sucursal
     sucursal = request.GET.get('sucursal')
     if sucursal:
-        queryset = queryset.filter(equipo__sucursal__nombre=sucursal)
+        queryset = queryset.filter(sucursal__nombre=sucursal)
     
     # Filtro por técnico
     tecnico = request.GET.get('tecnico')
@@ -895,7 +895,7 @@ def aplicar_filtros_reporte(queryset, request):
     # Filtro por severidad
     severidad = request.GET.get('severidad')
     if severidad:
-        queryset = queryset.filter(severidad=severidad)
+        queryset = queryset.filter(grado_severidad=severidad)
     
     # Filtro por estado
     estado = request.GET.get('estado')
@@ -1544,21 +1544,21 @@ def api_analisis_componentes(request):
     incidencias = aplicar_filtros_reporte(incidencias, request)
     
     # Total de incidencias con componente especificado
-    incidencias_con_componente = incidencias.exclude(componente_afectado__isnull=True).exclude(componente_afectado='')
+    incidencias_con_componente = incidencias.exclude(componente_afectado__isnull=True)
     total_con_componente = incidencias_con_componente.count()
     total_incidencias = incidencias.count()
     
     porcentaje_con_componente = round((total_con_componente / total_incidencias * 100), 2) if total_incidencias > 0 else 0
     
     # 1. Top 10 componentes con más fallos
-    top_componentes = incidencias_con_componente.values('componente_afectado').annotate(
+    top_componentes = incidencias_con_componente.values('componente_afectado__nombre').annotate(
         total=Count('id'),
         criticas=Count('id', filter=Q(grado_severidad='critico')),
         atribuibles=Count('id', filter=Q(es_atribuible=True))
     ).order_by('-total')[:10]
     
     top_componentes_data = {
-        'labels': [item['componente_afectado'] for item in top_componentes],
+        'labels': [item['componente_afectado__nombre'] for item in top_componentes],
         'data': [item['total'] for item in top_componentes],
         'criticas': [item['criticas'] for item in top_componentes],
         'colors': ['#e74c3c' if item['criticas'] > item['total'] * 0.3 else '#3498db' for item in top_componentes]
@@ -1566,7 +1566,7 @@ def api_analisis_componentes(request):
     
     # 2. Componentes por tipo de equipo (matriz)
     tipos_equipo = incidencias_con_componente.values_list('tipo_equipo', flat=True).distinct()
-    componentes_unicos = list(incidencias_con_componente.values_list('componente_afectado', flat=True).distinct())[:15]  # Top 15 componentes
+    componentes_unicos = list(incidencias_con_componente.values_list('componente_afectado__nombre', flat=True).distinct())[:15]  # Top 15 componentes
     
     matriz_componentes_equipo = {}
     for tipo in tipos_equipo:
@@ -1574,7 +1574,7 @@ def api_analisis_componentes(request):
         for componente in componentes_unicos:
             count = incidencias_con_componente.filter(
                 tipo_equipo=tipo,
-                componente_afectado=componente
+                componente_afectado__nombre=componente
             ).count()
             matriz_componentes_equipo[tipo][componente] = count
     
@@ -1591,8 +1591,8 @@ def api_analisis_componentes(request):
     # 3. Severidad por componente (Top 10)
     severidad_por_componente = {}
     for item in top_componentes[:10]:
-        componente = item['componente_afectado']
-        incidencias_comp = incidencias_con_componente.filter(componente_afectado=componente)
+        componente = item['componente_afectado__nombre']
+        incidencias_comp = incidencias_con_componente.filter(componente_afectado__nombre=componente)
         
         severidad_por_componente[componente] = {
             'baja': incidencias_comp.filter(grado_severidad='bajo').count(),
@@ -1636,19 +1636,20 @@ def api_analisis_componentes(request):
     hoy = timezone.now()
     hace_6_meses = hoy - timedelta(days=180)
     
-    top_5_componentes = [item['componente_afectado'] for item in top_componentes[:5]]
+    top_5_componentes = [item['componente_afectado__nombre'] for item in top_componentes[:5]]
     
     incidencias_recientes = incidencias_con_componente.filter(
         fecha_deteccion__gte=hace_6_meses,
-        componente_afectado__in=top_5_componentes
-    ).order_by('fecha_deteccion')
+        componente_afectado__nombre__in=top_5_componentes
+    ).select_related('componente_afectado').order_by('fecha_deteccion')
     
     # Agrupar por mes y componente
     tendencias_componentes = {comp: defaultdict(int) for comp in top_5_componentes}
     
     for inc in incidencias_recientes:
         mes_key = inc.fecha_deteccion.strftime('%Y-%m')
-        tendencias_componentes[inc.componente_afectado][mes_key] += 1
+        componente_nombre = inc.componente_afectado.nombre if inc.componente_afectado else 'Sin componente'
+        tendencias_componentes[componente_nombre][mes_key] += 1
     
     # Obtener todos los meses únicos
     todos_meses = set()
@@ -1676,7 +1677,7 @@ def api_analisis_componentes(request):
     # 5. Componentes más críticos (mayor % de incidencias críticas)
     componentes_criticos = []
     for item in top_componentes:
-        componente = item['componente_afectado']
+        componente = item['componente_afectado__nombre']
         total_comp = item['total']
         criticas_comp = item['criticas']
         porcentaje_criticas = round((criticas_comp / total_comp * 100), 2) if total_comp > 0 else 0
@@ -1699,7 +1700,7 @@ def api_analisis_componentes(request):
             'total_con_componente': total_con_componente,
             'porcentaje_con_componente': porcentaje_con_componente,
             'total_componentes_unicos': len(componentes_unicos),
-            'componente_mas_frecuente': top_componentes[0]['componente_afectado'] if top_componentes else 'N/A'
+            'componente_mas_frecuente': top_componentes[0]['componente_afectado__nombre'] if top_componentes else 'N/A'
         },
         'top_componentes': top_componentes_data,
         'heatmap_componentes_equipo': heatmap_componentes_equipo,
@@ -1717,10 +1718,10 @@ def api_analisis_notificaciones(request):
     Retorna métricas sobre notificaciones del sistema
     Soporta filtros: fecha_inicio, fecha_fin, sucursal, tecnico, area, severidad, estado
     """
-    from .models import HistorialNotificacion
+    from .models import NotificacionIncidencia
     
     # Obtener queryset base de notificaciones
-    notificaciones = HistorialNotificacion.objects.all()
+    notificaciones = NotificacionIncidencia.objects.all()
     
     # Aplicar filtros de fecha si están presentes
     fecha_inicio = request.GET.get('fecha_inicio')
@@ -1739,7 +1740,7 @@ def api_analisis_notificaciones(request):
     estado = request.GET.get('estado')
     
     if sucursal:
-        notificaciones = notificaciones.filter(incidencia__equipo__sucursal__nombre=sucursal)
+        notificaciones = notificaciones.filter(incidencia__sucursal__nombre=sucursal)
     if tecnico:
         notificaciones = notificaciones.filter(incidencia__tecnico_responsable__nombre_completo=tecnico)
     if area:
@@ -1753,8 +1754,8 @@ def api_analisis_notificaciones(request):
     total_notificaciones = notificaciones.count()
     
     # KPIs básicos
-    exitosas = notificaciones.filter(exitosa=True).count()
-    fallidas = notificaciones.filter(exitosa=False).count()
+    exitosas = notificaciones.filter(exitoso=True).count()
+    fallidas = notificaciones.filter(exitoso=False).count()
     tasa_exito = round((exitosas / total_notificaciones * 100), 2) if total_notificaciones > 0 else 0
     
     # 1. Distribución por tipo de notificación
@@ -1763,7 +1764,7 @@ def api_analisis_notificaciones(request):
     ).order_by('-total')
     
     distribucion_tipos = {
-        'labels': [dict(HistorialNotificacion.TIPO_NOTIFICACION_CHOICES).get(item['tipo_notificacion'], item['tipo_notificacion']) 
+        'labels': [dict(NotificacionIncidencia.TIPO_NOTIFICACION_CHOICES).get(item['tipo_notificacion'], item['tipo_notificacion']) 
                    for item in tipos_notificacion],
         'data': [item['total'] for item in tipos_notificacion],
         'colors': ['#3498db', '#e74c3c', '#2ecc71', '#f39c12']
@@ -1783,7 +1784,7 @@ def api_analisis_notificaciones(request):
     for notif in notificaciones_recientes:
         mes_key = notif.fecha_envio.strftime('%Y-%m')
         meses_notificaciones[mes_key] += 1
-        if notif.exitosa:
+        if notif.exitoso:
             meses_exitosas[mes_key] += 1
     
     meses_ordenados = sorted(meses_notificaciones.keys())
@@ -1835,7 +1836,16 @@ def api_analisis_notificaciones(request):
     
     for notif in notificaciones.select_related('incidencia'):
         if notif.incidencia and notif.incidencia.fecha_deteccion:
-            diferencia = notif.fecha_envio - notif.incidencia.fecha_deteccion
+            # CORRECCIÓN: Convertir fecha_deteccion (date) a datetime con timezone
+            # fecha_deteccion es un objeto date, necesitamos convertirlo a datetime aware
+            fecha_deteccion_dt = datetime.combine(
+                notif.incidencia.fecha_deteccion, 
+                datetime.min.time()
+            )
+            # Hacer el datetime aware (con timezone) para poder restarlo con fecha_envio
+            fecha_deteccion_dt = timezone.make_aware(fecha_deteccion_dt)
+            
+            diferencia = notif.fecha_envio - fecha_deteccion_dt
             minutos = diferencia.total_seconds() / 60
             tiempos_notificacion.append(minutos)
     
