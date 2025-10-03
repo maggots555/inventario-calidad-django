@@ -285,29 +285,30 @@
             </div>
         </div>
 
-        <!-- Sección 5: Estado y Reincidencia -->
+        <!-- Sección 5: Reincidencia -->
         <div class="form-section">
             <div class="form-section-header">
-                <h4><i class="bi bi-flag"></i> Estado y Reincidencia</h4>
+                <h4><i class="bi bi-arrow-repeat"></i> Reincidencia</h4>
             </div>
             
             <div class="row g-3">
-                <div class="col-md-6">
-                    <label for="{{ form.estado.id_for_label }}" class="form-label required-field">
-                        {{ form.estado.label }}
-                    </label>
-                    {{ form.estado }}
-                    {% if form.estado.errors %}
-                        <div class="invalid-feedback d-block">{{ form.estado.errors }}</div>
-                    {% endif %}
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Estado Inicial:</strong> Toda incidencia nueva inicia automáticamente como <strong>"Abierta"</strong>. 
+                        Al enviar la notificación manual, cambiará automáticamente a <strong>"En Revisión"</strong>.
+                    </div>
                 </div>
                 
                 <div class="col-md-6">
-                    <div class="form-check mt-4">
+                    <div class="form-check mt-3">
                         {{ form.es_reincidencia }}
                         <label class="form-check-label" for="{{ form.es_reincidencia.id_for_label }}">
-                            {{ form.es_reincidencia.label }}
+                            <strong>{{ form.es_reincidencia.label }}</strong>
                         </label>
+                        <small class="form-text text-muted d-block mt-1">
+                            Marca esta casilla si esta incidencia ya ocurrió anteriormente con el mismo equipo
+                        </small>
                     </div>
                 </div>
                 
@@ -316,6 +317,9 @@
                         {{ form.incidencia_relacionada.label }}
                     </label>
                     {{ form.incidencia_relacionada }}
+                    <small class="form-text text-muted">
+                        Selecciona la incidencia original relacionada con esta reincidencia
+                    </small>
                     {% if form.incidencia_relacionada.errors %}
                         <div class="invalid-feedback d-block">{{ form.incidencia_relacionada.errors }}</div>
                     {% endif %}

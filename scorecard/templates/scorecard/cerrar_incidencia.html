@@ -109,12 +109,46 @@
                         </div>
 
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-success">
-                                <i class="bi bi-check-circle"></i> Cerrar Incidencia y Notificar
+                            <button type="submit" class="btn btn-success" id="btnCerrarIncidencia">
+                                <span id="btnTexto">
+                                    <i class="bi bi-check-circle"></i> Cerrar Incidencia y Notificar
+                                </span>
+                                <span id="btnSpinner" style="display: none;">
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    Cerrando y enviando notificación...
+                                </span>
                             </button>
-                            <a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}" class="btn btn-secondary">
+                            <a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}" class="btn btn-secondary" id="btnCancelar">
                                 <i class="bi bi-x-circle"></i> Cancelar
                             </a>
+                        </div>
+                        
+                        <!-- Alerta de progreso (se muestra al enviar) -->
+                        <div class="alert alert-primary mt-3" id="alertaProcesando" style="display: none;">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border text-primary me-3" role="status">
+                                    <span class="visually-hidden">Procesando...</span>
+                                </div>
+                                <div>
+                                    <h6 class="alert-heading mb-1">
+                                        <i class="bi bi-hourglass-split"></i> Procesando Cierre de Incidencia
+                                    </h6>
+                                    <p class="mb-0">
+                                        Por favor espera... Se está cerrando la incidencia y enviando notificaciones por correo electrónico.
+                                        <br><small class="text-muted">Este proceso puede tardar unos segundos.</small>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="progress mt-3" style="height: 25px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                     role="progressbar" 
+                                     style="width: 100%;" 
+                                     aria-valuenow="100" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                    Enviando notificación...
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -183,4 +217,65 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// JavaScript para manejar el feedback visual al cerrar incidencia
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const btnCerrar = document.getElementById('btnCerrarIncidencia');
+    const btnTexto = document.getElementById('btnTexto');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const btnCancelar = document.getElementById('btnCancelar');
+    const alertaProcesando = document.getElementById('alertaProcesando');
+    
+    let formularioEnviado = false; // Flag para evitar múltiples envíos
+    
+    // Manejar el envío del formulario
+    form.addEventListener('submit', function(e) {
+        // Evitar múltiples envíos
+        if (formularioEnviado) {
+            e.preventDefault();
+            return;
+        }
+        
+        // Validar que los campos requeridos estén llenos (antes de deshabilitar)
+        const accionesTomadas = document.getElementById('{{ form.acciones_tomadas.id_for_label }}');
+        
+        if (!accionesTomadas.value.trim()) {
+            // Si no hay acciones tomadas, dejar que la validación del formulario se ejecute normalmente
+            return;
+        }
+        
+        // Marcar que el formulario se está enviando
+        formularioEnviado = true;
+        
+        // Mostrar feedback visual
+        
+        // Cambiar botón a estado de "procesando"
+        btnTexto.style.display = 'none';
+        btnSpinner.style.display = 'inline-block';
+        btnCerrar.disabled = true;
+        btnCerrar.classList.remove('btn-success');
+        btnCerrar.classList.add('btn-secondary');
+        
+        // Deshabilitar botón cancelar
+        btnCancelar.classList.add('disabled');
+        btnCancelar.style.pointerEvents = 'none';
+        
+        // Mostrar alerta de procesamiento
+        alertaProcesando.style.display = 'block';
+        
+        // Scroll suave hacia la alerta para que el usuario la vea
+        alertaProcesando.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // NO deshabilitar los campos del formulario para que los datos se envíen correctamente
+        // El flag 'formularioEnviado' previene múltiples envíos
+        
+        // Nota: El formulario se enviará normalmente
+        // La página se recargará cuando el servidor responda
+    });
+});
+</script>
 {% endblock %}

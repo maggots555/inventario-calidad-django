@@ -89,12 +89,16 @@ def detalle_incidencia(request, incidencia_id):
 def crear_incidencia(request):
     """
     Crear una nueva incidencia con formulario completo
+    NOTA: Todas las incidencias nuevas se crean con estado='abierta' automáticamente
     """
     if request.method == 'POST':
         form = IncidenciaForm(request.POST)
         
         if form.is_valid():
             incidencia = form.save(commit=False)
+            
+            # ESTADO AUTOMÁTICO: Toda nueva incidencia inicia como "Abierta"
+            incidencia.estado = 'abierta'
             
             # Auto-completar el área del técnico desde el empleado seleccionado
             tecnico = form.cleaned_data['tecnico_responsable']
@@ -139,6 +143,7 @@ def crear_incidencia(request):
 def editar_incidencia(request, incidencia_id):
     """
     Editar una incidencia existente
+    NOTA: El estado NO se modifica aquí, se gestiona mediante formularios específicos
     """
     incidencia = get_object_or_404(Incidencia, id=incidencia_id)
     
@@ -146,7 +151,13 @@ def editar_incidencia(request, incidencia_id):
         form = IncidenciaForm(request.POST, instance=incidencia)
         
         if form.is_valid():
+            # Guardar el estado actual antes de hacer save
+            estado_actual = incidencia.estado
+            
             incidencia = form.save(commit=False)
+            
+            # PRESERVAR EL ESTADO: No permitir que se modifique al editar
+            incidencia.estado = estado_actual
             
             # Auto-completar el área del técnico desde el empleado seleccionado
             tecnico = form.cleaned_data['tecnico_responsable']
@@ -597,6 +608,13 @@ def api_enviar_notificacion(request, incidencia_id):
     try:
         incidencia = get_object_or_404(Incidencia, id=incidencia_id)
         
+        # Validar que la incidencia NO esté cerrada
+        if incidencia.estado == 'cerrada':
+            return JsonResponse({
+                'success': False,
+                'message': 'No se puede enviar notificación para una incidencia cerrada'
+            }, status=400)
+        
         # Parsear el body JSON
         data = json.loads(request.body)
         destinatarios_seleccionados = data.get('destinatarios', [])
@@ -617,6 +635,15 @@ def api_enviar_notificacion(request, incidencia_id):
             enviado_por=request.user.username if request.user.is_authenticated else 'Sistema'
         )
         
+        # CAMBIO AUTOMÁTICO DE ESTADO: Si la notificación se envió correctamente
+        # y la incidencia está en estado "abierta", cambiarla a "en_revision"
+        if resultado['success'] and incidencia.estado == 'abierta':
+            incidencia.estado = 'en_revision'
+            incidencia.save()
+            resultado['estado_cambiado'] = True
+            resultado['nuevo_estado'] = 'En Revisión'
+            resultado['message'] += ' | Estado cambiado automáticamente a "En Revisión".'
+        
         if resultado['success']:
             return JsonResponse(resultado)
         else:
@@ -636,10 +663,24 @@ def api_enviar_notificacion(request, incidencia_id):
 
 def cambiar_estado_incidencia(request, incidencia_id):
     """
-    Vista para cambiar el estado de una incidencia desde el detalle
-    No envía notificaciones automáticas (solo cuando se cierra)
+    Vista para cambiar el estado de una incidencia manualmente
+    
+    ESTADOS PERMITIDOS:
+    - 'en_revision': Solo para casos excepcionales (sin enviar notificación)
+    - 'reincidente': Para marcar/desmarcar reincidencias
+    
+    NOTAS:
+    - Esta vista NO permite cerrar incidencias (usar formulario de cierre)
+    - Esta vista NO permite volver a "abierta" (crear nueva si es necesario)
+    - El cambio a "en_revision" se hace automáticamente al enviar notificación manual
+    - NO se puede usar en incidencias cerradas
     """
     incidencia = get_object_or_404(Incidencia, id=incidencia_id)
+    
+    # Validar que la incidencia NO esté cerrada
+    if incidencia.estado == 'cerrada':
+        messages.warning(request, 'No se puede cambiar el estado de una incidencia cerrada.')
+        return redirect('scorecard:detalle_incidencia', incidencia_id=incidencia.id)
     
     if request.method == 'POST':
         from .forms import CambiarEstadoIncidenciaForm
@@ -664,21 +705,7 @@ def cambiar_estado_incidencia(request, incidencia_id):
             
             incidencia.save()
             
-            # Solo notificar si se está cerrando
-            if nuevo_estado == 'cerrada':
-                from .emails import enviar_notificacion_cierre_incidencia
-                resultado = enviar_notificacion_cierre_incidencia(
-                    incidencia=incidencia,
-                    mensaje_adicional=notas,
-                    enviado_por=request.user.username if request.user.is_authenticated else 'Sistema'
-                )
-                
-                if resultado['success']:
-                    messages.success(request, f'Estado cambiado de "{estado_anterior}" a "{incidencia.get_estado_display()}" y notificación enviada.')
-                else:
-                    messages.warning(request, f'Estado cambiado, pero hubo un error al enviar notificación: {resultado["message"]}')
-            else:
-                messages.success(request, f'Estado cambiado de "{estado_anterior}" a "{incidencia.get_estado_display()}"')
+            messages.success(request, f'Estado cambiado de "{estado_anterior}" a "{incidencia.get_estado_display()}"')
             
             return redirect('scorecard:detalle_incidencia', incidencia_id=incidencia.id)
     else:

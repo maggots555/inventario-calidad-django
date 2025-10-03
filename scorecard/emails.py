@@ -92,8 +92,8 @@ def enviar_notificacion_incidencia(incidencia, destinatarios_seleccionados, mens
     # Crear asunto del email
     asunto = f"[INCIDENCIA] {incidencia.folio} - {incidencia.tipo_incidencia.nombre}"
     
-    # Obtener evidencias (máximo 3 para no saturar el email)
-    evidencias = incidencia.evidencias.all()[:3]
+    # Obtener evidencias (máximo 10 para no saturar el email)
+    evidencias = incidencia.evidencias.all()[:10]
     
     # Contexto para el template del email
     context = {
@@ -121,7 +121,7 @@ def enviar_notificacion_incidencia(incidencia, destinatarios_seleccionados, mens
     {f'- Número de Orden: {incidencia.numero_orden}' if incidencia.numero_orden else ''}
     
     RESPONSABLES:
-    - Técnico: {incidencia.tecnico_responsable.nombre_completo}
+    - Técnico/Personal: {incidencia.tecnico_responsable.nombre_completo}
     - Inspector: {incidencia.inspector_calidad}
     - Sucursal: {incidencia.sucursal.nombre}
     

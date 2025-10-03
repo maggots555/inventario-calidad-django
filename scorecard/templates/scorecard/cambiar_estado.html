@@ -20,7 +20,7 @@
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">
-                        <i class="bi bi-arrow-left-right"></i> Cambiar Estado de Incidencia
+                        <i class="bi bi-arrow-left-right"></i> Cambiar Estado de Incidencia (Manual)
                     </h4>
                 </div>
                 <div class="card-body">
@@ -32,17 +32,29 @@
                     <div class="mb-3">
                         <strong>Estado Actual:</strong> 
                         <span class="badge 
-                            {% if incidencia.estado == 'abierta' %}bg-warning{% elif incidencia.estado == 'en_revision' %}bg-info{% elif incidencia.estado == 'cerrada' %}bg-success{% else %}bg-danger{% endif %}">
+                            {% if incidencia.estado == 'abierta' %}bg-warning{% elif incidencia.estado == 'en_revision' %}bg-info{% elif incidencia.estado == 'cerrada' %}bg-success{% elif incidencia.estado == 'reincidente' %}bg-danger{% endif %}">
                             {{ incidencia.get_estado_display }}
                         </span>
                     </div>
 
-                    {% if incidencia.estado == 'cerrada' %}
-                    <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle"></i> Esta incidencia ya está cerrada. 
-                        Si deseas reabrirla, selecciona otro estado.
+                    <!-- Alertas informativas sobre flujo de estados -->
+                    <div class="alert alert-warning mb-3">
+                        <h6 class="alert-heading"><i class="bi bi-exclamation-triangle"></i> Uso de este Formulario</h6>
+                        <p class="mb-2"><strong>Este formulario permite cambios manuales limitados:</strong></p>
+                        <ul class="mb-0">
+                            <li><strong>"En Revisión":</strong> Solo úsalo si necesitas cambiar el estado SIN enviar notificación (situaciones excepcionales). Normalmente el cambio a "En Revisión" es automático al enviar la notificación manual.</li>
+                            <li><strong>"Reincidente":</strong> Para marcar o desmarcar una incidencia como reincidente.</li>
+                        </ul>
                     </div>
-                    {% endif %}
+
+                    <div class="alert alert-primary">
+                        <i class="bi bi-lightbulb"></i> <strong>Flujo Normal de Estados:</strong>
+                        <ol class="mb-0 mt-2">
+                            <li><strong>Nueva Incidencia</strong> → Estado "Abierta" (automático)</li>
+                            <li><strong>Enviar Notificación Manual</strong> → Cambia a "En Revisión" (automático)</li>
+                            <li><strong>Botón "Cerrar Incidencia"</strong> → Estado "Cerrada" (formulario específico)</li>
+                        </ol>
+                    </div>
 
                     <form method="post">
                         {% csrf_token %}
@@ -68,14 +80,6 @@
                             {% if form.notas.errors %}
                                 <div class="text-danger">{{ form.notas.errors }}</div>
                             {% endif %}
-                        </div>
-
-                        <div class="alert alert-warning">
-                            <i class="bi bi-bell"></i> <strong>Notificaciones:</strong>
-                            <ul class="mb-0 mt-2">
-                                <li>Si cambias a <strong>"Cerrada"</strong>, se enviará notificación automática al técnico</li>
-                                <li>Para otros estados, NO se envían notificaciones automáticas</li>
-                            </ul>
                         </div>
 
                         <div class="d-flex gap-2">

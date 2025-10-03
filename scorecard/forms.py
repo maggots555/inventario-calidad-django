@@ -11,6 +11,11 @@ class IncidenciaForm(forms.ModelForm):
     """
     Formulario para crear y editar incidencias
     Con widgets de Bootstrap y validaciones personalizadas
+    
+    NOTA: El campo 'estado' se excluye del formulario ya que se maneja automáticamente:
+    - Nueva incidencia: Siempre inicia como "Abierta"
+    - Al enviar notificación manual: Cambia automáticamente a "En Revisión"
+    - Para cambios manuales de estado, usar el formulario específico "Cambiar Estado"
     """
     
     class Meta:
@@ -35,7 +40,7 @@ class IncidenciaForm(forms.ModelForm):
             'descripcion_incidencia',
             'acciones_tomadas',
             'causa_raiz',
-            'estado',
+            # 'estado',  # EXCLUIDO: Se maneja automáticamente
             'es_reincidencia',
             'incidencia_relacionada',
         ]
@@ -162,11 +167,7 @@ class IncidenciaForm(forms.ModelForm):
                     'placeholder': 'Análisis de causa raíz (opcional)'
                 }
             ),
-            'estado': forms.Select(
-                attrs={
-                    'class': 'form-select'
-                }
-            ),
+            # 'estado': Campo excluido del formulario (se maneja automáticamente)
             'es_reincidencia': forms.CheckboxInput(
                 attrs={
                     'class': 'form-check-input',
@@ -200,7 +201,7 @@ class IncidenciaForm(forms.ModelForm):
             'descripcion_incidencia': 'Descripción de la Incidencia',
             'acciones_tomadas': 'Acciones Tomadas',
             'causa_raiz': 'Causa Raíz',
-            'estado': 'Estado',
+            # 'estado': Campo excluido del formulario
             'es_reincidencia': '¿Es una reincidencia?',
             'incidencia_relacionada': 'Incidencia Relacionada',
         }
@@ -327,12 +328,28 @@ class EvidenciaIncidenciaForm(forms.ModelForm):
 
 class CambiarEstadoIncidenciaForm(forms.Form):
     """
-    Formulario simple para cambiar el estado de una incidencia
-    Se usa desde el detalle de la incidencia para cambios rápidos
+    Formulario para cambiar el estado de una incidencia manualmente
+    
+    ESTADOS PERMITIDOS:
+    - 'en_revision': Para casos excepcionales donde se necesite cambiar sin enviar notificación
+    - 'reincidente': Para marcar incidencias reincidentes
+    
+    NOTAS:
+    - El estado 'abierta' se asigna automáticamente al crear la incidencia
+    - El estado 'en_revision' normalmente se asigna al enviar notificación manual
+    - El estado 'cerrada' se gestiona mediante el formulario de cierre específico
     """
+    
+    # Solo permitimos estos estados para cambio manual
+    ESTADOS_PERMITIDOS = [
+        ('en_revision', 'En Revisión'),
+        ('reincidente', 'Reincidente'),
+    ]
+    
     estado = forms.ChoiceField(
-        choices=Incidencia.ESTADO_CHOICES,
-        widget=forms.Select(attrs={'class': 'form-select'})
+        choices=ESTADOS_PERMITIDOS,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label='Nuevo Estado'
     )
     notas = forms.CharField(
         required=False,
@@ -340,7 +357,8 @@ class CambiarEstadoIncidenciaForm(forms.Form):
             'class': 'form-control',
             'rows': 3,
             'placeholder': 'Notas adicionales sobre el cambio de estado (opcional)'
-        })
+        }),
+        label='Notas'
     )
 
 

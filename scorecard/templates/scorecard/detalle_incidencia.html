@@ -36,11 +36,19 @@
             <div class="row g-3">
                 <!-- Cambiar Estado -->
                 <div class="col-md-3">
-                    <a href="{% url 'scorecard:cambiar_estado_incidencia' incidencia.id %}" class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3">
-                        <i class="bi bi-arrow-left-right fs-3 mb-2"></i>
-                        <strong>Cambiar Estado</strong>
-                        <small class="text-muted">Actual: {{ incidencia.get_estado_display }}</small>
-                    </a>
+                    {% if incidencia.estado != 'cerrada' %}
+                        <a href="{% url 'scorecard:cambiar_estado_incidencia' incidencia.id %}" class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3">
+                            <i class="bi bi-arrow-left-right fs-3 mb-2"></i>
+                            <strong>Cambiar Estado</strong>
+                            <small class="text-muted">Actual: {{ incidencia.get_estado_display }}</small>
+                        </a>
+                    {% else %}
+                        <div class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3 disabled" style="opacity: 0.5; cursor: not-allowed;">
+                            <i class="bi bi-arrow-left-right fs-3 mb-2"></i>
+                            <strong>Cambiar Estado</strong>
+                            <small class="text-muted">No disponible (cerrada)</small>
+                        </div>
+                    {% endif %}
                 </div>
                 
                 <!-- Marcar NO Atribuible -->
@@ -83,11 +91,19 @@
                 
                 <!-- Enviar Notificación Manual -->
                 <div class="col-md-3">
-                    <button type="button" class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3" id="btnAbrirModalNotificacion">
-                        <i class="bi bi-send fs-3 mb-2"></i>
-                        <strong>Enviar Notificación</strong>
-                        <small class="text-muted">Manual a destinatarios</small>
-                    </button>
+                    {% if incidencia.estado != 'cerrada' %}
+                        <button type="button" class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3" id="btnAbrirModalNotificacion">
+                            <i class="bi bi-send fs-3 mb-2"></i>
+                            <strong>Enviar Notificación</strong>
+                            <small class="text-muted">Manual a destinatarios</small>
+                        </button>
+                    {% else %}
+                        <div class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3 disabled" style="opacity: 0.5; cursor: not-allowed;">
+                            <i class="bi bi-send fs-3 mb-2"></i>
+                            <strong>Enviar Notificación</strong>
+                            <small class="text-muted">No disponible (cerrada)</small>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -389,9 +405,16 @@
 
                 <!-- Mensajes de resultado -->
                 <div id="mensajeExito" class="alert alert-success" style="display: none;">
-                    <i class="bi bi-check-circle-fill"></i> 
-                    <strong>¡Notificación enviada!</strong>
-                    <p class="mb-0 mt-2" id="textoExito"></p>
+                    <h5 class="alert-heading">
+                        <i class="bi bi-check-circle-fill"></i> ¡Notificación Enviada Exitosamente!
+                    </h5>
+                    <hr>
+                    <p class="mb-2" id="textoExito"></p>
+                    <div class="alert alert-info mt-3 mb-0">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Estado actualizado:</strong> La incidencia cambió automáticamente a 
+                        <span class="badge bg-info">En Revisión</span>
+                    </div>
                 </div>
 
                 <div id="mensajeError" class="alert alert-danger" style="display: none;">
@@ -401,7 +424,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="btnCancelar">
                     <i class="bi bi-x-circle"></i> Cancelar
                 </button>
                 <button type="button" class="btn btn-primary" id="btnEnviarNotificacion">
@@ -412,6 +435,9 @@
                         <span class="spinner-border spinner-border-sm" role="status"></span>
                         Enviando...
                     </span>
+                </button>
+                <button type="button" class="btn btn-success" data-bs-dismiss="modal" id="btnCerrarExito" style="display: none;">
+                    <i class="bi bi-check-circle"></i> Cerrar
                 </button>
             </div>
         </div>
@@ -424,6 +450,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalNotificacion = new bootstrap.Modal(document.getElementById('modalNotificacion'));
     const btnAbrirModal = document.getElementById('btnAbrirModalNotificacion');
     const btnEnviar = document.getElementById('btnEnviarNotificacion');
+    const btnCancelar = document.getElementById('btnCancelar');
+    const btnCerrarExito = document.getElementById('btnCerrarExito');
     const formNotificacion = document.getElementById('formEnviarNotificacion');
     const loadingDestinatarios = document.getElementById('loadingDestinatarios');
     const listaDestinatarios = document.getElementById('listaDestinatarios');
@@ -434,6 +462,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Abrir modal y cargar destinatarios
     btnAbrirModal.addEventListener('click', function() {
+        // Resetear estado del modal
+        formNotificacion.style.display = 'none';
+        document.getElementById('mensajeExito').style.display = 'none';
+        document.getElementById('mensajeError').style.display = 'none';
+        btnCancelar.style.display = 'inline-block';
+        btnEnviar.style.display = 'inline-block';
+        btnCerrarExito.style.display = 'none';
+        
         modalNotificacion.show();
         cargarDestinatarios();
     });
@@ -576,11 +612,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 mostrarExito(data.message);
                 formNotificacion.style.display = 'none';
                 
-                // Cerrar modal después de 3 segundos
-                setTimeout(() => {
-                    modalNotificacion.hide();
-                    location.reload(); // Recargar para mostrar historial actualizado
-                }, 3000);
+                // Ocultar botones de formulario y mostrar botón de cerrar
+                btnCancelar.style.display = 'none';
+                btnEnviar.style.display = 'none';
+                btnCerrarExito.style.display = 'inline-block';
+                
+                // Al cerrar el modal, recargar la página para mostrar cambios
+                btnCerrarExito.addEventListener('click', function() {
+                    location.reload();
+                }, { once: true });
             } else {
                 mostrarError(data.message);
             }
