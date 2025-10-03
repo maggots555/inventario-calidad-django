@@ -39,6 +39,18 @@ urlpatterns = [
     path('api/datos-dashboard/', views.api_datos_dashboard, name='api_datos_dashboard'),
     path('api/exportar-excel/', views.api_exportar_excel, name='api_exportar_excel'),
     
+    # APIs para reportes avanzados - FASE 1
+    path('api/analisis-atribuibilidad/', views.api_analisis_atribuibilidad, name='api_analisis_atribuibilidad'),
+    path('api/analisis-tecnicos/', views.api_analisis_tecnicos, name='api_analisis_tecnicos'),
+    
+    # APIs para reportes avanzados - FASE 2
+    path('api/analisis-reincidencias/', views.api_analisis_reincidencias, name='api_analisis_reincidencias'),
+    path('api/analisis-tiempos/', views.api_analisis_tiempos, name='api_analisis_tiempos'),
+    
+    # APIs para reportes avanzados - FASE 3
+    path('api/analisis-componentes/', views.api_analisis_componentes, name='api_analisis_componentes'),
+    path('api/analisis-notificaciones/', views.api_analisis_notificaciones, name='api_analisis_notificaciones'),
+    
     # APIs para notificaciones por email (Fase 4)
     path('api/incidencias/<int:incidencia_id>/destinatarios/', views.api_obtener_destinatarios, name='api_obtener_destinatarios'),
     path('api/incidencias/<int:incidencia_id>/enviar-notificacion/', views.api_enviar_notificacion, name='api_enviar_notificacion'),

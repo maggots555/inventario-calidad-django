@@ -170,19 +170,7 @@
                     {% endif %}
                 </div>
                 
-                <!-- 4. ÁREA DETECTORA -->
-                <div class="col-md-6">
-                    <label for="{{ form.area_detectora.id_for_label }}" class="form-label required-field">
-                        {{ form.area_detectora.label }}
-                    </label>
-                    {{ form.area_detectora }}
-                    <small class="form-text text-muted" id="area-detectora-info"></small>
-                    {% if form.area_detectora.errors %}
-                        <div class="invalid-feedback d-block">{{ form.area_detectora.errors }}</div>
-                    {% endif %}
-                </div>
-                
-                <!-- 5. INSPECTOR DE CALIDAD -->
+                <!-- 4. INSPECTOR DE CALIDAD -->
                 <div class="col-md-6">
                     <label for="{{ form.inspector_calidad.id_for_label }}" class="form-label required-field">
                         {{ form.inspector_calidad.label }}
@@ -191,6 +179,18 @@
                     <small class="form-text text-muted" id="inspector-info">Solo empleados del área de Calidad</small>
                     {% if form.inspector_calidad.errors %}
                         <div class="invalid-feedback d-block">{{ form.inspector_calidad.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <!-- 5. ÁREA DETECTORA -->
+                <div class="col-md-6">
+                    <label for="{{ form.area_detectora.id_for_label }}" class="form-label required-field">
+                        {{ form.area_detectora.label }}
+                    </label>
+                    {{ form.area_detectora }}
+                    <small class="form-text text-muted" id="area-detectora-info"></small>
+                    {% if form.area_detectora.errors %}
+                        <div class="invalid-feedback d-block">{{ form.area_detectora.errors }}</div>
                     {% endif %}
                 </div>
             </div>
