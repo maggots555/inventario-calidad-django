@@ -86,6 +86,42 @@ class ComponenteEquipo(models.Model):
         unique_together = ['nombre', 'tipo_equipo']
 
 
+class ServicioRealizado(models.Model):
+    """
+    Catálogo de servicios realizados en el Centro de Servicio
+    Permite estandarizar los servicios y facilitar análisis
+    """
+    nombre = models.CharField(
+        max_length=150,
+        unique=True,
+        help_text="Nombre del servicio (ej: Ingreso del equipo al CIS)"
+    )
+    descripcion = models.TextField(
+        blank=True,
+        help_text="Descripción detallada del servicio"
+    )
+    orden = models.PositiveIntegerField(
+        default=0,
+        help_text="Orden de aparición en listados (menor primero)"
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text="Servicio activo para selección"
+    )
+    
+    # Fechas de control
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return self.nombre
+    
+    class Meta:
+        ordering = ['orden', 'nombre']
+        verbose_name = "Servicio Realizado"
+        verbose_name_plural = "Servicios Realizados"
+
+
 class Incidencia(models.Model):
     """
     Modelo principal para registrar incidencias de calidad
@@ -170,10 +206,13 @@ class Incidencia(models.Model):
         blank=True,
         help_text="Número de orden interna del servicio"
     )
-    servicio_realizado = models.CharField(
-        max_length=200,
+    servicio_realizado = models.ForeignKey(
+        ServicioRealizado,
+        on_delete=models.PROTECT,
+        null=True,
         blank=True,
-        help_text="Descripción del servicio que se realizó"
+        related_name='incidencias',
+        help_text="Servicio que se realizó al equipo"
     )
     
     # UBICACIÓN Y RESPONSABLES

@@ -87,10 +87,10 @@ class IncidenciaForm(forms.ModelForm):
                     'autocomplete': 'off'
                 }
             ),
-            'servicio_realizado': forms.TextInput(
+            'servicio_realizado': forms.Select(
                 attrs={
-                    'class': 'form-control',
-                    'placeholder': 'Descripción breve del servicio'
+                    'class': 'form-select',
+                    'id': 'id_servicio_realizado'
                 }
             ),
             'sucursal': forms.Select(

@@ -3,7 +3,14 @@ Configuración del Django Admin para Score Card
 """
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import CategoriaIncidencia, ComponenteEquipo, Incidencia, EvidenciaIncidencia, NotificacionIncidencia
+from .models import (
+    CategoriaIncidencia, 
+    ComponenteEquipo, 
+    ServicioRealizado,
+    Incidencia, 
+    EvidenciaIncidencia, 
+    NotificacionIncidencia
+)
 
 
 @admin.register(CategoriaIncidencia)
@@ -37,6 +44,30 @@ class ComponenteEquipoAdmin(admin.ModelAdmin):
     list_filter = ['tipo_equipo', 'activo']
     search_fields = ['nombre']
     ordering = ['nombre']
+
+
+@admin.register(ServicioRealizado)
+class ServicioRealizadoAdmin(admin.ModelAdmin):
+    """
+    Administración de Servicios Realizados
+    """
+    list_display = ['nombre', 'orden', 'activo', 'fecha_creacion', 'total_incidencias']
+    list_filter = ['activo']
+    search_fields = ['nombre', 'descripcion']
+    ordering = ['orden', 'nombre']
+    list_editable = ['orden', 'activo']
+    
+    def total_incidencias(self, obj):
+        """
+        Muestra el total de incidencias asociadas a este servicio
+        """
+        total = obj.incidencias.count()
+        return format_html(
+            '<span style="background-color: {}; padding: 3px 10px; border-radius: 3px; color: white; font-weight: bold;">{}</span>',
+            '#28a745' if total > 0 else '#6c757d',
+            total
+        )
+    total_incidencias.short_description = 'Incidencias'
 
 
 class EvidenciaIncidenciaInline(admin.TabularInline):
