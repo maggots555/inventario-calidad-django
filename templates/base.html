@@ -19,8 +19,21 @@
     <!-- CSS específico por página (opcional) -->
     {% block extra_css %}
     {% endblock %}
+    <!-- Script inline para prevenir parpadeo de sidebar -->
+    <script>
+        // Aplicar estado colapsado ANTES de que la página se renderice
+        // PREDETERMINADO: La sidebar inicia colapsada para usuarios nuevos
+        (function() {
+            const sidebarState = localStorage.getItem('sidebarCollapsed');
+            // Si no hay valor (null) o es 'true', aplicar colapsado
+            const isCollapsed = sidebarState === null || sidebarState === 'true';
+            if (isCollapsed) {
+                document.documentElement.style.setProperty('--sidebar-width', '70px');
+            }
+        })();
+    </script>
 </head>
-<body>
+<body class="sidebar-loading">
     <!-- Navbar Moderno -->
     <nav class="modern-navbar">
         <div class="navbar-container">
@@ -195,41 +208,201 @@
         </div>
     </nav>
 
-    <!-- Messages de Sistema -->
-    {% if messages %}
-        <div class="container-fluid mt-2">
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                    {% if message.tags == 'success' %}
-                        <i class="bi bi-check-circle-fill"></i>
-                    {% elif message.tags == 'error' %}
-                        <i class="bi bi-exclamation-triangle-fill"></i>
-                    {% elif message.tags == 'warning' %}
-                        <i class="bi bi-exclamation-circle-fill"></i>
-                    {% else %}
-                        <i class="bi bi-info-circle-fill"></i>
-                    {% endif %}
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <!-- Sidebar Profesional -->
+    <aside class="app-sidebar" id="appSidebar">
+        <script>
+            // Aplicar clase collapsed inmediatamente
+            // PREDETERMINADO: La sidebar inicia colapsada para usuarios nuevos
+            (function() {
+                const sidebar = document.currentScript.parentElement;
+                const sidebarState = localStorage.getItem('sidebarCollapsed');
+                // Si no hay valor (null) o es 'true', aplicar colapsado
+                if (sidebarState === null || sidebarState === 'true') {
+                    sidebar.classList.add('collapsed');
+                }
+            })();
+        </script>
+        <!-- Botón de Toggle -->
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Colapsar/Expandir Sidebar">
+            <i class="bi bi-chevron-left"></i>
+        </button>
+        
+        <!-- Menú de la Sidebar -->
+        <ul class="sidebar-menu">
+            <!-- Dashboard -->
+            <li class="sidebar-section">
+                <div class="sidebar-section-title">Principal</div>
+                <div class="sidebar-item">
+                    <a href="{% url 'home' %}" class="sidebar-link {% if request.path == '/' %}active{% endif %}">
+                        <i class="sidebar-icon bi bi-speedometer2"></i>
+                        <span class="sidebar-text">Dashboard</span>
+                        <span class="sidebar-tooltip">Dashboard Principal</span>
+                    </a>
                 </div>
-            {% endfor %}
-        </div>
-    {% endif %}
-
-    <!-- Contenido Principal -->
-    <div class="container-fluid main-content">
-        <div class="row">
-            <!-- Sidebar (opcional, solo en ciertas páginas) -->
-            {% block sidebar %}
-            {% endblock %}
+            </li>
             
-            <!-- Contenido Principal -->
-            <div class="col-12 {% block content_class %}{% endblock %}">
-                <main class="py-4">
-                    {% block content %}
-                    {% endblock %}
-                </main>
+            <!-- Inventario -->
+            <li class="sidebar-section">
+                <div class="sidebar-section-title">Inventario</div>
+                <div class="sidebar-item has-submenu" id="inventario-menu">
+                    <a href="#" class="sidebar-link">
+                        <i class="sidebar-icon bi bi-box-seam"></i>
+                        <span class="sidebar-text">Inventario</span>
+                        <i class="sidebar-arrow bi bi-chevron-right"></i>
+                        <span class="sidebar-tooltip">Módulo de Inventario</span>
+                    </a>
+                    <ul class="sidebar-submenu">
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'dashboard_inventario' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-bar-chart-line"></i>
+                                <span class="sidebar-text">Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'lista_productos' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-list-ul"></i>
+                                <span class="sidebar-text">Productos</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'crear_producto' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-plus-circle"></i>
+                                <span class="sidebar-text">Nuevo Producto</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'lista_movimientos' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-arrow-left-right"></i>
+                                <span class="sidebar-text">Movimientos</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'movimiento_rapido' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-qr-code-scan"></i>
+                                <span class="sidebar-text">Scanner QR</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+            
+            <!-- Control de Calidad -->
+            <li class="sidebar-section">
+                <div class="sidebar-section-title">Calidad</div>
+                <div class="sidebar-item has-submenu" id="calidad-menu">
+                    <a href="#" class="sidebar-link">
+                        <i class="sidebar-icon bi bi-shield-check"></i>
+                        <span class="sidebar-text">Scorecard</span>
+                        <i class="sidebar-arrow bi bi-chevron-right"></i>
+                        <span class="sidebar-tooltip">Control de Calidad</span>
+                    </a>
+                    <ul class="sidebar-submenu">
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'scorecard:dashboard' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-bar-chart-line"></i>
+                                <span class="sidebar-text">Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'scorecard:lista_incidencias' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-exclamation-triangle"></i>
+                                <span class="sidebar-text">Incidencias</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'scorecard:reportes' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-file-earmark-bar-graph"></i>
+                                <span class="sidebar-text">Reportes</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+            
+            <!-- Configuración -->
+            <li class="sidebar-section">
+                <div class="sidebar-section-title">Configuración</div>
+                <div class="sidebar-item has-submenu" id="config-menu">
+                    <a href="#" class="sidebar-link">
+                        <i class="sidebar-icon bi bi-gear"></i>
+                        <span class="sidebar-text">Configuración</span>
+                        <i class="sidebar-arrow bi bi-chevron-right"></i>
+                        <span class="sidebar-tooltip">Configuración del Sistema</span>
+                    </a>
+                    <ul class="sidebar-submenu">
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'lista_sucursales' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-building"></i>
+                                <span class="sidebar-text">Sucursales</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'lista_empleados' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-people"></i>
+                                <span class="sidebar-text">Empleados</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="/admin/" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-gear-fill"></i>
+                                <span class="sidebar-text">Admin Django</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+        </ul>
+    </aside>
+    
+    <!-- Overlay para móviles -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
+    <!-- Botón para abrir sidebar en móviles -->
+    <button class="mobile-sidebar-toggle" id="mobileSidebarToggle" aria-label="Abrir menú lateral">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Wrapper del contenido principal -->
+    <div class="main-wrapper" id="mainWrapper">
+        <script>
+            // Aplicar clase collapsed al wrapper si corresponde
+            // PREDETERMINADO: La sidebar inicia colapsada para usuarios nuevos
+            (function() {
+                const wrapper = document.currentScript.parentElement;
+                const sidebarState = localStorage.getItem('sidebarCollapsed');
+                // Si no hay valor (null) o es 'true', aplicar colapsado
+                if (sidebarState === null || sidebarState === 'true') {
+                    wrapper.classList.add('sidebar-collapsed');
+                }
+            })();
+        </script>
+        <!-- Messages de Sistema -->
+        {% if messages %}
+            <div class="container-fluid mt-3">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {% if message.tags == 'success' %}
+                            <i class="bi bi-check-circle-fill"></i>
+                        {% elif message.tags == 'error' %}
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                        {% elif message.tags == 'warning' %}
+                            <i class="bi bi-exclamation-circle-fill"></i>
+                        {% else %}
+                            <i class="bi bi-info-circle-fill"></i>
+                        {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
             </div>
+        {% endif %}
+
+        <!-- Contenido Principal -->
+        <div class="container-fluid main-content">
+            <main class="py-4">
+                {% block content %}
+                {% endblock %}
+            </main>
         </div>
     </div>
 

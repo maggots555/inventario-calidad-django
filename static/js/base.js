@@ -298,3 +298,286 @@ function inicializarNavbarModerno() {
 document.addEventListener('DOMContentLoaded', function() {
     inicializarNavbarModerno();
 });
+
+/* =============================================================================
+   SIDEBAR PROFESIONAL - Funcionalidad de la barra lateral colapsable
+   ============================================================================= */
+
+/**
+ * Inicializa la funcionalidad de la sidebar
+ */
+function inicializarSidebar() {
+    const sidebar = document.getElementById('appSidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const mainWrapper = document.getElementById('mainWrapper');
+    
+    if (!sidebar) return; // Si no hay sidebar, salir
+    
+    // Toggle de colapsar/expandir sidebar en desktop
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+            mainWrapper.classList.toggle('sidebar-collapsed');
+            
+            // Guardar estado en localStorage
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+            
+            // Cerrar todos los submenús abiertos al cambiar de modo
+            const openSubmenus = sidebar.querySelectorAll('.sidebar-item.has-submenu.open');
+            openSubmenus.forEach(function(submenu) {
+                submenu.classList.remove('open');
+                // Limpiar estilos inline de posición
+                const submenuList = submenu.querySelector('.sidebar-submenu');
+                if (submenuList) {
+                    submenuList.style.top = '';
+                }
+            });
+        });
+    }
+    
+    // Sincronizar mainWrapper con el estado inicial de la sidebar
+    // (la sidebar ya tiene la clase 'collapsed' del script inline si corresponde)
+    if (sidebar.classList.contains('collapsed')) {
+        mainWrapper.classList.add('sidebar-collapsed');
+    }
+    
+    // Toggle móvil para abrir/cerrar sidebar
+    if (mobileSidebarToggle) {
+        mobileSidebarToggle.addEventListener('click', function() {
+            sidebar.classList.add('mobile-open');
+            sidebarOverlay.classList.add('active');
+        });
+    }
+    
+    // Cerrar sidebar en móvil al hacer click en overlay
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', function() {
+            sidebar.classList.remove('mobile-open');
+            sidebarOverlay.classList.remove('active');
+        });
+    }
+    
+    // Funcionalidad de submenús - SIMPLE Y ROBUSTO
+    const submenus = document.querySelectorAll('.sidebar-item.has-submenu');
+    
+    submenus.forEach(function(submenu) {
+        const link = submenu.querySelector('.sidebar-link');
+        const submenuList = submenu.querySelector('.sidebar-submenu');
+        
+        if (!link || !submenuList) return;
+        
+        // Click en el link del menú principal (para abrir/cerrar)
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation(); // CRÍTICO: Evitar que el evento burbujee al document
+            
+            const isCurrentlyOpen = submenu.classList.contains('open');
+            
+            // Cerrar todos los demás submenús (acordeón)
+            submenus.forEach(function(otherSubmenu) {
+                if (otherSubmenu !== submenu) {
+                    otherSubmenu.classList.remove('open');
+                    const otherList = otherSubmenu.querySelector('.sidebar-submenu');
+                    if (otherList) {
+                        otherList.style.top = '';
+                    }
+                }
+            });
+            
+            // Toggle del actual
+            if (isCurrentlyOpen) {
+                submenu.classList.remove('open');
+                // Limpiar style top inline
+                submenuList.style.top = '';
+            } else {
+                submenu.classList.add('open');
+                
+                // Calcular posición top dinámica en modo colapsado
+                const isCollapsed = sidebar.classList.contains('collapsed');
+                if (isCollapsed) {
+                    // Esperar a que el tooltip se renderice completamente
+                    setTimeout(function() {
+                        // Obtener posición del item clickeado
+                        const itemRect = submenu.getBoundingClientRect();
+                        
+                        // Obtener altura real del tooltip
+                        const tooltipHeight = submenuList.offsetHeight;
+                        
+                        // Centrar verticalmente el tooltip respecto al item
+                        const centeredTop = itemRect.top + (itemRect.height / 2) - (tooltipHeight / 2);
+                        
+                        // Asegurar que no se salga por arriba (navbar = 70px + margen)
+                        const minTop = 80;
+                        // No salirse por abajo
+                        const maxTop = window.innerHeight - tooltipHeight - 20;
+                        
+                        // Aplicar posición limitada
+                        const finalTop = Math.max(minTop, Math.min(centeredTop, maxTop));
+                        
+                        submenuList.style.top = finalTop + 'px';
+                    }, 50); // Esperar 50ms para que se renderice
+                }
+            }
+        });
+        
+        // NUEVO: Event listener en el submenu para cerrar al hacer click en opciones
+        submenuList.addEventListener('click', function(e) {
+            // Si el click es en un link de navegación (no en el contenedor)
+            const clickedLink = e.target.closest('a');
+            if (clickedLink && clickedLink.href && clickedLink.href !== '#') {
+                console.log('🔗 Click detectado en link:', clickedLink.href);
+                console.log('🚪 Cerrando submenu...');
+                
+                // Cerrar el submenu inmediatamente
+                submenu.classList.remove('open');
+                submenuList.style.top = '';
+                
+                // Cerrar sidebar móvil si está abierta
+                if (window.innerWidth <= 992) {
+                    sidebar.classList.remove('mobile-open');
+                    if (sidebarOverlay) {
+                        sidebarOverlay.classList.remove('active');
+                    }
+                }
+                // No prevenir default - dejar que navegue normalmente
+            }
+        });
+        
+        // ADICIONAL: Capturar clicks específicamente en los links <a>
+        const allLinks = submenuList.querySelectorAll('a[href]:not([href="#"])');
+        allLinks.forEach(function(navLink) {
+            navLink.addEventListener('click', function(e) {
+                console.log('🎯 Click directo en link detectado');
+                // Cerrar submenu inmediatamente
+                submenu.classList.remove('open');
+                submenuList.style.top = '';
+                
+                // Cerrar sidebar móvil
+                if (window.innerWidth <= 992) {
+                    sidebar.classList.remove('mobile-open');
+                    if (sidebarOverlay) {
+                        sidebarOverlay.classList.remove('active');
+                    }
+                }
+            }, true); // useCapture = true para capturar ANTES que otros handlers
+        });
+    });
+    
+    // Cerrar tooltips al hacer click FUERA de la sidebar (solo modo colapsado)
+    document.addEventListener('click', function(e) {
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        if (!isCollapsed) return;
+        
+        // Si el click NO fue en la sidebar ni en sus elementos
+        if (!sidebar.contains(e.target)) {
+            const openSubmenus = sidebar.querySelectorAll('.sidebar-item.has-submenu.open');
+            openSubmenus.forEach(function(submenu) {
+                submenu.classList.remove('open');
+            });
+        }
+    });
+    
+    // Ajustar sidebar en cambio de tamaño de ventana
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            if (window.innerWidth > 992) {
+                // Desktop: remover clases móviles
+                sidebar.classList.remove('mobile-open');
+                sidebarOverlay.classList.remove('active');
+            }
+            // No cerrar submenús automáticamente - dejar que el usuario los controle
+        }, 250);
+    });
+    
+    // Marcar enlace activo basado en URL actual
+    marcarEnlaceActivo();
+    
+    // CRÍTICO: Cerrar todos los tooltips antes de que la página se descargue
+    window.addEventListener('beforeunload', function() {
+        const openSubmenus = sidebar.querySelectorAll('.sidebar-item.has-submenu.open');
+        openSubmenus.forEach(function(submenu) {
+            submenu.classList.remove('open');
+            const submenuList = submenu.querySelector('.sidebar-submenu');
+            if (submenuList) {
+                submenuList.style.top = '';
+            }
+        });
+    });
+    
+    // ADICIONAL: Detectar cambios de página con pagehide (más confiable que beforeunload)
+    window.addEventListener('pagehide', function() {
+        const openSubmenus = sidebar.querySelectorAll('.sidebar-item.has-submenu.open');
+        openSubmenus.forEach(function(submenu) {
+            submenu.classList.remove('open');
+        });
+    });
+}
+
+/**
+ * Marca el enlace activo en la sidebar según la URL actual
+ */
+function marcarEnlaceActivo() {
+    const currentPath = window.location.pathname;
+    const sidebarLinks = document.querySelectorAll('.sidebar-link');
+    const sidebar = document.getElementById('appSidebar');
+    
+    sidebarLinks.forEach(function(link) {
+        const href = link.getAttribute('href');
+        
+        // Remover clase active de todos los enlaces
+        link.classList.remove('active');
+        
+        // Marcar como activo si coincide la URL
+        if (href && currentPath.startsWith(href) && href !== '#') {
+            link.classList.add('active');
+            
+            // Si está dentro de un submenú, abrir el submenú padre
+            // SOLO si la sidebar está EXPANDIDA (no colapsada)
+            const parentSubmenu = link.closest('.sidebar-item.has-submenu');
+            if (parentSubmenu && sidebar && !sidebar.classList.contains('collapsed')) {
+                parentSubmenu.classList.add('open');
+            }
+        }
+    });
+}
+
+/**
+ * Actualiza los badges de notificación en la sidebar
+ * @param {string} menuId - ID del menú a actualizar
+ * @param {number} count - Número de notificaciones
+ */
+function actualizarBadgeSidebar(menuId, count) {
+    const menu = document.getElementById(menuId);
+    if (!menu) return;
+    
+    let badge = menu.querySelector('.sidebar-badge');
+    
+    if (count > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'sidebar-badge';
+            const link = menu.querySelector('.sidebar-link');
+            if (link) {
+                link.appendChild(badge);
+            }
+        }
+        badge.textContent = count > 99 ? '99+' : count;
+    } else if (badge) {
+        badge.remove();
+    }
+}
+
+// Inicializar sidebar al cargar el DOM
+document.addEventListener('DOMContentLoaded', function() {
+    inicializarSidebar();
+    
+    // Remover clase de loading para habilitar transiciones
+    setTimeout(function() {
+        document.body.classList.remove('sidebar-loading');
+    }, 100);
+});
