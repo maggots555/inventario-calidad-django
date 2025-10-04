@@ -1,4 +1,7 @@
 from django import forms
+from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from .models import Producto, Movimiento, Sucursal, Empleado
 
 class EmpleadoSelectWidget(forms.Select):
@@ -641,3 +644,163 @@ class MovimientoFraccionarioForm(forms.ModelForm):
         if commit:
             movimiento.save()
         return movimiento
+
+
+class CambioContraseñaInicialForm(forms.Form):
+    """
+    Formulario para cambio de contraseña inicial (primer login)
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario se usa cuando un empleado inicia sesión por primera vez
+    con su contraseña temporal. Le obliga a cambiarla por una segura.
+    
+    Campos:
+    - contraseña_temporal: La contraseña que recibió por email
+    - nueva_contraseña: La nueva contraseña que quiere usar
+    - confirmar_contraseña: Debe repetir la nueva contraseña (para evitar errores)
+    
+    Validaciones:
+    - Verifica que la contraseña temporal sea correcta
+    - Valida que la nueva contraseña cumpla requisitos de seguridad de Django
+    - Verifica que ambas contraseñas nuevas coincidan
+    """
+    
+    contraseña_temporal = forms.CharField(
+        label='Contraseña Temporal',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Contraseña que recibiste por email',
+            'autocomplete': 'current-password'
+        }),
+        help_text='Ingresa la contraseña temporal que recibiste por correo electrónico'
+    )
+    
+    nueva_contraseña = forms.CharField(
+        label='Nueva Contraseña',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Tu nueva contraseña segura',
+            'autocomplete': 'new-password'
+        }),
+        help_text='Mínimo 8 caracteres. Debe incluir letras y números.'
+    )
+    
+    confirmar_contraseña = forms.CharField(
+        label='Confirmar Nueva Contraseña',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Repite tu nueva contraseña',
+            'autocomplete': 'new-password'
+        }),
+        help_text='Vuelve a escribir tu nueva contraseña para confirmar'
+    )
+    
+    def __init__(self, user, *args, **kwargs):
+        """
+        Inicializar el formulario con el usuario actual
+        
+        EXPLICACIÓN:
+        Necesitamos el objeto 'user' para poder verificar que la contraseña
+        temporal ingresada sea correcta. Lo guardamos como atributo del form.
+        
+        Args:
+            user: El objeto User de Django del empleado actual
+        """
+        self.user = user
+        super().__init__(*args, **kwargs)
+    
+    def clean_contraseña_temporal(self):
+        """
+        Valida que la contraseña temporal ingresada sea correcta
+        
+        EXPLICACIÓN:
+        Django almacena las contraseñas encriptadas (hasheadas), nunca en texto plano.
+        Usamos check_password() para verificar si la contraseña ingresada coincide
+        con el hash almacenado en la base de datos.
+        
+        Returns:
+            str: La contraseña temporal si es válida
+        
+        Raises:
+            ValidationError: Si la contraseña temporal es incorrecta
+        """
+        contraseña_temporal = self.cleaned_data.get('contraseña_temporal')
+        
+        # Verificar que la contraseña temporal sea correcta
+        # check_password compara el texto plano con el hash almacenado
+        if not self.user.check_password(contraseña_temporal):
+            raise ValidationError(
+                'La contraseña temporal es incorrecta. '
+                'Por favor verifica tu email y vuelve a intentarlo.'
+            )
+        
+        return contraseña_temporal
+    
+    def clean(self):
+        """
+        Validación completa del formulario (todos los campos juntos)
+        
+        EXPLICACIÓN:
+        Este método se ejecuta después de validar cada campo individual.
+        Aquí verificamos que:
+        1. La nueva contraseña cumpla con los requisitos de seguridad de Django
+        2. Ambas contraseñas nuevas coincidan
+        
+        Returns:
+            dict: Los datos limpiados y validados
+        
+        Raises:
+            ValidationError: Si hay problemas con la nueva contraseña
+        """
+        cleaned_data = super().clean()
+        nueva_contraseña = cleaned_data.get('nueva_contraseña')
+        confirmar_contraseña = cleaned_data.get('confirmar_contraseña')
+        
+        # Validar que ambas contraseñas nuevas coincidan
+        if nueva_contraseña and confirmar_contraseña:
+            if nueva_contraseña != confirmar_contraseña:
+                raise ValidationError({
+                    'confirmar_contraseña': 'Las contraseñas no coinciden. Por favor verifica.'
+                })
+        
+        # Validar que la nueva contraseña cumpla requisitos de seguridad
+        # Django incluye validadores como:
+        # - Mínimo 8 caracteres
+        # - No puede ser muy común (como "password123")
+        # - No puede ser muy similar al username
+        # - No puede ser completamente numérica
+        if nueva_contraseña:
+            try:
+                validate_password(nueva_contraseña, self.user)
+            except ValidationError as e:
+                # Agregar el error al campo nueva_contraseña
+                self.add_error('nueva_contraseña', e)
+        
+        return cleaned_data
+    
+    def save(self, commit=True):
+        """
+        Guarda la nueva contraseña del usuario
+        
+        EXPLICACIÓN:
+        Cuando el formulario es válido, este método:
+        1. Toma la nueva contraseña
+        2. La encripta usando set_password() (NUNCA guardar contraseñas en texto plano)
+        3. Guarda el usuario en la base de datos
+        
+        Args:
+            commit: Si True, guarda inmediatamente en la base de datos
+        
+        Returns:
+            User: El objeto usuario con la contraseña actualizada
+        """
+        nueva_contraseña = self.cleaned_data['nueva_contraseña']
+        
+        # set_password() encripta automáticamente la contraseña
+        # Usa un algoritmo hash seguro (PBKDF2 por defecto en Django)
+        self.user.set_password(nueva_contraseña)
+        
+        if commit:
+            self.user.save()
+        
+        return self.user

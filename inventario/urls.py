@@ -37,6 +37,7 @@ urlpatterns = [
     path('empleados/<int:empleado_id>/reenviar-credenciales/', views.reenviar_credenciales, name='reenviar_credenciales'),
     path('empleados/<int:empleado_id>/resetear-contraseña/', views.resetear_contraseña_empleado, name='resetear_contraseña_empleado'),
     path('empleados/<int:empleado_id>/revocar-acceso/', views.revocar_acceso_empleado, name='revocar_acceso_empleado'),
+    path('empleados/<int:empleado_id>/reactivar-acceso/', views.reactivar_acceso_empleado, name='reactivar_acceso_empleado'),
     
     # API endpoints
     path('api/buscar-producto-qr/', views.buscar_producto_qr, name='buscar_producto_qr'),

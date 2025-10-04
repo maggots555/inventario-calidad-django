@@ -28,6 +28,10 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(template_name='logout.html'), name='logout'),
     
+    # Cambio de contraseña inicial (Fase 5)
+    # NOTA: Usar solo caracteres ASCII en URLs para evitar problemas de codificación
+    path('cambiar-password-inicial/', inventario_views.cambiar_contraseña_inicial, name='cambiar_contraseña_inicial'),
+    
     # Dashboard principal
     path('', inventario_views.dashboard_principal, name='home'),  # Dashboard principal unificado
     

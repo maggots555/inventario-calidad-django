@@ -45,9 +45,18 @@
                     <label for="acceso_sistema" class="form-label">Acceso Sistema</label>
                     <select class="form-control" id="acceso_sistema" name="acceso_sistema">
                         <option value="">Todos</option>
-                        <option value="activo" {% if acceso_seleccionado == 'activo' %}selected{% endif %}>Con Acceso Activo</option>
-                        <option value="pendiente" {% if acceso_seleccionado == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                        <option value="sin_acceso" {% if acceso_seleccionado == 'sin_acceso' %}selected{% endif %}>Sin Acceso</option>
+                        <option value="activo" {% if acceso_seleccionado == 'activo' %}selected{% endif %}>
+                            <i class="bi bi-check-circle"></i> Acceso Activo
+                        </option>
+                        <option value="pendiente" {% if acceso_seleccionado == 'pendiente' %}selected{% endif %}>
+                            <i class="bi bi-hourglass"></i> Pendiente Activación
+                        </option>
+                        <option value="revocado" {% if acceso_seleccionado == 'revocado' %}selected{% endif %}>
+                            <i class="bi bi-lock"></i> Acceso Revocado
+                        </option>
+                        <option value="sin_acceso" {% if acceso_seleccionado == 'sin_acceso' %}selected{% endif %}>
+                            <i class="bi bi-x-circle"></i> Sin Acceso
+                        </option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -154,30 +163,43 @@
                                 </td>
                                 <td class="text-center">
                                     {% if empleado.user %}
-                                        {% if empleado.contraseña_configurada %}
-                                            <span class="badge bg-success">
-                                                <i class="bi bi-check-circle-fill"></i> Activo
-                                            </span>
-                                            <br>
-                                            {% if empleado.user.last_login %}
-                                                <small class="text-muted" title="Último acceso">
-                                                    <i class="bi bi-clock"></i> {{ empleado.user.last_login|date:"d/m/Y H:i" }}
-                                                </small>
+                                        {% if empleado.user.is_active %}
+                                            {# Usuario ACTIVO #}
+                                            {% if empleado.contraseña_configurada %}
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle-fill"></i> Activo
+                                                </span>
+                                                <br>
+                                                {% if empleado.user.last_login %}
+                                                    <small class="text-muted" title="Último acceso">
+                                                        <i class="bi bi-clock"></i> {{ empleado.user.last_login|date:"d/m/Y H:i" }}
+                                                    </small>
+                                                {% else %}
+                                                    <small class="text-muted">
+                                                        <i class="bi bi-info-circle"></i> Nunca accedió
+                                                    </small>
+                                                {% endif %}
                                             {% else %}
-                                                <small class="text-muted">
-                                                    <i class="bi bi-info-circle"></i> Nunca accedió
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="bi bi-hourglass-split"></i> Pendiente
+                                                </span>
+                                                <br>
+                                                <small class="text-muted" title="Email enviado">
+                                                    <i class="bi bi-envelope"></i> {{ empleado.fecha_envio_credenciales|date:"d/m/Y" }}
                                                 </small>
                                             {% endif %}
                                         {% else %}
-                                            <span class="badge bg-warning text-dark">
-                                                <i class="bi bi-hourglass-split"></i> Pendiente
+                                            {# Usuario REVOCADO (inactivo) #}
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-lock-fill"></i> Revocado
                                             </span>
                                             <br>
-                                            <small class="text-muted" title="Email enviado">
-                                                <i class="bi bi-envelope"></i> {{ empleado.fecha_envio_credenciales|date:"d/m/Y" }}
+                                            <small class="text-muted">
+                                                <i class="bi bi-info-circle"></i> Acceso desactivado
                                             </small>
                                         {% endif %}
                                     {% else %}
+                                        {# Sin usuario creado #}
                                         <span class="badge bg-secondary">
                                             <i class="bi bi-x-circle"></i> Sin acceso
                                         </span>
@@ -207,13 +229,16 @@
                                                 <button type="button" 
                                                         class="btn btn-sm btn-outline-success dropdown-toggle" 
                                                         data-bs-toggle="dropdown" 
+                                                        data-bs-auto-close="true"
+                                                        data-bs-offset="-120,0"
                                                         aria-expanded="false"
                                                         title="Gestionar Acceso">
                                                     <i class="bi bi-shield-lock"></i>
                                                 </button>
                                                 <ul class="dropdown-menu">
                                                     {% if not empleado.user %}
-                                                        <!-- Empleado sin acceso -->
+                                                        {# ========== ESTADO 1: SIN USUARIO ========== #}
+                                                        {# El empleado nunca ha tenido acceso al sistema #}
                                                         <li>
                                                             <a class="dropdown-item" 
                                                                href="{% url 'dar_acceso_empleado' empleado.id %}"
@@ -225,13 +250,42 @@
                                                             <li><hr class="dropdown-divider"></li>
                                                             <li>
                                                                 <span class="dropdown-item text-muted small">
-                                                                    <i class="bi bi-exclamation-circle"></i> Requiere email
+                                                                    <i class="bi bi-exclamation-circle"></i> Requiere email registrado
                                                                 </span>
                                                             </li>
                                                         {% endif %}
+                                                    {% elif not empleado.user.is_active %}
+                                                        {# ========== ESTADO 2: USUARIO REVOCADO ========== #}
+                                                        {# El empleado tuvo acceso pero fue revocado #}
+                                                        <li>
+                                                            <h6 class="dropdown-header text-danger">
+                                                                <i class="bi bi-lock-fill"></i> Acceso Revocado
+                                                            </h6>
+                                                        </li>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li>
+                                                            <a class="dropdown-item" 
+                                                               href="{% url 'reactivar_acceso_empleado' empleado.id %}"
+                                                               onclick="return confirm('¿Reactivar acceso de {{ empleado.nombre_completo }}?\n\nSe generará una nueva contraseña temporal y se enviará por email.');">
+                                                                <i class="bi bi-unlock-fill text-success"></i> Reactivar Acceso
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <span class="dropdown-item text-muted small">
+                                                                <i class="bi bi-info-circle"></i> Se enviará nueva contraseña
+                                                            </span>
+                                                        </li>
                                                     {% else %}
-                                                        <!-- Empleado con acceso -->
+                                                        {# ========== ESTADO 3: USUARIO ACTIVO ========== #}
+                                                        {# El empleado tiene acceso activo al sistema #}
                                                         {% if not empleado.contraseña_configurada %}
+                                                            {# Sub-estado: Pendiente de configurar contraseña #}
+                                                            <li>
+                                                                <h6 class="dropdown-header text-warning">
+                                                                    <i class="bi bi-hourglass-split"></i> Pendiente de Activación
+                                                                </h6>
+                                                            </li>
+                                                            <li><hr class="dropdown-divider"></li>
                                                             <li>
                                                                 <a class="dropdown-item" 
                                                                    href="{% url 'reenviar_credenciales' empleado.id %}"
@@ -239,11 +293,22 @@
                                                                     <i class="bi bi-envelope-fill text-primary"></i> Reenviar Credenciales
                                                                 </a>
                                                             </li>
+                                                            <li><hr class="dropdown-divider"></li>
+                                                        {% else %}
+                                                            {# Sub-estado: Acceso completamente activo #}
+                                                            <li>
+                                                                <h6 class="dropdown-header text-success">
+                                                                    <i class="bi bi-check-circle-fill"></i> Acceso Activo
+                                                                </h6>
+                                                            </li>
+                                                            <li><hr class="dropdown-divider"></li>
                                                         {% endif %}
+                                                        
+                                                        {# Opciones disponibles para usuarios activos #}
                                                         <li>
                                                             <a class="dropdown-item" 
                                                                href="{% url 'resetear_contraseña_empleado' empleado.id %}"
-                                                               onclick="return confirm('¿Resetear contraseña de {{ empleado.nombre_completo }}?\n\nSe generará una nueva contraseña temporal.');">
+                                                               onclick="return confirm('¿Resetear contraseña de {{ empleado.nombre_completo }}?\n\nSe generará una nueva contraseña temporal y deberá cambiarla en el próximo acceso.');">
                                                                 <i class="bi bi-arrow-clockwise text-warning"></i> Resetear Contraseña
                                                             </a>
                                                         </li>
@@ -253,6 +318,11 @@
                                                                href="{% url 'revocar_acceso_empleado' empleado.id %}">
                                                                 <i class="bi bi-shield-x"></i> Revocar Acceso
                                                             </a>
+                                                        </li>
+                                                        <li>
+                                                            <span class="dropdown-item text-muted small">
+                                                                <i class="bi bi-info-circle"></i> Podrás reactivarlo después
+                                                            </span>
                                                         </li>
                                                     {% endif %}
                                                 </ul>

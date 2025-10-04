@@ -2141,3 +2141,50 @@ input[readonly].form-control:focus {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
+
+/* =============================================================================
+   DROPDOWN MENUS DE GESTIÓN DE ACCESO
+   Descripción: Estilos visuales para dropdowns en lista de empleados
+   NOTA: El posicionamiento lo maneja Bootstrap/Popper.js automáticamente
+   ============================================================================= */
+
+/* Ancho mínimo para que el contenido sea legible */
+.btn-group .dropdown-menu {
+    min-width: 260px;
+}
+
+/* Estilizar headers del dropdown (estados: Activo, Revocado, Pendiente) */
+.dropdown-header {
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+}
+
+/* Mejorar hover de items del menú */
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.2s ease;
+}
+
+/* Items informativos (no clickeables) con texto pequeño */
+.dropdown-item.text-muted.small {
+    font-size: 0.75rem;
+    padding: 0.25rem 1rem;
+    cursor: default;
+}
+
+.dropdown-item.text-muted.small:hover {
+    background-color: transparent;
+}
+
+/* Iconos en items del dropdown */
+.dropdown-item i.bi {
+    margin-right: 0.5rem;
+    font-size: 1rem;
+}
+
+/* Dividers en dropdown */
+.dropdown-divider {
+    margin: 0.5rem 0;
+}
+

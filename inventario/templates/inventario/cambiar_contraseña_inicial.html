@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+
+{% block title %}Cambiar Contraseña - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            {# Card principal con diseño profesional #}
+            <div class="card shadow-lg border-0">
+                {# Encabezado con gradiente #}
+                <div class="card-header text-white text-center py-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <i class="bi bi-shield-lock" style="font-size: 3rem;"></i>
+                    <h3 class="mt-2 mb-0">🔐 Configuración de Contraseña</h3>
+                    <p class="mb-0 mt-1">Primer acceso al sistema</p>
+                </div>
+                
+                <div class="card-body p-4">
+                    {# Mensaje de bienvenida personalizado #}
+                    <div class="alert alert-info border-0 shadow-sm mb-4" role="alert">
+                        <h5 class="alert-heading">
+                            <i class="bi bi-info-circle-fill"></i> 
+                            ¡Bienvenido, {{ empleado.nombre_completo }}!
+                        </h5>
+                        <hr>
+                        <p class="mb-2">
+                            <strong>Por seguridad</strong>, necesitas cambiar tu contraseña temporal 
+                            por una contraseña personal que solo tú conozcas.
+                        </p>
+                        <p class="mb-0">
+                            <i class="bi bi-check-circle"></i> 
+                            Después de cambiarla, tendrás acceso completo al sistema.
+                        </p>
+                    </div>
+
+                    {# Requisitos de seguridad #}
+                    <div class="alert alert-warning border-0 shadow-sm mb-4" role="alert">
+                        <h6 class="alert-heading mb-2">
+                            <i class="bi bi-exclamation-triangle-fill"></i> 
+                            Requisitos de Contraseña Segura:
+                        </h6>
+                        <ul class="mb-0 ps-3">
+                            <li>Mínimo <strong>8 caracteres</strong></li>
+                            <li>Debe incluir <strong>letras y números</strong></li>
+                            <li>No puede ser muy común (como "password123")</li>
+                            <li>No puede ser similar a tu nombre de usuario</li>
+                        </ul>
+                    </div>
+
+                    {# Mensajes de Django (errores/éxitos) #}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {# Formulario de cambio de contraseña #}
+                    <form method="post" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        {# Campo: Contraseña Temporal #}
+                        <div class="mb-4">
+                            <label for="{{ form.contraseña_temporal.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-key"></i> {{ form.contraseña_temporal.label }}
+                            </label>
+                            {{ form.contraseña_temporal }}
+                            
+                            {# Texto de ayuda #}
+                            {% if form.contraseña_temporal.help_text %}
+                                <div class="form-text">
+                                    <i class="bi bi-lightbulb"></i> {{ form.contraseña_temporal.help_text }}
+                                </div>
+                            {% endif %}
+                            
+                            {# Errores del campo #}
+                            {% if form.contraseña_temporal.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.contraseña_temporal.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <hr class="my-4">
+
+                        {# Campo: Nueva Contraseña #}
+                        <div class="mb-4">
+                            <label for="{{ form.nueva_contraseña.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-shield-check"></i> {{ form.nueva_contraseña.label }}
+                            </label>
+                            {{ form.nueva_contraseña }}
+                            
+                            {# Texto de ayuda #}
+                            {% if form.nueva_contraseña.help_text %}
+                                <div class="form-text">
+                                    <i class="bi bi-lightbulb"></i> {{ form.nueva_contraseña.help_text }}
+                                </div>
+                            {% endif %}
+                            
+                            {# Errores del campo #}
+                            {% if form.nueva_contraseña.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.nueva_contraseña.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        {# Campo: Confirmar Nueva Contraseña #}
+                        <div class="mb-4">
+                            <label for="{{ form.confirmar_contraseña.id_for_label }}" class="form-label fw-bold">
+                                <i class="bi bi-shield-check"></i> {{ form.confirmar_contraseña.label }}
+                            </label>
+                            {{ form.confirmar_contraseña }}
+                            
+                            {# Texto de ayuda #}
+                            {% if form.confirmar_contraseña.help_text %}
+                                <div class="form-text">
+                                    <i class="bi bi-lightbulb"></i> {{ form.confirmar_contraseña.help_text }}
+                                </div>
+                            {% endif %}
+                            
+                            {# Errores del campo #}
+                            {% if form.confirmar_contraseña.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.confirmar_contraseña.errors %}
+                                        <i class="bi bi-exclamation-circle"></i> {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        {# Errores generales del formulario (no específicos de un campo) #}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    <i class="bi bi-exclamation-triangle-fill"></i> {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <hr class="my-4">
+
+                        {# Botones de acción #}
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-circle"></i> Cambiar Contraseña y Continuar
+                            </button>
+                            <a href="{% url 'logout' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                            </a>
+                        </div>
+                    </form>
+
+                    {# Nota de seguridad al pie #}
+                    <div class="mt-4 pt-3 border-top">
+                        <p class="text-muted small text-center mb-0">
+                            <i class="bi bi-shield-fill-check text-success"></i>
+                            Tu contraseña será encriptada y almacenada de forma segura.
+                            <br>
+                            Nunca compartas tu contraseña con nadie.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {# Información adicional (opcional) #}
+            <div class="text-center mt-4">
+                <p class="text-muted">
+                    <i class="bi bi-question-circle"></i>
+                    ¿Problemas para acceder? Contacta al administrador del sistema.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# CSS personalizado para este template #}
+<style>
+    /* Estilo para los campos de contraseña con icono */
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    
+    /* Animación suave para las alertas */
+    .alert {
+        animation: slideDown 0.3s ease-out;
+    }
+    
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Estilo para el card */
+    .card {
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    
+    /* Mejora visual de los botones */
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+</style>
+
+{# JavaScript para validación del formulario (opcional) #}
+<script>
+    // Validación HTML5 mejorada
+    (function() {
+        'use strict';
+        var forms = document.querySelectorAll('.needs-validation');
+        Array.prototype.slice.call(forms).forEach(function(form) {
+            form.addEventListener('submit', function(event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    })();
+    
+    // Mostrar/ocultar contraseñas (opcional - puedes agregar botones para esto)
+    function togglePasswordVisibility(fieldId) {
+        const field = document.getElementById(fieldId);
+        if (field.type === 'password') {
+            field.type = 'text';
+        } else {
+            field.type = 'password';
+        }
+    }
+</script>
+{% endblock %}

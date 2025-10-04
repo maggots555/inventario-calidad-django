@@ -61,6 +61,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Middleware personalizado para forzar cambio de contraseña en primer login
+    # DEBE estar después de AuthenticationMiddleware (para tener acceso a request.user)
+    'inventario.middleware.ForcePasswordChangeMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

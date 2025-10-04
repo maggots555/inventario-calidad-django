@@ -751,11 +751,25 @@ def lista_empleados(request):
     
     # Filtro de acceso al sistema
     if acceso_sistema == 'activo':
-        # Empleados con usuario creado y contraseña configurada
-        empleados = empleados.filter(user__isnull=False, contraseña_configurada=True)
+        # Empleados con usuario activo y contraseña configurada
+        empleados = empleados.filter(
+            user__isnull=False, 
+            user__is_active=True,
+            contraseña_configurada=True
+        )
     elif acceso_sistema == 'pendiente':
-        # Empleados con usuario pero sin configurar contraseña
-        empleados = empleados.filter(user__isnull=False, contraseña_configurada=False)
+        # Empleados con usuario activo pero sin configurar contraseña
+        empleados = empleados.filter(
+            user__isnull=False,
+            user__is_active=True,
+            contraseña_configurada=False
+        )
+    elif acceso_sistema == 'revocado':
+        # Empleados con usuario pero desactivado (acceso revocado)
+        empleados = empleados.filter(
+            user__isnull=False,
+            user__is_active=False
+        )
     elif acceso_sistema == 'sin_acceso':
         # Empleados sin usuario de sistema
         empleados = empleados.filter(user__isnull=True)
@@ -1063,6 +1077,110 @@ def revocar_acceso_empleado(request, empleado_id):
     return render(request, 'inventario/confirmar_revocar_acceso.html', {
         'empleado': empleado,
     })
+
+
+@login_required
+@staff_required
+def reactivar_acceso_empleado(request, empleado_id):
+    """
+    Reactiva el acceso al sistema de un empleado previamente revocado
+    Vuelve a activar su usuario y opcionalmente genera nueva contraseña
+    Solo accesible para usuarios staff/superusuario
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista se usa cuando un empleado tuvo acceso, se le revocó, y ahora
+    necesitamos dárselo de vuelta. A diferencia de "dar acceso" (que crea
+    un nuevo usuario), esta función solo reactiva el usuario existente.
+    
+    Flujo:
+    1. Verificar que el empleado tenga un usuario desactivado
+    2. Reactivar el usuario (is_active = True)
+    3. Generar nueva contraseña temporal (por seguridad)
+    4. Enviar email con las nuevas credenciales
+    5. Actualizar campos de control
+    """
+    from .utils import generar_contraseña_temporal, enviar_credenciales_empleado
+    
+    empleado = get_object_or_404(Empleado, id=empleado_id)
+    
+    # ===== VALIDACIONES =====
+    
+    # Validación 1: Debe tener un usuario existente
+    if not empleado.user:
+        messages.warning(
+            request, 
+            f'{empleado.nombre_completo} no tiene usuario creado. '
+            f'Usa "Dar Acceso" en lugar de "Reactivar".'
+        )
+        return redirect('lista_empleados')
+    
+    # Validación 2: El usuario debe estar inactivo (revocado)
+    if empleado.user.is_active:
+        messages.info(
+            request,
+            f'{empleado.nombre_completo} ya tiene acceso activo al sistema.'
+        )
+        return redirect('lista_empleados')
+    
+    # Validación 3: Debe tener email para recibir credenciales
+    if not empleado.email:
+        messages.error(
+            request,
+            f'El empleado {empleado.nombre_completo} no tiene un email registrado. '
+            f'Por favor, actualiza su información primero.'
+        )
+        return redirect('editar_empleado', empleado_id=empleado.id)
+    
+    # ===== PROCESO DE REACTIVACIÓN =====
+    
+    try:
+        # Paso 1: Generar nueva contraseña temporal (por seguridad)
+        # No usamos la contraseña anterior por seguridad
+        nueva_contraseña = generar_contraseña_temporal()
+        
+        # Paso 2: Actualizar la contraseña del usuario
+        empleado.user.set_password(nueva_contraseña)
+        
+        # Paso 3: Reactivar el usuario
+        empleado.user.is_active = True
+        empleado.user.save()
+        
+        # Paso 4: Actualizar campos del empleado
+        empleado.tiene_acceso_sistema = True
+        empleado.contraseña_configurada = False  # Debe cambiarla en primer login
+        empleado.fecha_activacion_acceso = None  # Se establecerá cuando cambie la contraseña
+        empleado.save()
+        
+        # Paso 5: Enviar email con las nuevas credenciales
+        email_enviado = enviar_credenciales_empleado(
+            empleado, 
+            nueva_contraseña, 
+            es_reenvio=True  # Usar template de reenvío
+        )
+        
+        # Paso 6: Mostrar mensaje de éxito
+        if email_enviado:
+            messages.success(
+                request,
+                f'✅ Acceso reactivado para {empleado.nombre_completo}. '
+                f'Las nuevas credenciales han sido enviadas a {empleado.email}'
+            )
+        else:
+            messages.warning(
+                request,
+                f'⚠️ Acceso reactivado pero hubo un problema al enviar el email. '
+                f'Contraseña temporal: {nueva_contraseña} '
+                f'(guárdala y compártela de forma segura con el empleado)'
+            )
+    
+    except Exception as e:
+        # Si hay cualquier error, mostrarlo
+        messages.error(
+            request,
+            f'❌ Error al reactivar acceso: {str(e)}'
+        )
+    
+    return redirect('lista_empleados')
 
 
 # ===== REPORTES =====
@@ -1486,3 +1604,87 @@ def descargar_reporte_excel(request):
     wb.save(response)
     
     return response
+
+
+# ===== CAMBIO DE CONTRASEÑA INICIAL (FASE 5) =====
+@login_required
+def cambiar_contraseña_inicial(request):
+    """
+    Vista para cambio obligatorio de contraseña en el primer login
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista se muestra cuando un empleado inicia sesión por primera vez
+    con su contraseña temporal. El middleware redirige aquí automáticamente
+    hasta que el empleado cambie su contraseña.
+    
+    Flujo:
+    1. Empleado recibe email con contraseña temporal
+    2. Inicia sesión por primera vez
+    3. Middleware detecta que contraseña_configurada=False
+    4. Lo redirige a esta vista
+    5. Empleado cambia su contraseña
+    6. Se actualiza contraseña_configurada=True
+    7. Puede acceder normalmente al sistema
+    
+    IMPORTANTE:
+    - Solo usuarios que tienen un perfil de Empleado llegan aquí
+    - Staff/superusers no pasan por este flujo
+    - Si el empleado ya cambió su contraseña, se redirige al dashboard
+    """
+    
+    # Verificar que el usuario tenga un perfil de empleado asociado
+    try:
+        empleado = request.user.empleado
+    except Empleado.DoesNotExist:
+        # Si el usuario no tiene perfil de empleado (es staff/admin), redirigir
+        messages.warning(request, 'Esta página es solo para empleados con acceso inicial.')
+        return redirect('home')
+    
+    # Si ya configuró su contraseña, redirigir al dashboard
+    if empleado.contraseña_configurada:
+        messages.info(request, 'Ya has configurado tu contraseña previamente.')
+        return redirect('home')
+    
+    if request.method == 'POST':
+        # Procesar el formulario enviado
+        from .forms import CambioContraseñaInicialForm
+        form = CambioContraseñaInicialForm(request.user, request.POST)
+        
+        if form.is_valid():
+            # Guardar la nueva contraseña
+            form.save()
+            
+            # Actualizar campos del empleado
+            empleado.contraseña_configurada = True
+            empleado.fecha_activacion_acceso = timezone.now()
+            empleado.save()
+            
+            # Mantener la sesión activa (actualizar session auth hash)
+            # Sin esto, el usuario sería deslogueado al cambiar su contraseña
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(request, request.user)
+            
+            messages.success(
+                request, 
+                '✅ ¡Contraseña actualizada correctamente! '
+                'Ahora puedes acceder a todas las funciones del sistema.'
+            )
+            return redirect('home')  # Redirigir al dashboard principal
+        else:
+            # Si hay errores, se mostrarán automáticamente en el template
+            messages.error(
+                request,
+                '❌ Por favor corrige los errores en el formulario.'
+            )
+    else:
+        # Primera carga de la página (GET request)
+        from .forms import CambioContraseñaInicialForm
+        form = CambioContraseñaInicialForm(request.user)
+    
+    # Renderizar el template con el formulario
+    context = {
+        'form': form,
+        'empleado': empleado,
+    }
+    
+    return render(request, 'inventario/cambiar_contraseña_inicial.html', context)
