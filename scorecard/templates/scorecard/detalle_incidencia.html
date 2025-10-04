@@ -4,107 +4,127 @@
 {% block title %}{{ incidencia.folio }} - Score Card - {{ block.super }}{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <h1 class="display-6">
-                <i class="bi bi-file-earmark-text text-info"></i>
-                {{ incidencia.folio }}
-                {% if not incidencia.es_atribuible %}
-                <span class="badge bg-info ms-2" title="Esta incidencia NO es atribuible al técnico">
-                    <i class="bi bi-shield-x"></i> No Atribuible
-                </span>
-                {% endif %}
-            </h1>
-            <p class="text-muted">Detalle de la incidencia</p>
-        </div>
-        <div class="col-md-6 text-end">
-            <div class="btn-group" role="group">
-                <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" class="btn btn-warning">
-                    <i class="bi bi-pencil"></i> Editar
+<div class="container-fluid mt-4">
+    <!-- Encabezado Modernizado -->
+    <div class="detalle-header">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="display-6 mb-2">
+                    <i class="bi bi-file-earmark-text text-info"></i>
+                    {{ incidencia.folio }}
+                    {% if not incidencia.es_atribuible %}
+                    <span class="badge bg-info ms-2" title="Esta incidencia NO es atribuible al técnico">
+                        <i class="bi bi-shield-x"></i> No Atribuible
+                    </span>
+                    {% endif %}
+                </h1>
+                <p class="text-muted fs-5 mb-0">Detalle completo de la incidencia</p>
+            </div>
+            <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" class="btn btn-warning btn-lg">
+                    <i class="bi bi-pencil-fill"></i> Editar Incidencia
                 </a>
             </div>
         </div>
     </div>
 
     <!-- Botones de Acción Rápida -->
-    <div class="card shadow mb-4 border-primary">
-        <div class="card-header bg-light">
-            <h5 class="mb-0"><i class="bi bi-lightning"></i> Acciones Rápidas</h5>
+    <div class="card acciones-rapidas-card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-lightning-charge-fill"></i> 
+                Acciones Rápidas
+            </h5>
         </div>
-        <div class="card-body">
-            <div class="row g-3">
-                <!-- Cambiar Estado -->
-                <div class="col-md-3">
+        <div class="card-body p-4">
+            <div class="row g-4">
+                <!-- Enviar Notificación Manual -->
+                <div class="col-xl-3 col-lg-6 col-md-6">
                     {% if incidencia.estado != 'cerrada' %}
-                        <a href="{% url 'scorecard:cambiar_estado_incidencia' incidencia.id %}" class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3">
-                            <i class="bi bi-arrow-left-right fs-3 mb-2"></i>
-                            <strong>Cambiar Estado</strong>
-                            <small class="text-muted">Actual: {{ incidencia.get_estado_display }}</small>
-                        </a>
+                        <button type="button" class="btn-accion-individual btn-notificar w-100 h-100 p-4" id="btnAbrirModalNotificacion">
+                            <i class="bi bi-send-fill fs-1 mb-3 text-secondary"></i>
+                            <strong class="fs-5">Enviar Notificación</strong>
+                            <small class="text-muted mt-2">Manual a destinatarios</small>
+                        </button>
                     {% else %}
-                        <div class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3 disabled" style="opacity: 0.5; cursor: not-allowed;">
-                            <i class="bi bi-arrow-left-right fs-3 mb-2"></i>
-                            <strong>Cambiar Estado</strong>
-                            <small class="text-muted">No disponible (cerrada)</small>
+                        <div class="alert alert-accion-completada alert-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4 mb-0">
+                            <i class="bi bi-send-slash-fill fs-1 mb-3"></i>
+                            <strong class="fs-5">Notificaciones Deshabilitadas</strong>
+                            <small class="text-muted mt-2">Incidencia cerrada</small>
                         </div>
                     {% endif %}
                 </div>
                 
                 <!-- Marcar NO Atribuible -->
                 {% if incidencia.es_atribuible and incidencia.estado != 'cerrada' %}
-                <div class="col-md-3">
-                    <a href="{% url 'scorecard:marcar_no_atribuible' incidencia.id %}" class="btn btn-outline-info w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3">
-                        <i class="bi bi-shield-x fs-3 mb-2"></i>
-                        <strong>Marcar NO Atribuible</strong>
-                        <small class="text-muted">No cuenta en scorecard</small>
+                <div class="col-xl-3 col-lg-6 col-md-6">
+                    <a href="{% url 'scorecard:marcar_no_atribuible' incidencia.id %}" class="btn-accion-individual btn-no-atribuible w-100 h-100 p-4">
+                        <i class="bi bi-shield-x fs-1 mb-3 text-info"></i>
+                        <strong class="fs-5">Marcar NO Atribuible</strong>
+                        <small class="text-muted mt-2">No cuenta en scorecard</small>
                     </a>
                 </div>
                 {% elif not incidencia.es_atribuible %}
-                <div class="col-md-3">
-                    <div class="alert alert-info mb-0 h-100 d-flex flex-column align-items-center justify-content-center p-3">
-                        <i class="bi bi-shield-check fs-3 mb-2"></i>
-                        <strong>Ya NO es Atribuible</strong>
-                        <small class="text-muted">Marcado el {{ incidencia.fecha_marcado_no_atribuible|date:"d/m/Y" }}</small>
+                <div class="col-xl-3 col-lg-6 col-md-6">
+                    <div class="alert alert-accion-completada alert-info w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4 mb-0">
+                        <i class="bi bi-shield-check-fill fs-1 mb-3"></i>
+                        <strong class="fs-5">Ya NO es Atribuible</strong>
+                        <small class="text-muted mt-2">Marcado el {{ incidencia.fecha_marcado_no_atribuible|date:"d/m/Y" }}</small>
                     </div>
                 </div>
                 {% endif %}
                 
-                <!-- Cerrar Incidencia -->
-                {% if incidencia.estado != 'cerrada' %}
-                <div class="col-md-3">
-                    <a href="{% url 'scorecard:cerrar_incidencia' incidencia.id %}" class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3">
-                        <i class="bi bi-check-circle fs-3 mb-2"></i>
-                        <strong>Cerrar Incidencia</strong>
-                        <small class="text-muted">Con notificación automática</small>
-                    </a>
-                </div>
-                {% else %}
-                <div class="col-md-3">
-                    <div class="alert alert-success mb-0 h-100 d-flex flex-column align-items-center justify-content-center p-3">
-                        <i class="bi bi-check-circle-fill fs-3 mb-2"></i>
-                        <strong>Cerrada</strong>
-                        <small class="text-muted">{{ incidencia.fecha_cierre|date:"d/m/Y H:i" }}</small>
-                    </div>
-                </div>
-                {% endif %}
-                
-                <!-- Enviar Notificación Manual -->
-                <div class="col-md-3">
+                <!-- Cambiar Estado - Dinámico según estado actual -->
+                <div class="col-xl-3 col-lg-6 col-md-6">
                     {% if incidencia.estado != 'cerrada' %}
-                        <button type="button" class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3" id="btnAbrirModalNotificacion">
-                            <i class="bi bi-send fs-3 mb-2"></i>
-                            <strong>Enviar Notificación</strong>
-                            <small class="text-muted">Manual a destinatarios</small>
-                        </button>
+                        <a href="{% url 'scorecard:cambiar_estado_incidencia' incidencia.id %}" 
+                           class="btn-accion-individual 
+                                  {% if incidencia.estado == 'abierta' %}btn-estado-abierta
+                                  {% elif incidencia.estado == 'en_revision' %}btn-estado-en_revision
+                                  {% elif incidencia.estado == 'reincidente' %}btn-estado-reincidente
+                                  {% endif %} 
+                                  w-100 h-100 p-4">
+                            {% if incidencia.estado == 'abierta' %}
+                                <i class="bi bi-play-circle-fill fs-1 mb-3 text-info"></i>
+                                <strong class="fs-5">Cambiar Estado</strong>
+                                <small class="text-muted mt-2">Actual: <span class="badge bg-info text-dark">{{ incidencia.get_estado_display }}</span></small>
+                            {% elif incidencia.estado == 'en_revision' %}
+                                <i class="bi bi-hourglass-split fs-1 mb-3 text-warning"></i>
+                                <strong class="fs-5">Cambiar Estado</strong>
+                                <small class="text-muted mt-2">Actual: <span class="badge bg-warning ">{{ incidencia.get_estado_display }}</span></small>
+                            {% elif incidencia.estado == 'reincidente' %}
+                                <i class="bi bi-exclamation-triangle-fill fs-1 mb-3 text-danger"></i>
+                                <strong class="fs-5">Cambiar Estado</strong>
+                                <small class="text-muted mt-2">Actual: <span class="badge bg-danger">{{ incidencia.get_estado_display }}</span></small>
+                            {% endif %}
+                        </a>
                     {% else %}
-                        <div class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3 disabled" style="opacity: 0.5; cursor: not-allowed;">
-                            <i class="bi bi-send fs-3 mb-2"></i>
-                            <strong>Enviar Notificación</strong>
-                            <small class="text-muted">No disponible (cerrada)</small>
+                        <div class="alert alert-accion-completada alert-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4 mb-0">
+                            <i class="bi bi-lock-fill fs-1 mb-3"></i>
+                            <strong class="fs-5">Estado Cerrado</strong>
+                            <small class="text-muted mt-2">No se puede cambiar</small>
                         </div>
                     {% endif %}
                 </div>
+                
+                <!-- Cerrar Incidencia -->
+                {% if incidencia.estado != 'cerrada' %}
+                <div class="col-xl-3 col-lg-6 col-md-6">
+                    <a href="{% url 'scorecard:cerrar_incidencia' incidencia.id %}" class="btn-accion-individual btn-cerrar w-100 h-100 p-4">
+                        <i class="bi bi-check-circle-fill fs-1 mb-3 text-success"></i>
+                        <strong class="fs-5">Cerrar Incidencia</strong>
+                        <small class="text-muted mt-2">Con notificación automática</small>
+                    </a>
+                </div>
+                {% else %}
+                <div class="col-xl-3 col-lg-6 col-md-6">
+                    <div class="alert alert-accion-completada alert-success w-100 h-100 d-flex flex-column align-items-center justify-content-center p-4 mb-0">
+                        <i class="bi bi-check-circle-fill fs-1 mb-3"></i>
+                        <strong class="fs-5">Incidencia Cerrada</strong>
+                        <small class="text-muted mt-2">{{ incidencia.fecha_cierre|date:"d/m/Y H:i" }}</small>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -132,115 +152,291 @@
     </div>
     {% endif %}
 
-    <!-- Información básica -->
-    <div class="card shadow mb-4">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0"><i class="bi bi-info-circle"></i> Información General</h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <p><strong>Folio:</strong> {{ incidencia.folio }}</p>
-                    <p><strong>Fecha Detección:</strong> {{ incidencia.fecha_deteccion|date:"d/m/Y" }}</p>
-                    <p><strong>Estado:</strong> 
-                        <span class="badge badge-categoria" 
-                              style="background-color: {{ incidencia.estado|color_estado }}; 
-                                     color: {{ incidencia.estado|color_estado|text_color_for_bg }};">
-                            <i class="bi bi-circle-fill"></i>
-                            {{ incidencia.get_estado_display }}
-                        </span>
-                    </p>
-                    <p><strong>Severidad:</strong> 
-                        <span class="badge badge-categoria" 
-                              style="background-color: {{ incidencia.grado_severidad|color_severidad }}; 
-                                     color: {{ incidencia.grado_severidad|color_severidad|text_color_for_bg }};">
-                            <i class="bi bi-exclamation-triangle-fill"></i>
-                            {{ incidencia.get_grado_severidad_display }}
-                        </span>
-                    </p>
+    <!-- Row para Cards lado a lado -->
+    <div class="row g-4 mb-4">
+        <!-- Columna: Información General -->
+        <div class="col-lg-6">
+            <!-- Información básica -->
+            <div class="card info-card-modern h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle-fill"></i> 
+                        Información General
+                    </h5>
                 </div>
-                <div class="col-md-6">
-                    <p><strong>Tipo de Equipo:</strong> {{ incidencia.get_tipo_equipo_display }}</p>
-                    <p><strong>Marca:</strong> {{ incidencia.marca }}</p>
-                    <p><strong>Modelo:</strong> {{ incidencia.modelo|default:"N/A" }}</p>
-                    <p><strong>Número de Serie (Service Tag):</strong> <code>{{ incidencia.numero_serie }}</code></p>
-                    {% if incidencia.numero_orden %}
-                        <p><strong>Número de Orden:</strong> <code>{{ incidencia.numero_orden }}</code></p>
-                    {% endif %}
-                    <p><strong>Servicio Realizado:</strong> 
-                        {% if incidencia.servicio_realizado %}
-                            <span class="badge badge-categoria" 
-                                  style="background-color: {{ incidencia.servicio_realizado.nombre|color_servicio }}; 
-                                         color: {{ incidencia.servicio_realizado.nombre|color_servicio|text_color_for_bg }};">
-                                <i class="bi bi-tools"></i> {{ incidencia.servicio_realizado.nombre }}
-                            </span>
-                        {% else %}
-                            <span class="text-muted">No especificado</span>
+                <div class="card-body">
+                    <ul class="info-list">
+                        <!-- Folio -->
+                        <li class="info-list-item">
+                            <div class="info-icon">
+                                <i class="bi bi-file-earmark-text-fill"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Folio:</span>
+                                <span class="info-value">{{ incidencia.folio }}</span>
+                            </div>
+                        </li>
+
+                        <!-- Fecha Detección -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-info">
+                                <i class="bi bi-calendar3"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Fecha Detección:</span>
+                                <span class="info-value">{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</span>
+                            </div>
+                        </li>
+
+                        <!-- Estado -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-warning">
+                                <i class="bi bi-circle-fill"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Estado:</span>
+                                <span class="info-value">
+                                    <span class="badge badge-categoria" 
+                                          style="background-color: {{ incidencia.estado|color_estado }}; 
+                                                 color: {{ incidencia.estado|color_estado|text_color_for_bg }};">
+                                        <i class="bi bi-circle-fill"></i>
+                                        {{ incidencia.get_estado_display }}
+                                    </span>
+                                </span>
+                            </div>
+                        </li>
+
+                        <!-- Severidad -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-danger">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Severidad:</span>
+                                <span class="info-value">
+                                    <span class="badge badge-categoria" 
+                                          style="background-color: {{ incidencia.grado_severidad|color_severidad }}; 
+                                                 color: {{ incidencia.grado_severidad|color_severidad|text_color_for_bg }};">
+                                        <i class="bi bi-exclamation-triangle-fill"></i>
+                                        {{ incidencia.get_grado_severidad_display }}
+                                    </span>
+                                </span>
+                            </div>
+                        </li>
+
+                        <!-- Tipo de Equipo -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-secondary">
+                                <i class="bi bi-laptop"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Tipo de Equipo:</span>
+                                <span class="info-value">{{ incidencia.get_tipo_equipo_display }}</span>
+                            </div>
+                        </li>
+
+                        <!-- Marca -->
+                        <li class="info-list-item">
+                            <div class="info-icon">
+                                <i class="bi bi-tag-fill"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Marca:</span>
+                                <span class="info-value">{{ incidencia.marca }}</span>
+                            </div>
+                        </li>
+
+                        <!-- Modelo -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-secondary">
+                                <i class="bi bi-cpu-fill"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Modelo:</span>
+                                <span class="info-value">{{ incidencia.modelo|default:"N/A" }}</span>
+                            </div>
+                        </li>
+
+                        <!-- Número de Serie -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-info">
+                                <i class="bi bi-upc-scan"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">N° Serie (Service Tag):</span>
+                                <span class="info-value"><code>{{ incidencia.numero_serie }}</code></span>
+                            </div>
+                        </li>
+
+                        <!-- Número de Orden (si existe) -->
+                        {% if incidencia.numero_orden %}
+                        <li class="info-list-item">
+                            <div class="info-icon icon-warning">
+                                <i class="bi bi-receipt"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Número de Orden:</span>
+                                <span class="info-value"><code>{{ incidencia.numero_orden }}</code></span>
+                            </div>
+                        </li>
                         {% endif %}
-                    </p>
+
+                        <!-- Servicio Realizado -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-success">
+                                <i class="bi bi-tools"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Servicio Realizado:</span>
+                                <span class="info-value">
+                                    {% if incidencia.servicio_realizado %}
+                                        <span class="badge badge-categoria" 
+                                              style="background-color: {{ incidencia.servicio_realizado.nombre|color_servicio }}; 
+                                                     color: {{ incidencia.servicio_realizado.nombre|color_servicio|text_color_for_bg }};">
+                                            <i class="bi bi-tools"></i> {{ incidencia.servicio_realizado.nombre }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">No especificado</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Responsables -->
-    <div class="card shadow mb-4">
-        <div class="card-header bg-info text-white">
-            <h5 class="mb-0"><i class="bi bi-people"></i> Responsables</h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <p><strong>Sucursal:</strong> {{ incidencia.sucursal.nombre }}</p>
-                    <p><strong>Área Detectora:</strong> {{ incidencia.get_area_detectora_display }}</p>
+        <!-- Columna: Responsables -->
+        <div class="col-lg-6">
+            <!-- Responsables -->
+            <div class="card info-card-modern card-info h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-people-fill"></i> 
+                        Responsables
+                    </h5>
                 </div>
-                <div class="col-md-6">
-                    <p><strong>Técnico/Personal Responsable:</strong> {{ incidencia.tecnico_responsable.nombre_completo }}</p>
-                    {% if incidencia.area_tecnico %}
-                        <p><strong>Área:</strong> 
-                            <span class="badge badge-categoria" 
-                                  style="background-color: {{ incidencia.area_tecnico|color_area }}; 
-                                         color: {{ incidencia.area_tecnico|color_area|text_color_for_bg }};">
-                                <i class="bi bi-briefcase"></i> {{ incidencia.area_tecnico }}
-                            </span>
-                        </p>
-                    {% endif %}
-                    <p><strong>Inspector de Calidad:</strong> {{ incidencia.inspector_calidad.nombre_completo }}</p>
+                <div class="card-body">
+                    <ul class="info-list">
+                        <!-- Sucursal -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-info">
+                                <i class="bi bi-building"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Sucursal:</span>
+                                <span class="info-value">{{ incidencia.sucursal.nombre }}</span>
+                            </div>
+                        </li>
+
+                        <!-- Área Detectora -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-warning">
+                                <i class="bi bi-geo-alt-fill"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Área Detectora:</span>
+                                <span class="info-value">{{ incidencia.get_area_detectora_display }}</span>
+                            </div>
+                        </li>
+
+                        <!-- Técnico Responsable -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-danger">
+                                <i class="bi bi-person-fill"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Técnico/Personal:</span>
+                                <span class="info-value">{{ incidencia.tecnico_responsable.nombre_completo }}</span>
+                            </div>
+                        </li>
+
+                        <!-- Área del Técnico (si existe) -->
+                        {% if incidencia.area_tecnico %}
+                        <li class="info-list-item">
+                            <div class="info-icon icon-secondary">
+                                <i class="bi bi-briefcase-fill"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Área:</span>
+                                <span class="info-value">
+                                    <span class="badge badge-categoria" 
+                                          style="background-color: {{ incidencia.area_tecnico|color_area }}; 
+                                                 color: {{ incidencia.area_tecnico|color_area|text_color_for_bg }};">
+                                        <i class="bi bi-briefcase"></i> {{ incidencia.area_tecnico }}
+                                    </span>
+                                </span>
+                            </div>
+                        </li>
+                        {% endif %}
+
+                        <!-- Inspector de Calidad -->
+                        <li class="info-list-item">
+                            <div class="info-icon icon-success">
+                                <i class="bi bi-shield-check"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Inspector de Calidad:</span>
+                                <span class="info-value">{{ incidencia.inspector_calidad.nombre_completo }}</span>
+                            </div>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Descripción -->
-    <div class="card shadow mb-4">
-        <div class="card-header bg-warning">
-            <h5 class="mb-0"><i class="bi bi-file-text"></i> Descripción</h5>
+    <div class="card info-card-modern card-warning">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-file-text-fill"></i> 
+                Descripción de la Incidencia
+            </h5>
         </div>
         <div class="card-body">
-            <p><strong>Descripción de la Incidencia:</strong></p>
-            <p class="text-justify">{{ incidencia.descripcion_incidencia }}</p>
+            <div class="info-description-box">
+                <div class="info-description-label">
+                    <i class="bi bi-journal-text"></i>
+                    Descripción de la Incidencia:
+                </div>
+                <p>{{ incidencia.descripcion_incidencia }}</p>
+            </div>
             
             {% if incidencia.acciones_tomadas %}
-            <hr>
-            <p><strong>Acciones Tomadas:</strong></p>
-            <p class="text-justify">{{ incidencia.acciones_tomadas }}</p>
+            <div class="info-section-divider"></div>
+            <div class="info-description-box" style="border-left-color: var(--success-color);">
+                <div class="info-description-label">
+                    <i class="bi bi-check2-circle" style="color: var(--success-color);"></i>
+                    Acciones Tomadas:
+                </div>
+                <p>{{ incidencia.acciones_tomadas }}</p>
+            </div>
             {% endif %}
         </div>
     </div>
 
     <!-- Evidencias -->
     {% if evidencias %}
-    <div class="card shadow mb-4">
-        <div class="card-header bg-success text-white">
-            <h5 class="mb-0"><i class="bi bi-images"></i> Evidencias ({{ evidencias.count }})</h5>
+    <div class="card info-card-modern card-success">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-images"></i> 
+                Evidencias Fotográficas ({{ evidencias.count }})
+            </h5>
         </div>
-        <div class="card-body">
-            <div class="row">
+        <div class="card-body p-4">
+            <div class="gallery-modern">
                 {% for evidencia in evidencias %}
-                <div class="col-md-3 mb-3">
-                    <img src="{{ evidencia.imagen.url }}" class="img-fluid rounded" alt="Evidencia">
+                <div class="gallery-item">
+                    <img src="{{ evidencia.imagen.url }}" alt="Evidencia {{ forloop.counter }}">
+                    <div class="gallery-zoom-icon">
+                        <i class="bi bi-zoom-in"></i>
+                    </div>
                     {% if evidencia.descripcion %}
-                    <p class="small text-muted mt-1">{{ evidencia.descripcion }}</p>
+                    <div class="gallery-item-caption">
+                        <p>{{ evidencia.descripcion }}</p>
+                    </div>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -250,109 +446,152 @@
     {% endif %}
 
     <!-- Notificaciones -->
-    <div class="card shadow mb-4 border-primary">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0"><i class="bi bi-clock-history"></i> Historial de Envíos</h5>
+    <div class="card info-card-modern">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-clock-history"></i> 
+                Historial de Notificaciones
+            </h5>
         </div>
-        <div class="card-body">
+        <div class="card-body p-4">
                     
                     {% if notificaciones_enviadas %}
-                        <div class="timeline">
+                        <div class="timeline-modern">
                             {% for notif in notificaciones_enviadas %}
-                            <div class="timeline-item mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}">
-                                <div class="d-flex align-items-start">
-                                    <div class="flex-shrink-0 me-3">
-                                        {% if notif.exitoso or notif.enviado_exitoso %}
-                                            <span class="badge bg-success rounded-circle p-2">
-                                                <i class="bi bi-check-lg"></i>
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-danger rounded-circle p-2">
-                                                <i class="bi bi-x-lg"></i>
-                                            </span>
-                                        {% endif %}
-                                    </div>
-                                    <div class="flex-grow-1">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div>
-                                                <strong class="d-block">
-                                                    {% if notif.exitoso or notif.enviado_exitoso %}
-                                                        <span class="text-success">Enviado exitosamente</span>
-                                                    {% else %}
-                                                        <span class="text-danger">Error en envío</span>
-                                                    {% endif %}
-                                                    
-                                                    <!-- Badge del tipo de notificación -->
-                                                    {% if notif.tipo_notificacion == 'no_atribuible' %}
-                                                        <span class="badge bg-info ms-2">No Atribuible</span>
-                                                    {% elif notif.tipo_notificacion == 'cierre' %}
-                                                        <span class="badge bg-success ms-2">Cierre</span>
-                                                    {% elif notif.tipo_notificacion == 'cierre_no_atribuible' %}
-                                                        <span class="badge bg-info ms-2">Cierre (No Atribuible)</span>
-                                                    {% elif notif.tipo_notificacion == 'manual' %}
-                                                        <span class="badge bg-secondary ms-2">Manual</span>
-                                                    {% endif %}
-                                                </strong>
-                                                <small class="text-muted">
-                                                    <i class="bi bi-calendar"></i> {{ notif.fecha_envio|date:"d/m/Y H:i" }}
-                                                    <br>
-                                                    <i class="bi bi-person"></i> Por: {{ notif.enviado_por }}
-                                                </small>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Destinatarios -->
-                                        <div class="mt-2">
-                                            <small class="text-muted">
-                                                <i class="bi bi-people"></i> <strong>Destinatarios:</strong>
-                                            </small>
-                                            <div class="mt-1">
-                                                {% for dest in notif.get_destinatarios_list %}
-                                                    <span class="badge bg-warning text-dark me-1 mb-1">
-                                                        {{ dest.nombre }}
+                            <div class="timeline-modern-item">
+                                <!-- Icono del timeline -->
+                                <div class="timeline-icon {% if notif.exitoso or notif.enviado_exitoso %}success{% else %}danger{% endif %}">
+                                    {% if notif.exitoso or notif.enviado_exitoso %}
+                                        <i class="bi bi-check-lg"></i>
+                                    {% else %}
+                                        <i class="bi bi-x-lg"></i>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Contenido del timeline -->
+                                <div class="timeline-content">
+                                    <div class="timeline-header">
+                                        <div>
+                                            <h6 class="timeline-title">
+                                                {% if notif.exitoso or notif.enviado_exitoso %}
+                                                    <span class="text-success">
+                                                        <i class="bi bi-check-circle-fill"></i> Enviado exitosamente
                                                     </span>
-                                                {% empty %}
-                                                    <span class="text-muted small">Sin destinatarios</span>
-                                                {% endfor %}
+                                                {% else %}
+                                                    <span class="text-danger">
+                                                        <i class="bi bi-exclamation-circle-fill"></i> Error en envío
+                                                    </span>
+                                                {% endif %}
+                                            </h6>
+                                            <div class="timeline-date">
+                                                <i class="bi bi-calendar3"></i> {{ notif.fecha_envio|date:"d/m/Y H:i" }}
+                                                <span class="mx-2">|</span>
+                                                <i class="bi bi-person-fill"></i> {{ notif.enviado_por }}
                                             </div>
                                         </div>
-                                        
-                                        <!-- Asunto del email -->
-                                        <div class="mt-2">
-                                            <small class="text-muted">
-                                                <i class="bi bi-envelope"></i> {{ notif.asunto }}
-                                            </small>
+                                        <div class="timeline-badges">
+                                            {% if notif.tipo_notificacion == 'no_atribuible' %}
+                                                <span class="timeline-badge bg-info text-white">No Atribuible</span>
+                                            {% elif notif.tipo_notificacion == 'cierre' %}
+                                                <span class="timeline-badge bg-success text-white">Cierre</span>
+                                            {% elif notif.tipo_notificacion == 'cierre_no_atribuible' %}
+                                                <span class="timeline-badge bg-info text-white">Cierre (No Atribuible)</span>
+                                            {% elif notif.tipo_notificacion == 'manual' %}
+                                                <span class="timeline-badge bg-secondary text-white">Manual</span>
+                                            {% endif %}
                                         </div>
-                                        
-                                        <!-- Mensaje de error si existe -->
-                                        {% if not notif.exitoso and not notif.enviado_exitoso and notif.mensaje_error %}
-                                        <div class="alert alert-danger alert-sm mt-2 mb-0 py-1 px-2">
-                                            <small><i class="bi bi-exclamation-triangle"></i> {{ notif.mensaje_error }}</small>
-                                        </div>
-                                        {% endif %}
                                     </div>
+                                    
+                                    <!-- Asunto -->
+                                    <div class="mt-3">
+                                        <strong class="text-muted">
+                                            <i class="bi bi-envelope-fill"></i> Asunto:
+                                        </strong>
+                                        <p class="mb-0 mt-1">{{ notif.asunto }}</p>
+                                    </div>
+                                    
+                                    <!-- Destinatarios -->
+                                    <div class="mt-3">
+                                        <strong class="text-muted">
+                                            <i class="bi bi-people-fill"></i> Destinatarios:
+                                        </strong>
+                                        <div class="mt-2 d-flex flex-wrap gap-2">
+                                            {% for dest in notif.get_destinatarios_list %}
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="bi bi-person"></i> {{ dest.nombre }}
+                                                </span>
+                                            {% empty %}
+                                                <span class="text-muted small">Sin destinatarios</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Mensaje de error si existe -->
+                                    {% if not notif.exitoso and not notif.enviado_exitoso and notif.mensaje_error %}
+                                    <div class="alert alert-danger mt-3 mb-0 py-2 px-3">
+                                        <small>
+                                            <i class="bi bi-exclamation-triangle-fill"></i> 
+                                            <strong>Error:</strong> {{ notif.mensaje_error }}
+                                        </small>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             {% endfor %}
                         </div>
                     {% else %}
-                        <div class="text-center text-muted py-4">
-                            <i class="bi bi-inbox display-4 d-block mb-2"></i>
-                            <p class="mb-0">No se han enviado notificaciones aún</p>
-                            <small>Las notificaciones enviadas aparecerán aquí</small>
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-inbox display-1 d-block mb-3 opacity-50"></i>
+                            <h5 class="fw-bold">No se han enviado notificaciones aún</h5>
+                            <p class="mb-0">Las notificaciones enviadas aparecerán aquí con su historial completo</p>
                         </div>
                     {% endif %}
         </div>
     </div>
 
     <!-- Botones de acción -->
-    <div class="mt-3 mb-5">
-        <a href="{% url 'scorecard:lista_incidencias' %}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Volver a la Lista
+    <div class="mt-4 mb-5 d-flex gap-3 flex-wrap">
+        <a href="{% url 'scorecard:lista_incidencias' %}" class="btn btn-outline-secondary btn-lg">
+            <i class="bi bi-arrow-left-circle"></i> Volver a la Lista
         </a>
-        <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" class="btn btn-warning">
-            <i class="bi bi-pencil"></i> Editar
+        <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" class="btn btn-warning btn-lg">
+            <i class="bi bi-pencil-square"></i> Editar Incidencia
         </a>
+    </div>
+</div>
+
+<!-- Modal para Galería de Imágenes -->
+<div class="modal fade" id="modalGaleria" tabindex="-1" aria-labelledby="modalGaleriaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-0">
+                <h5 class="modal-title text-white" id="modalGaleriaLabel">
+                    <i class="bi bi-images"></i> Evidencia <span id="imagenNumero"></span> de {{ evidencias.count }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-0" style="position: relative;">
+                <!-- Botón anterior -->
+                <button type="button" class="btn btn-light position-absolute top-50 start-0 translate-middle-y ms-3" 
+                        id="btnAnterior" style="z-index: 10; opacity: 0.8; border-radius: 50%; width: 45px; height: 45px;">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                
+                <!-- Imagen principal -->
+                <img id="imagenModal" src="" alt="Evidencia" class="img-fluid" style="max-height: 70vh; width: auto;">
+                
+                <!-- Botón siguiente -->
+                <button type="button" class="btn btn-light position-absolute top-50 end-0 translate-middle-y me-3" 
+                        id="btnSiguiente" style="z-index: 10; opacity: 0.8; border-radius: 50%; width: 45px; height: 45px;">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+                
+                <!-- Descripción de la imagen -->
+                <div id="descripcionModal" class="text-white p-3 bg-dark bg-opacity-75" style="display: none;">
+                    <p class="mb-0"></p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -457,6 +696,90 @@
 <script>
 // JavaScript para manejar el modal de notificaciones
 document.addEventListener('DOMContentLoaded', function() {
+    // ==========================================
+    // GALERÍA DE IMÁGENES
+    // ==========================================
+    {% if evidencias %}
+    const modalGaleria = new bootstrap.Modal(document.getElementById('modalGaleria'));
+    const imagenModal = document.getElementById('imagenModal');
+    const descripcionModal = document.getElementById('descripcionModal');
+    const imagenNumero = document.getElementById('imagenNumero');
+    const btnAnterior = document.getElementById('btnAnterior');
+    const btnSiguiente = document.getElementById('btnSiguiente');
+    
+    // Array con todas las imágenes y sus descripciones
+    const evidencias = [
+        {% for evidencia in evidencias %}
+        {
+            url: "{{ evidencia.imagen.url }}",
+            descripcion: "{{ evidencia.descripcion|default:''|escapejs }}",
+            numero: {{ forloop.counter }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    let indiceActual = 0;
+    
+    // Función para mostrar imagen en el modal
+    function mostrarImagen(indice) {
+        indiceActual = indice;
+        const evidencia = evidencias[indice];
+        
+        // Actualizar imagen
+        imagenModal.src = evidencia.url;
+        imagenModal.alt = `Evidencia ${evidencia.numero}`;
+        
+        // Actualizar número
+        imagenNumero.textContent = evidencia.numero;
+        
+        // Mostrar u ocultar descripción
+        if (evidencia.descripcion) {
+            descripcionModal.querySelector('p').textContent = evidencia.descripcion;
+            descripcionModal.style.display = 'block';
+        } else {
+            descripcionModal.style.display = 'none';
+        }
+        
+        // Controlar visibilidad de botones de navegación
+        btnAnterior.style.display = indice > 0 ? 'block' : 'none';
+        btnSiguiente.style.display = indice < evidencias.length - 1 ? 'block' : 'none';
+    }
+    
+    // Agregar event listeners a las miniaturas de la galería
+    document.querySelectorAll('.gallery-item').forEach((item, index) => {
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', function() {
+            mostrarImagen(index);
+            modalGaleria.show();
+        });
+    });
+    
+    // Navegación entre imágenes
+    btnAnterior.addEventListener('click', function() {
+        if (indiceActual > 0) {
+            mostrarImagen(indiceActual - 1);
+        }
+    });
+    
+    btnSiguiente.addEventListener('click', function() {
+        if (indiceActual < evidencias.length - 1) {
+            mostrarImagen(indiceActual + 1);
+        }
+    });
+    
+    // Navegación con teclado (flechas izquierda/derecha)
+    document.getElementById('modalGaleria').addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowLeft' && indiceActual > 0) {
+            mostrarImagen(indiceActual - 1);
+        } else if (e.key === 'ArrowRight' && indiceActual < evidencias.length - 1) {
+            mostrarImagen(indiceActual + 1);
+        }
+    });
+    {% endif %}
+    
+    // ==========================================
+    // MODAL DE NOTIFICACIONES
+    // ==========================================
     const modalNotificacion = new bootstrap.Modal(document.getElementById('modalNotificacion'));
     const btnAbrirModal = document.getElementById('btnAbrirModalNotificacion');
     const btnEnviar = document.getElementById('btnEnviarNotificacion');
