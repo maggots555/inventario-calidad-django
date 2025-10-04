@@ -147,4 +147,154 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+    
+    // Inicializar botón Scroll to Top
+    inicializarScrollToTop();
+});
+
+/* =============================================================================
+   SCROLL TO TOP - Funcionalidad del botón para volver arriba
+   ============================================================================= */
+
+/**
+ * Inicializa el botón de Scroll to Top
+ * Muestra/oculta el botón según la posición del scroll
+ * y maneja el click para scroll suave hacia arriba
+ */
+function inicializarScrollToTop() {
+    const scrollButton = document.getElementById('scrollToTop');
+    
+    if (!scrollButton) {
+        return; // Si el botón no existe, salir
+    }
+    
+    // Distancia en píxeles para mostrar el botón
+    const scrollThreshold = 300;
+    
+    /**
+     * Función para mostrar/ocultar el botón según el scroll
+     */
+    function toggleScrollButton() {
+        if (window.pageYOffset > scrollThreshold) {
+            scrollButton.classList.add('visible');
+        } else {
+            scrollButton.classList.remove('visible');
+        }
+    }
+    
+    /**
+     * Función para hacer scroll suave hacia arriba
+     */
+    function scrollToTop() {
+        // Usar smooth scroll nativo del navegador
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+        
+        // Alternativa con animación manual para navegadores antiguos
+        // (comentado, pero disponible si se necesita)
+        /*
+        const scrollStep = -window.scrollY / (500 / 15);
+        const scrollInterval = setInterval(function() {
+            if (window.scrollY !== 0) {
+                window.scrollBy(0, scrollStep);
+            } else {
+                clearInterval(scrollInterval);
+            }
+        }, 15);
+        */
+    }
+    
+    // Event listener para el scroll (con throttle para mejor performance)
+    let scrollTimeout;
+    window.addEventListener('scroll', function() {
+        if (scrollTimeout) {
+            window.cancelAnimationFrame(scrollTimeout);
+        }
+        
+        scrollTimeout = window.requestAnimationFrame(function() {
+            toggleScrollButton();
+        });
+    });
+    
+    // Event listener para el click del botón
+    scrollButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        scrollToTop();
+    });
+    
+    // Verificar posición inicial al cargar la página
+    toggleScrollButton();
+}
+
+/* =============================================================================
+   NAVBAR MODERNO - Funcionalidad de dropdowns y menú móvil
+   ============================================================================= */
+
+/**
+ * Inicializa la funcionalidad del navbar moderno
+ */
+function inicializarNavbarModerno() {
+    // Toggle menú móvil
+    const mobileToggle = document.getElementById('navbarToggle');
+    const navbarMenu = document.getElementById('navbarMenu');
+    
+    if (mobileToggle && navbarMenu) {
+        mobileToggle.addEventListener('click', function() {
+            this.classList.toggle('active');
+            navbarMenu.classList.toggle('active');
+        });
+    }
+    
+    // Dropdowns en desktop
+    const dropdownLinks = document.querySelectorAll('.navbar-menu-link[data-dropdown]');
+    
+    dropdownLinks.forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // En móvil, toggle el dropdown
+            if (window.innerWidth <= 992) {
+                const parentItem = this.closest('.navbar-menu-item');
+                parentItem.classList.toggle('active');
+            }
+        });
+    });
+    
+    // Cerrar dropdowns al hacer click fuera
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.navbar-menu-item')) {
+            document.querySelectorAll('.navbar-menu-item').forEach(function(item) {
+                item.classList.remove('active');
+            });
+        }
+    });
+    
+    // Cerrar menú móvil al hacer click en un enlace
+    const navbarLinks = navbarMenu ? navbarMenu.querySelectorAll('a:not([data-dropdown])') : [];
+    navbarLinks.forEach(function(link) {
+        link.addEventListener('click', function() {
+            if (window.innerWidth <= 992) {
+                if (mobileToggle) mobileToggle.classList.remove('active');
+                if (navbarMenu) navbarMenu.classList.remove('active');
+            }
+        });
+    });
+    
+    // Cerrar menú móvil al hacer resize a desktop
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 992) {
+            if (mobileToggle) mobileToggle.classList.remove('active');
+            if (navbarMenu) navbarMenu.classList.remove('active');
+            document.querySelectorAll('.navbar-menu-item').forEach(function(item) {
+                item.classList.remove('active');
+            });
+        }
+    });
+}
+
+// Llamar inicialización del navbar al cargar el DOM
+document.addEventListener('DOMContentLoaded', function() {
+    inicializarNavbarModerno();
 });

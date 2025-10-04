@@ -3,6 +3,7 @@ Vistas para el sistema de Score Card
 """
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
@@ -16,6 +17,7 @@ from collections import defaultdict
 import json
 
 
+@login_required
 def dashboard(request):
     """
     Dashboard principal con KPIs y gráficos

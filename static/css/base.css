@@ -793,3 +793,791 @@ footer::after {
     0% { left: -100%; }
     100% { left: 100%; }
 }
+
+/* =============================================================================
+   FOOTER MODERNO - Diseño inspirado en el footer profesional
+   ============================================================================= */
+
+.modern-footer {
+    background: linear-gradient(135deg, #2d3e50 0%, #34495e 100%);
+    color: #ecf0f1;
+    padding: 3rem 0 1.5rem;
+    margin-top: 4rem;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Efecto de fondo sutil */
+.modern-footer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="rgba(255,255,255,0.02)"/></svg>');
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.modern-footer .container {
+    position: relative;
+    z-index: 1;
+}
+
+/* Logo y Branding */
+.footer-brand {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.footer-logo {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+    transition: transform 0.3s ease;
+}
+
+.footer-logo:hover {
+    transform: translateY(-3px) rotate(5deg);
+}
+
+.footer-logo i {
+    font-size: 1.5rem;
+    color: white;
+}
+
+.footer-brand-text h5 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    color: #ffffff;
+}
+
+.footer-brand-text p {
+    font-size: 0.85rem;
+    color: #bdc3c7;
+    margin-bottom: 0;
+}
+
+/* Enlaces de Acceso Rápido */
+.footer-section h6 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.footer-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.footer-links li {
+    margin-bottom: 0.6rem;
+}
+
+.footer-links a {
+    color: #bdc3c7;
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    padding: 0.25rem 0;
+}
+
+.footer-links a:hover {
+    color: #3498db;
+    padding-left: 0.5rem;
+}
+
+.footer-links a i {
+    font-size: 1rem;
+    width: 20px;
+}
+
+/* Desarrollador */
+.footer-developer {
+    text-align: center;
+}
+
+.developer-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #27ae60, #229954);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+    border: 3px solid rgba(39, 174, 96, 0.3);
+    box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+    transition: all 0.3s ease;
+}
+
+.developer-avatar:hover {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 6px 20px rgba(39, 174, 96, 0.6);
+}
+
+.developer-avatar span {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 1px;
+}
+
+.developer-info h6 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 0.25rem;
+}
+
+.developer-alias {
+    font-size: 0.85rem;
+    color: #27ae60;
+    font-weight: 500;
+}
+
+/* Indicadores decorativos */
+.footer-indicators {
+    text-align: center;
+    margin: 2rem 0 1.5rem;
+}
+
+.footer-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    display: inline-block;
+    margin: 0 0.3rem;
+    transition: all 0.3s ease;
+}
+
+.footer-dot:nth-child(2) {
+    background: rgba(52, 152, 219, 0.8);
+    transform: scale(1.2);
+}
+
+.footer-dot:hover {
+    background: #3498db;
+    transform: scale(1.3);
+}
+
+/* Copyright y Bottom */
+.footer-bottom {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 1.5rem;
+    text-align: center;
+}
+
+.footer-copyright {
+    font-size: 0.85rem;
+    color: #95a5a6;
+    margin-bottom: 0.5rem;
+}
+
+.footer-made-with {
+    font-size: 0.9rem;
+    color: #bdc3c7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.footer-heart {
+    color: #e74c3c;
+    animation: heartbeat 1.5s ease-in-out infinite;
+    display: inline-block;
+}
+
+@keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.2); }
+    50% { transform: scale(1); }
+}
+
+.footer-tech {
+    font-weight: 600;
+    background: linear-gradient(135deg, #3498db, #27ae60);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .modern-footer {
+        padding: 2rem 0 1rem;
+    }
+    
+    .footer-brand {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .footer-section {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .footer-links a:hover {
+        padding-left: 0;
+    }
+    
+    .footer-developer {
+        margin-bottom: 2rem;
+    }
+}
+
+/* =============================================================================
+   BOTÓN SCROLL TO TOP - Botón flotante para volver arriba
+   ============================================================================= */
+
+.scroll-to-top {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #2d3e50 0%, #34495e 100%);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: #ffffff;
+    font-size: 1.25rem;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(100px);
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    z-index: 1000;
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                0 0 0 0 rgba(52, 152, 219, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Estado visible */
+.scroll-to-top.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* Efecto hover */
+.scroll-to-top:hover {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    transform: translateY(-5px) scale(1.1);
+    box-shadow: 0 8px 25px rgba(45, 62, 80, 0.7),
+                0 0 20px rgba(52, 152, 219, 0.6);
+    border-color: rgba(52, 152, 219, 0.5);
+}
+
+/* Efecto activo (click) */
+.scroll-to-top:active {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5);
+}
+
+/* Animación del ícono al hover */
+.scroll-to-top:hover i {
+    animation: arrowBounce 0.6s ease-in-out infinite;
+}
+
+@keyframes arrowBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+/* Efecto de pulso sutil cuando aparece */
+.scroll-to-top.visible {
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+    0%, 100% {
+        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                    0 0 0 0 rgba(52, 152, 219, 0.4);
+    }
+    50% {
+        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                    0 0 15px rgba(52, 152, 219, 0.6);
+    }
+}
+
+/* Responsive - Ajustes para móviles */
+@media (max-width: 768px) {
+    .scroll-to-top {
+        width: 45px;
+        height: 45px;
+        bottom: 20px;
+        right: 20px;
+        font-size: 1.1rem;
+    }
+}
+
+/* Para pantallas muy pequeñas */
+@media (max-width: 480px) {
+    .scroll-to-top {
+        width: 40px;
+        height: 40px;
+        bottom: 15px;
+        right: 15px;
+        font-size: 1rem;
+    }
+}
+
+/* Asegurar que el botón esté sobre el footer pero debajo de modales */
+.scroll-to-top {
+    z-index: 999;
+}
+
+/* Efecto focus para accesibilidad */
+.scroll-to-top:focus {
+    outline: 3px solid rgba(52, 152, 219, 0.5);
+    outline-offset: 3px;
+}
+
+/* =============================================================================
+   NAVBAR MODERNO - Diseño profesional coordinado con footer
+   ============================================================================= */
+
+.modern-navbar {
+    background: linear-gradient(135deg, #2d3e50 0%, #34495e 100%);
+    height: 70px;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.3);
+}
+
+.navbar-container {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+    gap: 1.5rem;
+}
+
+/* ===== LOGO Y BRAND ===== */
+.navbar-brand-section {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.navbar-brand-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.navbar-brand-link:hover {
+    transform: scale(1.02);
+}
+
+.navbar-logo {
+    width: 45px;
+    height: 45px;
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+    transition: all 0.3s ease;
+}
+
+.navbar-brand-link:hover .navbar-logo {
+    transform: rotate(5deg) scale(1.05);
+    box-shadow: 0 6px 15px rgba(52, 152, 219, 0.5);
+}
+
+.navbar-logo i {
+    font-size: 1.5rem;
+    color: white;
+}
+
+.navbar-brand-text h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+.navbar-brand-text span {
+    font-size: 0.75rem;
+    color: #bdc3c7;
+    display: block;
+}
+
+/* ===== MENÚ DE NAVEGACIÓN ===== */
+.navbar-menu {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    justify-content: flex-start;
+    margin-left: 2rem;
+}
+
+.navbar-menu-item {
+    position: relative;
+}
+
+.navbar-menu-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    color: #ecf0f1;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.navbar-menu-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #3498db;
+}
+
+.navbar-menu-link i:first-child {
+    font-size: 1.1rem;
+}
+
+/* ===== DROPDOWNS ===== */
+.navbar-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    min-width: 280px;
+    background: #34495e;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+    z-index: 1001;
+    padding: 0.5rem 0;
+}
+
+.navbar-menu-item:hover .navbar-dropdown,
+.navbar-menu-item.active .navbar-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.dropdown-section {
+    padding: 0.75rem 0;
+}
+
+.dropdown-section:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-header {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #95a5a6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1.25rem;
+    color: #ecf0f1;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background: rgba(52, 152, 219, 0.2);
+    color: #3498db;
+    padding-left: 1.5rem;
+}
+
+.dropdown-item i {
+    font-size: 1rem;
+    width: 20px;
+}
+
+/* ===== SECCIÓN DE USUARIO ===== */
+.navbar-user-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+.navbar-user-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+}
+
+.user-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+.user-role {
+    font-size: 0.75rem;
+    color: #95a5a6;
+}
+
+.navbar-user-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #27ae60, #229954);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid rgba(39, 174, 96, 0.3);
+    box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.navbar-user-avatar:hover {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 6px 20px rgba(39, 174, 96, 0.6);
+}
+
+.navbar-user-avatar span {
+    font-size: 1rem;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 1px;
+}
+
+/* ===== BOTONES DE ACCIÓN ===== */
+.navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.navbar-action-btn {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ecf0f1;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-size: 1.1rem;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.navbar-action-btn:hover {
+    background: rgba(52, 152, 219, 0.3);
+    color: #3498db;
+    transform: translateY(-2px);
+}
+
+.navbar-action-logout {
+    background: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+}
+
+.navbar-action-logout:hover {
+    background: rgba(231, 76, 60, 0.3);
+    color: #ff6b6b;
+}
+
+/* ===== TOGGLE MÓVIL ===== */
+.navbar-mobile-toggle {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.navbar-mobile-toggle span {
+    width: 25px;
+    height: 3px;
+    background: #ecf0f1;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 992px) {
+    .navbar-container {
+        padding: 0 1.5rem;
+    }
+    
+    .navbar-user-info {
+        display: none;
+    }
+    
+    .navbar-menu {
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        background: #2d3e50;
+        flex-direction: column;
+        gap: 0;
+        padding: 1rem 0;
+        max-height: calc(100vh - 70px);
+        overflow-y: auto;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-20px);
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    
+    .navbar-menu.active {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+    
+    .navbar-mobile-toggle {
+        display: flex;
+    }
+    
+    .navbar-mobile-toggle.active span:nth-child(1) {
+        transform: rotate(45deg) translateY(8px);
+    }
+    
+    .navbar-mobile-toggle.active span:nth-child(2) {
+        opacity: 0;
+    }
+    
+    .navbar-mobile-toggle.active span:nth-child(3) {
+        transform: rotate(-45deg) translateY(-8px);
+    }
+    
+    .navbar-menu-item {
+        width: 100%;
+    }
+    
+    .navbar-menu-link {
+        padding: 1rem 1.5rem;
+        border-radius: 0;
+    }
+    
+    .navbar-dropdown {
+        position: static;
+        opacity: 0;
+        visibility: hidden;
+        max-height: 0;
+        overflow: hidden;
+        transform: none;
+        box-shadow: none;
+        background: rgba(0, 0, 0, 0.2);
+        margin: 0 1rem;
+        border-radius: 8px;
+    }
+    
+    .navbar-menu-item.active .navbar-dropdown {
+        opacity: 1;
+        visibility: visible;
+        max-height: 500px;
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .navbar-container {
+        padding: 0 1rem;
+    }
+    
+    .navbar-brand-text span {
+        display: none;
+    }
+    
+    .navbar-actions {
+        gap: 0.25rem;
+    }
+    
+    .navbar-action-btn {
+        width: 35px;
+        height: 35px;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .modern-navbar {
+        height: 60px;
+    }
+    
+    .navbar-menu {
+        top: 60px;
+        max-height: calc(100vh - 60px);
+    }
+    
+    .navbar-logo {
+        width: 38px;
+        height: 38px;
+    }
+    
+    .navbar-logo i {
+        font-size: 1.25rem;
+    }
+    
+    .navbar-brand-text h1 {
+        font-size: 1.1rem;
+    }
+    
+    .navbar-user-avatar {
+        width: 38px;
+        height: 38px;
+    }
+    
+    .navbar-user-avatar span {
+        font-size: 0.9rem;
+    }
+}

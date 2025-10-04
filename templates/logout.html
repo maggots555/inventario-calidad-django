@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesión Cerrada - Sistema Integral de Gestión</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    
+    <!-- CSS personalizado -->
+    {% load static %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/auth.css' %}">
+</head>
+<body class="auth-page logout-page">
+    <div class="auth-container logout-container">
+        <div class="auth-card logout-card">
+            <!-- Ícono -->
+            <div class="logout-icon">
+                <i class="bi bi-box-arrow-right"></i>
+            </div>
+            
+            <!-- Título -->
+            <h1 class="logout-title">¡Hasta Luego!</h1>
+            <p class="logout-message">
+                Has cerrado sesión exitosamente.<br>
+                Gracias por usar el Sistema Integral de Gestión.
+            </p>
+            
+            <!-- Estadísticas de sesión (opcional) -->
+            <div class="logout-stats">
+                <div class="stat-item">
+                    <span class="stat-label">
+                        <i class="bi bi-check-circle-fill success-checkmark"></i>
+                        Estado de la sesión
+                    </span>
+                    <span class="stat-value">Cerrada</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">
+                        <i class="bi bi-shield-check text-success me-2"></i>
+                        Seguridad
+                    </span>
+                    <span class="stat-value">Protegida</span>
+                </div>
+            </div>
+            
+            <!-- Botones de acción -->
+            <a href="{% url 'login' %}" class="btn btn-login-again">
+                <i class="bi bi-box-arrow-in-right me-2"></i>
+                Iniciar Sesión Nuevamente
+            </a>
+            
+            <a href="{% url 'home' %}" class="btn btn-home">
+                <i class="bi bi-house-door me-2"></i>
+                Ir al Inicio
+            </a>
+        </div>
+        
+        <!-- Footer Text -->
+        <div class="footer-text">
+            <p class="mb-1">
+                <i class="bi bi-shield-lock-fill me-1"></i>
+                Tus datos están seguros
+            </p>
+            <p class="mb-0">
+                <small>© 2025 Sistema Integral de Gestión | <strong>Desarrollado por Jorge Magos</strong></small>
+            </p>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Auto-redirect script (opcional) -->
+    <script>
+        // Opcional: Auto-redirect después de 10 segundos
+        // setTimeout(function() {
+        //     window.location.href = "{% url 'login' %}";
+        // }, 10000);
+    </script>
+</body>
+</html>

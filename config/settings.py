@@ -168,3 +168,9 @@ JEFE_CALIDAD_2_NOMBRE = config('JEFE_CALIDAD_2_NOMBRE', default='Segundo Jefe de
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Authentication settings
+# https://docs.djangoproject.com/en/5.2/topics/auth/default/
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = 'home'  # Redirigir al dashboard después de login
+# LOGOUT_REDIRECT_URL removido para mostrar la página de logout personalizada

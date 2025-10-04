@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.db.models import Q, Sum, Count, F
@@ -34,6 +35,7 @@ def fecha_local(fecha_utc):
         return fecha_utc.astimezone(tz_local)
 
 # ===== DASHBOARD PRINCIPAL UNIFICADO =====
+@login_required
 def dashboard_principal(request):
     """
     Dashboard principal del sistema - Punto de entrada unificado
@@ -106,6 +108,7 @@ def dashboard_principal(request):
 
 
 # ===== DASHBOARD DE INVENTARIO =====
+@login_required
 def dashboard_inventario(request):
     """
     Vista del dashboard de inventario con métricas e información resumida
