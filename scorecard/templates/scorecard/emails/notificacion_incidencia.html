@@ -189,6 +189,12 @@
                         <value><strong>{{ incidencia.numero_orden }}</strong></value>
                     </div>
                     {% endif %}
+                    {% if incidencia.servicio_realizado %}
+                    <div class="info-item">
+                        <label>Servicio Realizado</label>
+                        <value>{{ incidencia.servicio_realizado.nombre }}</value>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             

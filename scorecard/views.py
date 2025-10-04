@@ -37,8 +37,9 @@ def dashboard(request):
 
 def lista_incidencias(request):
     """
-    Lista todas las incidencias con filtros
+    Lista todas las incidencias organizadas por pestañas según estado
     """
+    # Obtener todas las incidencias con relaciones necesarias
     incidencias = Incidencia.objects.all().select_related(
         'sucursal',
         'tecnico_responsable',
@@ -46,8 +47,29 @@ def lista_incidencias(request):
         'tipo_incidencia'
     )
     
+    # Separar incidencias por estado para cada pestaña
+    incidencias_abiertas = incidencias.filter(estado='abierta')
+    incidencias_revision = incidencias.filter(estado='en_revision')
+    incidencias_reincidentes = incidencias.filter(estado='reincidente')
+    incidencias_cerradas = incidencias.filter(estado='cerrada')
+    
+    # Determinar pestaña activa por defecto según prioridad
+    # Prioridad: 1) Abiertas, 2) En Revisión, 3) Reincidencias, 4) Cerradas
+    if incidencias_abiertas.exists():
+        tab_activa = 'abiertas'
+    elif incidencias_revision.exists():
+        tab_activa = 'revision'
+    elif incidencias_reincidentes.exists():
+        tab_activa = 'reincidentes'
+    else:
+        tab_activa = 'cerradas'
+    
     context = {
-        'incidencias': incidencias,
+        'incidencias_abiertas': incidencias_abiertas,
+        'incidencias_revision': incidencias_revision,
+        'incidencias_reincidentes': incidencias_reincidentes,
+        'incidencias_cerradas': incidencias_cerradas,
+        'tab_activa': tab_activa,
     }
     
     return render(request, 'scorecard/lista_incidencias.html', context)

@@ -22,122 +22,483 @@
         </div>
     </div>
 
-    <!-- Tabla de Incidencias -->
+    <!-- Sistema de Pestañas para Incidencias -->
     <div class="card shadow">
         <div class="card-body">
-            {% if incidencias %}
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Folio</th>
-                            <th>Fecha</th>
-                            <th>Equipo</th>
-                            <th>Número de Serie</th>
-                            <th>Orden Interna</th>
-                            <th>Técnico/Personal responsable</th>
-                            <th>Categoría</th>
-                            <th>Severidad</th>
-                            <th>Atribuibilidad</th>
-                            <th>Estado</th>
-                            <th style="width: 150px;">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for incidencia in incidencias %}
-                        <tr>
-                            <td>
-                                <strong>{{ incidencia.folio }}</strong>
-                            </td>
-                            <td>{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</td>
-                            <td>
-                                <i class="bi bi-laptop"></i>
-                                {{ incidencia.get_tipo_equipo_display }} {{ incidencia.marca }}
-                            </td>
-                            <td><code>{{ incidencia.numero_serie }}</code></td>
-                            <td>
-                                {% if incidencia.numero_orden %}
-                                    <span class="badge bg-dark">
-                                        <i class="bi bi-hash"></i> {{ incidencia.numero_orden }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ incidencia.tecnico_responsable.nombre_completo }}</td>
-                            <td>
-                                <span class="badge badge-categoria" 
-                                      style="background-color: {{ incidencia.tipo_incidencia.color }}; 
-                                             color: {{ incidencia.tipo_incidencia.color|text_color_for_bg }};">
-                                    {{ incidencia.tipo_incidencia.nombre }}
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge badge-categoria" 
-                                      style="background-color: {{ incidencia.grado_severidad|color_severidad }}; 
-                                             color: {{ incidencia.grado_severidad|color_severidad|text_color_for_bg }};">
-                                    {{ incidencia.get_grado_severidad_display }}
-                                </span>
-                            </td>
-                            <td>
-                                {% if incidencia.es_atribuible %}
-                                    <span class="badge bg-danger" title="Esta incidencia es atribuible al técnico">
-                                        <i class="bi bi-person-x"></i> Atribuible
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-secondary" 
-                                          title="No Atribuible: {{ incidencia.justificacion_no_atribuible|default:'Sin justificación registrada' }}"
-                                          data-bs-toggle="tooltip" 
-                                          data-bs-placement="left">
-                                        <i class="bi bi-shield-check"></i> No Atribuible
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if incidencia.estado == 'abierta' %}
-                                    <span class="badge bg-primary">Abierta</span>
-                                {% elif incidencia.estado == 'en_revision' %}
-                                    <span class="badge bg-warning text-dark">En Revisión</span>
-                                {% elif incidencia.estado == 'cerrada' %}
-                                    <span class="badge bg-success">Cerrada</span>
-                                {% else %}
-                                    <span class="badge bg-danger">Reincidente</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="btn-group" role="group">
-                                    <a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}" 
-                                       class="btn btn-sm btn-info" 
-                                       title="Ver detalles">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" 
-                                       class="btn btn-sm btn-warning" 
-                                       title="Editar">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <a href="{% url 'scorecard:eliminar_incidencia' incidencia.id %}" 
-                                       class="btn btn-sm btn-danger" 
-                                       title="Eliminar">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <!-- Pestañas de navegación -->
+            <ul class="nav nav-tabs mb-3" id="incidenciasTabs" role="tablist">
+                <!-- Pestaña: Abiertas -->
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if tab_activa == 'abiertas' %}active{% endif %}" 
+                            id="abiertas-tab" 
+                            data-bs-toggle="tab" 
+                            data-bs-target="#abiertas" 
+                            type="button" 
+                            role="tab" 
+                            aria-controls="abiertas" 
+                            aria-selected="{% if tab_activa == 'abiertas' %}true{% else %}false{% endif %}">
+                        <i class="bi bi-unlock text-primary"></i> Abiertas
+                        <span class="badge bg-primary ms-1">{{ incidencias_abiertas.count }}</span>
+                    </button>
+                </li>
+                
+                <!-- Pestaña: En Revisión -->
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if tab_activa == 'revision' %}active{% endif %}" 
+                            id="revision-tab" 
+                            data-bs-toggle="tab" 
+                            data-bs-target="#revision" 
+                            type="button" 
+                            role="tab" 
+                            aria-controls="revision" 
+                            aria-selected="{% if tab_activa == 'revision' %}true{% else %}false{% endif %}">
+                        <i class="bi bi-search text-warning"></i> En Revisión
+                        <span class="badge bg-warning text-dark ms-1">{{ incidencias_revision.count }}</span>
+                    </button>
+                </li>
+                
+                <!-- Pestaña: Reincidencias -->
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if tab_activa == 'reincidentes' %}active{% endif %}" 
+                            id="reincidentes-tab" 
+                            data-bs-toggle="tab" 
+                            data-bs-target="#reincidentes" 
+                            type="button" 
+                            role="tab" 
+                            aria-controls="reincidentes" 
+                            aria-selected="{% if tab_activa == 'reincidentes' %}true{% else %}false{% endif %}">
+                        <i class="bi bi-exclamation-triangle text-danger"></i> Reincidencias
+                        <span class="badge bg-danger ms-1">{{ incidencias_reincidentes.count }}</span>
+                    </button>
+                </li>
+                
+                <!-- Pestaña: Cerradas -->
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if tab_activa == 'cerradas' %}active{% endif %}" 
+                            id="cerradas-tab" 
+                            data-bs-toggle="tab" 
+                            data-bs-target="#cerradas" 
+                            type="button" 
+                            role="tab" 
+                            aria-controls="cerradas" 
+                            aria-selected="{% if tab_activa == 'cerradas' %}true{% else %}false{% endif %}">
+                        <i class="bi bi-check-circle text-success"></i> Cerradas
+                        <span class="badge bg-success ms-1">{{ incidencias_cerradas.count }}</span>
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Contenido de las pestañas -->
+            <div class="tab-content" id="incidenciasTabContent">
+                
+                <!-- TAB: Incidencias Abiertas -->
+                <div class="tab-pane fade {% if tab_activa == 'abiertas' %}show active{% endif %}" 
+                     id="abiertas" 
+                     role="tabpanel" 
+                     aria-labelledby="abiertas-tab">
+                    {% if incidencias_abiertas %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Folio</th>
+                                    <th>Fecha</th>
+                                    <th>Equipo</th>
+                                    <th>Número de Serie</th>
+                                    <th>Orden Interna</th>
+                                    <th>Técnico/Personal responsable</th>
+                                    <th>Categoría</th>
+                                    <th>Severidad</th>
+                                    <th>Atribuibilidad</th>
+                                    <th style="width: 150px;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for incidencia in incidencias_abiertas %}
+                                <tr>
+                                    <td><strong>{{ incidencia.folio }}</strong></td>
+                                    <td>{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <i class="bi bi-laptop"></i>
+                                        {{ incidencia.get_tipo_equipo_display }} {{ incidencia.marca }}
+                                    </td>
+                                    <td><code>{{ incidencia.numero_serie }}</code></td>
+                                    <td>
+                                        {% if incidencia.numero_orden %}
+                                            <span class="badge bg-dark">
+                                                <i class="bi bi-hash"></i> {{ incidencia.numero_orden }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ incidencia.tecnico_responsable.nombre_completo }}</td>
+                                    <td>
+                                        <span class="badge badge-categoria" 
+                                              style="background-color: {{ incidencia.tipo_incidencia.color }}; 
+                                                     color: {{ incidencia.tipo_incidencia.color|text_color_for_bg }};">
+                                            {{ incidencia.tipo_incidencia.nombre }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-categoria" 
+                                              style="background-color: {{ incidencia.grado_severidad|color_severidad }}; 
+                                                     color: {{ incidencia.grado_severidad|color_severidad|text_color_for_bg }};">
+                                            {{ incidencia.get_grado_severidad_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if incidencia.es_atribuible %}
+                                            <span class="badge bg-danger" title="Esta incidencia es atribuible al técnico">
+                                                <i class="bi bi-person-x"></i> Atribuible
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary" 
+                                                  title="No Atribuible: {{ incidencia.justificacion_no_atribuible|default:'Sin justificación registrada' }}"
+                                                  data-bs-toggle="tooltip" 
+                                                  data-bs-placement="left">
+                                                <i class="bi bi-shield-check"></i> No Atribuible
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-info" 
+                                               title="Ver detalles">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-warning" 
+                                               title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="{% url 'scorecard:eliminar_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-danger" 
+                                               title="Eliminar">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-unlock" style="font-size: 4rem; color: #0d6efd;"></i>
+                        <h4 class="mt-3 text-primary">No hay incidencias abiertas</h4>
+                        <p class="text-muted">¡Excelente! No hay incidencias pendientes de atención</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- TAB: Incidencias En Revisión -->
+                <div class="tab-pane fade {% if tab_activa == 'revision' %}show active{% endif %}" 
+                     id="revision" 
+                     role="tabpanel" 
+                     aria-labelledby="revision-tab">
+                    {% if incidencias_revision %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Folio</th>
+                                    <th>Fecha</th>
+                                    <th>Equipo</th>
+                                    <th>Número de Serie</th>
+                                    <th>Orden Interna</th>
+                                    <th>Técnico/Personal responsable</th>
+                                    <th>Categoría</th>
+                                    <th>Severidad</th>
+                                    <th>Atribuibilidad</th>
+                                    <th style="width: 150px;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for incidencia in incidencias_revision %}
+                                <tr>
+                                    <td><strong>{{ incidencia.folio }}</strong></td>
+                                    <td>{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <i class="bi bi-laptop"></i>
+                                        {{ incidencia.get_tipo_equipo_display }} {{ incidencia.marca }}
+                                    </td>
+                                    <td><code>{{ incidencia.numero_serie }}</code></td>
+                                    <td>
+                                        {% if incidencia.numero_orden %}
+                                            <span class="badge bg-dark">
+                                                <i class="bi bi-hash"></i> {{ incidencia.numero_orden }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ incidencia.tecnico_responsable.nombre_completo }}</td>
+                                    <td>
+                                        <span class="badge badge-categoria" 
+                                              style="background-color: {{ incidencia.tipo_incidencia.color }}; 
+                                                     color: {{ incidencia.tipo_incidencia.color|text_color_for_bg }};">
+                                            {{ incidencia.tipo_incidencia.nombre }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-categoria" 
+                                              style="background-color: {{ incidencia.grado_severidad|color_severidad }}; 
+                                                     color: {{ incidencia.grado_severidad|color_severidad|text_color_for_bg }};">
+                                            {{ incidencia.get_grado_severidad_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if incidencia.es_atribuible %}
+                                            <span class="badge bg-danger" title="Esta incidencia es atribuible al técnico">
+                                                <i class="bi bi-person-x"></i> Atribuible
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary" 
+                                                  title="No Atribuible: {{ incidencia.justificacion_no_atribuible|default:'Sin justificación registrada' }}"
+                                                  data-bs-toggle="tooltip" 
+                                                  data-bs-placement="left">
+                                                <i class="bi bi-shield-check"></i> No Atribuible
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-info" 
+                                               title="Ver detalles">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-warning" 
+                                               title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="{% url 'scorecard:eliminar_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-danger" 
+                                               title="Eliminar">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-search" style="font-size: 4rem; color: #ffc107;"></i>
+                        <h4 class="mt-3 text-warning">No hay incidencias en revisión</h4>
+                        <p class="text-muted">No hay casos pendientes de revisar</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- TAB: Reincidencias -->
+                <div class="tab-pane fade {% if tab_activa == 'reincidentes' %}show active{% endif %}" 
+                     id="reincidentes" 
+                     role="tabpanel" 
+                     aria-labelledby="reincidentes-tab">
+                    {% if incidencias_reincidentes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Folio</th>
+                                    <th>Fecha</th>
+                                    <th>Equipo</th>
+                                    <th>Número de Serie</th>
+                                    <th>Orden Interna</th>
+                                    <th>Técnico/Personal responsable</th>
+                                    <th>Categoría</th>
+                                    <th>Severidad</th>
+                                    <th>Atribuibilidad</th>
+                                    <th style="width: 150px;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for incidencia in incidencias_reincidentes %}
+                                <tr>
+                                    <td><strong>{{ incidencia.folio }}</strong></td>
+                                    <td>{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <i class="bi bi-laptop"></i>
+                                        {{ incidencia.get_tipo_equipo_display }} {{ incidencia.marca }}
+                                    </td>
+                                    <td><code>{{ incidencia.numero_serie }}</code></td>
+                                    <td>
+                                        {% if incidencia.numero_orden %}
+                                            <span class="badge bg-dark">
+                                                <i class="bi bi-hash"></i> {{ incidencia.numero_orden }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ incidencia.tecnico_responsable.nombre_completo }}</td>
+                                    <td>
+                                        <span class="badge badge-categoria" 
+                                              style="background-color: {{ incidencia.tipo_incidencia.color }}; 
+                                                     color: {{ incidencia.tipo_incidencia.color|text_color_for_bg }};">
+                                            {{ incidencia.tipo_incidencia.nombre }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-categoria" 
+                                              style="background-color: {{ incidencia.grado_severidad|color_severidad }}; 
+                                                     color: {{ incidencia.grado_severidad|color_severidad|text_color_for_bg }};">
+                                            {{ incidencia.get_grado_severidad_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if incidencia.es_atribuible %}
+                                            <span class="badge bg-danger" title="Esta incidencia es atribuible al técnico">
+                                                <i class="bi bi-person-x"></i> Atribuible
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary" 
+                                                  title="No Atribuible: {{ incidencia.justificacion_no_atribuible|default:'Sin justificación registrada' }}"
+                                                  data-bs-toggle="tooltip" 
+                                                  data-bs-placement="left">
+                                                <i class="bi bi-shield-check"></i> No Atribuible
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-info" 
+                                               title="Ver detalles">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'scorecard:editar_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-warning" 
+                                               title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="{% url 'scorecard:eliminar_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-danger" 
+                                               title="Eliminar">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-exclamation-triangle" style="font-size: 4rem; color: #dc3545;"></i>
+                        <h4 class="mt-3 text-danger">No hay reincidencias</h4>
+                        <p class="text-muted">¡Perfecto! No hay casos reincidentes registrados</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- TAB: Incidencias Cerradas -->
+                <div class="tab-pane fade {% if tab_activa == 'cerradas' %}show active{% endif %}" 
+                     id="cerradas" 
+                     role="tabpanel" 
+                     aria-labelledby="cerradas-tab">
+                    {% if incidencias_cerradas %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Folio</th>
+                                    <th>Fecha</th>
+                                    <th>Equipo</th>
+                                    <th>Número de Serie</th>
+                                    <th>Orden Interna</th>
+                                    <th>Técnico/Personal responsable</th>
+                                    <th>Categoría</th>
+                                    <th>Severidad</th>
+                                    <th>Atribuibilidad</th>
+                                    <th style="width: 150px;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for incidencia in incidencias_cerradas %}
+                                <tr>
+                                    <td><strong>{{ incidencia.folio }}</strong></td>
+                                    <td>{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <i class="bi bi-laptop"></i>
+                                        {{ incidencia.get_tipo_equipo_display }} {{ incidencia.marca }}
+                                    </td>
+                                    <td><code>{{ incidencia.numero_serie }}</code></td>
+                                    <td>
+                                        {% if incidencia.numero_orden %}
+                                            <span class="badge bg-dark">
+                                                <i class="bi bi-hash"></i> {{ incidencia.numero_orden }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ incidencia.tecnico_responsable.nombre_completo }}</td>
+                                    <td>
+                                        <span class="badge badge-categoria" 
+                                              style="background-color: {{ incidencia.tipo_incidencia.color }}; 
+                                                     color: {{ incidencia.tipo_incidencia.color|text_color_for_bg }};">
+                                            {{ incidencia.tipo_incidencia.nombre }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-categoria" 
+                                              style="background-color: {{ incidencia.grado_severidad|color_severidad }}; 
+                                                     color: {{ incidencia.grado_severidad|color_severidad|text_color_for_bg }};">
+                                            {{ incidencia.get_grado_severidad_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if incidencia.es_atribuible %}
+                                            <span class="badge bg-danger" title="Esta incidencia es atribuible al técnico">
+                                                <i class="bi bi-person-x"></i> Atribuible
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary" 
+                                                  title="No Atribuible: {{ incidencia.justificacion_no_atribuible|default:'Sin justificación registrada' }}"
+                                                  data-bs-toggle="tooltip" 
+                                                  data-bs-placement="left">
+                                                <i class="bi bi-shield-check"></i> No Atribuible
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'scorecard:detalle_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-info" 
+                                               title="Ver detalles">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'scorecard:eliminar_incidencia' incidencia.id %}" 
+                                               class="btn btn-sm btn-danger" 
+                                               title="Eliminar">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-check-circle" style="font-size: 4rem; color: #28a745;"></i>
+                        <h4 class="mt-3 text-success">No hay incidencias cerradas</h4>
+                        <p class="text-muted">Aún no se han cerrado casos</p>
+                    </div>
+                    {% endif %}
+                </div>
+
             </div>
-            {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-inbox" style="font-size: 4rem; color: #dee2e6;"></i>
-                <h4 class="mt-3 text-muted">No hay incidencias registradas</h4>
-                <p class="text-muted">Comienza registrando tu primera incidencia</p>
-                <a href="{% url 'scorecard:crear_incidencia' %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Registrar Incidencia
-                </a>
-            </div>
-            {% endif %}
         </div>
     </div>
 

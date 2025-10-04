@@ -364,11 +364,27 @@ class Incidencia(models.Model):
         # Generar folio si es nuevo registro
         if not self.folio:
             año_actual = timezone.now().year
-            # Contar incidencias del año actual
-            ultimo_numero = Incidencia.objects.filter(
+            
+            # Obtener el último folio del año actual
+            ultimo_folio = Incidencia.objects.filter(
                 folio__startswith=f'INC-{año_actual}'
-            ).count() + 1
-            self.folio = f"INC-{año_actual}-{ultimo_numero:04d}"
+            ).order_by('-folio').first()
+            
+            if ultimo_folio:
+                # Extraer el número del último folio (INC-2025-0003 → 3)
+                try:
+                    ultimo_numero = int(ultimo_folio.folio.split('-')[-1])
+                    siguiente_numero = ultimo_numero + 1
+                except (ValueError, IndexError):
+                    # Si hay error al parsear, usar count como fallback
+                    siguiente_numero = Incidencia.objects.filter(
+                        folio__startswith=f'INC-{año_actual}'
+                    ).count() + 1
+            else:
+                # Primera incidencia del año
+                siguiente_numero = 1
+            
+            self.folio = f"INC-{año_actual}-{siguiente_numero:04d}"
         
         # Calcular campos de fecha automáticos
         fecha = self.fecha_deteccion

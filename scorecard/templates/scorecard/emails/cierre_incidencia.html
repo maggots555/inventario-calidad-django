@@ -132,6 +132,12 @@
                     <div class="info-value">{{ incidencia.numero_orden }}</div>
                 </div>
                 {% endif %}
+                {% if incidencia.servicio_realizado %}
+                <div class="info-row">
+                    <div class="info-label">Servicio Realizado:</div>
+                    <div class="info-value">{{ incidencia.servicio_realizado.nombre }}</div>
+                </div>
+                {% endif %}
                 <div class="info-row">
                     <div class="info-label">Fecha Detección:</div>
                     <div class="info-value">{{ incidencia.fecha_deteccion|date:"d/m/Y" }}</div>
