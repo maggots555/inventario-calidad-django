@@ -10,9 +10,15 @@
         <h1 class="h3">
             <i class="bi bi-people"></i> Lista de Empleados
         </h1>
-        <a href="{% url 'crear_empleado' %}" class="btn btn-primary">
-            <i class="bi bi-person-plus"></i> Agregar Empleado
-        </a>
+        {% if es_admin %}
+            <a href="{% url 'crear_empleado' %}" class="btn btn-primary">
+                <i class="bi bi-person-plus"></i> Agregar Empleado
+            </a>
+        {% else %}
+            <div class="alert alert-info mb-0 py-2 px-3">
+                <i class="bi bi-info-circle"></i> <small>Modo solo lectura</small>
+            </div>
+        {% endif %}
     </div>
 
     <!-- Filtros de Búsqueda -->
@@ -35,7 +41,16 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <label for="acceso_sistema" class="form-label">Acceso Sistema</label>
+                    <select class="form-control" id="acceso_sistema" name="acceso_sistema">
+                        <option value="">Todos</option>
+                        <option value="activo" {% if acceso_seleccionado == 'activo' %}selected{% endif %}>Con Acceso Activo</option>
+                        <option value="pendiente" {% if acceso_seleccionado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                        <option value="sin_acceso" {% if acceso_seleccionado == 'sin_acceso' %}selected{% endif %}>Sin Acceso</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label for="activo" class="form-label">Estado</label>
                     <select class="form-control" id="activo" name="activo">
                         <option value="">Todos</option>
@@ -48,6 +63,7 @@
                         <i class="bi bi-search"></i> Filtrar
                     </button>
                 </div>
+
             </form>
         </div>
     </div>
@@ -78,6 +94,7 @@
                                 <th><i class="bi bi-envelope"></i> Email</th>
                                 <th><i class="bi bi-building"></i> Sucursal</th>
                                 <th><i class="bi bi-person-check"></i> Jefe Directo</th>
+                                <th><i class="bi bi-shield-lock"></i> Acceso Sistema</th>
                                 <th>Estado</th>
                                 <th>Fecha Ingreso</th>
                                 <th>Acciones</th>
@@ -135,6 +152,37 @@
                                         </span>
                                     {% endif %}
                                 </td>
+                                <td class="text-center">
+                                    {% if empleado.user %}
+                                        {% if empleado.contraseña_configurada %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle-fill"></i> Activo
+                                            </span>
+                                            <br>
+                                            {% if empleado.user.last_login %}
+                                                <small class="text-muted" title="Último acceso">
+                                                    <i class="bi bi-clock"></i> {{ empleado.user.last_login|date:"d/m/Y H:i" }}
+                                                </small>
+                                            {% else %}
+                                                <small class="text-muted">
+                                                    <i class="bi bi-info-circle"></i> Nunca accedió
+                                                </small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="bi bi-hourglass-split"></i> Pendiente
+                                            </span>
+                                            <br>
+                                            <small class="text-muted" title="Email enviado">
+                                                <i class="bi bi-envelope"></i> {{ empleado.fecha_envio_credenciales|date:"d/m/Y" }}
+                                            </small>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-x-circle"></i> Sin acceso
+                                        </span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if empleado.activo %}
                                         <span class="badge bg-success">Activo</span>
@@ -146,22 +194,88 @@
                                     <small class="text-muted">{{ empleado.fecha_ingreso|date:"d/m/Y" }}</small>
                                 </td>
                                 <td>
-                                    <div class="btn-group" role="group">
-                                        <a href="{% url 'editar_empleado' empleado.id %}" 
-                                           class="btn btn-sm btn-outline-primary" title="Editar">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        {% if empleado.activo %}
-                                            <a href="{% url 'eliminar_empleado' empleado.id %}" 
-                                               class="btn btn-sm btn-outline-danger" title="Desactivar">
-                                                <i class="bi bi-person-dash"></i>
+                                    {% if es_admin %}
+                                        <!-- Usuario Admin: Botones completos -->
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'editar_empleado' empleado.id %}" 
+                                               class="btn btn-sm btn-outline-primary" title="Editar">
+                                                <i class="bi bi-pencil"></i>
                                             </a>
-                                        {% endif %}
-                                    </div>
+                                            
+                                            <!-- Dropdown de Gestión de Acceso -->
+                                            <div class="btn-group" role="group">
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-success dropdown-toggle" 
+                                                        data-bs-toggle="dropdown" 
+                                                        aria-expanded="false"
+                                                        title="Gestionar Acceso">
+                                                    <i class="bi bi-shield-lock"></i>
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    {% if not empleado.user %}
+                                                        <!-- Empleado sin acceso -->
+                                                        <li>
+                                                            <a class="dropdown-item" 
+                                                               href="{% url 'dar_acceso_empleado' empleado.id %}"
+                                                               onclick="return confirm('¿Dar acceso al sistema a {{ empleado.nombre_completo }}?\n\nSe generará una contraseña temporal y se enviará por email.');">
+                                                                <i class="bi bi-key-fill text-success"></i> Dar Acceso al Sistema
+                                                            </a>
+                                                        </li>
+                                                        {% if not empleado.email %}
+                                                            <li><hr class="dropdown-divider"></li>
+                                                            <li>
+                                                                <span class="dropdown-item text-muted small">
+                                                                    <i class="bi bi-exclamation-circle"></i> Requiere email
+                                                                </span>
+                                                            </li>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        <!-- Empleado con acceso -->
+                                                        {% if not empleado.contraseña_configurada %}
+                                                            <li>
+                                                                <a class="dropdown-item" 
+                                                                   href="{% url 'reenviar_credenciales' empleado.id %}"
+                                                                   onclick="return confirm('¿Reenviar credenciales a {{ empleado.nombre_completo }}?\n\nSe generará una nueva contraseña temporal.');">
+                                                                    <i class="bi bi-envelope-fill text-primary"></i> Reenviar Credenciales
+                                                                </a>
+                                                            </li>
+                                                        {% endif %}
+                                                        <li>
+                                                            <a class="dropdown-item" 
+                                                               href="{% url 'resetear_contraseña_empleado' empleado.id %}"
+                                                               onclick="return confirm('¿Resetear contraseña de {{ empleado.nombre_completo }}?\n\nSe generará una nueva contraseña temporal.');">
+                                                                <i class="bi bi-arrow-clockwise text-warning"></i> Resetear Contraseña
+                                                            </a>
+                                                        </li>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li>
+                                                            <a class="dropdown-item text-danger" 
+                                                               href="{% url 'revocar_acceso_empleado' empleado.id %}">
+                                                                <i class="bi bi-shield-x"></i> Revocar Acceso
+                                                            </a>
+                                                        </li>
+                                                    {% endif %}
+                                                </ul>
+                                            </div>
+                                            
+                                            {% if empleado.activo %}
+                                                <a href="{% url 'eliminar_empleado' empleado.id %}" 
+                                                   class="btn btn-sm btn-outline-danger" title="Desactivar">
+                                                    <i class="bi bi-person-dash"></i>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <!-- Usuario Normal: Solo ver detalles -->
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Solo lectura">
+                                            <i class="bi bi-eye-slash"></i> Sin permisos
+                                        </button>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
+
                     </table>
                 </div>
             </div>
@@ -196,9 +310,14 @@
 // Auto-submit del formulario de filtros al cambiar selects
 document.addEventListener('DOMContentLoaded', function() {
     const areaSelect = document.getElementById('area');
+    const accesoSelect = document.getElementById('acceso_sistema');
     const activoSelect = document.getElementById('activo');
     
     areaSelect.addEventListener('change', function() {
+        this.form.submit();
+    });
+    
+    accesoSelect.addEventListener('change', function() {
         this.form.submit();
     });
     

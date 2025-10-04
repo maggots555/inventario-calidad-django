@@ -32,6 +32,12 @@ urlpatterns = [
     path('empleados/<int:empleado_id>/editar/', views.editar_empleado, name='editar_empleado'),
     path('empleados/<int:empleado_id>/eliminar/', views.eliminar_empleado, name='eliminar_empleado'),
     
+    # Gestión de acceso al sistema para empleados
+    path('empleados/<int:empleado_id>/dar-acceso/', views.dar_acceso_empleado, name='dar_acceso_empleado'),
+    path('empleados/<int:empleado_id>/reenviar-credenciales/', views.reenviar_credenciales, name='reenviar_credenciales'),
+    path('empleados/<int:empleado_id>/resetear-contraseña/', views.resetear_contraseña_empleado, name='resetear_contraseña_empleado'),
+    path('empleados/<int:empleado_id>/revocar-acceso/', views.revocar_acceso_empleado, name='revocar_acceso_empleado'),
+    
     # API endpoints
     path('api/buscar-producto-qr/', views.buscar_producto_qr, name='buscar_producto_qr'),
     path('api/buscar-producto-fraccionable-qr/', views.buscar_producto_fraccionable_qr, name='buscar_producto_fraccionable_qr'),

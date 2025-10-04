@@ -117,11 +117,11 @@ class MovimientoAdmin(admin.ModelAdmin):
 
 @admin.register(Empleado)
 class EmpleadoAdmin(admin.ModelAdmin):
-    list_display = ('nombre_completo', 'cargo', 'area', 'sucursal', 'jefe_directo', 'email', 'activo', 'fecha_ingreso')
-    list_filter = ('area', 'cargo', 'sucursal', 'activo', 'fecha_ingreso')
+    list_display = ('nombre_completo', 'cargo', 'area', 'sucursal', 'jefe_directo', 'email', 'estado_acceso_display', 'activo', 'fecha_ingreso')
+    list_filter = ('area', 'cargo', 'sucursal', 'activo', 'tiene_acceso_sistema', 'contraseña_configurada', 'fecha_ingreso')
     search_fields = ('nombre_completo', 'cargo', 'area', 'email')
     ordering = ['nombre_completo']
-    readonly_fields = ('fecha_ingreso', 'fecha_actualizacion')
+    readonly_fields = ('fecha_ingreso', 'fecha_actualizacion', 'user', 'tiene_acceso_sistema', 'fecha_envio_credenciales', 'contraseña_configurada', 'fecha_activacion_acceso')
     
     fieldsets = (
         ('Información Personal', {
@@ -130,6 +130,11 @@ class EmpleadoAdmin(admin.ModelAdmin):
         ('Ubicación y Jerarquía', {
             'fields': ('sucursal', 'jefe_directo'),
             'description': 'Sucursal donde trabaja el empleado y su jefe directo en la estructura organizacional'
+        }),
+        ('Acceso al Sistema', {
+            'fields': ('user', 'tiene_acceso_sistema', 'contraseña_configurada', 'fecha_envio_credenciales', 'fecha_activacion_acceso'),
+            'description': 'Información sobre el acceso del empleado al Sistema Integral de Gestión. Estos campos se gestionan automáticamente desde la interfaz de empleados.',
+            'classes': ('collapse',)
         }),
         ('Estado', {
             'fields': ('activo',)

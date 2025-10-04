@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.db.models import Q, Sum, Count, F
@@ -8,11 +8,41 @@ from django.db import models
 from django.utils import timezone
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
+from functools import wraps
 from .models import Producto, Movimiento, Sucursal, Empleado
 from .forms import ProductoForm, MovimientoForm, SucursalForm, MovimientoRapidoForm, EmpleadoForm, MovimientoFraccionarioForm
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
+
+
+# ===== DECORADORES DE PERMISOS =====
+def staff_required(view_func):
+    """
+    Decorador que requiere que el usuario sea staff o superusuario
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este decorador se usa en vistas que solo pueden acceder administradores.
+    Verifica que el usuario tenga is_staff=True o is_superuser=True.
+    Si no tiene permisos, muestra un mensaje de error y redirige.
+    
+    Uso:
+        @login_required
+        @staff_required
+        def mi_vista(request):
+            # Solo usuarios staff pueden ejecutar esto
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_staff and not request.user.is_superuser:
+            messages.error(
+                request, 
+                '⛔ No tienes permisos para realizar esta acción. '
+                'Solo los administradores pueden gestionar empleados.'
+            )
+            return redirect('lista_empleados')
+        return view_func(request, *args, **kwargs)
+    return wrapper
 
 # Importar modelos de scorecard para el dashboard principal
 try:
@@ -702,6 +732,7 @@ def lista_empleados(request):
     busqueda = request.GET.get('busqueda', '')
     area = request.GET.get('area', '')
     activo = request.GET.get('activo', '')
+    acceso_sistema = request.GET.get('acceso_sistema', '')
     
     if busqueda:
         empleados = empleados.filter(
@@ -718,25 +749,43 @@ def lista_empleados(request):
     elif activo == 'false':
         empleados = empleados.filter(activo=False)
     
+    # Filtro de acceso al sistema
+    if acceso_sistema == 'activo':
+        # Empleados con usuario creado y contraseña configurada
+        empleados = empleados.filter(user__isnull=False, contraseña_configurada=True)
+    elif acceso_sistema == 'pendiente':
+        # Empleados con usuario pero sin configurar contraseña
+        empleados = empleados.filter(user__isnull=False, contraseña_configurada=False)
+    elif acceso_sistema == 'sin_acceso':
+        # Empleados sin usuario de sistema
+        empleados = empleados.filter(user__isnull=True)
+    
     # Ordenar por área y luego por nombre
     empleados = empleados.order_by('area', 'nombre_completo')
     
     # Obtener áreas únicas para filtro
     areas_disponibles = Empleado.objects.values_list('area', flat=True).distinct().order_by('area')
     
+    # Verificar si el usuario tiene permisos de administrador
+    es_admin = request.user.is_staff or request.user.is_superuser
+    
     context = {
         'empleados': empleados,
         'busqueda': busqueda,
         'area_seleccionada': area,
         'activo_seleccionado': activo,
+        'acceso_seleccionado': acceso_sistema,
         'areas_disponibles': areas_disponibles,
+        'es_admin': es_admin,  # Nuevo: Indica si el usuario puede modificar
     }
     
     return render(request, 'inventario/lista_empleados.html', context)
 
+@staff_required
 def crear_empleado(request):
     """
     Crear un nuevo empleado
+    Solo accesible para usuarios staff/superusuario
     """
     if request.method == 'POST':
         form = EmpleadoForm(request.POST)
@@ -753,9 +802,11 @@ def crear_empleado(request):
         'boton_texto': 'Crear Empleado'
     })
 
+@staff_required
 def editar_empleado(request, empleado_id):
     """
     Editar un empleado existente
+    Solo accesible para usuarios staff/superusuario
     """
     empleado = get_object_or_404(Empleado, id=empleado_id)
     
@@ -775,9 +826,11 @@ def editar_empleado(request, empleado_id):
         'empleado': empleado
     })
 
+@staff_required
 def eliminar_empleado(request, empleado_id):
     """
     Marcar empleado como inactivo (soft delete)
+    Solo accesible para usuarios staff/superusuario
     """
     empleado = get_object_or_404(Empleado, id=empleado_id)
     
@@ -792,6 +845,225 @@ def eliminar_empleado(request, empleado_id):
         'tipo': 'empleado',
         'url_cancelar': 'lista_empleados'
     })
+
+
+# ===== GESTIÓN DE ACCESO AL SISTEMA =====
+
+@login_required
+@staff_required
+def dar_acceso_empleado(request, empleado_id):
+    """
+    Otorga acceso al sistema a un empleado
+    Crea su usuario de Django y envía credenciales por email
+    Solo accesible para usuarios staff/superusuario
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista hace varias cosas importantes:
+    1. Verifica que el empleado tenga email
+    2. Crea un usuario de Django para el empleado
+    3. Genera una contraseña temporal aleatoria
+    4. Envía un email con las credenciales
+    5. Redirige de vuelta a la lista de empleados
+    """
+    from .utils import crear_usuario_para_empleado, enviar_credenciales_empleado
+    
+    empleado = get_object_or_404(Empleado, id=empleado_id)
+    
+    # Validaciones
+    if empleado.user:
+        messages.warning(request, f'{empleado.nombre_completo} ya tiene acceso al sistema.')
+        return redirect('lista_empleados')
+    
+    if not empleado.email:
+        messages.error(request, f'El empleado {empleado.nombre_completo} no tiene un email registrado. Por favor, actualiza su información primero.')
+        return redirect('editar_empleado', empleado_id=empleado.id)
+    
+    try:
+        # Crear usuario y generar contraseña
+        user, contraseña_temporal = crear_usuario_para_empleado(empleado)
+        
+        # Enviar email con credenciales
+        email_enviado = enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=False)
+        
+        if email_enviado:
+            messages.success(
+                request, 
+                f'✅ Acceso otorgado a {empleado.nombre_completo}. '
+                f'Las credenciales han sido enviadas a {empleado.email}'
+            )
+        else:
+            messages.warning(
+                request,
+                f'⚠️ Usuario creado para {empleado.nombre_completo}, pero hubo un problema al enviar el email. '
+                f'Contraseña temporal: {contraseña_temporal} (guárdala y compártela de forma segura)'
+            )
+            
+    except ValueError as e:
+        # Error de validación (email duplicado, etc.)
+        messages.error(request, f'Error: {str(e)}')
+    except Exception as e:
+        # Cualquier otro error
+        messages.error(request, f'Error al crear el usuario: {str(e)}')
+    
+    return redirect('lista_empleados')
+
+
+@login_required
+@staff_required
+def reenviar_credenciales(request, empleado_id):
+    """
+    Reenvía las credenciales al empleado
+    Genera una nueva contraseña temporal y envía email
+    Solo accesible para usuarios staff/superusuario
+    """
+    from .utils import generar_contraseña_temporal, enviar_credenciales_empleado
+    
+    empleado = get_object_or_404(Empleado, id=empleado_id)
+    
+    # Validaciones
+    if not empleado.user:
+        messages.warning(request, f'{empleado.nombre_completo} no tiene acceso al sistema todavía.')
+        return redirect('lista_empleados')
+    
+    if not empleado.email:
+        messages.error(request, 'El empleado no tiene un email registrado.')
+        return redirect('lista_empleados')
+    
+    try:
+        # Generar nueva contraseña temporal
+        nueva_contraseña = generar_contraseña_temporal()
+        
+        # Actualizar contraseña del usuario
+        empleado.user.set_password(nueva_contraseña)
+        empleado.user.save()
+        
+        # Marcar que necesita configurar contraseña nuevamente
+        empleado.contraseña_configurada = False
+        empleado.save()
+        
+        # Enviar email
+        email_enviado = enviar_credenciales_empleado(empleado, nueva_contraseña, es_reenvio=True)
+        
+        if email_enviado:
+            messages.success(
+                request,
+                f'✅ Credenciales reenviadas a {empleado.nombre_completo} ({empleado.email})'
+            )
+        else:
+            messages.warning(
+                request,
+                f'⚠️ Contraseña reseteada pero hubo un problema al enviar el email. '
+                f'Nueva contraseña: {nueva_contraseña} (compártela de forma segura)'
+            )
+            
+    except Exception as e:
+        messages.error(request, f'Error al reenviar credenciales: {str(e)}')
+    
+    return redirect('lista_empleados')
+
+
+@login_required
+@staff_required
+def resetear_contraseña_empleado(request, empleado_id):
+    """
+    Resetea la contraseña del empleado a una nueva temporal
+    Similar a reenviar_credenciales pero con mensaje diferente
+    Solo accesible para usuarios staff/superusuario
+    """
+    from .utils import generar_contraseña_temporal, enviar_credenciales_empleado
+    
+    empleado = get_object_or_404(Empleado, id=empleado_id)
+    
+    # Validaciones
+    if not empleado.user:
+        messages.warning(request, f'{empleado.nombre_completo} no tiene acceso al sistema.')
+        return redirect('lista_empleados')
+    
+    if not empleado.email:
+        messages.error(request, 'El empleado no tiene un email registrado.')
+        return redirect('lista_empleados')
+    
+    try:
+        # Generar nueva contraseña temporal
+        nueva_contraseña = generar_contraseña_temporal()
+        
+        # Actualizar contraseña del usuario
+        empleado.user.set_password(nueva_contraseña)
+        empleado.user.save()
+        
+        # Marcar que necesita configurar contraseña
+        empleado.contraseña_configurada = False
+        empleado.fecha_activacion_acceso = None  # Resetear fecha de activación
+        empleado.save()
+        
+        # Enviar email
+        email_enviado = enviar_credenciales_empleado(empleado, nueva_contraseña, es_reenvio=True)
+        
+        if email_enviado:
+            messages.success(
+                request,
+                f'🔄 Contraseña reseteada para {empleado.nombre_completo}. '
+                f'Nueva contraseña enviada a {empleado.email}'
+            )
+        else:
+            messages.warning(
+                request,
+                f'⚠️ Contraseña reseteada pero no se pudo enviar el email. '
+                f'Nueva contraseña: {nueva_contraseña}'
+            )
+            
+    except Exception as e:
+        messages.error(request, f'Error al resetear contraseña: {str(e)}')
+    
+    return redirect('lista_empleados')
+
+
+@login_required
+@staff_required
+def revocar_acceso_empleado(request, empleado_id):
+    """
+    Revoca el acceso al sistema de un empleado
+    Desactiva su usuario pero mantiene el registro del empleado
+    Solo accesible para usuarios staff/superusuario
+    
+    EXPLICACIÓN:
+    No elimina el usuario ni el empleado, solo desactiva el acceso.
+    El empleado sigue en la base de datos pero no puede iniciar sesión.
+    """
+    empleado = get_object_or_404(Empleado, id=empleado_id)
+    
+    # Validar que tenga usuario
+    if not empleado.user:
+        messages.warning(request, f'{empleado.nombre_completo} no tiene acceso al sistema.')
+        return redirect('lista_empleados')
+    
+    if request.method == 'POST':
+        try:
+            # Desactivar el usuario de Django
+            empleado.user.is_active = False
+            empleado.user.save()
+            
+            # Actualizar campos del empleado
+            empleado.tiene_acceso_sistema = False
+            empleado.contraseña_configurada = False
+            empleado.save()
+            
+            messages.success(
+                request,
+                f'🔒 Acceso revocado para {empleado.nombre_completo}. '
+                f'El empleado ya no puede iniciar sesión en el sistema.'
+            )
+            
+        except Exception as e:
+            messages.error(request, f'Error al revocar acceso: {str(e)}')
+        
+        return redirect('lista_empleados')
+    
+    # Mostrar confirmación
+    return render(request, 'inventario/confirmar_revocar_acceso.html', {
+        'empleado': empleado,
+    })
+
 
 # ===== REPORTES =====
 def descargar_reporte_excel(request):

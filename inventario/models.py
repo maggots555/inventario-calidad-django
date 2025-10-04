@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 from django.utils import timezone
 import uuid
 import qrcode
@@ -540,8 +541,60 @@ class Empleado(models.Model):
     fecha_ingreso = models.DateTimeField(auto_now_add=True, help_text="Fecha de registro en el sistema")
     fecha_actualizacion = models.DateTimeField(auto_now=True, help_text="Última actualización del registro")
     
+    # === CAMPOS PARA ACCESO AL SISTEMA ===
+    # Estos campos controlan el acceso del empleado al Sistema Integral de Gestión
+    user = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='empleado',
+        verbose_name='Usuario del Sistema',
+        help_text='Usuario de Django asociado para acceso al sistema'
+    )
+    
+    tiene_acceso_sistema = models.BooleanField(
+        default=False,
+        verbose_name='Tiene acceso al sistema',
+        help_text='Indica si el empleado puede iniciar sesión en el sistema'
+    )
+    
+    fecha_envio_credenciales = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de envío de credenciales',
+        help_text='Última vez que se enviaron las credenciales por email'
+    )
+    
+    contraseña_configurada = models.BooleanField(
+        default=False,
+        verbose_name='Contraseña configurada',
+        help_text='Indica si el empleado ya cambió su contraseña temporal'
+    )
+    
+    fecha_activacion_acceso = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de activación de acceso',
+        help_text='Fecha en que el empleado completó su primer cambio de contraseña'
+    )
+    
     def __str__(self):
         return self.nombre_completo
+    
+    def estado_acceso_display(self):
+        """
+        Retorna el estado de acceso al sistema en formato legible
+        Para mostrar en templates y admin
+        """
+        if not self.user:
+            return "Sin acceso"
+        elif not self.contraseña_configurada:
+            return "Pendiente de activación"
+        else:
+            return "Acceso activo"
+    
+    estado_acceso_display.short_description = 'Estado de Acceso'
     
     class Meta:
         ordering = ['nombre_completo']

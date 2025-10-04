@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if es_reenvio %}Reenvío de {% endif %}Credenciales de Acceso</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .email-container {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .header .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .credentials-box {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #0d6efd;
+            margin: 20px 0;
+        }
+        .credentials-box h3 {
+            margin-top: 0;
+            color: #0056b3;
+        }
+        .credential-item {
+            margin: 15px 0;
+            padding: 12px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .credential-label {
+            font-weight: bold;
+            color: #0056b3;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .credential-value {
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            color: #212529;
+            background: #e7f3ff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 5px;
+            border: 1px dashed #0d6efd;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .warning-box strong {
+            color: #856404;
+        }
+        .warning-box ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .warning-box li {
+            margin: 5px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 14px 35px;
+            background: #0d6efd;
+            color: white !important;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: background 0.3s;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #0d6efd;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .info-box strong {
+            color: #0056b3;
+        }
+        .footer {
+            background: #343a40;
+            color: #adb5bd;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .divider {
+            border: none;
+            border-top: 1px solid #dee2e6;
+            margin: 25px 0;
+        }
+        .text-center {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <div class="icon">🔐</div>
+            <h1>{{ nombre_sistema }}</h1>
+            <p style="margin: 10px 0 0 0; font-size: 16px;">
+                {% if es_reenvio %}
+                    Reenvío de Credenciales de Acceso
+                {% else %}
+                    ¡Bienvenido al Sistema!
+                {% endif %}
+            </p>
+        </div>
+        
+        <div class="content">
+            <p>Hola <strong>{{ empleado.nombre_completo }}</strong>,</p>
+            
+            {% if es_reenvio %}
+                <p>Como solicitaste, te reenviamos tus credenciales de acceso al <strong>Sistema Integral de Gestión</strong>.</p>
+            {% else %}
+                <p>¡Nos complace informarte que se te ha otorgado acceso al <strong>Sistema Integral de Gestión</strong>!</p>
+                <p>A partir de ahora podrás acceder a todas las funcionalidades del sistema usando tus credenciales personales.</p>
+            {% endif %}
+            
+            <div class="credentials-box">
+                <h3>📋 TUS CREDENCIALES DE ACCESO</h3>
+                
+                <div class="credential-item">
+                    <div class="credential-label">👤 Usuario:</div>
+                    <div class="credential-value">{{ usuario }}</div>
+                </div>
+                
+                <div class="credential-item">
+                    <div class="credential-label">🔑 Contraseña Temporal:</div>
+                    <div class="credential-value">{{ contraseña_temporal }}</div>
+                </div>
+            </div>
+            
+            <div class="warning-box">
+                <strong>⚠️ IMPORTANTE - LEE CON ATENCIÓN:</strong>
+                <ul>
+                    <li><strong>Esta contraseña es TEMPORAL</strong> - Debes cambiarla en tu primer acceso al sistema</li>
+                    <li>Por seguridad, <strong>no compartas estas credenciales</strong> con nadie</li>
+                    <li>El sistema te pedirá cambiar tu contraseña inmediatamente después de iniciar sesión</li>
+                    <li>Si no solicitaste este acceso, contacta al administrador del sistema</li>
+                </ul>
+            </div>
+            
+            <div class="text-center">
+                <a href="{{ url_login }}" class="button">
+                    🌐 Acceder al Sistema Ahora
+                </a>
+            </div>
+            
+            <div class="info-box">
+                <strong>📄 Información de tu cuenta:</strong><br>
+                📧 Email: {{ empleado.email }}<br>
+                👔 Cargo: {{ empleado.cargo }}<br>
+                🏢 Área: {{ empleado.area }}<br>
+                {% if empleado.sucursal %}
+                    🏪 Sucursal: {{ empleado.sucursal.nombre }}<br>
+                {% endif %}
+            </div>
+            
+            <div class="divider"></div>
+            
+            <p style="font-size: 13px; color: #666;">
+                <strong>¿Problemas para acceder?</strong><br>
+                Si tienes dificultades para iniciar sesión o cambiar tu contraseña, contacta al administrador del sistema.
+            </p>
+            
+            <p style="font-size: 13px; color: #666; margin-top: 15px;">
+                <strong>Recomendaciones de seguridad:</strong><br>
+                • Elige una contraseña fuerte (mínimo 8 caracteres)<br>
+                • Combina letras, números y símbolos<br>
+                • No uses información personal obvia<br>
+                • Cierra sesión cuando termines de trabajar
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p style="margin: 0; font-weight: bold; font-size: 14px; color: #fff;">{{ nombre_sistema }}</p>
+            <p style="margin: 10px 0 0 0;">Este es un email automático, por favor no responder.</p>
+            <p style="margin: 5px 0 0 0;">© {% now "Y" %} - Todos los derechos reservados</p>
+        </div>
+    </div>
+</body>
+</html>
