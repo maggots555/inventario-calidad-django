@@ -314,3 +314,26 @@ git push origin master
 ---
 
 **💡 Tip**: Guarda este archivo como favorito y consúltalo hasta que memorices el flujo básico.
+
+**💡 Tip 2**: Sigue los siguientes pasos el lunes para aplicar el cambio del campo automatico:
+
+# 1. Asegurarte de estar en master
+git checkout master
+
+# 2. Descargar cambios
+
+✅ git status - Verificar estado local
+✅ git fetch - Obtener info de cambios remotos
+✅ git pull - Aplicar cambios (actualización exitosa: Fast-forward)
+
+# 3. Aplicar migraciones
+.\venv\Scripts\python.exe manage.py migrate
+
+# 4. Verificar que no hay errores
+.\venv\Scripts\python.exe manage.py check
+
+# 5. Poblar servicios
+.\venv\Scripts\python.exe poblar_servicios.py
+
+# 6. Iniciar servidor
+.\venv\Scripts\python.exe manage.py runserver

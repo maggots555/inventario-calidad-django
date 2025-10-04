@@ -233,11 +233,11 @@ Se ha creado exitosamente la aplicación **Score Card** como un módulo independ
 - [x] Adjuntar imágenes de evidencia comprimidas (60% quality)
 
 ### **Fase 5: Análisis Avanzado**
-- [ ] Indicadores de calidad (KPIs)
-- [ ] Análisis de causa raíz
-- [ ] Comparativas entre sucursales
-- [ ] Ranking de técnicos
-- [ ] Predicción de reincidencias (opcional)
+- [x] Indicadores de calidad (KPIs)
+- [x] Análisis de causa raíz
+- [x] Comparativas entre sucursales
+- [x] Ranking de técnicos
+- [x] Predicción de reincidencias (opcional)
 
 ---
 

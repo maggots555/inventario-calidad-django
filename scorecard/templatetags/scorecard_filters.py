@@ -72,6 +72,58 @@ COLORES_SEVERIDAD = {
     'default': '#6c757d',      # Gris
 }
 
+# Colores para Servicios Realizados
+COLORES_SERVICIOS = {
+    # Servicios de ingreso y recepción
+    'ingreso del equipo al cis': '#17a2b8',        # Verde azulado - Ingreso
+    'ingreso': '#17a2b8',                          # Verde azulado
+    
+    # Servicios de inspección
+    'revisión de detalles estéticos': '#6610f2',  # Índigo - Inspección visual
+    'revisión de detalles esteticos': '#6610f2',  # Índigo (sin acento)
+    'revisión estética': '#6610f2',                # Índigo
+    'revisión estetica': '#6610f2',                # Índigo (sin acento)
+    
+    # Servicios de reparación
+    'reparación del equipo': '#fd7e14',            # Naranja - Reparación general
+    'reparacion del equipo': '#fd7e14',            # Naranja (sin acento)
+    'reparación a nivel componente': '#dc3545',    # Rojo - Reparación crítica
+    'reparacion a nivel componente': '#dc3545',    # Rojo (sin acento)
+    'cambio de piezas': '#e83e8c',                 # Rosa - Reemplazo de partes
+    
+    # Servicios de verificación
+    'revisión de funcionalidad': '#0dcaf0',        # Cian - Testing
+    'revision de funcionalidad': '#0dcaf0',        # Cian (sin acento)
+    
+    # Servicios de mantenimiento
+    'limpieza interna/externa': '#20c997',         # Turquesa - Limpieza
+    'limpieza': '#20c997',                         # Turquesa
+    
+    # Servicios de datos
+    'respaldo de información': '#ffc107',          # Amarillo - Backup
+    'respaldo de informacion': '#ffc107',          # Amarillo (sin acento)
+    'respaldo': '#ffc107',                         # Amarillo
+    
+    # Servicios de entrega
+    'entrega del equipo': '#198754',               # Verde - Entrega final
+    'entrega': '#198754',                          # Verde
+    
+    # Color por defecto para servicios no definidos
+    'default': '#6c757d',                          # Gris
+}
+
+# Colores para Estados de Incidencia
+COLORES_ESTADO = {
+    'abierta': '#0d6efd',          # Azul - Activa, en proceso
+    'en_revision': '#ffc107',      # Amarillo - Esperando atención
+    'en revision': '#ffc107',      # Amarillo (sin guion bajo)
+    'cerrada': '#198754',          # Verde - Completada exitosamente
+    'reincidente': '#ff8c00',      # Naranja oscuro (DarkOrange) - Requiere atención especial
+    
+    # Color por defecto
+    'default': '#6c757d',          # Gris
+}
+
 
 @register.filter(name='text_color_for_bg')
 def text_color_for_bg(hex_color):
@@ -284,3 +336,81 @@ def color_severidad(grado_severidad):
     
     # Buscar el color en el diccionario
     return COLORES_SEVERIDAD.get(severidad_limpia, COLORES_SEVERIDAD['default'])
+
+
+@register.filter(name='color_servicio')
+def color_servicio(nombre_servicio):
+    """
+    Obtiene el color asignado para un servicio realizado específico.
+    
+    Este filtro busca el color correspondiente a un servicio en el diccionario
+    COLORES_SERVICIOS. Si no encuentra coincidencia exacta, devuelve el color
+    por defecto.
+    
+    ¿Cómo funciona?
+    - Convierte el nombre del servicio a minúsculas para hacer búsqueda sin importar mayúsculas
+    - Busca el nombre en el diccionario de colores
+    - Si encuentra coincidencia, retorna el color hexadecimal
+    - Si no encuentra, retorna el color por defecto (gris)
+    
+    Args:
+        nombre_servicio (str): Nombre del servicio (ej: "Reparación del equipo", "Limpieza interna/externa")
+    
+    Returns:
+        str: Color en formato hexadecimal (ej: '#17a2b8')
+    
+    Ejemplo de uso en template:
+        {% load scorecard_filters %}
+        <span class="badge" 
+              style="background-color: {{ incidencia.servicio_realizado.nombre|color_servicio }}; 
+                     color: {{ incidencia.servicio_realizado.nombre|color_servicio|text_color_for_bg }};">
+            {{ incidencia.servicio_realizado.nombre }}
+        </span>
+    """
+    if not nombre_servicio:
+        return COLORES_SERVICIOS['default']
+    
+    # Convertir a minúsculas y eliminar espacios extras para búsqueda
+    servicio_limpio = str(nombre_servicio).lower().strip()
+    
+    # Buscar el color en el diccionario
+    return COLORES_SERVICIOS.get(servicio_limpio, COLORES_SERVICIOS['default'])
+
+
+@register.filter(name='color_estado')
+def color_estado(estado_incidencia):
+    """
+    Obtiene el color asignado para un estado de incidencia específico.
+    
+    Este filtro busca el color correspondiente a un estado en el diccionario
+    COLORES_ESTADO. Si no encuentra coincidencia exacta, devuelve el color
+    por defecto.
+    
+    ¿Cómo funciona?
+    - Convierte el estado a minúsculas para hacer búsqueda sin importar mayúsculas
+    - Busca el estado en el diccionario de colores
+    - Si encuentra coincidencia, retorna el color hexadecimal
+    - Si no encuentra, retorna el color por defecto (gris)
+    
+    Args:
+        estado_incidencia (str): Estado de la incidencia (ej: "Abierta", "Cerrada", "En Revisión")
+    
+    Returns:
+        str: Color en formato hexadecimal (ej: '#0d6efd')
+    
+    Ejemplo de uso en template:
+        {% load scorecard_filters %}
+        <span class="badge badge-categoria" 
+              style="background-color: {{ incidencia.estado|color_estado }}; 
+                     color: {{ incidencia.estado|color_estado|text_color_for_bg }};">
+            {{ incidencia.get_estado_display }}
+        </span>
+    """
+    if not estado_incidencia:
+        return COLORES_ESTADO['default']
+    
+    # Convertir a minúsculas y eliminar espacios extras para búsqueda
+    estado_limpio = str(estado_incidencia).lower().strip()
+    
+    # Buscar el color en el diccionario
+    return COLORES_ESTADO.get(estado_limpio, COLORES_ESTADO['default'])
