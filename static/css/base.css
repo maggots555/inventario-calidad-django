@@ -520,10 +520,10 @@ body:not(.sidebar-loading) .app-sidebar {
     background: rgba(52, 152, 219, 0.7);
 }
 
-/* Botón de colapsar/expandir */
+/* Botón de colapsar/expandir (ubicado en la parte inferior del sidebar) */
 .sidebar-toggle {
     position: absolute;
-    top: 15px;
+    bottom: 20px;
     right: 10px;
     width: 32px;
     height: 32px;
@@ -552,8 +552,19 @@ body:not(.sidebar-loading) .app-sidebar {
     transition: transform 0.3s ease;
 }
 
+/* Rotar el ícono cuando el sidebar está colapsado */
 .app-sidebar.collapsed .sidebar-toggle i {
     transform: rotate(180deg);
+}
+
+/* Centrar el botón cuando el sidebar está colapsado */
+.app-sidebar.collapsed .sidebar-toggle {
+    right: 50%;
+    transform: translateX(50%);
+}
+
+.app-sidebar.collapsed .sidebar-toggle:hover {
+    transform: translateX(50%) scale(1.08);
 }
 
 /* Contenedor del menú */
@@ -1349,8 +1360,8 @@ footer::after {
 .modern-footer {
     background: linear-gradient(135deg, #2d3e50 0%, #34495e 100%);
     color: #ecf0f1;
-    padding: 3rem 0 1.5rem;
-    margin-top: 4rem;
+    padding: 1rem 0 0.5rem;
+    margin-top: 2.8rem;
     position: relative;
     overflow: hidden;
 }
@@ -1381,15 +1392,15 @@ footer::after {
 }
 
 .footer-logo {
-    width: 50px;
-    height: 50px;
+    width: 35px;
+    height: 35px;
     background: linear-gradient(135deg, #3498db, #2980b9);
-    border-radius: 12px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+    box-shadow: 0 3px 7px rgba(52, 152, 219, 0.3);
     transition: transform 0.3s ease;
 }
 
@@ -1398,29 +1409,29 @@ footer::after {
 }
 
 .footer-logo i {
-    font-size: 1.5rem;
+    font-size: 1.05rem;
     color: white;
 }
 
 .footer-brand-text h5 {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 700;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.175rem;
     color: #ffffff;
 }
 
 .footer-brand-text p {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     color: #bdc3c7;
     margin-bottom: 0;
 }
 
 /* Enlaces de Acceso Rápido */
 .footer-section h6 {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: #ffffff;
-    margin-bottom: 1rem;
+    margin-bottom: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -1432,7 +1443,7 @@ footer::after {
 }
 
 .footer-links li {
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.42rem;
 }
 
 .footer-links a {
@@ -1462,16 +1473,16 @@ footer::after {
 }
 
 .developer-avatar {
-    width: 60px;
-    height: 60px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     background: linear-gradient(135deg, #27ae60, #229954);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 0.75rem;
-    border: 3px solid rgba(39, 174, 96, 0.3);
-    box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+    margin-bottom: 0.525rem;
+    border: 2px solid rgba(39, 174, 96, 0.3);
+    box-shadow: 0 3px 10px rgba(39, 174, 96, 0.4);
     transition: all 0.3s ease;
 }
 
@@ -1481,21 +1492,21 @@ footer::after {
 }
 
 .developer-avatar span {
-    font-size: 1.5rem;
+    font-size: 1.05rem;
     font-weight: 700;
     color: white;
-    letter-spacing: 1px;
+    letter-spacing: 0.7px;
 }
 
 .developer-info h6 {
-    font-size: 1rem;
+    font-size: 0.875rem;
     font-weight: 600;
     color: #ffffff;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.175rem;
 }
 
 .developer-alias {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     color: #27ae60;
     font-weight: 500;
 }
@@ -1503,7 +1514,7 @@ footer::after {
 /* Indicadores decorativos */
 .footer-indicators {
     text-align: center;
-    margin: 2rem 0 1.5rem;
+    margin: 1.4rem 0 1.05rem;
 }
 
 .footer-dot {
@@ -1529,7 +1540,7 @@ footer::after {
 /* Copyright y Bottom */
 .footer-bottom {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding-top: 1.5rem;
+    padding-top: 1.05rem;
     text-align: center;
 }
 

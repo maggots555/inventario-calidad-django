@@ -170,13 +170,30 @@
                 {% if user.is_authenticated %}
                     <!-- Información del usuario -->
                     <div class="navbar-user-info">
-                        <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
-                        <span class="user-role">Administrador Sistema</span>
+                        {% if user.empleado %}
+                            <!-- Si el usuario tiene un perfil de empleado asociado -->
+                            <span class="user-name">{{ user.empleado.nombre_completo }}</span>
+                            <span class="user-role">{{ user.empleado.cargo }}</span>
+                        {% else %}
+                            <!-- Si no tiene empleado asociado, usar info básica del User -->
+                            <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
+                            <span class="user-role">{% if user.is_superuser %}Superusuario{% elif user.is_staff %}Administrador{% else %}Usuario{% endif %}</span>
+                        {% endif %}
                     </div>
                     
                     <!-- Avatar del usuario -->
-                    <div class="navbar-user-avatar" title="{{ user.get_full_name|default:user.username }}">
-                        <span>{{ user.first_name.0|default:"U" }}{{ user.last_name.0|default:"S" }}</span>
+                    <div class="navbar-user-avatar" title="{{ user.empleado.nombre_completo|default:user.username }}">
+                        {% if user.empleado and user.empleado.foto_perfil %}
+                            <!-- Mostrar foto de perfil si existe -->
+                            <img src="{{ user.empleado.foto_perfil.url }}" alt="{{ user.empleado.nombre_completo }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                        {% else %}
+                            <!-- Mostrar iniciales si no hay foto -->
+                            {% if user.empleado %}
+                                <span>{{ user.empleado.get_iniciales }}</span>
+                            {% else %}
+                                <span>{{ user.first_name.0|default:"U" }}{{ user.last_name.0|default:"S" }}</span>
+                            {% endif %}
+                        {% endif %}
                     </div>
                     
                     <!-- Botones de acción -->
@@ -222,10 +239,6 @@
                 }
             })();
         </script>
-        <!-- Botón de Toggle -->
-        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Colapsar/Expandir Sidebar">
-            <i class="bi bi-chevron-left"></i>
-        </button>
         
         <!-- Menú de la Sidebar -->
         <ul class="sidebar-menu">
@@ -352,6 +365,11 @@
                 </div>
             </li>
         </ul>
+        
+        <!-- Botón de Toggle (ubicado al final del sidebar) -->
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Colapsar/Expandir Sidebar">
+            <i class="bi bi-chevron-left"></i>
+        </button>
     </aside>
     
     <!-- Overlay para móviles -->

@@ -2188,3 +2188,129 @@ input[readonly].form-control:focus {
     margin: 0.5rem 0;
 }
 
+/* =============================================================================
+   AVATARES DE EMPLEADOS
+   Descripción: Estilos para mostrar fotos de perfil o iniciales de empleados
+   ============================================================================= */
+
+/* Avatar pequeño para tablas/listas (48px - 20% más grande que antes) */
+.empleado-avatar-small {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.empleado-avatar-small:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* Imagen dentro del avatar */
+.empleado-avatar-small img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* Iniciales cuando no hay foto */
+.empleado-avatar-small .avatar-iniciales {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Variación de colores de fondo para iniciales */
+.empleado-avatar-small:nth-child(3n+1) {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.empleado-avatar-small:nth-child(3n+2) {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.empleado-avatar-small:nth-child(3n) {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+/* Avatar mediano para detalles (60px) */
+.empleado-avatar-medium {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 3px solid #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.empleado-avatar-medium img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.empleado-avatar-medium .avatar-iniciales {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.25rem;
+    text-transform: uppercase;
+}
+
+/* Avatar grande para perfiles (120px) */
+.empleado-avatar-large {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 4px solid #ffffff;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.empleado-avatar-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.empleado-avatar-large .avatar-iniciales {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 2rem;
+    text-transform: uppercase;
+}
+
+/* Indicador de foto presente */
+.has-foto-indicator {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    background-color: #10b981;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+

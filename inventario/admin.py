@@ -117,15 +117,15 @@ class MovimientoAdmin(admin.ModelAdmin):
 
 @admin.register(Empleado)
 class EmpleadoAdmin(admin.ModelAdmin):
-    list_display = ('nombre_completo', 'cargo', 'area', 'sucursal', 'jefe_directo', 'email', 'estado_acceso_display', 'activo', 'fecha_ingreso')
+    list_display = ('nombre_completo', 'cargo', 'area', 'sucursal', 'jefe_directo', 'email', 'tiene_foto', 'estado_acceso_display', 'activo', 'fecha_ingreso')
     list_filter = ('area', 'cargo', 'sucursal', 'activo', 'tiene_acceso_sistema', 'contraseña_configurada', 'fecha_ingreso')
     search_fields = ('nombre_completo', 'cargo', 'area', 'email')
     ordering = ['nombre_completo']
-    readonly_fields = ('fecha_ingreso', 'fecha_actualizacion', 'user', 'tiene_acceso_sistema', 'fecha_envio_credenciales', 'contraseña_configurada', 'fecha_activacion_acceso')
+    readonly_fields = ('fecha_ingreso', 'fecha_actualizacion', 'user', 'tiene_acceso_sistema', 'fecha_envio_credenciales', 'contraseña_configurada', 'fecha_activacion_acceso', 'preview_foto')
     
     fieldsets = (
         ('Información Personal', {
-            'fields': ('nombre_completo', 'cargo', 'area', 'email')
+            'fields': ('nombre_completo', 'cargo', 'area', 'email', 'foto_perfil', 'preview_foto')
         }),
         ('Ubicación y Jerarquía', {
             'fields': ('sucursal', 'jefe_directo'),
@@ -144,6 +144,28 @@ class EmpleadoAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def tiene_foto(self, obj):
+        """
+        Muestra un ícono indicando si el empleado tiene foto de perfil
+        """
+        if obj.foto_perfil:
+            return '✅ Sí'
+        return '❌ No'
+    tiene_foto.short_description = 'Foto'
+    
+    def preview_foto(self, obj):
+        """
+        Muestra una vista previa de la foto de perfil en el admin
+        """
+        if obj.foto_perfil:
+            from django.utils.html import format_html
+            return format_html(
+                '<img src="{}" style="max-width: 150px; max-height: 150px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" />',
+                obj.foto_perfil.url
+            )
+        return "Sin foto de perfil"
+    preview_foto.short_description = 'Vista previa de foto'
     
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """

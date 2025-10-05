@@ -97,6 +97,7 @@
                     <table class="table table-hover mb-0">
                         <thead class="table-primary">
                             <tr>
+                                <th class="text-center" style="width: 70px;">Foto</th>
                                 <th>Nombre</th>
                                 <th>Cargo</th>
                                 <th>Área</th>
@@ -112,6 +113,16 @@
                         <tbody>
                             {% for empleado in empleados %}
                             <tr {% if not empleado.activo %}class="table-secondary"{% endif %}>
+                                <!-- Foto de Perfil -->
+                                <td class="text-center align-middle">
+                                    <div class="empleado-avatar-small" title="{{ empleado.nombre_completo }}">
+                                        {% if empleado.foto_perfil %}
+                                            <img src="{{ empleado.foto_perfil.url }}" alt="{{ empleado.nombre_completo }}">
+                                        {% else %}
+                                            <span class="avatar-iniciales">{{ empleado.get_iniciales }}</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
                                 <td>
                                     <strong>{{ empleado.nombre_completo }}</strong>
                                 </td>

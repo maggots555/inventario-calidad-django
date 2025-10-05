@@ -13,8 +13,52 @@
                     </h4>
                 </div>
                 <div class="card-body">
-                    <form method="post" novalidate>
+                    <!-- enctype="multipart/form-data" es necesario para subir archivos (imágenes) -->
+                    <form method="post" enctype="multipart/form-data" novalidate>
                         {% csrf_token %}
+                        
+                        <!-- Foto de Perfil -->
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <label class="form-label">
+                                    <i class="bi bi-camera"></i> Foto de Perfil
+                                </label>
+                                <div class="d-flex align-items-start gap-3">
+                                    <!-- Vista previa de la imagen -->
+                                    <div class="text-center">
+                                        <div id="foto-preview-container" style="width: 120px; height: 120px; border: 2px solid #dee2e6; border-radius: 8px; overflow: hidden; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center;">
+                                            {% if empleado.foto_perfil %}
+                                                <img id="foto-preview" src="{{ empleado.foto_perfil.url }}" alt="Foto actual" style="width: 100%; height: 100%; object-fit: cover;">
+                                            {% else %}
+                                                <div id="foto-preview" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #6c757d;">
+                                                    <i class="bi bi-person-circle" style="font-size: 3rem;"></i>
+                                                    <small>Sin foto</small>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <small class="text-muted d-block mt-2">Vista previa</small>
+                                    </div>
+                                    
+                                    <!-- Campo de archivo -->
+                                    <div class="flex-grow-1">
+                                        {{ form.foto_perfil }}
+                                        {% if form.foto_perfil.errors %}
+                                            <div class="text-danger small">
+                                                {{ form.foto_perfil.errors.0 }}
+                                            </div>
+                                        {% endif %}
+                                        <small class="form-text text-muted d-block mt-2">
+                                            <i class="bi bi-info-circle"></i> Formatos aceptados: JPG, PNG, GIF. Tamaño máximo: 5MB
+                                        </small>
+                                        {% if empleado.foto_perfil %}
+                                            <small class="form-text text-muted d-block mt-1">
+                                                <i class="bi bi-check-circle text-success"></i> Foto actual: {{ empleado.foto_perfil.name|slice:"18:" }}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         
                         <!-- Información Personal -->
                         <div class="row mb-3">
@@ -139,4 +183,43 @@
         </div>
     </div>
 </div>
+
+<!-- JavaScript para Vista Previa de Imagen -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Obtener el input de archivo y el contenedor de vista previa
+    const inputFoto = document.getElementById('id_foto_perfil');
+    const previewContainer = document.getElementById('foto-preview-container');
+    const preview = document.getElementById('foto-preview');
+    
+    // Escuchar cuando el usuario selecciona un archivo
+    inputFoto.addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        
+        // Verificar que se seleccionó un archivo y que es una imagen
+        if (file && file.type.startsWith('image/')) {
+            // FileReader nos permite leer el archivo y convertirlo a URL
+            const reader = new FileReader();
+            
+            // Cuando el archivo esté listo, actualizar la vista previa
+            reader.onload = function(e) {
+                // Crear un nuevo elemento img con la imagen seleccionada
+                const newImg = document.createElement('img');
+                newImg.src = e.target.result;
+                newImg.alt = 'Vista previa';
+                newImg.style.width = '100%';
+                newImg.style.height = '100%';
+                newImg.style.objectFit = 'cover';
+                
+                // Reemplazar el contenido del contenedor con la nueva imagen
+                previewContainer.innerHTML = '';
+                previewContainer.appendChild(newImg);
+            };
+            
+            // Iniciar la lectura del archivo
+            reader.readAsDataURL(file);
+        }
+    });
+});
+</script>
 {% endblock %}

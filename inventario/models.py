@@ -535,6 +535,16 @@ class Empleado(models.Model):
         verbose_name='Jefe Directo',
         help_text="Jefe directo del empleado en la jerarquía organizacional"
     )
+    
+    # Foto de perfil del empleado
+    foto_perfil = models.ImageField(
+        upload_to='empleados/fotos/',
+        blank=True,
+        null=True,
+        verbose_name='Foto de Perfil',
+        help_text='Foto del empleado para mostrar en el sistema (formatos: JPG, PNG, GIF)'
+    )
+    
     activo = models.BooleanField(default=True, help_text="Empleado activo en la empresa")
     
     # Fechas de control
@@ -581,6 +591,27 @@ class Empleado(models.Model):
     
     def __str__(self):
         return self.nombre_completo
+    
+    def get_foto_perfil_url(self):
+        """
+        Retorna la URL de la foto de perfil del empleado.
+        Si no tiene foto, retorna None para usar las iniciales.
+        """
+        if self.foto_perfil:
+            return self.foto_perfil.url
+        return None
+    
+    def get_iniciales(self):
+        """
+        Retorna las iniciales del empleado para mostrar cuando no hay foto.
+        Ejemplo: "Juan Pérez López" -> "JP"
+        """
+        nombres = self.nombre_completo.split()
+        if len(nombres) >= 2:
+            return f"{nombres[0][0]}{nombres[1][0]}".upper()
+        elif len(nombres) == 1:
+            return nombres[0][0:2].upper()
+        return "US"
     
     def estado_acceso_display(self):
         """

@@ -400,7 +400,7 @@ class EmpleadoForm(forms.ModelForm):
     """
     class Meta:
         model = Empleado
-        fields = ['nombre_completo', 'cargo', 'area', 'email', 'sucursal', 'jefe_directo', 'activo']
+        fields = ['nombre_completo', 'cargo', 'area', 'email', 'foto_perfil', 'sucursal', 'jefe_directo', 'activo']
         widgets = {
             'nombre_completo': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -417,6 +417,11 @@ class EmpleadoForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ej: juan.perez@empresa.com'
+            }),
+            'foto_perfil': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*',
+                'id': 'id_foto_perfil'
             }),
             'sucursal': forms.Select(attrs={
                 'class': 'form-control'

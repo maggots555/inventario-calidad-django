@@ -819,7 +819,8 @@ def crear_empleado(request):
     Solo accesible para usuarios staff/superusuario
     """
     if request.method == 'POST':
-        form = EmpleadoForm(request.POST)
+        # request.FILES permite manejar archivos subidos (como imágenes)
+        form = EmpleadoForm(request.POST, request.FILES)
         if form.is_valid():
             empleado = form.save()
             messages.success(request, f'Empleado {empleado.nombre_completo} creado exitosamente.')
@@ -843,7 +844,8 @@ def editar_empleado(request, empleado_id):
     empleado = get_object_or_404(Empleado, id=empleado_id)
     
     if request.method == 'POST':
-        form = EmpleadoForm(request.POST, instance=empleado)
+        # request.FILES permite manejar archivos subidos (como imágenes)
+        form = EmpleadoForm(request.POST, request.FILES, instance=empleado)
         if form.is_valid():
             empleado = form.save()
             messages.success(request, f'Empleado {empleado.nombre_completo} actualizado exitosamente.')
