@@ -207,6 +207,7 @@ def dashboard_inventario(request):
     return render(request, 'inventario/dashboard.html', context)
 
 # ===== GESTIÓN DE PRODUCTOS =====
+@login_required
 def lista_productos(request):
     """
     Lista de productos con filtros y búsqueda
@@ -265,6 +266,7 @@ def lista_productos(request):
     
     return render(request, 'inventario/lista_productos.html', context)
 
+@login_required
 def detalle_producto(request, producto_id):
     """
     Vista detallada de un producto con su historial de movimientos
@@ -282,6 +284,7 @@ def detalle_producto(request, producto_id):
     
     return render(request, 'inventario/detalle_producto.html', context)
 
+@login_required
 def crear_producto(request):
     """
     Crear un nuevo producto
@@ -301,6 +304,7 @@ def crear_producto(request):
         'boton_texto': 'Crear Producto'
     })
 
+@login_required
 def editar_producto(request, producto_id):
     """
     Editar un producto existente
@@ -322,6 +326,7 @@ def editar_producto(request, producto_id):
         'boton_texto': 'Guardar Cambios'
     })
 
+@login_required
 def eliminar_producto(request, producto_id):
     """
     Eliminar un producto (con confirmación)
@@ -340,6 +345,7 @@ def eliminar_producto(request, producto_id):
     })
 
 # ===== GESTIÓN DE MOVIMIENTOS =====
+@login_required
 def lista_movimientos(request):
     """
     Lista de todos los movimientos con filtros
@@ -394,6 +400,7 @@ def lista_movimientos(request):
     
     return render(request, 'inventario/lista_movimientos.html', context)
 
+@login_required
 def crear_movimiento(request):
     """
     Crear un nuevo movimiento de inventario
@@ -413,6 +420,7 @@ def crear_movimiento(request):
         'boton_texto': 'Registrar Movimiento'
     })
 
+@login_required
 def movimiento_rapido(request):
     """
     Formulario rápido para movimientos usando código QR
@@ -432,6 +440,7 @@ def movimiento_rapido(request):
         'titulo': 'Movimiento Rápido (Scanner QR)'
     })
 
+@login_required
 def movimiento_fraccionario(request):
     """
     Vista para movimientos fraccionarios (consumo parcial de productos)
@@ -465,6 +474,7 @@ def movimiento_fraccionario(request):
     })
 
 # ===== GESTIÓN DE SUCURSALES =====
+@login_required
 def lista_sucursales(request):
     """
     Lista de todas las sucursales
@@ -472,6 +482,7 @@ def lista_sucursales(request):
     sucursales = Sucursal.objects.all()
     return render(request, 'inventario/lista_sucursales.html', {'sucursales': sucursales})
 
+@login_required
 def crear_sucursal(request):
     """
     Crear una nueva sucursal
@@ -491,6 +502,7 @@ def crear_sucursal(request):
         'boton_texto': 'Crear Sucursal'
     })
 
+@login_required
 def editar_sucursal(request, sucursal_id):
     """
     Editar una sucursal existente
@@ -512,6 +524,7 @@ def editar_sucursal(request, sucursal_id):
         'boton_texto': 'Guardar Cambios'
     })
 
+@login_required
 def eliminar_sucursal(request, sucursal_id):
     """
     Eliminar una sucursal (con validaciones de seguridad)
@@ -604,6 +617,7 @@ def buscar_producto_qr(request):
     return JsonResponse(data)
 
 
+@login_required
 def buscar_producto_fraccionable_qr(request):
     """
     API endpoint para buscar producto fraccionable por código QR
@@ -698,6 +712,7 @@ def buscar_producto_fraccionable_qr(request):
 #     
 #     raise Producto.DoesNotExist("No se pudo encontrar el producto")
 
+@login_required
 def generar_qr_producto(request, producto_id):
     """
     Generar y mostrar código QR de un producto
@@ -722,6 +737,7 @@ def generar_qr_producto(request, producto_id):
 
 
 # ===== GESTIÓN DE EMPLEADOS =====
+@login_required
 def lista_empleados(request):
     """
     Lista de empleados con filtros
@@ -795,6 +811,7 @@ def lista_empleados(request):
     
     return render(request, 'inventario/lista_empleados.html', context)
 
+@login_required
 @staff_required
 def crear_empleado(request):
     """
@@ -816,6 +833,7 @@ def crear_empleado(request):
         'boton_texto': 'Crear Empleado'
     })
 
+@login_required
 @staff_required
 def editar_empleado(request, empleado_id):
     """
@@ -840,6 +858,7 @@ def editar_empleado(request, empleado_id):
         'empleado': empleado
     })
 
+@login_required
 @staff_required
 def eliminar_empleado(request, empleado_id):
     """
@@ -1184,6 +1203,7 @@ def reactivar_acceso_empleado(request, empleado_id):
 
 
 # ===== REPORTES =====
+@login_required
 def descargar_reporte_excel(request):
     """
     Genera y descarga un reporte completo en Excel con información del inventario

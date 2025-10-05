@@ -37,6 +37,7 @@ def dashboard(request):
     return render(request, 'scorecard/dashboard.html', context)
 
 
+@login_required
 def lista_incidencias(request):
     """
     Lista todas las incidencias organizadas por pestañas según estado
@@ -77,6 +78,7 @@ def lista_incidencias(request):
     return render(request, 'scorecard/lista_incidencias.html', context)
 
 
+@login_required
 def detalle_incidencia(request, incidencia_id):
     """
     Detalle completo de una incidencia
@@ -110,6 +112,7 @@ def detalle_incidencia(request, incidencia_id):
     return render(request, 'scorecard/detalle_incidencia.html', context)
 
 
+@login_required
 def crear_incidencia(request):
     """
     Crear una nueva incidencia con formulario completo
@@ -164,6 +167,7 @@ def crear_incidencia(request):
     return render(request, 'scorecard/form_incidencia.html', context)
 
 
+@login_required
 def editar_incidencia(request, incidencia_id):
     """
     Editar una incidencia existente
@@ -229,6 +233,7 @@ def editar_incidencia(request, incidencia_id):
     return render(request, 'scorecard/form_incidencia.html', context)
 
 
+@login_required
 def eliminar_incidencia(request, incidencia_id):
     """
     Eliminar una incidencia
@@ -244,6 +249,7 @@ def eliminar_incidencia(request, incidencia_id):
     return render(request, 'scorecard/confirmar_eliminacion.html', {'incidencia': incidencia})
 
 
+@login_required
 def reportes(request):
     """
     Página de reportes y análisis
@@ -251,6 +257,7 @@ def reportes(request):
     return render(request, 'scorecard/reportes.html')
 
 
+@login_required
 def lista_categorias(request):
     """
     Lista de categorías de incidencias
@@ -259,6 +266,7 @@ def lista_categorias(request):
     return render(request, 'scorecard/lista_categorias.html', {'categorias': categorias})
 
 
+@login_required
 def lista_componentes(request):
     """
     Lista de componentes de equipos
@@ -268,6 +276,7 @@ def lista_componentes(request):
 
 
 # APIs para JavaScript
+@login_required
 def api_empleado_data(request, empleado_id):
     """
     API para obtener datos de un empleado (para autocompletar)
@@ -292,6 +301,7 @@ def api_empleado_data(request, empleado_id):
     return JsonResponse(data)
 
 
+@login_required
 def api_buscar_reincidencias(request):
     """
     API para buscar incidencias previas por número de serie
@@ -328,6 +338,7 @@ def api_buscar_reincidencias(request):
     return JsonResponse(data)
 
 
+@login_required
 def api_componentes_por_tipo(request):
     """
     API para obtener componentes filtrados por tipo de equipo
@@ -356,6 +367,7 @@ def api_componentes_por_tipo(request):
 
 # === APIs para Gráficos y Reportes (Fase 3) ===
 
+@login_required
 def api_datos_dashboard(request):
     """
     API que proporciona todos los datos para gráficos del dashboard
@@ -508,6 +520,7 @@ def api_datos_dashboard(request):
     return JsonResponse(data)
 
 
+@login_required
 def api_exportar_excel(request):
     """
     API para exportar incidencias a Excel
@@ -590,6 +603,7 @@ def api_exportar_excel(request):
 # ==========================================
 
 @require_http_methods(["GET"])
+@login_required
 def api_obtener_destinatarios(request, incidencia_id):
     """
     API: Obtiene la lista de destinatarios disponibles para una incidencia
@@ -613,6 +627,7 @@ def api_obtener_destinatarios(request, incidencia_id):
 
 
 @require_http_methods(["POST"])
+@login_required
 def api_enviar_notificacion(request, incidencia_id):
     """
     API: Envía notificación por email sobre una incidencia
@@ -685,6 +700,7 @@ def api_enviar_notificacion(request, incidencia_id):
         }, status=500)
 
 
+@login_required
 def cambiar_estado_incidencia(request, incidencia_id):
     """
     Vista para cambiar el estado de una incidencia manualmente
@@ -744,6 +760,7 @@ def cambiar_estado_incidencia(request, incidencia_id):
     return render(request, 'scorecard/cambiar_estado.html', context)
 
 
+@login_required
 def marcar_no_atribuible(request, incidencia_id):
     """
     Vista para marcar una incidencia como NO atribuible al técnico
@@ -811,6 +828,7 @@ def marcar_no_atribuible(request, incidencia_id):
     return render(request, 'scorecard/marcar_no_atribuible.html', context)
 
 
+@login_required
 def cerrar_incidencia(request, incidencia_id):
     """
     Vista para cerrar una incidencia con formulario de cierre
@@ -929,6 +947,7 @@ def aplicar_filtros_reporte(queryset, request):
     return queryset
 
 
+@login_required
 def api_analisis_atribuibilidad(request):
     """
     API: Análisis completo de atribuibilidad de incidencias
@@ -1082,6 +1101,7 @@ def api_analisis_atribuibilidad(request):
     return JsonResponse(data)
 
 
+@login_required
 def api_analisis_tecnicos(request):
     """
     API: Análisis detallado por técnico con múltiples métricas
@@ -1201,6 +1221,7 @@ def api_analisis_tecnicos(request):
     return JsonResponse(data)
 
 
+@login_required
 def api_analisis_reincidencias(request):
     """
     API: Análisis profundo de reincidencias con cadenas de relaciones
@@ -1358,6 +1379,7 @@ def api_analisis_reincidencias(request):
     return JsonResponse(data)
 
 
+@login_required
 def api_analisis_tiempos(request):
     """
     API: Análisis de tiempos de resolución por estados
@@ -1557,6 +1579,7 @@ def api_analisis_tiempos(request):
 # APIS PARA REPORTES AVANZADOS - FASE 3
 # ==========================================
 
+@login_required
 def api_analisis_componentes(request):
     """
     API: Análisis detallado de componentes afectados
@@ -1736,6 +1759,7 @@ def api_analisis_componentes(request):
     return JsonResponse(data)
 
 
+@login_required
 def api_analisis_notificaciones(request):
     """
     API: Análisis del historial de notificaciones enviadas
