@@ -51,7 +51,8 @@ class IncidenciaForm(forms.ModelForm):
                     'class': 'form-control',
                     'type': 'date',
                     'placeholder': 'Fecha de detección'
-                }
+                },
+                format='%Y-%m-%d'  # Formato correcto para input type="date"
             ),
             'tipo_equipo': forms.Select(
                 attrs={
@@ -208,6 +209,9 @@ class IncidenciaForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Configurar formato de fecha para input type="date" (yyyy-MM-dd)
+        self.fields['fecha_deteccion'].input_formats = ['%Y-%m-%d']
         
         # Filtrar solo empleados activos
         self.fields['tecnico_responsable'].queryset = Empleado.objects.filter(activo=True)
