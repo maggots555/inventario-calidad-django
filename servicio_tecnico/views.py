@@ -114,8 +114,9 @@ def crear_orden(request):
                     f'Equipo: {orden.detalle_equipo.marca} {orden.detalle_equipo.modelo}'
                 )
                 
-                # Redirigir al inicio (o podrías redirigir al detalle de la orden)
-                return redirect('servicio_tecnico:inicio')
+                # Redirigir al detalle de la orden recién creada
+                # Usamos el nombre de la URL 'servicio_tecnico:detalle_orden' y pasamos el id de la orden
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
             
             except Exception as e:
                 # Si algo sale mal al guardar, mostrar error
