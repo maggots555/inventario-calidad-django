@@ -151,11 +151,14 @@
                         </div>
                         <div class="dropdown-section">
                             <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Órdenes</h6>
-                            <a href="{% url 'admin:servicio_tecnico_ordenservicio_changelist' %}" class="dropdown-item">
-                                <i class="bi bi-list-ul"></i> Ver Todas las Órdenes
+                            <a href="{% url 'servicio_tecnico:crear_orden' %}" class="dropdown-item">
+                                <i class="bi bi-plus-circle-fill text-success"></i> Nueva Orden de Servicio
                             </a>
-                            <a href="{% url 'admin:servicio_tecnico_ordenservicio_add' %}" class="dropdown-item">
-                                <i class="bi bi-plus-circle"></i> Nueva Orden de Servicio
+                            <a href="{% url 'servicio_tecnico:lista_activas' %}" class="dropdown-item">
+                                <i class="bi bi-hourglass-split text-primary"></i> Órdenes Activas
+                            </a>
+                            <a href="{% url 'servicio_tecnico:lista_finalizadas' %}" class="dropdown-item">
+                                <i class="bi bi-check-circle text-success"></i> Órdenes Finalizadas
                             </a>
                         </div>
                         <div class="dropdown-section">

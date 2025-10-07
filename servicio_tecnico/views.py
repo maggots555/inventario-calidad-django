@@ -13,14 +13,18 @@ from django.contrib import messages
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.http import JsonResponse
+from django.utils.safestring import mark_safe
 from PIL import Image
 import os
+import json
 from .models import OrdenServicio, DetalleEquipo, HistorialOrden, ImagenOrden
+from inventario.models import Empleado
 from .forms import (
     NuevaOrdenForm,
     ConfiguracionAdicionalForm,
     ReingresoRHITSOForm,
     CambioEstadoForm,
+    AsignarResponsablesForm,
     ComentarioForm,
     SubirImagenesForm,
 )
@@ -480,7 +484,62 @@ def detalle_orden(request, orden_id):
                 messages.error(request, '❌ Error al cambiar el estado.')
         
         # ------------------------------------------------------------------------
-        # FORMULARIO 4: Agregar Comentario
+        # FORMULARIO 4: Asignar Responsables
+        # ------------------------------------------------------------------------
+        elif form_type == 'asignar_responsables':
+            form_responsables = AsignarResponsablesForm(request.POST, instance=orden)
+            
+            if form_responsables.is_valid():
+                # Guardar técnico anterior antes de cambiar
+                tecnico_anterior = orden.tecnico_asignado_actual
+                responsable_anterior = orden.responsable_seguimiento
+                
+                orden_actualizada = form_responsables.save()
+                
+                # Registrar cambios en el historial
+                cambios = []
+                if tecnico_anterior != orden_actualizada.tecnico_asignado_actual:
+                    cambios.append(
+                        f'Técnico: {tecnico_anterior.nombre_completo} → {orden_actualizada.tecnico_asignado_actual.nombre_completo}'
+                    )
+                    # Crear entrada específica de cambio de técnico
+                    HistorialOrden.objects.create(
+                        orden=orden,
+                        tipo_evento='cambio_tecnico',
+                        comentario=f'Técnico reasignado',
+                        usuario=empleado_actual,
+                        tecnico_anterior=tecnico_anterior,
+                        tecnico_nuevo=orden_actualizada.tecnico_asignado_actual,
+                        es_sistema=False
+                    )
+                
+                if responsable_anterior != orden_actualizada.responsable_seguimiento:
+                    cambios.append(
+                        f'Responsable: {responsable_anterior.nombre_completo} → {orden_actualizada.responsable_seguimiento.nombre_completo}'
+                    )
+                    # Crear entrada de cambio de responsable
+                    HistorialOrden.objects.create(
+                        orden=orden,
+                        tipo_evento='actualizacion',
+                        comentario=f'Responsable de seguimiento cambiado a: {orden_actualizada.responsable_seguimiento.nombre_completo}',
+                        usuario=empleado_actual,
+                        es_sistema=False
+                    )
+                
+                if cambios:
+                    messages.success(
+                        request,
+                        f'✅ Responsables actualizados: {" | ".join(cambios)}'
+                    )
+                else:
+                    messages.info(request, 'ℹ️ No se realizaron cambios en los responsables.')
+                
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+            else:
+                messages.error(request, '❌ Error al asignar responsables.')
+        
+        # ------------------------------------------------------------------------
+        # FORMULARIO 5: Agregar Comentario
         # ------------------------------------------------------------------------
         elif form_type == 'comentario':
             form_comentario = ComentarioForm(request.POST)
@@ -493,7 +552,7 @@ def detalle_orden(request, orden_id):
                 messages.error(request, '❌ Error al agregar el comentario.')
         
         # ------------------------------------------------------------------------
-        # FORMULARIO 5: Subir Imágenes
+        # FORMULARIO 6: Subir Imágenes
         # ------------------------------------------------------------------------
         elif form_type == 'subir_imagenes':
             form_imagenes = SubirImagenesForm(request.POST, request.FILES)
@@ -569,6 +628,7 @@ def detalle_orden(request, orden_id):
     form_config = ConfiguracionAdicionalForm(instance=orden.detalle_equipo)
     form_reingreso = ReingresoRHITSOForm(instance=orden)
     form_estado = CambioEstadoForm(instance=orden)
+    form_responsables = AsignarResponsablesForm(instance=orden)
     form_comentario = ComentarioForm()
     form_imagenes = SubirImagenesForm()
     
@@ -598,6 +658,22 @@ def detalle_orden(request, orden_id):
     total_imagenes = orden.imagenes.count()
     
     # ========================================================================
+    # ESTADÍSTICAS DE TÉCNICOS (Para alertas de carga de trabajo)
+    # ========================================================================
+    
+    # Obtener todos los técnicos de laboratorio para mostrar sus estadísticas
+    tecnicos_laboratorio = Empleado.objects.filter(
+        activo=True,
+        cargo__icontains='TECNICO DE LABORATORIO'
+    )
+    
+    # Crear diccionario con estadísticas de cada técnico
+    # Esto se usa en el template para mostrar alertas
+    estadisticas_tecnicos = {}
+    for tecnico in tecnicos_laboratorio:
+        estadisticas_tecnicos[tecnico.pk] = tecnico.obtener_estadisticas_ordenes_activas()
+    
+    # ========================================================================
     # CONTEXT PARA EL TEMPLATE
     # ========================================================================
     
@@ -609,6 +685,7 @@ def detalle_orden(request, orden_id):
         'form_config': form_config,
         'form_reingreso': form_reingreso,
         'form_estado': form_estado,
+        'form_responsables': form_responsables,
         'form_comentario': form_comentario,
         'form_imagenes': form_imagenes,
         
@@ -624,6 +701,9 @@ def detalle_orden(request, orden_id):
         # Información adicional
         'dias_en_servicio': orden.dias_en_servicio,
         'esta_retrasada': orden.esta_retrasada,
+        
+        # Estadísticas de técnicos (para alertas) - Convertido a JSON para JavaScript
+        'estadisticas_tecnicos': mark_safe(json.dumps(estadisticas_tecnicos)),
     }
     
     return render(request, 'servicio_tecnico/detalle_orden.html', context)

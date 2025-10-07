@@ -614,3 +614,108 @@
 .bg-gradient-success {
     background: var(--st-gradient-5) !important;
 }
+
+/* =============================================================================
+   ESTILOS PARA VISTA DE DETALLE DE ORDEN (detalle_orden.html)
+   ============================================================================= */
+
+/* ===== BADGES Y ETIQUETAS ===== */
+.info-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+/* ===== CARDS DE SECCIÓN ===== */
+.section-card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-radius: 1rem;
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.section-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem 1.5rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* ===== GALERÍA DE IMÁGENES ===== */
+.gallery-image {
+    position: relative;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.gallery-image:hover {
+    transform: scale(1.05);
+}
+
+.gallery-image img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.image-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+    color: white;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+}
+
+/* ===== TIMELINE PARA HISTORIAL ===== */
+.timeline-item {
+    position: relative;
+    padding-left: 2rem;
+    padding-bottom: 1.5rem;
+    border-left: 2px solid #e9ecef;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #667eea;
+    border: 2px solid white;
+}
+
+.timeline-item:last-child {
+    border-left: none;
+}
+
+/* ===== BADGES DE ESTADO ===== */
+.estado-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ===== DÍAS EN SERVICIO ===== */
+.dias-servicio {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #667eea;
+}

@@ -627,6 +627,58 @@ class Empleado(models.Model):
     
     estado_acceso_display.short_description = 'Estado de Acceso'
     
+    def obtener_estadisticas_ordenes_activas(self):
+        """
+        Obtiene estadísticas de las órdenes activas asignadas al técnico.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Este método cuenta cuántos equipos tiene asignados un técnico actualmente
+        y cuántos de esos equipos NO encienden. Esto es útil para:
+        1. Evitar sobrecargar técnicos
+        2. Alertar cuando un técnico ya tiene muchos equipos complejos
+        3. Distribuir mejor la carga de trabajo
+        
+        Returns:
+            dict: Diccionario con estadísticas:
+                - ordenes_activas: Total de órdenes no finalizadas/entregadas
+                - equipos_no_encienden: Cantidad de equipos que NO encienden
+                - tiene_sobrecarga: True si tiene 3 o más equipos que no encienden
+                - porcentaje_no_encienden: % de equipos que no encienden
+        """
+        # Importar aquí para evitar circular imports
+        from servicio_tecnico.models import OrdenServicio
+        
+        # Estados que se consideran "activos" (no terminados)
+        estados_activos = ['espera', 'diagnostico', 'cotizacion', 'reparacion']
+        
+        # Obtener órdenes activas del técnico
+        ordenes_activas = OrdenServicio.objects.filter(
+            tecnico_asignado_actual=self,
+            estado__in=estados_activos
+        ).select_related('detalle_equipo')
+        
+        total_ordenes = ordenes_activas.count()
+        
+        # Contar cuántos equipos NO encienden
+        equipos_no_encienden = ordenes_activas.filter(
+            detalle_equipo__equipo_enciende=False
+        ).count()
+        
+        # Calcular porcentaje
+        porcentaje = 0
+        if total_ordenes > 0:
+            porcentaje = round((equipos_no_encienden / total_ordenes) * 100, 1)
+        
+        # Determinar si tiene sobrecarga (criterio: 3+ equipos que no encienden)
+        tiene_sobrecarga = equipos_no_encienden >= 3
+        
+        return {
+            'ordenes_activas': total_ordenes,
+            'equipos_no_encienden': equipos_no_encienden,
+            'tiene_sobrecarga': tiene_sobrecarga,
+            'porcentaje_no_encienden': porcentaje,
+        }
+    
     class Meta:
         ordering = ['nombre_completo']
         verbose_name_plural = "Empleados"

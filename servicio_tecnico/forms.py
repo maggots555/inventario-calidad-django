@@ -495,6 +495,9 @@ class CambioEstadoForm(forms.ModelForm):
     3. Cambia el estado de la orden
     
     Los estados posibles están definidos en config/constants.py
+    
+    NOTA: Este formulario SOLO cambia el estado. Para asignar responsables
+    usa el formulario AsignarResponsablesForm.
     """
     
     comentario_cambio = forms.CharField(
@@ -510,31 +513,93 @@ class CambioEstadoForm(forms.ModelForm):
     
     class Meta:
         model = OrdenServicio
-        fields = ['estado', 'tecnico_asignado_actual']
+        fields = ['estado']  # Solo el estado, no los responsables
         
         widgets = {
             'estado': forms.Select(attrs={
-                'class': 'form-control form-select',
-            }),
-            'tecnico_asignado_actual': forms.Select(attrs={
                 'class': 'form-control form-select',
             }),
         }
         
         labels = {
             'estado': 'Nuevo Estado',
-            'tecnico_asignado_actual': 'Técnico Asignado',
         }
         
         help_texts = {
             'estado': 'Selecciona el nuevo estado de la orden',
-            'tecnico_asignado_actual': 'Técnico responsable de la orden',
+        }
+
+
+class AsignarResponsablesForm(forms.ModelForm):
+    """
+    Formulario para asignar responsables de la orden (técnico y seguimiento).
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario permite cambiar quién es responsable de la orden:
+    
+    - tecnico_asignado_actual: El técnico que repara el equipo (SOLO TECNICOS DE LABORATORIO)
+    - responsable_seguimiento: La persona que da seguimiento al caso
+    
+    FILTROS APLICADOS:
+    - Técnicos: Solo empleados con cargo "TECNICO DE LABORATORIO" y activos
+    - Responsables: Todos los empleados activos
+    
+    Cuando cambias estos responsables:
+    1. Se actualiza la orden
+    2. Se registra el cambio en el historial
+    3. Se guarda quién era el técnico anterior (si aplica)
+    """
+    
+    class Meta:
+        model = OrdenServicio
+        fields = ['tecnico_asignado_actual', 'responsable_seguimiento']
+        
+        widgets = {
+            'tecnico_asignado_actual': forms.Select(attrs={
+                'class': 'form-control form-select',
+                'id': 'id_tecnico_select',  # ID específico para JavaScript
+            }),
+            'responsable_seguimiento': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
+        }
+        
+        labels = {
+            'tecnico_asignado_actual': 'Técnico Asignado',
+            'responsable_seguimiento': 'Responsable de Seguimiento',
+        }
+        
+        help_texts = {
+            'tecnico_asignado_actual': 'Técnico de laboratorio que reparará el equipo',
+            'responsable_seguimiento': 'Persona encargada del seguimiento',
         }
     
     def __init__(self, *args, **kwargs):
+        """
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Este método se ejecuta cuando se crea el formulario.
+        Aquí aplicamos filtros especiales:
+        
+        1. Para TÉCNICOS: Solo mostramos empleados con cargo "TECNICO DE LABORATORIO"
+        2. Para RESPONSABLES: Mostramos todos los empleados activos
+        
+        El filtro usa __icontains que es case-insensitive (no importa mayúsculas/minúsculas)
+        """
         super().__init__(*args, **kwargs)
-        # Filtrar solo empleados activos
-        self.fields['tecnico_asignado_actual'].queryset = Empleado.objects.filter(activo=True)
+        
+        # FILTRO ESPECIAL: Solo técnicos de laboratorio activos
+        # __icontains = búsqueda case-insensitive (ignora mayúsculas/minúsculas)
+        tecnicos_laboratorio = Empleado.objects.filter(
+            activo=True,
+            cargo__icontains='TECNICO DE LABORATORIO'
+        ).order_by('nombre_completo')
+        
+        self.fields['tecnico_asignado_actual'].queryset = tecnicos_laboratorio
+        
+        # Para responsables: todos los empleados activos
+        self.fields['responsable_seguimiento'].queryset = Empleado.objects.filter(
+            activo=True
+        ).order_by('nombre_completo')
 
 
 class ComentarioForm(forms.ModelForm):
