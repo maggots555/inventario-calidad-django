@@ -4,7 +4,8 @@
 {% block title %}Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}">
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=4.4">
+<link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}?v=1.0">
 {% endblock %}
 
 {% block content %}
@@ -645,37 +646,35 @@
                             <div class="row g-3">
                                 {% for imagen in imagenes %}
                                 <div class="col-md-3 col-sm-6">
-                                    <div class="gallery-image" data-bs-toggle="modal" data-bs-target="#modalImagen{{ imagen.pk }}">
-                                        <img src="{{ imagen.imagen.url }}" alt="{{ imagen.descripcion }}">
-                                        <div class="image-overlay">
-                                            <div>{{ imagen.fecha_subida|date:"d/m/Y" }}</div>
-                                            {% if imagen.descripcion %}
-                                                <div class="small">{{ imagen.descripcion|truncatewords:5 }}</div>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Modal para ver imagen completa -->
-                                    <div class="modal fade" id="modalImagen{{ imagen.pk }}" tabindex="-1">
-                                        <div class="modal-dialog modal-lg modal-dialog-centered">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">
-                                                        <i class="bi bi-image"></i>
-                                                        Imagen de {{ imagen.get_tipo_display }}
-                                                    </h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <div class="modal-body text-center">
-                                                    <img src="{{ imagen.imagen.url }}" alt="{{ imagen.descripcion }}" class="img-fluid">
-                                                    {% if imagen.descripcion %}
-                                                        <p class="mt-3">{{ imagen.descripcion }}</p>
-                                                    {% endif %}
-                                                    <p class="text-muted small">
-                                                        Subida el {{ imagen.fecha_subida|date:"d/m/Y H:i" }} por {{ imagen.subido_por.nombre_completo }}
-                                                    </p>
-                                                </div>
+                                    <div class="gallery-image-container"
+                                         data-descripcion="{{ imagen.descripcion|default:'Sin descripción' }}"
+                                         data-usuario="{{ imagen.subido_por.nombre_completo }}"
+                                         data-fecha="{{ imagen.fecha_subida|date:'d/m/Y H:i' }}"
+                                         data-url-descarga="{% url 'servicio_tecnico:descargar_imagen' imagen.pk %}">
+                                        
+                                        <!-- Botón descarga en miniatura -->
+                                        <a href="{% url 'servicio_tecnico:descargar_imagen' imagen.pk %}" 
+                                           class="btn-descarga-miniatura" 
+                                           title="Descargar imagen original"
+                                           onclick="event.stopPropagation();">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                        
+                                        <div class="gallery-image">
+                                            <img src="{{ imagen.imagen.url }}" alt="{{ imagen.descripcion }}">
+                                            <div class="image-overlay">
+                                                <div>{{ imagen.fecha_subida|date:"d/m/Y H:i" }}</div>
+                                                {% if imagen.descripcion %}
+                                                    <div class="small">{{ imagen.descripcion|truncatewords:5 }}</div>
+                                                {% endif %}
                                             </div>
+                                        </div>
+                                        
+                                        <!-- Pie de imagen con usuario -->
+                                        <div class="image-footer">
+                                            <small class="text-muted">
+                                                <i class="bi bi-person-circle"></i> {{ imagen.subido_por.nombre_completo }}
+                                            </small>
                                         </div>
                                     </div>
                                 </div>
@@ -699,6 +698,9 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Lightbox personalizado para galería -->
+<script src="{% static 'js/lightbox_galeria.js' %}?v=1.0"></script>
+
 <script>
 // ============================================================================
 // ESTADÍSTICAS DE TÉCNICOS (Datos del servidor)
