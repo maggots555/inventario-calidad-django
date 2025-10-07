@@ -38,6 +38,7 @@ urlpatterns = [
     # Módulos de la aplicación
     path('inventario/', include('inventario.urls')),  # URLs del módulo de inventario
     path('scorecard/', include('scorecard.urls')),  # URLs del módulo de control de calidad
+    path('servicio-tecnico/', include('servicio_tecnico.urls')),  # URLs del módulo de servicio técnico
 ]
 
 # Servir archivos media en desarrollo

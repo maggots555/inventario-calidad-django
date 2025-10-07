@@ -1,0 +1,296 @@
+/* =============================================================================
+   ESTILOS PARA MÓDULO DE SERVICIO TÉCNICO
+   Descripción: Estilos para cards de órdenes de servicio con diseño moderno
+   ============================================================================= */
+
+/* ===== CARDS DE SERVICIO TÉCNICO ===== */
+.service-card {
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    background: white;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85rem; /* Reducido para cards más pequeñas */
+    max-width: 320px; /* Limitar ancho para cards más compactas (30% menos) */
+}
+
+.service-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    border-color: #2563eb;
+}
+
+.service-card-header {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.service-card-body {
+    padding: 1rem;
+    flex-grow: 1;
+}
+
+.service-card-footer {
+    padding: 0.75rem;
+    border-top: 1px solid #f3f4f6;
+    background-color: #f9fafb;
+}
+
+/* ===== MARCA PRINCIPAL ===== */
+.marca-principal {
+    font-size: 1.4rem; /* Reducido de 1.75rem */
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+    line-height: 1.2;
+}
+
+/* ===== INFORMACIÓN DE EQUIPO ===== */
+.info-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem; /* Reducido de 0.75rem */
+    font-size: 0.8rem; /* Reducido de 0.9rem */
+}
+
+.info-item i {
+    width: 20px; /* Reducido de 24px */
+    margin-right: 6px; /* Reducido de 8px */
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.info-item strong {
+    color: #374151;
+    margin-right: 4px; /* Reducido de 6px */
+}
+
+/* ===== INDICADORES VISUALES ===== */
+.indicadores {
+    display: flex;
+    gap: 0.5rem; /* Reducido de 0.75rem */
+    margin-top: 0.75rem; /* Reducido de 1rem */
+}
+
+.indicador {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem; /* Reducido de 0.5rem */
+    padding: 0.4rem 0.6rem; /* Reducido */
+    border-radius: 6px;
+    background-color: #f3f4f6;
+    font-size: 0.75rem; /* Reducido de 0.875rem */
+}
+
+.indicador-icon {
+    width: 28px; /* Reducido de 32px */
+    height: 28px; /* Reducido de 32px */
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.7rem; /* Reducido de 0.75rem */
+}
+
+.indicador-icon.has-images {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.indicador-icon.no-images {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+}
+
+.indicador-icon.has-charger {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.indicador-icon.no-charger {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.indicador-text-small {
+    font-size: 0.65rem; /* Reducido de 0.7rem */
+}
+
+.indicador-text-main {
+    font-size: 0.75rem; /* Reducido de 0.85rem */
+}
+
+/* ===== BADGES DE ESTADO ===== */
+.badge-estado {
+    font-size: 0.65rem; /* Reducido de 0.75rem */
+    font-weight: 600;
+    padding: 0.3rem 0.6rem; /* Reducido */
+    border-radius: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Colores por estado */
+.badge-espera { 
+    background-color: #fef3c7; 
+    color: #92400e; 
+}
+
+.badge-recepcion { 
+    background-color: #dbeafe; 
+    color: #1e40af; 
+}
+
+.badge-diagnostico { 
+    background-color: #e0e7ff; 
+    color: #3730a3; 
+}
+
+.badge-cotizacion { 
+    background-color: #fce7f3; 
+    color: #831843; 
+}
+
+.badge-rechazada { 
+    background-color: #fee2e2; 
+    color: #991b1b; 
+}
+
+.badge-esperando_piezas { 
+    background-color: #fed7aa; 
+    color: #92400e; 
+}
+
+.badge-reparacion { 
+    background-color: #c7d2fe; 
+    color: #3730a3; 
+}
+
+.badge-control_calidad { 
+    background-color: #fef08a; 
+    color: #854d0e; 
+}
+
+.badge-finalizado { 
+    background-color: #bbf7d0; 
+    color: #065f46; 
+}
+
+.badge-entregado { 
+    background-color: #d1fae5; 
+    color: #047857; 
+}
+
+.badge-cancelado { 
+    background-color: #f3f4f6; 
+    color: #4b5563; 
+}
+
+/* Badge especial RHITSO con animación */
+.badge-rhitso {
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+    color: white;
+    font-weight: 700;
+    animation: pulse-rhitso 2s infinite;
+}
+
+@keyframes pulse-rhitso {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+/* ===== BARRA DE BÚSQUEDA ===== */
+.search-box {
+    background: white;
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 2rem;
+}
+
+/* Ajustar el tamaño del input de búsqueda - tamaño estándar */
+.search-box .form-control {
+    height: 45px;
+    font-size: 0.95rem;
+    padding: 0.625rem 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+.search-box .form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Ajustar el tamaño del botón de búsqueda para que coincida exactamente con el input */
+.search-box .btn-primary {
+    height: 45px;
+    font-size: 0.95rem;
+    padding: 0.625rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+/* Label de búsqueda más compacto */
+.search-box .form-label {
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+/* Texto de ayuda más pequeño */
+.search-box small.text-muted {
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+/* ===== BOTONES ===== */
+.btn-ver-detalles {
+    width: 100%;
+    border-radius: 6px;
+    font-weight: 600;
+    padding: 0.6rem; /* Reducido de 0.75rem */
+    transition: all 0.2s;
+    font-size: 0.85rem;
+}
+
+.btn-cerrar-orden {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+}
+
+.btn-cerrar-orden:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: scale(1.02);
+    color: white;
+}
+
+/* ===== GRID RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .marca-principal {
+        font-size: 1.2rem;
+    }
+    
+    .info-item {
+        font-size: 0.75rem;
+    }
+}
+
+/* ===== TEXTO MUTED PERSONALIZADO ===== */
+.text-muted-small {
+    color: #6b7280;
+    font-size: 0.75rem;
+}

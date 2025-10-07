@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'inventario',
     'scorecard',  # Nueva app para Score Card de Calidad
+    'servicio_tecnico',  # Nueva app para Gestión de Órdenes de Servicio Técnico
 ]
 
 MIDDLEWARE = [

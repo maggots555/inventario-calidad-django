@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Servicio Técnico - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Encabezado -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><i class="bi bi-tools"></i> Servicio Técnico</h1>
+                    <p class="text-muted">Gestión de Órdenes de Servicio - Centro de Reparación</p>
+                </div>
+                <div>
+                    <a href="{% url 'servicio_tecnico:crear_orden' %}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-plus-circle"></i> Nueva Orden
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjetas de Estadísticas -->
+    <div class="row mb-4">
+        <!-- Total de Órdenes -->
+        <div class="col-md-3">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-file-earmark-text"></i> Total Órdenes
+                    </h5>
+                    <h2 class="card-text">{{ total_ordenes }}</h2>
+                    <p class="card-text"><small>Todas las órdenes registradas</small></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Órdenes Activas -->
+        <div class="col-md-3">
+            <div class="card text-white bg-info mb-3" style="cursor: pointer;" onclick="window.location.href='{% url 'servicio_tecnico:lista_activas' %}'">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-hourglass-split"></i> Activas
+                    </h5>
+                    <h2 class="card-text">{{ ordenes_activas }}</h2>
+                    <p class="card-text"><small>En proceso de reparación</small></p>
+                    <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-light btn-sm mt-2">
+                        <i class="bi bi-eye"></i> Ver Órdenes Activas
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Órdenes Retrasadas -->
+        <div class="col-md-3">
+            <div class="card text-white bg-warning mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-exclamation-triangle"></i> Atención
+                    </h5>
+                    <h2 class="card-text">{{ ordenes_retrasadas }}</h2>
+                    <p class="card-text"><small>Requieren seguimiento</small></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Acceso Admin -->
+        <div class="col-md-3">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-gear"></i> Gestión
+                    </h5>
+                    <a href="{% url 'servicio_tecnico:lista_finalizadas' %}" class="btn btn-light btn-sm w-100 mb-2">
+                        <i class="bi bi-check-circle"></i> Órdenes Cerradas
+                    </a>
+                    <a href="{% url 'admin:servicio_tecnico_ordenservicio_changelist' %}" class="btn btn-light btn-sm w-100">
+                        <i class="bi bi-list-ul"></i> Admin Django
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Órdenes por Estado -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Órdenes por Estado</h5>
+                </div>
+                <div class="card-body">
+                    {% if ordenes_por_estado %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Estado</th>
+                                        <th class="text-end">Cantidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in ordenes_por_estado %}
+                                        <tr>
+                                            <td>
+                                                {% if item.estado == 'espera' %}
+                                                    <span class="badge bg-secondary">En Espera</span>
+                                                {% elif item.estado == 'diagnostico' %}
+                                                    <span class="badge bg-warning">En Diagnóstico</span>
+                                                {% elif item.estado == 'cotizacion' %}
+                                                    <span class="badge bg-info">Esperando Aprobación</span>
+                                                {% elif item.estado == 'reparacion' %}
+                                                    <span class="badge bg-primary">En Reparación</span>
+                                                {% elif item.estado == 'finalizado' %}
+                                                    <span class="badge bg-success">Finalizado</span>
+                                                {% elif item.estado == 'entregado' %}
+                                                    <span class="badge bg-success">Entregado</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">{{ item.estado }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-end"><strong>{{ item.total }}</strong></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center py-4">No hay órdenes registradas aún</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Órdenes Recientes -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Órdenes Recientes</h5>
+                </div>
+                <div class="card-body">
+                    {% if ordenes_recientes %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Orden</th>
+                                        <th>Equipo</th>
+                                        <th>Estado</th>
+                                        <th>Fecha</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for orden in ordenes_recientes %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'admin:servicio_tecnico_ordenservicio_change' orden.pk %}" class="text-decoration-none">
+                                                    <strong>{{ orden.numero_orden_interno }}</strong>
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <small>
+                                                    {{ orden.detalle_equipo.marca }} {{ orden.detalle_equipo.modelo|truncatewords:2 }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                {% if orden.estado == 'espera' %}
+                                                    <span class="badge bg-secondary">Espera</span>
+                                                {% elif orden.estado == 'diagnostico' %}
+                                                    <span class="badge bg-warning">Diagnóstico</span>
+                                                {% elif orden.estado == 'reparacion' %}
+                                                    <span class="badge bg-primary">Reparación</span>
+                                                {% elif orden.estado == 'finalizado' %}
+                                                    <span class="badge bg-success">Finalizado</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">{{ orden.get_estado_display }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td><small>{{ orden.fecha_ingreso|date:"d/m/Y" }}</small></td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center py-4">No hay órdenes registradas aún</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enlaces Rápidos -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Accesos Rápidos</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'admin:servicio_tecnico_ordenservicio_changelist' %}" class="btn btn-outline-primary w-100">
+                                <i class="bi bi-list"></i> Todas las Órdenes
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'admin:servicio_tecnico_cotizacion_changelist' %}" class="btn btn-outline-info w-100">
+                                <i class="bi bi-receipt"></i> Cotizaciones
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'admin:servicio_tecnico_imagenorden_changelist' %}" class="btn btn-outline-warning w-100">
+                                <i class="bi bi-images"></i> Imágenes
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="{% url 'admin:servicio_tecnico_referenciagamaequipo_changelist' %}" class="btn btn-outline-success w-100">
+                                <i class="bi bi-bookmark"></i> Referencias Gama
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información del Sistema -->
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h5><i class="bi bi-info-circle"></i> Información del Sistema</h5>
+                <p class="mb-0">
+                    <strong>Fase Actual:</strong> FASE 1 - Modelos y Admin configurados<br>
+                    <strong>Próximas fases:</strong> Formularios personalizados, Dashboard con KPIs, Integración con ScoreCard<br>
+                    <strong>Acceso Admin:</strong> Por el momento, toda la gestión se realiza a través del <a href="{% url 'admin:index' %}">Admin de Django</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

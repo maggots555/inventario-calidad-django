@@ -136,6 +136,49 @@
                     </div>
                 </div>
                 
+                <!-- MÓDULO: SERVICIO TÉCNICO -->
+                <div class="navbar-menu-item dropdown">
+                    <a href="#" class="navbar-menu-link" data-dropdown="servicio">
+                        <i class="bi bi-tools"></i> Servicio Técnico
+                        <i class="bi bi-chevron-down ms-1"></i>
+                    </a>
+                    <div class="navbar-dropdown" id="dropdown-servicio">
+                        <div class="dropdown-section">
+                            <h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6>
+                            <a href="{% url 'servicio_tecnico:inicio' %}" class="dropdown-item">
+                                <i class="bi bi-house"></i> Inicio Servicio Técnico
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Órdenes</h6>
+                            <a href="{% url 'admin:servicio_tecnico_ordenservicio_changelist' %}" class="dropdown-item">
+                                <i class="bi bi-list-ul"></i> Ver Todas las Órdenes
+                            </a>
+                            <a href="{% url 'admin:servicio_tecnico_ordenservicio_add' %}" class="dropdown-item">
+                                <i class="bi bi-plus-circle"></i> Nueva Orden de Servicio
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <h6 class="dropdown-header"><i class="bi bi-receipt"></i> Cotizaciones y Piezas</h6>
+                            <a href="{% url 'admin:servicio_tecnico_cotizacion_changelist' %}" class="dropdown-item">
+                                <i class="bi bi-file-earmark-bar-graph"></i> Cotizaciones
+                            </a>
+                            <a href="{% url 'admin:servicio_tecnico_seguimientopieza_changelist' %}" class="dropdown-item">
+                                <i class="bi bi-truck"></i> Seguimiento de Piezas
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
+                            <a href="{% url 'admin:servicio_tecnico_referenciagamaequipo_changelist' %}" class="dropdown-item">
+                                <i class="bi bi-bookmark"></i> Referencias de Gama
+                            </a>
+                            <a href="{% url 'admin:servicio_tecnico_imagenorden_changelist' %}" class="dropdown-item">
+                                <i class="bi bi-images"></i> Imágenes
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- MÓDULO: CONFIGURACIÓN -->
                 <div class="navbar-menu-item dropdown">
                     <a href="#" class="navbar-menu-link" data-dropdown="configuracion">

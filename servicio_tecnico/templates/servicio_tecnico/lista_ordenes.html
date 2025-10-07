@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<!-- Cargar estilos específicos de servicio técnico -->
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header con título y botones de acción -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h1 class="h3 mb-1">
+                        <i class="bi bi-laptop"></i> {{ titulo }}
+                    </h1>
+                    <p class="text-muted mb-0">Control y seguimiento de equipos en servicio</p>
+                </div>
+                <div class="d-flex gap-2">
+                    {% if tipo == 'activas' %}
+                        <a href="{% url 'servicio_tecnico:lista_finalizadas' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-check-circle"></i> Ver Cerrados
+                        </a>
+                        <form method="post" action="{% url 'servicio_tecnico:cerrar_todas' %}" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success" 
+                                    onclick="return confirm('¿Cerrar todas las órdenes finalizadas?')">
+                                <i class="bi bi-check-all"></i> Cerrar Finalizados
+                            </button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-outline-primary">
+                            <i class="bi bi-hourglass-split"></i> Ver Activos
+                        </a>
+                    {% endif %}
+                    <a href="{% url 'servicio_tecnico:crear_orden' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Nueva Orden
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de búsqueda y filtros -->
+    <div class="search-box">
+        <form method="get" class="row g-3">
+            <div class="col-md-9">
+                <label for="busqueda" class="form-label">
+                    <i class="bi bi-search"></i> Buscar por N° de Serie u Orden
+                </label>
+                <input type="text" 
+                       class="form-control" 
+                       id="busqueda" 
+                       name="busqueda" 
+                       value="{{ busqueda }}"
+                       placeholder="Escribe el número de serie o la orden...">
+                <small class="text-muted">Presiona ESC para limpiar la búsqueda</small>
+            </div>
+            <div class="col-md-3 d-flex flex-column">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Buscar
+                </button>
+                {% if busqueda %}
+                    <a href="?" class="btn btn-outline-secondary btn-sm w-100 mt-2">
+                        <i class="bi bi-x-circle"></i> Limpiar
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+        <div class="mt-3">
+            <span class="badge bg-primary">{{ total }} resultado(s)</span>
+        </div>
+    </div>
+
+    <!-- Grid de cards -->
+    {% if ordenes %}
+        <div class="row g-2">
+            {% for orden in ordenes %}
+                <div class="col-lg-2 col-md-4 col-sm-6">
+                    <div class="service-card">
+                        <!-- Header: Estado y fecha -->
+                        <div class="service-card-header">
+                            <span class="badge badge-estado badge-{{ orden.estado }}">
+                                {{ orden.get_estado_display }}
+                            </span>
+                            {% if orden.es_candidato_rhitso %}
+                                <span class="badge badge-rhitso">RHITSO</span>
+                            {% endif %}
+                            <small class="text-muted">
+                                {{ orden.fecha_ingreso|date:"d/m/Y" }}
+                            </small>
+                        </div>
+
+                        <!-- Body: Información principal -->
+                        <div class="service-card-body">
+                            <!-- Marca en grande -->
+                            <h3 class="marca-principal">{{ orden.detalle_equipo.marca|upper }}</h3>
+                            <p class="text-muted mb-3">{{ orden.detalle_equipo.get_tipo_equipo_display }}</p>
+
+                            <!-- Información detallada -->
+                            <div class="info-item">
+                                <i class="bi bi-upc-scan"></i>
+                                <strong>N° Serie:</strong>
+                                <span>{{ orden.detalle_equipo.numero_serie }}</span>
+                            </div>
+
+                            <div class="info-item">
+                                <i class="bi bi-receipt"></i>
+                                <strong>Orden SIC:</strong>
+                                <span>{{ orden.detalle_equipo.orden_cliente }}</span>
+                            </div>
+
+                            <div class="info-item">
+                                <i class="bi bi-building"></i>
+                                <strong>Centro:</strong>
+                                <span>{{ orden.sucursal.nombre }}</span>
+                            </div>
+
+                            <div class="info-item">
+                                <i class="bi bi-hash"></i>
+                                <strong>Orden:</strong>
+                                <span class="text-primary fw-bold">{{ orden.numero_orden_interno }}</span>
+                            </div>
+
+                            <!-- Indicadores visuales -->
+                            <div class="indicadores">
+                                <!-- Indicador de imágenes -->
+                                {% with imagenes_count=orden.imagenes.count %}
+                                <div class="indicador">
+                                    <div class="indicador-icon {% if imagenes_count > 0 %}has-images{% else %}no-images{% endif %}">
+                                        {{ imagenes_count }}
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block" style="font-size: 0.7rem;">IMÁGENES</small>
+                                        <strong style="font-size: 0.85rem;">{{ imagenes_count }} foto(s)</strong>
+                                    </div>
+                                </div>
+                                {% endwith %}
+
+                                <!-- Indicador de cargador -->
+                                <div class="indicador">
+                                    <div class="indicador-icon {% if orden.detalle_equipo.tiene_cargador %}has-charger{% else %}no-charger{% endif %}">
+                                        <i class="bi bi-{% if orden.detalle_equipo.tiene_cargador %}check{% else %}x{% endif %}"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block" style="font-size: 0.7rem;">CARGADOR</small>
+                                        <strong style="font-size: 0.85rem;">{{ orden.detalle_equipo.tiene_cargador|yesno:"Sí,No" }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Footer: Botones de acción -->
+                        <div class="service-card-footer">
+                            {% if tipo == 'activas' and orden.estado == 'finalizado' %}
+                                <form method="post" action="{% url 'servicio_tecnico:cerrar_orden' orden.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-cerrar-orden btn-ver-detalles mb-2"
+                                            onclick="return confirm('¿Marcar orden {{ orden.numero_orden_interno }} como entregada?')">
+                                        <i class="bi bi-check-circle"></i> Cerrar Orden
+                                    </button>
+                                </form>
+                            {% endif %}
+                            <a href="#" class="btn btn-primary btn-ver-detalles">
+                                <i class="bi bi-eye"></i> Ver Detalles
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <!-- Mensaje cuando no hay resultados -->
+        <div class="alert alert-info text-center py-5">
+            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+            <h4 class="mt-3">No se encontraron órdenes</h4>
+            {% if busqueda %}
+                <p>No hay resultados para la búsqueda: <strong>"{{ busqueda }}"</strong></p>
+                <a href="?" class="btn btn-primary">Ver todas las órdenes</a>
+            {% else %}
+                <p>No hay órdenes {{ tipo }} registradas.</p>
+                <a href="{% url 'servicio_tecnico:crear_orden' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Crear primera orden
+                </a>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Limpiar búsqueda con ESC
+document.addEventListener('DOMContentLoaded', function() {
+    const busquedaInput = document.getElementById('busqueda');
+    if (busquedaInput) {
+        busquedaInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                this.value = '';
+                this.form.submit();
+            }
+        });
+        
+        // Auto-focus en el campo de búsqueda
+        busquedaInput.focus();
+    }
+});
+</script>
+{% endblock %}
