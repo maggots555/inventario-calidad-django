@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    .help-box {
+        background: #e7f3ff;
+        border-left: 4px solid #0d6efd;
+        padding: 15px;
+        border-radius: 5px;
+    }
+    .required-label::after {
+        content: " *";
+        color: red;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'servicio_tecnico:inicio' %}">Servicio Técnico</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'servicio_tecnico:lista_referencias_gama' %}">Referencias de Gama</a>
+            </li>
+            <li class="breadcrumb-item active">{{ accion }}</li>
+        </ol>
+    </nav>
+
+    <!-- Header -->
+    <div class="text-center mb-4">
+        <h2>
+            <i class="bi bi-bookmark-plus"></i> {{ titulo }}
+        </h2>
+        <p class="text-muted">
+            Completa el formulario para {{ accion|lower }} una referencia de gama
+        </p>
+    </div>
+
+    <!-- Formulario -->
+    <div class="card form-card shadow-sm">
+        <div class="card-body p-4">
+            
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                <!-- Mostrar errores generales si existen -->
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <!-- Sección: Información del Equipo -->
+                <h5 class="mb-3 text-primary">
+                    <i class="bi bi-laptop"></i> Información del Equipo
+                </h5>
+                
+                <div class="row mb-3">
+                    <!-- Marca -->
+                    <div class="col-md-6">
+                        <label for="{{ form.marca.id_for_label }}" class="form-label fw-bold required-label">
+                            {{ form.marca.label }}
+                        </label>
+                        {{ form.marca }}
+                        {% if form.marca.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.marca.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            {{ form.marca.help_text }}
+                        </small>
+                    </div>
+                    
+                    <!-- Modelo Base -->
+                    <div class="col-md-6">
+                        <label for="{{ form.modelo_base.id_for_label }}" class="form-label fw-bold required-label">
+                            {{ form.modelo_base.label }}
+                        </label>
+                        {{ form.modelo_base }}
+                        {% if form.modelo_base.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.modelo_base.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            {{ form.modelo_base.help_text }}
+                        </small>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- Sección: Clasificación -->
+                <h5 class="mb-3 text-primary">
+                    <i class="bi bi-speedometer"></i> Clasificación y Rango de Precios
+                </h5>
+                
+                <div class="row mb-3">
+                    <!-- Gama -->
+                    <div class="col-md-12 mb-3">
+                        <label for="{{ form.gama.id_for_label }}" class="form-label fw-bold required-label">
+                            {{ form.gama.label }}
+                        </label>
+                        {{ form.gama }}
+                        {% if form.gama.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.gama.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            {{ form.gama.help_text }}
+                        </small>
+                    </div>
+                    
+                    <!-- Rango Costo Mínimo -->
+                    <div class="col-md-6">
+                        <label for="{{ form.rango_costo_min.id_for_label }}" class="form-label fw-bold required-label">
+                            {{ form.rango_costo_min.label }}
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            {{ form.rango_costo_min }}
+                        </div>
+                        {% if form.rango_costo_min.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.rango_costo_min.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            {{ form.rango_costo_min.help_text }}
+                        </small>
+                    </div>
+                    
+                    <!-- Rango Costo Máximo -->
+                    <div class="col-md-6">
+                        <label for="{{ form.rango_costo_max.id_for_label }}" class="form-label fw-bold required-label">
+                            {{ form.rango_costo_max.label }}
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            {{ form.rango_costo_max }}
+                        </div>
+                        {% if form.rango_costo_max.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.rango_costo_max.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            {{ form.rango_costo_max.help_text }}
+                        </small>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- Sección: Estado -->
+                <h5 class="mb-3 text-primary">
+                    <i class="bi bi-toggle-on"></i> Estado de la Referencia
+                </h5>
+                
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        {{ form.activo }}
+                        <label class="form-check-label" for="{{ form.activo.id_for_label }}">
+                            <strong>{{ form.activo.label }}</strong>
+                            <br>
+                            <small class="text-muted">
+                                {{ form.activo.help_text }}
+                            </small>
+                        </label>
+                    </div>
+                    {% if form.activo.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.activo.errors }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Caja de ayuda -->
+                <div class="help-box mt-4">
+                    <h6 class="fw-bold">
+                        <i class="bi bi-lightbulb"></i> ¿Cómo se usa esta referencia?
+                    </h6>
+                    <p class="mb-2 small">
+                        Cuando alguien crea una orden de servicio, el sistema:
+                    </p>
+                    <ol class="small mb-0">
+                        <li>Compara la marca y modelo ingresados con las referencias activas</li>
+                        <li>Si encuentra coincidencia, asigna automáticamente la gama</li>
+                        <li>Si no encuentra coincidencia, el usuario la selecciona manualmente</li>
+                    </ol>
+                    <p class="mt-2 mb-0 small">
+                        <strong>Ejemplo:</strong> Si creas "HP Pavilion - Media", cualquier equipo 
+                        HP con modelo que contenga "Pavilion" se clasificará como gama media.
+                    </p>
+                </div>
+
+                <!-- Botones de acción -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'servicio_tecnico:lista_referencias_gama' %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-circle"></i> {{ accion }}
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+    <!-- Ejemplos de referencias comunes -->
+    <div class="card mt-4 form-card">
+        <div class="card-body bg-light">
+            <h6 class="fw-bold">
+                <i class="bi bi-info-circle text-info"></i> Ejemplos de Referencias Comunes
+            </h6>
+            <div class="row">
+                <div class="col-md-4">
+                    <strong class="text-success">Gama Alta:</strong>
+                    <ul class="small mb-0">
+                        <li>Lenovo ThinkPad X1</li>
+                        <li>Dell XPS</li>
+                        <li>HP EliteBook</li>
+                        <li>Apple MacBook Pro</li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <strong class="text-primary">Gama Media:</strong>
+                    <ul class="small mb-0">
+                        <li>Lenovo IdeaPad</li>
+                        <li>Dell Inspiron</li>
+                        <li>HP Pavilion</li>
+                        <li>Acer Aspire</li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <strong class="text-secondary">Gama Baja:</strong>
+                    <ul class="small mb-0">
+                        <li>HP Stream</li>
+                        <li>Lenovo Essential</li>
+                        <li>Acer Chromebook</li>
+                        <li>Dell Vostro</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-enfoque en el primer campo
+    document.addEventListener('DOMContentLoaded', function() {
+        const primerCampo = document.querySelector('input[type="text"]');
+        if (primerCampo) {
+            primerCampo.focus();
+        }
+    });
+</script>
+{% endblock %}

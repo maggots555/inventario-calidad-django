@@ -34,6 +34,15 @@ urlpatterns = [
     path('ordenes/cerrar/<int:orden_id>/', views.cerrar_orden, name='cerrar_orden'),
     path('ordenes/cerrar-todas/', views.cerrar_todas_finalizadas, name='cerrar_todas'),
     
+    # ========================================================================
+    # GESTIÓN DE REFERENCIAS DE GAMA
+    # ========================================================================
+    path('referencias-gama/', views.lista_referencias_gama, name='lista_referencias_gama'),
+    path('referencias-gama/crear/', views.crear_referencia_gama, name='crear_referencia_gama'),
+    path('referencias-gama/<int:referencia_id>/editar/', views.editar_referencia_gama, name='editar_referencia_gama'),
+    path('referencias-gama/<int:referencia_id>/eliminar/', views.eliminar_referencia_gama, name='eliminar_referencia_gama'),
+    path('referencias-gama/<int:referencia_id>/reactivar/', views.reactivar_referencia_gama, name='reactivar_referencia_gama'),
+    
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]

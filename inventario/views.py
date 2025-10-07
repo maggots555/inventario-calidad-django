@@ -917,8 +917,8 @@ def dar_acceso_empleado(request, empleado_id):
         # Crear usuario y generar contraseña
         user, contraseña_temporal = crear_usuario_para_empleado(empleado)
         
-        # Enviar email con credenciales
-        email_enviado = enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=False)
+        # Enviar email con credenciales (retorna tupla: exito, mensaje_error)
+        email_enviado, error_mensaje = enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=False)
         
         if email_enviado:
             messages.success(
@@ -930,6 +930,7 @@ def dar_acceso_empleado(request, empleado_id):
             messages.warning(
                 request,
                 f'⚠️ Usuario creado para {empleado.nombre_completo}, pero hubo un problema al enviar el email. '
+                f'Error: {error_mensaje}. '
                 f'Contraseña temporal: {contraseña_temporal} (guárdala y compártela de forma segura)'
             )
             
@@ -976,8 +977,8 @@ def reenviar_credenciales(request, empleado_id):
         empleado.contraseña_configurada = False
         empleado.save()
         
-        # Enviar email
-        email_enviado = enviar_credenciales_empleado(empleado, nueva_contraseña, es_reenvio=True)
+        # Enviar email (retorna tupla: exito, mensaje_error)
+        email_enviado, error_mensaje = enviar_credenciales_empleado(empleado, nueva_contraseña, es_reenvio=True)
         
         if email_enviado:
             messages.success(
@@ -988,6 +989,7 @@ def reenviar_credenciales(request, empleado_id):
             messages.warning(
                 request,
                 f'⚠️ Contraseña reseteada pero hubo un problema al enviar el email. '
+                f'Error: {error_mensaje}. '
                 f'Nueva contraseña: {nueva_contraseña} (compártela de forma segura)'
             )
             
@@ -1031,8 +1033,8 @@ def resetear_contraseña_empleado(request, empleado_id):
         empleado.fecha_activacion_acceso = None  # Resetear fecha de activación
         empleado.save()
         
-        # Enviar email
-        email_enviado = enviar_credenciales_empleado(empleado, nueva_contraseña, es_reenvio=True)
+        # Enviar email (retorna tupla: exito, mensaje_error)
+        email_enviado, error_mensaje = enviar_credenciales_empleado(empleado, nueva_contraseña, es_reenvio=True)
         
         if email_enviado:
             messages.success(
@@ -1044,6 +1046,7 @@ def resetear_contraseña_empleado(request, empleado_id):
             messages.warning(
                 request,
                 f'⚠️ Contraseña reseteada pero no se pudo enviar el email. '
+                f'Error: {error_mensaje}. '
                 f'Nueva contraseña: {nueva_contraseña}'
             )
             
@@ -1172,8 +1175,8 @@ def reactivar_acceso_empleado(request, empleado_id):
         empleado.fecha_activacion_acceso = None  # Se establecerá cuando cambie la contraseña
         empleado.save()
         
-        # Paso 5: Enviar email con las nuevas credenciales
-        email_enviado = enviar_credenciales_empleado(
+        # Paso 5: Enviar email con las nuevas credenciales (retorna tupla: exito, mensaje_error)
+        email_enviado, error_mensaje = enviar_credenciales_empleado(
             empleado, 
             nueva_contraseña, 
             es_reenvio=True  # Usar template de reenvío
@@ -1190,6 +1193,7 @@ def reactivar_acceso_empleado(request, empleado_id):
             messages.warning(
                 request,
                 f'⚠️ Acceso reactivado pero hubo un problema al enviar el email. '
+                f'Error: {error_mensaje}. '
                 f'Contraseña temporal: {nueva_contraseña} '
                 f'(guárdala y compártela de forma segura con el empleado)'
             )

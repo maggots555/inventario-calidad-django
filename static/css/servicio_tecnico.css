@@ -707,3 +707,84 @@
     font-weight: 700;
     color: #667eea;
 }
+
+/* =============================================================================
+   ESTILOS PARA BARRA DE PROGRESO DE CARGA DE IMÁGENES
+   ============================================================================= */
+
+/* Contenedor de progreso con sombra suave */
+#progresoUpload {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Barra de progreso con mejor diseño */
+#progresoUpload .progress {
+    background-color: #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+#progresoUpload .progress-bar {
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Badge del porcentaje */
+#porcentajeProgreso {
+    font-size: 1rem;
+    font-weight: 700;
+    min-width: 50px;
+    text-align: center;
+}
+
+/* Texto informativo */
+#infoArchivos {
+    font-size: 0.875rem;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Badge de archivos seleccionados */
+#archivosSeleccionados {
+    animation: fadeIn 0.3s ease-out;
+    font-size: 0.875rem;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Botón en estado de carga */
+#btnSubirImagenes:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Formulario deshabilitado durante la carga */
+form:has(#btnSubirImagenes:disabled) input:not([type="hidden"]),
+form:has(#btnSubirImagenes:disabled) select,
+form:has(#btnSubirImagenes:disabled) textarea {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+}

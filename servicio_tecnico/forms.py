@@ -706,3 +706,229 @@ class SubirImagenesForm(forms.Form):
         label='Descripción',
         help_text='Descripción breve opcional',
     )
+
+
+# ============================================================================
+# FORMULARIO 7: Editar Información Principal del Equipo
+# ============================================================================
+
+class EditarInformacionEquipoForm(forms.ModelForm):
+    """
+    Formulario para editar la información principal del equipo.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario permite modificar datos importantes del equipo que pueden
+    haber sido omitidos o necesitan corrección, como:
+    - Modelo del equipo (si no se especificó al inicio)
+    - Si el equipo enciende o no
+    - Número de serie del cargador
+    - Otros datos básicos del equipo
+    
+    Se usa en un modal para permitir ediciones rápidas sin salir de la vista
+    de detalle de la orden.
+    """
+    
+    class Meta:
+        model = DetalleEquipo
+        fields = [
+            'tipo_equipo',
+            'marca',
+            'modelo',
+            'numero_serie',
+            'orden_cliente',
+            'equipo_enciende',
+            'tiene_cargador',
+            'numero_serie_cargador',
+            'gama',
+        ]
+        
+        widgets = {
+            'tipo_equipo': forms.Select(attrs={
+                'class': 'form-control form-select',
+                'required': True,
+            }),
+            'marca': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Dell, HP, Lenovo',
+                'required': True,
+                'list': 'marcas-list-modal',
+            }),
+            'modelo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Inspiron 15, ThinkPad X1 (opcional)',
+            }),
+            'numero_serie': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número de serie o Service Tag',
+                'required': True,
+                'style': 'text-transform: uppercase;',
+            }),
+            'orden_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número de orden del cliente',
+                'required': True,
+            }),
+            'equipo_enciende': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
+            'tiene_cargador': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'id_tiene_cargador_modal',
+                'onchange': 'toggleCargadorFieldsModal()',
+            }),
+            'numero_serie_cargador': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número de serie del cargador (opcional)',
+                'id': 'id_numero_serie_cargador_modal',
+            }),
+            'gama': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
+        }
+        
+        labels = {
+            'tipo_equipo': 'Tipo de Equipo',
+            'marca': 'Marca',
+            'modelo': 'Modelo',
+            'numero_serie': 'Número de Serie',
+            'orden_cliente': 'Orden del Cliente',
+            'equipo_enciende': '¿El equipo enciende?',
+            'tiene_cargador': '¿Incluye cargador?',
+            'numero_serie_cargador': 'Número de Serie del Cargador',
+            'gama': 'Gama del Equipo',
+        }
+        
+        help_texts = {
+            'tipo_equipo': 'Tipo de equipo (Laptop, Desktop, etc.)',
+            'marca': 'Marca del fabricante',
+            'modelo': 'Modelo específico (opcional)',
+            'numero_serie': 'Número de serie o Service Tag del equipo',
+            'orden_cliente': 'Número de orden del cliente',
+            'equipo_enciende': 'Marca si el equipo enciende al momento del ingreso',
+            'tiene_cargador': 'Marca si el equipo incluye cargador',
+            'numero_serie_cargador': 'Solo si el cargador tiene número de serie identificable',
+            'gama': 'Clasificación de gama del equipo',
+        }
+
+
+# ============================================================================
+# FORMULARIO PARA REFERENCIAS DE GAMA
+# ============================================================================
+
+class ReferenciaGamaEquipoForm(forms.ModelForm):
+    """
+    Formulario para crear y editar referencias de gama de equipos.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario permite agregar/editar referencias que el sistema usa
+    para clasificar automáticamente los equipos en gama alta, media o baja.
+    
+    Por ejemplo:
+    - Marca: Lenovo
+    - Modelo Base: ThinkPad X1
+    - Gama: Alta
+    - Rango de costo: $25,000 - $45,000
+    
+    Cuando alguien cree una orden con marca "Lenovo" y modelo "ThinkPad X1 Carbon",
+    el sistema automáticamente lo clasificará como gama alta.
+    """
+    
+    class Meta:
+        model = ReferenciaGamaEquipo
+        fields = [
+            'marca',
+            'modelo_base',
+            'gama',
+            'rango_costo_min',
+            'rango_costo_max',
+            'activo',
+        ]
+        
+        # Widgets: Definir cómo se ven los campos en el HTML
+        widgets = {
+            'marca': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Lenovo, HP, Dell, Apple',
+                'maxlength': 50,
+            }),
+            'modelo_base': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: ThinkPad, Inspiron, Pavilion, MacBook Pro',
+                'maxlength': 100,
+            }),
+            'gama': forms.Select(attrs={
+                'class': 'form-select',
+            }),
+            'rango_costo_min': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 5000.00',
+                'step': '0.01',
+                'min': '0',
+            }),
+            'rango_costo_max': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 15000.00',
+                'step': '0.01',
+                'min': '0',
+            }),
+            'activo': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
+        }
+        
+        labels = {
+            'marca': 'Marca del Equipo',
+            'modelo_base': 'Modelo Base o Familia',
+            'gama': 'Clasificación de Gama',
+            'rango_costo_min': 'Costo Mínimo Aproximado ($)',
+            'rango_costo_max': 'Costo Máximo Aproximado ($)',
+            'activo': 'Referencia Activa',
+        }
+        
+        help_texts = {
+            'marca': 'Nombre del fabricante del equipo',
+            'modelo_base': 'Modelo o familia de productos (se buscan coincidencias parciales). Ej: "ThinkPad" coincidirá con "ThinkPad X1 Carbon"',
+            'gama': 'Clasificación que se asignará automáticamente a equipos que coincidan',
+            'rango_costo_min': 'Costo aproximado mínimo del equipo (solo referencia)',
+            'rango_costo_max': 'Costo aproximado máximo del equipo (solo referencia)',
+            'activo': 'Si está activa, se usará para clasificación automática. Si está inactiva, se ignorará',
+        }
+    
+    def clean(self):
+        """
+        Validaciones personalizadas del formulario.
+        
+        EXPLICACIÓN:
+        Esta función se ejecuta cuando Django valida el formulario.
+        Verificamos que los datos sean consistentes antes de guardar.
+        """
+        cleaned_data = super().clean()
+        
+        marca = cleaned_data.get('marca')
+        modelo_base = cleaned_data.get('modelo_base')
+        rango_min = cleaned_data.get('rango_costo_min')
+        rango_max = cleaned_data.get('rango_costo_max')
+        
+        # Validación 1: El costo máximo debe ser mayor al mínimo
+        if rango_min and rango_max:
+            if rango_max <= rango_min:
+                raise ValidationError(
+                    '❌ El costo máximo debe ser mayor que el costo mínimo'
+                )
+        
+        # Validación 2: Verificar duplicados (marca + modelo_base únicos)
+        # Solo si estamos creando (no editando)
+        if self.instance.pk is None:  # Es un nuevo registro
+            if marca and modelo_base:
+                existe = ReferenciaGamaEquipo.objects.filter(
+                    marca__iexact=marca,
+                    modelo_base__iexact=modelo_base
+                ).exists()
+                
+                if existe:
+                    raise ValidationError(
+                        f'❌ Ya existe una referencia para {marca} {modelo_base}. '
+                        f'Edita la existente o usa un modelo diferente.'
+                    )
+        
+        return cleaned_data

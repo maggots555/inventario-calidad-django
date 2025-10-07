@@ -1,0 +1,273 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Referencias de Gama de Equipos{% endblock %}
+
+{% block extra_css %}
+<style>
+    .badge-gama-alta { background-color: #198754; }
+    .badge-gama-media { background-color: #0d6efd; }
+    .badge-gama-baja { background-color: #6c757d; }
+    .table-hover tbody tr:hover { background-color: #f8f9fa; }
+    .filter-card { 
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    .stats-card {
+        border-left: 4px solid #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-bookmark-star"></i> Referencias de Gama de Equipos</h2>
+            <p class="text-muted mb-0">
+                Gestiona el catálogo de referencias para clasificación automática de equipos
+            </p>
+        </div>
+        <a href="{% url 'servicio_tecnico:crear_referencia_gama' %}" class="btn btn-success btn-lg">
+            <i class="bi bi-plus-circle"></i> Nueva Referencia
+        </a>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card stats-card">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Total de Referencias</h5>
+                    <h2 class="mb-0">{{ total_referencias }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stats-card" style="border-left-color: #198754;">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Gama Alta</h5>
+                    <h2 class="mb-0 text-success">{{ referencias|length }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stats-card" style="border-left-color: #0d6efd;">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Marcas Registradas</h5>
+                    <h2 class="mb-0 text-primary">{{ marcas_disponibles|length }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros de Búsqueda -->
+    <div class="card filter-card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-search"></i> Búsqueda General
+                    </label>
+                    <input type="text" 
+                           name="busqueda" 
+                           class="form-control" 
+                           placeholder="Buscar por marca o modelo..."
+                           value="{{ busqueda }}">
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-funnel"></i> Filtrar por Marca
+                    </label>
+                    <select name="marca" class="form-select">
+                        <option value="">Todas las marcas</option>
+                        {% for marca in marcas_disponibles %}
+                            <option value="{{ marca }}" {% if filtro_marca == marca %}selected{% endif %}>
+                                {{ marca }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-speedometer"></i> Filtrar por Gama
+                    </label>
+                    <select name="gama" class="form-select">
+                        <option value="">Todas las gamas</option>
+                        {% for value, label in gamas_choices %}
+                            <option value="{{ value }}" {% if filtro_gama == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-eye"></i> Opciones
+                    </label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" 
+                               type="checkbox" 
+                               name="mostrar_inactivos" 
+                               id="mostrar_inactivos"
+                               {% if mostrar_inactivos %}checked{% endif %}>
+                        <label class="form-check-label" for="mostrar_inactivos">
+                            Mostrar inactivos
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-light w-100">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de Referencias -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            {% if referencias %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>
+                                    <a href="?orden=marca&busqueda={{ busqueda }}&marca={{ filtro_marca }}&gama={{ filtro_gama }}" 
+                                       class="text-decoration-none text-dark">
+                                        Marca <i class="bi bi-arrow-down-up"></i>
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="?orden=modelo_base&busqueda={{ busqueda }}&marca={{ filtro_marca }}&gama={{ filtro_gama }}" 
+                                       class="text-decoration-none text-dark">
+                                        Modelo Base <i class="bi bi-arrow-down-up"></i>
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="?orden=gama&busqueda={{ busqueda }}&marca={{ filtro_marca }}&gama={{ filtro_gama }}" 
+                                       class="text-decoration-none text-dark">
+                                        Gama <i class="bi bi-arrow-down-up"></i>
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="?orden=rango_costo_min&busqueda={{ busqueda }}&marca={{ filtro_marca }}&gama={{ filtro_gama }}" 
+                                       class="text-decoration-none text-dark">
+                                        Rango de Costo <i class="bi bi-arrow-down-up"></i>
+                                    </a>
+                                </th>
+                                <th class="text-center">Estado</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ref in referencias %}
+                                <tr {% if not ref.activo %}class="table-secondary"{% endif %}>
+                                    <td>
+                                        <strong>{{ ref.marca }}</strong>
+                                    </td>
+                                    <td>{{ ref.modelo_base }}</td>
+                                    <td>
+                                        {% if ref.gama == 'alta' %}
+                                            <span class="badge badge-gama-alta">
+                                                <i class="bi bi-star-fill"></i> Alta
+                                            </span>
+                                        {% elif ref.gama == 'media' %}
+                                            <span class="badge badge-gama-media">
+                                                <i class="bi bi-star-half"></i> Media
+                                            </span>
+                                        {% else %}
+                                            <span class="badge badge-gama-baja">
+                                                <i class="bi bi-star"></i> Baja
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            ${{ ref.rango_costo_min|floatformat:2 }} - 
+                                            ${{ ref.rango_costo_max|floatformat:2 }}
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if ref.activo %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle"></i> Activo
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="bi bi-x-circle"></i> Inactivo
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'servicio_tecnico:editar_referencia_gama' ref.id %}" 
+                                               class="btn btn-outline-primary"
+                                               title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            
+                                            {% if ref.activo %}
+                                                <a href="{% url 'servicio_tecnico:eliminar_referencia_gama' ref.id %}" 
+                                                   class="btn btn-outline-danger"
+                                                   title="Desactivar"
+                                                   onclick="return confirm('¿Desactivar esta referencia?\n\nDejará de usarse para clasificación automática.');">
+                                                    <i class="bi bi-trash"></i>
+                                                </a>
+                                            {% else %}
+                                                <a href="{% url 'servicio_tecnico:reactivar_referencia_gama' ref.id %}" 
+                                                   class="btn btn-outline-success"
+                                                   title="Reactivar">
+                                                    <i class="bi bi-arrow-clockwise"></i>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info text-center" role="alert">
+                    <i class="bi bi-info-circle fs-1 d-block mb-2"></i>
+                    <h5>No se encontraron referencias</h5>
+                    <p class="mb-0">
+                        {% if busqueda or filtro_marca or filtro_gama %}
+                            Intenta ajustar los filtros de búsqueda.
+                        {% else %}
+                            Comienza agregando tu primera referencia de gama.
+                        {% endif %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Información de ayuda -->
+    <div class="card bg-light mt-4">
+        <div class="card-body">
+            <h5 class="card-title">
+                <i class="bi bi-question-circle text-primary"></i> ¿Cómo funciona la clasificación automática?
+            </h5>
+            <p class="mb-2">
+                Cuando creas una orden de servicio, el sistema busca coincidencias en esta tabla:
+            </p>
+            <ul class="mb-0">
+                <li><strong>Coincidencia exacta:</strong> Marca y modelo idénticos</li>
+                <li><strong>Coincidencia parcial:</strong> Si el modelo ingresado contiene el modelo base registrado</li>
+                <li><strong>Ejemplo:</strong> Si registras "Lenovo ThinkPad", coincidirá con "Lenovo ThinkPad X1 Carbon"</li>
+                <li><strong>Sin coincidencia:</strong> El usuario puede seleccionar la gama manualmente</li>
+            </ul>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

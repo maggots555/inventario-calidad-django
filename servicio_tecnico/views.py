@@ -19,6 +19,7 @@ import os
 import json
 from .models import OrdenServicio, DetalleEquipo, HistorialOrden, ImagenOrden
 from inventario.models import Empleado
+from config.constants import ESTADO_ORDEN_CHOICES
 from .forms import (
     NuevaOrdenForm,
     ConfiguracionAdicionalForm,
@@ -27,6 +28,7 @@ from .forms import (
     AsignarResponsablesForm,
     ComentarioForm,
     SubirImagenesForm,
+    EditarInformacionEquipoForm,
 )
 
 
@@ -616,10 +618,89 @@ def detalle_orden(request, orden_id):
                         usuario=empleado_actual,
                         es_sistema=False
                     )
+                    
+                    # ================================================================
+                    # CAMBIO AUTOMÁTICO DE ESTADO SEGÚN TIPO DE IMAGEN
+                    # ================================================================
+                    estado_anterior = orden.estado
+                    cambio_realizado = False
+                    
+                    # Si se suben imágenes de INGRESO → Cambiar a "En Diagnóstico"
+                    if tipo_imagen == 'ingreso' and estado_anterior != 'diagnostico':
+                        orden.estado = 'diagnostico'
+                        cambio_realizado = True
+                        
+                        messages.info(
+                            request,
+                            f'ℹ️ Estado actualizado automáticamente: '
+                            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → '
+                            f'En Diagnóstico (imágenes de ingreso cargadas)'
+                        )
+                        
+                        # Registrar cambio automático en historial
+                        HistorialOrden.objects.create(
+                            orden=orden,
+                            tipo_evento='estado',
+                            comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico (imágenes de ingreso cargadas)',
+                            usuario=empleado_actual,
+                            es_sistema=True
+                        )
+                    
+                    # Si se suben imágenes de EGRESO → Cambiar a "Finalizado - Listo para Entrega"
+                    elif tipo_imagen == 'egreso' and estado_anterior != 'finalizado':
+                        orden.estado = 'finalizado'
+                        orden.fecha_finalizacion = timezone.now()
+                        cambio_realizado = True
+                        
+                        messages.success(
+                            request,
+                            f'🎉 Estado actualizado automáticamente: '
+                            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → '
+                            f'Finalizado - Listo para Entrega (imágenes de egreso cargadas)'
+                        )
+                        
+                        # Registrar cambio automático en historial
+                        HistorialOrden.objects.create(
+                            orden=orden,
+                            tipo_evento='estado',
+                            comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Finalizado - Listo para Entrega (imágenes de egreso cargadas)',
+                            usuario=empleado_actual,
+                            es_sistema=True
+                        )
+                    
+                    # Guardar cambios si hubo actualización de estado
+                    if cambio_realizado:
+                        orden.save()
                 
                 return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
             else:
                 messages.error(request, '❌ Error al subir las imágenes.')
+        
+        # ------------------------------------------------------------------------
+        # FORMULARIO 7: Editar Información Principal del Equipo
+        # ------------------------------------------------------------------------
+        elif form_type == 'editar_info_equipo':
+            form_editar_info = EditarInformacionEquipoForm(
+                request.POST,
+                instance=orden.detalle_equipo
+            )
+            
+            if form_editar_info.is_valid():
+                detalle_actualizado = form_editar_info.save()
+                messages.success(request, '✅ Información del equipo actualizada correctamente.')
+                
+                # Registrar en historial
+                HistorialOrden.objects.create(
+                    orden=orden,
+                    tipo_evento='actualizacion',
+                    comentario='Información principal del equipo actualizada (marca, modelo, número de serie, etc.)',
+                    usuario=empleado_actual,
+                    es_sistema=False
+                )
+                
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+            else:
+                messages.error(request, '❌ Error al actualizar la información del equipo.')
     
     # ========================================================================
     # CREAR FORMULARIOS VACÍOS O CON DATOS ACTUALES (GET o POST con errores)
@@ -631,6 +712,7 @@ def detalle_orden(request, orden_id):
     form_responsables = AsignarResponsablesForm(instance=orden)
     form_comentario = ComentarioForm()
     form_imagenes = SubirImagenesForm()
+    form_editar_info = EditarInformacionEquipoForm(instance=orden.detalle_equipo)
     
     # ========================================================================
     # OBTENER HISTORIAL Y COMENTARIOS
@@ -688,6 +770,7 @@ def detalle_orden(request, orden_id):
         'form_responsables': form_responsables,
         'form_comentario': form_comentario,
         'form_imagenes': form_imagenes,
+        'form_editar_info': form_editar_info,
         
         # Historial y comentarios
         'historial_automatico': historial_automatico[:20],  # Últimos 20
@@ -869,3 +952,226 @@ def descargar_imagen_original(request, imagen_id):
     response['Content-Disposition'] = f'attachment; filename="{nombre_descarga}"'
     
     return response
+
+
+# ============================================================================
+# VISTAS PARA GESTIÓN DE REFERENCIAS DE GAMA
+# ============================================================================
+
+@login_required
+def lista_referencias_gama(request):
+    """
+    Lista todas las referencias de gama de equipos con filtros de búsqueda.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista muestra un listado de todas las referencias de gama (alta, media, baja)
+    que se usan para clasificar automáticamente los equipos cuando se crea una orden.
+    
+    Funcionalidad:
+    - Listado completo de referencias
+    - Filtros por marca, modelo y gama
+    - Búsqueda por texto
+    - Ordenamiento por campos
+    """
+    from .models import ReferenciaGamaEquipo
+    
+    # Obtener todas las referencias activas primero
+    referencias = ReferenciaGamaEquipo.objects.all()
+    
+    # Filtros de búsqueda
+    busqueda = request.GET.get('busqueda', '')
+    filtro_marca = request.GET.get('marca', '')
+    filtro_gama = request.GET.get('gama', '')
+    mostrar_inactivos = request.GET.get('mostrar_inactivos', '') == 'on'
+    
+    if busqueda:
+        # Buscar en marca o modelo
+        referencias = referencias.filter(
+            Q(marca__icontains=busqueda) | 
+            Q(modelo_base__icontains=busqueda)
+        )
+    
+    if filtro_marca:
+        referencias = referencias.filter(marca__iexact=filtro_marca)
+    
+    if filtro_gama:
+        referencias = referencias.filter(gama=filtro_gama)
+    
+    if not mostrar_inactivos:
+        referencias = referencias.filter(activo=True)
+    
+    # Obtener listas únicas para los filtros
+    marcas_disponibles = ReferenciaGamaEquipo.objects.values_list('marca', flat=True).distinct().order_by('marca')
+    
+    # Ordenamiento
+    orden = request.GET.get('orden', 'marca')
+    if orden in ['marca', '-marca', 'modelo_base', '-modelo_base', 'gama', '-gama', 'rango_costo_min', '-rango_costo_min']:
+        referencias = referencias.order_by(orden)
+    
+    context = {
+        'referencias': referencias,
+        'busqueda': busqueda,
+        'filtro_marca': filtro_marca,
+        'filtro_gama': filtro_gama,
+        'mostrar_inactivos': mostrar_inactivos,
+        'marcas_disponibles': marcas_disponibles,
+        'total_referencias': referencias.count(),
+        'gamas_choices': [
+            ('alta', 'Alta'),
+            ('media', 'Media'),
+            ('baja', 'Baja'),
+        ],
+    }
+    
+    return render(request, 'servicio_tecnico/referencias_gama/lista.html', context)
+
+
+@login_required
+def crear_referencia_gama(request):
+    """
+    Crea una nueva referencia de gama de equipo.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista permite agregar una nueva referencia al catálogo.
+    Cuando creas una referencia (por ejemplo: "Lenovo ThinkPad - Alta"),
+    el sistema automáticamente clasificará equipos Lenovo ThinkPad como gama alta
+    cuando se cree una orden de servicio.
+    """
+    from .models import ReferenciaGamaEquipo
+    from .forms import ReferenciaGamaEquipoForm
+    
+    if request.method == 'POST':
+        form = ReferenciaGamaEquipoForm(request.POST)
+        
+        if form.is_valid():
+            try:
+                referencia = form.save()
+                messages.success(
+                    request,
+                    f'✅ Referencia creada: {referencia.marca} {referencia.modelo_base} - '
+                    f'Gama {referencia.get_gama_display()}'
+                )
+                return redirect('servicio_tecnico:lista_referencias_gama')
+            except Exception as e:
+                messages.error(request, f'❌ Error al crear referencia: {str(e)}')
+    else:
+        form = ReferenciaGamaEquipoForm()
+    
+    context = {
+        'form': form,
+        'titulo': 'Crear Nueva Referencia de Gama',
+        'accion': 'Crear',
+    }
+    
+    return render(request, 'servicio_tecnico/referencias_gama/form.html', context)
+
+
+@login_required
+def editar_referencia_gama(request, referencia_id):
+    """
+    Edita una referencia de gama existente.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Permite modificar los datos de una referencia ya creada.
+    Útil cuando:
+    - Cambian los rangos de precio de un modelo
+    - Necesitas corregir el nombre de marca o modelo
+    - Quieres cambiar la clasificación de gama
+    """
+    from .models import ReferenciaGamaEquipo
+    from .forms import ReferenciaGamaEquipoForm
+    
+    referencia = get_object_or_404(ReferenciaGamaEquipo, id=referencia_id)
+    
+    if request.method == 'POST':
+        form = ReferenciaGamaEquipoForm(request.POST, instance=referencia)
+        
+        if form.is_valid():
+            try:
+                referencia = form.save()
+                messages.success(
+                    request,
+                    f'✅ Referencia actualizada: {referencia.marca} {referencia.modelo_base}'
+                )
+                return redirect('servicio_tecnico:lista_referencias_gama')
+            except Exception as e:
+                messages.error(request, f'❌ Error al actualizar: {str(e)}')
+    else:
+        form = ReferenciaGamaEquipoForm(instance=referencia)
+    
+    context = {
+        'form': form,
+        'referencia': referencia,
+        'titulo': f'Editar Referencia: {referencia.marca} {referencia.modelo_base}',
+        'accion': 'Actualizar',
+    }
+    
+    return render(request, 'servicio_tecnico/referencias_gama/form.html', context)
+
+
+@login_required
+def eliminar_referencia_gama(request, referencia_id):
+    """
+    Desactiva (soft delete) una referencia de gama.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    En lugar de eliminar permanentemente la referencia, solo la marca como "inactiva".
+    Esto significa que:
+    - Ya no se usará para calcular gamas automáticamente
+    - Se puede reactivar si es necesario
+    - Se mantiene el historial
+    
+    Nota: Es mejor desactivar que eliminar para mantener consistencia en el sistema.
+    """
+    from .models import ReferenciaGamaEquipo
+    
+    referencia = get_object_or_404(ReferenciaGamaEquipo, id=referencia_id)
+    
+    if request.method == 'POST':
+        try:
+            # Soft delete: solo marcar como inactivo
+            referencia.activo = False
+            referencia.save()
+            
+            messages.success(
+                request,
+                f'✅ Referencia desactivada: {referencia.marca} {referencia.modelo_base}. '
+                f'Ya no se usará para clasificación automática.'
+            )
+        except Exception as e:
+            messages.error(request, f'❌ Error al desactivar: {str(e)}')
+        
+        return redirect('servicio_tecnico:lista_referencias_gama')
+    
+    context = {
+        'referencia': referencia,
+    }
+    
+    return render(request, 'servicio_tecnico/referencias_gama/confirmar_eliminar.html', context)
+
+
+@login_required
+def reactivar_referencia_gama(request, referencia_id):
+    """
+    Reactiva una referencia previamente desactivada.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Si desactivaste una referencia por error o necesitas volver a usarla,
+    esta función la marca como activa nuevamente.
+    """
+    from .models import ReferenciaGamaEquipo
+    
+    referencia = get_object_or_404(ReferenciaGamaEquipo, id=referencia_id)
+    
+    try:
+        referencia.activo = True
+        referencia.save()
+        
+        messages.success(
+            request,
+            f'✅ Referencia reactivada: {referencia.marca} {referencia.modelo_base}'
+        )
+    except Exception as e:
+        messages.error(request, f'❌ Error al reactivar: {str(e)}')
+    
+    return redirect('servicio_tecnico:lista_referencias_gama')

@@ -133,15 +133,34 @@ def enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=Fals
         es_reenvio: Si es True, cambia el texto del email (default: False)
     
     Returns:
-        bool: True si se envió correctamente, False en caso contrario
+        tuple: (bool, str) - (True/False si se envió, mensaje de error si falló)
     
     Ejemplo de uso:
         >>> empleado = Empleado.objects.get(id=1)
-        >>> exito = enviar_credenciales_empleado(empleado, "AbC123XyZ", es_reenvio=False)
+        >>> exito, error = enviar_credenciales_empleado(empleado, "AbC123XyZ", es_reenvio=False)
         >>> if exito:
         ...     print("Email enviado correctamente")
+        ... else:
+        ...     print(f"Error: {error}")
     """
     try:
+        # VALIDACIÓN 1: Verificar que existe configuración de email
+        if not settings.EMAIL_HOST_USER:
+            mensaje_error = "❌ EMAIL_HOST_USER no está configurado en archivo .env"
+            print(mensaje_error)
+            return False, mensaje_error
+        
+        if not settings.EMAIL_HOST_PASSWORD:
+            mensaje_error = "❌ EMAIL_HOST_PASSWORD no está configurado en archivo .env"
+            print(mensaje_error)
+            return False, mensaje_error
+        
+        # VALIDACIÓN 2: Verificar que el empleado tiene email
+        if not empleado.email:
+            mensaje_error = f"❌ El empleado {empleado.nombre_completo} no tiene email registrado"
+            print(mensaje_error)
+            return False, mensaje_error
+        
         # Construir URL de login basada en ALLOWED_HOSTS configurado
         # Buscar una IP válida en ALLOWED_HOSTS que no sea '*'
         host = 'localhost'
@@ -167,6 +186,13 @@ def enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=Fals
         # Asunto del email
         asunto = '¡Bienvenido al Sistema Integral de Gestión!' if not es_reenvio else 'Credenciales de Acceso - Reenvío'
         
+        # MENSAJE DE DEBUG: Mostrar información antes de enviar
+        print(f"\n📧 Intentando enviar email:")
+        print(f"  - Destinatario: {empleado.email}")
+        print(f"  - Servidor SMTP: {settings.EMAIL_HOST}:{settings.EMAIL_PORT}")
+        print(f"  - Usuario SMTP: {settings.EMAIL_HOST_USER}")
+        print(f"  - Remitente: {settings.DEFAULT_FROM_EMAIL}")
+        
         # Enviar email usando configuración SMTP de settings.py
         send_mail(
             subject=asunto,
@@ -177,16 +203,37 @@ def enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=Fals
             fail_silently=False,  # Lanza excepción si hay error (para detectarlo)
         )
         
+        print(f"✅ Email enviado correctamente a {empleado.email}")
+        
         # Actualizar fecha de envío
         empleado.fecha_envio_credenciales = timezone.now()
         empleado.save()
         
-        return True
+        return True, None
         
     except Exception as e:
-        # En caso de error, imprimir para debugging
-        print(f"Error al enviar email a {empleado.email}: {e}")
-        return False
+        # Capturar el error específico con información detallada
+        tipo_error = type(e).__name__
+        mensaje_error = str(e)
+        
+        # Mensajes de ayuda según el tipo de error
+        error_detallado = f"{tipo_error}: {mensaje_error}"
+        
+        print(f"\n❌ ERROR al enviar email a {empleado.email}:")
+        print(f"   {error_detallado}")
+        
+        # Proporcionar sugerencias según el tipo de error
+        if "Authentication" in mensaje_error or "Username and Password not accepted" in mensaje_error:
+            print("   💡 Sugerencia: Verifica tu EMAIL_HOST_USER y EMAIL_HOST_PASSWORD en .env")
+            print("   💡 Si usas Gmail, asegúrate de usar una 'Contraseña de aplicación', no tu contraseña normal")
+        elif "Connection" in mensaje_error or "timed out" in mensaje_error:
+            print("   💡 Sugerencia: Problema de conexión. Verifica tu internet o firewall")
+        elif "SMTPServerDisconnected" in tipo_error:
+            print("   💡 Sugerencia: El servidor SMTP cerró la conexión. Verifica EMAIL_HOST y EMAIL_PORT")
+        elif "SMTPRecipientsRefused" in tipo_error:
+            print("   💡 Sugerencia: El email del destinatario fue rechazado. Verifica que sea válido")
+        
+        return False, error_detallado
 
 
 def validar_email_empleado(email, empleado_actual=None):

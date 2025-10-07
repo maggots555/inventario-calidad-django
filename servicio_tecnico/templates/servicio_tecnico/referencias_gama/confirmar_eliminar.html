@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Desactivar Referencia de Gama{% endblock %}
+
+{% block extra_css %}
+<style>
+    .confirm-card {
+        max-width: 600px;
+        margin: 50px auto;
+    }
+    .warning-icon {
+        font-size: 4rem;
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    
+    <div class="card confirm-card shadow">
+        <div class="card-body text-center p-5">
+            
+            <!-- Ícono de advertencia -->
+            <div class="warning-icon mb-3">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+
+            <!-- Título -->
+            <h3 class="mb-3">¿Desactivar esta referencia?</h3>
+            
+            <!-- Información de la referencia -->
+            <div class="alert alert-warning" role="alert">
+                <h5 class="mb-2">
+                    <strong>{{ referencia.marca }} {{ referencia.modelo_base }}</strong>
+                </h5>
+                <p class="mb-0">
+                    Gama: 
+                    {% if referencia.gama == 'alta' %}
+                        <span class="badge bg-success">Alta</span>
+                    {% elif referencia.gama == 'media' %}
+                        <span class="badge bg-primary">Media</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Baja</span>
+                    {% endif %}
+                    <br>
+                    <small class="text-muted">
+                        Rango: ${{ referencia.rango_costo_min|floatformat:2 }} - 
+                        ${{ referencia.rango_costo_max|floatformat:2 }}
+                    </small>
+                </p>
+            </div>
+
+            <!-- Explicación -->
+            <div class="text-start mb-4">
+                <h6 class="fw-bold">
+                    <i class="bi bi-info-circle text-info"></i> ¿Qué significa desactivar?
+                </h6>
+                <ul class="mb-0">
+                    <li><strong>No se eliminará permanentemente</strong> - La referencia se conserva en el sistema</li>
+                    <li><strong>No se usará para clasificación automática</strong> - Ya no asignará gamas automáticamente</li>
+                    <li><strong>Se puede reactivar</strong> - Puedes volver a activarla cuando quieras</li>
+                    <li><strong>No afecta órdenes existentes</strong> - Las órdenes ya creadas mantienen su gama</li>
+                </ul>
+            </div>
+
+            <!-- Formulario de confirmación -->
+            <form method="post" class="d-inline">
+                {% csrf_token %}
+                
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="{% url 'servicio_tecnico:lista_referencias_gama' %}" class="btn btn-secondary btn-lg">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-danger btn-lg">
+                        <i class="bi bi-toggle-off"></i> Sí, Desactivar
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}
