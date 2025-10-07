@@ -77,12 +77,117 @@
         </div>
     </div>
 
+    <!-- Cuadro informativo: Estadísticas por técnico -->
+    <div class="row mt-4 g-4 estadisticas-tecnico-row">
+        <!-- Equipos "No enciende" por técnico -->
+        {% if equipos_no_enciende_por_tecnico %}
+            <div class="col-lg-6">
+                <div class="card border-warning h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="card-title mb-0">
+                            <i class="bi bi-exclamation-triangle"></i> Equipos "No Enciende" por Técnico
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            {% for tecnico in equipos_no_enciende_por_tecnico %}
+                                <div class="col-12">
+                                    <div class="tecnico-no-enciende-card">
+                                        <div class="d-flex align-items-center">
+                                            <div class="tecnico-avatar">
+                                                {% if tecnico.foto_url %}
+                                                    <img src="{{ tecnico.foto_url }}" 
+                                                         alt="Foto de {{ tecnico.tecnico_asignado_actual__nombre_completo }}"
+                                                         class="tecnico-foto">
+                                                {% else %}
+                                                    <div class="tecnico-iniciales">
+                                                        {{ tecnico.iniciales }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="ms-2 flex-grow-1">
+                                                <div class="tecnico-nombre fw-bold">{{ tecnico.tecnico_asignado_actual__nombre_completo }}</div>
+                                                <div class="tecnico-count">
+                                                    <span class="badge bg-danger">{{ tecnico.total_no_enciende }}</span>
+                                                    <small class="text-muted">equipo(s) no enciende</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Equipos por gama por técnico -->
+        {% if equipos_por_gama_por_tecnico %}
+            <div class="col-lg-6">
+                <div class="card border-info h-100">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="card-title mb-0">
+                            <i class="bi bi-bar-chart"></i> Equipos por Gama por Técnico
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            {% for tecnico in equipos_por_gama_por_tecnico %}
+                                <div class="col-12">
+                                    <div class="tecnico-gama-card">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <div class="d-flex align-items-center">
+                                                <div class="tecnico-avatar">
+                                                    {% if tecnico.foto_url %}
+                                                        <img src="{{ tecnico.foto_url }}" 
+                                                             alt="Foto de {{ tecnico.nombre }}"
+                                                             class="tecnico-foto">
+                                                    {% else %}
+                                                        <div class="tecnico-iniciales">
+                                                            {{ tecnico.iniciales }}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="ms-2">
+                                                    <div class="tecnico-nombre fw-bold">{{ tecnico.nombre }}</div>
+                                                    <small class="text-muted">Total: {{ tecnico.total }} equipo(s)</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="gama-badges">
+                                            {% if tecnico.gamas.alta > 0 %}
+                                                <span class="badge bg-success me-1">
+                                                    <i class="bi bi-star"></i> Alta: {{ tecnico.gamas.alta }}
+                                                </span>
+                                            {% endif %}
+                                            {% if tecnico.gamas.media > 0 %}
+                                                <span class="badge bg-warning me-1">
+                                                    <i class="bi bi-dash-circle"></i> Media: {{ tecnico.gamas.media }}
+                                                </span>
+                                            {% endif %}
+                                            {% if tecnico.gamas.baja > 0 %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="bi bi-circle"></i> Baja: {{ tecnico.gamas.baja }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
     <!-- Grid de cards -->
     {% if ordenes %}
         <div class="row g-2">
             {% for orden in ordenes %}
                 <div class="col-lg-2 col-md-4 col-sm-6">
-                    <div class="service-card">
+                    <div class="service-card {% if orden.detalle_equipo.orden_cliente|slice:":3" == "FL-" %}orden-fl{% elif orden.detalle_equipo.orden_cliente|slice:":4" == "OOW-" %}orden-oow{% endif %}">
                         <!-- Header: Estado y fecha -->
                         <div class="service-card-header">
                             <span class="badge badge-estado badge-{{ orden.estado }}">
@@ -136,8 +241,8 @@
                                         {{ imagenes_count }}
                                     </div>
                                     <div>
-                                        <small class="text-muted d-block" style="font-size: 0.7rem;">IMÁGENES</small>
-                                        <strong style="font-size: 0.85rem;">{{ imagenes_count }} foto(s)</strong>
+                                        <small class="text-muted d-block" style="font-size: 0.6rem;">IMÁGENES</small>
+                                        <strong style="font-size: 0.75rem;">{{ imagenes_count }} foto(s)</strong>
                                     </div>
                                 </div>
                                 {% endwith %}
@@ -148,8 +253,25 @@
                                         <i class="bi bi-{% if orden.detalle_equipo.tiene_cargador %}check{% else %}x{% endif %}"></i>
                                     </div>
                                     <div>
-                                        <small class="text-muted d-block" style="font-size: 0.7rem;">CARGADOR</small>
-                                        <strong style="font-size: 0.85rem;">{{ orden.detalle_equipo.tiene_cargador|yesno:"Sí,No" }}</strong>
+                                        <small class="text-muted d-block" style="font-size: 0.6rem;">CARGADOR</small>
+                                        <strong style="font-size: 0.75rem;">{{ orden.detalle_equipo.tiene_cargador|yesno:"Sí,No" }}</strong>
+                                    </div>
+                                </div>
+
+                                <!-- Indicador de técnico asignado -->
+                                <div class="indicador">
+                                    <div class="indicador-icon {% if orden.tecnico_asignado_actual %}has-technician{% else %}no-technician{% endif %}">
+                                        <i class="bi bi-{% if orden.tecnico_asignado_actual %}person-check{% else %}person-x{% endif %}"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block" style="font-size: 0.6rem;">TÉCNICO</small>
+                                        <strong style="font-size: 0.75rem;">
+                                            {% if orden.tecnico_asignado_actual %}
+                                                {{ orden.tecnico_asignado_actual.nombre_completo|truncatechars:12 }}
+                                            {% else %}
+                                                Sin asignar
+                                            {% endif %}
+                                        </strong>
                                     </div>
                                 </div>
                             </div>

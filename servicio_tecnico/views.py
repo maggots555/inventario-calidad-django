@@ -181,12 +181,82 @@ def lista_ordenes_activas(request):
             Q(numero_orden_interno__icontains=busqueda)
         )
     
+    # Estadísticas de equipos "No enciende" por técnico
+    equipos_no_enciende_raw = OrdenServicio.objects.exclude(
+        estado__in=['entregado', 'cancelado']
+    ).filter(
+        detalle_equipo__equipo_enciende=False,
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
+    ).values(
+        'tecnico_asignado_actual__nombre_completo',
+        'tecnico_asignado_actual__id'
+    ).annotate(
+        total_no_enciende=Count('numero_orden_interno')
+    ).order_by('-total_no_enciende', 'tecnico_asignado_actual__nombre_completo')
+    
+    # Procesar datos para incluir información de foto
+    equipos_no_enciende_por_tecnico = []
+    for item in equipos_no_enciende_raw:
+        tecnico_id = item['tecnico_asignado_actual__id']
+        tecnico_obj = Empleado.objects.get(id=tecnico_id)
+        equipos_no_enciende_por_tecnico.append({
+            'tecnico_asignado_actual__id': tecnico_id,
+            'tecnico_asignado_actual__nombre_completo': item['tecnico_asignado_actual__nombre_completo'],
+            'total_no_enciende': item['total_no_enciende'],
+            'foto_url': tecnico_obj.get_foto_perfil_url(),
+            'iniciales': tecnico_obj.get_iniciales()
+        })
+    
+    # Estadísticas de equipos por gama por técnico
+    equipos_por_gama_por_tecnico_raw = OrdenServicio.objects.exclude(
+        estado__in=['entregado', 'cancelado']
+    ).filter(
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
+    ).values(
+        'tecnico_asignado_actual__nombre_completo',
+        'tecnico_asignado_actual__id',
+        'detalle_equipo__gama'
+    ).annotate(
+        total_equipos=Count('numero_orden_interno')
+    ).order_by('tecnico_asignado_actual__nombre_completo', 'detalle_equipo__gama')
+    
+    # Procesar datos para agrupar por técnico
+    equipos_por_gama_por_tecnico = {}
+    for item in equipos_por_gama_por_tecnico_raw:
+        tecnico_id = item['tecnico_asignado_actual__id']
+        tecnico_nombre = item['tecnico_asignado_actual__nombre_completo']
+        gama = item['detalle_equipo__gama']
+        total = item['total_equipos']
+        
+        if tecnico_id not in equipos_por_gama_por_tecnico:
+            # Obtener información adicional del técnico
+            tecnico_obj = Empleado.objects.get(id=tecnico_id)
+            equipos_por_gama_por_tecnico[tecnico_id] = {
+                'nombre': tecnico_nombre,
+                'gamas': {'alta': 0, 'media': 0, 'baja': 0},
+                'total': 0,
+                'foto_url': tecnico_obj.get_foto_perfil_url(),
+                'iniciales': tecnico_obj.get_iniciales()
+            }
+        
+        equipos_por_gama_por_tecnico[tecnico_id]['gamas'][gama] = total
+        equipos_por_gama_por_tecnico[tecnico_id]['total'] += total
+    
+    # Convertir a lista ordenada por total descendente
+    equipos_por_gama_por_tecnico = sorted(
+        equipos_por_gama_por_tecnico.values(),
+        key=lambda x: x['total'],
+        reverse=True
+    )
+    
     context = {
         'ordenes': ordenes,
         'tipo': 'activas',
         'titulo': 'Órdenes Activas',
         'total': ordenes.count(),
         'busqueda': busqueda,
+        'equipos_no_enciende_por_tecnico': equipos_no_enciende_por_tecnico,
+        'equipos_por_gama_por_tecnico': equipos_por_gama_por_tecnico,
     }
     
     return render(request, 'servicio_tecnico/lista_ordenes.html', context)
@@ -226,12 +296,82 @@ def lista_ordenes_finalizadas(request):
             Q(numero_orden_interno__icontains=busqueda)
         )
     
+    # Estadísticas de equipos "No enciende" por técnico (solo órdenes activas)
+    equipos_no_enciende_raw = OrdenServicio.objects.exclude(
+        estado__in=['entregado', 'cancelado']
+    ).filter(
+        detalle_equipo__equipo_enciende=False,
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
+    ).values(
+        'tecnico_asignado_actual__nombre_completo',
+        'tecnico_asignado_actual__id'
+    ).annotate(
+        total_no_enciende=Count('numero_orden_interno')
+    ).order_by('-total_no_enciende', 'tecnico_asignado_actual__nombre_completo')
+    
+    # Procesar datos para incluir información de foto
+    equipos_no_enciende_por_tecnico = []
+    for item in equipos_no_enciende_raw:
+        tecnico_id = item['tecnico_asignado_actual__id']
+        tecnico_obj = Empleado.objects.get(id=tecnico_id)
+        equipos_no_enciende_por_tecnico.append({
+            'tecnico_asignado_actual__id': tecnico_id,
+            'tecnico_asignado_actual__nombre_completo': item['tecnico_asignado_actual__nombre_completo'],
+            'total_no_enciende': item['total_no_enciende'],
+            'foto_url': tecnico_obj.get_foto_perfil_url(),
+            'iniciales': tecnico_obj.get_iniciales()
+        })
+    
+    # Estadísticas de equipos por gama por técnico (solo órdenes activas)
+    equipos_por_gama_por_tecnico_raw = OrdenServicio.objects.exclude(
+        estado__in=['entregado', 'cancelado']
+    ).filter(
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
+    ).values(
+        'tecnico_asignado_actual__nombre_completo',
+        'tecnico_asignado_actual__id',
+        'detalle_equipo__gama'
+    ).annotate(
+        total_equipos=Count('numero_orden_interno')
+    ).order_by('tecnico_asignado_actual__nombre_completo', 'detalle_equipo__gama')
+    
+    # Procesar datos para agrupar por técnico
+    equipos_por_gama_por_tecnico = {}
+    for item in equipos_por_gama_por_tecnico_raw:
+        tecnico_id = item['tecnico_asignado_actual__id']
+        tecnico_nombre = item['tecnico_asignado_actual__nombre_completo']
+        gama = item['detalle_equipo__gama']
+        total = item['total_equipos']
+        
+        if tecnico_id not in equipos_por_gama_por_tecnico:
+            # Obtener información adicional del técnico
+            tecnico_obj = Empleado.objects.get(id=tecnico_id)
+            equipos_por_gama_por_tecnico[tecnico_id] = {
+                'nombre': tecnico_nombre,
+                'gamas': {'alta': 0, 'media': 0, 'baja': 0},
+                'total': 0,
+                'foto_url': tecnico_obj.get_foto_perfil_url(),
+                'iniciales': tecnico_obj.get_iniciales()
+            }
+        
+        equipos_por_gama_por_tecnico[tecnico_id]['gamas'][gama] = total
+        equipos_por_gama_por_tecnico[tecnico_id]['total'] += total
+    
+    # Convertir a lista ordenada por total descendente
+    equipos_por_gama_por_tecnico = sorted(
+        equipos_por_gama_por_tecnico.values(),
+        key=lambda x: x['total'],
+        reverse=True
+    )
+    
     context = {
         'ordenes': ordenes,
         'tipo': 'finalizadas',
         'titulo': 'Órdenes Finalizadas',
         'total': ordenes.count(),
         'busqueda': busqueda,
+        'equipos_no_enciende_por_tecnico': equipos_no_enciende_por_tecnico,
+        'equipos_por_gama_por_tecnico': equipos_por_gama_por_tecnico,
     }
     
     return render(request, 'servicio_tecnico/lista_ordenes.html', context)
