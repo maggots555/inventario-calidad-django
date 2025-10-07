@@ -166,7 +166,7 @@
                                     </button>
                                 </form>
                             {% endif %}
-                            <a href="#" class="btn btn-primary btn-ver-detalles">
+                            <a href="{% url 'servicio_tecnico:detalle_orden' orden.pk %}" class="btn btn-primary btn-ver-detalles">
                                 <i class="bi bi-eye"></i> Ver Detalles
                             </a>
                         </div>

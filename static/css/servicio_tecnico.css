@@ -294,3 +294,323 @@
     color: #6b7280;
     font-size: 0.75rem;
 }
+
+
+/* =============================================================================
+   ESTILOS PARA VISTA DE DETALLES DE ORDEN
+   Descripción: Estilos específicos para la página de detalles completa
+   Incluye: Vista de detalles, galería de imágenes, historial, estados
+   ============================================================================= */
+
+/* ===== VARIABLES CSS ADICIONALES ===== */
+:root {
+    --st-primary: #667eea;
+    --st-secondary: #764ba2;
+    --st-success: #27ae60;
+    --st-danger: #e74c3c;
+    --st-warning: #f39c12;
+    --st-info: #3498db;
+    
+    --st-gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --st-gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --st-gradient-3: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    --st-gradient-4: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+    --st-gradient-5: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    
+    --st-border-radius: 1rem;
+    --st-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    --st-shadow-hover: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+/* ===== SECTION CARDS (Tarjetas de Sección) ===== */
+.section-card {
+    border: none;
+    box-shadow: var(--st-shadow);
+    border-radius: var(--st-border-radius);
+    margin-bottom: 2rem;
+    overflow: hidden;
+    transition: box-shadow 0.3s ease;
+}
+
+.section-card:hover {
+    box-shadow: var(--st-shadow-hover);
+}
+
+.section-header {
+    background: var(--st-gradient-1);
+    color: white;
+    padding: 1rem 1.5rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-header i {
+    font-size: 1.3rem;
+}
+
+/* ===== BADGES DE INFORMACIÓN ===== */
+.info-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.estado-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-block;
+}
+
+/* Estados específicos */
+.estado-badge.bg-success {
+    background: linear-gradient(135deg, #27ae60, #2ecc71) !important;
+}
+
+.estado-badge.bg-warning {
+    background: linear-gradient(135deg, #f39c12, #f1c40f) !important;
+}
+
+.estado-badge.bg-danger {
+    background: linear-gradient(135deg, #e74c3c, #c0392b) !important;
+}
+
+.estado-badge.bg-info {
+    background: linear-gradient(135deg, #3498db, #2980b9) !important;
+}
+
+/* ===== DÍAS EN SERVICIO ===== */
+.dias-servicio {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--st-primary);
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ===== TIMELINE (Línea de Tiempo) ===== */
+.timeline {
+    position: relative;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 2rem;
+    padding-bottom: 1.5rem;
+    border-left: 2px solid #e9ecef;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--st-primary);
+    border: 2px solid white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
+.timeline-item:last-child {
+    border-left: none;
+    padding-bottom: 0;
+}
+
+.timeline-item:hover::before {
+    transform: scale(1.2);
+    transition: transform 0.3s ease;
+}
+
+/* ===== GALERÍA DE IMÁGENES ===== */
+.gallery-image {
+    position: relative;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.gallery-image:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.gallery-image img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    transition: filter 0.3s ease;
+}
+
+.gallery-image:hover img {
+    filter: brightness(1.1);
+}
+
+.image-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+    color: white;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+}
+
+.gallery-image:hover .image-overlay {
+    transform: translateY(0);
+}
+
+/* ===== TABS DE IMÁGENES ===== */
+#imagenesTab .nav-link {
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+#imagenesTab .nav-link:hover {
+    background-color: rgba(102, 126, 234, 0.1);
+}
+
+#imagenesTab .nav-link.active {
+    background: var(--st-gradient-1);
+    color: white;
+}
+
+#imagenesTab .nav-link .badge {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+#imagenesTab .nav-link.active .badge {
+    background-color: rgba(255, 255, 255, 0.9);
+    color: var(--st-primary);
+}
+
+/* ===== FORMULARIOS ===== */
+.section-card form .form-control:focus,
+.section-card form .form-select:focus {
+    border-color: var(--st-primary);
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.section-card form textarea {
+    resize: vertical;
+}
+
+/* ===== SCROLLBARS PERSONALIZADOS ===== */
+.card-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.card-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.card-body::-webkit-scrollbar-thumb {
+    background: var(--st-primary);
+    border-radius: 10px;
+}
+
+.card-body::-webkit-scrollbar-thumb:hover {
+    background: var(--st-secondary);
+}
+
+/* ===== MODALES DE IMAGEN ===== */
+.modal-content {
+    border-radius: var(--st-border-radius);
+    border: none;
+}
+
+.modal-header {
+    background: var(--st-gradient-1);
+    color: white;
+    border-radius: var(--st-border-radius) var(--st-border-radius) 0 0;
+}
+
+.modal-header .btn-close {
+    filter: invert(1);
+}
+
+/* ===== RESPONSIVE PARA DETALLES ===== */
+@media (max-width: 768px) {
+    .section-header {
+        font-size: 1rem;
+        padding: 0.75rem 1rem;
+    }
+    
+    .dias-servicio {
+        font-size: 1.5rem;
+    }
+    
+    .gallery-image img {
+        height: 150px;
+    }
+    
+    .timeline-item {
+        padding-left: 1.5rem;
+    }
+}
+
+/* ===== ANIMACIONES ===== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.section-card {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.section-card:nth-child(1) { animation-delay: 0.1s; }
+.section-card:nth-child(2) { animation-delay: 0.2s; }
+.section-card:nth-child(3) { animation-delay: 0.3s; }
+.section-card:nth-child(4) { animation-delay: 0.4s; }
+
+/* ===== UTILIDADES ADICIONALES ===== */
+.text-gradient {
+    background: var(--st-gradient-1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.bg-gradient-primary {
+    background: var(--st-gradient-1) !important;
+}
+
+.bg-gradient-secondary {
+    background: var(--st-gradient-2) !important;
+}
+
+.bg-gradient-warning {
+    background: var(--st-gradient-3) !important;
+}
+
+.bg-gradient-info {
+    background: var(--st-gradient-4) !important;
+}
+
+.bg-gradient-success {
+    background: var(--st-gradient-5) !important;
+}

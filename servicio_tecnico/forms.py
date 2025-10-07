@@ -9,9 +9,15 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 """
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import OrdenServicio, DetalleEquipo, ReferenciaGamaEquipo
+from .models import (
+    OrdenServicio, 
+    DetalleEquipo, 
+    ReferenciaGamaEquipo,
+    HistorialOrden,
+    ImagenOrden,
+)
 from inventario.models import Sucursal, Empleado
-from config.constants import TIPO_EQUIPO_CHOICES, MARCAS_EQUIPOS
+from config.constants import TIPO_EQUIPO_CHOICES, MARCAS_EQUIPOS, TIPO_IMAGEN_CHOICES
 
 
 class NuevaOrdenForm(forms.ModelForm):
@@ -327,3 +333,311 @@ class NuevaOrdenForm(forms.ModelForm):
         desde las constantes. Se usa en el template para el autocompletar.
         """
         return MARCAS_EQUIPOS
+
+
+# ============================================================================
+# FORMULARIOS PARA LA VISTA DE DETALLES
+# ============================================================================
+
+class ConfiguracionAdicionalForm(forms.ModelForm):
+    """
+    Formulario para configurar información adicional del equipo después de crear la orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario permite al técnico agregar más información detallada sobre el equipo
+    después de que la orden fue creada. Incluye:
+    - Diagnóstico técnico (SIC - Sistema de Información del Cliente)
+    - Fechas de inicio y fin del diagnóstico
+    - Fechas de inicio y fin de la reparación
+    - Si requiere factura
+    """
+    
+    class Meta:
+        model = DetalleEquipo
+        fields = [
+            'falla_principal',
+            'diagnostico_sic',
+            'fecha_inicio_diagnostico',
+            'fecha_fin_diagnostico',
+            'fecha_inicio_reparacion',
+            'fecha_fin_reparacion',
+        ]
+        
+        widgets = {
+            'falla_principal': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Describe la falla principal reportada por el cliente...',
+            }),
+            'diagnostico_sic': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': 'Diagnóstico técnico detallado del equipo...',
+            }),
+            'fecha_inicio_diagnostico': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+            }),
+            'fecha_fin_diagnostico': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+            }),
+            'fecha_inicio_reparacion': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+            }),
+            'fecha_fin_reparacion': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+            }),
+        }
+        
+        labels = {
+            'falla_principal': 'Falla Principal',
+            'diagnostico_sic': 'Diagnóstico SIC',
+            'fecha_inicio_diagnostico': 'Inicio Diagnóstico',
+            'fecha_fin_diagnostico': 'Fin Diagnóstico',
+            'fecha_inicio_reparacion': 'Inicio Reparación',
+            'fecha_fin_reparacion': 'Fin Reparación',
+        }
+        
+        help_texts = {
+            'falla_principal': 'Descripción de la falla reportada por el cliente',
+            'diagnostico_sic': 'Diagnóstico técnico completo',
+        }
+
+
+class ReingresoRHITSOForm(forms.ModelForm):
+    """
+    Formulario para marcar una orden como reingreso o candidato a RHITSO.
+    
+    EXPLICACIÓN:
+    - Reingreso: Equipo que regresa después de una reparación previa
+    - RHITSO: Reparación especializada (soldadura, reballing, etc.)
+    
+    Este formulario permite marcar estas condiciones después de crear la orden.
+    """
+    
+    class Meta:
+        model = OrdenServicio
+        fields = [
+            'es_reingreso',
+            'orden_original',
+            'es_candidato_rhitso',
+            'motivo_rhitso',
+            'descripcion_rhitso',
+        ]
+        
+        widgets = {
+            'es_reingreso': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'id_es_reingreso_detalle',
+            }),
+            'orden_original': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
+            'es_candidato_rhitso': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'id_es_candidato_rhitso_detalle',
+            }),
+            'motivo_rhitso': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
+            'descripcion_rhitso': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Describe por qué requiere reparación especializada...',
+            }),
+        }
+        
+        labels = {
+            'es_reingreso': '¿Es un reingreso?',
+            'orden_original': 'Orden Original',
+            'es_candidato_rhitso': '¿Candidato a RHITSO?',
+            'motivo_rhitso': 'Motivo RHITSO',
+            'descripcion_rhitso': 'Descripción Detallada',
+        }
+        
+        help_texts = {
+            'es_reingreso': 'Marca si este equipo ya fue reparado anteriormente',
+            'orden_original': 'Selecciona la orden original si es reingreso',
+            'es_candidato_rhitso': 'Marca si requiere reparación especializada',
+            'motivo_rhitso': 'Motivo por el cual requiere RHITSO',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """
+        Personalizar el formulario al crearlo.
+        Filtra las órdenes disponibles para seleccionar como orden original.
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Solo mostrar órdenes entregadas como posibles órdenes originales
+        if self.instance and self.instance.pk:
+            # Excluir la orden actual de la lista
+            self.fields['orden_original'].queryset = OrdenServicio.objects.filter(
+                estado='entregado'
+            ).exclude(pk=self.instance.pk)
+        else:
+            self.fields['orden_original'].queryset = OrdenServicio.objects.filter(
+                estado='entregado'
+            )
+
+
+class CambioEstadoForm(forms.ModelForm):
+    """
+    Formulario para cambiar el estado de una orden.
+    
+    EXPLICACIÓN:
+    Cuando cambias el estado de una orden, el sistema automáticamente:
+    1. Registra el cambio en el historial
+    2. Actualiza las fechas correspondientes
+    3. Cambia el estado de la orden
+    
+    Los estados posibles están definidos en config/constants.py
+    """
+    
+    comentario_cambio = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Comentario opcional sobre el cambio de estado...',
+        }),
+        label='Comentario (Opcional)',
+        help_text='Agrega un comentario sobre por qué cambió el estado'
+    )
+    
+    class Meta:
+        model = OrdenServicio
+        fields = ['estado', 'tecnico_asignado_actual']
+        
+        widgets = {
+            'estado': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
+            'tecnico_asignado_actual': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
+        }
+        
+        labels = {
+            'estado': 'Nuevo Estado',
+            'tecnico_asignado_actual': 'Técnico Asignado',
+        }
+        
+        help_texts = {
+            'estado': 'Selecciona el nuevo estado de la orden',
+            'tecnico_asignado_actual': 'Técnico responsable de la orden',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filtrar solo empleados activos
+        self.fields['tecnico_asignado_actual'].queryset = Empleado.objects.filter(activo=True)
+
+
+class ComentarioForm(forms.ModelForm):
+    """
+    Formulario para agregar comentarios al historial de la orden.
+    
+    EXPLICACIÓN:
+    Los comentarios se guardan en el modelo HistorialOrden con tipo_evento='comentario'.
+    Este formulario es simple pero importante para la trazabilidad del proceso.
+    """
+    
+    class Meta:
+        model = HistorialOrden
+        fields = ['comentario']
+        
+        widgets = {
+            'comentario': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Escribe un comentario sobre la orden...',
+                'required': True,
+            }),
+        }
+        
+        labels = {
+            'comentario': 'Comentario',
+        }
+        
+        help_texts = {
+            'comentario': 'Agrega notas, observaciones o actualizaciones sobre la orden',
+        }
+    
+    def save(self, commit=True, orden=None, usuario=None):
+        """
+        Guardar el comentario con información adicional.
+        
+        EXPLICACIÓN:
+        Necesitamos sobrescribir save() porque el comentario requiere:
+        - La orden a la que pertenece
+        - El usuario que lo creó
+        - Tipo de evento = 'comentario'
+        """
+        comentario = super().save(commit=False)
+        
+        if orden:
+            comentario.orden = orden
+        
+        if usuario:
+            comentario.usuario = usuario
+        
+        comentario.tipo_evento = 'comentario'
+        comentario.es_sistema = False
+        
+        if commit:
+            comentario.save()
+        
+        return comentario
+
+
+class SubirImagenesForm(forms.Form):
+    """
+    Formulario para subir múltiples imágenes de una orden.
+    
+    EXPLICACIÓN:
+    Este formulario maneja la subida de imágenes con las siguientes características:
+    - Permite subir múltiples archivos a la vez
+    - Valida que sean imágenes (JPG, PNG, GIF)
+    - Limita el tamaño a 6MB por imagen
+    - Comprime automáticamente las imágenes
+    - Organiza las imágenes por service_tag y tipo
+    
+    IMPORTANTE:
+    La compresión y organización se maneja en la vista, no en el formulario.
+    Usamos forms.Form (no ModelForm) porque necesitamos manejar múltiples archivos.
+    El atributo 'multiple' se agrega directamente en el HTML del template.
+    """
+    
+    tipo = forms.ChoiceField(
+        choices=TIPO_IMAGEN_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-control form-select',
+        }),
+        label='Tipo de Imagen',
+        help_text='Selecciona el tipo de imagen (ingreso, egreso, diagnóstico, etc.)',
+    )
+    
+    imagenes = forms.FileField(
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': 'image/jpeg,image/jpg,image/png,image/gif',
+        }),
+        label='Seleccionar Imágenes',
+        help_text='Puedes seleccionar múltiples imágenes (máximo 30, 6MB cada una)',
+        required=False,
+    )
+    
+    descripcion = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Descripción opcional de las imágenes...',
+        }),
+        label='Descripción',
+        help_text='Descripción breve opcional',
+    )

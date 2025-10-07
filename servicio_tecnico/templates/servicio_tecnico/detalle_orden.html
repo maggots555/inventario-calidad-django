@@ -1,0 +1,758 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}">
+<style>
+    /* Estilos inline temporales hasta crear el CSS externo */
+    .info-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .section-card {
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-radius: 1rem;
+        margin-bottom: 2rem;
+        overflow: hidden;
+    }
+    
+    .section-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 1.5rem;
+        font-weight: 600;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .gallery-image {
+        position: relative;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .gallery-image:hover {
+        transform: scale(1.05);
+    }
+    
+    .gallery-image img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+    }
+    
+    .image-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+        color: white;
+        padding: 0.5rem;
+        font-size: 0.85rem;
+    }
+    
+    .timeline-item {
+        position: relative;
+        padding-left: 2rem;
+        padding-bottom: 1.5rem;
+        border-left: 2px solid #e9ecef;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        top: 0;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #667eea;
+        border: 2px solid white;
+    }
+    
+    .timeline-item:last-child {
+        border-left: none;
+    }
+    
+    .estado-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 2rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .dias-servicio {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #667eea;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    
+    <!-- ============================================================ -->
+    <!-- ENCABEZADO CON INFORMACIÓN PRINCIPAL -->
+    <!-- ============================================================ -->
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-2">
+                        <i class="bi bi-tools"></i> 
+                        {{ orden.numero_orden_interno }}
+                    </h2>
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-calendar"></i> 
+                        Ingreso: {{ orden.fecha_ingreso|date:"d/m/Y H:i" }}
+                    </p>
+                </div>
+                <div class="text-end">
+                    <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 1: INFORMACIÓN PRINCIPAL (Solo Lectura) -->
+    <!-- ============================================================ -->
+    
+    <div class="row">
+        <!-- Panel Principal Izquierdo (8 columnas) -->
+        <div class="col-lg-8">
+            <div class="card section-card">
+                <div class="section-header">
+                    <i class="bi bi-info-circle-fill"></i>
+                    Información Principal
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Estado y Días en Servicio -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Estado Actual</label>
+                            <div>
+                                <span class="estado-badge bg-{{ orden.estado|yesno:'success,warning,danger' }}">
+                                    {{ orden.get_estado_display }}
+                                </span>
+                                {% if orden.esta_retrasada %}
+                                <span class="badge bg-danger ms-2">
+                                    <i class="bi bi-exclamation-triangle"></i> Retrasada
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Días en Servicio</label>
+                            <div class="dias-servicio">{{ dias_en_servicio }} días</div>
+                        </div>
+                        
+                        <!-- Información del Equipo -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Tipo de Equipo</label>
+                            <p class="mb-0"><strong>{{ detalle.get_tipo_equipo_display|upper }}</strong></p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Marca y Modelo</label>
+                            <p class="mb-0"><strong>{{ detalle.marca }} {{ detalle.modelo }}</strong></p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Número de Serie (Service Tag)</label>
+                            <p class="mb-0"><code>{{ detalle.numero_serie }}</code></p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Orden del Cliente</label>
+                            <p class="mb-0"><code>{{ detalle.orden_cliente|default:"N/A" }}</code></p>
+                        </div>
+                        
+                        <!-- Gama y Accesorios -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Gama del Equipo</label>
+                            <p class="mb-0">
+                                <span class="badge bg-{% if detalle.gama == 'alta' %}success{% elif detalle.gama == 'media' %}warning{% else %}secondary{% endif %}">
+                                    {{ detalle.get_gama_display }}
+                                </span>
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Accesorios</label>
+                            <p class="mb-0">
+                                {% if detalle.tiene_cargador %}
+                                    <i class="bi bi-check-circle text-success"></i> Incluye cargador
+                                    {% if detalle.numero_serie_cargador %}
+                                        <br><small class="text-muted">S/N: {{ detalle.numero_serie_cargador }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <i class="bi bi-x-circle text-danger"></i> Sin cargador
+                                {% endif %}
+                            </p>
+                        </div>
+                        
+                        <!-- Ubicación y Responsables -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Sucursal</label>
+                            <p class="mb-0">
+                                <i class="bi bi-building"></i> {{ orden.sucursal.nombre }}
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Técnico Asignado</label>
+                            <p class="mb-0">
+                                <i class="bi bi-person-badge"></i> {{ orden.tecnico_asignado_actual.nombre_completo }}
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label text-muted small">Responsable de Seguimiento</label>
+                            <p class="mb-0">
+                                <i class="bi bi-person-check"></i> {{ orden.responsable_seguimiento.nombre_completo }}
+                            </p>
+                        </div>
+                        
+                        <!-- Equipo Enciende -->
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label text-muted small">¿El equipo enciende?</label>
+                            <p class="mb-0">
+                                {% if detalle.equipo_enciende %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-power"></i> SÍ ENCIENDE
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-power"></i> NO ENCIENDE
+                                    </span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Panel Lateral Derecho (4 columnas) - Configuración Adicional -->
+        <div class="col-lg-4">
+            <div class="card section-card">
+                <div class="section-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <i class="bi bi-gear-fill"></i>
+                    Configuración Adicional
+                </div>
+                <div class="card-body">
+                    <form method="post" id="formConfiguracion">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="configuracion">
+                        
+                        {{ form_config.falla_principal.errors }}
+                        <div class="mb-3">
+                            <label for="{{ form_config.falla_principal.id_for_label }}" class="form-label">
+                                {{ form_config.falla_principal.label }}
+                            </label>
+                            {{ form_config.falla_principal }}
+                            <small class="text-muted">{{ form_config.falla_principal.help_text }}</small>
+                        </div>
+                        
+                        {{ form_config.diagnostico_sic.errors }}
+                        <div class="mb-3">
+                            <label for="{{ form_config.diagnostico_sic.id_for_label }}" class="form-label">
+                                {{ form_config.diagnostico_sic.label }}
+                            </label>
+                            {{ form_config.diagnostico_sic }}
+                            <small class="text-muted">{{ form_config.diagnostico_sic.help_text }}</small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                {{ form_config.fecha_inicio_diagnostico.errors }}
+                                <label for="{{ form_config.fecha_inicio_diagnostico.id_for_label }}" class="form-label small">
+                                    {{ form_config.fecha_inicio_diagnostico.label }}
+                                </label>
+                                {{ form_config.fecha_inicio_diagnostico }}
+                            </div>
+                            <div class="col-6 mb-3">
+                                {{ form_config.fecha_fin_diagnostico.errors }}
+                                <label for="{{ form_config.fecha_fin_diagnostico.id_for_label }}" class="form-label small">
+                                    {{ form_config.fecha_fin_diagnostico.label }}
+                                </label>
+                                {{ form_config.fecha_fin_diagnostico }}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                {{ form_config.fecha_inicio_reparacion.errors }}
+                                <label for="{{ form_config.fecha_inicio_reparacion.id_for_label }}" class="form-label small">
+                                    {{ form_config.fecha_inicio_reparacion.label }}
+                                </label>
+                                {{ form_config.fecha_inicio_reparacion }}
+                            </div>
+                            <div class="col-6 mb-3">
+                                {{ form_config.fecha_fin_reparacion.errors }}
+                                <label for="{{ form_config.fecha_fin_reparacion.id_for_label }}" class="form-label small">
+                                    {{ form_config.fecha_fin_reparacion.label }}
+                                </label>
+                                {{ form_config.fecha_fin_reparacion }}
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Guardar Configuración
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 2: REINGRESO Y RHITSO -->
+    <!-- ============================================================ -->
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    <i class="bi bi-arrow-repeat"></i>
+                    Reingreso y RHITSO (Reparación Especializada)
+                </div>
+                <div class="card-body">
+                    <form method="post" id="formReingresoRHITSO">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="reingreso_rhitso">
+                        
+                        <div class="row">
+                            <!-- Reingreso -->
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <h6 class="text-danger mb-3">
+                                        <i class="bi bi-arrow-clockwise"></i> Reingreso
+                                    </h6>
+                                    
+                                    <div class="form-check mb-3">
+                                        {{ form_reingreso.es_reingreso }}
+                                        <label class="form-check-label" for="{{ form_reingreso.es_reingreso.id_for_label }}">
+                                            {{ form_reingreso.es_reingreso.label }}
+                                        </label>
+                                    </div>
+                                    
+                                    {% if orden.es_reingreso %}
+                                        <div class="alert alert-danger mb-3">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                            <strong>Esta orden es un REINGRESO</strong>
+                                            {% if orden.incidencia_scorecard %}
+                                                <br><small>Incidencia: {{ orden.incidencia_scorecard.folio }}</small>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <div class="mb-3">
+                                        {{ form_reingreso.orden_original.errors }}
+                                        <label for="{{ form_reingreso.orden_original.id_for_label }}" class="form-label small">
+                                            {{ form_reingreso.orden_original.label }}
+                                        </label>
+                                        {{ form_reingreso.orden_original }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- RHITSO -->
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <h6 class="text-warning mb-3">
+                                        <i class="bi bi-tools"></i> RHITSO (Reparación Especializada)
+                                    </h6>
+                                    
+                                    <div class="form-check mb-3">
+                                        {{ form_reingreso.es_candidato_rhitso }}
+                                        <label class="form-check-label" for="{{ form_reingreso.es_candidato_rhitso.id_for_label }}">
+                                            {{ form_reingreso.es_candidato_rhitso.label }}
+                                        </label>
+                                    </div>
+                                    
+                                    {% if orden.es_candidato_rhitso %}
+                                        <div class="alert alert-warning mb-3">
+                                            <i class="bi bi-tools"></i>
+                                            <strong>Candidato a RHITSO</strong>
+                                            <br><small>{{ orden.get_motivo_rhitso_display }}</small>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <div class="mb-3">
+                                        {{ form_reingreso.motivo_rhitso.errors }}
+                                        <label for="{{ form_reingreso.motivo_rhitso.id_for_label }}" class="form-label small">
+                                            {{ form_reingreso.motivo_rhitso.label }}
+                                        </label>
+                                        {{ form_reingreso.motivo_rhitso }}
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        {{ form_reingreso.descripcion_rhitso.errors }}
+                                        <label for="{{ form_reingreso.descripcion_rhitso.id_for_label }}" class="form-label small">
+                                            {{ form_reingreso.descripcion_rhitso.label }}
+                                        </label>
+                                        {{ form_reingreso.descripcion_rhitso }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-3">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-save"></i> Actualizar Reingreso/RHITSO
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 3: ASIGNAR ESTADO -->
+    <!-- ============================================================ -->
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
+                    <i class="bi bi-activity"></i>
+                    Cambiar Estado de la Orden
+                </div>
+                <div class="card-body">
+                    <form method="post" id="formCambioEstado">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="cambio_estado">
+                        
+                        <div class="row align-items-end">
+                            <div class="col-md-4 mb-3">
+                                {{ form_estado.estado.errors }}
+                                <label for="{{ form_estado.estado.id_for_label }}" class="form-label">
+                                    {{ form_estado.estado.label }}
+                                </label>
+                                {{ form_estado.estado }}
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                {{ form_estado.tecnico_asignado_actual.errors }}
+                                <label for="{{ form_estado.tecnico_asignado_actual.id_for_label }}" class="form-label">
+                                    {{ form_estado.tecnico_asignado_actual.label }}
+                                </label>
+                                {{ form_estado.tecnico_asignado_actual }}
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <button type="submit" class="btn btn-success w-100">
+                                    <i class="bi bi-check-circle"></i> Actualizar Estado
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                {{ form_estado.comentario_cambio.errors }}
+                                <label for="{{ form_estado.comentario_cambio.id_for_label }}" class="form-label">
+                                    {{ form_estado.comentario_cambio.label }}
+                                </label>
+                                {{ form_estado.comentario_cambio }}
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 4: HISTORIAL Y COMENTARIOS (2 columnas) -->
+    <!-- ============================================================ -->
+    
+    <div class="row">
+        <!-- Historial Automático (Izquierda) -->
+        <div class="col-lg-6">
+            <div class="card section-card">
+                <div class="section-header" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <i class="bi bi-clock-history"></i>
+                    Historial Automático
+                </div>
+                <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                    {% if historial_automatico %}
+                        <div class="timeline">
+                            {% for evento in historial_automatico %}
+                            <div class="timeline-item">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <span class="badge bg-secondary">{{ evento.get_tipo_evento_display }}</span>
+                                    <small class="text-muted">{{ evento.fecha_evento|date:"d/m/Y H:i" }}</small>
+                                </div>
+                                <p class="mb-1">{{ evento.comentario }}</p>
+                                {% if evento.usuario %}
+                                    <small class="text-muted">
+                                        <i class="bi bi-person"></i> {{ evento.usuario.nombre_completo }}
+                                    </small>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center">No hay eventos en el historial.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Comentarios (Derecha) -->
+        <div class="col-lg-6">
+            <div class="card section-card">
+                <div class="section-header" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
+                    <i class="bi bi-chat-dots"></i>
+                    Comentarios
+                </div>
+                <div class="card-body">
+                    <!-- Formulario para agregar comentario -->
+                    <form method="post" id="formComentario" class="mb-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="comentario">
+                        
+                        {{ form_comentario.comentario.errors }}
+                        <label for="{{ form_comentario.comentario.id_for_label }}" class="form-label">
+                            <i class="bi bi-plus-circle"></i> Agregar Comentario
+                        </label>
+                        {{ form_comentario.comentario }}
+                        
+                        <div class="d-grid mt-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-send"></i> Publicar Comentario
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <hr>
+                    
+                    <!-- Lista de comentarios -->
+                    <div style="max-height: 350px; overflow-y: auto;">
+                        {% if comentarios %}
+                            {% for comentario in comentarios %}
+                            <div class="border-bottom pb-3 mb-3">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <strong>
+                                        <i class="bi bi-person-circle"></i>
+                                        {{ comentario.usuario.nombre_completo|default:"Sistema" }}
+                                    </strong>
+                                    <small class="text-muted">{{ comentario.fecha_evento|date:"d/m/Y H:i" }}</small>
+                                </div>
+                                <p class="mb-0">{{ comentario.comentario }}</p>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center">No hay comentarios aún.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 5: GALERÍA DE IMÁGENES -->
+    <!-- ============================================================ -->
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header" style="background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%); color: #333;">
+                    <i class="bi bi-images"></i>
+                    Galería de Imágenes del Equipo
+                    <span class="badge bg-dark ms-2">{{ total_imagenes }}/30</span>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Formulario para subir imágenes -->
+                    <div class="border rounded p-3 mb-4 bg-light">
+                        <h6 class="mb-3">
+                            <i class="bi bi-cloud-upload"></i> Subir Nuevas Imágenes
+                            <small class="text-muted">(Quedan {{ imagenes_restantes }} espacios disponibles)</small>
+                        </h6>
+                        
+                        <form method="post" enctype="multipart/form-data" id="formSubirImagenes">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="subir_imagenes">
+                            
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    {{ form_imagenes.tipo.errors }}
+                                    <label for="{{ form_imagenes.tipo.id_for_label }}" class="form-label">
+                                        {{ form_imagenes.tipo.label }}
+                                    </label>
+                                    {{ form_imagenes.tipo }}
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    {{ form_imagenes.imagenes.errors }}
+                                    <label for="{{ form_imagenes.imagenes.id_for_label }}" class="form-label">
+                                        {{ form_imagenes.imagenes.label }}
+                                    </label>
+                                    <input type="file" 
+                                           name="imagenes" 
+                                           class="form-control" 
+                                           id="{{ form_imagenes.imagenes.id_for_label }}"
+                                           accept="image/jpeg,image/jpg,image/png,image/gif"
+                                           multiple>
+                                    <small class="text-muted d-block">
+                                        <i class="bi bi-info-circle"></i> Máximo 6MB por imagen. Formatos: JPG, PNG, GIF
+                                    </small>
+                                </div>
+                                
+                                <div class="col-md-3 mb-3 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-success w-100">
+                                        <i class="bi bi-upload"></i> Subir
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-12">
+                                    {{ form_imagenes.descripcion.errors }}
+                                    <label for="{{ form_imagenes.descripcion.id_for_label }}" class="form-label">
+                                        {{ form_imagenes.descripcion.label }}
+                                    </label>
+                                    {{ form_imagenes.descripcion }}
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Tabs de categorías de imágenes -->
+                    <ul class="nav nav-pills mb-3" id="imagenesTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="ingreso-tab" data-bs-toggle="pill" data-bs-target="#ingreso" type="button">
+                                <i class="bi bi-arrow-down-circle"></i> Ingreso 
+                                <span class="badge bg-primary">{{ imagenes_por_tipo.ingreso.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="diagnostico-tab" data-bs-toggle="pill" data-bs-target="#diagnostico" type="button">
+                                <i class="bi bi-search"></i> Diagnóstico 
+                                <span class="badge bg-primary">{{ imagenes_por_tipo.diagnostico.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="reparacion-tab" data-bs-toggle="pill" data-bs-target="#reparacion" type="button">
+                                <i class="bi bi-tools"></i> Reparación 
+                                <span class="badge bg-primary">{{ imagenes_por_tipo.reparacion.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="egreso-tab" data-bs-toggle="pill" data-bs-target="#egreso" type="button">
+                                <i class="bi bi-arrow-up-circle"></i> Egreso 
+                                <span class="badge bg-primary">{{ imagenes_por_tipo.egreso.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="otras-tab" data-bs-toggle="pill" data-bs-target="#otras" type="button">
+                                <i class="bi bi-image"></i> Otras 
+                                <span class="badge bg-primary">{{ imagenes_por_tipo.otras.count }}</span>
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <!-- Contenido de los tabs -->
+                    <div class="tab-content" id="imagenesTabContent">
+                        {% for tipo, imagenes in imagenes_por_tipo.items %}
+                        <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="{{ tipo }}" role="tabpanel">
+                            {% if imagenes %}
+                            <div class="row g-3">
+                                {% for imagen in imagenes %}
+                                <div class="col-md-3 col-sm-6">
+                                    <div class="gallery-image" data-bs-toggle="modal" data-bs-target="#modalImagen{{ imagen.pk }}">
+                                        <img src="{{ imagen.imagen.url }}" alt="{{ imagen.descripcion }}">
+                                        <div class="image-overlay">
+                                            <div>{{ imagen.fecha_subida|date:"d/m/Y" }}</div>
+                                            {% if imagen.descripcion %}
+                                                <div class="small">{{ imagen.descripcion|truncatewords:5 }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Modal para ver imagen completa -->
+                                    <div class="modal fade" id="modalImagen{{ imagen.pk }}" tabindex="-1">
+                                        <div class="modal-dialog modal-lg modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">
+                                                        <i class="bi bi-image"></i>
+                                                        Imagen de {{ imagen.get_tipo_display }}
+                                                    </h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body text-center">
+                                                    <img src="{{ imagen.imagen.url }}" alt="{{ imagen.descripcion }}" class="img-fluid">
+                                                    {% if imagen.descripcion %}
+                                                        <p class="mt-3">{{ imagen.descripcion }}</p>
+                                                    {% endif %}
+                                                    <p class="text-muted small">
+                                                        Subida el {{ imagen.fecha_subida|date:"d/m/Y H:i" }} por {{ imagen.subido_por.nombre_completo }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-image" style="font-size: 3rem;"></i>
+                                <p class="mt-2">No hay imágenes de {{ tipo }} aún.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Confirmaciones antes de enviar formularios
+document.getElementById('formCambioEstado').addEventListener('submit', function(e) {
+    if (!confirm('¿Estás seguro de cambiar el estado de la orden?')) {
+        e.preventDefault();
+    }
+});
+
+// Previsualización de imágenes seleccionadas
+document.querySelector('input[name="imagenes"]').addEventListener('change', function(e) {
+    const files = e.target.files;
+    console.log(`${files.length} imagen(es) seleccionada(s)`);
+});
+</script>
+{% endblock %}

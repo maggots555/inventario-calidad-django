@@ -91,8 +91,7 @@ TIPO_IMAGEN_CHOICES = [
     ('diagnostico', 'Durante Diagnóstico'),
     ('reparacion', 'Durante Reparación'),
     ('egreso', 'Egreso - Estado Final'),
-    ('problema', 'Evidencia de Problema'),
-    ('otro', 'Otro'),
+    ('otras', 'Otras'),
 ]
 
 # ============================================================================

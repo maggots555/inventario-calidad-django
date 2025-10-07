@@ -20,6 +20,9 @@ urlpatterns = [
     # Crear nueva orden de servicio
     path('ordenes/crear/', views.crear_orden, name='crear_orden'),
     
+    # Detalle de orden (NUEVA VISTA)
+    path('ordenes/<int:orden_id>/', views.detalle_orden, name='detalle_orden'),
+    
     # Listas de órdenes
     path('ordenes/activas/', views.lista_ordenes_activas, name='lista_activas'),
     path('ordenes/finalizadas/', views.lista_ordenes_finalizadas, name='lista_finalizadas'),
@@ -29,6 +32,5 @@ urlpatterns = [
     path('ordenes/cerrar-todas/', views.cerrar_todas_finalizadas, name='cerrar_todas'),
     
     # URLs futuras para funcionalidad completa
-    # path('ordenes/<int:orden_id>/', views.detalle_orden, name='detalle_orden'),
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]
