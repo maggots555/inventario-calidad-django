@@ -563,15 +563,15 @@ def detalle_orden(request, orden_id):
                 tipo_imagen = form_imagenes.cleaned_data['tipo']
                 descripcion = form_imagenes.cleaned_data.get('descripcion', '')
                 
-                # Validar cantidad máxima (30 imágenes por orden)
-                total_imagenes_actuales = orden.imagenes.count()
+                # Validar cantidad máxima (30 imágenes POR CARGA, no total)
                 imagenes_a_subir = len(imagenes_files)
                 
-                if total_imagenes_actuales + imagenes_a_subir > 30:
+                if imagenes_a_subir > 30:
                     messages.error(
                         request,
-                        f'❌ Límite de imágenes excedido. Tienes {total_imagenes_actuales} imágenes '
-                        f'e intentas subir {imagenes_a_subir} más. Máximo: 30 imágenes por orden.'
+                        f'❌ Solo puedes subir máximo 30 imágenes por carga. '
+                        f'Seleccionaste {imagenes_a_subir}. Si necesitas más, '
+                        f'realiza otra carga después.'
                     )
                     return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
                 
@@ -696,7 +696,6 @@ def detalle_orden(request, orden_id):
         # Imágenes
         'imagenes_por_tipo': imagenes_por_tipo,
         'total_imagenes': total_imagenes,
-        'imagenes_restantes': 30 - total_imagenes,
         
         # Información adicional
         'dias_en_servicio': orden.dias_en_servicio,
@@ -721,9 +720,9 @@ def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
     Esta función hace lo siguiente:
     1. Crea la estructura de carpetas: media/servicio_tecnico/{service_tag}/{tipo}/
     2. Genera un nombre único para la imagen: {tipo}_{timestamp}.jpg
-    3. Guarda la imagen ORIGINAL
+    3. Guarda la imagen ORIGINAL (alta resolución, sin comprimir)
     4. Crea una versión COMPRIMIDA para mostrar en la galería
-    5. Guarda el registro en la base de datos
+    5. Guarda ambas versiones en el registro de la base de datos
     
     Args:
         orden: OrdenServicio a la que pertenece la imagen
@@ -733,7 +732,7 @@ def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
         empleado: Empleado que sube la imagen
     
     Returns:
-        ImagenOrden: Registro de imagen creado
+        ImagenOrden: Registro de imagen creado con ambas versiones
     """
     from django.core.files.base import ContentFile
     from io import BytesIO
@@ -752,29 +751,39 @@ def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
     
     # Nombre del archivo: {tipo}_{timestamp}{extension}
     nombre_archivo = f"{tipo}_{timestamp}{extension}"
-    
-    # Ruta relativa para guardar: servicio_tecnico/{service_tag}/{tipo}/{nombre}
-    ruta_relativa = f"servicio_tecnico/{service_tag}/{tipo}/{nombre_archivo}"
+    nombre_archivo_original = f"{tipo}_{timestamp}_original{extension}"
     
     # Abrir imagen con Pillow
-    img = Image.open(imagen_file)
+    img_original = Image.open(imagen_file)
     
     # Convertir a RGB si es necesario (para JPG)
-    if img.mode in ('RGBA', 'LA', 'P'):
-        background = Image.new('RGB', img.size, (255, 255, 255))
-        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-        img = background
+    if img_original.mode in ('RGBA', 'LA', 'P'):
+        background = Image.new('RGB', img_original.size, (255, 255, 255))
+        background.paste(img_original, mask=img_original.split()[-1] if img_original.mode == 'RGBA' else None)
+        img_original = background
     
-    # Comprimir imagen (calidad 85%, tamaño máximo 1920px)
+    # ========================================================================
+    # GUARDAR IMAGEN ORIGINAL (SIN COMPRIMIR - ALTA RESOLUCIÓN)
+    # ========================================================================
+    buffer_original = BytesIO()
+    img_original.save(buffer_original, format='JPEG', quality=95, optimize=False)
+    buffer_original.seek(0)
+    
+    # ========================================================================
+    # CREAR VERSIÓN COMPRIMIDA PARA GALERÍA
+    # ========================================================================
+    img_comprimida = img_original.copy()
     max_size = (1920, 1920)
-    img.thumbnail(max_size, Image.Resampling.LANCZOS)
+    img_comprimida.thumbnail(max_size, Image.Resampling.LANCZOS)
     
-    # Guardar en buffer
-    buffer = BytesIO()
-    img.save(buffer, format='JPEG', quality=85, optimize=True)
-    buffer.seek(0)
+    # Guardar versión comprimida en buffer
+    buffer_comprimido = BytesIO()
+    img_comprimida.save(buffer_comprimido, format='JPEG', quality=85, optimize=True)
+    buffer_comprimido.seek(0)
     
-    # Crear registro de ImagenOrden
+    # ========================================================================
+    # CREAR REGISTRO DE IMAGENORDEN
+    # ========================================================================
     imagen_orden = ImagenOrden(
         orden=orden,
         tipo=tipo,
@@ -782,7 +791,81 @@ def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
         subido_por=empleado
     )
     
-    # Guardar archivo comprimido
-    imagen_orden.imagen.save(nombre_archivo, ContentFile(buffer.getvalue()), save=True)
+    # Guardar archivo comprimido (para galería)
+    imagen_orden.imagen.save(nombre_archivo, ContentFile(buffer_comprimido.getvalue()), save=False)
+    
+    # Guardar archivo original (para descargas)
+    imagen_orden.imagen_original.save(nombre_archivo_original, ContentFile(buffer_original.getvalue()), save=False)
+    
+    # Guardar el objeto (esto dispara el save() del modelo que crea el historial)
+    imagen_orden.save()
     
     return imagen_orden
+
+
+# ============================================================================
+# VISTA: Descargar Imagen Original
+# ============================================================================
+
+@login_required
+def descargar_imagen_original(request, imagen_id):
+    """
+    Descarga la imagen original (alta resolución) de una orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista permite descargar la versión original (sin comprimir) de una imagen.
+    Incluye validaciones de seguridad:
+    - Usuario debe estar autenticado
+    - La imagen debe existir
+    - Debe tener versión original guardada
+    
+    Args:
+        request: Objeto HttpRequest
+        imagen_id: ID de la ImagenOrden
+    
+    Returns:
+        HttpResponse con el archivo de imagen para descargar
+    """
+    from django.http import FileResponse, Http404, HttpResponseForbidden
+    
+    # Obtener la imagen o retornar 404
+    imagen = get_object_or_404(ImagenOrden, pk=imagen_id)
+    
+    # Verificar que el usuario tiene permiso (empleado activo)
+    try:
+        empleado = request.user.empleado
+        if not empleado.activo:
+            return HttpResponseForbidden("No tienes permisos para descargar imágenes.")
+    except:
+        return HttpResponseForbidden("Debes ser un empleado activo para descargar imágenes.")
+    
+    # Verificar que existe la imagen original
+    if not imagen.imagen_original:
+        messages.warning(
+            request,
+            '⚠️ Esta imagen no tiene versión original guardada. '
+            'Se descargará la versión comprimida.'
+        )
+        archivo_imagen = imagen.imagen
+    else:
+        archivo_imagen = imagen.imagen_original
+    
+    # Verificar que el archivo existe físicamente
+    if not archivo_imagen or not archivo_imagen.storage.exists(archivo_imagen.name):
+        raise Http404("El archivo de imagen no existe.")
+    
+    # Obtener el nombre del archivo original
+    nombre_archivo = os.path.basename(archivo_imagen.name)
+    
+    # Crear nombre descriptivo para descarga
+    tipo_texto = imagen.get_tipo_display()
+    orden_numero = imagen.orden.numero_orden_interno
+    service_tag = imagen.orden.detalle_equipo.numero_serie
+    nombre_descarga = f"{orden_numero}_{service_tag}_{tipo_texto}_{nombre_archivo}"
+    
+    # Abrir archivo y crear respuesta
+    archivo = archivo_imagen.open('rb')
+    response = FileResponse(archivo, content_type='image/jpeg')
+    response['Content-Disposition'] = f'attachment; filename="{nombre_descarga}"'
+    
+    return response

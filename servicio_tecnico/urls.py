@@ -23,6 +23,9 @@ urlpatterns = [
     # Detalle de orden (NUEVA VISTA)
     path('ordenes/<int:orden_id>/', views.detalle_orden, name='detalle_orden'),
     
+    # Descargar imagen original
+    path('imagenes/<int:imagen_id>/descargar/', views.descargar_imagen_original, name='descargar_imagen'),
+    
     # Listas de órdenes
     path('ordenes/activas/', views.lista_ordenes_activas, name='lista_activas'),
     path('ordenes/finalizadas/', views.lista_ordenes_finalizadas, name='lista_finalizadas'),

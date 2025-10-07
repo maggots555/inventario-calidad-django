@@ -1009,7 +1009,14 @@ class ImagenOrden(models.Model):
     imagen = models.ImageField(
         upload_to='servicio_tecnico/imagenes/%Y/%m/',
         validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif'])],
-        help_text="Archivo de imagen (JPG, PNG, GIF)"
+        help_text="Archivo de imagen comprimida para galería (JPG, PNG, GIF)"
+    )
+    imagen_original = models.ImageField(
+        upload_to='servicio_tecnico/imagenes_originales/%Y/%m/',
+        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif'])],
+        null=True,
+        blank=True,
+        help_text="Archivo de imagen original sin comprimir (alta resolución)"
     )
     descripcion = models.CharField(
         max_length=200,
