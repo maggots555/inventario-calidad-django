@@ -736,11 +736,10 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
-            <form method="post" id="formEditarInfoEquipo">
-                {% csrf_token %}
-                <input type="hidden" name="form_type" value="editar_info_equipo">
-                
-                <div class="modal-body">
+            <div class="modal-body">
+                <form method="post" id="formEditarInfoEquipo">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="editar_info_equipo">
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle"></i>
                         <strong>Importante:</strong> Puedes actualizar cualquier información del equipo que haya sido omitida o necesite corrección.
@@ -873,17 +872,17 @@
                             {% endif %}
                         </div>
                     </div>
-                </div>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-x-circle"></i> Cancelar
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Guardar Cambios
-                    </button>
-                </div>
-            </form>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="submit" form="formEditarInfoEquipo" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Guardar Cambios
+                </button>
+            </div>
         </div>
     </div>
 </div>

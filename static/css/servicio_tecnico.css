@@ -921,3 +921,46 @@ form:has(#btnSubirImagenes:disabled) textarea {
     transform: translateY(-2px);
     box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
 }
+
+/* =============================================================================
+   CORRECCIÓN PARA MODALES DE BOOTSTRAP (ESPECIALMENTE CON SCROLLABLE)
+   Descripción: Asegura que los modales se muestren correctamente con scroll
+   Problema: Los modales aparecían "cortados" sin poder ver el footer o botones
+   ============================================================================= */
+
+/* Asegurar que modal-dialog-scrollable funcione correctamente */
+.modal-dialog-scrollable .modal-content {
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: calc(100vh - 3.5rem) !important;
+    overflow: hidden !important;
+}
+
+/* El modal-body debe tener scroll, no el modal-content */
+.modal-dialog-scrollable .modal-body {
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+/* Asegurar que header y footer se mantengan fijos */
+.modal-dialog-scrollable .modal-header,
+.modal-dialog-scrollable .modal-footer {
+    flex-shrink: 0 !important;
+}
+
+/* Prevenir conflictos con z-index del lightbox */
+.modal-backdrop {
+    z-index: 1040 !important;
+}
+
+.modal {
+    z-index: 1050 !important;
+}
+
+/* Asegurar que el modal tenga altura adecuada en móviles */
+@media (max-width: 768px) {
+    .modal-dialog-scrollable .modal-content {
+        max-height: calc(100vh - 2rem) !important;
+    }
+}

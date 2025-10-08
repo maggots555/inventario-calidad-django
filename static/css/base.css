@@ -115,11 +115,16 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    /* overflow-x: hidden aplicado solo en móviles ahora */
+    width: 100%;
+    max-width: 100%;
 }
 
 /* Mejora del scroll */
 html {
     scroll-behavior: smooth;
+    /* overflow-x: hidden aplicado solo en móviles ahora */
+    width: 100%;
 }
 
 /* Contenedor principal que debe crecer para empujar el footer abajo */
@@ -944,9 +949,10 @@ body:not(.sidebar-loading) .main-wrapper {
     visibility: visible;
 }
 
-/* Ocultar botón móvil en escritorio */
+/* ===== BOTÓN FLOTANTE DE SIDEBAR MÓVIL - DESACTIVADO ===== */
+/* Este botón ha sido eliminado para usar solo la navbar superior */
 .mobile-sidebar-toggle {
-    display: none;
+    display: none !important; /* Ocultado permanentemente */
 }
 
 /* Responsive - Tablet y móvil */
@@ -973,50 +979,13 @@ body:not(.sidebar-loading) .main-wrapper {
         margin-left: 0;
     }
     
-    /* Botón hamburguesa para móviles - MOSTRAR EN MÓVIL */
-    .mobile-sidebar-toggle {
-        display: flex; /* Reactivar en móvil */
-        position: fixed;
-        top: 80px;
-        left: 15px;
-        width: 45px;
-        height: 45px;
-        background: linear-gradient(135deg, #3498db, #2980b9);
-        border: none;
-        border-radius: 50%;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        z-index: 997;
-        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
-        transition: all 0.3s ease;
-    }
-    
-    .mobile-sidebar-toggle:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 20px rgba(52, 152, 219, 0.6);
-    }
-    
-    .mobile-sidebar-toggle i {
-        color: white;
-        font-size: 1.25rem;
-    }
-    
     .sidebar-toggle {
         display: none;
     }
 }
 
-@media (max-width: 768px) {
-    .mobile-sidebar-toggle {
-        width: 40px;
-        height: 40px;
-    }
-    
-    .mobile-sidebar-toggle i {
-        font-size: 1.1rem;
-    }
-}
+/* ===== ELIMINADAS REGLAS DE MOBILE-SIDEBAR-TOGGLE ===== */
+/* Ya no se usa el botón flotante, solo la navbar superior */
 
 /* Animación de entrada */
 @keyframes slideInLeft {
@@ -1726,6 +1695,9 @@ footer::after {
     top: 0;
     z-index: 1000;
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    /* overflow-x removido de aquí - se aplicará solo en móviles */
+    overflow-y: visible; /* Asegurar que dropdowns sean visibles */
 }
 
 .navbar-container {
@@ -1738,6 +1710,7 @@ footer::after {
     justify-content: space-between;
     padding: 0 1.5rem;
     gap: 1.5rem;
+    box-sizing: border-box; /* Incluir padding en el ancho */
 }
 
 /* ===== LOGO Y BRAND ===== */
@@ -1900,7 +1873,8 @@ footer::after {
     display: flex;
     align-items: center;
     gap: 1rem;
-    flex-shrink: 0;
+    flex-shrink: 0; /* Evitar compresión excesiva */
+    min-width: 0; /* Permitir overflow controlado */
 }
 
 .navbar-user-info {
@@ -1908,6 +1882,7 @@ footer::after {
     flex-direction: column;
     align-items: flex-end;
     gap: 0.1rem;
+    min-width: 0; /* Para permitir truncar texto si es necesario */
 }
 
 .user-name {
@@ -1915,11 +1890,15 @@ footer::after {
     font-weight: 600;
     color: #ffffff;
     line-height: 1.2;
+    white-space: nowrap; /* Evitar saltos de línea */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Truncar con ... si es muy largo */
 }
 
 .user-role {
     font-size: 0.75rem;
     color: #95a5a6;
+    white-space: nowrap;
 }
 
 .navbar-user-avatar {
@@ -1953,6 +1932,7 @@ footer::after {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-shrink: 0; /* Evitar que se compriman demasiado */
 }
 
 .navbar-action-btn {
@@ -1970,6 +1950,9 @@ footer::after {
     border: none;
     cursor: pointer;
     padding: 0;
+    flex-shrink: 0; /* No permitir compresión de botones */
+    min-width: 38px; /* Tamaño mínimo táctil */
+    min-height: 38px;
 }
 
 .navbar-action-btn:hover {
@@ -2013,10 +1996,12 @@ footer::after {
         padding: 0 1.5rem;
     }
     
+    /* Ocultar información de usuario en tablets */
     .navbar-user-info {
         display: none;
     }
     
+    /* Menú desplegable móvil */
     .navbar-menu {
         position: fixed;
         top: 70px;
@@ -2033,6 +2018,7 @@ footer::after {
         transform: translateY(-20px);
         transition: all 0.3s ease;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
     }
     
     .navbar-menu.active {
@@ -2064,6 +2050,7 @@ footer::after {
     .navbar-menu-link {
         padding: 1rem 1.5rem;
         border-radius: 0;
+        justify-content: space-between;
     }
     
     .navbar-dropdown {
@@ -2077,66 +2064,352 @@ footer::after {
         background: rgba(0, 0, 0, 0.2);
         margin: 0 1rem;
         border-radius: 8px;
+        transition: all 0.3s ease;
     }
     
     .navbar-menu-item.active .navbar-dropdown {
         opacity: 1;
         visibility: visible;
-        max-height: 500px;
+        max-height: 800px;
         margin-top: 0.5rem;
         margin-bottom: 0.5rem;
+        padding: 0.5rem 0;
+    }
+    
+    /* Mejorar botones de acción en tablets */
+    .navbar-actions {
+        gap: 0.5rem;
+    }
+    
+    /* PREVENCIÓN DE OVERFLOW HORIZONTAL SOLO EN MÓVILES */
+    .modern-navbar {
+        overflow-x: hidden; /* Solo aplicado en tablets y móviles */
     }
 }
 
 @media (max-width: 768px) {
+    /* PREVENCIÓN GLOBAL DE OVERFLOW HORIZONTAL EN MÓVILES */
+    html {
+        overflow-x: hidden;
+        max-width: 100vw;
+    }
+    
+    body {
+        overflow-x: hidden;
+        max-width: 100vw;
+    }
+    
     .navbar-container {
-        padding: 0 1rem;
+        padding: 0 0.5rem; /* Reducido de 1rem */
+        gap: 0.5rem; /* Reducido de 0.75rem */
     }
     
-    .navbar-brand-text span {
-        display: none;
+    /* OCULTAR COMPLETAMENTE el título en móviles para dar espacio a botones */
+    .navbar-brand-text {
+        display: none !important;
     }
     
+    .navbar-logo {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .navbar-logo i {
+        font-size: 1.2rem;
+    }
+    
+    /* Reducir gap entre logo y toggle */
+    .navbar-brand-section {
+        gap: 0.5rem;
+    }
+    
+    /* Reducir botones de acción */
+    .navbar-actions {
+        gap: 0.3rem; /* Aumentado ligeramente para mejor táctil */
+    }
+    
+    .navbar-action-btn {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
+        font-size: 0.95rem;
+    }
+    
+    /* Avatar más pequeño */
+    .navbar-user-avatar {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .navbar-user-avatar span {
+        font-size: 0.85rem;
+    }
+    
+    /* Asegurar que navbar no cause overflow */
+    .modern-navbar {
+        overflow-x: hidden;
+    }
+}
+
+@media (max-width: 576px) {
+    .navbar-container {
+        padding: 0 0.4rem; /* Más compacto */
+        gap: 0.4rem;
+    }
+    
+    .modern-navbar {
+        height: 56px; /* Reducido de 60px */
+        padding: 0.4rem 0;
+    }
+    
+    .navbar-menu {
+        top: 56px;
+        max-height: calc(100vh - 56px);
+    }
+    
+    /* Logo compacto pero visible */
+    .navbar-logo {
+        width: 34px;
+        height: 34px;
+    }
+    
+    .navbar-logo i {
+        font-size: 1.1rem;
+    }
+    
+    /* Título OCULTO (ya está oculto desde 768px) */
+    .navbar-brand-text {
+        display: none !important;
+    }
+    
+    /* Botones táctiles pero compactos */
     .navbar-actions {
         gap: 0.25rem;
     }
     
     .navbar-action-btn {
-        width: 35px;
-        height: 35px;
-        font-size: 1rem;
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        min-height: 34px;
+        font-size: 0.9rem;
+    }
+    
+    /* Avatar compacto */
+    .navbar-user-avatar {
+        width: 34px;
+        height: 34px;
+    }
+    
+    .navbar-user-avatar span {
+        font-size: 0.8rem;
+    }
+    
+    /* Toggle más compacto */
+    .navbar-mobile-toggle {
+        padding: 6px;
+    }
+    
+    .navbar-mobile-toggle span {
+        width: 20px;
+        height: 2.5px;
     }
 }
 
 @media (max-width: 480px) {
+    /* Pantallas muy pequeñas */
+    .navbar-container {
+        padding: 0 0.3rem; /* Muy compacto */
+        gap: 0.3rem;
+    }
+    
     .modern-navbar {
-        height: 60px;
+        height: 52px;
     }
     
     .navbar-menu {
-        top: 60px;
-        max-height: calc(100vh - 60px);
+        top: 52px;
+        max-height: calc(100vh - 52px);
     }
     
+    /* Solo logo, sin título */
     .navbar-logo {
-        width: 38px;
-        height: 38px;
+        width: 32px;
+        height: 32px;
     }
     
     .navbar-logo i {
-        font-size: 1.25rem;
+        font-size: 1rem;
     }
     
-    .navbar-brand-text h1 {
-        font-size: 1.1rem;
+    .navbar-brand-text {
+        display: none !important;
+    }
+    
+    /* Reducir gap entre botones al mínimo pero manteniendo usabilidad */
+    .navbar-actions {
+        gap: 0.2rem;
+    }
+    
+    .navbar-action-btn {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+        font-size: 0.85rem;
     }
     
     .navbar-user-avatar {
-        width: 38px;
-        height: 38px;
+        width: 32px;
+        height: 32px;
     }
     
     .navbar-user-avatar span {
+        font-size: 0.75rem;
+    }
+    
+    /* Toggle compacto */
+    .navbar-mobile-toggle {
+        padding: 5px;
+    }
+    
+    .navbar-mobile-toggle span {
+        width: 18px;
+        height: 2px;
+    }
+}
+
+@media (max-width: 380px) {
+    /* Pantallas extra pequeñas (iPhone SE, etc) */
+    .navbar-container {
+        padding: 0 0.25rem; /* Mínimo padding */
+        gap: 0.25rem;
+    }
+    
+    .modern-navbar {
+        height: 50px;
+    }
+    
+    .navbar-menu {
+        top: 50px;
+        max-height: calc(100vh - 50px);
+    }
+    
+    .navbar-logo {
+        width: 30px;
+        height: 30px;
+    }
+    
+    .navbar-logo i {
+        font-size: 0.95rem;
+    }
+    
+    /* Título completamente oculto */
+    .navbar-brand-text {
+        display: none !important;
+    }
+    
+    .navbar-actions {
+        gap: 0.15rem; /* Mínimo gap pero táctil */
+    }
+    
+    .navbar-action-btn {
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        min-height: 30px;
+        font-size: 0.8rem;
+    }
+    
+    .navbar-user-avatar {
+        width: 30px;
+        height: 30px;
+    }
+    
+    .navbar-user-avatar span {
+        font-size: 0.7rem;
+    }
+    
+    /* Ocultar botón de admin en pantallas muy pequeñas */
+    .navbar-action-btn[title="Panel Admin"] {
+        display: none;
+    }
+    
+    .navbar-mobile-toggle {
+        padding: 4px;
+    }
+    
+    .navbar-mobile-toggle span {
+        width: 16px;
+        height: 2px;
+    }
+}
+
+@media (max-width: 320px) {
+    /* Pantallas ultra pequeñas */
+    .navbar-container {
+        padding: 0 0.2rem; /* Padding mínimo absoluto */
+        gap: 0.2rem;
+    }
+    
+    .modern-navbar {
+        height: 48px;
+    }
+    
+    .navbar-menu {
+        top: 48px;
+        max-height: calc(100vh - 48px);
+    }
+    
+    .navbar-logo {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .navbar-logo i {
         font-size: 0.9rem;
+    }
+    
+    /* Sin título, solo logo */
+    .navbar-brand-text {
+        display: none !important;
+    }
+    
+    .navbar-actions {
+        gap: 0.1rem; /* Gap ultra mínimo */
+    }
+    
+    .navbar-action-btn {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+        font-size: 0.75rem;
+        border-radius: 6px; /* Más pequeño */
+    }
+    
+    .navbar-user-avatar {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .navbar-user-avatar span {
+        font-size: 0.65rem;
+    }
+    
+    /* Ocultar botón de admin y dashboard en pantallas ultra pequeñas */
+    .navbar-action-btn[title="Panel Admin"],
+    .navbar-action-btn[title="Dashboard Principal"] {
+        display: none;
+    }
+    
+    .navbar-mobile-toggle {
+        padding: 3px;
+    }
+    
+    .navbar-mobile-toggle span {
+        width: 15px;
+        height: 2px;
     }
 }

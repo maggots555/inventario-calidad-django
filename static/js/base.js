@@ -309,7 +309,6 @@ document.addEventListener('DOMContentLoaded', function() {
 function inicializarSidebar() {
     const sidebar = document.getElementById('appSidebar');
     const sidebarToggle = document.getElementById('sidebarToggle');
-    const mobileSidebarToggle = document.getElementById('mobileSidebarToggle');
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     const mainWrapper = document.getElementById('mainWrapper');
     
@@ -344,13 +343,8 @@ function inicializarSidebar() {
         mainWrapper.classList.add('sidebar-collapsed');
     }
     
-    // Toggle móvil para abrir/cerrar sidebar
-    if (mobileSidebarToggle) {
-        mobileSidebarToggle.addEventListener('click', function() {
-            sidebar.classList.add('mobile-open');
-            sidebarOverlay.classList.add('active');
-        });
-    }
+    // NOTA: El botón flotante mobileSidebarToggle ha sido eliminado
+    // Ahora solo se usa la navbar superior para navegación móvil
     
     // Cerrar sidebar en móvil al hacer click en overlay
     if (sidebarOverlay) {
