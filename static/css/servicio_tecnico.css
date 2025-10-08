@@ -964,3 +964,198 @@ form:has(#btnSubirImagenes:disabled) textarea {
         max-height: calc(100vh - 2rem) !important;
     }
 }
+
+/* =============================================================================
+   ESTILOS PARA SECCIÓN DE COTIZACIÓN
+   Descripción: Estilos para mejorar la visualización de cotizaciones
+   ============================================================================= */
+
+/* ===== TABLA DE PIEZAS COTIZADAS ===== */
+.table-hover tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* Badges en tabla de piezas */
+.table .badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* ===== CARDS DE SEGUIMIENTO DE PROVEEDORES ===== */
+.card.border-start {
+    border-left-width: 4px !important;
+}
+
+.card.border-success {
+    border-left-color: #28a745 !important;
+}
+
+.card.border-danger {
+    border-left-color: #dc3545 !important;
+}
+
+.card.border-info {
+    border-left-color: #17a2b8 !important;
+}
+
+.card.border-warning {
+    border-left-color: #ffc107 !important;
+}
+
+/* ===== ANIMACIONES PARA DECISIÓN DE COTIZACIÓN ===== */
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.form-check:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+    border-radius: 4px;
+    padding: 4px;
+    margin: -4px;
+    transition: background-color 0.2s ease;
+}
+
+/* ===== RESALTADO DE INFORMACIÓN IMPORTANTE ===== */
+.alert-info.d-flex {
+    background: linear-gradient(135deg, #e0f7fa 0%, #e1f5fe 100%);
+    border: none;
+    border-left: 4px solid #0288d1;
+}
+
+.alert-danger.p-2 {
+    font-size: 0.85rem;
+}
+
+/* ===== MEJORAS VISUALES PARA ESTADOS ===== */
+.badge.bg-warning.text-dark {
+    background-color: #ffc107 !important;
+    color: #000 !important;
+}
+
+.badge[style*="font-size: 1rem"] {
+    padding: 0.5rem 0.75rem;
+    font-weight: 600;
+}
+
+/* ===== RESPONSIVE PARA TABLA DE COSTOS ===== */
+@media (max-width: 768px) {
+    .table-sm td,
+    .table-sm th {
+        font-size: 0.85rem;
+        padding: 0.5rem;
+    }
+}
+
+/* ============================================================================ */
+/* ESTILOS PARA GESTIÓN DE PIEZAS Y SEGUIMIENTOS */
+/* ============================================================================ */
+
+/* Alerta de retraso más prominente */
+.seguimiento-card .alert-danger {
+    background: linear-gradient(135deg, #f093fb 0%, #ff6b6b 100%);
+    border: 2px solid #e74c3c;
+    color: white;
+    font-weight: bold;
+    font-size: 0.9rem;
+    padding: 0.75rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+    animation: pulseRetraso 2s ease-in-out infinite;
+}
+
+@keyframes pulseRetraso {
+    0%, 100% {
+        box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+    }
+    50% {
+        box-shadow: 0 4px 20px rgba(231, 76, 60, 0.7);
+    }
+}
+
+/* Badge de retraso en header de sección */
+.badge-retraso-global {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 20px;
+    box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3);
+    animation: shake 0.5s ease-in-out infinite;
+}
+
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-2px);
+    }
+    75% {
+        transform: translateX(2px);
+    }
+}
+
+/* Cards de seguimiento con bordes más prominentes */
+.seguimiento-card.border-danger {
+    border-width: 4px !important;
+    box-shadow: 0 0 20px rgba(231, 76, 60, 0.3);
+}
+
+.seguimiento-card.border-success {
+    border-width: 3px !important;
+}
+
+/* Botones de acción en modales y cards */
+.btn-group-sm .btn {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+}
+
+/* Tabla de piezas - hover effect */
+#tablaPiezas tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+    transform: scale(1.01);
+    transition: all 0.2s ease;
+}
+
+/* Estilo para botones de acción en tabla */
+#tablaPiezas .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 1rem;
+}
+
+/* Modal headers con gradientes */
+.modal-header.bg-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+.modal-header.bg-info {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+}
+
+/* Cards vacías con estilo atractivo */
+.card-body.text-center i.bi {
+    color: #6c757d;
+    opacity: 0.5;
+}
+
+/* Animación para toast notifications */
+.alert.position-fixed {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}

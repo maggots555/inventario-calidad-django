@@ -14,6 +14,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from django.http import JsonResponse
 from django.utils.safestring import mark_safe
+from django.views.decorators.http import require_http_methods
 from PIL import Image
 import os
 import json
@@ -29,7 +30,31 @@ from .forms import (
     ComentarioForm,
     SubirImagenesForm,
     EditarInformacionEquipoForm,
+    CrearCotizacionForm,
+    GestionarCotizacionForm,
 )
+
+
+def registrar_historial(orden, accion, empleado, detalles=''):
+    """
+    Función helper para registrar eventos en el historial de la orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta función crea un registro en la tabla HistorialOrden cada vez que
+    sucede algo importante en una orden (cambio de estado, comentario, etc.)
+    
+    PARÁMETROS:
+    - orden: La orden de servicio
+    - accion: Tipo de acción (ej: 'PIEZA_AGREGADA', 'ESTADO_CAMBIADO')
+    - empleado: El empleado que realizó la acción
+    - detalles: Descripción adicional (opcional)
+    """
+    HistorialOrden.objects.create(
+        orden=orden,
+        accion=accion,
+        realizado_por=empleado,
+        detalles=detalles
+    )
 
 
 @login_required
@@ -842,6 +867,179 @@ def detalle_orden(request, orden_id):
                 return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
             else:
                 messages.error(request, '❌ Error al actualizar la información del equipo.')
+        
+        # ------------------------------------------------------------------------
+        # FORMULARIO 8: Crear Cotización
+        # ------------------------------------------------------------------------
+        elif form_type == 'crear_cotizacion':
+            # Verificar que no exista ya una cotización
+            if hasattr(orden, 'cotizacion'):
+                messages.warning(request, '⚠️ Esta orden ya tiene una cotización. Edítala desde el admin.')
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+            
+            form_crear_cotizacion = CrearCotizacionForm(request.POST)
+            
+            if form_crear_cotizacion.is_valid():
+                # Crear la cotización vinculada a la orden
+                cotizacion = form_crear_cotizacion.save(commit=False)
+                cotizacion.orden = orden
+                cotizacion.save()
+                
+                messages.success(
+                    request,
+                    f'✅ Cotización creada correctamente con mano de obra: ${cotizacion.costo_mano_obra}. '
+                    f'Ahora agrega las piezas necesarias desde el admin.'
+                )
+                
+                # Registrar en historial
+                HistorialOrden.objects.create(
+                    orden=orden,
+                    tipo_evento='cotizacion',
+                    comentario=f'Cotización creada - Mano de obra: ${cotizacion.costo_mano_obra}',
+                    usuario=empleado_actual,
+                    es_sistema=False
+                )
+                
+                # Cambiar estado a "Esperando Aprobación Cliente" si no está ya
+                if orden.estado != 'cotizacion':
+                    estado_anterior = orden.estado
+                    orden.estado = 'cotizacion'
+                    orden.save()
+                    
+                    messages.info(
+                        request,
+                        f'ℹ️ Estado actualizado automáticamente a: Esperando Aprobación Cliente'
+                    )
+                    
+                    # Registrar cambio de estado
+                    HistorialOrden.objects.create(
+                        orden=orden,
+                        tipo_evento='cambio_estado',
+                        estado_anterior=estado_anterior,
+                        estado_nuevo='cotizacion',
+                        comentario=f'Cambio automático de estado al crear cotización',
+                        usuario=empleado_actual,
+                        es_sistema=True
+                    )
+                
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+            else:
+                messages.error(request, '❌ Error al crear la cotización.')
+        
+        # ------------------------------------------------------------------------
+        # FORMULARIO 9: Gestionar Cotización (Aceptar/Rechazar)
+        # ------------------------------------------------------------------------
+        elif form_type == 'gestionar_cotizacion':
+            # Verificar que existe cotización
+            if not hasattr(orden, 'cotizacion'):
+                messages.error(request, '❌ No existe una cotización para esta orden.')
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+            
+            form_gestionar_cotizacion = GestionarCotizacionForm(
+                request.POST,
+                instance=orden.cotizacion
+            )
+            
+            if form_gestionar_cotizacion.is_valid():
+                cotizacion_actualizada = form_gestionar_cotizacion.save()
+                accion = form_gestionar_cotizacion.cleaned_data.get('accion')
+                
+                # Mensaje según la decisión
+                if accion == 'aceptar':
+                    messages.success(
+                        request,
+                        '✅ Cotización ACEPTADA por el cliente. Continúa con la reparación.'
+                    )
+                    
+                    # Cambiar estado a "Esperando Piezas" o "En Reparación" según el caso
+                    # Si hay piezas pendientes de llegar, estado = esperando_piezas
+                    # Si todas las piezas están, estado = reparacion
+                    tiene_seguimientos_pendientes = orden.cotizacion.seguimientos_piezas.exclude(
+                        estado='recibido'
+                    ).exists()
+                    
+                    if tiene_seguimientos_pendientes:
+                        nuevo_estado = 'esperando_piezas'
+                        mensaje_estado = 'Esperando Llegada de Piezas'
+                    else:
+                        nuevo_estado = 'reparacion'
+                        mensaje_estado = 'En Reparación'
+                    
+                    if orden.estado != nuevo_estado:
+                        estado_anterior = orden.estado
+                        orden.estado = nuevo_estado
+                        orden.save()
+                        
+                        messages.info(
+                            request,
+                            f'ℹ️ Estado actualizado automáticamente a: {mensaje_estado}'
+                        )
+                        
+                        HistorialOrden.objects.create(
+                            orden=orden,
+                            tipo_evento='cambio_estado',
+                            estado_anterior=estado_anterior,
+                            estado_nuevo=nuevo_estado,
+                            comentario=f'Cambio automático: cotización aceptada',
+                            usuario=empleado_actual,
+                            es_sistema=True
+                        )
+                    
+                    # Registrar en historial
+                    HistorialOrden.objects.create(
+                        orden=orden,
+                        tipo_evento='cotizacion',
+                        comentario=f'Cliente ACEPTÓ la cotización - Total: ${cotizacion_actualizada.costo_total}',
+                        usuario=empleado_actual,
+                        es_sistema=False
+                    )
+                
+                elif accion == 'rechazar':
+                    motivo = cotizacion_actualizada.get_motivo_rechazo_display()
+                    detalle = cotizacion_actualizada.detalle_rechazo
+                    
+                    messages.warning(
+                        request,
+                        f'⚠️ Cotización RECHAZADA por el cliente. Motivo: {motivo}'
+                    )
+                    
+                    # Cambiar estado a "Cotización Rechazada"
+                    if orden.estado != 'rechazada':
+                        estado_anterior = orden.estado
+                        orden.estado = 'rechazada'
+                        orden.save()
+                        
+                        messages.info(
+                            request,
+                            'ℹ️ Estado actualizado automáticamente a: Cotización Rechazada'
+                        )
+                        
+                        HistorialOrden.objects.create(
+                            orden=orden,
+                            tipo_evento='cambio_estado',
+                            estado_anterior=estado_anterior,
+                            estado_nuevo='rechazada',
+                            comentario=f'Cambio automático: cotización rechazada',
+                            usuario=empleado_actual,
+                            es_sistema=True
+                        )
+                    
+                    # Registrar en historial
+                    comentario_historial = f'Cliente RECHAZÓ la cotización - Motivo: {motivo}'
+                    if detalle:
+                        comentario_historial += f' | Detalle: {detalle}'
+                    
+                    HistorialOrden.objects.create(
+                        orden=orden,
+                        tipo_evento='cotizacion',
+                        comentario=comentario_historial,
+                        usuario=empleado_actual,
+                        es_sistema=False
+                    )
+                
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+            else:
+                messages.error(request, '❌ Error al procesar la decisión de cotización.')
     
     # ========================================================================
     # CREAR FORMULARIOS VACÍOS O CON DATOS ACTUALES (GET o POST con errores)
@@ -881,6 +1079,50 @@ def detalle_orden(request, orden_id):
     total_imagenes = orden.imagenes.count()
     
     # ========================================================================
+    # DATOS DE COTIZACIÓN (Si existe)
+    # ========================================================================
+    
+    # Verificar si la orden tiene cotización
+    cotizacion = getattr(orden, 'cotizacion', None)
+    
+    # Inicializar formularios de cotización
+    form_crear_cotizacion = None
+    form_gestionar_cotizacion = None
+    piezas_cotizadas = None
+    seguimientos_piezas = None
+    
+    if cotizacion:
+        # Si existe cotización, preparar formulario de gestión
+        # Solo si no tiene respuesta aún (usuario_acepto es None)
+        if cotizacion.usuario_acepto is None:
+            form_gestionar_cotizacion = GestionarCotizacionForm(instance=cotizacion)
+        
+        # Obtener piezas cotizadas ordenadas por prioridad
+        piezas_cotizadas = cotizacion.piezas_cotizadas.select_related(
+            'componente'
+        ).order_by('orden_prioridad', 'fecha_creacion')
+        
+        # Obtener seguimientos de piezas (pedidos a proveedores)
+        seguimientos_piezas = cotizacion.seguimientos_piezas.all().order_by(
+            '-fecha_pedido'
+        )
+    else:
+        # Si no existe cotización, preparar formulario para crear
+        form_crear_cotizacion = CrearCotizacionForm()
+    
+    # ========================================================================
+    # CALCULAR SEGUIMIENTOS CON RETRASO
+    # ========================================================================
+    seguimientos_retrasados_count = 0
+    if seguimientos_piezas:
+        from django.utils import timezone
+        hoy = timezone.now().date()
+        for seguimiento in seguimientos_piezas:
+            if seguimiento.estado != 'recibido' and seguimiento.fecha_entrega_estimada:
+                if hoy > seguimiento.fecha_entrega_estimada:
+                    seguimientos_retrasados_count += 1
+    
+    # ========================================================================
     # ESTADÍSTICAS DE TÉCNICOS (Para alertas de carga de trabajo)
     # ========================================================================
     
@@ -912,6 +1154,16 @@ def detalle_orden(request, orden_id):
         'form_comentario': form_comentario,
         'form_imagenes': form_imagenes,
         'form_editar_info': form_editar_info,
+        
+        # Formularios de Cotización
+        'form_crear_cotizacion': form_crear_cotizacion,
+        'form_gestionar_cotizacion': form_gestionar_cotizacion,
+        
+        # Datos de Cotización
+        'cotizacion': cotizacion,
+        'piezas_cotizadas': piezas_cotizadas,
+        'seguimientos_piezas': seguimientos_piezas,
+        'seguimientos_retrasados_count': seguimientos_retrasados_count,
         
         # Historial y comentarios
         'historial_automatico': historial_automatico[:20],  # Últimos 20
@@ -1316,3 +1568,624 @@ def reactivar_referencia_gama(request, referencia_id):
         messages.error(request, f'❌ Error al reactivar: {str(e)}')
     
     return redirect('servicio_tecnico:lista_referencias_gama')
+
+
+# ============================================================================
+# VISTAS AJAX: GESTIÓN DE PIEZAS COTIZADAS
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def agregar_pieza_cotizada(request, orden_id):
+    """
+    Agrega una nueva pieza a una cotización existente.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista maneja el formulario modal para agregar piezas a una cotización.
+    Responde con JSON para actualizar la interfaz sin recargar la página (AJAX).
+    
+    FLUJO:
+    1. Obtiene la orden y verifica que tenga cotización
+    2. Valida el formulario recibido
+    3. Asocia la pieza a la cotización
+    4. Actualiza los totales de la cotización
+    5. Devuelve JSON con el resultado
+    """
+    from django.http import JsonResponse
+    from .forms import PiezaCotizadaForm
+    from .models import PiezaCotizada, Cotizacion
+    
+    try:
+        orden = get_object_or_404(OrdenServicio, id=orden_id)
+        
+        # Verificar que existe cotización
+        if not hasattr(orden, 'cotizacion'):
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden no tiene cotización asociada'
+            }, status=400)
+        
+        cotizacion = orden.cotizacion
+        
+        # Procesar formulario
+        form = PiezaCotizadaForm(request.POST)
+        
+        if form.is_valid():
+            pieza = form.save(commit=False)
+            pieza.cotizacion = cotizacion
+            pieza.save()
+            
+            # Registrar en historial
+            registrar_historial(
+                orden=orden,
+                accion="PIEZA_AGREGADA",
+                empleado=request.user.empleado,
+                detalles=f"✅ Pieza agregada: {pieza.componente.nombre} (x{pieza.cantidad})"
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Pieza agregada: {pieza.componente.nombre}',
+                'pieza_id': pieza.id,
+                'pieza_html': _render_pieza_row(pieza, cotizacion)  # Función helper
+            })
+        else:
+            # Devolver errores del formulario
+            errors = {}
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0]  # Primer error de cada campo
+            
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def editar_pieza_cotizada(request, pieza_id):
+    """
+    Edita una pieza cotizada existente.
+    
+    EXPLICACIÓN:
+    Permite modificar cantidad, costo, prioridad de una pieza.
+    Puede usarse incluso después de aceptar la cotización (para ajustar costos reales).
+    """
+    from django.http import JsonResponse
+    from .forms import PiezaCotizadaForm
+    from .models import PiezaCotizada
+    
+    try:
+        pieza = get_object_or_404(PiezaCotizada, id=pieza_id)
+        cotizacion = pieza.cotizacion
+        orden = cotizacion.orden
+        
+        # Procesar formulario de edición
+        form = PiezaCotizadaForm(request.POST, instance=pieza)
+        
+        if form.is_valid():
+            pieza_actualizada = form.save()
+            
+            # Registrar en historial
+            registrar_historial(
+                orden=orden,
+                accion="PIEZA_EDITADA",
+                empleado=request.user.empleado,
+                detalles=f"✏️ Pieza modificada: {pieza_actualizada.componente.nombre}"
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Pieza actualizada: {pieza_actualizada.componente.nombre}',
+                'pieza_html': _render_pieza_row(pieza_actualizada, cotizacion)
+            })
+        else:
+            errors = {}
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0]
+            
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def eliminar_pieza_cotizada(request, pieza_id):
+    """
+    Elimina una pieza de la cotización.
+    
+    ⚠️ VALIDACIÓN IMPORTANTE:
+    NO se puede eliminar si la cotización ya fue aceptada por el usuario.
+    En ese caso, se debe editar la cantidad a 0 si ya no se necesita.
+    """
+    from django.http import JsonResponse
+    from .models import PiezaCotizada
+    
+    try:
+        pieza = get_object_or_404(PiezaCotizada, id=pieza_id)
+        cotizacion = pieza.cotizacion
+        orden = cotizacion.orden
+        
+        # ⚠️ VALIDACIÓN: No eliminar si cotización aceptada
+        if cotizacion.usuario_acepto:
+            return JsonResponse({
+                'success': False,
+                'error': '❌ No puedes eliminar piezas de una cotización ya aceptada. ' +
+                         'Puedes editarla y cambiar la cantidad a 0 si ya no la necesitas.'
+            }, status=403)
+        
+        # Guardar info antes de eliminar
+        componente_nombre = pieza.componente.nombre
+        
+        # Eliminar
+        pieza.delete()
+        
+        # Registrar en historial
+        registrar_historial(
+            orden=orden,
+            accion="PIEZA_ELIMINADA",
+            empleado=request.user.empleado,
+            detalles=f"🗑️ Pieza eliminada: {componente_nombre}"
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Pieza eliminada: {componente_nombre}'
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+# ============================================================================
+# VISTAS AJAX: GESTIÓN DE SEGUIMIENTOS DE PIEZAS
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def agregar_seguimiento_pieza(request, orden_id):
+    """
+    Agrega un nuevo seguimiento de pedido a proveedor.
+    
+    EXPLICACIÓN:
+    Permite registrar un nuevo pedido a un proveedor con su información
+    de tracking: proveedor, fecha de pedido, fecha estimada, etc.
+    """
+    from django.http import JsonResponse
+    from .forms import SeguimientoPiezaForm
+    from .models import SeguimientoPieza
+    
+    try:
+        orden = get_object_or_404(OrdenServicio, id=orden_id)
+        
+        # Verificar que existe cotización
+        if not hasattr(orden, 'cotizacion'):
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden no tiene cotización asociada'
+            }, status=400)
+        
+        cotizacion = orden.cotizacion
+        
+        # Procesar formulario
+        form = SeguimientoPiezaForm(request.POST)
+        
+        if form.is_valid():
+            seguimiento = form.save(commit=False)
+            seguimiento.cotizacion = cotizacion
+            seguimiento.save()
+            
+            # Registrar en historial
+            registrar_historial(
+                orden=orden,
+                accion="SEGUIMIENTO_AGREGADO",
+                empleado=request.user.empleado,
+                detalles=f"📦 Seguimiento agregado - Proveedor: {seguimiento.proveedor}"
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Seguimiento agregado: {seguimiento.proveedor}',
+                'seguimiento_id': seguimiento.id,
+                'seguimiento_html': _render_seguimiento_card(seguimiento)
+            })
+        else:
+            errors = {}
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0]
+            
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def editar_seguimiento_pieza(request, seguimiento_id):
+    """
+    Edita un seguimiento existente.
+    
+    EXPLICACIÓN:
+    Permite actualizar información del seguimiento: cambiar fechas,
+    actualizar estado, agregar notas, etc.
+    """
+    from django.http import JsonResponse
+    from .forms import SeguimientoPiezaForm
+    from .models import SeguimientoPieza
+    
+    try:
+        seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        estado_anterior = seguimiento.estado
+        cotizacion = seguimiento.cotizacion
+        orden = cotizacion.orden
+        
+        # Procesar formulario
+        form = SeguimientoPiezaForm(request.POST, instance=seguimiento)
+        
+        if form.is_valid():
+            seguimiento_actualizado = form.save()
+            
+            # Si cambió a "recibido", enviar notificación
+            if estado_anterior != 'recibido' and seguimiento_actualizado.estado == 'recibido':
+                _enviar_notificacion_pieza_recibida(orden, seguimiento_actualizado)
+            
+            # Registrar en historial
+            registrar_historial(
+                orden=orden,
+                accion="SEGUIMIENTO_EDITADO",
+                empleado=request.user.empleado,
+                detalles=f"✏️ Seguimiento actualizado - {seguimiento_actualizado.proveedor}"
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Seguimiento actualizado: {seguimiento_actualizado.proveedor}',
+                'seguimiento_html': _render_seguimiento_card(seguimiento_actualizado)
+            })
+        else:
+            errors = {}
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0]
+            
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def eliminar_seguimiento_pieza(request, seguimiento_id):
+    """
+    Elimina un seguimiento de pieza.
+    
+    NOTA:
+    A diferencia de las piezas, los seguimientos SÍ se pueden eliminar
+    incluso después de aceptar la cotización (son solo para tracking).
+    """
+    from django.http import JsonResponse
+    from .models import SeguimientoPieza
+    
+    try:
+        seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        cotizacion = seguimiento.cotizacion
+        orden = cotizacion.orden
+        proveedor_nombre = seguimiento.proveedor
+        
+        # Eliminar
+        seguimiento.delete()
+        
+        # Registrar en historial
+        registrar_historial(
+            orden=orden,
+            accion="SEGUIMIENTO_ELIMINADO",
+            empleado=request.user.empleado,
+            detalles=f"🗑️ Seguimiento eliminado - Proveedor: {proveedor_nombre}"
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Seguimiento eliminado: {proveedor_nombre}'
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def marcar_pieza_recibida(request, seguimiento_id):
+    """
+    Marca una pieza como recibida y envía notificación al técnico.
+    
+    EXPLICACIÓN:
+    Función especial para marcar un seguimiento como recibido.
+    Requiere la fecha de entrega real y automáticamente:
+    1. Cambia el estado a "recibido"
+    2. Registra la fecha actual como fecha_entrega_real
+    3. Envía email al técnico asignado
+    """
+    from django.http import JsonResponse
+    from django.utils import timezone
+    from .models import SeguimientoPieza
+    
+    try:
+        seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        cotizacion = seguimiento.cotizacion
+        orden = cotizacion.orden
+        
+        # Obtener fecha de entrega real del POST
+        fecha_entrega_real_str = request.POST.get('fecha_entrega_real')
+        
+        if not fecha_entrega_real_str:
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Debes proporcionar la fecha de entrega real'
+            }, status=400)
+        
+        # Convertir string a date
+        from datetime import datetime
+        try:
+            fecha_entrega_real = datetime.strptime(fecha_entrega_real_str, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Formato de fecha inválido (debe ser YYYY-MM-DD)'
+            }, status=400)
+        
+        # Actualizar seguimiento
+        seguimiento.estado = 'recibido'
+        seguimiento.fecha_entrega_real = fecha_entrega_real
+        seguimiento.save()
+        
+        # Enviar notificación por email
+        _enviar_notificacion_pieza_recibida(orden, seguimiento)
+        
+        # Registrar en historial
+        registrar_historial(
+            orden=orden,
+            accion="PIEZA_RECIBIDA",
+            empleado=request.user.empleado,
+            detalles=f"📬 Pieza recibida - {seguimiento.proveedor} - Notificación enviada a técnico"
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Pieza marcada como recibida. Email enviado al técnico.',
+            'seguimiento_html': _render_seguimiento_card(seguimiento)
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+# ============================================================================
+# FUNCIONES HELPER: RENDER HTML Y NOTIFICACIONES
+# ============================================================================
+
+def _render_pieza_row(pieza, cotizacion):
+    """
+    Renderiza una fila de la tabla de piezas como HTML.
+    
+    EXPLICACIÓN:
+    Esta función genera el HTML de una fila de pieza para insertarla
+    dinámicamente en la tabla después de agregar/editar via AJAX.
+    
+    NOTA: Idealmente esto debería usar un template parcial, pero por
+    simplicidad lo generamos aquí directamente.
+    """
+    puede_eliminar = 'false' if cotizacion.usuario_acepto else 'true'
+    
+    html = f'''
+    <tr data-pieza-id="{pieza.id}">
+        <td>
+            <span class="badge bg-primary">{pieza.orden_prioridad}</span>
+        </td>
+        <td>
+            <strong>{pieza.componente.nombre}</strong><br>
+            <small class="text-muted">{pieza.componente.categoria}</small>
+            {f'<br><small>{pieza.descripcion_adicional}</small>' if pieza.descripcion_adicional else ''}
+        </td>
+        <td class="text-center">{pieza.cantidad}</td>
+        <td class="text-end">${pieza.costo_unitario:.2f}</td>
+        <td class="text-end"><strong>${pieza.subtotal:.2f}</strong></td>
+        <td class="text-center">
+            {'<span class="badge bg-success">Sí</span>' if pieza.es_necesaria else '<span class="badge bg-info">Opcional</span>'}
+        </td>
+        <td class="text-center">
+            {'<span class="badge bg-warning text-dark">Técnico</span>' if pieza.sugerida_por_tecnico else ''}
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-primary me-1" 
+                    onclick="editarPieza({pieza.id})" title="Editar">
+                📝
+            </button>
+            {'<button type="button" class="btn btn-sm btn-outline-danger" onclick="eliminarPieza(' + str(pieza.id) + ')" title="Eliminar">🗑️</button>' if not cotizacion.usuario_acepto else '<span class="text-muted" title="No se puede eliminar (cotización aceptada)">🔒</span>'}
+        </td>
+    </tr>
+    '''
+    
+    return html.strip()
+
+
+def _render_seguimiento_card(seguimiento):
+    """
+    Renderiza una card de seguimiento como HTML.
+    
+    EXPLICACIÓN:
+    Genera el HTML de una card de seguimiento para insertarla
+    dinámicamente después de agregar/editar via AJAX.
+    """
+    from django.utils import timezone
+    
+    # Calcular si hay retraso
+    retraso_dias = 0
+    hay_retraso = False
+    if seguimiento.estado != 'recibido' and seguimiento.fecha_entrega_estimada:
+        hoy = timezone.now().date()
+        if hoy > seguimiento.fecha_entrega_estimada:
+            retraso_dias = (hoy - seguimiento.fecha_entrega_estimada).days
+            hay_retraso = True
+    
+    # Definir estilos según estado
+    estado_badges = {
+        'pendiente': 'bg-warning text-dark',
+        'en_transito': 'bg-info',
+        'recibido': 'bg-success',
+        'cancelado': 'bg-danger',
+    }
+    
+    estado_nombres = {
+        'pendiente': 'Pendiente',
+        'en_transito': 'En Tránsito',
+        'recibido': 'Recibido',
+        'cancelado': 'Cancelado',
+    }
+    
+    border_class = ''
+    if seguimiento.estado == 'recibido':
+        border_class = 'border-success'
+    elif hay_retraso:
+        border_class = 'border-danger'
+    
+    html = f'''
+    <div class="card seguimiento-card {border_class}" data-seguimiento-id="{seguimiento.id}">
+        <div class="card-body">
+            <h6 class="card-title">
+                🏪 {seguimiento.proveedor}
+                <span class="badge {estado_badges.get(seguimiento.estado, 'bg-secondary')} float-end">
+                    {estado_nombres.get(seguimiento.estado, seguimiento.estado)}
+                </span>
+            </h6>
+            
+            <p class="card-text">
+                <small><strong>Piezas:</strong> {seguimiento.descripcion_piezas}</small><br>
+                {f'<small><strong>Pedido:</strong> {seguimiento.numero_pedido}</small><br>' if seguimiento.numero_pedido else ''}
+                <small><strong>Fecha Pedido:</strong> {seguimiento.fecha_pedido.strftime('%d/%m/%Y')}</small><br>
+                <small><strong>Entrega Estimada:</strong> {seguimiento.fecha_entrega_estimada.strftime('%d/%m/%Y')}</small><br>
+                {f'<small><strong>Entrega Real:</strong> {seguimiento.fecha_entrega_real.strftime("%d/%m/%Y")}</small><br>' if seguimiento.fecha_entrega_real else ''}
+            </p>
+            
+            {f'<div class="alert alert-danger alert-sm mb-2"><strong>⚠️ RETRASO:</strong> {retraso_dias} días</div>' if hay_retraso else ''}
+            
+            {f'<p class="card-text"><small class="text-muted"><strong>Notas:</strong> {seguimiento.notas_seguimiento}</small></p>' if seguimiento.notas_seguimiento else ''}
+            
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-primary" onclick="editarSeguimiento({seguimiento.id})" title="Editar">
+                    📝 Editar
+                </button>
+                {'<button type="button" class="btn btn-outline-success" onclick="marcarRecibido(' + str(seguimiento.id) + ')" title="Marcar como recibido">📬 Marcar Recibido</button>' if seguimiento.estado != 'recibido' else ''}
+                <button type="button" class="btn btn-outline-danger" onclick="eliminarSeguimiento({seguimiento.id})" title="Eliminar">
+                    🗑️
+                </button>
+            </div>
+        </div>
+    </div>
+    '''
+    
+    return html.strip()
+
+
+def _enviar_notificacion_pieza_recibida(orden, seguimiento):
+    """
+    Envía email al técnico notificando que una pieza fue recibida.
+    
+    EXPLICACIÓN:
+    Esta función se ejecuta automáticamente cuando se marca un seguimiento
+    como "recibido". Envía un email al técnico asignado para que sepa
+    que ya puede continuar con la reparación.
+    
+    CONTENIDO DEL EMAIL:
+    - Número de orden
+    - Cliente
+    - Proveedor de la pieza
+    - Descripción de las piezas recibidas
+    - Fecha de recepción
+    """
+    from django.core.mail import send_mail
+    from django.conf import settings
+    
+    try:
+        # Verificar que hay técnico asignado
+        if not orden.tecnico_asignado or not orden.tecnico_asignado.correo:
+            print(f"⚠️ No se envió email: Orden #{orden.numero_orden} no tiene técnico con email")
+            return
+        
+        # Construir email
+        asunto = f'📬 Pieza Recibida - Orden #{orden.numero_orden}'
+        
+        mensaje = f'''
+Hola {orden.tecnico_asignado.usuario.first_name},
+
+Te informamos que ha llegado una pieza para la orden que tienes asignada:
+
+📋 INFORMACIÓN DE LA ORDEN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Orden: #{orden.numero_orden}
+• Cliente: {orden.cliente.nombre}
+• Equipo: {orden.tipo_equipo} - {orden.marca}
+
+📦 INFORMACIÓN DE LA PIEZA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Proveedor: {seguimiento.proveedor}
+• Piezas: {seguimiento.descripcion_piezas}
+• Fecha de recepción: {seguimiento.fecha_entrega_real.strftime('%d/%m/%Y')}
+{f'• Número de pedido: {seguimiento.numero_pedido}' if seguimiento.numero_pedido else ''}
+
+Ya puedes recoger la pieza en almacén y continuar con la reparación.
+
+---
+Sistema de Servicio Técnico
+Este es un mensaje automático, por favor no responder.
+        '''
+        
+        # Enviar email
+        send_mail(
+            subject=asunto,
+            message=mensaje,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[orden.tecnico_asignado.correo],
+            fail_silently=False,
+        )
+        
+        print(f"✅ Email enviado a {orden.tecnico_asignado.correo} - Pieza recibida Orden #{orden.numero_orden}")
+    
+    except Exception as e:
+        print(f"❌ Error al enviar email de notificación: {str(e)}")
+        # No levantamos la excepción para no afectar el flujo principal

@@ -15,9 +15,19 @@ from .models import (
     ReferenciaGamaEquipo,
     HistorialOrden,
     ImagenOrden,
+    Cotizacion,
+    PiezaCotizada,
+    SeguimientoPieza,
 )
 from inventario.models import Sucursal, Empleado
-from config.constants import TIPO_EQUIPO_CHOICES, MARCAS_EQUIPOS, TIPO_IMAGEN_CHOICES
+from scorecard.models import ComponenteEquipo
+from config.constants import (
+    TIPO_EQUIPO_CHOICES, 
+    MARCAS_EQUIPOS, 
+    TIPO_IMAGEN_CHOICES, 
+    MOTIVO_RECHAZO_COTIZACION,
+    ESTADO_PIEZA_CHOICES,
+)
 
 
 class NuevaOrdenForm(forms.ModelForm):
@@ -930,5 +940,456 @@ class ReferenciaGamaEquipoForm(forms.ModelForm):
                         f'❌ Ya existe una referencia para {marca} {modelo_base}. '
                         f'Edita la existente o usa un modelo diferente.'
                     )
+        
+        return cleaned_data
+
+
+# ============================================================================
+# FORMULARIO: CREAR COTIZACIÓN
+# ============================================================================
+
+class CrearCotizacionForm(forms.ModelForm):
+    """
+    Formulario para crear una nueva cotización para una orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario permite iniciar el proceso de cotización. Captura solo
+    el costo de mano de obra inicialmente. Las piezas se agregan después
+    desde el admin de Django.
+    
+    FLUJO:
+    1. Usuario crea cotización con costo de mano de obra
+    2. Se va al admin para agregar las piezas necesarias (PiezaCotizada)
+    3. Se envía cotización al cliente
+    4. Cliente responde (acepta/rechaza) usando GestionarCotizacionForm
+    """
+    
+    class Meta:
+        model = Cotizacion
+        fields = ['costo_mano_obra']
+        
+        widgets = {
+            'costo_mano_obra': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0.00',
+                'step': '0.01',
+                'min': '0',
+                'required': True,
+            }),
+        }
+        
+        labels = {
+            'costo_mano_obra': 'Costo de Mano de Obra',
+        }
+        
+        help_texts = {
+            'costo_mano_obra': 'Costo del servicio técnico (diagnóstico + reparación)',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """
+        EXPLICACIÓN:
+        Configuración inicial del formulario. Aquí podemos personalizar
+        cómo se ve o comporta el formulario antes de mostrarlo.
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Agregar clase de validación de Bootstrap
+        for field_name, field in self.fields.items():
+            if 'class' in field.widget.attrs:
+                field.widget.attrs['class'] += ' '
+            else:
+                field.widget.attrs['class'] = ''
+            field.widget.attrs['class'] += 'is-validatable'
+
+
+# ============================================================================
+# FORMULARIO: GESTIONAR COTIZACIÓN (Aceptar/Rechazar)
+# ============================================================================
+
+class GestionarCotizacionForm(forms.ModelForm):
+    """
+    Formulario para que el cliente acepte o rechace la cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario captura la decisión del cliente sobre la cotización.
+    - Si acepta: usuario_acepto = True, se continúa con la reparación
+    - Si rechaza: usuario_acepto = False, debe indicar el motivo
+    
+    IMPORTANTE:
+    Este formulario NO edita piezas individuales. Para eso, hay que ir
+    al admin de Django y modificar las PiezaCotizada directamente.
+    """
+    
+    # Campo adicional para decidir la acción (no se guarda en la BD)
+    accion = forms.ChoiceField(
+        choices=[
+            ('aceptar', 'Aceptar Cotización'),
+            ('rechazar', 'Rechazar Cotización'),
+        ],
+        widget=forms.RadioSelect(attrs={
+            'class': 'form-check-input',
+        }),
+        label='Decisión del Cliente',
+        help_text='Selecciona la decisión del cliente sobre la cotización',
+        required=True,
+    )
+    
+    class Meta:
+        model = Cotizacion
+        fields = ['motivo_rechazo', 'detalle_rechazo']
+        
+        widgets = {
+            'motivo_rechazo': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
+            'detalle_rechazo': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Describe con más detalle el motivo del rechazo...',
+            }),
+        }
+        
+        labels = {
+            'motivo_rechazo': 'Motivo del Rechazo',
+            'detalle_rechazo': 'Detalle Adicional del Rechazo',
+        }
+        
+        help_texts = {
+            'motivo_rechazo': 'Selecciona la razón principal por la que rechaza',
+            'detalle_rechazo': 'Información adicional sobre el rechazo (opcional)',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """
+        EXPLICACIÓN:
+        Configuración inicial del formulario.
+        Los campos de rechazo solo son obligatorios si se rechaza la cotización.
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Por defecto, los campos de rechazo no son obligatorios
+        # Se harán obligatorios con JavaScript si selecciona "rechazar"
+        self.fields['motivo_rechazo'].required = False
+        self.fields['detalle_rechazo'].required = False
+    
+    def clean(self):
+        """
+        EXPLICACIÓN:
+        Validación personalizada del formulario.
+        Si rechaza, debe indicar al menos el motivo.
+        """
+        cleaned_data = super().clean()
+        accion = cleaned_data.get('accion')
+        motivo_rechazo = cleaned_data.get('motivo_rechazo')
+        
+        # Si rechaza, el motivo es obligatorio
+        if accion == 'rechazar' and not motivo_rechazo:
+            raise ValidationError({
+                'motivo_rechazo': '❌ Debes seleccionar un motivo si rechazas la cotización'
+            })
+        
+        # Si acepta, limpiar campos de rechazo
+        if accion == 'aceptar':
+            cleaned_data['motivo_rechazo'] = ''
+            cleaned_data['detalle_rechazo'] = ''
+        
+        return cleaned_data
+    
+    def save(self, commit=True):
+        """
+        EXPLICACIÓN:
+        Guardar el formulario con la decisión del cliente.
+        Actualiza usuario_acepto según la acción seleccionada.
+        """
+        instance = super().save(commit=False)
+        
+        # Obtener la acción del cleaned_data
+        accion = self.cleaned_data.get('accion')
+        
+        # Actualizar usuario_acepto según la acción
+        if accion == 'aceptar':
+            instance.usuario_acepto = True
+            # Limpiar campos de rechazo si existían
+            instance.motivo_rechazo = ''
+            instance.detalle_rechazo = ''
+        elif accion == 'rechazar':
+            instance.usuario_acepto = False
+        
+        # Actualizar fecha de respuesta
+        from django.utils import timezone
+        if instance.fecha_respuesta is None:
+            instance.fecha_respuesta = timezone.now()
+        
+        if commit:
+            instance.save()
+        
+        return instance
+
+
+# ============================================================================
+# FORMULARIO: GESTIONAR PIEZA COTIZADA
+# ============================================================================
+
+class PiezaCotizadaForm(forms.ModelForm):
+    """
+    Formulario para agregar o editar piezas en una cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario permite gestionar las piezas individuales que forman parte
+    de una cotización. El usuario selecciona un componente del catálogo de
+    ScoreCard, define cantidad y costo, y marca su prioridad.
+    
+    IMPORTANTE:
+    - No se puede eliminar una pieza si la cotización ya fue aceptada
+    - Sí se puede modificar después de aceptada (para ajustar costos reales)
+    - El componente viene del catálogo de ScoreCard (reutilización)
+    """
+    
+    class Meta:
+        model = PiezaCotizada
+        fields = [
+            'componente',
+            'descripcion_adicional',
+            'cantidad',
+            'costo_unitario',
+            'orden_prioridad',
+            'es_necesaria',
+            'sugerida_por_tecnico',
+        ]
+        
+        widgets = {
+            'componente': forms.Select(attrs={
+                'class': 'form-control form-select',
+                'required': True,
+            }),
+            'descripcion_adicional': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Descripción específica de la pieza (opcional)',
+            }),
+            'cantidad': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'value': '1',
+                'required': True,
+            }),
+            'costo_unitario': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0',
+                'placeholder': '0.00',
+                'required': True,
+            }),
+            'orden_prioridad': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'value': '1',
+                'required': True,
+            }),
+            'es_necesaria': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
+            'sugerida_por_tecnico': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
+        }
+        
+        labels = {
+            'componente': 'Componente',
+            'descripcion_adicional': 'Descripción Adicional',
+            'cantidad': 'Cantidad',
+            'costo_unitario': 'Costo Unitario ($)',
+            'orden_prioridad': 'Prioridad',
+            'es_necesaria': '¿Es necesaria para el funcionamiento?',
+            'sugerida_por_tecnico': '¿Sugerida por el técnico?',
+        }
+        
+        help_texts = {
+            'componente': 'Selecciona el componente del catálogo',
+            'cantidad': 'Número de unidades a cambiar',
+            'costo_unitario': 'Precio por unidad',
+            'orden_prioridad': '1 = más importante',
+            'es_necesaria': 'Marca si es necesaria para el funcionamiento (vs mejora estética/rendimiento)',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """
+        EXPLICACIÓN:
+        Personalización del formulario al inicializarse.
+        Filtramos solo componentes activos del catálogo.
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar solo componentes activos
+        self.fields['componente'].queryset = ComponenteEquipo.objects.filter(
+            activo=True
+        ).order_by('categoria', 'nombre')
+        
+        # Agregar opción vacía al dropdown
+        self.fields['componente'].empty_label = "-- Selecciona un componente --"
+    
+    def clean(self):
+        """
+        EXPLICACIÓN:
+        Validaciones personalizadas del formulario.
+        """
+        cleaned_data = super().clean()
+        cantidad = cleaned_data.get('cantidad')
+        costo_unitario = cleaned_data.get('costo_unitario')
+        
+        # Validar que cantidad sea positiva
+        if cantidad and cantidad < 1:
+            raise ValidationError({
+                'cantidad': '❌ La cantidad debe ser al menos 1'
+            })
+        
+        # Validar que costo sea positivo
+        if costo_unitario and costo_unitario < 0:
+            raise ValidationError({
+                'costo_unitario': '❌ El costo no puede ser negativo'
+            })
+        
+        return cleaned_data
+
+
+# ============================================================================
+# FORMULARIO: GESTIONAR SEGUIMIENTO DE PIEZA
+# ============================================================================
+
+class SeguimientoPiezaForm(forms.ModelForm):
+    """
+    Formulario para agregar o actualizar seguimiento de pedidos a proveedores.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario gestiona el tracking de pedidos de piezas a proveedores.
+    Permite registrar: quién provee, cuándo se pidió, cuándo llega, estado actual.
+    
+    CAMPOS OBLIGATORIOS:
+    - Proveedor (siempre)
+    - Descripción de piezas (siempre)
+    - Fecha de pedido (siempre)
+    - Fecha estimada de entrega (siempre)
+    
+    NOTIFICACIÓN AUTOMÁTICA:
+    Cuando el estado cambia a "recibido", se envía un email al técnico asignado.
+    """
+    
+    class Meta:
+        model = SeguimientoPieza
+        fields = [
+            'proveedor',
+            'descripcion_piezas',
+            'numero_pedido',
+            'fecha_pedido',
+            'fecha_entrega_estimada',
+            'fecha_entrega_real',
+            'estado',
+            'notas_seguimiento',
+        ]
+        
+        widgets = {
+            'proveedor': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: STEREN, CompuMarket, Amazon',
+                'required': True,
+                'list': 'proveedores-list',  # Para autocompletar
+            }),
+            'descripcion_piezas': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Describe las piezas incluidas en este pedido',
+                'required': True,
+            }),
+            'numero_pedido': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número de pedido o tracking',
+            }),
+            'fecha_pedido': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+                'required': True,
+            }),
+            'fecha_entrega_estimada': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+                'required': True,
+            }),
+            'fecha_entrega_real': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+            }),
+            'estado': forms.Select(attrs={
+                'class': 'form-control form-select',
+                'required': True,
+            }),
+            'notas_seguimiento': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Notas adicionales sobre el seguimiento (opcional)',
+            }),
+        }
+        
+        labels = {
+            'proveedor': 'Proveedor',
+            'descripcion_piezas': 'Descripción de Piezas',
+            'numero_pedido': 'Número de Pedido / Tracking',
+            'fecha_pedido': 'Fecha de Pedido',
+            'fecha_entrega_estimada': 'Fecha Estimada de Entrega',
+            'fecha_entrega_real': 'Fecha Real de Entrega',
+            'estado': 'Estado del Pedido',
+            'notas_seguimiento': 'Notas de Seguimiento',
+        }
+        
+        help_texts = {
+            'proveedor': 'Nombre del proveedor donde se pidió',
+            'descripcion_piezas': 'Lista de piezas incluidas en este pedido',
+            'numero_pedido': 'Número de orden o tracking del proveedor (opcional)',
+            'fecha_entrega_estimada': 'Fecha comprometida por el proveedor',
+            'fecha_entrega_real': 'Fecha en que realmente llegó (dejar vacío si aún no llega)',
+            'estado': 'Estado actual del pedido',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """
+        EXPLICACIÓN:
+        Personalización del formulario.
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Si es edición y el estado es "recibido", hacer obligatoria la fecha real
+        if self.instance and self.instance.pk and self.instance.estado == 'recibido':
+            self.fields['fecha_entrega_real'].required = True
+    
+    def clean(self):
+        """
+        EXPLICACIÓN:
+        Validaciones personalizadas.
+        """
+        cleaned_data = super().clean()
+        fecha_pedido = cleaned_data.get('fecha_pedido')
+        fecha_estimada = cleaned_data.get('fecha_entrega_estimada')
+        fecha_real = cleaned_data.get('fecha_entrega_real')
+        estado = cleaned_data.get('estado')
+        
+        # Validar que fecha estimada sea posterior a fecha de pedido
+        if fecha_pedido and fecha_estimada:
+            if fecha_estimada < fecha_pedido:
+                raise ValidationError({
+                    'fecha_entrega_estimada': '❌ La fecha estimada no puede ser anterior a la fecha de pedido'
+                })
+        
+        # Si el estado es "recibido", la fecha real es obligatoria
+        if estado == 'recibido' and not fecha_real:
+            raise ValidationError({
+                'fecha_entrega_real': '❌ Debes indicar la fecha real de entrega si el estado es "Recibido"'
+            })
+        
+        # Si hay fecha real, validar que sea posterior al pedido
+        if fecha_pedido and fecha_real:
+            if fecha_real < fecha_pedido:
+                raise ValidationError({
+                    'fecha_entrega_real': '❌ La fecha real de entrega no puede ser anterior a la fecha de pedido'
+                })
         
         return cleaned_data

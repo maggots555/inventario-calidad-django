@@ -43,6 +43,21 @@ urlpatterns = [
     path('referencias-gama/<int:referencia_id>/eliminar/', views.eliminar_referencia_gama, name='eliminar_referencia_gama'),
     path('referencias-gama/<int:referencia_id>/reactivar/', views.reactivar_referencia_gama, name='reactivar_referencia_gama'),
     
+    # ========================================================================
+    # GESTIÓN DE PIEZAS COTIZADAS (AJAX)
+    # ========================================================================
+    path('ordenes/<int:orden_id>/piezas/agregar/', views.agregar_pieza_cotizada, name='agregar_pieza'),
+    path('piezas/<int:pieza_id>/editar/', views.editar_pieza_cotizada, name='editar_pieza'),
+    path('piezas/<int:pieza_id>/eliminar/', views.eliminar_pieza_cotizada, name='eliminar_pieza'),
+    
+    # ========================================================================
+    # GESTIÓN DE SEGUIMIENTOS DE PIEZAS (AJAX)
+    # ========================================================================
+    path('ordenes/<int:orden_id>/seguimientos/agregar/', views.agregar_seguimiento_pieza, name='agregar_seguimiento'),
+    path('seguimientos/<int:seguimiento_id>/editar/', views.editar_seguimiento_pieza, name='editar_seguimiento'),
+    path('seguimientos/<int:seguimiento_id>/eliminar/', views.eliminar_seguimiento_pieza, name='eliminar_seguimiento'),
+    path('seguimientos/<int:seguimiento_id>/marcar-recibido/', views.marcar_pieza_recibida, name='marcar_recibido'),
+    
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]

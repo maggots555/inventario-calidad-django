@@ -342,11 +342,459 @@
     </div>
     
     <!-- ============================================================ -->
-    <!-- SECCIÓN 3: CAMBIAR ESTADO Y ASIGNAR RESPONSABLES -->
+    <!-- SECCIÓN 3: GESTIÓN DE COTIZACIÓN -->
     <!-- ============================================================ -->
     
     <div class="row">
-        <!-- SUBSECCIÓN 3.1: Cambiar Estado -->
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <i class="bi bi-currency-dollar"></i>
+                    Gestión de Cotización
+                </div>
+                <div class="card-body">
+                    
+                    {% if not cotizacion %}
+                        <!-- ========================================== -->
+                        <!-- NO EXISTE COTIZACIÓN - Mostrar botón crear -->
+                        <!-- ========================================== -->
+                        <div class="alert alert-info d-flex align-items-center mb-4">
+                            <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                            <div>
+                                <h6 class="mb-1">No hay cotización para esta orden</h6>
+                                <p class="mb-0 small">Crea una cotización para enviar al cliente con el costo de mano de obra. Después agrega las piezas necesarias desde el admin.</p>
+                            </div>
+                        </div>
+                        
+                        <form method="post" id="formCrearCotizacion">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="crear_cotizacion">
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form_crear_cotizacion.costo_mano_obra.errors }}
+                                    <label for="{{ form_crear_cotizacion.costo_mano_obra.id_for_label }}" class="form-label">
+                                        <i class="bi bi-tools"></i> {{ form_crear_cotizacion.costo_mano_obra.label }}
+                                    </label>
+                                    {{ form_crear_cotizacion.costo_mano_obra }}
+                                    <small class="text-muted">{{ form_crear_cotizacion.costo_mano_obra.help_text }}</small>
+                                </div>
+                                <div class="col-md-6 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-success w-100">
+                                        <i class="bi bi-plus-circle"></i> Crear Cotización
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    
+                    {% else %}
+                        <!-- ========================================== -->
+                        <!-- EXISTE COTIZACIÓN - Mostrar información -->
+                        <!-- ========================================== -->
+                        
+                        <div class="row mb-4">
+                            <!-- Panel Izquierdo: Estado y Decisión -->
+                            <div class="col-lg-6">
+                                <div class="card h-100" style="border-left: 4px solid #f093fb;">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-3">
+                                            <i class="bi bi-clipboard-check"></i> Estado de la Cotización
+                                        </h6>
+                                        
+                                        <!-- Estado Actual -->
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Decisión del Cliente:</label>
+                                            <div>
+                                                {% if cotizacion.usuario_acepto is None %}
+                                                    <span class="badge bg-warning text-dark" style="font-size: 1rem;">
+                                                        <i class="bi bi-hourglass-split"></i> Sin Respuesta
+                                                    </span>
+                                                {% elif cotizacion.usuario_acepto %}
+                                                    <span class="badge bg-success" style="font-size: 1rem;">
+                                                        <i class="bi bi-check-circle-fill"></i> ACEPTADA
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-danger" style="font-size: 1rem;">
+                                                        <i class="bi bi-x-circle-fill"></i> RECHAZADA
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Fechas -->
+                                        <div class="mb-3">
+                                            <label class="text-muted small">Fecha de Envío:</label>
+                                            <p class="mb-0"><strong>{{ cotizacion.fecha_envio|date:"d/m/Y H:i" }}</strong></p>
+                                        </div>
+                                        
+                                        {% if cotizacion.fecha_respuesta %}
+                                            <div class="mb-3">
+                                                <label class="text-muted small">Fecha de Respuesta:</label>
+                                                <p class="mb-0"><strong>{{ cotizacion.fecha_respuesta|date:"d/m/Y H:i" }}</strong></p>
+                                            </div>
+                                        {% else %}
+                                            <div class="mb-3">
+                                                <label class="text-muted small">Días sin Respuesta:</label>
+                                                <p class="mb-0">
+                                                    <span class="badge {% if cotizacion.dias_sin_respuesta > 7 %}bg-danger{% elif cotizacion.dias_sin_respuesta > 3 %}bg-warning{% else %}bg-info{% endif %}">
+                                                        {{ cotizacion.dias_sin_respuesta }} día{{ cotizacion.dias_sin_respuesta|pluralize }}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <!-- Información de Rechazo (si aplica) -->
+                                        {% if not cotizacion.usuario_acepto and cotizacion.usuario_acepto is not None %}
+                                            <div class="alert alert-danger mt-3">
+                                                <strong><i class="bi bi-exclamation-triangle"></i> Motivo del Rechazo:</strong><br>
+                                                {{ cotizacion.get_motivo_rechazo_display }}
+                                                {% if cotizacion.detalle_rechazo %}
+                                                    <br><small>{{ cotizacion.detalle_rechazo }}</small>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <!-- Formulario de Gestión (Solo si sin respuesta) -->
+                                        {% if cotizacion.usuario_acepto is None and form_gestionar_cotizacion %}
+                                            <hr>
+                                            <h6 class="mb-3"><i class="bi bi-hand-index"></i> Registrar Decisión del Cliente</h6>
+                                            
+                                            <form method="post" id="formGestionarCotizacion">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="form_type" value="gestionar_cotizacion">
+                                                
+                                                <!-- Acción: Aceptar o Rechazar -->
+                                                <div class="mb-3">
+                                                    {{ form_gestionar_cotizacion.accion.errors }}
+                                                    <label class="form-label">{{ form_gestionar_cotizacion.accion.label }}</label>
+                                                    <div class="d-flex gap-3">
+                                                        {% for radio in form_gestionar_cotizacion.accion %}
+                                                            <div class="form-check">
+                                                                {{ radio.tag }}
+                                                                <label class="form-check-label" for="{{ radio.id_for_label }}">
+                                                                    {% if 'aceptar' in radio.choice_value %}
+                                                                        <i class="bi bi-check-circle text-success"></i> {{ radio.choice_label }}
+                                                                    {% else %}
+                                                                        <i class="bi bi-x-circle text-danger"></i> {{ radio.choice_label }}
+                                                                    {% endif %}
+                                                                </label>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Campos de Rechazo (solo visibles si rechaza) -->
+                                                <div id="camposRechazo" style="display: none;">
+                                                    <div class="mb-3">
+                                                        {{ form_gestionar_cotizacion.motivo_rechazo.errors }}
+                                                        <label for="{{ form_gestionar_cotizacion.motivo_rechazo.id_for_label }}" class="form-label">
+                                                            {{ form_gestionar_cotizacion.motivo_rechazo.label }}
+                                                        </label>
+                                                        {{ form_gestionar_cotizacion.motivo_rechazo }}
+                                                    </div>
+                                                    
+                                                    <div class="mb-3">
+                                                        {{ form_gestionar_cotizacion.detalle_rechazo.errors }}
+                                                        <label for="{{ form_gestionar_cotizacion.detalle_rechazo.id_for_label }}" class="form-label">
+                                                            {{ form_gestionar_cotizacion.detalle_rechazo.label }}
+                                                        </label>
+                                                        {{ form_gestionar_cotizacion.detalle_rechazo }}
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="d-grid">
+                                                    <button type="submit" class="btn btn-primary">
+                                                        <i class="bi bi-save"></i> Guardar Decisión
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Panel Derecho: Resumen Financiero -->
+                            <div class="col-lg-6">
+                                <div class="card h-100" style="border-left: 4px solid #4facfe;">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-3">
+                                            <i class="bi bi-cash-stack"></i> Resumen Financiero
+                                        </h6>
+                                        
+                                        <table class="table table-sm table-borderless">
+                                            <tr>
+                                                <td class="text-muted">Mano de Obra:</td>
+                                                <td class="text-end"><strong>${{ cotizacion.costo_mano_obra|floatformat:2 }}</strong></td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted">Total Piezas Cotizadas:</td>
+                                                <td class="text-end"><strong>${{ cotizacion.costo_total_piezas|floatformat:2 }}</strong></td>
+                                            </tr>
+                                            {% if cotizacion.costo_piezas_aceptadas != cotizacion.costo_total_piezas %}
+                                                <tr>
+                                                    <td class="text-muted">Piezas Aceptadas:</td>
+                                                    <td class="text-end text-success"><strong>${{ cotizacion.costo_piezas_aceptadas|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            {% endif %}
+                                            <tr style="border-top: 2px solid #dee2e6;">
+                                                <td class="text-muted"><strong>TOTAL COTIZACIÓN:</strong></td>
+                                                <td class="text-end"><h5 class="mb-0 text-primary">${{ cotizacion.costo_total|floatformat:2 }}</h5></td>
+                                            </tr>
+                                            {% if cotizacion.usuario_acepto and cotizacion.costo_piezas_aceptadas != cotizacion.costo_total_piezas %}
+                                                <tr style="border-top: 2px solid #28a745;">
+                                                    <td class="text-success"><strong>TOTAL A PAGAR:</strong></td>
+                                                    <td class="text-end">
+                                                        <h5 class="mb-0 text-success">
+                                                            ${{ cotizacion.costo_piezas_aceptadas|add:cotizacion.costo_mano_obra|floatformat:2 }}
+                                                        </h5>
+                                                    </td>
+                                                </tr>
+                                            {% endif %}
+                                        </table>
+                                        
+                                        <div class="alert alert-info mt-3">
+                                            <small>
+                                                <i class="bi bi-info-circle"></i>
+                                                <strong>Nota:</strong> Para agregar o editar piezas, ve al 
+                                                <a href="/admin/servicio_tecnico/cotizacion/{{ orden.pk }}/change/" target="_blank" class="alert-link">
+                                                    admin de Django <i class="bi bi-box-arrow-up-right"></i>
+                                                </a>
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tabla de Piezas Cotizadas -->
+                        {% if piezas_cotizadas %}
+                            <div class="card mb-4">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-tools"></i> Piezas Cotizadas 
+                                        <span class="badge bg-secondary">{{ piezas_cotizadas.count }}</span>
+                                    </h6>
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="abrirModalPieza()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Pieza
+                                    </button>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0" id="tablaPiezas">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Prioridad</th>
+                                                    <th>Componente</th>
+                                                    <th>Descripción</th>
+                                                    <th class="text-center">Cantidad</th>
+                                                    <th class="text-end">Precio Unit.</th>
+                                                    <th class="text-end">Total</th>
+                                                    <th class="text-center">Necesaria</th>
+                                                    <th class="text-center">Cliente</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for pieza in piezas_cotizadas %}
+                                                    <tr data-pieza-id="{{ pieza.id }}">
+                                                        <td>
+                                                            <span class="badge bg-secondary">{{ pieza.orden_prioridad }}</span>
+                                                        </td>
+                                                        <td><strong>{{ pieza.componente.nombre }}</strong></td>
+                                                        <td>
+                                                            <small class="text-muted">
+                                                                {{ pieza.descripcion_adicional|default:"—" }}
+                                                            </small>
+                                                        </td>
+                                                        <td class="text-center">{{ pieza.cantidad }}</td>
+                                                        <td class="text-end">${{ pieza.costo_unitario|floatformat:2 }}</td>
+                                                        <td class="text-end"><strong>${{ pieza.costo_total|floatformat:2 }}</strong></td>
+                                                        <td class="text-center">
+                                                            {% if pieza.es_necesaria %}
+                                                                <span class="badge bg-danger">Sí</span>
+                                                            {% else %}
+                                                                <span class="badge bg-info">Mejora</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">
+                                                            {% if pieza.aceptada_por_cliente is None %}
+                                                                <span class="badge bg-warning text-dark">⏳ Sin resp.</span>
+                                                            {% elif pieza.aceptada_por_cliente %}
+                                                                <span class="badge bg-success">✅ Aceptada</span>
+                                                            {% else %}
+                                                                <span class="badge bg-danger">❌ Rechazada</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <button type="button" class="btn btn-sm btn-outline-primary me-1" 
+                                                                    onclick="editarPieza({{ pieza.id }})" title="Editar">
+                                                                📝
+                                                            </button>
+                                                            {% if cotizacion.usuario_acepto %}
+                                                                <span class="text-muted" title="No se puede eliminar (cotización aceptada)">
+                                                                    🔒
+                                                                </span>
+                                                            {% else %}
+                                                                <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                                        onclick="eliminarPieza({{ pieza.id }})" title="Eliminar">
+                                                                    🗑️
+                                                                </button>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="card mb-4">
+                                <div class="card-body text-center py-4">
+                                    <p class="text-muted mb-3">
+                                        <i class="bi bi-tools" style="font-size: 3rem;"></i><br>
+                                        No hay piezas cotizadas aún
+                                    </p>
+                                    <button type="button" class="btn btn-primary" onclick="abrirModalPieza()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Primera Pieza
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Seguimiento de Proveedores -->
+                        {% if seguimientos_piezas %}
+                            <div class="card">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <h6 class="mb-0">
+                                            <i class="bi bi-truck"></i> Seguimiento de Pedidos a Proveedores
+                                            <span class="badge bg-secondary">{{ seguimientos_piezas.count }}</span>
+                                        </h6>
+                                        {% if seguimientos_retrasados_count > 0 %}
+                                            <span class="badge badge-retraso-global">
+                                                ⚠️ {{ seguimientos_retrasados_count }} Pedido{{ seguimientos_retrasados_count|pluralize }} con Retraso
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-info text-white" onclick="abrirModalSeguimiento()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Seguimiento
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3" id="contenedorSeguimientos">
+                                        {% for seguimiento in seguimientos_piezas %}
+                                            <div class="col-md-6">
+                                                <div class="card h-100 border-start border-4 seguimiento-card
+                                                    {% if seguimiento.estado == 'recibido' %}border-success
+                                                    {% elif seguimiento.esta_retrasado %}border-danger
+                                                    {% elif seguimiento.estado == 'transito' %}border-info
+                                                    {% else %}border-warning{% endif %}" 
+                                                    data-seguimiento-id="{{ seguimiento.id }}">
+                                                    <div class="card-body">
+                                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                                            <h6 class="card-title mb-0">
+                                                                <i class="bi bi-building"></i> {{ seguimiento.proveedor }}
+                                                            </h6>
+                                                            <span class="badge 
+                                                                {% if seguimiento.estado == 'recibido' %}bg-success
+                                                                {% elif seguimiento.esta_retrasado %}bg-danger
+                                                                {% elif seguimiento.estado == 'transito' %}bg-info
+                                                                {% elif seguimiento.estado == 'confirmado' %}bg-primary
+                                                                {% else %}bg-warning text-dark{% endif %}">
+                                                                {{ seguimiento.get_estado_display }}
+                                                            </span>
+                                                        </div>
+                                                        
+                                                        <p class="card-text small mb-2">
+                                                            <strong>Pedido:</strong> {{ seguimiento.numero_pedido|default:"Sin número" }}<br>
+                                                            <strong>Piezas:</strong> {{ seguimiento.descripcion_piezas|truncatewords:10 }}
+                                                        </p>
+                                                        
+                                                        <div class="small">
+                                                            <div class="row">
+                                                                <div class="col-6">
+                                                                    <strong>Pedido:</strong><br>
+                                                                    <small>{{ seguimiento.fecha_pedido|date:"d/m/Y" }}</small>
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <strong>Estimado:</strong><br>
+                                                                    <small>{{ seguimiento.fecha_entrega_estimada|date:"d/m/Y" }}</small>
+                                                                </div>
+                                                            </div>
+                                                            {% if seguimiento.fecha_entrega_real %}
+                                                                <div class="mt-2">
+                                                                    <strong>Entregado:</strong> <small>{{ seguimiento.fecha_entrega_real|date:"d/m/Y" }}</small>
+                                                                </div>
+                                                            {% elif seguimiento.esta_retrasado %}
+                                                                <div class="alert alert-danger p-2 mt-2 mb-0">
+                                                                    <small><i class="bi bi-exclamation-triangle"></i> <strong>⚠️ RETRASO: {{ seguimiento.dias_retraso }} día{{ seguimiento.dias_retraso|pluralize }}</strong></small>
+                                                                </div>
+                                                            {% endif %}
+                                                        </div>
+                                                        
+                                                        {% if seguimiento.notas_seguimiento %}
+                                                            <div class="mt-2 pt-2 border-top">
+                                                                <small class="text-muted">
+                                                                    <i class="bi bi-sticky"></i> {{ seguimiento.notas_seguimiento|truncatewords:20 }}
+                                                                </small>
+                                                            </div>
+                                                        {% endif %}
+                                                        
+                                                        <!-- Botones de acción -->
+                                                        <div class="btn-group btn-group-sm mt-3 w-100" role="group">
+                                                            <button type="button" class="btn btn-outline-primary" 
+                                                                    onclick="editarSeguimiento({{ seguimiento.id }})" 
+                                                                    title="Editar">
+                                                                📝 Editar
+                                                            </button>
+                                                            {% if seguimiento.estado != 'recibido' %}
+                                                                <button type="button" class="btn btn-outline-success" 
+                                                                        onclick="marcarRecibido({{ seguimiento.id }})" 
+                                                                        title="Marcar como recibido">
+                                                                    📬 Recibido
+                                                                </button>
+                                                            {% endif %}
+                                                            <button type="button" class="btn btn-outline-danger" 
+                                                                    onclick="eliminarSeguimiento({{ seguimiento.id }})" 
+                                                                    title="Eliminar">
+                                                                🗑️
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="card">
+                                <div class="card-body text-center py-4">
+                                    <p class="text-muted mb-3">
+                                        <i class="bi bi-truck" style="font-size: 3rem;"></i><br>
+                                        No hay seguimientos de proveedores aún
+                                    </p>
+                                    <button type="button" class="btn btn-info text-white" onclick="abrirModalSeguimiento()">
+                                        <i class="bi bi-plus-circle"></i> Agregar Primer Seguimiento
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
+                    
+                    {% endif %}
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 4: CAMBIAR ESTADO Y ASIGNAR RESPONSABLES -->
+    <!-- ============================================================ -->
+    
+    <div class="row">
+        <!-- SUBSECCIÓN 4.1: Cambiar Estado -->
         <div class="col-lg-6">
             <div class="card section-card">
                 <div class="section-header" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
@@ -388,7 +836,7 @@
             </div>
         </div>
         
-        <!-- SUBSECCIÓN 3.2: Asignar Responsables -->
+        <!-- SUBSECCIÓN 4.2: Asignar Responsables -->
         <div class="col-lg-6">
             <div class="card section-card">
                 <div class="section-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
@@ -452,7 +900,7 @@
     </div>
     
     <!-- ============================================================ -->
-    <!-- SECCIÓN 4: HISTORIAL Y COMENTARIOS (2 columnas) -->
+    <!-- SECCIÓN 5: HISTORIAL Y COMENTARIOS (2 columnas) -->
     <!-- ============================================================ -->
     
     <div class="row">
@@ -541,7 +989,7 @@
     </div>
     
     <!-- ============================================================ -->
-    <!-- SECCIÓN 5: GALERÍA DE IMÁGENES -->
+    <!-- SECCIÓN 6: GALERÍA DE IMÁGENES -->
     <!-- ============================================================ -->
     
     <div class="row">
@@ -887,6 +1335,254 @@
     </div>
 </div>
 
+<!-- ============================================================================ -->
+<!-- MODAL: GESTIONAR PIEZA COTIZADA (Agregar/Editar) -->
+<!-- ============================================================================ -->
+<div class="modal fade" id="modalPieza" tabindex="-1" aria-labelledby="modalPiezaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalPiezaLabel">
+                    <i class="bi bi-gear"></i> <span id="modalPiezaTitulo">Agregar Pieza</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form id="formPieza">
+                {% csrf_token %}
+                <input type="hidden" id="piezaId" name="pieza_id" value="">
+                
+                <div class="modal-body">
+                    <!-- Alerta de errores (oculta por defecto) -->
+                    <div class="alert alert-danger d-none" id="alertErroresPieza" role="alert">
+                        <strong>❌ Errores:</strong>
+                        <ul id="listaErroresPieza" class="mb-0"></ul>
+                    </div>
+                    
+                    <div class="row">
+                        <!-- Columna izquierda -->
+                        <div class="col-md-6">
+                            <!-- Componente -->
+                            <div class="mb-3">
+                                <label for="componente" class="form-label">
+                                    Componente <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-control form-select" id="componente" name="componente" required>
+                                    <option value="">-- Selecciona un componente --</option>
+                                    <!-- Opciones serán cargadas dinámicamente desde el backend -->
+                                </select>
+                                <small class="form-text text-muted">Selecciona el componente del catálogo</small>
+                            </div>
+                            
+                            <!-- Cantidad -->
+                            <div class="mb-3">
+                                <label for="cantidad" class="form-label">
+                                    Cantidad <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" class="form-control" id="cantidad" name="cantidad" 
+                                       min="1" value="1" required>
+                                <small class="form-text text-muted">Número de unidades a cambiar</small>
+                            </div>
+                            
+                            <!-- Costo Unitario -->
+                            <div class="mb-3">
+                                <label for="costo_unitario" class="form-label">
+                                    Costo Unitario ($) <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" class="form-control" id="costo_unitario" name="costo_unitario" 
+                                       step="0.01" min="0" placeholder="0.00" required>
+                                <small class="form-text text-muted">Precio por unidad</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Columna derecha -->
+                        <div class="col-md-6">
+                            <!-- Orden de Prioridad -->
+                            <div class="mb-3">
+                                <label for="orden_prioridad" class="form-label">
+                                    Prioridad <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" class="form-control" id="orden_prioridad" name="orden_prioridad" 
+                                       min="1" value="1" required>
+                                <small class="form-text text-muted">1 = más importante</small>
+                            </div>
+                            
+                            <!-- Es Necesaria -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="es_necesaria" name="es_necesaria">
+                                    <label class="form-check-label" for="es_necesaria">
+                                        ¿Es necesaria para el funcionamiento?
+                                    </label>
+                                </div>
+                                <small class="form-text text-muted">Marca si es necesaria (vs mejora estética/rendimiento)</small>
+                            </div>
+                            
+                            <!-- Sugerida por Técnico -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sugerida_por_tecnico" name="sugerida_por_tecnico">
+                                    <label class="form-check-label" for="sugerida_por_tecnico">
+                                        ¿Sugerida por el técnico?
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Descripción Adicional (full width) -->
+                    <div class="mb-3">
+                        <label for="descripcion_adicional" class="form-label">
+                            Descripción Adicional
+                        </label>
+                        <textarea class="form-control" id="descripcion_adicional" name="descripcion_adicional" 
+                                  rows="2" placeholder="Descripción específica de la pieza (opcional)"></textarea>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> <span id="btnPiezaTexto">Agregar Pieza</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================================ -->
+<!-- MODAL: GESTIONAR SEGUIMIENTO DE PIEZA (Agregar/Editar) -->
+<!-- ============================================================================ -->
+<div class="modal fade" id="modalSeguimiento" tabindex="-1" aria-labelledby="modalSeguimientoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="modalSeguimientoLabel">
+                    <i class="bi bi-truck"></i> <span id="modalSeguimientoTitulo">Agregar Seguimiento</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form id="formSeguimiento">
+                {% csrf_token %}
+                <input type="hidden" id="seguimientoId" name="seguimiento_id" value="">
+                
+                <div class="modal-body">
+                    <!-- Alerta de errores (oculta por defecto) -->
+                    <div class="alert alert-danger d-none" id="alertErroresSeguimiento" role="alert">
+                        <strong>❌ Errores:</strong>
+                        <ul id="listaErroresSeguimiento" class="mb-0"></ul>
+                    </div>
+                    
+                    <div class="row">
+                        <!-- Columna izquierda -->
+                        <div class="col-md-6">
+                            <!-- Proveedor -->
+                            <div class="mb-3">
+                                <label for="proveedor" class="form-label">
+                                    Proveedor <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="proveedor" name="proveedor" 
+                                       placeholder="Ej: STEREN, CompuMarket, Amazon" required 
+                                       list="proveedores-list">
+                                <datalist id="proveedores-list">
+                                    <option value="STEREN">
+                                    <option value="CompuMarket">
+                                    <option value="Amazon">
+                                    <option value="MercadoLibre">
+                                </datalist>
+                                <small class="form-text text-muted">Nombre del proveedor donde se pidió</small>
+                            </div>
+                            
+                            <!-- Descripción de Piezas -->
+                            <div class="mb-3">
+                                <label for="descripcion_piezas" class="form-label">
+                                    Descripción de Piezas <span class="text-danger">*</span>
+                                </label>
+                                <textarea class="form-control" id="descripcion_piezas" name="descripcion_piezas" 
+                                          rows="2" placeholder="Describe las piezas incluidas en este pedido" required></textarea>
+                                <small class="form-text text-muted">Lista de piezas incluidas en este pedido</small>
+                            </div>
+                            
+                            <!-- Número de Pedido -->
+                            <div class="mb-3">
+                                <label for="numero_pedido" class="form-label">
+                                    Número de Pedido / Tracking
+                                </label>
+                                <input type="text" class="form-control" id="numero_pedido" name="numero_pedido" 
+                                       placeholder="Número de pedido o tracking">
+                                <small class="form-text text-muted">Número de orden o tracking del proveedor (opcional)</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Columna derecha -->
+                        <div class="col-md-6">
+                            <!-- Fecha de Pedido -->
+                            <div class="mb-3">
+                                <label for="fecha_pedido" class="form-label">
+                                    Fecha de Pedido <span class="text-danger">*</span>
+                                </label>
+                                <input type="date" class="form-control" id="fecha_pedido" name="fecha_pedido" required>
+                            </div>
+                            
+                            <!-- Fecha Estimada de Entrega -->
+                            <div class="mb-3">
+                                <label for="fecha_entrega_estimada" class="form-label">
+                                    Fecha Estimada de Entrega <span class="text-danger">*</span>
+                                </label>
+                                <input type="date" class="form-control" id="fecha_entrega_estimada" name="fecha_entrega_estimada" required>
+                                <small class="form-text text-muted">Fecha comprometida por el proveedor</small>
+                            </div>
+                            
+                            <!-- Fecha Real de Entrega -->
+                            <div class="mb-3">
+                                <label for="fecha_entrega_real" class="form-label">
+                                    Fecha Real de Entrega
+                                </label>
+                                <input type="date" class="form-control" id="fecha_entrega_real" name="fecha_entrega_real">
+                                <small class="form-text text-muted">Dejar vacío si aún no llega</small>
+                            </div>
+                            
+                            <!-- Estado -->
+                            <div class="mb-3">
+                                <label for="estado" class="form-label">
+                                    Estado del Pedido <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-control form-select" id="estado" name="estado" required>
+                                    <option value="pendiente">Pendiente</option>
+                                    <option value="en_transito">En Tránsito</option>
+                                    <option value="recibido">Recibido</option>
+                                    <option value="cancelado">Cancelado</option>
+                                </select>
+                                <small class="form-text text-muted">Estado actual del pedido</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Notas de Seguimiento (full width) -->
+                    <div class="mb-3">
+                        <label for="notas_seguimiento" class="form-label">
+                            Notas de Seguimiento
+                        </label>
+                        <textarea class="form-control" id="notas_seguimiento" name="notas_seguimiento" 
+                                  rows="2" placeholder="Notas adicionales sobre el seguimiento (opcional)"></textarea>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-info text-white">
+                        <i class="bi bi-check-circle"></i> <span id="btnSeguimientoTexto">Agregar Seguimiento</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -1167,6 +1863,406 @@ if (modalEditarInfo) {
     modalEditarInfo.addEventListener('shown.bs.modal', function() {
         toggleCargadorFieldsModal();
     });
+}
+
+// ============================================================================
+// GESTIÓN DE COTIZACIÓN - Mostrar/Ocultar campos de rechazo
+// ============================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    const formGestionar = document.getElementById('formGestionarCotizacion');
+    
+    if (formGestionar) {
+        const radiosAccion = document.querySelectorAll('input[name="accion"]');
+        const camposRechazo = document.getElementById('camposRechazo');
+        const selectMotivo = document.querySelector('select[name="motivo_rechazo"]');
+        
+        // Función para mostrar/ocultar campos de rechazo
+        function toggleCamposRechazo() {
+            const accionSeleccionada = document.querySelector('input[name="accion"]:checked');
+            
+            if (accionSeleccionada && accionSeleccionada.value === 'rechazar') {
+                camposRechazo.style.display = 'block';
+                // Hacer el motivo obligatorio
+                if (selectMotivo) {
+                    selectMotivo.required = true;
+                }
+            } else {
+                camposRechazo.style.display = 'none';
+                // Quitar obligatoriedad
+                if (selectMotivo) {
+                    selectMotivo.required = false;
+                }
+            }
+        }
+        
+        // Escuchar cambios en los radio buttons
+        radiosAccion.forEach(radio => {
+            radio.addEventListener('change', toggleCamposRechazo);
+        });
+        
+        // Inicializar al cargar
+        toggleCamposRechazo();
+        
+        // Confirmación antes de enviar
+        formGestionar.addEventListener('submit', function(e) {
+            const accionSeleccionada = document.querySelector('input[name="accion"]:checked');
+            
+            if (!accionSeleccionada) {
+                e.preventDefault();
+                alert('Por favor selecciona si aceptas o rechazas la cotización.');
+                return false;
+            }
+            
+            const accion = accionSeleccionada.value;
+            const mensaje = accion === 'aceptar' 
+                ? '¿Confirmas que el cliente ACEPTÓ la cotización? Esto cambiará el estado de la orden.'
+                : '¿Confirmas que el cliente RECHAZÓ la cotización? Esto cambiará el estado de la orden.';
+            
+            if (!confirm(mensaje)) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    }
+});
+
+// ============================================================================
+// GESTIÓN DE PIEZAS COTIZADAS - FUNCIONES AJAX
+// ============================================================================
+
+/**
+ * Abre el modal para agregar una nueva pieza
+ */
+function abrirModalPieza(piezaId = null) {
+    const modal = new bootstrap.Modal(document.getElementById('modalPieza'));
+    const form = document.getElementById('formPieza');
+    const titulo = document.getElementById('modalPiezaTitulo');
+    const btnTexto = document.getElementById('btnPiezaTexto');
+    const alertErrores = document.getElementById('alertErroresPieza');
+    
+    // Resetear formulario
+    form.reset();
+    alertErrores.classList.add('d-none');
+    
+    if (piezaId) {
+        // Modo EDITAR - Cargar datos de la pieza
+        titulo.textContent = 'Editar Pieza';
+        btnTexto.textContent = 'Actualizar Pieza';
+        document.getElementById('piezaId').value = piezaId;
+        
+        // Aquí cargaríamos los datos vía AJAX si fuera necesario
+        // Por ahora asumimos que los datos ya están en el form
+    } else {
+        // Modo AGREGAR
+        titulo.textContent = 'Agregar Pieza';
+        btnTexto.textContent = 'Agregar Pieza';
+        document.getElementById('piezaId').value = '';
+    }
+    
+    modal.show();
+}
+
+/**
+ * Guarda una pieza (agregar o editar)
+ */
+document.getElementById('formPieza')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const piezaId = document.getElementById('piezaId').value;
+    const formData = new FormData(this);
+    const alertErrores = document.getElementById('alertErroresPieza');
+    const listaErrores = document.getElementById('listaErroresPieza');
+    
+    // Determinar URL según sea agregar o editar
+    let url;
+    if (piezaId) {
+        url = "{% url 'servicio_tecnico:editar_pieza' 0 %}".replace('/0/', `/${piezaId}/`);
+    } else {
+        url = "{% url 'servicio_tecnico:agregar_pieza' orden.id %}";
+    }
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Cerrar modal
+            bootstrap.Modal.getInstance(document.getElementById('modalPieza')).hide();
+            
+            // Mostrar mensaje de éxito
+            mostrarToast(data.message, 'success');
+            
+            // Recargar la página para actualizar la tabla
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            // Mostrar errores del formulario
+            listaErrores.innerHTML = '';
+            if (data.errors) {
+                Object.entries(data.errors).forEach(([field, error]) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${field}: ${error}`;
+                    listaErrores.appendChild(li);
+                });
+            } else if (data.error) {
+                const li = document.createElement('li');
+                li.textContent = data.error;
+                listaErrores.appendChild(li);
+            }
+            alertErrores.classList.remove('d-none');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        mostrarToast('Error de conexión', 'danger');
+    }
+});
+
+/**
+ * Edita una pieza existente
+ */
+function editarPieza(piezaId) {
+    abrirModalPieza(piezaId);
+    // TODO: Cargar datos de la pieza vía AJAX y poblar el formulario
+}
+
+/**
+ * Elimina una pieza
+ */
+async function eliminarPieza(piezaId) {
+    if (!confirm('¿Estás seguro de eliminar esta pieza?')) {
+        return;
+    }
+    
+    const url = "{% url 'servicio_tecnico:eliminar_pieza' 0 %}".replace('/0/', `/${piezaId}/`);
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            mostrarToast(data.message, 'success');
+            
+            // Eliminar la fila de la tabla
+            const fila = document.querySelector(`tr[data-pieza-id="${piezaId}"]`);
+            if (fila) {
+                fila.remove();
+            }
+            
+            // Recargar para actualizar totales
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            mostrarToast(data.error || 'Error al eliminar', 'danger');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        mostrarToast('Error de conexión', 'danger');
+    }
+}
+
+// ============================================================================
+// GESTIÓN DE SEGUIMIENTOS - FUNCIONES AJAX
+// ============================================================================
+
+/**
+ * Abre el modal para agregar/editar seguimiento
+ */
+function abrirModalSeguimiento(seguimientoId = null) {
+    const modal = new bootstrap.Modal(document.getElementById('modalSeguimiento'));
+    const form = document.getElementById('formSeguimiento');
+    const titulo = document.getElementById('modalSeguimientoTitulo');
+    const btnTexto = document.getElementById('btnSeguimientoTexto');
+    const alertErrores = document.getElementById('alertErroresSeguimiento');
+    
+    // Resetear formulario
+    form.reset();
+    alertErrores.classList.add('d-none');
+    
+    if (seguimientoId) {
+        // Modo EDITAR
+        titulo.textContent = 'Editar Seguimiento';
+        btnTexto.textContent = 'Actualizar Seguimiento';
+        document.getElementById('seguimientoId').value = seguimientoId;
+        
+        // TODO: Cargar datos del seguimiento vía AJAX
+    } else {
+        // Modo AGREGAR
+        titulo.textContent = 'Agregar Seguimiento';
+        btnTexto.textContent = 'Agregar Seguimiento';
+        document.getElementById('seguimientoId').value = '';
+        
+        // Establecer fecha de hoy por defecto
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById('fecha_pedido').value = hoy;
+    }
+    
+    modal.show();
+}
+
+/**
+ * Guarda un seguimiento (agregar o editar)
+ */
+document.getElementById('formSeguimiento')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const seguimientoId = document.getElementById('seguimientoId').value;
+    const formData = new FormData(this);
+    const alertErrores = document.getElementById('alertErroresSeguimiento');
+    const listaErrores = document.getElementById('listaErroresSeguimiento');
+    
+    // Determinar URL
+    let url;
+    if (seguimientoId) {
+        url = "{% url 'servicio_tecnico:editar_seguimiento' 0 %}".replace('/0/', `/${seguimientoId}/`);
+    } else {
+        url = "{% url 'servicio_tecnico:agregar_seguimiento' orden.id %}";
+    }
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalSeguimiento')).hide();
+            mostrarToast(data.message, 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            listaErrores.innerHTML = '';
+            if (data.errors) {
+                Object.entries(data.errors).forEach(([field, error]) => {
+                    const li = document.createElement('li');
+                    li.textContent = `${field}: ${error}`;
+                    listaErrores.appendChild(li);
+                });
+            } else if (data.error) {
+                const li = document.createElement('li');
+                li.textContent = data.error;
+                listaErrores.appendChild(li);
+            }
+            alertErrores.classList.remove('d-none');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        mostrarToast('Error de conexión', 'danger');
+    }
+});
+
+/**
+ * Edita un seguimiento existente
+ */
+function editarSeguimiento(seguimientoId) {
+    abrirModalSeguimiento(seguimientoId);
+}
+
+/**
+ * Elimina un seguimiento
+ */
+async function eliminarSeguimiento(seguimientoId) {
+    if (!confirm('¿Estás seguro de eliminar este seguimiento?')) {
+        return;
+    }
+    
+    const url = "{% url 'servicio_tecnico:eliminar_seguimiento' 0 %}".replace('/0/', `/${seguimientoId}/`);
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            mostrarToast(data.message, 'success');
+            
+            // Eliminar la card
+            const card = document.querySelector(`[data-seguimiento-id="${seguimientoId}"]`).closest('.col-md-6');
+            if (card) {
+                card.remove();
+            }
+            
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            mostrarToast(data.error || 'Error al eliminar', 'danger');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        mostrarToast('Error de conexión', 'danger');
+    }
+}
+
+/**
+ * Marca una pieza como recibida
+ */
+async function marcarRecibido(seguimientoId) {
+    const fechaReal = prompt('Fecha de entrega real (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+    
+    if (!fechaReal) return;
+    
+    const url = "{% url 'servicio_tecnico:marcar_recibido' 0 %}".replace('/0/', `/${seguimientoId}/`);
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    formData.append('fecha_entrega_real', fechaReal);
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            mostrarToast(data.message + ' 📧 Email enviado al técnico', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            mostrarToast(data.error || 'Error al marcar como recibido', 'danger');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        mostrarToast('Error de conexión', 'danger');
+    }
+}
+
+/**
+ * Función helper para mostrar notificaciones toast
+ */
+function mostrarToast(mensaje, tipo = 'info') {
+    // Crear elemento de alerta temporal
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${tipo} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${mensaje}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // Auto-ocultar después de 3 segundos
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 3000);
 }
 </script>
 {% endblock %}
