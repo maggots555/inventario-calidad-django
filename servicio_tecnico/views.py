@@ -35,7 +35,7 @@ from .forms import (
 )
 
 
-def registrar_historial(orden, accion, empleado, detalles=''):
+def registrar_historial(orden, tipo_evento, usuario, comentario='', es_sistema=False):
     """
     Función helper para registrar eventos en el historial de la orden.
     
@@ -45,15 +45,25 @@ def registrar_historial(orden, accion, empleado, detalles=''):
     
     PARÁMETROS:
     - orden: La orden de servicio
-    - accion: Tipo de acción (ej: 'PIEZA_AGREGADA', 'ESTADO_CAMBIADO')
-    - empleado: El empleado que realizó la acción
-    - detalles: Descripción adicional (opcional)
+    - tipo_evento: Tipo de acción (ej: 'actualizacion', 'estado', 'comentario', 'cotizacion')
+    - usuario: El empleado que realizó la acción (puede ser None para eventos del sistema)
+    - comentario: Descripción detallada del evento (opcional)
+    - es_sistema: True si es un evento automático del sistema
+    
+    TIPOS DE EVENTO VÁLIDOS:
+    - 'estado': Cambio de estado
+    - 'comentario': Comentario agregado
+    - 'actualizacion': Actualización de información
+    - 'imagen': Imagen subida
+    - 'cambio_tecnico': Reasignación de técnico
+    - 'cotizacion': Eventos relacionados con cotización
     """
     HistorialOrden.objects.create(
         orden=orden,
-        accion=accion,
-        realizado_por=empleado,
-        detalles=detalles
+        tipo_evento=tipo_evento,
+        comentario=comentario,
+        usuario=usuario,
+        es_sistema=es_sistema
     )
 
 
@@ -941,14 +951,55 @@ def detalle_orden(request, orden_id):
             )
             
             if form_gestionar_cotizacion.is_valid():
-                cotizacion_actualizada = form_gestionar_cotizacion.save()
                 accion = form_gestionar_cotizacion.cleaned_data.get('accion')
+                
+                # NUEVO: Obtener las piezas seleccionadas desde el POST
+                piezas_seleccionadas_ids = request.POST.getlist('piezas_seleccionadas')
+                
+                # VALIDACIÓN: Si acepta, debe tener al menos una pieza seleccionada
+                if accion == 'aceptar' and not piezas_seleccionadas_ids:
+                    messages.error(
+                        request,
+                        '❌ Debes seleccionar al menos una pieza para aceptar la cotización.'
+                    )
+                    return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+                
+                # Guardar la cotización
+                cotizacion_actualizada = form_gestionar_cotizacion.save()
+                
+                # NUEVO: Actualizar el estado de cada pieza según la decisión
+                todas_las_piezas = cotizacion_actualizada.piezas_cotizadas.all()
+                piezas_aceptadas_count = 0
+                piezas_rechazadas_count = 0
+                
+                if accion == 'aceptar':
+                    # Si acepta, actualizar cada pieza según si fue seleccionada
+                    for pieza in todas_las_piezas:
+                        if str(pieza.id) in piezas_seleccionadas_ids:
+                            pieza.aceptada_por_cliente = True
+                            piezas_aceptadas_count += 1
+                        else:
+                            pieza.aceptada_por_cliente = False
+                            pieza.motivo_rechazo_pieza = 'Cliente decidió no incluir esta pieza'
+                            piezas_rechazadas_count += 1
+                        pieza.save()
+                elif accion == 'rechazar':
+                    # Si rechaza toda la cotización, todas las piezas se rechazan
+                    for pieza in todas_las_piezas:
+                        pieza.aceptada_por_cliente = False
+                        pieza.motivo_rechazo_pieza = cotizacion_actualizada.get_motivo_rechazo_display()
+                        pieza.save()
+                        piezas_rechazadas_count += 1
                 
                 # Mensaje según la decisión
                 if accion == 'aceptar':
+                    mensaje_piezas = f'{piezas_aceptadas_count} pieza(s) aceptada(s)'
+                    if piezas_rechazadas_count > 0:
+                        mensaje_piezas += f' y {piezas_rechazadas_count} pieza(s) rechazada(s)'
+                    
                     messages.success(
                         request,
-                        '✅ Cotización ACEPTADA por el cliente. Continúa con la reparación.'
+                        f'✅ Cotización ACEPTADA por el cliente ({mensaje_piezas}). Continúa con la reparación.'
                     )
                     
                     # Cambiar estado a "Esperando Piezas" o "En Reparación" según el caso
@@ -985,11 +1036,12 @@ def detalle_orden(request, orden_id):
                             es_sistema=True
                         )
                     
-                    # Registrar en historial
+                    # Registrar en historial con detalle de piezas
+                    comentario_historial = f'Cliente ACEPTÓ la cotización - {mensaje_piezas} - Total: ${cotizacion_actualizada.costo_piezas_aceptadas + cotizacion_actualizada.costo_mano_obra}'
                     HistorialOrden.objects.create(
                         orden=orden,
                         tipo_evento='cotizacion',
-                        comentario=f'Cliente ACEPTÓ la cotización - Total: ${cotizacion_actualizada.costo_total}',
+                        comentario=comentario_historial,
                         usuario=empleado_actual,
                         es_sistema=False
                     )
@@ -1000,7 +1052,7 @@ def detalle_orden(request, orden_id):
                     
                     messages.warning(
                         request,
-                        f'⚠️ Cotización RECHAZADA por el cliente. Motivo: {motivo}'
+                        f'⚠️ Cotización RECHAZADA por el cliente. Motivo: {motivo} ({piezas_rechazadas_count} pieza(s) rechazada(s))'
                     )
                     
                     # Cambiar estado a "Cotización Rechazada"
@@ -1025,7 +1077,7 @@ def detalle_orden(request, orden_id):
                         )
                     
                     # Registrar en historial
-                    comentario_historial = f'Cliente RECHAZÓ la cotización - Motivo: {motivo}'
+                    comentario_historial = f'Cliente RECHAZÓ la cotización - Motivo: {motivo} ({piezas_rechazadas_count} pieza(s) rechazada(s))'
                     if detalle:
                         comentario_historial += f' | Detalle: {detalle}'
                     
@@ -1045,6 +1097,9 @@ def detalle_orden(request, orden_id):
     # CREAR FORMULARIOS VACÍOS O CON DATOS ACTUALES (GET o POST con errores)
     # ========================================================================
     
+    # IMPORTANTE: Obtener cotización PRIMERO (se necesita para otros formularios)
+    cotizacion = getattr(orden, 'cotizacion', None)
+    
     form_config = ConfiguracionAdicionalForm(instance=orden.detalle_equipo)
     form_reingreso = ReingresoRHITSOForm(instance=orden)
     form_estado = CambioEstadoForm(instance=orden)
@@ -1052,6 +1107,12 @@ def detalle_orden(request, orden_id):
     form_comentario = ComentarioForm()
     form_imagenes = SubirImagenesForm()
     form_editar_info = EditarInformacionEquipoForm(instance=orden.detalle_equipo)
+    
+    # Formulario para agregar/editar piezas (usado en el modal)
+    from .forms import PiezaCotizadaForm, SeguimientoPiezaForm
+    form_pieza = PiezaCotizadaForm()
+    # MODIFICADO: Pasar la cotización al formulario de seguimiento
+    form_seguimiento = SeguimientoPiezaForm(cotizacion=cotizacion) if cotizacion else SeguimientoPiezaForm()
     
     # ========================================================================
     # OBTENER HISTORIAL Y COMENTARIOS
@@ -1081,9 +1142,6 @@ def detalle_orden(request, orden_id):
     # ========================================================================
     # DATOS DE COTIZACIÓN (Si existe)
     # ========================================================================
-    
-    # Verificar si la orden tiene cotización
-    cotizacion = getattr(orden, 'cotizacion', None)
     
     # Inicializar formularios de cotización
     form_crear_cotizacion = None
@@ -1158,6 +1216,10 @@ def detalle_orden(request, orden_id):
         # Formularios de Cotización
         'form_crear_cotizacion': form_crear_cotizacion,
         'form_gestionar_cotizacion': form_gestionar_cotizacion,
+        
+        # Formularios para modales (Piezas y Seguimientos)
+        'form_pieza': form_pieza,
+        'form_seguimiento': form_seguimiento,
         
         # Datos de Cotización
         'cotizacion': cotizacion,
@@ -1618,9 +1680,10 @@ def agregar_pieza_cotizada(request, orden_id):
             # Registrar en historial
             registrar_historial(
                 orden=orden,
-                accion="PIEZA_AGREGADA",
-                empleado=request.user.empleado,
-                detalles=f"✅ Pieza agregada: {pieza.componente.nombre} (x{pieza.cantidad})"
+                tipo_evento='cotizacion',
+                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                comentario=f"✅ Pieza agregada: {pieza.componente.nombre} (x{pieza.cantidad})",
+                es_sistema=False
             )
             
             return JsonResponse({
@@ -1675,9 +1738,10 @@ def editar_pieza_cotizada(request, pieza_id):
             # Registrar en historial
             registrar_historial(
                 orden=orden,
-                accion="PIEZA_EDITADA",
-                empleado=request.user.empleado,
-                detalles=f"✏️ Pieza modificada: {pieza_actualizada.componente.nombre}"
+                tipo_evento='cotizacion',
+                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                comentario=f"✏️ Pieza modificada: {pieza_actualizada.componente.nombre}",
+                es_sistema=False
             )
             
             return JsonResponse({
@@ -1737,9 +1801,10 @@ def eliminar_pieza_cotizada(request, pieza_id):
         # Registrar en historial
         registrar_historial(
             orden=orden,
-            accion="PIEZA_ELIMINADA",
-            empleado=request.user.empleado,
-            detalles=f"🗑️ Pieza eliminada: {componente_nombre}"
+            tipo_evento='cotizacion',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=f"🗑️ Pieza eliminada: {componente_nombre}",
+            es_sistema=False
         )
         
         return JsonResponse({
@@ -1785,19 +1850,21 @@ def agregar_seguimiento_pieza(request, orden_id):
         cotizacion = orden.cotizacion
         
         # Procesar formulario
-        form = SeguimientoPiezaForm(request.POST)
+        form = SeguimientoPiezaForm(request.POST, cotizacion=cotizacion)
         
         if form.is_valid():
             seguimiento = form.save(commit=False)
             seguimiento.cotizacion = cotizacion
             seguimiento.save()
+            form.save_m2m()  # Guardar relaciones ManyToMany (piezas)
             
             # Registrar en historial
             registrar_historial(
                 orden=orden,
-                accion="SEGUIMIENTO_AGREGADO",
-                empleado=request.user.empleado,
-                detalles=f"📦 Seguimiento agregado - Proveedor: {seguimiento.proveedor}"
+                tipo_evento='cotizacion',
+                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                comentario=f"📦 Seguimiento agregado - Proveedor: {seguimiento.proveedor}",
+                es_sistema=False
             )
             
             return JsonResponse({
@@ -1844,7 +1911,7 @@ def editar_seguimiento_pieza(request, seguimiento_id):
         orden = cotizacion.orden
         
         # Procesar formulario
-        form = SeguimientoPiezaForm(request.POST, instance=seguimiento)
+        form = SeguimientoPiezaForm(request.POST, instance=seguimiento, cotizacion=cotizacion)
         
         if form.is_valid():
             seguimiento_actualizado = form.save()
@@ -1856,9 +1923,10 @@ def editar_seguimiento_pieza(request, seguimiento_id):
             # Registrar en historial
             registrar_historial(
                 orden=orden,
-                accion="SEGUIMIENTO_EDITADO",
-                empleado=request.user.empleado,
-                detalles=f"✏️ Seguimiento actualizado - {seguimiento_actualizado.proveedor}"
+                tipo_evento='cotizacion',
+                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                comentario=f"✏️ Seguimiento actualizado - {seguimiento_actualizado.proveedor}",
+                es_sistema=False
             )
             
             return JsonResponse({
@@ -1908,9 +1976,10 @@ def eliminar_seguimiento_pieza(request, seguimiento_id):
         # Registrar en historial
         registrar_historial(
             orden=orden,
-            accion="SEGUIMIENTO_ELIMINADO",
-            empleado=request.user.empleado,
-            detalles=f"🗑️ Seguimiento eliminado - Proveedor: {proveedor_nombre}"
+            tipo_evento='cotizacion',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=f"🗑️ Seguimiento eliminado - Proveedor: {proveedor_nombre}",
+            es_sistema=False
         )
         
         return JsonResponse({
@@ -1977,9 +2046,10 @@ def marcar_pieza_recibida(request, seguimiento_id):
         # Registrar en historial
         registrar_historial(
             orden=orden,
-            accion="PIEZA_RECIBIDA",
-            empleado=request.user.empleado,
-            detalles=f"📬 Pieza recibida - {seguimiento.proveedor} - Notificación enviada a técnico"
+            tipo_evento='cotizacion',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=f"📬 Pieza recibida - {seguimiento.proveedor} - Notificación enviada a técnico",
+            es_sistema=False
         )
         
         return JsonResponse({
@@ -1989,6 +2059,100 @@ def marcar_pieza_recibida(request, seguimiento_id):
         })
     
     except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+def cambiar_estado_seguimiento(request, seguimiento_id):
+    """
+    Cambia el estado de un seguimiento de pieza de forma rápida.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista permite cambiar el estado del seguimiento sin necesidad de 
+    editar todo el formulario. Es útil para actualizaciones rápidas del progreso.
+    
+    FLUJO TÍPICO:
+    pedido → confirmado → transito → retrasado → recibido
+    
+    ESTADOS VÁLIDOS:
+    - pedido: Pedido realizado al proveedor
+    - confirmado: Proveedor confirmó el pedido
+    - transito: Paquete en camino
+    - retrasado: Hay retraso en la entrega
+    - recibido: Pieza recibida (usar marcar_pieza_recibida en su lugar)
+    
+    RETORNA:
+    JSON con el HTML actualizado del card para reemplazarlo dinámicamente
+    """
+    from django.http import JsonResponse
+    from .models import SeguimientoPieza
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+    
+    try:
+        seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        cotizacion = seguimiento.cotizacion
+        orden = cotizacion.orden
+        
+        # Obtener empleado actual
+        try:
+            empleado_actual = request.user.empleado
+        except AttributeError:
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Usuario no asociado a un empleado'
+            }, status=403)
+        
+        # Obtener nuevo estado
+        nuevo_estado = request.POST.get('nuevo_estado')
+        
+        # Validar estado
+        estados_validos = ['pedido', 'confirmado', 'transito', 'retrasado', 'recibido']
+        if nuevo_estado not in estados_validos:
+            return JsonResponse({
+                'success': False,
+                'error': f'❌ Estado inválido: {nuevo_estado}'
+            }, status=400)
+        
+        # Guardar estado anterior para historial
+        estado_anterior = seguimiento.get_estado_display()
+        
+        # Actualizar estado
+        seguimiento.estado = nuevo_estado
+        seguimiento.save()
+        
+        # Obtener nombre del nuevo estado
+        estado_nuevo_display = seguimiento.get_estado_display()
+        
+        # Registrar en historial
+        registrar_historial(
+            orden=orden,
+            tipo_evento='cotizacion',
+            usuario=empleado_actual,
+            comentario=f"📦 Estado de seguimiento actualizado: {estado_anterior} → {estado_nuevo_display} ({seguimiento.proveedor})",
+            es_sistema=False
+        )
+        
+        # Si cambió a "recibido", enviar notificación
+        if nuevo_estado == 'recibido' and not seguimiento.fecha_entrega_real:
+            from django.utils import timezone
+            seguimiento.fecha_entrega_real = timezone.now().date()
+            seguimiento.save()
+            _enviar_notificacion_pieza_recibida(orden, seguimiento)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Estado actualizado a: {estado_nuevo_display}',
+            'card_html': _render_seguimiento_card(seguimiento)
+        })
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JsonResponse({
             'success': False,
             'error': f'❌ Error inesperado: {str(e)}'
@@ -2019,12 +2183,12 @@ def _render_pieza_row(pieza, cotizacion):
         </td>
         <td>
             <strong>{pieza.componente.nombre}</strong><br>
-            <small class="text-muted">{pieza.componente.categoria}</small>
+            <small class="text-muted">{pieza.componente.get_tipo_equipo_display()}</small>
             {f'<br><small>{pieza.descripcion_adicional}</small>' if pieza.descripcion_adicional else ''}
         </td>
         <td class="text-center">{pieza.cantidad}</td>
         <td class="text-end">${pieza.costo_unitario:.2f}</td>
-        <td class="text-end"><strong>${pieza.subtotal:.2f}</strong></td>
+        <td class="text-end"><strong>${pieza.costo_total:.2f}</strong></td>
         <td class="text-center">
             {'<span class="badge bg-success">Sí</span>' if pieza.es_necesaria else '<span class="badge bg-info">Opcional</span>'}
         </td>
@@ -2063,25 +2227,27 @@ def _render_seguimiento_card(seguimiento):
             retraso_dias = (hoy - seguimiento.fecha_entrega_estimada).days
             hay_retraso = True
     
-    # Definir estilos según estado
+    # Definir estilos según estado (ACTUALIZADOS según ESTADO_PIEZA_CHOICES)
     estado_badges = {
-        'pendiente': 'bg-warning text-dark',
-        'en_transito': 'bg-info',
+        'pedido': 'bg-primary',
+        'confirmado': 'bg-info',
+        'transito': 'bg-warning text-dark',
+        'retrasado': 'bg-danger',
         'recibido': 'bg-success',
-        'cancelado': 'bg-danger',
     }
     
     estado_nombres = {
-        'pendiente': 'Pendiente',
-        'en_transito': 'En Tránsito',
-        'recibido': 'Recibido',
-        'cancelado': 'Cancelado',
+        'pedido': '📋 Pedido Realizado',
+        'confirmado': '✅ Confirmado',
+        'transito': '🚚 En Tránsito',
+        'retrasado': '⚠️ Retrasado',
+        'recibido': '📬 Recibido',
     }
     
     border_class = ''
     if seguimiento.estado == 'recibido':
         border_class = 'border-success'
-    elif hay_retraso:
+    elif hay_retraso or seguimiento.estado == 'retrasado':
         border_class = 'border-danger'
     
     html = f'''
@@ -2102,18 +2268,33 @@ def _render_seguimiento_card(seguimiento):
                 {f'<small><strong>Entrega Real:</strong> {seguimiento.fecha_entrega_real.strftime("%d/%m/%Y")}</small><br>' if seguimiento.fecha_entrega_real else ''}
             </p>
             
+            <!-- NUEVO: Piezas Vinculadas -->
+            {'<div class="mt-2 p-2" style="background-color: rgba(13, 110, 253, 0.05); border-left: 3px solid #0d6efd; border-radius: 4px;"><small class="text-primary fw-bold"><i class="bi bi-box-seam"></i> Piezas Vinculadas:</small><ul class="list-unstyled mb-0 mt-1">' + ''.join([f'<li class="small text-muted"><i class="bi bi-check2"></i> {pieza.componente.nombre} × {pieza.cantidad}</li>' for pieza in seguimiento.piezas.all()]) + '</ul></div>' if seguimiento.piezas.exists() else ''}
+            
             {f'<div class="alert alert-danger alert-sm mb-2"><strong>⚠️ RETRASO:</strong> {retraso_dias} días</div>' if hay_retraso else ''}
             
             {f'<p class="card-text"><small class="text-muted"><strong>Notas:</strong> {seguimiento.notas_seguimiento}</small></p>' if seguimiento.notas_seguimiento else ''}
             
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn btn-outline-primary" onclick="editarSeguimiento({seguimiento.id})" title="Editar">
-                    📝 Editar
-                </button>
-                {'<button type="button" class="btn btn-outline-success" onclick="marcarRecibido(' + str(seguimiento.id) + ')" title="Marcar como recibido">📬 Marcar Recibido</button>' if seguimiento.estado != 'recibido' else ''}
-                <button type="button" class="btn btn-outline-danger" onclick="eliminarSeguimiento({seguimiento.id})" title="Eliminar">
-                    🗑️
-                </button>
+            <div class="mt-3">
+                <!-- Fila 1: Cambio rápido de estado -->
+                {f'''
+                <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                    {f'<button type="button" class="btn btn-info" onclick="cambiarEstadoSeguimiento({seguimiento.id}, \'confirmado\')" title="Confirmar pedido">✅ Confirmar</button>' if seguimiento.estado == 'pedido' else ''}
+                    {f'<button type="button" class="btn btn-warning" onclick="cambiarEstadoSeguimiento({seguimiento.id}, \'transito\')" title="Marcar en tránsito">� En Tránsito</button>' if seguimiento.estado in ['pedido', 'confirmado'] else ''}
+                    {f'<button type="button" class="btn btn-danger" onclick="cambiarEstadoSeguimiento({seguimiento.id}, \'retrasado\')" title="Marcar como retrasado">⚠️ Retrasado</button>' if seguimiento.estado in ['pedido', 'confirmado', 'transito'] else ''}
+                    <button type="button" class="btn btn-success" onclick="marcarRecibido({seguimiento.id})" title="Marcar como recibido">📬 Recibido</button>
+                </div>
+                ''' if seguimiento.estado != 'recibido' else ''}
+                
+                <!-- Fila 2: Editar y Eliminar -->
+                <div class="btn-group btn-group-sm w-100" role="group">
+                    <button type="button" class="btn btn-outline-primary" onclick="editarSeguimiento({seguimiento.id})" title="Editar">
+                        📝 Editar
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="eliminarSeguimiento({seguimiento.id})" title="Eliminar">
+                        🗑️ Eliminar
+                    </button>
+                </div>
             </div>
         </div>
     </div>

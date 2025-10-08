@@ -57,6 +57,7 @@ urlpatterns = [
     path('seguimientos/<int:seguimiento_id>/editar/', views.editar_seguimiento_pieza, name='editar_seguimiento'),
     path('seguimientos/<int:seguimiento_id>/eliminar/', views.eliminar_seguimiento_pieza, name='eliminar_seguimiento'),
     path('seguimientos/<int:seguimiento_id>/marcar-recibido/', views.marcar_pieza_recibida, name='marcar_recibido'),
+    path('seguimientos/<int:seguimiento_id>/cambiar-estado/', views.cambiar_estado_seguimiento, name='cambiar_estado_seguimiento'),
     
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),

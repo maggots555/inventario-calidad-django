@@ -635,6 +635,14 @@ class Cotizacion(models.Model):
         )
     
     @property
+    def costo_piezas_rechazadas(self):
+        """Calcula el costo total de las piezas rechazadas por el cliente"""
+        return sum(
+            pieza.costo_total 
+            for pieza in self.piezas_cotizadas.filter(aceptada_por_cliente=False)
+        )
+    
+    @property
     def costo_total(self):
         """Calcula el costo total (piezas + mano de obra)"""
         return self.costo_total_piezas + self.costo_mano_obra
@@ -751,6 +759,10 @@ class SeguimientoPieza(models.Model):
     """
     Seguimiento de pedidos de piezas a proveedores.
     Permite rastrear múltiples pedidos por cotización.
+    
+    NUEVA FUNCIONALIDAD:
+    Ahora puede vincularse a piezas específicas que fueron aceptadas por el cliente.
+    Esto permite un seguimiento más preciso de qué piezas se están esperando.
     """
     
     # RELACIÓN CON COTIZACIÓN
@@ -759,6 +771,14 @@ class SeguimientoPieza(models.Model):
         on_delete=models.CASCADE,
         related_name='seguimientos_piezas',
         help_text="Cotización a la que pertenece este seguimiento"
+    )
+    
+    # NUEVO: RELACIÓN CON PIEZAS ESPECÍFICAS
+    piezas = models.ManyToManyField(
+        'PiezaCotizada',
+        blank=True,
+        related_name='seguimientos',
+        help_text="Piezas específicas que se están rastreando en este pedido"
     )
     
     # INFORMACIÓN DEL PEDIDO

@@ -361,14 +361,21 @@ class CotizacionAdmin(admin.ModelAdmin):
     estado_respuesta.short_description = 'Estado'
     
     def costo_total_piezas_display(self, obj):
-        return f"${obj.costo_total_piezas:,.2f}"
+        """Muestra el costo total de piezas formateado"""
+        try:
+            costo = float(obj.costo_total_piezas)
+            return f"${costo:,.2f}"
+        except (ValueError, TypeError):
+            return '$0.00'
     costo_total_piezas_display.short_description = 'Total Piezas'
     
     def costo_total_display(self, obj):
-        return format_html(
-            '<strong>${:,.2f}</strong>',
-            obj.costo_total
-        )
+        """Muestra el costo total con formato de moneda"""
+        try:
+            costo = float(obj.costo_total)
+            return format_html('<strong>${:,.2f}</strong>', costo)
+        except (ValueError, TypeError):
+            return '<strong>$0.00</strong>'
     costo_total_display.short_description = 'Total'
 
 
@@ -396,7 +403,12 @@ class PiezaCotizadaAdmin(admin.ModelAdmin):
     )
     
     def costo_total_display(self, obj):
-        return f"${obj.costo_total:,.2f}"
+        """Muestra el costo total formateado"""
+        try:
+            costo = float(obj.costo_total)
+            return f"${costo:,.2f}"
+        except (ValueError, TypeError):
+            return '$0.00'
     costo_total_display.short_description = 'Costo Total'
 
 

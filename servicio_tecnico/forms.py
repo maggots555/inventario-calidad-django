@@ -1013,12 +1013,13 @@ class GestionarCotizacionForm(forms.ModelForm):
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     Este formulario captura la decisión del cliente sobre la cotización.
-    - Si acepta: usuario_acepto = True, se continúa con la reparación
-    - Si rechaza: usuario_acepto = False, debe indicar el motivo
+    - Si acepta: usuario_acepto = True, solo las piezas seleccionadas se aceptan
+    - Si rechaza: usuario_acepto = False, TODAS las piezas se rechazan automáticamente
     
-    IMPORTANTE:
-    Este formulario NO edita piezas individuales. Para eso, hay que ir
-    al admin de Django y modificar las PiezaCotizada directamente.
+    NOTA IMPORTANTE:
+    Las piezas seleccionadas NO se manejan en el formulario, sino directamente
+    en la vista desde request.POST.getlist('piezas_seleccionadas'). Esto es porque
+    los checkboxes están fuera del formulario en el template.
     """
     
     # Campo adicional para decidir la acción (no se guarda en la BD)
@@ -1078,6 +1079,9 @@ class GestionarCotizacionForm(forms.ModelForm):
         EXPLICACIÓN:
         Validación personalizada del formulario.
         Si rechaza, debe indicar al menos el motivo.
+        
+        NOTA: La validación de piezas seleccionadas se hace en la vista,
+        no aquí, porque los checkboxes están fuera del formulario.
         """
         cleaned_data = super().clean()
         accion = cleaned_data.get('accion')
@@ -1101,6 +1105,9 @@ class GestionarCotizacionForm(forms.ModelForm):
         EXPLICACIÓN:
         Guardar el formulario con la decisión del cliente.
         Actualiza usuario_acepto según la acción seleccionada.
+        
+        NOTA IMPORTANTE: Este método NO actualiza las piezas individuales.
+        Eso se hace en la vista para tener más control y registro en el historial.
         """
         instance = super().save(commit=False)
         
@@ -1161,21 +1168,25 @@ class PiezaCotizadaForm(forms.ModelForm):
         widgets = {
             'componente': forms.Select(attrs={
                 'class': 'form-control form-select',
+                'id': 'componente',  # ID explícito para JavaScript
                 'required': True,
             }),
             'descripcion_adicional': forms.Textarea(attrs={
                 'class': 'form-control',
+                'id': 'descripcion_adicional',
                 'rows': 2,
                 'placeholder': 'Descripción específica de la pieza (opcional)',
             }),
             'cantidad': forms.NumberInput(attrs={
                 'class': 'form-control',
+                'id': 'cantidad',
                 'min': '1',
                 'value': '1',
                 'required': True,
             }),
             'costo_unitario': forms.NumberInput(attrs={
                 'class': 'form-control',
+                'id': 'costo_unitario',
                 'step': '0.01',
                 'min': '0',
                 'placeholder': '0.00',
@@ -1183,15 +1194,18 @@ class PiezaCotizadaForm(forms.ModelForm):
             }),
             'orden_prioridad': forms.NumberInput(attrs={
                 'class': 'form-control',
+                'id': 'orden_prioridad',
                 'min': '1',
                 'value': '1',
                 'required': True,
             }),
             'es_necesaria': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
+                'id': 'es_necesaria',
             }),
             'sugerida_por_tecnico': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
+                'id': 'sugerida_por_tecnico',
             }),
         }
         
@@ -1224,7 +1238,7 @@ class PiezaCotizadaForm(forms.ModelForm):
         # Filtrar solo componentes activos
         self.fields['componente'].queryset = ComponenteEquipo.objects.filter(
             activo=True
-        ).order_by('categoria', 'nombre')
+        ).order_by('nombre')
         
         # Agregar opción vacía al dropdown
         self.fields['componente'].empty_label = "-- Selecciona un componente --"
@@ -1265,6 +1279,10 @@ class SeguimientoPiezaForm(forms.ModelForm):
     Este formulario gestiona el tracking de pedidos de piezas a proveedores.
     Permite registrar: quién provee, cuándo se pidió, cuándo llega, estado actual.
     
+    NUEVA FUNCIONALIDAD:
+    Ahora permite seleccionar las piezas específicas que se están rastreando.
+    Solo muestra piezas que fueron aceptadas por el cliente.
+    
     CAMPOS OBLIGATORIOS:
     - Proveedor (siempre)
     - Descripción de piezas (siempre)
@@ -1278,6 +1296,7 @@ class SeguimientoPiezaForm(forms.ModelForm):
     class Meta:
         model = SeguimientoPieza
         fields = [
+            'piezas',  # NUEVO: Selección de piezas específicas
             'proveedor',
             'descripcion_piezas',
             'numero_pedido',
@@ -1289,6 +1308,9 @@ class SeguimientoPiezaForm(forms.ModelForm):
         ]
         
         widgets = {
+            'piezas': forms.CheckboxSelectMultiple(attrs={
+                'class': 'form-check-input',
+            }),
             'proveedor': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ej: STEREN, CompuMarket, Amazon',
@@ -1331,6 +1353,7 @@ class SeguimientoPiezaForm(forms.ModelForm):
         }
         
         labels = {
+            'piezas': 'Piezas a Rastrear',
             'proveedor': 'Proveedor',
             'descripcion_piezas': 'Descripción de Piezas',
             'numero_pedido': 'Número de Pedido / Tracking',
@@ -1342,6 +1365,7 @@ class SeguimientoPiezaForm(forms.ModelForm):
         }
         
         help_texts = {
+            'piezas': 'Selecciona las piezas específicas que se están pidiendo a este proveedor',
             'proveedor': 'Nombre del proveedor donde se pidió',
             'descripcion_piezas': 'Lista de piezas incluidas en este pedido',
             'numero_pedido': 'Número de orden o tracking del proveedor (opcional)',
@@ -1354,8 +1378,24 @@ class SeguimientoPiezaForm(forms.ModelForm):
         """
         EXPLICACIÓN:
         Personalización del formulario.
+        Filtra las piezas para mostrar SOLO las que fueron aceptadas por el cliente.
         """
+        cotizacion = kwargs.pop('cotizacion', None)
         super().__init__(*args, **kwargs)
+        
+        # NUEVO: Filtrar solo piezas aceptadas por el cliente
+        if cotizacion:
+            piezas_aceptadas = cotizacion.piezas_cotizadas.filter(aceptada_por_cliente=True)
+            self.fields['piezas'].queryset = piezas_aceptadas
+            self.fields['piezas'].label_from_instance = lambda obj: f"{obj.componente.nombre} × {obj.cantidad} (${obj.costo_total})"
+        else:
+            # Si no hay cotización, no mostrar ninguna pieza
+            self.fields['piezas'].queryset = PiezaCotizada.objects.none()
+        
+        # Configurar fechas mínimas
+        from datetime import date
+        self.fields['fecha_pedido'].widget.attrs['max'] = date.today().isoformat()
+        self.fields['fecha_entrega_estimada'].widget.attrs['min'] = date.today().isoformat()
         
         # Si es edición y el estado es "recibido", hacer obligatoria la fecha real
         if self.instance and self.instance.pk and self.instance.estado == 'recibido':

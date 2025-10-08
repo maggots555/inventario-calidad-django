@@ -530,11 +530,20 @@
                                                 <td class="text-muted">Total Piezas Cotizadas:</td>
                                                 <td class="text-end"><strong>${{ cotizacion.costo_total_piezas|floatformat:2 }}</strong></td>
                                             </tr>
-                                            {% if cotizacion.costo_piezas_aceptadas != cotizacion.costo_total_piezas %}
-                                                <tr>
-                                                    <td class="text-muted">Piezas Aceptadas:</td>
-                                                    <td class="text-end text-success"><strong>${{ cotizacion.costo_piezas_aceptadas|floatformat:2 }}</strong></td>
-                                                </tr>
+                                            {% if cotizacion.usuario_acepto is not None %}
+                                                <!-- Mostrar desglose de piezas solo si hay decisión -->
+                                                {% if cotizacion.costo_piezas_aceptadas != cotizacion.costo_total_piezas %}
+                                                    <tr>
+                                                        <td class="text-muted">Piezas Aceptadas:</td>
+                                                        <td class="text-end text-success"><strong>${{ cotizacion.costo_piezas_aceptadas|floatformat:2 }}</strong></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="text-muted">Piezas Rechazadas:</td>
+                                                        <td class="text-end text-danger">
+                                                            <strong>${{ cotizacion.costo_piezas_rechazadas|floatformat:2 }}</strong>
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
                                             {% endif %}
                                             <tr style="border-top: 2px solid #dee2e6;">
                                                 <td class="text-muted"><strong>TOTAL COTIZACIÓN:</strong></td>
@@ -552,15 +561,49 @@
                                             {% endif %}
                                         </table>
                                         
-                                        <div class="alert alert-info mt-3">
-                                            <small>
-                                                <i class="bi bi-info-circle"></i>
-                                                <strong>Nota:</strong> Para agregar o editar piezas, ve al 
-                                                <a href="/admin/servicio_tecnico/cotizacion/{{ orden.pk }}/change/" target="_blank" class="alert-link">
-                                                    admin de Django <i class="bi bi-box-arrow-up-right"></i>
-                                                </a>
-                                            </small>
-                                        </div>
+                                        <!-- Desglose de piezas aceptadas/rechazadas (solo si hay decisión) -->
+                                        {% if cotizacion.usuario_acepto is not None %}
+                                            <hr class="my-3">
+                                            <h6 class="mb-2">
+                                                <i class="bi bi-list-check"></i> Desglose de Piezas
+                                            </h6>
+                                            
+                                            <!-- Piezas Aceptadas -->
+                                            {% with piezas_aceptadas=piezas_cotizadas|dictsort:"aceptada_por_cliente" %}
+                                                {% for pieza in piezas_cotizadas %}
+                                                    {% if pieza.aceptada_por_cliente %}
+                                                        <div class="d-flex justify-content-between align-items-center mb-2 p-2" 
+                                                             style="background-color: rgba(40, 167, 69, 0.1); border-left: 3px solid #28a745; border-radius: 4px;">
+                                                            <div>
+                                                                <small>
+                                                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                                                    <strong>{{ pieza.componente.nombre }}</strong>
+                                                                    <span class="text-muted">× {{ pieza.cantidad }}</span>
+                                                                </small>
+                                                            </div>
+                                                            <small class="text-success fw-bold">${{ pieza.costo_total|floatformat:2 }}</small>
+                                                        </div>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% endwith %}
+                                            
+                                            <!-- Piezas Rechazadas -->
+                                            {% for pieza in piezas_cotizadas %}
+                                                {% if pieza.aceptada_por_cliente == False %}
+                                                    <div class="d-flex justify-content-between align-items-center mb-2 p-2" 
+                                                         style="background-color: rgba(220, 53, 69, 0.1); border-left: 3px solid #dc3545; border-radius: 4px;">
+                                                        <div>
+                                                            <small>
+                                                                <i class="bi bi-x-circle-fill text-danger"></i>
+                                                                <strong class="text-muted text-decoration-line-through">{{ pieza.componente.nombre }}</strong>
+                                                                <span class="text-muted">× {{ pieza.cantidad }}</span>
+                                                            </small>
+                                                        </div>
+                                                        <small class="text-danger fw-bold text-decoration-line-through">${{ pieza.costo_total|floatformat:2 }}</small>
+                                                    </div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -578,11 +621,37 @@
                                         <i class="bi bi-plus-circle"></i> Agregar Pieza
                                     </button>
                                 </div>
+                                <!-- Mensaje de Ayuda (solo visible si cotización pendiente) -->
+                                {% if cotizacion.usuario_acepto is None %}
+                                    <div class="alert alert-info mb-0 mx-3 mt-3" style="border-left: 4px solid #0dcaf0;">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-info-circle-fill me-2" style="font-size: 1.5rem;"></i>
+                                            <div>
+                                                <strong>💡 Instrucciones:</strong> Selecciona con los checkboxes las piezas que el cliente <strong>acepta</strong>.
+                                                Al guardar la decisión, solo las piezas seleccionadas serán aceptadas. 
+                                                Si rechazas la cotización, todas las piezas se marcarán como rechazadas automáticamente.
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
                                 <div class="card-body p-0">
                                     <div class="table-responsive">
                                         <table class="table table-hover mb-0" id="tablaPiezas">
                                             <thead class="table-light">
                                                 <tr>
+                                                    <!-- Nueva columna: Checkbox para seleccionar piezas (solo si cotización pendiente) -->
+                                                    {% if cotizacion.usuario_acepto is None %}
+                                                        <th class="text-center" style="width: 60px;">
+                                                            <div class="form-check d-flex justify-content-center">
+                                                                <input class="form-check-input" type="checkbox" 
+                                                                       id="selectAllPiezas" 
+                                                                       checked 
+                                                                       title="Seleccionar/Deseleccionar todas"
+                                                                       style="cursor: pointer;">
+                                                            </div>
+                                                            <small class="text-muted" style="font-size: 0.7rem;">Todas</small>
+                                                        </th>
+                                                    {% endif %}
                                                     <th>Prioridad</th>
                                                     <th>Componente</th>
                                                     <th>Descripción</th>
@@ -596,7 +665,21 @@
                                             </thead>
                                             <tbody>
                                                 {% for pieza in piezas_cotizadas %}
-                                                    <tr data-pieza-id="{{ pieza.id }}">
+                                                    <tr data-pieza-id="{{ pieza.id }}" class="pieza-row">
+                                                        <!-- Checkbox de selección (solo si cotización pendiente) -->
+                                                        {% if cotizacion.usuario_acepto is None %}
+                                                            <td class="text-center">
+                                                                <div class="form-check d-flex justify-content-center">
+                                                                    <input class="form-check-input pieza-checkbox" 
+                                                                           type="checkbox" 
+                                                                           name="piezas_seleccionadas" 
+                                                                           value="{{ pieza.id }}"
+                                                                           checked
+                                                                           title="Seleccionar esta pieza"
+                                                                           style="cursor: pointer;">
+                                                                </div>
+                                                            </td>
+                                                        {% endif %}
                                                         <td>
                                                             <span class="badge bg-secondary">{{ pieza.orden_prioridad }}</span>
                                                         </td>
@@ -687,9 +770,10 @@
                                             <div class="col-md-6">
                                                 <div class="card h-100 border-start border-4 seguimiento-card
                                                     {% if seguimiento.estado == 'recibido' %}border-success
-                                                    {% elif seguimiento.esta_retrasado %}border-danger
+                                                    {% elif seguimiento.esta_retrasado or seguimiento.estado == 'retrasado' %}border-danger
                                                     {% elif seguimiento.estado == 'transito' %}border-info
-                                                    {% else %}border-warning{% endif %}" 
+                                                    {% elif seguimiento.estado == 'confirmado' %}border-primary
+                                                    {% else %}border-secondary{% endif %}" 
                                                     data-seguimiento-id="{{ seguimiento.id }}">
                                                     <div class="card-body">
                                                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -698,9 +782,10 @@
                                                             </h6>
                                                             <span class="badge 
                                                                 {% if seguimiento.estado == 'recibido' %}bg-success
-                                                                {% elif seguimiento.esta_retrasado %}bg-danger
+                                                                {% elif seguimiento.esta_retrasado or seguimiento.estado == 'retrasado' %}bg-danger
                                                                 {% elif seguimiento.estado == 'transito' %}bg-info
                                                                 {% elif seguimiento.estado == 'confirmado' %}bg-primary
+                                                                {% elif seguimiento.estado == 'pedido' %}bg-secondary
                                                                 {% else %}bg-warning text-dark{% endif %}">
                                                                 {{ seguimiento.get_estado_display }}
                                                             </span>
@@ -710,6 +795,22 @@
                                                             <strong>Pedido:</strong> {{ seguimiento.numero_pedido|default:"Sin número" }}<br>
                                                             <strong>Piezas:</strong> {{ seguimiento.descripcion_piezas|truncatewords:10 }}
                                                         </p>
+                                                        
+                                                        <!-- NUEVO: Mostrar piezas específicas vinculadas -->
+                                                        {% if seguimiento.piezas.exists %}
+                                                            <div class="mt-2 p-2" style="background-color: rgba(13, 110, 253, 0.05); border-left: 3px solid #0d6efd; border-radius: 4px;">
+                                                                <small class="text-primary fw-bold">
+                                                                    <i class="bi bi-box-seam"></i> Piezas Vinculadas:
+                                                                </small>
+                                                                <ul class="list-unstyled mb-0 mt-1">
+                                                                    {% for pieza in seguimiento.piezas.all %}
+                                                                        <li class="small text-muted">
+                                                                            <i class="bi bi-check2"></i> {{ pieza.componente.nombre }} × {{ pieza.cantidad }}
+                                                                        </li>
+                                                                    {% endfor %}
+                                                                </ul>
+                                                            </div>
+                                                        {% endif %}
                                                         
                                                         <div class="small">
                                                             <div class="row">
@@ -742,24 +843,55 @@
                                                         {% endif %}
                                                         
                                                         <!-- Botones de acción -->
-                                                        <div class="btn-group btn-group-sm mt-3 w-100" role="group">
-                                                            <button type="button" class="btn btn-outline-primary" 
-                                                                    onclick="editarSeguimiento({{ seguimiento.id }})" 
-                                                                    title="Editar">
-                                                                📝 Editar
-                                                            </button>
+                                                        <div class="mt-3">
+                                                            <!-- Fila 1: Cambio rápido de estado -->
                                                             {% if seguimiento.estado != 'recibido' %}
-                                                                <button type="button" class="btn btn-outline-success" 
-                                                                        onclick="marcarRecibido({{ seguimiento.id }})" 
-                                                                        title="Marcar como recibido">
-                                                                    📬 Recibido
-                                                                </button>
+                                                                <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                                                                    {% if seguimiento.estado == 'pedido' %}
+                                                                        <button type="button" class="btn btn-info" 
+                                                                                onclick="cambiarEstadoSeguimiento({{ seguimiento.id }}, 'confirmado')" 
+                                                                                title="Confirmar pedido">
+                                                                            ✅ Confirmar
+                                                                        </button>
+                                                                    {% endif %}
+                                                                    
+                                                                    {% if seguimiento.estado in 'pedido,confirmado' %}
+                                                                        <button type="button" class="btn btn-warning" 
+                                                                                onclick="cambiarEstadoSeguimiento({{ seguimiento.id }}, 'transito')" 
+                                                                                title="Marcar en tránsito">
+                                                                            � En Tránsito
+                                                                        </button>
+                                                                    {% endif %}
+                                                                    
+                                                                    {% if seguimiento.estado in 'pedido,confirmado,transito' %}
+                                                                        <button type="button" class="btn btn-danger" 
+                                                                                onclick="cambiarEstadoSeguimiento({{ seguimiento.id }}, 'retrasado')" 
+                                                                                title="Marcar como retrasado">
+                                                                            ⚠️ Retrasado
+                                                                        </button>
+                                                                    {% endif %}
+                                                                    
+                                                                    <button type="button" class="btn btn-success" 
+                                                                            onclick="marcarRecibido({{ seguimiento.id }})" 
+                                                                            title="Marcar como recibido">
+                                                                        📬 Recibido
+                                                                    </button>
+                                                                </div>
                                                             {% endif %}
-                                                            <button type="button" class="btn btn-outline-danger" 
-                                                                    onclick="eliminarSeguimiento({{ seguimiento.id }})" 
-                                                                    title="Eliminar">
-                                                                🗑️
-                                                            </button>
+                                                            
+                                                            <!-- Fila 2: Editar y Eliminar -->
+                                                            <div class="btn-group btn-group-sm w-100" role="group">
+                                                                <button type="button" class="btn btn-outline-primary" 
+                                                                        onclick="editarSeguimiento({{ seguimiento.id }})" 
+                                                                        title="Editar">
+                                                                    📝 Editar
+                                                                </button>
+                                                                <button type="button" class="btn btn-outline-danger" 
+                                                                        onclick="eliminarSeguimiento({{ seguimiento.id }})" 
+                                                                        title="Eliminar">
+                                                                    🗑️ Eliminar
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1363,34 +1495,38 @@
                         <div class="col-md-6">
                             <!-- Componente -->
                             <div class="mb-3">
-                                <label for="componente" class="form-label">
-                                    Componente <span class="text-danger">*</span>
+                                <label for="{{ form_pieza.componente.id_for_label }}" class="form-label">
+                                    {{ form_pieza.componente.label }} <span class="text-danger">*</span>
                                 </label>
-                                <select class="form-control form-select" id="componente" name="componente" required>
-                                    <option value="">-- Selecciona un componente --</option>
-                                    <!-- Opciones serán cargadas dinámicamente desde el backend -->
-                                </select>
-                                <small class="form-text text-muted">Selecciona el componente del catálogo</small>
+                                {{ form_pieza.componente }}
+                                {% if form_pieza.componente.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.componente.help_text }}</small>
+                                {% endif %}
+                                {% if form_pieza.componente.errors %}
+                                    <div class="text-danger small">{{ form_pieza.componente.errors }}</div>
+                                {% endif %}
                             </div>
                             
                             <!-- Cantidad -->
                             <div class="mb-3">
-                                <label for="cantidad" class="form-label">
-                                    Cantidad <span class="text-danger">*</span>
+                                <label for="{{ form_pieza.cantidad.id_for_label }}" class="form-label">
+                                    {{ form_pieza.cantidad.label }} <span class="text-danger">*</span>
                                 </label>
-                                <input type="number" class="form-control" id="cantidad" name="cantidad" 
-                                       min="1" value="1" required>
-                                <small class="form-text text-muted">Número de unidades a cambiar</small>
+                                {{ form_pieza.cantidad }}
+                                {% if form_pieza.cantidad.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.cantidad.help_text }}</small>
+                                {% endif %}
                             </div>
                             
                             <!-- Costo Unitario -->
                             <div class="mb-3">
-                                <label for="costo_unitario" class="form-label">
-                                    Costo Unitario ($) <span class="text-danger">*</span>
+                                <label for="{{ form_pieza.costo_unitario.id_for_label }}" class="form-label">
+                                    {{ form_pieza.costo_unitario.label }} <span class="text-danger">*</span>
                                 </label>
-                                <input type="number" class="form-control" id="costo_unitario" name="costo_unitario" 
-                                       step="0.01" min="0" placeholder="0.00" required>
-                                <small class="form-text text-muted">Precio por unidad</small>
+                                {{ form_pieza.costo_unitario }}
+                                {% if form_pieza.costo_unitario.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.costo_unitario.help_text }}</small>
+                                {% endif %}
                             </div>
                         </div>
                         
@@ -1398,31 +1534,34 @@
                         <div class="col-md-6">
                             <!-- Orden de Prioridad -->
                             <div class="mb-3">
-                                <label for="orden_prioridad" class="form-label">
-                                    Prioridad <span class="text-danger">*</span>
+                                <label for="{{ form_pieza.orden_prioridad.id_for_label }}" class="form-label">
+                                    {{ form_pieza.orden_prioridad.label }} <span class="text-danger">*</span>
                                 </label>
-                                <input type="number" class="form-control" id="orden_prioridad" name="orden_prioridad" 
-                                       min="1" value="1" required>
-                                <small class="form-text text-muted">1 = más importante</small>
+                                {{ form_pieza.orden_prioridad }}
+                                {% if form_pieza.orden_prioridad.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.orden_prioridad.help_text }}</small>
+                                {% endif %}
                             </div>
                             
                             <!-- Es Necesaria -->
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="es_necesaria" name="es_necesaria">
-                                    <label class="form-check-label" for="es_necesaria">
-                                        ¿Es necesaria para el funcionamiento?
+                                    {{ form_pieza.es_necesaria }}
+                                    <label class="form-check-label" for="{{ form_pieza.es_necesaria.id_for_label }}">
+                                        {{ form_pieza.es_necesaria.label }}
                                     </label>
                                 </div>
-                                <small class="form-text text-muted">Marca si es necesaria (vs mejora estética/rendimiento)</small>
+                                {% if form_pieza.es_necesaria.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.es_necesaria.help_text }}</small>
+                                {% endif %}
                             </div>
                             
                             <!-- Sugerida por Técnico -->
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="sugerida_por_tecnico" name="sugerida_por_tecnico">
-                                    <label class="form-check-label" for="sugerida_por_tecnico">
-                                        ¿Sugerida por el técnico?
+                                    {{ form_pieza.sugerida_por_tecnico }}
+                                    <label class="form-check-label" for="{{ form_pieza.sugerida_por_tecnico.id_for_label }}">
+                                        {{ form_pieza.sugerida_por_tecnico.label }}
                                     </label>
                                 </div>
                             </div>
@@ -1431,11 +1570,10 @@
                     
                     <!-- Descripción Adicional (full width) -->
                     <div class="mb-3">
-                        <label for="descripcion_adicional" class="form-label">
-                            Descripción Adicional
+                        <label for="{{ form_pieza.descripcion_adicional.id_for_label }}" class="form-label">
+                            {{ form_pieza.descripcion_adicional.label }}
                         </label>
-                        <textarea class="form-control" id="descripcion_adicional" name="descripcion_adicional" 
-                                  rows="2" placeholder="Descripción específica de la pieza (opcional)"></textarea>
+                        {{ form_pieza.descripcion_adicional }}
                     </div>
                 </div>
                 
@@ -1474,6 +1612,27 @@
                         <strong>❌ Errores:</strong>
                         <ul id="listaErroresSeguimiento" class="mb-0"></ul>
                     </div>
+                    
+                    <!-- NUEVO: Selección de piezas específicas -->
+                    <div class="mb-4 p-3" style="background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #17a2b8;">
+                        <h6 class="mb-3">
+                            <i class="bi bi-tools"></i> Piezas a Rastrear
+                            <small class="text-muted">(opcional)</small>
+                        </h6>
+                        <p class="small text-muted mb-2">
+                            <i class="bi bi-info-circle"></i> 
+                            Selecciona las piezas específicas que se están pidiendo en este pedido.
+                            Solo aparecen las piezas que el cliente aceptó.
+                        </p>
+                        <div id="listaPiezasDisponibles">
+                            {{ form_seguimiento.piezas }}
+                        </div>
+                        <small class="form-text text-muted d-block mt-2">
+                            Puedes seleccionar múltiples piezas si el pedido incluye varias
+                        </small>
+                    </div>
+                    
+                    <hr class="my-4">
                     
                     <div class="row">
                         <!-- Columna izquierda -->
@@ -1550,10 +1709,11 @@
                                     Estado del Pedido <span class="text-danger">*</span>
                                 </label>
                                 <select class="form-control form-select" id="estado" name="estado" required>
-                                    <option value="pendiente">Pendiente</option>
-                                    <option value="en_transito">En Tránsito</option>
-                                    <option value="recibido">Recibido</option>
-                                    <option value="cancelado">Cancelado</option>
+                                    <option value="pedido">📋 Pedido Realizado</option>
+                                    <option value="confirmado">✅ Pedido Confirmado</option>
+                                    <option value="transito">🚚 En Tránsito</option>
+                                    <option value="retrasado">⚠️ Retrasado</option>
+                                    <option value="recibido">📬 Recibido en Sucursal</option>
                                 </select>
                                 <small class="form-text text-muted">Estado actual del pedido</small>
                             </div>
@@ -2214,6 +2374,75 @@ async function eliminarSeguimiento(seguimientoId) {
 /**
  * Marca una pieza como recibida
  */
+// ============================================================================
+// CAMBIO RÁPIDO DE ESTADO DE SEGUIMIENTO
+// ============================================================================
+
+/**
+ * Cambia el estado de un seguimiento de pieza sin necesidad de editar todo el formulario.
+ * 
+ * EXPLICACIÓN:
+ * Permite cambios rápidos de estado: pedido → confirmado → transito → retrasado → recibido
+ * Útil para actualizar el progreso del pedido sin entrar al modal de edición completo.
+ * 
+ * @param {number} seguimientoId - ID del seguimiento a actualizar
+ * @param {string} nuevoEstado - Nuevo estado (confirmado, transito, retrasado)
+ */
+async function cambiarEstadoSeguimiento(seguimientoId, nuevoEstado) {
+    // Mensajes de confirmación según el estado
+    const mensajes = {
+        'confirmado': '¿Confirmar que el proveedor aceptó el pedido?',
+        'transito': '¿Marcar el pedido como En Tránsito?',
+        'retrasado': '¿Marcar este pedido como Retrasado?'
+    };
+    
+    const estadosNombres = {
+        'confirmado': 'Confirmado',
+        'transito': 'En Tránsito',
+        'retrasado': 'Retrasado'
+    };
+    
+    if (!confirm(mensajes[nuevoEstado] || '¿Cambiar el estado?')) {
+        return;
+    }
+    
+    const url = "{% url 'servicio_tecnico:cambiar_estado_seguimiento' 0 %}".replace('/0/', `/${seguimientoId}/`);
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    formData.append('nuevo_estado', nuevoEstado);
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            mostrarToast(`✅ Estado actualizado a: ${estadosNombres[nuevoEstado]}`, 'success');
+            
+            // Actualizar el card visualmente (sin recargar toda la página)
+            const card = document.querySelector(`.seguimiento-card[data-seguimiento-id="${seguimientoId}"]`);
+            if (card && data.card_html) {
+                card.outerHTML = data.card_html;
+            } else {
+                // Fallback: recargar página
+                setTimeout(() => location.reload(), 1000);
+            }
+        } else {
+            mostrarToast(data.error || 'Error al cambiar estado', 'danger');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        mostrarToast('Error de conexión', 'danger');
+    }
+}
+
+// ============================================================================
+// MARCAR SEGUIMIENTO COMO RECIBIDO
+// ============================================================================
+
 async function marcarRecibido(seguimientoId) {
     const fechaReal = prompt('Fecha de entrega real (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
     
@@ -2264,5 +2493,189 @@ function mostrarToast(mensaje, tipo = 'info') {
         alertDiv.remove();
     }, 3000);
 }
+
+// ============================================================================
+// GESTIÓN DE SELECCIÓN DE PIEZAS EN COTIZACIÓN
+// ============================================================================
+
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Esta sección maneja la selección de piezas cuando el cliente acepta/rechaza
+ * una cotización. Permite seleccionar individualmente qué piezas se aceptan.
+ */
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Solo ejecutar si existe el formulario de gestión de cotización
+    const formGestionar = document.getElementById('formGestionarCotizacion');
+    if (!formGestionar) return;
+    
+    // Elementos del DOM
+    const checkboxSelectAll = document.getElementById('selectAllPiezas');
+    const checkboxesPiezas = document.querySelectorAll('.pieza-checkbox');
+    const radioAceptar = document.querySelector('input[name="accion"][value="aceptar"]');
+    const radioRechazar = document.querySelector('input[name="accion"][value="rechazar"]');
+    const camposRechazo = document.getElementById('camposRechazo');
+    
+    // -------------------------------------------------------------------------
+    // 1. FUNCIONALIDAD: Seleccionar/Deseleccionar todas las piezas
+    // -------------------------------------------------------------------------
+    if (checkboxSelectAll) {
+        checkboxSelectAll.addEventListener('change', function() {
+            const isChecked = this.checked;
+            checkboxesPiezas.forEach(checkbox => {
+                checkbox.checked = isChecked;
+            });
+            
+            // Actualizar visualmente las filas
+            actualizarEstiloFilas();
+        });
+    }
+    
+    // Actualizar checkbox "Seleccionar todas" si se desmarca alguna pieza individual
+    checkboxesPiezas.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            // Si todas están marcadas, marcar "Seleccionar todas"
+            const todasMarcadas = Array.from(checkboxesPiezas).every(cb => cb.checked);
+            if (checkboxSelectAll) {
+                checkboxSelectAll.checked = todasMarcadas;
+            }
+            
+            // Actualizar visualmente las filas
+            actualizarEstiloFilas();
+        });
+    });
+    
+    // -------------------------------------------------------------------------
+    // 2. FUNCIONALIDAD: Mostrar/ocultar campos de rechazo
+    // -------------------------------------------------------------------------
+    function actualizarCamposRechazo() {
+        if (radioRechazar && radioRechazar.checked) {
+            // Si rechaza, mostrar campos de rechazo
+            if (camposRechazo) {
+                camposRechazo.style.display = 'block';
+            }
+            
+            // Deshabilitar checkboxes (no importan si rechaza todo)
+            checkboxesPiezas.forEach(checkbox => {
+                checkbox.disabled = true;
+                checkbox.checked = false; // Desmarcar todas
+            });
+            if (checkboxSelectAll) {
+                checkboxSelectAll.disabled = true;
+                checkboxSelectAll.checked = false;
+            }
+        } else {
+            // Si acepta o no ha decidido, ocultar campos de rechazo
+            if (camposRechazo) {
+                camposRechazo.style.display = 'none';
+            }
+            
+            // Habilitar checkboxes
+            checkboxesPiezas.forEach(checkbox => {
+                checkbox.disabled = false;
+            });
+            if (checkboxSelectAll) {
+                checkboxSelectAll.disabled = false;
+                checkboxSelectAll.checked = true; // Marcar todas por defecto
+            }
+            
+            // Marcar todas las piezas si acepta
+            if (radioAceptar && radioAceptar.checked) {
+                checkboxesPiezas.forEach(checkbox => {
+                    checkbox.checked = true;
+                });
+            }
+        }
+        
+        actualizarEstiloFilas();
+    }
+    
+    // Escuchar cambios en los radio buttons
+    if (radioAceptar) {
+        radioAceptar.addEventListener('change', actualizarCamposRechazo);
+    }
+    if (radioRechazar) {
+        radioRechazar.addEventListener('change', actualizarCamposRechazo);
+    }
+    
+    // -------------------------------------------------------------------------
+    // 3. FUNCIONALIDAD: Validación antes de enviar
+    // -------------------------------------------------------------------------
+    // 3. FUNCIONALIDAD: Validación antes de enviar
+    // -------------------------------------------------------------------------
+    formGestionar.addEventListener('submit', function(e) {
+        const accionSeleccionada = document.querySelector('input[name="accion"]:checked');
+        
+        if (!accionSeleccionada) {
+            e.preventDefault();
+            alert('❌ Por favor selecciona si el cliente acepta o rechaza la cotización.');
+            return;
+        }
+        
+        // Si acepta, validar que haya al menos una pieza seleccionada
+        if (accionSeleccionada.value === 'aceptar') {
+            const piezasSeleccionadas = Array.from(checkboxesPiezas).filter(cb => cb.checked);
+            
+            if (piezasSeleccionadas.length === 0) {
+                e.preventDefault();
+                alert('❌ Debes seleccionar al menos una pieza para aceptar la cotización.');
+                return;
+            }
+            
+            // CRÍTICO: Copiar los checkboxes al formulario antes de enviar
+            // Los checkboxes están fuera del form, así que debemos clonarlos
+            piezasSeleccionadas.forEach(checkbox => {
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'piezas_seleccionadas';
+                hiddenInput.value = checkbox.value;
+                formGestionar.appendChild(hiddenInput);
+            });
+            
+            // Confirmación con resumen
+            const mensaje = `¿Confirmar aceptación de ${piezasSeleccionadas.length} pieza(s)?`;
+            if (!confirm(mensaje)) {
+                e.preventDefault();
+                return;
+            }
+        }
+        
+        // Si rechaza, confirmar
+        if (accionSeleccionada.value === 'rechazar') {
+            if (!confirm('¿Estás seguro de rechazar TODA la cotización?')) {
+                e.preventDefault();
+                return;
+            }
+        }
+    });
+    
+    // -------------------------------------------------------------------------
+    // 4. HELPER: Actualizar estilos visuales de las filas
+    // -------------------------------------------------------------------------
+    function actualizarEstiloFilas() {
+        checkboxesPiezas.forEach(checkbox => {
+            const fila = checkbox.closest('tr');
+            if (fila) {
+                if (checkbox.checked && !checkbox.disabled) {
+                    // Pieza seleccionada: resaltar con fondo verde claro
+                    fila.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
+                    fila.style.borderLeft = '4px solid #28a745';
+                } else if (checkbox.disabled) {
+                    // Rechazada: fondo gris
+                    fila.style.backgroundColor = 'rgba(108, 117, 125, 0.1)';
+                    fila.style.borderLeft = '4px solid #6c757d';
+                } else {
+                    // Desmarcada pero habilitada: fondo rojo claro
+                    fila.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
+                    fila.style.borderLeft = '4px solid #dc3545';
+                }
+            }
+        });
+    }
+    
+    // Inicializar estilos al cargar
+    actualizarEstiloFilas();
+    actualizarCamposRechazo();
+});
 </script>
 {% endblock %}
