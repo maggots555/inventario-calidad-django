@@ -1200,6 +1200,37 @@ def detalle_orden(request, orden_id):
     # CONTEXT PARA EL TEMPLATE
     # ========================================================================
     
+    # ========================================================================
+    # VENTA MOSTRADOR - FASE 3
+    # ========================================================================
+    # Inicializar variables de venta mostrador
+    venta_mostrador = None
+    form_venta_mostrador = None
+    form_pieza_venta_mostrador = None
+    piezas_venta_mostrador = []
+    
+    # Si la orden es tipo "venta_mostrador", preparar contexto específico
+    if orden.tipo_servicio == 'venta_mostrador':
+        from .forms import VentaMostradorForm, PiezaVentaMostradorForm
+        
+        # Verificar si ya existe venta mostrador
+        if hasattr(orden, 'venta_mostrador'):
+            venta_mostrador = orden.venta_mostrador
+            
+            # Formulario de venta mostrador con datos existentes (para editar)
+            form_venta_mostrador = VentaMostradorForm(instance=venta_mostrador)
+            
+            # Obtener todas las piezas vendidas
+            piezas_venta_mostrador = venta_mostrador.piezas_vendidas.select_related(
+                'componente'
+            ).order_by('-fecha_venta')
+        else:
+            # No existe venta mostrador, preparar formulario para crear
+            form_venta_mostrador = VentaMostradorForm()
+        
+        # Formulario para agregar piezas (siempre disponible)
+        form_pieza_venta_mostrador = PiezaVentaMostradorForm()
+    
     context = {
         'orden': orden,
         'detalle': orden.detalle_equipo,
@@ -1220,6 +1251,12 @@ def detalle_orden(request, orden_id):
         # Formularios para modales (Piezas y Seguimientos)
         'form_pieza': form_pieza,
         'form_seguimiento': form_seguimiento,
+        
+        # NUEVOS: Formularios de Venta Mostrador - FASE 3
+        'venta_mostrador': venta_mostrador,
+        'form_venta_mostrador': form_venta_mostrador,
+        'form_pieza_venta_mostrador': form_pieza_venta_mostrador,
+        'piezas_venta_mostrador': piezas_venta_mostrador,
         
         # Datos de Cotización
         'cotizacion': cotizacion,
@@ -2370,3 +2407,419 @@ Este es un mensaje automático, por favor no responder.
     except Exception as e:
         print(f"❌ Error al enviar email de notificación: {str(e)}")
         # No levantamos la excepción para no afectar el flujo principal
+
+
+# ============================================================================
+# VISTAS AJAX PARA VENTA MOSTRADOR - FASE 3
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def crear_venta_mostrador(request, orden_id):
+    """
+    Crea una nueva venta mostrador asociada a una orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista maneja el formulario modal para crear una venta mostrador.
+    Responde con JSON para actualizar la interfaz sin recargar la página (AJAX).
+    
+    FLUJO:
+    1. Obtiene la orden y verifica que sea tipo 'venta_mostrador'
+    2. Verifica que NO tenga venta mostrador existente
+    3. Valida el formulario recibido
+    4. Crea la venta mostrador asociada a la orden
+    5. Registra en historial
+    6. Devuelve JSON con el resultado
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        orden_id: ID de la orden a la que se asocia la venta
+    
+    Returns:
+        JsonResponse con success=True/False y datos de la venta
+    """
+    from django.http import JsonResponse
+    from .forms import VentaMostradorForm
+    from .models import VentaMostrador
+    
+    try:
+        # Obtener la orden
+        orden = get_object_or_404(OrdenServicio, id=orden_id)
+        
+        # Verificar que sea tipo venta mostrador
+        if orden.tipo_servicio != 'venta_mostrador':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden no es de tipo "Venta Mostrador"'
+            }, status=400)
+        
+        # Verificar que NO tenga venta mostrador existente
+        if hasattr(orden, 'venta_mostrador'):
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden ya tiene una venta mostrador asociada'
+            }, status=400)
+        
+        # Procesar formulario
+        form = VentaMostradorForm(request.POST)
+        
+        if form.is_valid():
+            venta = form.save(commit=False)
+            venta.orden = orden
+            venta.save()
+            
+            # Registrar en historial
+            registrar_historial(
+                orden=orden,
+                tipo_evento='actualizacion',
+                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                comentario=f"✅ Venta Mostrador creada: {venta.folio_venta} | Paquete: {venta.get_paquete_display()} | Total: ${venta.total_venta}",
+                es_sistema=False
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Venta Mostrador creada: {venta.folio_venta}',
+                'folio_venta': venta.folio_venta,
+                'total_venta': float(venta.total_venta),
+                'paquete': venta.get_paquete_display(),
+                'redirect_url': f'/servicio-tecnico/ordenes/{orden_id}/'  # Redirigir para refrescar
+            })
+        else:
+            # Devolver errores del formulario
+            errors = {}
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0]  # Primer error de cada campo
+            
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def agregar_pieza_venta_mostrador(request, orden_id):
+    """
+    Agrega una nueva pieza a una venta mostrador existente.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista maneja el formulario modal para agregar piezas individuales
+    a una venta mostrador. Por ejemplo: RAM adicional, cables, accesorios.
+    Responde con JSON para actualizar la interfaz sin recargar (AJAX).
+    
+    FLUJO:
+    1. Obtiene la orden y verifica que tenga venta mostrador
+    2. Valida el formulario de pieza recibido
+    3. Asocia la pieza a la venta mostrador
+    4. Actualiza el total de la venta automáticamente (property)
+    5. Registra en historial
+    6. Devuelve JSON con la fila HTML de la nueva pieza
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        orden_id: ID de la orden que tiene la venta mostrador
+    
+    Returns:
+        JsonResponse con success=True/False y HTML de la pieza
+    """
+    from django.http import JsonResponse
+    from .forms import PiezaVentaMostradorForm
+    from .models import PiezaVentaMostrador, VentaMostrador
+    
+    try:
+        orden = get_object_or_404(OrdenServicio, id=orden_id)
+        
+        # Verificar que existe venta mostrador
+        if not hasattr(orden, 'venta_mostrador'):
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden no tiene venta mostrador asociada'
+            }, status=400)
+        
+        venta_mostrador = orden.venta_mostrador
+        
+        # Procesar formulario
+        form = PiezaVentaMostradorForm(request.POST)
+        
+        if form.is_valid():
+            pieza = form.save(commit=False)
+            pieza.venta_mostrador = venta_mostrador
+            pieza.save()
+            
+            # Registrar en historial
+            registrar_historial(
+                orden=orden,
+                tipo_evento='actualizacion',
+                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                comentario=f"✅ Pieza agregada a venta mostrador: {pieza.descripcion_pieza} (x{pieza.cantidad}) - ${pieza.subtotal}",
+                es_sistema=False
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Pieza agregada: {pieza.descripcion_pieza}',
+                'pieza_id': pieza.id,
+                'descripcion': pieza.descripcion_pieza,
+                'cantidad': pieza.cantidad,
+                'precio_unitario': float(pieza.precio_unitario),
+                'subtotal': float(pieza.subtotal),
+                'total_venta_actualizado': float(venta_mostrador.total_venta),
+                'redirect_url': f'/servicio-tecnico/ordenes/{orden_id}/'  # Redirigir para refrescar
+            })
+        else:
+            # Devolver errores del formulario
+            errors = {}
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0]  # Primer error de cada campo
+            
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def editar_pieza_venta_mostrador(request, pieza_id):
+    """
+    Edita una pieza de venta mostrador existente.
+    
+    EXPLICACIÓN:
+    Permite modificar cantidad, precio unitario, descripción de una pieza.
+    Actualiza automáticamente el total de la venta.
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        pieza_id: ID de la pieza a editar
+    
+    Returns:
+        JsonResponse con success=True/False y datos actualizados
+    """
+    from django.http import JsonResponse
+    from .forms import PiezaVentaMostradorForm
+    from .models import PiezaVentaMostrador
+    
+    try:
+        pieza = get_object_or_404(PiezaVentaMostrador, id=pieza_id)
+        venta_mostrador = pieza.venta_mostrador
+        orden = venta_mostrador.orden
+        
+        # Procesar formulario de edición
+        form = PiezaVentaMostradorForm(request.POST, instance=pieza)
+        
+        if form.is_valid():
+            pieza_actualizada = form.save()
+            
+            # Registrar en historial
+            registrar_historial(
+                orden=orden,
+                tipo_evento='actualizacion',
+                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                comentario=f"✏️ Pieza modificada: {pieza_actualizada.descripcion_pieza} - ${pieza_actualizada.subtotal}",
+                es_sistema=False
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Pieza actualizada: {pieza_actualizada.descripcion_pieza}',
+                'pieza_id': pieza_actualizada.id,
+                'descripcion': pieza_actualizada.descripcion_pieza,
+                'cantidad': pieza_actualizada.cantidad,
+                'precio_unitario': float(pieza_actualizada.precio_unitario),
+                'subtotal': float(pieza_actualizada.subtotal),
+                'total_venta_actualizado': float(venta_mostrador.total_venta),
+                'redirect_url': f'/servicio-tecnico/ordenes/{orden.id}/'
+            })
+        else:
+            # Devolver errores del formulario
+            errors = {}
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0]
+            
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def eliminar_pieza_venta_mostrador(request, pieza_id):
+    """
+    Elimina una pieza de venta mostrador.
+    
+    EXPLICACIÓN:
+    Elimina una pieza vendida y actualiza el total de la venta.
+    Registra la acción en el historial.
+    
+    Args:
+        request: HttpRequest
+        pieza_id: ID de la pieza a eliminar
+    
+    Returns:
+        JsonResponse con success=True/False
+    """
+    from django.http import JsonResponse
+    from .models import PiezaVentaMostrador
+    
+    try:
+        pieza = get_object_or_404(PiezaVentaMostrador, id=pieza_id)
+        venta_mostrador = pieza.venta_mostrador
+        orden = venta_mostrador.orden
+        
+        # Guardar info antes de eliminar
+        descripcion = pieza.descripcion_pieza
+        subtotal = pieza.subtotal
+        
+        # Eliminar pieza
+        pieza.delete()
+        
+        # Registrar en historial
+        registrar_historial(
+            orden=orden,
+            tipo_evento='actualizacion',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=f"🗑️ Pieza eliminada de venta mostrador: {descripcion} (${subtotal})",
+            es_sistema=False
+        )
+        
+        # Recalcular total (se hace automáticamente por el property total_venta)
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Pieza eliminada: {descripcion}',
+            'total_venta_actualizado': float(venta_mostrador.total_venta),
+            'redirect_url': f'/servicio-tecnico/ordenes/{orden.id}/'
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def convertir_venta_a_diagnostico(request, orden_id):
+    """
+    Convierte una orden de venta mostrador a orden con diagnóstico.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista maneja el caso especial cuando una venta mostrador falla
+    (por ejemplo, al instalar una pieza) y se necesita hacer diagnóstico.
+    
+    ESCENARIO REAL:
+    1. Cliente compra RAM sin diagnóstico
+    2. Al instalar, el equipo no enciende
+    3. Se descubre que el problema es otra cosa (motherboard, fuente, etc.)
+    4. Se convierte a orden con diagnóstico para investigar
+    
+    FLUJO:
+    1. Verifica que la orden sea tipo 'venta_mostrador'
+    2. Verifica que tenga venta mostrador asociada
+    3. Valida que el estado permita la conversión
+    4. Recibe el motivo de conversión del usuario
+    5. Llama al método convertir_a_diagnostico() del modelo
+    6. Devuelve JSON con la nueva orden creada
+    
+    Args:
+        request: HttpRequest con POST data (motivo_conversion)
+        orden_id: ID de la orden de venta mostrador
+    
+    Returns:
+        JsonResponse con success=True/False y datos de nueva orden
+    """
+    from django.http import JsonResponse
+    
+    try:
+        orden = get_object_or_404(OrdenServicio, id=orden_id)
+        
+        # Validación 1: Debe ser tipo venta_mostrador
+        if orden.tipo_servicio != 'venta_mostrador':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Solo se pueden convertir órdenes de tipo "Venta Mostrador"'
+            }, status=400)
+        
+        # Validación 2: Debe tener venta mostrador asociada
+        if not hasattr(orden, 'venta_mostrador'):
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden no tiene venta mostrador asociada'
+            }, status=400)
+        
+        # Validación 3: No debe estar ya convertida
+        if orden.estado == 'convertida_a_diagnostico':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden ya fue convertida a diagnóstico'
+            }, status=400)
+        
+        # Validación 4: Estados válidos para conversión
+        estados_validos = ['recepcion', 'reparacion', 'control_calidad']
+        if orden.estado not in estados_validos:
+            return JsonResponse({
+                'success': False,
+                'error': f'❌ No se puede convertir desde el estado "{orden.get_estado_display()}". Estados válidos: Recepción, Reparación, Control de Calidad'
+            }, status=400)
+        
+        # Obtener motivo de conversión (obligatorio)
+        motivo_conversion = request.POST.get('motivo_conversion', '').strip()
+        if not motivo_conversion or len(motivo_conversion) < 10:
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Debes proporcionar un motivo detallado de conversión (mínimo 10 caracteres)'
+            }, status=400)
+        
+        # Obtener empleado actual
+        empleado_actual = None
+        if hasattr(request.user, 'empleado'):
+            empleado_actual = request.user.empleado
+        
+        # Llamar al método del modelo para convertir
+        nueva_orden = orden.convertir_a_diagnostico(
+            usuario=empleado_actual,
+            motivo_conversion=motivo_conversion
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Orden convertida a diagnóstico exitosamente',
+            'orden_original': orden.numero_orden_interno,
+            'nueva_orden_id': nueva_orden.id,
+            'nueva_orden_numero': nueva_orden.numero_orden_interno,
+            'monto_abono': float(orden.venta_mostrador.total_venta),
+            'redirect_url': f'/servicio-tecnico/ordenes/{nueva_orden.id}/'
+        })
+    
+    except ValueError as e:
+        # Errores de validación del modelo
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado al convertir: {str(e)}'
+        }, status=500)

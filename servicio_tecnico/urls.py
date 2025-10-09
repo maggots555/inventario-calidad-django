@@ -59,6 +59,20 @@ urlpatterns = [
     path('seguimientos/<int:seguimiento_id>/marcar-recibido/', views.marcar_pieza_recibida, name='marcar_recibido'),
     path('seguimientos/<int:seguimiento_id>/cambiar-estado/', views.cambiar_estado_seguimiento, name='cambiar_estado_seguimiento'),
     
+    # ========================================================================
+    # GESTIÓN DE VENTA MOSTRADOR (AJAX) - FASE 3
+    # ========================================================================
+    # Crear venta mostrador
+    path('ordenes/<int:orden_id>/venta-mostrador/crear/', views.crear_venta_mostrador, name='venta_mostrador_crear'),
+    
+    # Gestión de piezas de venta mostrador
+    path('ordenes/<int:orden_id>/venta-mostrador/piezas/agregar/', views.agregar_pieza_venta_mostrador, name='venta_mostrador_agregar_pieza'),
+    path('venta-mostrador/piezas/<int:pieza_id>/editar/', views.editar_pieza_venta_mostrador, name='venta_mostrador_editar_pieza'),
+    path('venta-mostrador/piezas/<int:pieza_id>/eliminar/', views.eliminar_pieza_venta_mostrador, name='venta_mostrador_eliminar_pieza'),
+    
+    # Conversión a diagnóstico
+    path('ordenes/<int:orden_id>/convertir-a-diagnostico/', views.convertir_venta_a_diagnostico, name='venta_mostrador_convertir'),
+    
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]

@@ -18,6 +18,8 @@ from .models import (
     Cotizacion,
     PiezaCotizada,
     SeguimientoPieza,
+    VentaMostrador,  # ← NUEVO - FASE 3
+    PiezaVentaMostrador,  # ← NUEVO - FASE 3
 )
 from inventario.models import Sucursal, Empleado
 from scorecard.models import ComponenteEquipo
@@ -1433,3 +1435,282 @@ class SeguimientoPiezaForm(forms.ModelForm):
                 })
         
         return cleaned_data
+
+
+# ============================================================================
+# FORMULARIOS PARA VENTA MOSTRADOR - FASE 3
+# ============================================================================
+
+class VentaMostradorForm(forms.ModelForm):
+    """
+    Formulario para crear/editar una Venta Mostrador asociada a una orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario permite registrar ventas directas sin diagnóstico previo:
+    - Seleccionar paquete (premium/oro/plata/ninguno)
+    - Agregar servicios adicionales (cambio pieza, limpieza, kit, reinstalación)
+    - Cada servicio adicional tiene un campo de costo asociado
+    
+    CAMPOS INCLUIDOS:
+    - paquete: Select con opciones de paquetes
+    - incluye_cambio_pieza + costo_cambio_pieza: Checkbox + campo numérico
+    - incluye_limpieza + costo_limpieza: Checkbox + campo numérico
+    - incluye_kit_limpieza + costo_kit: Checkbox + campo numérico
+    - incluye_reinstalacion_so + costo_reinstalacion: Checkbox + campo numérico
+    - notas_adicionales: Textarea para observaciones
+    """
+    
+    class Meta:
+        model = VentaMostrador
+        fields = [
+            'paquete',
+            'incluye_cambio_pieza',
+            'costo_cambio_pieza',
+            'incluye_limpieza',
+            'costo_limpieza',
+            'incluye_kit_limpieza',
+            'costo_kit',
+            'incluye_reinstalacion_so',
+            'costo_reinstalacion',
+            'notas_adicionales',
+        ]
+        
+        widgets = {
+            'paquete': forms.Select(attrs={
+                'class': 'form-control form-select',
+                'id': 'id_paquete_venta',
+            }),
+            'incluye_cambio_pieza': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'onchange': 'toggleCambioPiezaCosto()',
+            }),
+            'costo_cambio_pieza': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0.00',
+                'step': '0.01',
+                'min': '0',
+            }),
+            'incluye_limpieza': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'onchange': 'toggleLimpiezaCosto()',
+            }),
+            'costo_limpieza': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0.00',
+                'step': '0.01',
+                'min': '0',
+            }),
+            'incluye_kit_limpieza': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'onchange': 'toggleKitCosto()',
+            }),
+            'costo_kit': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0.00',
+                'step': '0.01',
+                'min': '0',
+            }),
+            'incluye_reinstalacion_so': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'onchange': 'toggleReinstalacionCosto()',
+            }),
+            'costo_reinstalacion': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0.00',
+                'step': '0.01',
+                'min': '0',
+            }),
+            'notas_adicionales': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Notas u observaciones adicionales sobre la venta...',
+            }),
+        }
+        
+        labels = {
+            'paquete': 'Paquete de Servicio',
+            'incluye_cambio_pieza': 'Incluye cambio de pieza',
+            'costo_cambio_pieza': 'Costo de instalación',
+            'incluye_limpieza': 'Incluye limpieza y mantenimiento',
+            'costo_limpieza': 'Costo de limpieza',
+            'incluye_kit_limpieza': 'Venta de kit de limpieza',
+            'costo_kit': 'Costo del kit',
+            'incluye_reinstalacion_so': 'Reinstalación de sistema operativo',
+            'costo_reinstalacion': 'Costo de reinstalación',
+            'notas_adicionales': 'Notas adicionales',
+        }
+        
+        help_texts = {
+            'paquete': 'Selecciona el paquete que desea el cliente',
+            'incluye_cambio_pieza': 'Marca si incluye instalación de pieza comprada',
+            'costo_cambio_pieza': 'Costo del servicio de instalación',
+            'incluye_limpieza': 'Limpieza interna y externa del equipo',
+            'costo_limpieza': 'Costo del servicio de limpieza',
+            'incluye_kit_limpieza': 'Venta de kit de limpieza para el cliente',
+            'costo_kit': 'Precio de venta del kit',
+            'incluye_reinstalacion_so': 'Reinstalación de Windows u otro SO',
+            'costo_reinstalacion': 'Costo del servicio de reinstalación',
+            'notas_adicionales': 'Cualquier observación o detalle importante',
+        }
+    
+    def clean(self):
+        """
+        Validaciones personalizadas del formulario.
+        
+        EXPLICACIÓN:
+        Verifica que si un checkbox está marcado, su costo asociado sea mayor a 0.
+        Por ejemplo: Si "incluye_cambio_pieza" = True, entonces "costo_cambio_pieza" > 0
+        """
+        cleaned_data = super().clean()
+        
+        # Validar cambio de pieza
+        if cleaned_data.get('incluye_cambio_pieza'):
+            if not cleaned_data.get('costo_cambio_pieza') or cleaned_data.get('costo_cambio_pieza') <= 0:
+                raise ValidationError({
+                    'costo_cambio_pieza': '❌ Si incluye cambio de pieza, el costo debe ser mayor a 0'
+                })
+        
+        # Validar limpieza
+        if cleaned_data.get('incluye_limpieza'):
+            if not cleaned_data.get('costo_limpieza') or cleaned_data.get('costo_limpieza') <= 0:
+                raise ValidationError({
+                    'costo_limpieza': '❌ Si incluye limpieza, el costo debe ser mayor a 0'
+                })
+        
+        # Validar kit de limpieza
+        if cleaned_data.get('incluye_kit_limpieza'):
+            if not cleaned_data.get('costo_kit') or cleaned_data.get('costo_kit') <= 0:
+                raise ValidationError({
+                    'costo_kit': '❌ Si incluye kit de limpieza, el costo debe ser mayor a 0'
+                })
+        
+        # Validar reinstalación SO
+        if cleaned_data.get('incluye_reinstalacion_so'):
+            if not cleaned_data.get('costo_reinstalacion') or cleaned_data.get('costo_reinstalacion') <= 0:
+                raise ValidationError({
+                    'costo_reinstalacion': '❌ Si incluye reinstalación, el costo debe ser mayor a 0'
+                })
+        
+        return cleaned_data
+
+
+class PiezaVentaMostradorForm(forms.ModelForm):
+    """
+    Formulario para agregar/editar piezas vendidas en mostrador.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este formulario permite registrar piezas individuales vendidas además
+    de los paquetes. Por ejemplo: RAM adicional, cables, accesorios, etc.
+    
+    CAMPOS INCLUIDOS:
+    - componente: Select con autocompletado (opcional, del catálogo ScoreCard)
+    - descripcion_pieza: Texto libre para describir la pieza
+    - cantidad: Número de unidades vendidas
+    - precio_unitario: Precio por unidad
+    - notas: Observaciones adicionales
+    
+    NOTA: El subtotal se calcula automáticamente (cantidad × precio_unitario)
+    """
+    
+    class Meta:
+        model = PiezaVentaMostrador
+        fields = [
+            'componente',
+            'descripcion_pieza',
+            'cantidad',
+            'precio_unitario',
+            'notas',
+        ]
+        
+        widgets = {
+            'componente': forms.Select(attrs={
+                'class': 'form-control form-select',
+                'id': 'id_componente_pieza',
+            }),
+            'descripcion_pieza': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: RAM 8GB DDR4 Kingston, Cable HDMI 2m',
+                'required': True,
+            }),
+            'cantidad': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'value': '1',
+                'required': True,
+                'onchange': 'calcularSubtotalPieza()',
+            }),
+            'precio_unitario': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0.01',
+                'placeholder': '0.00',
+                'required': True,
+                'onchange': 'calcularSubtotalPieza()',
+            }),
+            'notas': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Observaciones sobre la pieza vendida (opcional)',
+            }),
+        }
+        
+        labels = {
+            'componente': 'Componente del catálogo (opcional)',
+            'descripcion_pieza': 'Descripción de la pieza',
+            'cantidad': 'Cantidad',
+            'precio_unitario': 'Precio unitario',
+            'notas': 'Notas',
+        }
+        
+        help_texts = {
+            'componente': 'Selecciona del catálogo si está disponible',
+            'descripcion_pieza': 'Describe claramente qué pieza se vendió',
+            'cantidad': 'Número de unidades vendidas',
+            'precio_unitario': 'Precio por unidad (IVA incluido)',
+            'notas': 'Cualquier observación adicional',
+        }
+    
+    def clean_descripcion_pieza(self):
+        """
+        Validación del campo descripcion_pieza.
+        
+        EXPLICACIÓN:
+        Asegura que la descripción no esté vacía y tenga al menos 3 caracteres.
+        """
+        descripcion = self.cleaned_data.get('descripcion_pieza', '').strip()
+        
+        if not descripcion:
+            raise ValidationError('❌ La descripción de la pieza es obligatoria')
+        
+        if len(descripcion) < 3:
+            raise ValidationError('❌ La descripción debe tener al menos 3 caracteres')
+        
+        return descripcion
+    
+    def clean_cantidad(self):
+        """
+        Validación del campo cantidad.
+        
+        EXPLICACIÓN:
+        Asegura que la cantidad sea un número positivo mayor a 0.
+        """
+        cantidad = self.cleaned_data.get('cantidad')
+        
+        if cantidad is None or cantidad < 1:
+            raise ValidationError('❌ La cantidad debe ser al menos 1')
+        
+        return cantidad
+    
+    def clean_precio_unitario(self):
+        """
+        Validación del campo precio_unitario.
+        
+        EXPLICACIÓN:
+        Asegura que el precio sea un número positivo mayor a 0.
+        """
+        precio = self.cleaned_data.get('precio_unitario')
+        
+        if precio is None or precio <= 0:
+            raise ValidationError('❌ El precio unitario debe ser mayor a 0')
+        
+        return precio
