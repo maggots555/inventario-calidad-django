@@ -495,6 +495,15 @@ def cerrar_orden(request, orden_id):
     # Obtener la orden o mostrar error 404
     orden = get_object_or_404(OrdenServicio, pk=orden_id)
     
+    # VALIDACIÓN: No permitir modificar orden convertida
+    if orden.estado == 'convertida_a_diagnostico':
+        messages.error(
+            request,
+            f'❌ La orden {orden.numero_orden_interno} fue convertida a diagnóstico y ya no puede modificarse. '
+            f'Esta orden está cerrada permanentemente.'
+        )
+        return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
+    
     # Verificar que esté en estado 'finalizado'
     if orden.estado == 'finalizado':
         # Cambiar estado a entregado
@@ -1344,6 +1353,8 @@ def detalle_orden(request, orden_id):
         # Información adicional
         'dias_en_servicio': orden.dias_en_servicio,
         'esta_retrasada': orden.esta_retrasada,
+        'esta_convertida': orden.esta_convertida,  # NUEVO: Indica si fue convertida a diagnóstico
+        'puede_modificarse': orden.puede_modificarse,  # NUEVO: Indica si puede modificarse
         
         # Estadísticas de técnicos (para alertas) - Convertido a JSON para JavaScript
         'estadisticas_tecnicos': mark_safe(json.dumps(estadisticas_tecnicos)),

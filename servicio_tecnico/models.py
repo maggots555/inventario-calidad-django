@@ -355,6 +355,37 @@ class OrdenServicio(models.Model):
             # Advertencia: Diagnósticos generalmente requieren QA
             # Nota: No bloqueamos, solo documentamos que es raro
             pass
+        
+        # REGLA 7: Orden convertida a diagnóstico NO puede cambiar de estado
+        if self.estado == 'convertida_a_diagnostico':
+            # Verificar si se está intentando cambiar el estado
+            if self.pk:  # Solo si la orden ya existe en BD
+                orden_anterior = OrdenServicio.objects.filter(pk=self.pk).first()
+                if orden_anterior and orden_anterior.estado != 'convertida_a_diagnostico':
+                    # Se está cambiando A convertida_a_diagnostico (permitido)
+                    pass
+                elif orden_anterior and orden_anterior.estado == 'convertida_a_diagnostico':
+                    # Ya estaba convertida y se intenta cambiar (BLOQUEADO)
+                    raise ValidationError({
+                        'estado': (
+                            "❌ Esta orden fue convertida a diagnóstico y ya no puede modificarse. "
+                            "La orden está cerrada y su continuación es la nueva orden de diagnóstico. "
+                            "Para ver la nueva orden, consulta el historial."
+                        )
+                    })
+    
+    @property
+    def esta_convertida(self):
+        """Retorna True si la orden fue convertida a diagnóstico"""
+        return self.estado == 'convertida_a_diagnostico'
+    
+    @property
+    def puede_modificarse(self):
+        """
+        Retorna True si la orden puede modificarse.
+        Una orden convertida a diagnóstico NO puede modificarse.
+        """
+        return not self.esta_convertida
     
     @property
     def dias_en_servicio(self):

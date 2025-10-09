@@ -38,6 +38,56 @@
     </div>
     
     <!-- ============================================================ -->
+    <!-- ALERTA: ORDEN CONVERTIDA A DIAGNÓSTICO (No Modificable) -->
+    <!-- ============================================================ -->
+    
+    {% if esta_convertida %}
+    <div class="alert alert-danger shadow mb-4" role="alert" style="border-left: 5px solid #dc3545; border-radius: 8px;">
+        <div class="d-flex align-items-start">
+            <div class="me-3" style="font-size: 2.5rem; animation: pulse 2s infinite;">
+                <i class="bi bi-lock-fill"></i>
+            </div>
+            <div class="flex-grow-1">
+                <h4 class="alert-heading mb-3">
+                    <strong>🔒 ORDEN CONVERTIDA A DIAGNÓSTICO - NO MODIFICABLE</strong>
+                </h4>
+                <p class="mb-3" style="font-size: 1.05rem;">
+                    Esta orden de venta mostrador fue convertida a una orden con diagnóstico técnico.
+                    <strong>Ya no puede modificarse, agregar piezas, ni cambiar de estado.</strong>
+                </p>
+                <hr>
+                <p class="mb-2 mt-3">
+                    <strong>📋 ¿Qué hacer ahora?</strong>
+                </p>
+                <ul class="mb-3">
+                    <li>Esta orden queda como <strong>registro histórico</strong> de lo que se intentó vender</li>
+                    <li>El trabajo continúa en la <strong>nueva orden de diagnóstico</strong> que se creó automáticamente</li>
+                    <li>Puedes consultar el <strong>historial</strong> abajo para ver el motivo de conversión y el número de la nueva orden</li>
+                </ul>
+                <div class="mt-3">
+                    <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-light btn-lg">
+                        <i class="bi bi-list-ul"></i> Ver Lista de Órdenes Activas
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.7;
+                transform: scale(1.1);
+            }
+        }
+    </style>
+    {% endif %}
+    
+    <!-- ============================================================ -->
     <!-- SECCIÓN 1: INFORMACIÓN PRINCIPAL (Solo Lectura) -->
     <!-- ============================================================ -->
     
@@ -1247,6 +1297,14 @@
                     Cambiar Estado de la Orden
                 </div>
                 <div class="card-body">
+                    {% if esta_convertida %}
+                    <!-- Orden convertida: Mostrar mensaje en lugar del formulario -->
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-lock-fill"></i> 
+                        <strong>No disponible:</strong> Esta orden fue convertida a diagnóstico y ya no puede cambiar de estado.
+                    </div>
+                    {% else %}
+                    <!-- Orden normal: Mostrar formulario -->
                     <form method="post" id="formCambioEstado">
                         {% csrf_token %}
                         <input type="hidden" name="form_type" value="cambio_estado">
@@ -1277,6 +1335,7 @@
                             </div>
                         </div>
                     </form>
+                    {% endif %}
                 </div>
             </div>
         </div>
