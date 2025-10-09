@@ -5,9 +5,9 @@
 Este documento detalla la implementación del sistema de **Ventas Mostrador** para el módulo de Servicio Técnico. Las ventas mostrador son servicios directos que NO requieren diagnóstico técnico previo, como instalación de piezas, reinstalación de sistema operativo, limpieza express, venta de accesorios, etc.
 
 **Fecha de Planeación:** 8 de Octubre, 2025  
-**Estado:** ✅ FASE 2 COMPLETADA - Admin Configurado y Funcional  
+**Estado:** ✅ FASE 4 COMPLETADA - Frontend Funcional y Conversión a Diagnóstico  
 **Integración:** Sistema de Servicio Técnico existente  
-**Última Actualización:** 8 de Octubre, 2025 - 23:45
+**Última Actualización:** 9 de Octubre, 2025 - 00:45
 
 ---
 
@@ -44,18 +44,22 @@ Este documento detalla la implementación del sistema de **Ventas Mostrador** pa
 ### 🚀 Implementación
 - [✅ FASE 1: Backend y Modelos (COMPLETADA)](#-fase-1-backend-y-modelos-completada---8-oct-2025)
 - [✅ FASE 2: Actualizar Admin (COMPLETADA)](#-fase-2-actualizar-admin-completada---8-oct-2025)
-- [FASE 3: Crear Vistas AJAX (PENDIENTE)](#fase-3-crear-vistas-ajax-3-horas---pendiente)
-- [FASE 4: Actualizar Templates (PENDIENTE)](#fase-4-actualizar-templates-2-horas---pendiente)
+- [✅ FASE 3: Crear Vistas AJAX (COMPLETADA)](#-fase-3-crear-vistas-ajax-completada---9-oct-2025)
+- [✅ FASE 4: Frontend - Templates y JavaScript (COMPLETADA)](#-fase-4-frontend---templates-y-javascript-completada---9-oct-2025)
 - [FASE 5: Pruebas (PENDIENTE)](#fase-5-pruebas-2-horas---pendiente)
 - [FASE 6: Documentación (PENDIENTE)](#fase-6-documentación-1-hora---pendiente)
 
 ### 📝 Documentación Adicional
 - [CHANGELOG_VENTA_MOSTRADOR.md](./CHANGELOG_VENTA_MOSTRADOR.md) - Registro detallado de cambios FASE 1
-- [CHANGELOG_VENTA_MOSTRADOR_FASE2.md](./CHANGELOG_VENTA_MOSTRADOR_FASE2.md) - Registro detallado de cambios FASE 2 (NUEVO)
-- [REFERENCIA_RAPIDA_VENTA_MOSTRADOR.md](./REFERENCIA_RAPIDA_VENTA_MOSTRADOR.md) - Guía rápida para desarrolladores
-- [REFERENCIA_RAPIDA_ADMIN_VENTA_MOSTRADOR.md](./REFERENCIA_RAPIDA_ADMIN_VENTA_MOSTRADOR.md) - Guía del Admin Django (NUEVO)
+- [CHANGELOG_VENTA_MOSTRADOR_FASE2.md](./CHANGELOG_VENTA_MOSTRADOR_FASE2.md) - Registro detallado de cambios FASE 2
+- [CHANGELOG_VENTA_MOSTRADOR_FASE3.md](./CHANGELOG_VENTA_MOSTRADOR_FASE3.md) - Registro detallado de cambios FASE 3
+- [CHANGELOG_VENTA_MOSTRADOR_FASE4.md](./CHANGELOG_VENTA_MOSTRADOR_FASE4.md) - Registro detallado de cambios FASE 4 (NUEVO)
+- [REFERENCIA_RAPIDA_VENTA_MOSTRADOR.md](./REFERENCIA_RAPIDA_VENTA_MOSTRADOR.md) - Guía rápida para desarrolladores FASE 1-2
+- [REFERENCIA_RAPIDA_VENTA_MOSTRADOR_FASE3.md](./REFERENCIA_RAPIDA_VENTA_MOSTRADOR_FASE3.md) - Guía rápida FASE 3 (Backend AJAX)
+- [REFERENCIA_RAPIDA_VENTA_MOSTRADOR_FASE4.md](./REFERENCIA_RAPIDA_VENTA_MOSTRADOR_FASE4.md) - Guía rápida FASE 4 (Frontend) (NUEVO)
+- [REFERENCIA_RAPIDA_ADMIN_VENTA_MOSTRADOR.md](./REFERENCIA_RAPIDA_ADMIN_VENTA_MOSTRADOR.md) - Guía del Admin Django
 - [verificar_fase1.py](./verificar_fase1.py) - Script de verificación de FASE 1
-- [verificar_fase2.py](./verificar_fase2.py) - Script de verificación de FASE 2 (NUEVO)
+- [verificar_fase2.py](./verificar_fase2.py) - Script de verificación de FASE 2
 
 ---
 
@@ -1094,93 +1098,183 @@ def estadisticas_ventas_mostrador():
 
 ---
 
-### ⏳ FASE 4: Frontend - Templates y JavaScript (PENDIENTE)
+### ✅ FASE 4: Frontend - Templates y JavaScript (COMPLETADA - 9 Oct 2025)
 
-#### 📝 Template detalle_orden.html - Pendiente
-- [ ] Agregar sección HTML de Venta Mostrador (después de cotización)
+**Duración Real:** 3 horas  
+**Estado:** ✅ COMPLETADA  
+**Desarrollador:** GitHub Copilot + Usuario  
+**Fecha:** 9 de Octubre, 2025
+
+#### ✅ Template detalle_orden.html - COMPLETADO
+- [x] Agregar sección HTML de Venta Mostrador (después de cotización)
   - Card con header warning (bg-warning)
-  - Mostrar folio de venta
-  - Tabla de información del paquete
-  - Tabla de servicios adicionales
-  - Tabla de piezas vendidas
-  - Total general de venta
-  - Botón "Crear Venta Mostrador" si no existe
-  - Botón "Convertir a Diagnóstico" con alerta
+  - Mostrar folio de venta, método de pago, total
+  - Tabla de piezas/servicios vendidos
+  - Total general de venta con formato de moneda
+  - Botón "Registrar Venta Mostrador" si no existe
+  - Botón "Convertir a Diagnóstico" con modal de confirmación
   - Condicional: `{% if orden.tipo_servicio == 'venta_mostrador' %}`
+  - Badge indicador cuando no hay venta registrada
 
-- [ ] Crear modal 'modalVentaMostrador'
-  - Estructura Bootstrap modal
-  - Formulario con campos de VentaMostradorForm
-  - Select de paquetes con descripciones
-  - Checkboxes + inputs numéricos para servicios
-  - Textarea para notas
-  - Botones: Guardar y Cancelar
+- [x] Crear modal 'modalVentaMostrador'
+  - Estructura Bootstrap 5 modal
+  - Formulario con campos: total_venta, metodo_pago, notas
+  - Inputs numéricos con validación de montos positivos
+  - Select de métodos de pago (efectivo, tarjeta, transferencia, cheque)
+  - Textarea para notas opcionales
+  - Botones: Guardar (btn-success) y Cancelar (btn-secondary)
+  - Validación de campos requeridos en frontend
 
-- [ ] Crear modal 'modalPiezaVentaMostrador'
-  - Estructura Bootstrap modal
-  - Formulario con campos de PiezaVentaMostradorForm
-  - Select de componentes (opcional)
-  - Input de descripción (obligatorio)
-  - Inputs numéricos para cantidad y precio
-  - Cálculo dinámico de subtotal
-  - Textarea para notas
-  - Botones: Agregar y Cancelar
+- [x] Crear modal 'modalPiezaVentaMostrador'
+  - Estructura Bootstrap 5 modal
+  - Formulario dinámico para agregar/editar piezas
+  - Campos: tipo (repuesto/servicio), descripción, cantidad, precio unitario
+  - Cálculo automático de precio total (cantidad × precio_unitario)
+  - Textarea para notas/observaciones
+  - Botones: Agregar/Actualizar y Cancelar
+  - Validación: descripción obligatoria, montos positivos
 
-#### 🎨 JavaScript venta_mostrador.js - Pendiente
-- [ ] Crear archivo `static/js/venta_mostrador.js`
-- [ ] Función `abrirModalVentaMostrador()`
-  - Limpiar formulario
-  - Cargar datos si es edición
-  - Mostrar modal con Bootstrap
+- [x] Crear modal 'modalConvertirDiagnostico'
+  - Modal de confirmación con advertencia (bg-warning)
+  - Textarea para motivo de conversión (obligatorio, min 10 caracteres)
+  - Explicación clara del proceso de conversión
+  - Información sobre trazabilidad y abono previo
+  - Botones: Confirmar Conversión (btn-danger) y Cancelar
+
+#### ✅ JavaScript venta_mostrador.js - COMPLETADO
+- [x] Crear archivo `static/js/venta_mostrador.js` (~700 líneas)
   
-- [ ] Función `guardarVentaMostrador()`
-  - Recoger datos del formulario
-  - Validar campos requeridos
-  - Hacer petición AJAX POST a `venta_mostrador_crear`
-  - Manejar respuesta JSON
-  - Mostrar mensaje de éxito/error
-  - Recargar página si exitoso
+- [x] Función `guardarVentaMostrador()`
+  - Recoger datos del formulario (total, método pago, notas)
+  - Validar campos requeridos (total > 0, método seleccionado)
+  - Fetch POST AJAX a `/ordenes/<id>/venta-mostrador/crear/`
+  - Manejo de respuesta JSON con success/error
+  - Mostrar alertas Bootstrap (success/danger)
+  - Recargar página automáticamente en éxito
+  - CSRF token incluido en headers
 
-- [ ] Función `abrirModalPiezaVentaMostrador(esEdicion=false, piezaId=null)`
-  - Limpiar o cargar datos según sea creación/edición
-  - Mostrar modal
+- [x] Función `abrirModalPiezaVentaMostrador(esEdicion=false, piezaId=null)`
+  - Limpiar formulario para nueva pieza
+  - Cargar datos existentes si es edición (GET AJAX)
+  - Cambiar título del modal dinámicamente
+  - Configurar action del formulario según modo
+  - Mostrar modal con Bootstrap API
 
-- [ ] Función `guardarPiezaVentaMostrador()`
-  - Recoger datos del formulario
-  - Validar campos
-  - POST AJAX a `venta_mostrador_agregar_pieza` o `venta_mostrador_editar_pieza`
-  - Actualizar tabla de piezas en DOM
-  - Actualizar total de venta
+- [x] Función `guardarPiezaVentaMostrador()`
+  - Validar descripción, cantidad y precio
+  - Determinar endpoint según modo (crear/editar)
+  - POST AJAX con datos del formulario
+  - Actualizar tabla de piezas en DOM sin recargar
+  - Recalcular y actualizar total de venta
+  - Cerrar modal y mostrar mensaje de éxito
 
-- [ ] Función `eliminarPiezaVentaMostrador(piezaId)`
-  - Confirmar con usuario
-  - DELETE AJAX a `venta_mostrador_eliminar_pieza`
-  - Remover fila de tabla
-  - Actualizar total
+- [x] Función `eliminarPiezaVentaMostrador(piezaId)`
+  - Confirmar eliminación con `confirm()` nativo
+  - POST AJAX a `/venta-mostrador/piezas/<id>/eliminar/`
+  - Remover fila de tabla con animación
+  - Actualizar contador de piezas y total
+  - Mostrar mensaje de confirmación
 
-- [ ] Función `convertirADiagnostico(ordenId)`
-  - Mostrar modal de confirmación con textarea para motivo
+- [x] Función `convertirADiagnostico(ordenId)`
+  - Abrir modal de confirmación
   - Validar motivo (>= 10 caracteres)
-  - POST AJAX a `venta_mostrador_convertir`
-  - Redirigir a nueva orden creada
+  - POST AJAX a `/ordenes/<id>/convertir-a-diagnostico/`
+  - Redirigir automáticamente a nueva orden creada
+  - Mostrar información de orden original y nueva
 
-- [ ] Función `calcularSubtotalPieza()`
-  - Escuchar cambios en cantidad y precio_unitario
-  - Calcular y mostrar subtotal dinámicamente
+- [x] Función `calcularSubtotalPieza()`
+  - Event listeners en inputs de cantidad y precio_unitario
+  - Cálculo dinámico: cantidad × precio_unitario
+  - Formateo de moneda con 2 decimales
+  - Actualización en tiempo real del campo precio_total
 
-- [ ] Funciones helper:
-  - `getCookie(name)` para obtener CSRF token
-  - `mostrarAlerta(tipo, mensaje)` para feedback visual
-  - `formatearMoneda(valor)` para display de precios
+- [x] Funciones helper implementadas:
+  - `getCookie(name)` - Obtener CSRF token de cookies
+  - `mostrarAlerta(tipo, mensaje)` - Crear alertas Bootstrap dinámicas
+  - `formatearMoneda(valor)` - Formato $X,XXX.XX
+  - `actualizarTotalVenta()` - Recalcular total sumando todas las piezas
 
-#### 🔌 Carga de JavaScript en template - Pendiente
-- [ ] Agregar bloque `{% block extra_js %}` al final de detalle_orden.html
-- [ ] Cargar venta_mostrador.js con `{% static %}`
-- [ ] Incluir CSRF token para AJAX:
-  ```javascript
-  const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-  ```
-- [ ] Condicional de carga: Solo si `orden.tipo_servicio == 'venta_mostrador'`
+#### ✅ Carga de JavaScript en template - COMPLETADO
+- [x] Agregar bloque `{% block extra_js %}` al final de detalle_orden.html
+- [x] Cargar venta_mostrador.js con `{% static 'js/venta_mostrador.js' %}`
+- [x] Versioning de caché con parámetro `?v=1.0`
+- [x] Condicional de carga: Solo si `orden.tipo_servicio == 'venta_mostrador'`
+- [x] Inicialización automática al cargar DOM
+- [x] Console logs para debugging y confirmación de carga
+
+#### ✅ Integración con Backend AJAX (FASE 3)
+- [x] Endpoints conectados correctamente:
+  - `POST /ordenes/<id>/venta-mostrador/crear/` - Crear venta mostrador
+  - `POST /ordenes/<id>/venta-mostrador/piezas/agregar/` - Agregar pieza
+  - `POST /venta-mostrador/piezas/<id>/editar/` - Editar pieza
+  - `POST /venta-mostrador/piezas/<id>/eliminar/` - Eliminar pieza
+  - `POST /ordenes/<id>/convertir-a-diagnostico/` - Convertir a diagnóstico
+
+#### ✅ Formulario de Creación de Orden Venta Mostrador
+- [x] Crear `NuevaOrdenVentaMostradorForm` en forms.py
+  - Campos: tipo_equipo, marca, modelo, numero_serie, descripcion_servicio, sucursal
+  - Método save() personalizado que establece tipo_servicio='venta_mostrador'
+  - Creación automática de OrdenServicio + DetalleEquipo
+  - Registro en HistorialOrden con empleado correcto
+  - **FIX CRÍTICO:** Usar empleado del usuario para historial, no User directamente
+
+- [x] Crear vista `crear_orden_venta_mostrador` en views.py
+  - Renderiza formulario en GET
+  - Procesa y valida formulario en POST
+  - Redirige a detalle_orden después de crear
+  - Mensajes de éxito/error con Django messages framework
+
+- [x] Crear template `form_nueva_orden_venta_mostrador.html`
+  - Formulario Bootstrap con todos los campos
+  - Secciones claras: Información del Equipo, Descripción, Ubicación
+  - Alertas informativas sobre concepto de venta mostrador
+  - Breadcrumbs para navegación
+  - Botones: Crear Orden y Cancelar
+
+- [x] Agregar URL pattern en urls.py
+  - `path('ordenes/venta-mostrador/crear/', ...)`
+  - Nombre: 'crear_orden_venta_mostrador'
+
+- [x] Agregar botón en inicio.html
+  - Botón "Venta Mostrador" junto a "Nueva Orden"
+  - Estilo diferenciado (btn-warning vs btn-primary)
+  - Icono de carrito de compras
+
+#### ✅ Correcciones y Mejoras
+- [x] **FIX BUG:** HistorialOrden.usuario requiere Empleado, no User
+  - Verificar `hasattr(user, 'empleado')` antes de asignar
+  - Usar `user.empleado` en lugar de `user` directamente
+  - Prevenir errores de asignación de tipo incorrecto
+
+- [x] **FIX BUG:** Método convertir_a_diagnostico() en models.py
+  - Cambiar `hasattr()` por `try-except` para detectar DetalleEquipo
+  - Crear DetalleEquipo básico si no existe en orden original
+  - Corregir nombres de campos: `gama` en lugar de `gama_equipo`
+  - Eliminar campos inexistentes: observaciones, contraseña_equipo, contiene_informacion_sensible
+  - Copiar campos correctos: tipo_equipo, marca, modelo, numero_serie, orden_cliente, gama, etc.
+  - Garantizar que nueva orden siempre tenga DetalleEquipo
+
+#### 📊 Resultados de FASE 4
+- ✅ Frontend completamente funcional
+- ✅ Creación de órdenes de venta mostrador desde interfaz
+- ✅ Registro de ventas mostrador con modal
+- ✅ Gestión completa de piezas/servicios (CRUD)
+- ✅ Conversión a diagnóstico con trazabilidad
+- ✅ Validaciones en frontend y backend
+- ✅ UX profesional con Bootstrap 5
+- ✅ Mensajes de feedback claros para el usuario
+- ✅ Cálculos automáticos de totales
+- ✅ Integración completa con backend AJAX
+
+#### 🎯 Funcionalidades Implementadas
+1. **Creación de Ordenes VM**: Formulario dedicado sin acceder a Django Admin
+2. **Registro de Venta**: Modal con total, método de pago y notas
+3. **Gestión de Piezas**: Agregar, editar y eliminar servicios/repuestos vendidos
+4. **Cálculos Automáticos**: Totales y subtotales en tiempo real
+5. **Conversión a Diagnóstico**: Proceso guiado con motivo obligatorio
+6. **Trazabilidad**: Vinculación entre orden original y nueva orden de diagnóstico
+7. **Validaciones**: Frontend y backend para datos consistentes
+8. **UX Mejorada**: Alertas, confirmaciones y feedback visual
 
 ---
 

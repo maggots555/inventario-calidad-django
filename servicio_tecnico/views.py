@@ -23,6 +23,7 @@ from inventario.models import Empleado
 from config.constants import ESTADO_ORDEN_CHOICES
 from .forms import (
     NuevaOrdenForm,
+    NuevaOrdenVentaMostradorForm,
     ConfiguracionAdicionalForm,
     ReingresoRHITSOForm,
     CambioEstadoForm,
@@ -179,6 +180,74 @@ def crear_orden(request):
     }
     
     return render(request, 'servicio_tecnico/form_nueva_orden.html', context)
+
+
+@login_required
+def crear_orden_venta_mostrador(request):
+    """
+    Vista para crear una nueva orden de Venta Mostrador (sin diagnóstico).
+    
+    EXPLICACIÓN DEL FLUJO:
+    Las ventas mostrador son servicios directos que NO requieren diagnóstico técnico:
+    - Instalación de piezas compradas en el momento
+    - Reinstalación de sistema operativo
+    - Limpieza express
+    - Venta de accesorios
+    
+    El flujo es más simple que una orden normal:
+    1. Se crea la orden con tipo_servicio='venta_mostrador'
+    2. El estado inicial es 'recepcion' (pueden empezar de inmediato)
+    3. Se redirige al detalle de la orden para agregar los servicios específicos
+    
+    Args:
+        request: Objeto HttpRequest
+    
+    Returns:
+        HttpResponse: Renderiza el template o redirige
+    """
+    
+    if request.method == 'POST':
+        form = NuevaOrdenVentaMostradorForm(request.POST, user=request.user)
+        
+        if form.is_valid():
+            try:
+                # Guardar la orden (automáticamente se marca como venta_mostrador)
+                orden = form.save()
+                
+                # Mensaje de éxito
+                messages.success(
+                    request,
+                    f'¡Orden de Venta Mostrador {orden.numero_orden_interno} creada exitosamente! '
+                    f'Ahora agrega los servicios y paquetes específicos.'
+                )
+                
+                # Redirigir al detalle de la orden para agregar la venta mostrador
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
+            
+            except Exception as e:
+                messages.error(
+                    request,
+                    f'Error al crear la orden de venta mostrador: {str(e)}'
+                )
+        else:
+            messages.warning(
+                request,
+                'Por favor corrige los errores en el formulario.'
+            )
+    
+    else:
+        # GET: Mostrar formulario vacío
+        form = NuevaOrdenVentaMostradorForm(user=request.user)
+    
+    context = {
+        'form': form,
+        'titulo': 'Nueva Venta Mostrador',
+        'subtitulo': 'Servicio Directo sin Diagnóstico',
+        'accion': 'Crear',
+        'es_venta_mostrador': True,  # Flag para el template
+    }
+    
+    return render(request, 'servicio_tecnico/form_nueva_orden_venta_mostrador.html', context)
 
 
 @login_required
@@ -2790,10 +2859,16 @@ def convertir_venta_a_diagnostico(request, orden_id):
                 'error': '❌ Debes proporcionar un motivo detallado de conversión (mínimo 10 caracteres)'
             }, status=400)
         
-        # Obtener empleado actual
+        # Obtener empleado actual (requerido para el historial)
         empleado_actual = None
         if hasattr(request.user, 'empleado'):
             empleado_actual = request.user.empleado
+        else:
+            # Si el usuario no tiene empleado asociado, no puede hacer la conversión
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Tu usuario no tiene un empleado asociado. Contacta al administrador.'
+            }, status=400)
         
         # Llamar al método del modelo para convertir
         nueva_orden = orden.convertir_a_diagnostico(

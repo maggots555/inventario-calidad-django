@@ -348,6 +348,227 @@ class NuevaOrdenForm(forms.ModelForm):
 
 
 # ============================================================================
+# FORMULARIO PARA CREAR ORDEN DE VENTA MOSTRADOR
+# ============================================================================
+
+class NuevaOrdenVentaMostradorForm(forms.ModelForm):
+    """
+    Formulario simplificado para crear órdenes de Venta Mostrador.
+    
+    EXPLICACIÓN:
+    Las ventas mostrador NO requieren diagnóstico técnico previo.
+    Son servicios directos como:
+    - Instalación de piezas
+    - Reinstalación de sistema operativo
+    - Limpieza express
+    - Venta de accesorios
+    
+    Por lo tanto, este formulario es más simple que NuevaOrdenForm.
+    """
+    
+    # ========================================================================
+    # CAMPOS ADICIONALES DEL DETALLE DEL EQUIPO
+    # ========================================================================
+    
+    tipo_equipo = forms.ChoiceField(
+        choices=TIPO_EQUIPO_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-control form-select',
+            'required': True,
+        }),
+        label="Tipo de Equipo",
+        help_text="Tipo de equipo que ingresa para el servicio"
+    )
+    
+    marca = forms.CharField(
+        max_length=50,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Dell, HP, Lenovo',
+            'required': True,
+            'list': 'marcas-list-vm',
+        }),
+        label="Marca del Equipo",
+        help_text="Marca del equipo"
+    )
+    
+    modelo = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Inspiron 15 (opcional)',
+        }),
+        label="Modelo del Equipo",
+        help_text="Modelo específico (opcional)"
+    )
+    
+    numero_serie = forms.CharField(
+        max_length=100,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: SN123456789',
+            'required': True,
+            'style': 'text-transform: uppercase;',
+        }),
+        label="Número de Serie",
+        help_text="Número de serie o Service Tag del equipo"
+    )
+    
+    orden_cliente = forms.CharField(
+        max_length=50,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: VM-001, CLIENTE-123',
+            'required': True,
+        }),
+        label="Número de Orden del Cliente",
+        help_text="Identificador de la orden del cliente"
+    )
+    
+    equipo_enciende = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+        }),
+        label="¿El equipo enciende?",
+        help_text="Estado del equipo al momento del ingreso"
+    )
+    
+    # ========================================================================
+    # CAMPOS OPCIONALES DE DESCRIPCIÓN DEL SERVICIO
+    # ========================================================================
+    
+    descripcion_servicio = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Ej: Cliente solicita instalación de RAM 8GB + Limpieza general del equipo',
+        }),
+        label="Descripción del Servicio Solicitado",
+        help_text="Breve descripción de lo que el cliente solicita (opcional)"
+    )
+    
+    # ========================================================================
+    # CAMPOS DE LA ORDEN DE SERVICIO
+    # ========================================================================
+    
+    class Meta:
+        model = OrdenServicio
+        fields = [
+            'sucursal',
+        ]
+        
+        widgets = {
+            'sucursal': forms.Select(attrs={
+                'class': 'form-control form-select',
+                'required': True,
+            }),
+        }
+        
+        labels = {
+            'sucursal': 'Sucursal',
+        }
+        
+        help_texts = {
+            'sucursal': 'Sucursal donde se registra la venta mostrador',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """Inicializa el formulario con opciones filtradas"""
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar solo sucursales activas
+        self.fields['sucursal'].queryset = Sucursal.objects.filter(activa=True)
+    
+    def clean_numero_serie(self):
+        """Limpia y normaliza el número de serie"""
+        numero_serie = self.cleaned_data.get('numero_serie')
+        if numero_serie:
+            return numero_serie.strip().upper()
+        return numero_serie
+    
+    def clean_orden_cliente(self):
+        """Limpia y normaliza el número de orden del cliente"""
+        orden_cliente = self.cleaned_data.get('orden_cliente')
+        if orden_cliente:
+            return orden_cliente.strip().upper()
+        return orden_cliente
+    
+    def save(self, commit=True):
+        """
+        Guarda la orden de Venta Mostrador.
+        
+        IMPORTANTE: Marca automáticamente tipo_servicio='venta_mostrador'
+        """
+        orden = super().save(commit=False)
+        
+        # ESTABLECER TIPO DE SERVICIO COMO VENTA MOSTRADOR
+        orden.tipo_servicio = 'venta_mostrador'
+        
+        # Establecer estado inicial como 'recepcion' (pueden empezar servicio de inmediato)
+        orden.estado = 'recepcion'
+        
+        # Asignar responsable y técnico
+        if self.user and hasattr(self.user, 'empleado'):
+            orden.responsable_seguimiento = self.user.empleado
+            orden.tecnico_asignado_actual = self.user.empleado
+        else:
+            primer_empleado = Empleado.objects.filter(activo=True).first()
+            if primer_empleado:
+                orden.responsable_seguimiento = primer_empleado
+                orden.tecnico_asignado_actual = primer_empleado
+            else:
+                raise ValidationError("No hay empleados activos para asignar a la orden")
+        
+        if commit:
+            orden.save()
+            
+            # Crear DetalleEquipo relacionado
+            detalle = DetalleEquipo(
+                orden=orden,
+                tipo_equipo=self.cleaned_data['tipo_equipo'],
+                marca=self.cleaned_data['marca'],
+                modelo=self.cleaned_data.get('modelo', ''),
+                numero_serie=self.cleaned_data['numero_serie'],
+                orden_cliente=self.cleaned_data['orden_cliente'],
+                equipo_enciende=self.cleaned_data.get('equipo_enciende', True),
+                falla_principal=self.cleaned_data.get('descripcion_servicio', 'Venta Mostrador - Servicio Directo'),
+                gama='media',  # Valor por defecto
+                tiene_cargador=False,  # No relevante para venta mostrador
+            )
+            
+            # Intentar calcular gama automáticamente
+            gama_calculada = ReferenciaGamaEquipo.obtener_gama(
+                self.cleaned_data['marca'],
+                self.cleaned_data.get('modelo', '')
+            )
+            if gama_calculada:
+                detalle.gama = gama_calculada
+            
+            detalle.save()
+            
+            # Registrar en historial
+            # Obtener el empleado del usuario actual para el historial
+            empleado_historial = None
+            if self.user and hasattr(self.user, 'empleado'):
+                empleado_historial = self.user.empleado
+            
+            HistorialOrden.objects.create(
+                orden=orden,
+                tipo_evento='creacion',
+                comentario=f'🛒 Orden de Venta Mostrador creada: {orden.numero_orden_interno}. Servicio directo sin diagnóstico previo.',
+                usuario=empleado_historial,
+                es_sistema=False
+            )
+        
+        return orden
+
+
+# ============================================================================
 # FORMULARIOS PARA LA VISTA DE DETALLES
 # ============================================================================
 

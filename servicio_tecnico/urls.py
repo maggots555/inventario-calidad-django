@@ -20,6 +20,9 @@ urlpatterns = [
     # Crear nueva orden de servicio
     path('ordenes/crear/', views.crear_orden, name='crear_orden'),
     
+    # Crear nueva orden de Venta Mostrador (sin diagnóstico)
+    path('ordenes/venta-mostrador/crear/', views.crear_orden_venta_mostrador, name='crear_orden_venta_mostrador'),
+    
     # Detalle de orden (NUEVA VISTA)
     path('ordenes/<int:orden_id>/', views.detalle_orden, name='detalle_orden'),
     

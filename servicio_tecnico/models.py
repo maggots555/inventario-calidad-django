@@ -469,7 +469,14 @@ class OrdenServicio(models.Model):
                 "No se puede realizar la conversión."
             )
         
-        # VALIDACIÓN 3: No puede estar ya convertida
+        # VALIDACIÓN 3: Debe tener un usuario válido
+        if not usuario:
+            raise ValueError(
+                "Se requiere un usuario (empleado) para autorizar la conversión. "
+                "El usuario debe tener un empleado asociado."
+            )
+        
+        # VALIDACIÓN 4: No puede estar ya convertida
         if self.estado == 'convertida_a_diagnostico':
             raise ValueError(
                 "Esta orden ya fue convertida a diagnóstico previamente. "
@@ -496,7 +503,7 @@ class OrdenServicio(models.Model):
         )
         
         # PASO 3: Copiar información del equipo si existe
-        if hasattr(self, 'detalle_equipo'):
+        try:
             detalle_original = self.detalle_equipo
             DetalleEquipo.objects.create(
                 orden=nueva_orden,
@@ -504,12 +511,24 @@ class OrdenServicio(models.Model):
                 marca=detalle_original.marca,
                 modelo=detalle_original.modelo,
                 numero_serie=detalle_original.numero_serie,
-                gama_equipo=detalle_original.gama_equipo,
+                orden_cliente=detalle_original.orden_cliente,
+                gama=detalle_original.gama,
+                tiene_cargador=detalle_original.tiene_cargador,
+                numero_serie_cargador=detalle_original.numero_serie_cargador,
+                equipo_enciende=detalle_original.equipo_enciende,
                 falla_principal=detalle_original.falla_principal,
-                observaciones=detalle_original.observaciones,
-                contraseña_equipo=detalle_original.contraseña_equipo,
-                contiene_informacion_sensible=detalle_original.contiene_informacion_sensible,
+                diagnostico_sic=detalle_original.diagnostico_sic,
                 fecha_inicio_diagnostico=timezone.now(),  # Inicia diagnóstico ahora
+            )
+        except DetalleEquipo.DoesNotExist:
+            # Si no existe detalle de equipo, crear uno básico
+            DetalleEquipo.objects.create(
+                orden=nueva_orden,
+                tipo_equipo='otro',
+                marca='N/A',
+                modelo='N/A',
+                falla_principal='Diagnóstico requerido por conversión de venta mostrador',
+                fecha_inicio_diagnostico=timezone.now(),
             )
         
         # PASO 4: Registrar en historial de la orden ORIGINAL
