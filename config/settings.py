@@ -168,6 +168,14 @@ JEFE_CALIDAD_NOMBRE = config('JEFE_CALIDAD_NOMBRE', default='Jefe de Calidad')
 JEFE_CALIDAD_2_EMAIL = config('JEFE_CALIDAD_2_EMAIL', default='')
 JEFE_CALIDAD_2_NOMBRE = config('JEFE_CALIDAD_2_NOMBRE', default='Segundo Jefe de Calidad')
 
+# Email del Jefe General (también recibe copia de todas las notificaciones)
+JEFE_GENERAL_EMAIL = config('JEFE_GENERAL_EMAIL', default='')
+JEFE_GENERAL_NOMBRE = config('JEFE_GENERAL_NOMBRE', default='Jefe General')
+
+# Email del Ayudante de Compras (también recibe copia de todas las notificaciones)
+AYUDANTE_COMPRAS_EMAIL = config('AYUDANTE_COMPRAS_EMAIL', default='')
+AYUDANTE_COMPRAS_NOMBRE = config('AYUDANTE_COMPRAS_NOMBRE', default='Ayudante Compras')
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 

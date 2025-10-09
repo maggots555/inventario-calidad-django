@@ -1678,6 +1678,7 @@
         border-width: 2px;
     }
     
+    
     .stat-icon {
         opacity: 0.5;
     }
@@ -1697,3 +1698,56 @@
         animation: none;
     }
 }
+
+/* =============================================================================
+   ESTILOS PARA GRUPOS DE DESTINATARIOS EN MODAL DE NOTIFICACIONES
+   Descripción: Estilos para organizar visualmente destinatarios del sistema
+   vs. destinatarios adicionales en notificaciones manuales
+   ============================================================================= */
+
+.destinatarios-grupo-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border: 2px solid #dee2e6;
+    transition: all 0.3s ease;
+}
+
+.destinatarios-grupo-header:hover {
+    border-color: #0d6efd;
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.15);
+}
+
+.destinatarios-grupo-header button {
+    color: inherit !important;
+}
+
+.destinatarios-grupo-header button:hover {
+    color: #0d6efd !important;
+}
+
+.destinatarios-grupo-contenido {
+    transition: all 0.3s ease;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+/* Estilo especial para destinatarios del sistema */
+.destinatarios-grupo-contenido .bg-light {
+    background: linear-gradient(135deg, #e7f3ff 0%, #f0f8ff 100%) !important;
+    border-left: 4px solid #0d6efd !important;
+}
+
+/* Animación suave para el chevron */
+#iconToggleSistema {
+    transition: transform 0.3s ease;
+}
+
+/* Badge de sistema más visible */
+.badge.bg-primary[style*="font-size: 0.7rem"] {
+    padding: 0.25rem 0.5rem;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(13, 110, 253, 0.3);
+}
+

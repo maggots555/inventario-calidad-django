@@ -129,6 +129,16 @@
     color: #9ca3af;
 }
 
+.indicador-icon.has-responsible {
+    background-color: #e9d5ff;
+    color: #6b21a8;
+}
+
+.indicador-icon.no-responsible {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+}
+
 .indicador-text-small {
     font-size: 0.6rem; /* Más reducido */
 }

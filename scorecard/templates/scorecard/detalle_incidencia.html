@@ -839,35 +839,142 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        destinatarios.forEach((dest, index) => {
-            const divDestinatario = document.createElement('div');
-            divDestinatario.className = 'form-check mb-2 p-3 border-bottom';
-            
-            const checkbox = document.createElement('input');
-            checkbox.className = 'form-check-input';
-            checkbox.type = 'checkbox';
-            checkbox.id = `dest_${index}`;
-            checkbox.value = index;
-            checkbox.checked = dest.seleccionado_default;
-            checkbox.addEventListener('change', actualizarPreview);
-            
-            const label = document.createElement('label');
-            label.className = 'form-check-label w-100';
-            label.htmlFor = `dest_${index}`;
-            label.innerHTML = `
-                <strong>${dest.nombre}</strong>
-                <br>
-                <small class="text-muted">
-                    <i class="bi bi-envelope"></i> ${dest.email}
-                    <br>
-                    <i class="bi bi-person-badge"></i> ${dest.rol}
+        // Separar destinatarios en dos grupos
+        const destinatariosSistema = destinatarios.filter(d => d.es_sistema);
+        const destinatariosOtros = destinatarios.filter(d => !d.es_sistema);
+        
+        // ========== GRUPO 1: OTROS DESTINATARIOS RELEVANTES (Primero) ==========
+        if (destinatariosOtros.length > 0) {
+            // Header para otros destinatarios
+            const headerOtros = document.createElement('div');
+            headerOtros.className = 'mb-2';
+            headerOtros.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-people-fill text-success"></i>
+                    <strong class="text-success ms-2">Otros Destinatarios Relevantes</strong>
+                    <span class="badge bg-success ms-2">${destinatariosOtros.length}</span>
+                </div>
+                <small class="text-muted d-block mt-1 ms-4">
+                    Técnico responsable, jefes directos y destinatarios del historial
                 </small>
             `;
+            listaDestinatarios.appendChild(headerOtros);
             
-            divDestinatario.appendChild(checkbox);
-            divDestinatario.appendChild(label);
-            listaDestinatarios.appendChild(divDestinatario);
-        });
+            destinatariosOtros.forEach((dest, index) => {
+                const divDestinatario = document.createElement('div');
+                divDestinatario.className = 'form-check mb-2 p-3 border-bottom';
+                
+                const checkbox = document.createElement('input');
+                checkbox.className = 'form-check-input';
+                checkbox.type = 'checkbox';
+                checkbox.id = `dest_${index}`;
+                checkbox.value = index;
+                checkbox.checked = dest.seleccionado_default;
+                checkbox.addEventListener('change', actualizarPreview);
+                
+                const label = document.createElement('label');
+                label.className = 'form-check-label w-100';
+                label.htmlFor = `dest_${index}`;
+                label.innerHTML = `
+                    <strong>${dest.nombre}</strong>
+                    <br>
+                    <small class="text-muted">
+                        <i class="bi bi-envelope"></i> ${dest.email}
+                        <br>
+                        <i class="bi bi-person-badge"></i> ${dest.rol}
+                    </small>
+                `;
+                
+                divDestinatario.appendChild(checkbox);
+                divDestinatario.appendChild(label);
+                listaDestinatarios.appendChild(divDestinatario);
+            });
+        }
+        
+        // ========== GRUPO 2: DESTINATARIOS DEL SISTEMA (Abajo, Colapsado) ==========
+        if (destinatariosSistema.length > 0) {
+            // Agregar separador si hay otros destinatarios
+            if (destinatariosOtros.length > 0) {
+                const separador = document.createElement('div');
+                separador.className = 'my-3';
+                listaDestinatarios.appendChild(separador);
+            }
+            
+            // Header del grupo con botón expandible
+            const headerSistema = document.createElement('div');
+            headerSistema.className = 'destinatarios-grupo-header';
+            headerSistema.innerHTML = `
+                <button type="button" class="btn btn-link p-0 text-decoration-none w-100 text-start d-flex justify-content-between align-items-center" 
+                        id="btnToggleSistema" style="border: none; background: none;">
+                    <div>
+                        <i class="bi bi-gear-fill text-primary"></i>
+                        <strong class="text-primary">Destinatarios Predeterminados del Sistema</strong>
+                        <span class="badge bg-primary ms-2">${destinatariosSistema.length}</span>
+                    </div>
+                    <i class="bi bi-chevron-right" id="iconToggleSistema"></i>
+                </button>
+                <small class="text-muted d-block mt-1 ms-4">
+                    Estos correos están configurados en el sistema y siempre aparecen como opciones
+                </small>
+            `;
+            listaDestinatarios.appendChild(headerSistema);
+            
+            // Contenedor colapsable para destinatarios del sistema
+            const contenedorSistema = document.createElement('div');
+            contenedorSistema.id = 'contenedorDestinatariosSistema';
+            contenedorSistema.className = 'destinatarios-grupo-contenido';
+            contenedorSistema.style.display = 'none'; // Colapsado por defecto
+            
+            destinatariosSistema.forEach((dest, index) => {
+                const indexReal = index + destinatariosOtros.length;
+                const divDestinatario = document.createElement('div');
+                divDestinatario.className = 'form-check mb-2 p-3 border-bottom bg-light';
+                
+                const checkbox = document.createElement('input');
+                checkbox.className = 'form-check-input';
+                checkbox.type = 'checkbox';
+                checkbox.id = `dest_${indexReal}`;
+                checkbox.value = indexReal;
+                checkbox.checked = dest.seleccionado_default;
+                checkbox.addEventListener('change', actualizarPreview);
+                
+                const label = document.createElement('label');
+                label.className = 'form-check-label w-100';
+                label.htmlFor = `dest_${indexReal}`;
+                label.innerHTML = `
+                    <strong>${dest.nombre}</strong>
+                    <span class="badge bg-primary ms-2" style="font-size: 0.7rem;">
+                        <i class="bi bi-gear"></i> Sistema
+                    </span>
+                    <br>
+                    <small class="text-muted">
+                        <i class="bi bi-envelope"></i> ${dest.email}
+                        <br>
+                        <i class="bi bi-person-badge"></i> ${dest.rol}
+                    </small>
+                `;
+                
+                divDestinatario.appendChild(checkbox);
+                divDestinatario.appendChild(label);
+                contenedorSistema.appendChild(divDestinatario);
+            });
+            
+            listaDestinatarios.appendChild(contenedorSistema);
+            
+            // Funcionalidad de expandir/colapsar
+            document.getElementById('btnToggleSistema').addEventListener('click', function() {
+                const contenedor = document.getElementById('contenedorDestinatariosSistema');
+                const icono = document.getElementById('iconToggleSistema');
+                
+                if (contenedor.style.display === 'none') {
+                    contenedor.style.display = 'block';
+                    icono.className = 'bi bi-chevron-down';
+                } else {
+                    contenedor.style.display = 'none';
+                    icono.className = 'bi bi-chevron-right';
+                }
+            });
+        }
         
         // Actualizar preview inicial
         actualizarPreview();

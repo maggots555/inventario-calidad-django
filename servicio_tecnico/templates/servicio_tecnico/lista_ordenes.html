@@ -274,6 +274,23 @@
                                         </strong>
                                     </div>
                                 </div>
+
+                                <!-- Indicador de responsable del seguimiento -->
+                                <div class="indicador">
+                                    <div class="indicador-icon {% if orden.responsable_seguimiento %}has-responsible{% else %}no-responsible{% endif %}">
+                                        <i class="bi bi-{% if orden.responsable_seguimiento %}person-badge{% else %}person-dash{% endif %}"></i>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block" style="font-size: 0.6rem;">RESPONSABLE</small>
+                                        <strong style="font-size: 0.75rem;">
+                                            {% if orden.responsable_seguimiento %}
+                                                {{ orden.responsable_seguimiento.nombre_completo|truncatechars:12 }}
+                                            {% else %}
+                                                Sin asignar
+                                            {% endif %}
+                                        </strong>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

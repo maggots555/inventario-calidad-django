@@ -254,7 +254,8 @@ def obtener_destinatarios_disponibles(incidencia):
             'nombre': incidencia.tecnico_responsable.nombre_completo,
             'email': incidencia.tecnico_responsable.email,
             'rol': 'Técnico/Personal Responsable',
-            'seleccionado_default': True
+            'seleccionado_default': True,
+            'es_sistema': False
         })
         
         # 2. Jefe directo del técnico (opcional)
@@ -263,7 +264,8 @@ def obtener_destinatarios_disponibles(incidencia):
                 'nombre': incidencia.tecnico_responsable.jefe_directo.nombre_completo,
                 'email': incidencia.tecnico_responsable.jefe_directo.email,
                 'rol': 'Jefe Directo',
-                'seleccionado_default': True
+                'seleccionado_default': True,
+                'es_sistema': False
             })
     
     # 3. Inspector de calidad (opcional)
@@ -275,7 +277,8 @@ def obtener_destinatarios_disponibles(incidencia):
         'nombre': settings.JEFE_CALIDAD_NOMBRE,
         'email': settings.JEFE_CALIDAD_EMAIL,
         'rol': 'Inspector de Calidad',
-        'seleccionado_default': True
+        'seleccionado_default': True,
+        'es_sistema': True
     })
     
     # 5. Jefe de Calidad 2 (opcional, desde settings)
@@ -284,7 +287,28 @@ def obtener_destinatarios_disponibles(incidencia):
             'nombre': settings.JEFE_CALIDAD_2_NOMBRE,
             'email': settings.JEFE_CALIDAD_2_EMAIL,
             'rol': 'Jefe de calidad',
-            'seleccionado_default': True
+            'seleccionado_default': True,
+            'es_sistema': True
+        })
+    
+    # 6. Jefe General (opcional, desde settings)
+    if hasattr(settings, 'JEFE_GENERAL_EMAIL') and settings.JEFE_GENERAL_EMAIL:
+        destinatarios.append({
+            'nombre': settings.JEFE_GENERAL_NOMBRE,
+            'email': settings.JEFE_GENERAL_EMAIL,
+            'rol': 'Jefe General',
+            'seleccionado_default': True,
+            'es_sistema': True
+        })
+    
+    # 7. Ayudante de Compras (opcional, desde settings)
+    if hasattr(settings, 'AYUDANTE_COMPRAS_EMAIL') and settings.AYUDANTE_COMPRAS_EMAIL:
+        destinatarios.append({
+            'nombre': settings.AYUDANTE_COMPRAS_NOMBRE,
+            'email': settings.AYUDANTE_COMPRAS_EMAIL,
+            'rol': 'Ayudante Compras',
+            'seleccionado_default': True,
+            'es_sistema': True
         })
     
     return destinatarios
@@ -331,7 +355,8 @@ def obtener_destinatarios_historicos(incidencia):
                     destinatarios_unicos[email] = {
                         'nombre': dest.get('nombre', 'Sin nombre'),
                         'email': email,
-                        'rol': dest.get('rol', 'Previamente notificado')
+                        'rol': dest.get('rol', 'Previamente notificado'),
+                        'es_sistema': False  # Los históricos no son del sistema
                     }
         
         # Convertir dict a lista
