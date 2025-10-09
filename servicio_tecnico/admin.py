@@ -14,6 +14,7 @@ from .models import (
     PiezaCotizada,
     SeguimientoPieza,
     VentaMostrador,
+    PiezaVentaMostrador,  # NUEVO - FASE 2
     ImagenOrden,
     HistorialOrden,
 )
@@ -91,6 +92,47 @@ class HistorialOrdenInline(admin.TabularInline):
         return False
 
 
+class PiezaVentaMostradorInline(admin.TabularInline):
+    """
+    Inline para mostrar piezas vendidas en venta mostrador.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - TabularInline: Muestra las piezas en forma de tabla dentro del formulario de VentaMostrador
+    - extra = 1: Muestra 1 fila vacía adicional para agregar nuevas piezas
+    - fields: Campos que se mostrarán en cada fila de la tabla
+    - readonly_fields: Campo 'subtotal' es calculado automáticamente, no se puede editar
+    - autocomplete_fields: Campo 'componente' se busca con autocompletado para facilidad
+    
+    Esto permite agregar múltiples piezas a una venta mostrador directamente desde el admin.
+    """
+    model = PiezaVentaMostrador
+    extra = 1
+    fields = (
+        'componente',
+        'descripcion_pieza',
+        'cantidad',
+        'precio_unitario',
+        'subtotal_display',
+        'notas',
+    )
+    readonly_fields = ('subtotal_display',)
+    autocomplete_fields = ['componente']
+    
+    def subtotal_display(self, obj):
+        """
+        Muestra el subtotal calculado (cantidad × precio_unitario) con formato de moneda.
+        
+        EXPLICACIÓN:
+        - obj.subtotal: Es una property del modelo que calcula cantidad * precio_unitario
+        - format_html: Django función que permite crear HTML seguro
+        - ${:,.2f}: Formato de moneda con comas y 2 decimales
+        """
+        if obj.pk:  # Si el objeto ya existe (no es nuevo)
+            return format_html('<strong>${:,.2f}</strong>', obj.subtotal)
+        return '-'
+    subtotal_display.short_description = 'Subtotal'
+
+
 # ============================================================================
 # ADMIN: ORDEN DE SERVICIO
 # ============================================================================
@@ -100,6 +142,7 @@ class OrdenServicioAdmin(admin.ModelAdmin):
     list_display = (
         'numero_orden_interno',
         'sucursal',
+        'tipo_servicio_badge',  # NUEVO - FASE 2: Muestra el tipo de servicio con badge
         'estado_badge',
         'tecnico_asignado_actual',
         'fecha_ingreso',
@@ -109,6 +152,7 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         'requiere_factura',
     )
     list_filter = (
+        'tipo_servicio',  # NUEVO - FASE 2: Permite filtrar por tipo de servicio
         'estado',
         'sucursal',
         'es_reingreso',
@@ -131,6 +175,13 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         ('Identificación', {
             'fields': ('numero_orden_interno',)
         }),
+        ('Tipo de Servicio', {
+            'fields': (
+                'tipo_servicio',
+                'control_calidad_requerido',
+            ),
+            'description': 'Define si esta orden es una venta mostrador (sin diagnóstico) o requiere diagnóstico técnico completo.'
+        }),
         ('Ubicación y Responsables', {
             'fields': (
                 'sucursal',
@@ -145,6 +196,15 @@ class OrdenServicioAdmin(admin.ModelAdmin):
                 'fecha_finalizacion',
                 'fecha_entrega',
             )
+        }),
+        ('Conversión desde Venta Mostrador', {
+            'fields': (
+                'orden_venta_mostrador_previa',
+                'monto_abono_previo',
+                'notas_conversion',
+            ),
+            'classes': ('collapse',),
+            'description': 'Información sobre conversión de una venta mostrador que requirió diagnóstico completo.'
         }),
         ('Reingreso y ScoreCard', {
             'fields': (
@@ -180,8 +240,37 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         HistorialOrdenInline,
     ]
     
+    def tipo_servicio_badge(self, obj):
+        """
+        Muestra el tipo de servicio con un badge de color.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - Este método crea un "badge" (etiqueta con color) que muestra visualmente el tipo de servicio
+        - 'diagnostico': Azul (#007bff) - Servicio completo con diagnóstico técnico
+        - 'venta_mostrador': Verde (#28a745) - Servicio directo sin diagnóstico
+        - format_html: Función de Django que crea HTML de forma segura
+        - get_tipo_servicio_display(): Método automático de Django que devuelve el texto legible del choice
+        
+        Este badge ayuda a identificar rápidamente qué tipo de orden es al ver la lista en el admin.
+        """
+        colores = {
+            'diagnostico': '#007bff',      # Azul para órdenes con diagnóstico
+            'venta_mostrador': '#28a745',  # Verde para ventas mostrador
+        }
+        color = colores.get(obj.tipo_servicio, '#6c757d')  # Gris por defecto
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; border-radius: 3px; font-weight: bold;">{}</span>',
+            color,
+            obj.get_tipo_servicio_display()
+        )
+    tipo_servicio_badge.short_description = 'Tipo de Servicio'
+    
     def estado_badge(self, obj):
-        """Muestra el estado con un badge de color"""
+        """
+        Muestra el estado con un badge de color.
+        
+        ACTUALIZADO FASE 2: Se agregó el color para el nuevo estado 'convertida_a_diagnostico'
+        """
         colores = {
             'espera': '#6c757d',
             'recepcion': '#17a2b8',
@@ -194,6 +283,7 @@ class OrdenServicioAdmin(admin.ModelAdmin):
             'finalizado': '#28a745',
             'entregado': '#28a745',
             'cancelado': '#6c757d',
+            'convertida_a_diagnostico': '#9b59b6',  # NUEVO - FASE 2: Morado para conversiones
         }
         color = colores.get(obj.estado, '#6c757d')
         return format_html(
@@ -475,9 +565,16 @@ class VentaMostradorAdmin(admin.ModelAdmin):
         'fecha_venta',
         'paquete_badge',
         'servicios_incluidos',
+        'genera_comision',  # NUEVO - FASE 2: Muestra si genera comisión
         'total_venta_display',
     )
-    list_filter = ('paquete', 'incluye_cambio_pieza', 'incluye_limpieza', 'incluye_reinstalacion_so')
+    list_filter = (
+        'paquete',
+        'genera_comision',  # NUEVO - FASE 2: Permite filtrar por comisión
+        'incluye_cambio_pieza',
+        'incluye_limpieza',
+        'incluye_reinstalacion_so',
+    )
     search_fields = ('folio_venta', 'orden__numero_orden_interno')
     date_hierarchy = 'fecha_venta'
     
@@ -489,6 +586,10 @@ class VentaMostradorAdmin(admin.ModelAdmin):
         }),
         ('Paquete', {
             'fields': ('paquete',)
+        }),
+        ('Comisiones', {
+            'fields': ('genera_comision',),
+            'description': 'Las ventas de paquetes Premium, Oro y Plata generan comisión automáticamente.'
         }),
         ('Servicios Adicionales', {
             'fields': (
@@ -503,13 +604,26 @@ class VentaMostradorAdmin(admin.ModelAdmin):
         }),
     )
     
+    # NUEVO - FASE 2: Agregar inline de piezas vendidas
+    inlines = [PiezaVentaMostradorInline]
+    
     def paquete_badge(self, obj):
-        """Muestra el paquete con color"""
+        """
+        Muestra el paquete con color.
+        
+        ACTUALIZADO FASE 2: Se actualizaron los colores para los nuevos paquetes:
+        - premium: Morado (#9b59b6) - Paquete más completo
+        - oro: Dorado (#FFD700) - Paquete intermedio alto
+        - plata: Plateado (#C0C0C0) - Paquete intermedio básico
+        - ninguno: Gris (#6c757d) - Sin paquete
+        
+        Los colores ayudan a identificar visualmente el nivel de cada paquete.
+        """
         colores = {
-            'oro': '#FFD700',
-            'plata': '#C0C0C0',
-            'bronce': '#CD7F32',
-            'ninguno': '#6c757d',
+            'premium': '#9b59b6',   # ACTUALIZADO - Morado para Premium
+            'oro': '#FFD700',       # Dorado (mantiene el dorado original)
+            'plata': '#C0C0C0',     # Plateado (mantiene el plateado original)
+            'ninguno': '#6c757d',   # Gris para sin paquete
         }
         color = colores.get(obj.paquete, '#6c757d')
         return format_html(
@@ -539,6 +653,82 @@ class VentaMostradorAdmin(admin.ModelAdmin):
             obj.total_venta
         )
     total_venta_display.short_description = 'Total'
+
+
+# ============================================================================
+# ADMIN: PIEZA VENTA MOSTRADOR (NUEVO - FASE 2)
+# ============================================================================
+
+@admin.register(PiezaVentaMostrador)
+class PiezaVentaMostradorAdmin(admin.ModelAdmin):
+    """
+    Admin para gestionar piezas vendidas en mostrador.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Este admin permite ver y gestionar todas las piezas que se han vendido en mostrador
+    - list_display: Columnas que se muestran en la lista principal
+    - list_filter: Filtros laterales para buscar piezas específicas
+    - search_fields: Campos en los que se puede buscar texto
+    - date_hierarchy: Navegación por fechas en la parte superior
+    - readonly_fields: Campos que no se pueden editar (calculados automáticamente)
+    
+    Es útil para reportes, auditorías y seguimiento de inventario.
+    """
+    list_display = (
+        'venta_mostrador',
+        'descripcion_pieza',
+        'componente',
+        'cantidad',
+        'precio_unitario_display',
+        'subtotal_display',
+        'fecha_venta',
+    )
+    list_filter = (
+        'fecha_venta',
+        'componente',
+    )
+    search_fields = (
+        'descripcion_pieza',
+        'venta_mostrador__folio_venta',
+        'venta_mostrador__orden__numero_orden_interno',
+        'componente__nombre',
+    )
+    date_hierarchy = 'fecha_venta'
+    
+    readonly_fields = ('subtotal_display', 'fecha_venta')
+    
+    autocomplete_fields = ['componente', 'venta_mostrador']
+    
+    fieldsets = (
+        ('Venta Relacionada', {
+            'fields': ('venta_mostrador', 'fecha_venta')
+        }),
+        ('Información de la Pieza', {
+            'fields': (
+                'componente',
+                'descripcion_pieza',
+                ('cantidad', 'precio_unitario'),
+                'subtotal_display',
+            )
+        }),
+        ('Notas', {
+            'fields': ('notas',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def precio_unitario_display(self, obj):
+        """Muestra el precio unitario con formato de moneda"""
+        return f"${obj.precio_unitario:,.2f}"
+    precio_unitario_display.short_description = 'Precio Unitario'
+    
+    def subtotal_display(self, obj):
+        """Muestra el subtotal con formato de moneda y negrita"""
+        return format_html(
+            '<strong style="color: green;">${:,.2f}</strong>',
+            obj.subtotal
+        )
+    subtotal_display.short_description = 'Subtotal'
 
 
 # ============================================================================
