@@ -55,32 +55,73 @@ ESTADO_ORDEN_CHOICES = [
     ('finalizado', 'Finalizado - Listo para Entrega'),
     ('entregado', 'Entregado al Cliente'),
     ('cancelado', 'Cancelado'),
+    ('convertida_a_diagnostico', 'Convertida a Diagnóstico'),  # Para ventas mostrador convertidas
 ]
 
 # ============================================================================
 # PAQUETES DE VENTA MOSTRADOR - Servicios adicionales
+# Actualizado: Octubre 2025 - Nuevos paquetes Premium/Oro/Plata
 # ============================================================================
 PAQUETES_CHOICES = [
-    ('oro', 'Paquete Oro'),
-    ('plata', 'Paquete Plata'),
-    ('bronce', 'Paquete Bronce'),
+    ('premium', 'Solución Premium'),
+    ('oro', 'Solución Oro'),
+    ('plata', 'Solución Plata'),
     ('ninguno', 'Sin Paquete'),
 ]
 
-# Precios fijos de paquetes (en pesos mexicanos)
+# Precios fijos de paquetes (en pesos mexicanos, IVA incluido)
 PRECIOS_PAQUETES = {
-    'oro': 1500.00,
-    'plata': 1000.00,
-    'bronce': 500.00,
+    'premium': 5500.00,  # RAM 16GB DDR5 + SSD 1TB + Kit Limpieza
+    'oro': 3850.00,      # RAM 8GB DDR5 + SSD 1TB
+    'plata': 2900.00,    # SSD 1TB
     'ninguno': 0.00,
 }
 
-# Descripción de cada paquete
+# Descripción técnica detallada de cada paquete
 DESCRIPCION_PAQUETES = {
-    'oro': 'Limpieza profunda + Aplicación de pasta térmica premium + Optimización de sistema + Garantía extendida 6 meses',
-    'plata': 'Limpieza profunda + Aplicación de pasta térmica + Optimización de sistema + Garantía 3 meses',
-    'bronce': 'Limpieza básica + Aplicación de pasta térmica + Garantía 1 mes',
-    'ninguno': 'Sin paquete adicional',
+    'premium': '''🏆 SOLUCIÓN PREMIUM - $5,500 IVA incluido
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ RAM 16GB DDR5 Samsung (4800-5600 MHz)
+✅ SSD 1TB de alta velocidad
+✅ Kit de Limpieza Profesional de REGALO
+✅ Instalación y configuración incluida
+
+*Ideal para gaming, diseño gráfico y edición de video''',
+    
+    'oro': '''🥇 SOLUCIÓN ORO - $3,850 IVA incluido
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ RAM 8GB DDR5 Samsung (3200 MHz)
+✅ SSD 1TB de alta velocidad
+✅ Instalación y configuración incluida
+
+*Perfecto para trabajo de oficina y multitarea''',
+    
+    'plata': '''🥈 SOLUCIÓN PLATA - $2,900 IVA incluido
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ SSD 1TB de alta velocidad
+✅ Instalación y configuración incluida
+
+*Mejora el rendimiento general de tu equipo''',
+    
+    'ninguno': 'Sin paquete adicional - Servicios individuales',
+}
+
+# Componentes incluidos en cada paquete (para referencia de inventario)
+# Usado para tracking de qué incluye cada paquete sin desglosa en ventas
+COMPONENTES_PAQUETES = {
+    'premium': [
+        {'tipo': 'RAM', 'capacidad': '16GB', 'tecnologia': 'DDR5', 'velocidad': '4800-5600 MHz', 'marca': 'Samsung'},
+        {'tipo': 'SSD', 'capacidad': '1TB', 'interfaz': 'NVMe/SATA'},
+        {'tipo': 'Kit Limpieza', 'descripcion': 'Kit profesional de limpieza'},
+    ],
+    'oro': [
+        {'tipo': 'RAM', 'capacidad': '8GB', 'tecnologia': 'DDR5', 'velocidad': '3200 MHz', 'marca': 'Samsung'},
+        {'tipo': 'SSD', 'capacidad': '1TB', 'interfaz': 'NVMe/SATA'},
+    ],
+    'plata': [
+        {'tipo': 'SSD', 'capacidad': '1TB', 'interfaz': 'NVMe/SATA'},
+    ],
+    'ninguno': [],
 }
 
 # ============================================================================
@@ -188,3 +229,30 @@ def obtener_nombre_estado(codigo_estado):
         if codigo == codigo_estado:
             return nombre
     return 'Estado Desconocido'
+
+
+def obtener_componentes_paquete(codigo_paquete):
+    """
+    Retorna la lista de componentes incluidos en un paquete
+    
+    Args:
+        codigo_paquete (str): Código del paquete ('premium', 'oro', 'plata', 'ninguno')
+    
+    Returns:
+        list: Lista de diccionarios con información de componentes
+    """
+    return COMPONENTES_PAQUETES.get(codigo_paquete, [])
+
+
+def paquete_genera_comision(codigo_paquete):
+    """
+    Determina si un paquete genera comisión para el responsable
+    
+    Args:
+        codigo_paquete (str): Código del paquete
+    
+    Returns:
+        bool: True si el paquete genera comisión (premium, oro, plata)
+    """
+    # Los paquetes premium, oro y plata siempre generan comisión
+    return codigo_paquete in ['premium', 'oro', 'plata']

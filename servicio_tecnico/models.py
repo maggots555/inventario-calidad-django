@@ -90,7 +90,7 @@ class OrdenServicio(models.Model):
     
     # ESTADO Y WORKFLOW
     estado = models.CharField(
-        max_length=20,
+        max_length=30,  # Aumentado para soportar 'convertida_a_diagnostico' (24 chars)
         choices=ESTADO_ORDEN_CHOICES,
         default='espera',
         help_text="Estado actual de la orden"
@@ -146,6 +146,47 @@ class OrdenServicio(models.Model):
     motivo_no_factura = models.TextField(
         blank=True,
         help_text="Motivo por el cual no se ha emitido la factura"
+    )
+    
+    # TIPO DE SERVICIO Y CONVERSIÓN (Sistema Venta Mostrador)
+    # =========================================================================
+    # Estos campos permiten diferenciar entre órdenes con diagnóstico completo
+    # y ventas mostrador (servicios directos sin diagnóstico previo)
+    tipo_servicio = models.CharField(
+        max_length=20,
+        choices=[
+            ('diagnostico', 'Con Diagnóstico Técnico'),
+            ('venta_mostrador', 'Venta Mostrador - Sin Diagnóstico'),
+        ],
+        default='diagnostico',
+        help_text="Tipo de servicio: con diagnóstico técnico o venta mostrador directa"
+    )
+    
+    orden_venta_mostrador_previa = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orden_diagnostico_posterior',
+        help_text="Orden de venta mostrador que se convirtió a diagnóstico (si aplica)"
+    )
+    
+    monto_abono_previo = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Monto a abonar por servicio de venta mostrador previo"
+    )
+    
+    notas_conversion = models.TextField(
+        blank=True,
+        help_text="Motivo y detalles de conversión de venta mostrador a diagnóstico"
+    )
+    
+    control_calidad_requerido = models.BooleanField(
+        default=False,
+        help_text="¿Requiere pasar por control de calidad? (Opcional para ventas simples como accesorios)"
     )
     
     # CAMPOS CALCULADOS (para reportes y KPIs)
@@ -244,6 +285,77 @@ class OrdenServicio(models.Model):
                     es_sistema=True
                 )
     
+    def clean(self):
+        """
+        Validaciones personalizadas para mantener integridad de datos.
+        
+        Reglas de negocio:
+        1. Venta mostrador NO puede tener cotización
+        2. Diagnóstico NO puede tener venta mostrador directa (salvo conversión)
+        3. Si hay orden previa, debe haber monto de abono
+        4. Estados válidos según tipo de servicio
+        5. Control de calidad obligatorio para diagnósticos
+        """
+        from django.core.exceptions import ValidationError
+        
+        # REGLA 1: Venta mostrador NO puede tener cotización
+        if self.tipo_servicio == 'venta_mostrador':
+            if hasattr(self, 'cotizacion'):
+                raise ValidationError({
+                    'tipo_servicio': (
+                        "❌ Una orden de venta mostrador no puede tener cotización asociada. "
+                        "Si necesita diagnóstico técnico, debe convertirse primero usando "
+                        "el método convertir_a_diagnostico()."
+                    )
+                })
+        
+        # REGLA 2: Diagnóstico NO puede tener venta mostrador directa (salvo conversión)
+        if self.tipo_servicio == 'diagnostico':
+            if hasattr(self, 'venta_mostrador') and not self.orden_venta_mostrador_previa:
+                raise ValidationError({
+                    'tipo_servicio': (
+                        "❌ Una orden de diagnóstico no puede tener venta mostrador directa. "
+                        "Use el sistema de cotización para agregar piezas y servicios."
+                    )
+                })
+        
+        # REGLA 3: Si hay orden previa, debe haber monto de abono > 0
+        if self.orden_venta_mostrador_previa and self.monto_abono_previo <= 0:
+            raise ValidationError({
+                'monto_abono_previo': (
+                    "❌ Si hay una orden de venta mostrador previa, debe registrar el monto "
+                    f"de abono. Total de venta mostrador: ${self.orden_venta_mostrador_previa.venta_mostrador.total_venta}"
+                )
+            })
+        
+        # REGLA 4: Estados válidos según tipo de servicio
+        if self.tipo_servicio == 'venta_mostrador':
+            # Venta mostrador NO puede pasar por estos estados
+            estados_invalidos = ['diagnostico', 'cotizacion', 'rechazada', 'esperando_piezas']
+            if self.estado in estados_invalidos:
+                raise ValidationError({
+                    'estado': (
+                        f"❌ Estado '{self.get_estado_display()}' no es válido para ventas mostrador. "
+                        f"Las ventas mostrador siguen un flujo directo sin diagnóstico ni cotización. "
+                        f"Estados permitidos: espera, recepcion, reparacion, control_calidad, finalizado, entregado, cancelado."
+                    )
+                })
+        
+        # REGLA 5: No se puede convertir diagnóstico → venta mostrador
+        if self.tipo_servicio == 'venta_mostrador' and self.orden_venta_mostrador_previa:
+            raise ValidationError({
+                'tipo_servicio': (
+                    "❌ No se puede convertir una orden de diagnóstico a venta mostrador. "
+                    "La conversión solo funciona en un sentido: venta_mostrador → diagnostico."
+                )
+            })
+        
+        # REGLA 6: Control de calidad obligatorio para diagnósticos
+        if self.tipo_servicio == 'diagnostico' and not self.control_calidad_requerido:
+            # Advertencia: Diagnósticos generalmente requieren QA
+            # Nota: No bloqueamos, solo documentamos que es raro
+            pass
+    
     @property
     def dias_en_servicio(self):
         """Calcula los días que lleva la orden en el sistema"""
@@ -315,6 +427,125 @@ class OrdenServicio(models.Model):
             
             return incidencia
         return None
+    
+    def convertir_a_diagnostico(self, usuario, motivo_conversion):
+        """
+        Convierte una orden de venta mostrador a orden con diagnóstico técnico.
+        Mantiene trazabilidad completa entre ambas órdenes.
+        
+        Este método se usa cuando un servicio de venta mostrador no puede completarse
+        sin un diagnóstico técnico completo (ej: instalación de pieza falla, se detecta
+        problema adicional, etc.)
+        
+        Args:
+            usuario (Empleado): Usuario que autoriza la conversión
+            motivo_conversion (str): Razón detallada de la conversión
+        
+        Returns:
+            OrdenServicio: Nueva orden de tipo 'diagnostico'
+        
+        Raises:
+            ValueError: Si la orden no es de tipo venta_mostrador o no tiene venta asociada
+            
+        Ejemplo:
+            >>> orden_vm = OrdenServicio.objects.get(numero_orden_interno='VM-2025-0001')
+            >>> nueva_orden = orden_vm.convertir_a_diagnostico(
+            ...     usuario=empleado,
+            ...     motivo_conversion="Equipo no enciende después de instalar RAM"
+            ... )
+            >>> print(nueva_orden.numero_orden_interno)  # ORD-2025-0234
+        """
+        # VALIDACIÓN 1: Solo se pueden convertir órdenes de venta mostrador
+        if self.tipo_servicio != 'venta_mostrador':
+            raise ValueError(
+                f"Solo se pueden convertir órdenes de tipo 'venta_mostrador'. "
+                f"Esta orden es de tipo '{self.tipo_servicio}'"
+            )
+        
+        # VALIDACIÓN 2: Debe tener una venta mostrador asociada
+        if not hasattr(self, 'venta_mostrador'):
+            raise ValueError(
+                "La orden no tiene una venta mostrador asociada. "
+                "No se puede realizar la conversión."
+            )
+        
+        # VALIDACIÓN 3: No puede estar ya convertida
+        if self.estado == 'convertida_a_diagnostico':
+            raise ValueError(
+                "Esta orden ya fue convertida a diagnóstico previamente. "
+                "No se puede convertir dos veces."
+            )
+        
+        # PASO 1: Cambiar estado de la orden actual
+        estado_anterior = self.estado
+        self.estado = 'convertida_a_diagnostico'
+        self.save()
+        
+        # PASO 2: Crear nueva orden de diagnóstico
+        nueva_orden = OrdenServicio.objects.create(
+            sucursal=self.sucursal,
+            responsable_seguimiento=self.responsable_seguimiento,
+            tecnico_asignado_actual=self.tecnico_asignado_actual,
+            tipo_servicio='diagnostico',
+            estado='diagnostico',
+            orden_venta_mostrador_previa=self,
+            monto_abono_previo=self.venta_mostrador.total_venta,
+            notas_conversion=motivo_conversion,
+            requiere_factura=self.requiere_factura,
+            control_calidad_requerido=True,  # Diagnóstico siempre requiere QA
+        )
+        
+        # PASO 3: Copiar información del equipo si existe
+        if hasattr(self, 'detalle_equipo'):
+            detalle_original = self.detalle_equipo
+            DetalleEquipo.objects.create(
+                orden=nueva_orden,
+                tipo_equipo=detalle_original.tipo_equipo,
+                marca=detalle_original.marca,
+                modelo=detalle_original.modelo,
+                numero_serie=detalle_original.numero_serie,
+                gama_equipo=detalle_original.gama_equipo,
+                falla_principal=detalle_original.falla_principal,
+                observaciones=detalle_original.observaciones,
+                contraseña_equipo=detalle_original.contraseña_equipo,
+                contiene_informacion_sensible=detalle_original.contiene_informacion_sensible,
+                fecha_inicio_diagnostico=timezone.now(),  # Inicia diagnóstico ahora
+            )
+        
+        # PASO 4: Registrar en historial de la orden ORIGINAL
+        HistorialOrden.objects.create(
+            orden=self,
+            tipo_evento='sistema',
+            estado_anterior=estado_anterior,
+            estado_nuevo='convertida_a_diagnostico',
+            comentario=(
+                f"⚠️ CONVERTIDA A DIAGNÓSTICO\n"
+                f"Nueva orden: {nueva_orden.numero_orden_interno}\n"
+                f"Motivo: {motivo_conversion}\n"
+                f"Monto cobrado previamente: ${self.venta_mostrador.total_venta}\n"
+                f"Autorizado por: {usuario.nombre_completo}"
+            ),
+            usuario=usuario,
+            es_sistema=False
+        )
+        
+        # PASO 5: Registrar en historial de la orden NUEVA
+        HistorialOrden.objects.create(
+            orden=nueva_orden,
+            tipo_evento='creacion',
+            comentario=(
+                f"✅ ORDEN CREADA POR CONVERSIÓN\n"
+                f"Orden original: {self.numero_orden_interno} (Venta Mostrador)\n"
+                f"Folio VM: {self.venta_mostrador.folio_venta}\n"
+                f"Monto abonado: ${self.venta_mostrador.total_venta}\n"
+                f"Motivo conversión: {motivo_conversion}\n"
+                f"Autorizado por: {usuario.nombre_completo}"
+            ),
+            usuario=usuario,
+            es_sistema=False
+        )
+        
+        return nueva_orden
     
     def __str__(self):
         return f"{self.numero_orden_interno} - {self.sucursal.nombre} ({self.get_estado_display()})"
@@ -950,6 +1181,12 @@ class VentaMostrador(models.Model):
         help_text="Notas adicionales sobre la venta"
     )
     
+    # COMISIONES (Sistema de comisiones futuro)
+    genera_comision = models.BooleanField(
+        default=False,
+        help_text="¿Esta venta genera comisión para el responsable? (Paquetes siempre generan)"
+    )
+    
     # Fechas de control
     fecha_actualizacion = models.DateTimeField(auto_now=True)
     
@@ -960,16 +1197,40 @@ class VentaMostrador(models.Model):
     
     @property
     def total_venta(self):
-        """Calcula el total de la venta sumando todos los conceptos"""
+        """
+        Calcula el total de la venta sumando todos los conceptos:
+        - Paquete (premium/oro/plata)
+        - Servicios adicionales (cambio pieza, limpieza, kit, reinstalación)
+        - Piezas vendidas individualmente
+        """
         total = self.costo_paquete
         total += self.costo_cambio_pieza
         total += self.costo_limpieza
         total += self.costo_kit
         total += self.costo_reinstalacion
+        
+        # NUEVO: Sumar todas las piezas vendidas individualmente
+        if hasattr(self, 'piezas_vendidas'):
+            total += sum(pieza.subtotal for pieza in self.piezas_vendidas.all())
+        
         return total
     
+    @property
+    def total_piezas_vendidas(self):
+        """
+        Calcula el total solo de piezas vendidas individualmente.
+        No incluye paquetes ni servicios.
+        """
+        if hasattr(self, 'piezas_vendidas'):
+            return sum(pieza.subtotal for pieza in self.piezas_vendidas.all())
+        return Decimal('0.00')
+    
     def save(self, *args, **kwargs):
-        """Generar folio si es nuevo"""
+        """
+        Generar folio VM-YYYY-XXXX si es nuevo.
+        Activar genera_comision automáticamente si es un paquete premium/oro/plata.
+        """
+        # Generar folio si es nuevo
         if not self.folio_venta:
             año_actual = timezone.now().year
             
@@ -990,6 +1251,10 @@ class VentaMostrador(models.Model):
             
             self.folio_venta = f"VM-{año_actual}-{siguiente_numero:04d}"
         
+        # Activar comisión automáticamente si es paquete premium/oro/plata
+        if self.paquete in ['premium', 'oro', 'plata']:
+            self.genera_comision = True
+        
         super().save(*args, **kwargs)
     
     def __str__(self):
@@ -998,6 +1263,85 @@ class VentaMostrador(models.Model):
     class Meta:
         verbose_name = "Venta Mostrador"
         verbose_name_plural = "Ventas Mostrador"
+
+
+# ============================================================================
+# MODELO 7.5: PIEZA VENTA MOSTRADOR (Simplificado)
+# ============================================================================
+
+class PiezaVentaMostrador(models.Model):
+    """
+    Piezas vendidas directamente en mostrador sin diagnóstico previo.
+    Versión simplificada sin tracking de instalación.
+    
+    Este modelo registra piezas individuales vendidas además de los paquetes,
+    como memorias RAM, discos duros, cables, accesorios, etc.
+    
+    Nota: Los paquetes (premium/oro/plata) NO se desglosan aquí, se manejan
+    como un concepto único en VentaMostrador.paquete
+    """
+    
+    # RELACIÓN CON VENTA MOSTRADOR
+    venta_mostrador = models.ForeignKey(
+        VentaMostrador,
+        on_delete=models.CASCADE,
+        related_name='piezas_vendidas',
+        help_text="Venta mostrador a la que pertenece esta pieza"
+    )
+    
+    # IDENTIFICACIÓN DE LA PIEZA
+    # Puede ser del catálogo ScoreCard o descripción libre
+    componente = models.ForeignKey(
+        ComponenteEquipo,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Componente del catálogo ScoreCard (opcional)"
+    )
+    descripcion_pieza = models.CharField(
+        max_length=200,
+        help_text="Descripción de la pieza (ej: RAM 8GB DDR4 Kingston, Cable HDMI 2m)"
+    )
+    
+    # CANTIDADES Y PRECIOS
+    cantidad = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+        help_text="Cantidad vendida"
+    )
+    precio_unitario = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Precio unitario de venta (IVA incluido)"
+    )
+    
+    # CONTROL Y NOTAS
+    fecha_venta = models.DateTimeField(
+        default=timezone.now,
+        help_text="Fecha de venta de la pieza"
+    )
+    notas = models.TextField(
+        blank=True,
+        help_text="Notas u observaciones sobre la pieza vendida"
+    )
+    
+    @property
+    def subtotal(self):
+        """Calcula el subtotal de esta pieza (cantidad × precio unitario)"""
+        return self.cantidad * self.precio_unitario
+    
+    def __str__(self):
+        return f"{self.descripcion_pieza} x{self.cantidad} - ${self.subtotal}"
+    
+    class Meta:
+        verbose_name = "Pieza Venta Mostrador"
+        verbose_name_plural = "Piezas Venta Mostrador"
+        ordering = ['-fecha_venta']
+        indexes = [
+            models.Index(fields=['-fecha_venta']),
+            models.Index(fields=['venta_mostrador']),
+        ]
 
 
 # ============================================================================
