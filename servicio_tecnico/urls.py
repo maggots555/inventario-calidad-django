@@ -29,6 +29,9 @@ urlpatterns = [
     # Descargar imagen original
     path('imagenes/<int:imagen_id>/descargar/', views.descargar_imagen_original, name='descargar_imagen'),
     
+    # Eliminar imagen
+    path('imagenes/<int:imagen_id>/eliminar/', views.eliminar_imagen, name='eliminar_imagen'),
+    
     # Listas de órdenes
     path('ordenes/activas/', views.lista_ordenes_activas, name='lista_activas'),
     path('ordenes/finalizadas/', views.lista_ordenes_finalizadas, name='lista_finalizadas'),

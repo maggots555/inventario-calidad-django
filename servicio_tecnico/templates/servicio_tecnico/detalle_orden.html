@@ -1626,6 +1626,7 @@
                                 {% for imagen in imagenes %}
                                 <div class="col-md-3 col-sm-6">
                                     <div class="gallery-image-container"
+                                         data-imagen-id="{{ imagen.pk }}"
                                          data-descripcion="{{ imagen.descripcion|default:'Sin descripción' }}"
                                          data-usuario="{{ imagen.subido_por.nombre_completo }}"
                                          data-fecha="{{ imagen.fecha_subida|date:'d/m/Y H:i' }}"
@@ -1638,6 +1639,14 @@
                                            onclick="event.stopPropagation();">
                                             <i class="bi bi-download"></i>
                                         </a>
+                                        
+                                        <!-- Botón eliminar en miniatura -->
+                                        <button type="button"
+                                                class="btn-eliminar-miniatura" 
+                                                title="Eliminar imagen"
+                                                onclick="confirmarEliminarImagen({{ imagen.pk }}, '{{ imagen.get_tipo_display }}', event);">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
                                         
                                         <div class="gallery-image">
                                             <img src="{{ imagen.imagen.url }}" alt="{{ imagen.descripcion }}">
@@ -2589,21 +2598,63 @@ formSubirImagenes.addEventListener('submit', function(e) {
     
     // Manejar respuesta del servidor
     xhr.addEventListener('load', function() {
-        if (xhr.status === 200) {
-            // Éxito - mostrar mensaje final
-            barraProgreso.classList.remove('progress-bar-animated');
-            barraProgreso.classList.add('bg-success');
-            textoProgreso.textContent = '¡Completado!';
-            porcentajeProgreso.textContent = '100%';
-            infoArchivos.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Imágenes subidas exitosamente. Recargando página...';
-            
-            // Recargar página después de 1.5 segundos
-            setTimeout(function() {
-                window.location.reload();
-            }, 1500);
+        if (xhr.status === 200 || xhr.status === 500) {
+            try {
+                // Parsear respuesta JSON del servidor
+                const data = JSON.parse(xhr.responseText);
+                
+                if (data.success) {
+                    // Éxito - mostrar mensaje final
+                    barraProgreso.classList.remove('progress-bar-animated');
+                    barraProgreso.classList.add('bg-success');
+                    textoProgreso.textContent = '¡Completado!';
+                    porcentajeProgreso.textContent = '100%';
+                    
+                    // Construir mensaje detallado
+                    let mensajeDetalle = `<i class="bi bi-check-circle-fill text-success"></i> ${data.message}`;
+                    
+                    // Agregar advertencias si hay imágenes omitidas
+                    if (data.imagenes_omitidas && data.imagenes_omitidas.length > 0) {
+                        mensajeDetalle += `<br><small class="text-warning">⚠️ ${data.imagenes_omitidas.length} imagen(es) omitida(s) por exceder 6MB</small>`;
+                    }
+                    
+                    // Agregar errores si los hay
+                    if (data.errores && data.errores.length > 0) {
+                        mensajeDetalle += `<br><small class="text-danger">⚠️ ${data.errores.length} error(es) al procesar</small>`;
+                    }
+                    
+                    infoArchivos.innerHTML = mensajeDetalle;
+                    
+                    // Recargar página después de 1.5 segundos
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    // Error reportado por el servidor
+                    let mensajeError = data.error || 'Error desconocido al subir imágenes';
+                    
+                    // Si hay información adicional del error, mostrarla
+                    if (data.error_type) {
+                        console.error(`Error tipo: ${data.error_type}`);
+                        mensajeError += `<br><small>Tipo: ${data.error_type}</small>`;
+                    }
+                    
+                    // Si se guardaron algunas imágenes antes del error
+                    if (data.imagenes_guardadas > 0) {
+                        mensajeError += `<br><small class="text-info">ℹ️ Se guardaron ${data.imagenes_guardadas} imagen(es) antes del error. Recarga para verlas.</small>`;
+                    }
+                    
+                    mostrarErrorCarga(mensajeError);
+                }
+            } catch (e) {
+                // Error al parsear JSON
+                console.error('Error al parsear respuesta:', e);
+                console.error('Respuesta del servidor:', xhr.responseText);
+                mostrarErrorCarga('Error al procesar la respuesta del servidor. Revisa la consola para más detalles.');
+            }
         } else {
-            // Error del servidor
-            mostrarErrorCarga('Error del servidor. Por favor intenta nuevamente.');
+            // Status code diferente de 200 o 500
+            mostrarErrorCarga(`Error del servidor (código ${xhr.status}). Por favor intenta nuevamente.`);
         }
     });
     
@@ -2627,10 +2678,12 @@ formSubirImagenes.addEventListener('submit', function(e) {
 function mostrarErrorCarga(mensaje) {
     barraProgreso.classList.remove('bg-success', 'progress-bar-animated');
     barraProgreso.classList.add('bg-danger');
+    barraProgreso.style.width = '100%'; // Completar barra en rojo para indicar error
     textoProgreso.textContent = 'Error';
+    porcentajeProgreso.textContent = '✗';
     infoArchivos.innerHTML = `<i class="bi bi-x-circle-fill text-danger"></i> ${mensaje}`;
     
-    // Rehabilitar formulario después de 3 segundos
+    // Rehabilitar formulario después de 4 segundos (más tiempo para leer el error)
     setTimeout(function() {
         btnSubir.disabled = false;
         inputImagenes.disabled = false;
@@ -2640,7 +2693,10 @@ function mostrarErrorCarga(mensaje) {
         progresoDiv.style.display = 'none';
         barraProgreso.classList.remove('bg-danger');
         barraProgreso.classList.add('progress-bar-animated', 'bg-success');
-    }, 3000);
+        barraProgreso.style.width = '0%';
+        badgeArchivos.style.display = 'none';
+        inputImagenes.value = ''; // Limpiar selección de archivos
+    }, 4000);
 }
 
 // ============================================================================
@@ -3329,6 +3385,134 @@ document.addEventListener('DOMContentLoaded', function() {
     actualizarEstiloFilas();
     actualizarCamposRechazo();
 });
+
+// ============================================================================
+// FUNCIÓN: ELIMINAR IMAGEN DE LA GALERÍA
+// ============================================================================
+
+/**
+ * Confirma y elimina una imagen de la galería.
+ * 
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Esta función maneja todo el proceso de eliminar una imagen:
+ * 1. Muestra un cuadro de confirmación para evitar borrados accidentales
+ * 2. Envía petición AJAX al servidor para eliminar imagen y archivos
+ * 3. Si tiene éxito, elimina visualmente la tarjeta de la imagen del DOM
+ * 4. Muestra feedback al usuario (éxito o error)
+ * 
+ * @param {number} imagenId - ID de la imagen a eliminar
+ * @param {string} tipoImagen - Tipo de imagen (para mensaje de confirmación)
+ * @param {Event} event - Evento del click (para prevenir propagación)
+ */
+function confirmarEliminarImagen(imagenId, tipoImagen, event) {
+    // Prevenir que se abra el lightbox al hacer click en eliminar
+    event.stopPropagation();
+    
+    // Doble confirmación para seguridad
+    const confirmacion = confirm(
+        `⚠️ ¿Estás seguro de eliminar esta imagen de ${tipoImagen}?\n\n` +
+        `Esta acción NO se puede deshacer.\n` +
+        `Se eliminarán tanto la imagen comprimida como la original.`
+    );
+    
+    if (!confirmacion) {
+        return; // Usuario canceló
+    }
+    
+    // Obtener el contenedor de la imagen para efectos visuales
+    const contenedorImagen = document.querySelector(`[data-imagen-id="${imagenId}"]`);
+    const columnaPadre = contenedorImagen ? contenedorImagen.closest('.col-md-3') : null;
+    
+    // Mostrar feedback visual: desactivar botón y añadir spinner
+    const btnEliminar = event.currentTarget;
+    const iconoOriginal = btnEliminar.innerHTML;
+    btnEliminar.disabled = true;
+    btnEliminar.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    btnEliminar.style.opacity = '0.6';
+    
+    // Preparar datos para la petición
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    // URL de eliminación
+    const url = "{% url 'servicio_tecnico:eliminar_imagen' 0 %}".replace('/0/', `/${imagenId}/`);
+    
+    // Enviar petición AJAX
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Éxito: Mostrar mensaje y eliminar del DOM con animación
+            mostrarToast(data.message || '✅ Imagen eliminada correctamente', 'success');
+            
+            // Animar salida y eliminar del DOM
+            if (columnaPadre) {
+                columnaPadre.style.transition = 'all 0.3s ease-out';
+                columnaPadre.style.opacity = '0';
+                columnaPadre.style.transform = 'scale(0.8)';
+                
+                setTimeout(() => {
+                    columnaPadre.remove();
+                    
+                    // Verificar si ya no quedan imágenes en esta categoría
+                    verificarCategoriasVacias();
+                }, 300);
+            }
+        } else {
+            // Error del servidor
+            mostrarToast(data.error || '❌ Error al eliminar la imagen', 'danger');
+            
+            // Restaurar botón
+            btnEliminar.disabled = false;
+            btnEliminar.innerHTML = iconoOriginal;
+            btnEliminar.style.opacity = '1';
+        }
+    })
+    .catch(error => {
+        // Error de red o JavaScript
+        console.error('Error al eliminar imagen:', error);
+        mostrarToast('❌ Error de conexión. Por favor intenta nuevamente.', 'danger');
+        
+        // Restaurar botón
+        btnEliminar.disabled = false;
+        btnEliminar.innerHTML = iconoOriginal;
+        btnEliminar.style.opacity = '1';
+    });
+}
+
+/**
+ * Verifica si alguna categoría quedó sin imágenes y muestra mensaje apropiado.
+ * 
+ * EXPLICACIÓN:
+ * Después de eliminar una imagen, revisamos si la categoría (tab) quedó vacía.
+ * Si es así, mostramos un mensaje "No hay imágenes de [tipo] aún" en lugar
+ * de dejar el espacio en blanco.
+ */
+function verificarCategoriasVacias() {
+    const tabs = document.querySelectorAll('.tab-pane');
+    
+    tabs.forEach(tab => {
+        const imagenes = tab.querySelectorAll('.gallery-image-container');
+        
+        if (imagenes.length === 0) {
+            // No quedan imágenes en esta categoría
+            const tipoCategoria = tab.id; // El ID del tab es el tipo de imagen
+            const nombreCategoria = tab.querySelector('.text-center')?.textContent || tipoCategoria;
+            
+            // Mostrar mensaje de categoría vacía
+            tab.innerHTML = `
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-image" style="font-size: 3rem;"></i>
+                    <p class="mt-2">No hay imágenes de ${tipoCategoria} aún.</p>
+                </div>
+            `;
+        }
+    });
+}
+
 </script>
 
 <!-- ============================================================================

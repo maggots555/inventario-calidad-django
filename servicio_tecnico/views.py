@@ -823,112 +823,132 @@ def detalle_orden(request, orden_id):
                 imagenes_a_subir = len(imagenes_files)
                 
                 if imagenes_a_subir > 30:
-                    messages.error(
-                        request,
-                        f'❌ Solo puedes subir máximo 30 imágenes por carga. '
-                        f'Seleccionaste {imagenes_a_subir}. Si necesitas más, '
-                        f'realiza otra carga después.'
-                    )
-                    return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+                    # Retornar JSON con error en lugar de redirect
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Solo puedes subir máximo 30 imágenes por carga. Seleccionaste {imagenes_a_subir}. Si necesitas más, realiza otra carga después.'
+                    })
                 
                 # Procesar cada imagen
                 imagenes_guardadas = 0
-                for imagen_file in imagenes_files:
-                    # Validar tamaño (6MB = 6 * 1024 * 1024 bytes)
-                    if imagen_file.size > 6 * 1024 * 1024:
-                        messages.warning(
-                            request,
-                            f'⚠️ Imagen "{imagen_file.name}" excede 6MB y fue omitida.'
-                        )
-                        continue
-                    
-                    # Comprimir y guardar imagen
-                    try:
-                        imagen_orden = comprimir_y_guardar_imagen(
-                            orden=orden,
-                            imagen_file=imagen_file,
-                            tipo=tipo_imagen,
-                            descripcion=descripcion,
-                            empleado=empleado_actual
-                        )
-                        imagenes_guardadas += 1
-                    except Exception as e:
-                        messages.warning(
-                            request,
-                            f'⚠️ Error al procesar "{imagen_file.name}": {str(e)}'
-                        )
+                imagenes_omitidas = []
+                errores_procesamiento = []
                 
-                if imagenes_guardadas > 0:
-                    messages.success(
-                        request,
-                        f'✅ {imagenes_guardadas} imagen(es) subida(s) correctamente.'
-                    )
-                    
-                    # Registrar en historial
-                    HistorialOrden.objects.create(
-                        orden=orden,
-                        tipo_evento='imagen',
-                        comentario=f'{imagenes_guardadas} imagen(es) tipo "{dict(form_imagenes.fields["tipo"].choices)[tipo_imagen]}" agregadas',
-                        usuario=empleado_actual,
-                        es_sistema=False
-                    )
-                    
-                    # ================================================================
-                    # CAMBIO AUTOMÁTICO DE ESTADO SEGÚN TIPO DE IMAGEN
-                    # ================================================================
-                    estado_anterior = orden.estado
-                    cambio_realizado = False
-                    
-                    # Si se suben imágenes de INGRESO → Cambiar a "En Diagnóstico"
-                    if tipo_imagen == 'ingreso' and estado_anterior != 'diagnostico':
-                        orden.estado = 'diagnostico'
-                        cambio_realizado = True
+                try:
+                    for imagen_file in imagenes_files:
+                        # Validar tamaño (6MB = 6 * 1024 * 1024 bytes)
+                        if imagen_file.size > 6 * 1024 * 1024:
+                            imagenes_omitidas.append(imagen_file.name)
+                            continue
                         
-                        messages.info(
-                            request,
-                            f'ℹ️ Estado actualizado automáticamente: '
-                            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → '
-                            f'En Diagnóstico (imágenes de ingreso cargadas)'
-                        )
-                        
-                        # Registrar cambio automático en historial
+                        # Comprimir y guardar imagen
+                        try:
+                            imagen_orden = comprimir_y_guardar_imagen(
+                                orden=orden,
+                                imagen_file=imagen_file,
+                                tipo=tipo_imagen,
+                                descripcion=descripcion,
+                                empleado=empleado_actual
+                            )
+                            imagenes_guardadas += 1
+                        except Exception as e:
+                            errores_procesamiento.append(f"{imagen_file.name}: {str(e)}")
+                    
+                    # Preparar respuesta
+                    if imagenes_guardadas > 0:
+                        # Registrar en historial
                         HistorialOrden.objects.create(
                             orden=orden,
-                            tipo_evento='estado',
-                            comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico (imágenes de ingreso cargadas)',
+                            tipo_evento='imagen',
+                            comentario=f'{imagenes_guardadas} imagen(es) tipo "{dict(form_imagenes.fields["tipo"].choices)[tipo_imagen]}" agregadas',
                             usuario=empleado_actual,
-                            es_sistema=True
-                        )
-                    
-                    # Si se suben imágenes de EGRESO → Cambiar a "Finalizado - Listo para Entrega"
-                    elif tipo_imagen == 'egreso' and estado_anterior != 'finalizado':
-                        orden.estado = 'finalizado'
-                        orden.fecha_finalizacion = timezone.now()
-                        cambio_realizado = True
-                        
-                        messages.success(
-                            request,
-                            f'🎉 Estado actualizado automáticamente: '
-                            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → '
-                            f'Finalizado - Listo para Entrega (imágenes de egreso cargadas)'
+                            es_sistema=False
                         )
                         
-                        # Registrar cambio automático en historial
-                        HistorialOrden.objects.create(
-                            orden=orden,
-                            tipo_evento='estado',
-                            comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Finalizado - Listo para Entrega (imágenes de egreso cargadas)',
-                            usuario=empleado_actual,
-                            es_sistema=True
-                        )
-                    
-                    # Guardar cambios si hubo actualización de estado
-                    if cambio_realizado:
-                        orden.save()
-                
-                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+                        # ================================================================
+                        # CAMBIO AUTOMÁTICO DE ESTADO SEGÚN TIPO DE IMAGEN
+                        # ================================================================
+                        estado_anterior = orden.estado
+                        cambio_realizado = False
+                        mensaje_estado = ''
+                        
+                        # Si se suben imágenes de INGRESO → Cambiar a "En Diagnóstico"
+                        if tipo_imagen == 'ingreso' and estado_anterior != 'diagnostico':
+                            orden.estado = 'diagnostico'
+                            cambio_realizado = True
+                            mensaje_estado = f'Estado actualizado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico'
+                            
+                            # Registrar cambio automático en historial
+                            HistorialOrden.objects.create(
+                                orden=orden,
+                                tipo_evento='estado',
+                                comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico (imágenes de ingreso cargadas)',
+                                usuario=empleado_actual,
+                                es_sistema=True
+                            )
+                        
+                        # Si se suben imágenes de EGRESO → Cambiar a "Finalizado - Listo para Entrega"
+                        elif tipo_imagen == 'egreso' and estado_anterior != 'finalizado':
+                            from django.utils import timezone as tz_module
+                            orden.estado = 'finalizado'
+                            orden.fecha_finalizacion = tz_module.now()
+                            cambio_realizado = True
+                            mensaje_estado = f'Estado actualizado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Finalizado - Listo para Entrega'
+                            
+                            # Registrar cambio automático en historial
+                            HistorialOrden.objects.create(
+                                orden=orden,
+                                tipo_evento='estado',
+                                comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Finalizado - Listo para Entrega (imágenes de egreso cargadas)',
+                                usuario=empleado_actual,
+                                es_sistema=True
+                            )
+                        
+                        # Guardar cambios si hubo actualización de estado
+                        if cambio_realizado:
+                            orden.save()
+                        
+                        # Construir mensaje de respuesta
+                        mensaje = f'✅ {imagenes_guardadas} imagen(es) subida(s) correctamente.'
+                        if mensaje_estado:
+                            mensaje += f' {mensaje_estado}.'
+                        
+                        # Retornar respuesta JSON exitosa
+                        return JsonResponse({
+                            'success': True,
+                            'message': mensaje,
+                            'imagenes_guardadas': imagenes_guardadas,
+                            'imagenes_omitidas': imagenes_omitidas,
+                            'errores': errores_procesamiento,
+                            'cambio_estado': cambio_realizado
+                        })
+                    else:
+                        # No se guardó ninguna imagen
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'No se pudo guardar ninguna imagen.',
+                            'imagenes_omitidas': imagenes_omitidas,
+                            'errores': errores_procesamiento
+                        })
+                        
+                except Exception as e:
+                    # Capturar cualquier error inesperado y retornarlo
+                    import traceback
+                    error_detallado = traceback.format_exc()
+                    print(f"❌ ERROR AL PROCESAR IMÁGENES: {error_detallado}")
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error inesperado al procesar imágenes: {str(e)}',
+                        'error_type': type(e).__name__,
+                        'imagenes_guardadas': imagenes_guardadas
+                    }, status=500)
             else:
-                messages.error(request, '❌ Error al subir las imágenes.')
+                # Formulario no válido
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Error en el formulario. Verifica los datos enviados.',
+                    'form_errors': form_imagenes.errors
+                })
         
         # ------------------------------------------------------------------------
         # FORMULARIO 7: Editar Información Principal del Equipo
@@ -1524,6 +1544,123 @@ def descargar_imagen_original(request, imagen_id):
     response['Content-Disposition'] = f'attachment; filename="{nombre_descarga}"'
     
     return response
+
+
+# ============================================================================
+# VISTA: Eliminar Imagen de Orden
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def eliminar_imagen(request, imagen_id):
+    """
+    Elimina una imagen de una orden de servicio.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista elimina completamente una imagen:
+    1. Verifica permisos del usuario
+    2. Elimina el registro de la base de datos
+    3. Elimina los archivos físicos (imagen comprimida y original)
+    4. Registra la acción en el historial
+    5. Retorna JSON con el resultado
+    
+    Validaciones de seguridad:
+    - Usuario debe estar autenticado
+    - Solo método POST permitido
+    - Usuario debe ser empleado activo
+    - La imagen debe existir
+    
+    Args:
+        request: Objeto HttpRequest
+        imagen_id: ID de la ImagenOrden a eliminar
+    
+    Returns:
+        JsonResponse con éxito o error
+    """
+    # Verificar que el usuario es un empleado activo
+    try:
+        empleado_actual = request.user.empleado
+        if not empleado_actual.activo:
+            return JsonResponse({
+                'success': False,
+                'error': 'No tienes permisos para eliminar imágenes.'
+            }, status=403)
+    except:
+        return JsonResponse({
+            'success': False,
+            'error': 'Debes ser un empleado activo para eliminar imágenes.'
+        }, status=403)
+    
+    # Obtener la imagen o retornar error 404
+    try:
+        imagen = ImagenOrden.objects.select_related('orden', 'subido_por').get(pk=imagen_id)
+    except ImagenOrden.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'La imagen no existe.'
+        }, status=404)
+    
+    try:
+        # Guardar información para el historial antes de eliminar
+        orden = imagen.orden
+        tipo_imagen = imagen.get_tipo_display()
+        descripcion_imagen = imagen.descripcion or imagen.nombre_archivo
+        
+        # Eliminar archivos físicos del sistema de archivos
+        archivos_eliminados = []
+        
+        # Eliminar imagen comprimida
+        if imagen.imagen:
+            try:
+                ruta_imagen = imagen.imagen.path
+                if os.path.exists(ruta_imagen):
+                    os.remove(ruta_imagen)
+                    archivos_eliminados.append('imagen comprimida')
+            except Exception as e:
+                print(f"⚠️ No se pudo eliminar archivo comprimido: {str(e)}")
+        
+        # Eliminar imagen original
+        if imagen.imagen_original:
+            try:
+                ruta_original = imagen.imagen_original.path
+                if os.path.exists(ruta_original):
+                    os.remove(ruta_original)
+                    archivos_eliminados.append('imagen original')
+            except Exception as e:
+                print(f"⚠️ No se pudo eliminar archivo original: {str(e)}")
+        
+        # Eliminar registro de la base de datos
+        imagen.delete()
+        
+        # Registrar en historial
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='imagen',
+            comentario=f'Imagen {tipo_imagen} eliminada: {descripcion_imagen} (Eliminada por: {empleado_actual.nombre_completo})',
+            usuario=empleado_actual,
+            es_sistema=False
+        )
+        
+        # Mensaje de éxito
+        mensaje_archivos = f" ({', '.join(archivos_eliminados)})" if archivos_eliminados else ""
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Imagen {tipo_imagen} eliminada correctamente{mensaje_archivos}.',
+            'imagen_id': imagen_id
+        })
+        
+    except Exception as e:
+        # Capturar cualquier error inesperado
+        import traceback
+        error_detallado = traceback.format_exc()
+        print(f"❌ ERROR AL ELIMINAR IMAGEN: {error_detallado}")
+        
+        return JsonResponse({
+            'success': False,
+            'error': f'Error inesperado al eliminar la imagen: {str(e)}',
+            'error_type': type(e).__name__
+        }, status=500)
 
 
 # ============================================================================
