@@ -23,6 +23,7 @@ from inventario.models import Empleado
 from config.constants import ESTADO_ORDEN_CHOICES
 from .forms import (
     NuevaOrdenForm,
+    NuevaOrdenVentaMostradorForm,
     ConfiguracionAdicionalForm,
     ReingresoRHITSOForm,
     CambioEstadoForm,
@@ -179,6 +180,74 @@ def crear_orden(request):
     }
     
     return render(request, 'servicio_tecnico/form_nueva_orden.html', context)
+
+
+@login_required
+def crear_orden_venta_mostrador(request):
+    """
+    Vista para crear una nueva orden de Venta Mostrador (sin diagnóstico).
+    
+    EXPLICACIÓN DEL FLUJO:
+    Las ventas mostrador son servicios directos que NO requieren diagnóstico técnico:
+    - Instalación de piezas compradas en el momento
+    - Reinstalación de sistema operativo
+    - Limpieza express
+    - Venta de accesorios
+    
+    El flujo es más simple que una orden normal:
+    1. Se crea la orden con tipo_servicio='venta_mostrador'
+    2. El estado inicial es 'recepcion' (pueden empezar de inmediato)
+    3. Se redirige al detalle de la orden para agregar los servicios específicos
+    
+    Args:
+        request: Objeto HttpRequest
+    
+    Returns:
+        HttpResponse: Renderiza el template o redirige
+    """
+    
+    if request.method == 'POST':
+        form = NuevaOrdenVentaMostradorForm(request.POST, user=request.user)
+        
+        if form.is_valid():
+            try:
+                # Guardar la orden (automáticamente se marca como venta_mostrador)
+                orden = form.save()
+                
+                # Mensaje de éxito
+                messages.success(
+                    request,
+                    f'¡Orden de Venta Mostrador {orden.numero_orden_interno} creada exitosamente! '
+                    f'Ahora agrega los servicios y paquetes específicos.'
+                )
+                
+                # Redirigir al detalle de la orden para agregar la venta mostrador
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
+            
+            except Exception as e:
+                messages.error(
+                    request,
+                    f'Error al crear la orden de venta mostrador: {str(e)}'
+                )
+        else:
+            messages.warning(
+                request,
+                'Por favor corrige los errores en el formulario.'
+            )
+    
+    else:
+        # GET: Mostrar formulario vacío
+        form = NuevaOrdenVentaMostradorForm(user=request.user)
+    
+    context = {
+        'form': form,
+        'titulo': 'Nueva Venta Mostrador',
+        'subtitulo': 'Servicio Directo sin Diagnóstico',
+        'accion': 'Crear',
+        'es_venta_mostrador': True,  # Flag para el template
+    }
+    
+    return render(request, 'servicio_tecnico/form_nueva_orden_venta_mostrador.html', context)
 
 
 @login_required
@@ -425,6 +494,15 @@ def cerrar_orden(request, orden_id):
     """
     # Obtener la orden o mostrar error 404
     orden = get_object_or_404(OrdenServicio, pk=orden_id)
+    
+    # VALIDACIÓN: No permitir modificar orden convertida
+    if orden.estado == 'convertida_a_diagnostico':
+        messages.error(
+            request,
+            f'❌ La orden {orden.numero_orden_interno} fue convertida a diagnóstico y ya no puede modificarse. '
+            f'Esta orden está cerrada permanentemente.'
+        )
+        return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
     
     # Verificar que esté en estado 'finalizado'
     if orden.estado == 'finalizado':
@@ -745,112 +823,132 @@ def detalle_orden(request, orden_id):
                 imagenes_a_subir = len(imagenes_files)
                 
                 if imagenes_a_subir > 30:
-                    messages.error(
-                        request,
-                        f'❌ Solo puedes subir máximo 30 imágenes por carga. '
-                        f'Seleccionaste {imagenes_a_subir}. Si necesitas más, '
-                        f'realiza otra carga después.'
-                    )
-                    return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+                    # Retornar JSON con error en lugar de redirect
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Solo puedes subir máximo 30 imágenes por carga. Seleccionaste {imagenes_a_subir}. Si necesitas más, realiza otra carga después.'
+                    })
                 
                 # Procesar cada imagen
                 imagenes_guardadas = 0
-                for imagen_file in imagenes_files:
-                    # Validar tamaño (6MB = 6 * 1024 * 1024 bytes)
-                    if imagen_file.size > 6 * 1024 * 1024:
-                        messages.warning(
-                            request,
-                            f'⚠️ Imagen "{imagen_file.name}" excede 6MB y fue omitida.'
-                        )
-                        continue
-                    
-                    # Comprimir y guardar imagen
-                    try:
-                        imagen_orden = comprimir_y_guardar_imagen(
-                            orden=orden,
-                            imagen_file=imagen_file,
-                            tipo=tipo_imagen,
-                            descripcion=descripcion,
-                            empleado=empleado_actual
-                        )
-                        imagenes_guardadas += 1
-                    except Exception as e:
-                        messages.warning(
-                            request,
-                            f'⚠️ Error al procesar "{imagen_file.name}": {str(e)}'
-                        )
+                imagenes_omitidas = []
+                errores_procesamiento = []
                 
-                if imagenes_guardadas > 0:
-                    messages.success(
-                        request,
-                        f'✅ {imagenes_guardadas} imagen(es) subida(s) correctamente.'
-                    )
-                    
-                    # Registrar en historial
-                    HistorialOrden.objects.create(
-                        orden=orden,
-                        tipo_evento='imagen',
-                        comentario=f'{imagenes_guardadas} imagen(es) tipo "{dict(form_imagenes.fields["tipo"].choices)[tipo_imagen]}" agregadas',
-                        usuario=empleado_actual,
-                        es_sistema=False
-                    )
-                    
-                    # ================================================================
-                    # CAMBIO AUTOMÁTICO DE ESTADO SEGÚN TIPO DE IMAGEN
-                    # ================================================================
-                    estado_anterior = orden.estado
-                    cambio_realizado = False
-                    
-                    # Si se suben imágenes de INGRESO → Cambiar a "En Diagnóstico"
-                    if tipo_imagen == 'ingreso' and estado_anterior != 'diagnostico':
-                        orden.estado = 'diagnostico'
-                        cambio_realizado = True
+                try:
+                    for imagen_file in imagenes_files:
+                        # Validar tamaño (6MB = 6 * 1024 * 1024 bytes)
+                        if imagen_file.size > 6 * 1024 * 1024:
+                            imagenes_omitidas.append(imagen_file.name)
+                            continue
                         
-                        messages.info(
-                            request,
-                            f'ℹ️ Estado actualizado automáticamente: '
-                            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → '
-                            f'En Diagnóstico (imágenes de ingreso cargadas)'
-                        )
-                        
-                        # Registrar cambio automático en historial
+                        # Comprimir y guardar imagen
+                        try:
+                            imagen_orden = comprimir_y_guardar_imagen(
+                                orden=orden,
+                                imagen_file=imagen_file,
+                                tipo=tipo_imagen,
+                                descripcion=descripcion,
+                                empleado=empleado_actual
+                            )
+                            imagenes_guardadas += 1
+                        except Exception as e:
+                            errores_procesamiento.append(f"{imagen_file.name}: {str(e)}")
+                    
+                    # Preparar respuesta
+                    if imagenes_guardadas > 0:
+                        # Registrar en historial
                         HistorialOrden.objects.create(
                             orden=orden,
-                            tipo_evento='estado',
-                            comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico (imágenes de ingreso cargadas)',
+                            tipo_evento='imagen',
+                            comentario=f'{imagenes_guardadas} imagen(es) tipo "{dict(form_imagenes.fields["tipo"].choices)[tipo_imagen]}" agregadas',
                             usuario=empleado_actual,
-                            es_sistema=True
-                        )
-                    
-                    # Si se suben imágenes de EGRESO → Cambiar a "Finalizado - Listo para Entrega"
-                    elif tipo_imagen == 'egreso' and estado_anterior != 'finalizado':
-                        orden.estado = 'finalizado'
-                        orden.fecha_finalizacion = timezone.now()
-                        cambio_realizado = True
-                        
-                        messages.success(
-                            request,
-                            f'🎉 Estado actualizado automáticamente: '
-                            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → '
-                            f'Finalizado - Listo para Entrega (imágenes de egreso cargadas)'
+                            es_sistema=False
                         )
                         
-                        # Registrar cambio automático en historial
-                        HistorialOrden.objects.create(
-                            orden=orden,
-                            tipo_evento='estado',
-                            comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Finalizado - Listo para Entrega (imágenes de egreso cargadas)',
-                            usuario=empleado_actual,
-                            es_sistema=True
-                        )
-                    
-                    # Guardar cambios si hubo actualización de estado
-                    if cambio_realizado:
-                        orden.save()
-                
-                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+                        # ================================================================
+                        # CAMBIO AUTOMÁTICO DE ESTADO SEGÚN TIPO DE IMAGEN
+                        # ================================================================
+                        estado_anterior = orden.estado
+                        cambio_realizado = False
+                        mensaje_estado = ''
+                        
+                        # Si se suben imágenes de INGRESO → Cambiar a "En Diagnóstico"
+                        if tipo_imagen == 'ingreso' and estado_anterior != 'diagnostico':
+                            orden.estado = 'diagnostico'
+                            cambio_realizado = True
+                            mensaje_estado = f'Estado actualizado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico'
+                            
+                            # Registrar cambio automático en historial
+                            HistorialOrden.objects.create(
+                                orden=orden,
+                                tipo_evento='estado',
+                                comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico (imágenes de ingreso cargadas)',
+                                usuario=empleado_actual,
+                                es_sistema=True
+                            )
+                        
+                        # Si se suben imágenes de EGRESO → Cambiar a "Finalizado - Listo para Entrega"
+                        elif tipo_imagen == 'egreso' and estado_anterior != 'finalizado':
+                            from django.utils import timezone as tz_module
+                            orden.estado = 'finalizado'
+                            orden.fecha_finalizacion = tz_module.now()
+                            cambio_realizado = True
+                            mensaje_estado = f'Estado actualizado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Finalizado - Listo para Entrega'
+                            
+                            # Registrar cambio automático en historial
+                            HistorialOrden.objects.create(
+                                orden=orden,
+                                tipo_evento='estado',
+                                comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Finalizado - Listo para Entrega (imágenes de egreso cargadas)',
+                                usuario=empleado_actual,
+                                es_sistema=True
+                            )
+                        
+                        # Guardar cambios si hubo actualización de estado
+                        if cambio_realizado:
+                            orden.save()
+                        
+                        # Construir mensaje de respuesta
+                        mensaje = f'✅ {imagenes_guardadas} imagen(es) subida(s) correctamente.'
+                        if mensaje_estado:
+                            mensaje += f' {mensaje_estado}.'
+                        
+                        # Retornar respuesta JSON exitosa
+                        return JsonResponse({
+                            'success': True,
+                            'message': mensaje,
+                            'imagenes_guardadas': imagenes_guardadas,
+                            'imagenes_omitidas': imagenes_omitidas,
+                            'errores': errores_procesamiento,
+                            'cambio_estado': cambio_realizado
+                        })
+                    else:
+                        # No se guardó ninguna imagen
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'No se pudo guardar ninguna imagen.',
+                            'imagenes_omitidas': imagenes_omitidas,
+                            'errores': errores_procesamiento
+                        })
+                        
+                except Exception as e:
+                    # Capturar cualquier error inesperado y retornarlo
+                    import traceback
+                    error_detallado = traceback.format_exc()
+                    print(f"❌ ERROR AL PROCESAR IMÁGENES: {error_detallado}")
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Error inesperado al procesar imágenes: {str(e)}',
+                        'error_type': type(e).__name__,
+                        'imagenes_guardadas': imagenes_guardadas
+                    }, status=500)
             else:
-                messages.error(request, '❌ Error al subir las imágenes.')
+                # Formulario no válido
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Error en el formulario. Verifica los datos enviados.',
+                    'form_errors': form_imagenes.errors
+                })
         
         # ------------------------------------------------------------------------
         # FORMULARIO 7: Editar Información Principal del Equipo
@@ -1200,6 +1298,37 @@ def detalle_orden(request, orden_id):
     # CONTEXT PARA EL TEMPLATE
     # ========================================================================
     
+    # ========================================================================
+    # VENTA MOSTRADOR - FASE 3
+    # ========================================================================
+    # Inicializar variables de venta mostrador
+    venta_mostrador = None
+    form_venta_mostrador = None
+    form_pieza_venta_mostrador = None
+    piezas_venta_mostrador = []
+    
+    # Si la orden es tipo "venta_mostrador", preparar contexto específico
+    if orden.tipo_servicio == 'venta_mostrador':
+        from .forms import VentaMostradorForm, PiezaVentaMostradorForm
+        
+        # Verificar si ya existe venta mostrador
+        if hasattr(orden, 'venta_mostrador'):
+            venta_mostrador = orden.venta_mostrador
+            
+            # Formulario de venta mostrador con datos existentes (para editar)
+            form_venta_mostrador = VentaMostradorForm(instance=venta_mostrador)
+            
+            # Obtener todas las piezas vendidas
+            piezas_venta_mostrador = venta_mostrador.piezas_vendidas.select_related(
+                'componente'
+            ).order_by('-fecha_venta')
+        else:
+            # No existe venta mostrador, preparar formulario para crear
+            form_venta_mostrador = VentaMostradorForm()
+        
+        # Formulario para agregar piezas (siempre disponible)
+        form_pieza_venta_mostrador = PiezaVentaMostradorForm()
+    
     context = {
         'orden': orden,
         'detalle': orden.detalle_equipo,
@@ -1221,6 +1350,12 @@ def detalle_orden(request, orden_id):
         'form_pieza': form_pieza,
         'form_seguimiento': form_seguimiento,
         
+        # NUEVOS: Formularios de Venta Mostrador - FASE 3
+        'venta_mostrador': venta_mostrador,
+        'form_venta_mostrador': form_venta_mostrador,
+        'form_pieza_venta_mostrador': form_pieza_venta_mostrador,
+        'piezas_venta_mostrador': piezas_venta_mostrador,
+        
         # Datos de Cotización
         'cotizacion': cotizacion,
         'piezas_cotizadas': piezas_cotizadas,
@@ -1238,6 +1373,8 @@ def detalle_orden(request, orden_id):
         # Información adicional
         'dias_en_servicio': orden.dias_en_servicio,
         'esta_retrasada': orden.esta_retrasada,
+        'esta_convertida': orden.esta_convertida,  # NUEVO: Indica si fue convertida a diagnóstico
+        'puede_modificarse': orden.puede_modificarse,  # NUEVO: Indica si puede modificarse
         
         # Estadísticas de técnicos (para alertas) - Convertido a JSON para JavaScript
         'estadisticas_tecnicos': mark_safe(json.dumps(estadisticas_tecnicos)),
@@ -1407,6 +1544,123 @@ def descargar_imagen_original(request, imagen_id):
     response['Content-Disposition'] = f'attachment; filename="{nombre_descarga}"'
     
     return response
+
+
+# ============================================================================
+# VISTA: Eliminar Imagen de Orden
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def eliminar_imagen(request, imagen_id):
+    """
+    Elimina una imagen de una orden de servicio.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista elimina completamente una imagen:
+    1. Verifica permisos del usuario
+    2. Elimina el registro de la base de datos
+    3. Elimina los archivos físicos (imagen comprimida y original)
+    4. Registra la acción en el historial
+    5. Retorna JSON con el resultado
+    
+    Validaciones de seguridad:
+    - Usuario debe estar autenticado
+    - Solo método POST permitido
+    - Usuario debe ser empleado activo
+    - La imagen debe existir
+    
+    Args:
+        request: Objeto HttpRequest
+        imagen_id: ID de la ImagenOrden a eliminar
+    
+    Returns:
+        JsonResponse con éxito o error
+    """
+    # Verificar que el usuario es un empleado activo
+    try:
+        empleado_actual = request.user.empleado
+        if not empleado_actual.activo:
+            return JsonResponse({
+                'success': False,
+                'error': 'No tienes permisos para eliminar imágenes.'
+            }, status=403)
+    except:
+        return JsonResponse({
+            'success': False,
+            'error': 'Debes ser un empleado activo para eliminar imágenes.'
+        }, status=403)
+    
+    # Obtener la imagen o retornar error 404
+    try:
+        imagen = ImagenOrden.objects.select_related('orden', 'subido_por').get(pk=imagen_id)
+    except ImagenOrden.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'La imagen no existe.'
+        }, status=404)
+    
+    try:
+        # Guardar información para el historial antes de eliminar
+        orden = imagen.orden
+        tipo_imagen = imagen.get_tipo_display()
+        descripcion_imagen = imagen.descripcion or imagen.nombre_archivo
+        
+        # Eliminar archivos físicos del sistema de archivos
+        archivos_eliminados = []
+        
+        # Eliminar imagen comprimida
+        if imagen.imagen:
+            try:
+                ruta_imagen = imagen.imagen.path
+                if os.path.exists(ruta_imagen):
+                    os.remove(ruta_imagen)
+                    archivos_eliminados.append('imagen comprimida')
+            except Exception as e:
+                print(f"⚠️ No se pudo eliminar archivo comprimido: {str(e)}")
+        
+        # Eliminar imagen original
+        if imagen.imagen_original:
+            try:
+                ruta_original = imagen.imagen_original.path
+                if os.path.exists(ruta_original):
+                    os.remove(ruta_original)
+                    archivos_eliminados.append('imagen original')
+            except Exception as e:
+                print(f"⚠️ No se pudo eliminar archivo original: {str(e)}")
+        
+        # Eliminar registro de la base de datos
+        imagen.delete()
+        
+        # Registrar en historial
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='imagen',
+            comentario=f'Imagen {tipo_imagen} eliminada: {descripcion_imagen} (Eliminada por: {empleado_actual.nombre_completo})',
+            usuario=empleado_actual,
+            es_sistema=False
+        )
+        
+        # Mensaje de éxito
+        mensaje_archivos = f" ({', '.join(archivos_eliminados)})" if archivos_eliminados else ""
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Imagen {tipo_imagen} eliminada correctamente{mensaje_archivos}.',
+            'imagen_id': imagen_id
+        })
+        
+    except Exception as e:
+        # Capturar cualquier error inesperado
+        import traceback
+        error_detallado = traceback.format_exc()
+        print(f"❌ ERROR AL ELIMINAR IMAGEN: {error_detallado}")
+        
+        return JsonResponse({
+            'success': False,
+            'error': f'Error inesperado al eliminar la imagen: {str(e)}',
+            'error_type': type(e).__name__
+        }, status=500)
 
 
 # ============================================================================
@@ -2370,3 +2624,425 @@ Este es un mensaje automático, por favor no responder.
     except Exception as e:
         print(f"❌ Error al enviar email de notificación: {str(e)}")
         # No levantamos la excepción para no afectar el flujo principal
+
+
+# ============================================================================
+# VISTAS AJAX PARA VENTA MOSTRADOR - FASE 3
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def crear_venta_mostrador(request, orden_id):
+    """
+    Crea una nueva venta mostrador asociada a una orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista maneja el formulario modal para crear una venta mostrador.
+    Responde con JSON para actualizar la interfaz sin recargar la página (AJAX).
+    
+    FLUJO:
+    1. Obtiene la orden y verifica que sea tipo 'venta_mostrador'
+    2. Verifica que NO tenga venta mostrador existente
+    3. Valida el formulario recibido
+    4. Crea la venta mostrador asociada a la orden
+    5. Registra en historial
+    6. Devuelve JSON con el resultado
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        orden_id: ID de la orden a la que se asocia la venta
+    
+    Returns:
+        JsonResponse con success=True/False y datos de la venta
+    """
+    from django.http import JsonResponse
+    from .forms import VentaMostradorForm
+    from .models import VentaMostrador
+    
+    try:
+        # Obtener la orden
+        orden = get_object_or_404(OrdenServicio, id=orden_id)
+        
+        # Verificar que sea tipo venta mostrador
+        if orden.tipo_servicio != 'venta_mostrador':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden no es de tipo "Venta Mostrador"'
+            }, status=400)
+        
+        # Verificar que NO tenga venta mostrador existente
+        if hasattr(orden, 'venta_mostrador'):
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden ya tiene una venta mostrador asociada'
+            }, status=400)
+        
+        # Procesar formulario
+        form = VentaMostradorForm(request.POST)
+        
+        if form.is_valid():
+            venta = form.save(commit=False)
+            venta.orden = orden
+            venta.save()
+            
+            # Registrar en historial
+            registrar_historial(
+                orden=orden,
+                tipo_evento='actualizacion',
+                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                comentario=f"✅ Venta Mostrador creada: {venta.folio_venta} | Paquete: {venta.get_paquete_display()} | Total: ${venta.total_venta}",
+                es_sistema=False
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Venta Mostrador creada: {venta.folio_venta}',
+                'folio_venta': venta.folio_venta,
+                'total_venta': float(venta.total_venta),
+                'paquete': venta.get_paquete_display(),
+                'redirect_url': f'/servicio-tecnico/ordenes/{orden_id}/'  # Redirigir para refrescar
+            })
+        else:
+            # Devolver errores del formulario
+            errors = {}
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0]  # Primer error de cada campo
+            
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def agregar_pieza_venta_mostrador(request, orden_id):
+    """
+    Agrega una nueva pieza a una venta mostrador existente.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista maneja el formulario modal para agregar piezas individuales
+    a una venta mostrador. Por ejemplo: RAM adicional, cables, accesorios.
+    Responde con JSON para actualizar la interfaz sin recargar (AJAX).
+    
+    FLUJO:
+    1. Obtiene la orden y verifica que tenga venta mostrador
+    2. Valida el formulario de pieza recibido
+    3. Asocia la pieza a la venta mostrador
+    4. Actualiza el total de la venta automáticamente (property)
+    5. Registra en historial
+    6. Devuelve JSON con la fila HTML de la nueva pieza
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        orden_id: ID de la orden que tiene la venta mostrador
+    
+    Returns:
+        JsonResponse con success=True/False y HTML de la pieza
+    """
+    from django.http import JsonResponse
+    from .forms import PiezaVentaMostradorForm
+    from .models import PiezaVentaMostrador, VentaMostrador
+    
+    try:
+        orden = get_object_or_404(OrdenServicio, id=orden_id)
+        
+        # Verificar que existe venta mostrador
+        if not hasattr(orden, 'venta_mostrador'):
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden no tiene venta mostrador asociada'
+            }, status=400)
+        
+        venta_mostrador = orden.venta_mostrador
+        
+        # Procesar formulario
+        form = PiezaVentaMostradorForm(request.POST)
+        
+        if form.is_valid():
+            pieza = form.save(commit=False)
+            pieza.venta_mostrador = venta_mostrador
+            pieza.save()
+            
+            # Registrar en historial
+            registrar_historial(
+                orden=orden,
+                tipo_evento='actualizacion',
+                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                comentario=f"✅ Pieza agregada a venta mostrador: {pieza.descripcion_pieza} (x{pieza.cantidad}) - ${pieza.subtotal}",
+                es_sistema=False
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Pieza agregada: {pieza.descripcion_pieza}',
+                'pieza_id': pieza.id,
+                'descripcion': pieza.descripcion_pieza,
+                'cantidad': pieza.cantidad,
+                'precio_unitario': float(pieza.precio_unitario),
+                'subtotal': float(pieza.subtotal),
+                'total_venta_actualizado': float(venta_mostrador.total_venta),
+                'redirect_url': f'/servicio-tecnico/ordenes/{orden_id}/'  # Redirigir para refrescar
+            })
+        else:
+            # Devolver errores del formulario
+            errors = {}
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0]  # Primer error de cada campo
+            
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def editar_pieza_venta_mostrador(request, pieza_id):
+    """
+    Edita una pieza de venta mostrador existente.
+    
+    EXPLICACIÓN:
+    Permite modificar cantidad, precio unitario, descripción de una pieza.
+    Actualiza automáticamente el total de la venta.
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        pieza_id: ID de la pieza a editar
+    
+    Returns:
+        JsonResponse con success=True/False y datos actualizados
+    """
+    from django.http import JsonResponse
+    from .forms import PiezaVentaMostradorForm
+    from .models import PiezaVentaMostrador
+    
+    try:
+        pieza = get_object_or_404(PiezaVentaMostrador, id=pieza_id)
+        venta_mostrador = pieza.venta_mostrador
+        orden = venta_mostrador.orden
+        
+        # Procesar formulario de edición
+        form = PiezaVentaMostradorForm(request.POST, instance=pieza)
+        
+        if form.is_valid():
+            pieza_actualizada = form.save()
+            
+            # Registrar en historial
+            registrar_historial(
+                orden=orden,
+                tipo_evento='actualizacion',
+                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                comentario=f"✏️ Pieza modificada: {pieza_actualizada.descripcion_pieza} - ${pieza_actualizada.subtotal}",
+                es_sistema=False
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Pieza actualizada: {pieza_actualizada.descripcion_pieza}',
+                'pieza_id': pieza_actualizada.id,
+                'descripcion': pieza_actualizada.descripcion_pieza,
+                'cantidad': pieza_actualizada.cantidad,
+                'precio_unitario': float(pieza_actualizada.precio_unitario),
+                'subtotal': float(pieza_actualizada.subtotal),
+                'total_venta_actualizado': float(venta_mostrador.total_venta),
+                'redirect_url': f'/servicio-tecnico/ordenes/{orden.id}/'
+            })
+        else:
+            # Devolver errores del formulario
+            errors = {}
+            for field, error_list in form.errors.items():
+                errors[field] = error_list[0]
+            
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def eliminar_pieza_venta_mostrador(request, pieza_id):
+    """
+    Elimina una pieza de venta mostrador.
+    
+    EXPLICACIÓN:
+    Elimina una pieza vendida y actualiza el total de la venta.
+    Registra la acción en el historial.
+    
+    Args:
+        request: HttpRequest
+        pieza_id: ID de la pieza a eliminar
+    
+    Returns:
+        JsonResponse con success=True/False
+    """
+    from django.http import JsonResponse
+    from .models import PiezaVentaMostrador
+    
+    try:
+        pieza = get_object_or_404(PiezaVentaMostrador, id=pieza_id)
+        venta_mostrador = pieza.venta_mostrador
+        orden = venta_mostrador.orden
+        
+        # Guardar info antes de eliminar
+        descripcion = pieza.descripcion_pieza
+        subtotal = pieza.subtotal
+        
+        # Eliminar pieza
+        pieza.delete()
+        
+        # Registrar en historial
+        registrar_historial(
+            orden=orden,
+            tipo_evento='actualizacion',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=f"🗑️ Pieza eliminada de venta mostrador: {descripcion} (${subtotal})",
+            es_sistema=False
+        )
+        
+        # Recalcular total (se hace automáticamente por el property total_venta)
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Pieza eliminada: {descripcion}',
+            'total_venta_actualizado': float(venta_mostrador.total_venta),
+            'redirect_url': f'/servicio-tecnico/ordenes/{orden.id}/'
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def convertir_venta_a_diagnostico(request, orden_id):
+    """
+    Convierte una orden de venta mostrador a orden con diagnóstico.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista maneja el caso especial cuando una venta mostrador falla
+    (por ejemplo, al instalar una pieza) y se necesita hacer diagnóstico.
+    
+    ESCENARIO REAL:
+    1. Cliente compra RAM sin diagnóstico
+    2. Al instalar, el equipo no enciende
+    3. Se descubre que el problema es otra cosa (motherboard, fuente, etc.)
+    4. Se convierte a orden con diagnóstico para investigar
+    
+    FLUJO:
+    1. Verifica que la orden sea tipo 'venta_mostrador'
+    2. Verifica que tenga venta mostrador asociada
+    3. Valida que el estado permita la conversión
+    4. Recibe el motivo de conversión del usuario
+    5. Llama al método convertir_a_diagnostico() del modelo
+    6. Devuelve JSON con la nueva orden creada
+    
+    Args:
+        request: HttpRequest con POST data (motivo_conversion)
+        orden_id: ID de la orden de venta mostrador
+    
+    Returns:
+        JsonResponse con success=True/False y datos de nueva orden
+    """
+    from django.http import JsonResponse
+    
+    try:
+        orden = get_object_or_404(OrdenServicio, id=orden_id)
+        
+        # Validación 1: Debe ser tipo venta_mostrador
+        if orden.tipo_servicio != 'venta_mostrador':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Solo se pueden convertir órdenes de tipo "Venta Mostrador"'
+            }, status=400)
+        
+        # Validación 2: Debe tener venta mostrador asociada
+        if not hasattr(orden, 'venta_mostrador'):
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden no tiene venta mostrador asociada'
+            }, status=400)
+        
+        # Validación 3: No debe estar ya convertida
+        if orden.estado == 'convertida_a_diagnostico':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden ya fue convertida a diagnóstico'
+            }, status=400)
+        
+        # Validación 4: Estados válidos para conversión
+        estados_validos = ['recepcion', 'reparacion', 'control_calidad']
+        if orden.estado not in estados_validos:
+            return JsonResponse({
+                'success': False,
+                'error': f'❌ No se puede convertir desde el estado "{orden.get_estado_display()}". Estados válidos: Recepción, Reparación, Control de Calidad'
+            }, status=400)
+        
+        # Obtener motivo de conversión (obligatorio)
+        motivo_conversion = request.POST.get('motivo_conversion', '').strip()
+        if not motivo_conversion or len(motivo_conversion) < 10:
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Debes proporcionar un motivo detallado de conversión (mínimo 10 caracteres)'
+            }, status=400)
+        
+        # Obtener empleado actual (requerido para el historial)
+        empleado_actual = None
+        if hasattr(request.user, 'empleado'):
+            empleado_actual = request.user.empleado
+        else:
+            # Si el usuario no tiene empleado asociado, no puede hacer la conversión
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Tu usuario no tiene un empleado asociado. Contacta al administrador.'
+            }, status=400)
+        
+        # Llamar al método del modelo para convertir
+        nueva_orden = orden.convertir_a_diagnostico(
+            usuario=empleado_actual,
+            motivo_conversion=motivo_conversion
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Orden convertida a diagnóstico exitosamente',
+            'orden_original': orden.numero_orden_interno,
+            'nueva_orden_id': nueva_orden.id,
+            'nueva_orden_numero': nueva_orden.numero_orden_interno,
+            'monto_abono': float(orden.venta_mostrador.total_venta),
+            'redirect_url': f'/servicio-tecnico/ordenes/{nueva_orden.id}/'
+        })
+    
+    except ValueError as e:
+        # Errores de validación del modelo
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado al convertir: {str(e)}'
+        }, status=500)

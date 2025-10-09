@@ -13,9 +13,12 @@
                     <h1><i class="bi bi-tools"></i> Servicio Técnico</h1>
                     <p class="text-muted">Gestión de Órdenes de Servicio - Centro de Reparación</p>
                 </div>
-                <div>
+                <div class="btn-group" role="group">
                     <a href="{% url 'servicio_tecnico:crear_orden' %}" class="btn btn-primary btn-lg">
                         <i class="bi bi-plus-circle"></i> Nueva Orden
+                    </a>
+                    <a href="{% url 'servicio_tecnico:crear_orden_venta_mostrador' %}" class="btn btn-warning btn-lg">
+                        <i class="bi bi-shop"></i> Venta Mostrador
                     </a>
                 </div>
             </div>

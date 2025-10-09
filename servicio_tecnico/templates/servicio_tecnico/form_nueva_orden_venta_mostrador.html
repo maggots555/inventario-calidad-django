@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo|default:"Nueva Venta Mostrador" }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- HEADER DEL FORMULARIO -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3">
+                        <i class="bi bi-shop"></i> {{ titulo|default:"Nueva Venta Mostrador" }}
+                    </h1>
+                    {% if subtitulo %}
+                        <p class="text-muted mb-0">{{ subtitulo }}</p>
+                    {% endif %}
+                </div>
+                <a href="{% url 'servicio_tecnico:inicio' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Volver
+                </a>
+            </div>
+
+            <!-- ALERTA INFORMATIVA -->
+            <div class="alert alert-info d-flex align-items-center mb-4">
+                <i class="bi bi-info-circle-fill fs-3 me-3"></i>
+                <div>
+                    <h6 class="mb-1">¿Qué es una Venta Mostrador?</h6>
+                    <p class="mb-0 small">
+                        Son servicios directos que <strong>NO requieren diagnóstico técnico previo</strong>. 
+                        Ejemplos: instalación de RAM, reinstalación de SO, limpieza express, venta de accesorios.
+                        <br>El cliente puede esperar o regresar el mismo día.
+                    </p>
+                </div>
+            </div>
+
+            <!-- MENSAJES -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- FORMULARIO PRINCIPAL -->
+            <form method="post" id="formNuevaOrdenVentaMostrador">
+                {% csrf_token %}
+                
+                <!-- SECCIÓN 1: INFORMACIÓN DEL EQUIPO -->
+                <div class="card mb-4">
+                    <div class="card-header text-white" style="background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);">
+                        <h5 class="mb-0">
+                            <i class="bi bi-pc-display"></i> Información del Equipo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Fila 1: Tipo, Marca, Modelo -->
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.tipo_equipo.id_for_label }}" class="form-label required">
+                                    <i class="bi bi-laptop"></i> Tipo de Equipo
+                                </label>
+                                {{ form.tipo_equipo }}
+                                {% if form.tipo_equipo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.tipo_equipo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{{ form.tipo_equipo.help_text }}</div>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.marca.id_for_label }}" class="form-label required">
+                                    <i class="bi bi-award"></i> Marca
+                                </label>
+                                {{ form.marca }}
+                                <datalist id="marcas-list-vm">
+                                    <option value="Dell">
+                                    <option value="HP">
+                                    <option value="Lenovo">
+                                    <option value="Asus">
+                                    <option value="Acer">
+                                    <option value="Apple">
+                                    <option value="Samsung">
+                                    <option value="Toshiba">
+                                </datalist>
+                                {% if form.marca.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.marca.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{{ form.marca.help_text }}</div>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.modelo.id_for_label }}" class="form-label">
+                                    <i class="bi bi-tag"></i> Modelo
+                                    <span class="badge bg-secondary">Opcional</span>
+                                </label>
+                                {{ form.modelo }}
+                                {% if form.modelo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.modelo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{{ form.modelo.help_text }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Fila 2: Número de Serie y Orden Cliente -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.numero_serie.id_for_label }}" class="form-label required">
+                                    <i class="bi bi-upc-scan"></i> Número de Serie
+                                </label>
+                                {{ form.numero_serie }}
+                                {% if form.numero_serie.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.numero_serie.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{{ form.numero_serie.help_text }}</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.orden_cliente.id_for_label }}" class="form-label required">
+                                    <i class="bi bi-receipt"></i> Número de Orden del Cliente
+                                </label>
+                                {{ form.orden_cliente }}
+                                {% if form.orden_cliente.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.orden_cliente.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{{ form.orden_cliente.help_text }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Fila 3: Estado al Ingreso -->
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">
+                                    <i class="bi bi-power"></i> Estado al Ingreso
+                                </label>
+                                <div class="form-check form-switch">
+                                    {{ form.equipo_enciende }}
+                                    <label class="form-check-label" for="{{ form.equipo_enciende.id_for_label }}">
+                                        ¿El equipo enciende?
+                                    </label>
+                                </div>
+                                <div class="form-text">{{ form.equipo_enciende.help_text }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 2: DESCRIPCIÓN DEL SERVICIO -->
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-list-check"></i> Descripción del Servicio
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="{{ form.descripcion_servicio.id_for_label }}" class="form-label">
+                                <i class="bi bi-card-text"></i> ¿Qué servicio solicita el cliente?
+                                <span class="badge bg-secondary">Opcional</span>
+                            </label>
+                            {{ form.descripcion_servicio }}
+                            <div class="form-text">
+                                Describe brevemente el servicio que solicita el cliente. 
+                                Los detalles específicos (paquetes, piezas) se agregarán después.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 3: UBICACIÓN -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-geo-alt"></i> Ubicación
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.sucursal.id_for_label }}" class="form-label required">
+                                    <i class="bi bi-building"></i> Sucursal
+                                </label>
+                                {{ form.sucursal }}
+                                {% if form.sucursal.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.sucursal.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{{ form.sucursal.help_text }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOTONES DE ACCIÓN -->
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-5">
+                    <a href="{% url 'servicio_tecnico:inicio' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-warning btn-lg">
+                        <i class="bi bi-check-circle"></i> Crear Venta Mostrador
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- NOTA INFORMATIVA AL FINAL -->
+<div class="container mb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="alert alert-light border">
+                <h6><i class="bi bi-lightbulb"></i> Próximos Pasos:</h6>
+                <ol class="mb-0">
+                    <li>Al crear la orden, serás redirigido al detalle de la orden</li>
+                    <li>Agrega el paquete de servicio o servicios individuales</li>
+                    <li>Agrega piezas vendidas si aplica</li>
+                    <li>Completa el servicio y cambia el estado a "Finalizado"</li>
+                    <li>Entrega el equipo al cliente</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
