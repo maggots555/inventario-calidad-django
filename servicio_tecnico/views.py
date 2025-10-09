@@ -353,6 +353,11 @@ def lista_ordenes_activas(request):
         reverse=True
     )
     
+    # Calcular total de órdenes activas (sin filtro de búsqueda) para las estadísticas
+    total_ordenes_activas = OrdenServicio.objects.exclude(
+        estado__in=['entregado', 'cancelado']
+    ).count()
+    
     context = {
         'ordenes': ordenes,
         'tipo': 'activas',
@@ -361,6 +366,8 @@ def lista_ordenes_activas(request):
         'busqueda': busqueda,
         'equipos_no_enciende_por_tecnico': equipos_no_enciende_por_tecnico,
         'equipos_por_gama_por_tecnico': equipos_por_gama_por_tecnico,
+        'total_ordenes_activas': total_ordenes_activas,  # Para mostrar en estadísticas
+        'mostrar_estadisticas': True,  # Siempre mostrar en vista activas
     }
     
     return render(request, 'servicio_tecnico/lista_ordenes.html', context)
@@ -400,82 +407,14 @@ def lista_ordenes_finalizadas(request):
             Q(numero_orden_interno__icontains=busqueda)
         )
     
-    # Estadísticas de equipos "No enciende" por técnico (solo órdenes activas)
-    equipos_no_enciende_raw = OrdenServicio.objects.exclude(
-        estado__in=['entregado', 'cancelado']
-    ).filter(
-        detalle_equipo__equipo_enciende=False,
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
-    ).values(
-        'tecnico_asignado_actual__nombre_completo',
-        'tecnico_asignado_actual__id'
-    ).annotate(
-        total_no_enciende=Count('numero_orden_interno')
-    ).order_by('-total_no_enciende', 'tecnico_asignado_actual__nombre_completo')
-    
-    # Procesar datos para incluir información de foto
-    equipos_no_enciende_por_tecnico = []
-    for item in equipos_no_enciende_raw:
-        tecnico_id = item['tecnico_asignado_actual__id']
-        tecnico_obj = Empleado.objects.get(id=tecnico_id)
-        equipos_no_enciende_por_tecnico.append({
-            'tecnico_asignado_actual__id': tecnico_id,
-            'tecnico_asignado_actual__nombre_completo': item['tecnico_asignado_actual__nombre_completo'],
-            'total_no_enciende': item['total_no_enciende'],
-            'foto_url': tecnico_obj.get_foto_perfil_url(),
-            'iniciales': tecnico_obj.get_iniciales()
-        })
-    
-    # Estadísticas de equipos por gama por técnico (solo órdenes activas)
-    equipos_por_gama_por_tecnico_raw = OrdenServicio.objects.exclude(
-        estado__in=['entregado', 'cancelado']
-    ).filter(
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
-    ).values(
-        'tecnico_asignado_actual__nombre_completo',
-        'tecnico_asignado_actual__id',
-        'detalle_equipo__gama'
-    ).annotate(
-        total_equipos=Count('numero_orden_interno')
-    ).order_by('tecnico_asignado_actual__nombre_completo', 'detalle_equipo__gama')
-    
-    # Procesar datos para agrupar por técnico
-    equipos_por_gama_por_tecnico = {}
-    for item in equipos_por_gama_por_tecnico_raw:
-        tecnico_id = item['tecnico_asignado_actual__id']
-        tecnico_nombre = item['tecnico_asignado_actual__nombre_completo']
-        gama = item['detalle_equipo__gama']
-        total = item['total_equipos']
-        
-        if tecnico_id not in equipos_por_gama_por_tecnico:
-            # Obtener información adicional del técnico
-            tecnico_obj = Empleado.objects.get(id=tecnico_id)
-            equipos_por_gama_por_tecnico[tecnico_id] = {
-                'nombre': tecnico_nombre,
-                'gamas': {'alta': 0, 'media': 0, 'baja': 0},
-                'total': 0,
-                'foto_url': tecnico_obj.get_foto_perfil_url(),
-                'iniciales': tecnico_obj.get_iniciales()
-            }
-        
-        equipos_por_gama_por_tecnico[tecnico_id]['gamas'][gama] = total
-        equipos_por_gama_por_tecnico[tecnico_id]['total'] += total
-    
-    # Convertir a lista ordenada por total descendente
-    equipos_por_gama_por_tecnico = sorted(
-        equipos_por_gama_por_tecnico.values(),
-        key=lambda x: x['total'],
-        reverse=True
-    )
-    
+    # NO mostrar estadísticas en vista finalizadas (no tiene sentido ver cargas de trabajo de órdenes cerradas)
     context = {
         'ordenes': ordenes,
         'tipo': 'finalizadas',
         'titulo': 'Órdenes Finalizadas',
         'total': ordenes.count(),
         'busqueda': busqueda,
-        'equipos_no_enciende_por_tecnico': equipos_no_enciende_por_tecnico,
-        'equipos_por_gama_por_tecnico': equipos_por_gama_por_tecnico,
+        'mostrar_estadisticas': False,  # No mostrar estadísticas aquí
     }
     
     return render(request, 'servicio_tecnico/lista_ordenes.html', context)
@@ -743,41 +682,55 @@ def detalle_orden(request, orden_id):
         # FORMULARIO 4: Asignar Responsables
         # ------------------------------------------------------------------------
         elif form_type == 'asignar_responsables':
+            # IMPORTANTE: Refrescar el objeto desde la base de datos PRIMERO
+            # Esto previene que se use una versión en caché del objeto
+            orden.refresh_from_db()
+            
+            # Guardar los valores actuales DESPUÉS del refresh
+            tecnico_anterior_id = orden.tecnico_asignado_actual.id if orden.tecnico_asignado_actual else None
+            responsable_anterior_id = orden.responsable_seguimiento.id if orden.responsable_seguimiento else None
+            tecnico_anterior_obj = orden.tecnico_asignado_actual
+            responsable_anterior_obj = orden.responsable_seguimiento
+            
             form_responsables = AsignarResponsablesForm(request.POST, instance=orden)
             
             if form_responsables.is_valid():
-                # Guardar técnico anterior antes de cambiar
-                tecnico_anterior = orden.tecnico_asignado_actual
-                responsable_anterior = orden.responsable_seguimiento
+                # Obtener los NUEVOS valores del formulario sin guardar
+                orden_actualizada = form_responsables.save(commit=False)
+                tecnico_nuevo_id = orden_actualizada.tecnico_asignado_actual.id if orden_actualizada.tecnico_asignado_actual else None
+                responsable_nuevo_id = orden_actualizada.responsable_seguimiento.id if orden_actualizada.responsable_seguimiento else None
                 
-                orden_actualizada = form_responsables.save()
+                # Guardar SOLO los campos del formulario para evitar triggers del modelo
+                # Esto previene que el método save() del modelo registre el cambio automáticamente
+                orden_actualizada.save(update_fields=['tecnico_asignado_actual', 'responsable_seguimiento'])
                 
-                # Registrar cambios en el historial
+                # Ahora registramos los cambios MANUALMENTE en el historial
                 cambios = []
-                if tecnico_anterior != orden_actualizada.tecnico_asignado_actual:
+                
+                # Cambio de técnico
+                if tecnico_anterior_id != tecnico_nuevo_id:
                     cambios.append(
-                        f'Técnico: {tecnico_anterior.nombre_completo} → {orden_actualizada.tecnico_asignado_actual.nombre_completo}'
+                        f'Técnico: {tecnico_anterior_obj.nombre_completo if tecnico_anterior_obj else "Sin asignar"} → {orden_actualizada.tecnico_asignado_actual.nombre_completo if orden_actualizada.tecnico_asignado_actual else "Sin asignar"}'
                     )
-                    # Crear entrada específica de cambio de técnico
                     HistorialOrden.objects.create(
                         orden=orden,
                         tipo_evento='cambio_tecnico',
-                        comentario=f'Técnico reasignado',
+                        comentario=f'Técnico reasignado de {tecnico_anterior_obj.nombre_completo if tecnico_anterior_obj else "Sin asignar"} a {orden_actualizada.tecnico_asignado_actual.nombre_completo if orden_actualizada.tecnico_asignado_actual else "Sin asignar"}',
                         usuario=empleado_actual,
-                        tecnico_anterior=tecnico_anterior,
+                        tecnico_anterior=tecnico_anterior_obj,
                         tecnico_nuevo=orden_actualizada.tecnico_asignado_actual,
                         es_sistema=False
                     )
                 
-                if responsable_anterior != orden_actualizada.responsable_seguimiento:
+                # Cambio de responsable
+                if responsable_anterior_id != responsable_nuevo_id:
                     cambios.append(
-                        f'Responsable: {responsable_anterior.nombre_completo} → {orden_actualizada.responsable_seguimiento.nombre_completo}'
+                        f'Responsable: {responsable_anterior_obj.nombre_completo if responsable_anterior_obj else "Sin asignar"} → {orden_actualizada.responsable_seguimiento.nombre_completo if orden_actualizada.responsable_seguimiento else "Sin asignar"}'
                     )
-                    # Crear entrada de cambio de responsable
                     HistorialOrden.objects.create(
                         orden=orden,
                         tipo_evento='actualizacion',
-                        comentario=f'Responsable de seguimiento cambiado a: {orden_actualizada.responsable_seguimiento.nombre_completo}',
+                        comentario=f'Responsable de seguimiento cambiado de {responsable_anterior_obj.nombre_completo if responsable_anterior_obj else "Sin asignar"} a {orden_actualizada.responsable_seguimiento.nombre_completo if orden_actualizada.responsable_seguimiento else "Sin asignar"}',
                         usuario=empleado_actual,
                         es_sistema=False
                     )

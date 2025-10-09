@@ -74,11 +74,38 @@
         </form>
         <div class="mt-3">
             <span class="badge bg-primary">{{ total }} resultado(s)</span>
+            {% if busqueda %}
+                <span class="badge bg-info ms-2">
+                    <i class="bi bi-funnel"></i> Búsqueda activa: "{{ busqueda }}"
+                </span>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Cuadro informativo: Estadísticas por técnico -->
-    <div class="row mt-4 g-4 estadisticas-tecnico-row">
+    <!-- Cuadro informativo: Estadísticas por técnico (solo en vista activas) -->
+    {% if mostrar_estadisticas %}
+        <!-- Banner informativo sobre las estadísticas -->
+        <div class="alert alert-info mt-4 mb-3" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-info-circle-fill me-2" style="font-size: 1.5rem;"></i>
+                <div>
+                    <h6 class="alert-heading mb-1">
+                        <i class="bi bi-bar-chart-line"></i> Vista General de Carga de Trabajo
+                    </h6>
+                    <p class="mb-0">
+                        Las estadísticas muestran la carga de trabajo <strong>total</strong> de todos los técnicos
+                        {% if busqueda %}
+                            (independiente de la búsqueda activa).
+                        {% else %}
+                            en todas las órdenes activas.
+                        {% endif %}
+                        Total de órdenes activas: <strong>{{ total_ordenes_activas }}</strong>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4 g-4 estadisticas-tecnico-row">
         <!-- Equipos "No enciende" por técnico -->
         {% if equipos_no_enciende_por_tecnico %}
             <div class="col-lg-6">
@@ -181,6 +208,7 @@
             </div>
         {% endif %}
     </div>
+    {% endif %}  <!-- Fin de mostrar_estadisticas -->
 
     <!-- Grid de cards -->
     {% if ordenes %}
@@ -205,7 +233,12 @@
                         <div class="service-card-body">
                             <!-- Marca en grande -->
                             <h3 class="marca-principal">{{ orden.detalle_equipo.marca|upper }}</h3>
-                            <p class="text-muted mb-3">{{ orden.detalle_equipo.get_tipo_equipo_display }}</p>
+                            <p class="text-muted mb-3">
+                                {{ orden.detalle_equipo.get_tipo_equipo_display }}
+                                {% if orden.detalle_equipo.modelo %}
+                                    <span class="text-primary"> | {{ orden.detalle_equipo.modelo }}</span>
+                                {% endif %}
+                            </p>
 
                             <!-- Información detallada -->
                             <div class="info-item">
