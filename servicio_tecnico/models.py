@@ -381,6 +381,160 @@ class OrdenServicio(models.Model):
         
         return delta.days
     
+    # ========================================================================
+    # PROPERTIES ADICIONALES PARA MÓDULO RHITSO (Fase 2)
+    # ========================================================================
+    
+    @property
+    def ultimo_seguimiento_rhitso(self):
+        """
+        Retorna el último (más reciente) registro de seguimiento RHITSO.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Una @property en Python es como un atributo calculado. Puedes accederlo
+        como si fuera un campo normal (orden.ultimo_seguimiento_rhitso) pero
+        en realidad ejecuta código para calcularlo.
+        
+        ¿Qué hace?
+            Busca en la tabla SeguimientoRHITSO el registro más reciente para
+            esta orden (ordenando por fecha_actualizacion descendente y tomando
+            el primero).
+        
+        Returns:
+            SeguimientoRHITSO o None: El último seguimiento o None si no hay ninguno
+        
+        Ejemplo de uso:
+            orden = OrdenServicio.objects.get(pk=1)
+            ultimo = orden.ultimo_seguimiento_rhitso
+            if ultimo:
+                print(f"Estado actual: {ultimo.estado.estado}")
+        """
+        return self.seguimientos_rhitso.order_by('-fecha_actualizacion').first()
+    
+    @property
+    def incidencias_abiertas_count(self):
+        """
+        Cuenta cuántas incidencias RHITSO están abiertas (no resueltas).
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Esta property cuenta incidencias que NO están en estado RESUELTA o CERRADA.
+        
+        Estados de incidencias:
+            - ABIERTA: Acaba de reportarse
+            - EN_REVISION: Se está investigando
+            - RESUELTA: Ya se solucionó
+            - CERRADA: Cerrada definitivamente
+        
+        ¿Por qué es útil?
+            Para mostrar en el panel principal cuántos problemas activos hay,
+            sin tener que hacer la consulta manualmente cada vez.
+        
+        Returns:
+            int: Número de incidencias abiertas
+        
+        Ejemplo de uso:
+            orden = OrdenServicio.objects.get(pk=1)
+            if orden.incidencias_abiertas_count > 0:
+                print(f"¡Atención! Hay {orden.incidencias_abiertas_count} problemas activos")
+        """
+        return self.incidencias_rhitso.exclude(
+            estado__in=['RESUELTA', 'CERRADA']
+        ).count()
+    
+    @property
+    def incidencias_criticas_count(self):
+        """
+        Cuenta cuántas incidencias CRÍTICAS abiertas hay.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Esta property cuenta incidencias que cumplen DOS condiciones:
+        1. Su tipo_incidencia tiene gravedad CRITICA
+        2. NO están resueltas o cerradas
+        
+        ¿Por qué es útil?
+            Las incidencias críticas requieren atención inmediata. Esta property
+            te permite identificar rápidamente si hay problemas graves pendientes.
+        
+        La consulta:
+            - exclude(): Excluye registros que cumplan la condición
+            - tipo_incidencia__gravedad: Accede al campo 'gravedad' de la 
+              ForeignKey tipo_incidencia (esto se llama "lookup" en Django)
+        
+        Returns:
+            int: Número de incidencias críticas abiertas
+        
+        Ejemplo de uso:
+            orden = OrdenServicio.objects.get(pk=1)
+            if orden.incidencias_criticas_count > 0:
+                print("🚨 ¡ALERTA! Hay incidencias críticas sin resolver")
+        """
+        return self.incidencias_rhitso.filter(
+            tipo_incidencia__gravedad='CRITICA'
+        ).exclude(
+            estado__in=['RESUELTA', 'CERRADA']
+        ).count()
+    
+    def puede_cambiar_estado_rhitso(self, usuario=None):
+        """
+        Valida si se puede cambiar el estado RHITSO de esta orden.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Este es un MÉTODO (no property) porque necesita recibir un parámetro
+        (el usuario que quiere hacer el cambio).
+        
+        Métodos vs Properties:
+            - Property: orden.dias_en_rhitso (sin paréntesis)
+            - Método: orden.puede_cambiar_estado_rhitso(usuario) (con paréntesis)
+        
+        ¿Qué validaciones hace?
+            1. La orden debe ser candidata a RHITSO
+            2. No debe estar en estado 'entregado' o 'cancelado'
+            3. (Futuro) Puede agregar validaciones de permisos del usuario
+        
+        Args:
+            usuario (Empleado, opcional): Usuario que quiere cambiar el estado
+        
+        Returns:
+            tuple: (puede_cambiar: bool, mensaje: str)
+                   Si puede: (True, "")
+                   Si no puede: (False, "Mensaje explicando por qué")
+        
+        Ejemplo de uso:
+            orden = OrdenServicio.objects.get(pk=1)
+            puede, mensaje = orden.puede_cambiar_estado_rhitso(request.user.empleado)
+            if not puede:
+                messages.error(request, mensaje)
+                return redirect('detalle_orden', orden.id)
+        """
+        # Validación 1: Debe ser candidato RHITSO
+        if not self.es_candidato_rhitso:
+            return False, "Esta orden no está marcada como candidata a RHITSO"
+        
+        # Validación 2: Estado de la orden
+        if self.estado in ['entregado', 'cancelado']:
+            return False, f"No se puede cambiar el estado RHITSO de una orden {self.get_estado_display()}"
+        
+        # Validación 3: Verificar que haya al menos un estado disponible
+        from servicio_tecnico.models import EstadoRHITSO
+        estados_disponibles = EstadoRHITSO.objects.filter(activo=True).count()
+        if estados_disponibles == 0:
+            return False, "No hay estados RHITSO configurados en el sistema"
+        
+        # Validación 4 (opcional): Permisos del usuario
+        # Aquí podrías agregar lógica como:
+        # if usuario and not usuario.tiene_permiso('cambiar_estado_rhitso'):
+        #     return False, "No tienes permisos para cambiar estados RHITSO"
+        
+        # Si pasó todas las validaciones
+        return True, ""
+    
+    # Fin de properties RHITSO
+    # ========================================================================
+    
     def crear_incidencia_reingreso(self, usuario=None):
         """
         Crea automáticamente una incidencia en ScoreCard cuando es reingreso.

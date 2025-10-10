@@ -20,6 +20,10 @@ from .models import (
     SeguimientoPieza,
     VentaMostrador,  # ← NUEVO - FASE 3
     PiezaVentaMostrador,  # ← NUEVO - FASE 3
+    # RHITSO - FASE 3 del módulo de seguimiento especializado
+    EstadoRHITSO,
+    TipoIncidenciaRHITSO,
+    IncidenciaRHITSO,
 )
 from inventario.models import Sucursal, Empleado
 from scorecard.models import ComponenteEquipo
@@ -29,6 +33,11 @@ from config.constants import (
     TIPO_IMAGEN_CHOICES, 
     MOTIVO_RECHAZO_COTIZACION,
     ESTADO_PIEZA_CHOICES,
+    # RHITSO - Constantes para módulo de seguimiento especializado
+    MOTIVO_RHITSO_CHOICES,
+    COMPLEJIDAD_CHOICES,
+    IMPACTO_CLIENTE_CHOICES,
+    PRIORIDAD_CHOICES,
 )
 
 
@@ -1987,3 +1996,524 @@ class PiezaVentaMostradorForm(forms.ModelForm):
             raise ValidationError('❌ El precio unitario debe ser mayor a 0')
         
         return precio
+
+
+# ============================================================================
+# FORMULARIOS RHITSO - FASE 3 (Módulo de Seguimiento Especializado)
+# ============================================================================
+
+"""
+EXPLICACIÓN PARA PRINCIPIANTES - MÓDULO RHITSO:
+===============================================
+RHITSO es el módulo de seguimiento especializado para reparaciones de alta complejidad
+(soldadura, reballing, etc.) que requieren ser enviadas a un centro externo.
+
+Los siguientes formularios permiten:
+1. Cambiar el estado RHITSO de una orden
+2. Registrar incidencias/problemas durante el proceso
+3. Resolver incidencias existentes
+4. Editar el diagnóstico SIC y datos RHITSO
+
+Estos formularios trabajan en conjunto con los signals de la Fase 2 para
+mantener un historial automático de todos los cambios.
+"""
+
+
+class ActualizarEstadoRHITSOForm(forms.Form):
+    """
+    Formulario para cambiar el estado RHITSO de una orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Este formulario permite cambiar el estado de una orden que está en proceso
+    RHITSO. Por ejemplo: de "DIAGNOSTICO_SIC" a "ENVIADO_A_RHITSO".
+    
+    ¿Qué hace especial este formulario?
+    - Los estados disponibles son DINÁMICOS: se cargan desde la base de datos
+    - Requiere observaciones obligatorias: para documentar por qué cambió
+    - Opción de notificar al cliente: checkbox opcional
+    
+    ¿Cómo funciona con los signals?
+    Cuando guardas un cambio de estado_rhitso en la orden, el signal
+    automáticamente crea un registro en SeguimientoRHITSO. Este formulario
+    solo captura la información necesaria para hacer el cambio.
+    
+    CAMPOS:
+    - estado_rhitso: Seleccionar el nuevo estado (dropdown dinámico)
+    - observaciones: Explicar por qué se hace el cambio (textarea obligatorio)
+    - notificar_cliente: Checkbox opcional para enviar notificación
+    """
+    
+    estado_rhitso = forms.ChoiceField(
+        label="Nuevo Estado RHITSO",
+        help_text="Selecciona el nuevo estado para la orden",
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'required': True,
+        })
+    )
+    
+    observaciones = forms.CharField(
+        label="Observaciones",
+        help_text="Explica el motivo del cambio de estado (mínimo 10 caracteres)",
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 4,
+            'placeholder': 'Ej: Equipo enviado a RHITSO para soldadura de componente X...',
+            'required': True,
+        })
+    )
+    
+    notificar_cliente = forms.BooleanField(
+        label="¿Notificar al cliente?",
+        help_text="Marca esta casilla si deseas que se notifique al cliente sobre este cambio",
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+        })
+    )
+    
+    def __init__(self, *args, **kwargs):
+        """
+        EXPLICACIÓN DE __init__:
+        ========================
+        Este método se ejecuta cuando se crea el formulario.
+        
+        Aquí cargamos los estados ACTIVOS desde la base de datos para
+        poblar el dropdown dinámicamente.
+        
+        ¿Por qué dinámico?
+        Porque los estados pueden cambiar en el admin sin tocar código.
+        Si agregas un nuevo estado, automáticamente aparecerá en el formulario.
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Cargar estados activos desde la base de datos
+        estados_activos = EstadoRHITSO.objects.filter(activo=True).order_by('orden')
+        
+        # Convertir a lista de tuplas (valor, etiqueta) para choices
+        self.fields['estado_rhitso'].choices = [
+            ('', '--- Selecciona un estado ---')  # Opción vacía por defecto
+        ] + [
+            (estado.estado, f'{estado.estado} - {estado.descripcion}')
+            for estado in estados_activos
+        ]
+    
+    def clean_estado_rhitso(self):
+        """
+        Validación del campo estado_rhitso.
+        
+        EXPLICACIÓN:
+        ============
+        Verifica que el estado seleccionado realmente exista en la base de datos.
+        
+        ¿Por qué es necesario?
+        Aunque el dropdown solo muestra estados válidos, alguien podría
+        manipular el HTML y enviar un valor inválido. Esta validación
+        lo previene.
+        """
+        estado_seleccionado = self.cleaned_data.get('estado_rhitso')
+        
+        if not estado_seleccionado:
+            raise ValidationError('❌ Debes seleccionar un estado RHITSO válido')
+        
+        # Verificar que el estado existe en la BD
+        try:
+            EstadoRHITSO.objects.get(estado=estado_seleccionado, activo=True)
+        except EstadoRHITSO.DoesNotExist:
+            raise ValidationError(
+                f'❌ El estado "{estado_seleccionado}" no existe o está inactivo'
+            )
+        
+        return estado_seleccionado
+    
+    def clean_observaciones(self):
+        """
+        Validación del campo observaciones.
+        
+        EXPLICACIÓN:
+        ============
+        Asegura que el usuario escriba al menos 10 caracteres.
+        
+        ¿Por qué?
+        Para tener un historial útil. "Ok" o "Cambio" no es información
+        suficiente. Necesitamos contexto real sobre por qué cambió el estado.
+        """
+        observaciones = self.cleaned_data.get('observaciones', '').strip()
+        
+        if len(observaciones) < 10:
+            raise ValidationError(
+                '❌ Las observaciones deben tener al menos 10 caracteres. '
+                'Proporciona más detalles sobre el cambio.'
+            )
+        
+        return observaciones
+
+
+class RegistrarIncidenciaRHITSOForm(forms.ModelForm):
+    """
+    Formulario para registrar una nueva incidencia con RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Las "incidencias" son problemas que ocurren durante el proceso RHITSO.
+    Por ejemplo:
+    - RHITSO dañó un componente adicional
+    - Retraso injustificado en la entrega
+    - Pieza incorrecta instalada
+    - Falta de comunicación
+    
+    Este formulario captura toda la información necesaria para documentar
+    el problema y su impacto.
+    
+    ¿Qué pasa cuando se registra una incidencia crítica?
+    El signal de la Fase 2 automáticamente registra un evento en el
+    HistorialOrden con una alerta ⚠️ visible para todos.
+    
+    CAMPOS:
+    - tipo_incidencia: Tipo de problema (desde catálogo)
+    - titulo: Título breve del problema
+    - descripcion_detallada: Descripción completa
+    - impacto_cliente: Qué tan grave es para el cliente
+    - prioridad: Qué tan urgente es resolverlo
+    - costo_adicional: Costo extra generado (opcional)
+    """
+    
+    class Meta:
+        model = IncidenciaRHITSO
+        fields = [
+            'tipo_incidencia',
+            'titulo',
+            'descripcion_detallada',
+            'impacto_cliente',
+            'prioridad',
+            'costo_adicional',
+        ]
+        
+        widgets = {
+            'tipo_incidencia': forms.Select(attrs={
+                'class': 'form-select',
+                'required': True,
+            }),
+            'titulo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Daño en placa madre durante desmontaje',
+                'maxlength': 255,
+                'required': True,
+            }),
+            'descripcion_detallada': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 5,
+                'placeholder': 'Describe detalladamente qué ocurrió, cuándo, y las consecuencias...',
+                'required': True,
+            }),
+            'impacto_cliente': forms.Select(attrs={
+                'class': 'form-select',
+                'required': True,
+            }),
+            'prioridad': forms.Select(attrs={
+                'class': 'form-select',
+                'required': True,
+            }),
+            'costo_adicional': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'step': '0.01',
+                'placeholder': '0.00',
+            }),
+        }
+        
+        labels = {
+            'tipo_incidencia': 'Tipo de Incidencia',
+            'titulo': 'Título de la Incidencia',
+            'descripcion_detallada': 'Descripción Detallada',
+            'impacto_cliente': 'Impacto al Cliente',
+            'prioridad': 'Prioridad',
+            'costo_adicional': 'Costo Adicional (MXN)',
+        }
+        
+        help_texts = {
+            'tipo_incidencia': 'Selecciona el tipo de problema que ocurrió',
+            'titulo': 'Un título breve que describa el problema (máximo 255 caracteres)',
+            'descripcion_detallada': 'Descripción completa del problema con todos los detalles',
+            'impacto_cliente': '¿Qué tan grave es este problema para el cliente?',
+            'prioridad': '¿Qué tan urgente es resolver este problema?',
+            'costo_adicional': 'Costo extra generado por esta incidencia (dejar en 0 si no aplica)',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """
+        EXPLICACIÓN DE __init__:
+        ========================
+        Personaliza el formulario al crearlo:
+        - Solo muestra tipos de incidencia activos
+        - Configura valores iniciales apropiados
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar solo tipos de incidencia activos
+        self.fields['tipo_incidencia'].queryset = TipoIncidenciaRHITSO.objects.filter(
+            activo=True
+        ).order_by('nombre')
+        
+        # Configurar choices para campos que usan constantes
+        self.fields['impacto_cliente'].choices = IMPACTO_CLIENTE_CHOICES
+        self.fields['prioridad'].choices = PRIORIDAD_CHOICES
+        
+        # Valor inicial para costo_adicional
+        if not self.instance.pk:  # Si es un nuevo registro
+            self.fields['costo_adicional'].initial = 0.00
+    
+    def clean_titulo(self):
+        """
+        Validación del campo titulo.
+        
+        EXPLICACIÓN:
+        ============
+        Asegura que el título tenga al menos 5 caracteres.
+        
+        ¿Por qué?
+        Un título debe ser descriptivo. "Error" o "Mal" no es suficiente.
+        Necesitamos títulos que identifiquen rápidamente el problema.
+        """
+        titulo = self.cleaned_data.get('titulo', '').strip()
+        
+        if len(titulo) < 5:
+            raise ValidationError(
+                '❌ El título debe tener al menos 5 caracteres. '
+                'Sé más descriptivo sobre el problema.'
+            )
+        
+        return titulo
+    
+    def clean_costo_adicional(self):
+        """
+        Validación del campo costo_adicional.
+        
+        EXPLICACIÓN:
+        ============
+        Asegura que el costo sea un número positivo (>= 0).
+        No puede ser negativo.
+        """
+        costo = self.cleaned_data.get('costo_adicional')
+        
+        if costo is None:
+            costo = 0.00
+        
+        if costo < 0:
+            raise ValidationError(
+                '❌ El costo adicional no puede ser negativo. '
+                'Debe ser 0 o un número positivo.'
+            )
+        
+        return costo
+
+
+class ResolverIncidenciaRHITSOForm(forms.Form):
+    """
+    Formulario para resolver/cerrar una incidencia existente.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Cuando una incidencia se resuelve, necesitamos documentar:
+    1. Qué acción se tomó para resolverla
+    2. Si hubo algún costo adicional final
+    
+    Este formulario es simple pero importante para cerrar el ciclo de
+    seguimiento de problemas.
+    
+    ¿Qué pasa al resolver una incidencia?
+    El modelo tiene un método marcar_como_resuelta() que actualiza:
+    - Estado → 'RESUELTA'
+    - fecha_resolucion → ahora
+    - resuelto_por → usuario actual
+    - accion_tomada → lo que escribiste aquí
+    
+    CAMPOS:
+    - accion_tomada: Descripción de cómo se resolvió (mínimo 20 caracteres)
+    - costo_adicional_final: Costo final si cambió (opcional)
+    """
+    
+    accion_tomada = forms.CharField(
+        label="Acción Correctiva Tomada",
+        help_text="Describe detalladamente cómo se resolvió la incidencia (mínimo 20 caracteres)",
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 5,
+            'placeholder': 'Ej: Se reemplazó el componente dañado sin costo para el cliente. '
+                          'RHITSO asumió la responsabilidad y entregó pieza nueva...',
+            'required': True,
+        })
+    )
+    
+    costo_adicional_final = forms.DecimalField(
+        label="Costo Adicional Final (MXN)",
+        help_text="Costo final si cambió desde el registro inicial (opcional)",
+        required=False,
+        min_value=0,
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': '0',
+            'step': '0.01',
+            'placeholder': '0.00',
+        })
+    )
+    
+    def clean_accion_tomada(self):
+        """
+        Validación del campo accion_tomada.
+        
+        EXPLICACIÓN:
+        ============
+        Asegura que se proporcione una descripción completa (mínimo 20 caracteres).
+        
+        ¿Por qué 20 caracteres?
+        Para documentar adecuadamente la resolución. Necesitamos saber:
+        - Qué se hizo exactamente
+        - Quién fue responsable
+        - Si hubo algún costo o compensación
+        
+        "Se arregló" no es suficiente información.
+        """
+        accion = self.cleaned_data.get('accion_tomada', '').strip()
+        
+        if len(accion) < 20:
+            raise ValidationError(
+                '❌ La descripción de la acción tomada debe tener al menos 20 caracteres. '
+                'Proporciona detalles completos sobre cómo se resolvió la incidencia.'
+            )
+        
+        return accion
+
+
+class EditarDiagnosticoSICForm(forms.Form):
+    """
+    Formulario para editar el diagnóstico SIC y datos relacionados con RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Este formulario es especial porque maneja campos de DOS modelos diferentes:
+    1. DetalleEquipo (diagnostico_sic)
+    2. OrdenServicio (motivo_rhitso, descripcion_rhitso, etc.)
+    
+    ¿Por qué no usar ModelForm?
+    Porque ModelForm trabaja con UN solo modelo. Aquí necesitamos editar
+    campos de dos modelos al mismo tiempo. Por eso usamos Form (sin Model).
+    
+    ¿Cuándo se usa este formulario?
+    Cuando el técnico de SIC hace el diagnóstico inicial y determina que
+    el equipo necesita ir a RHITSO. Aquí documenta:
+    - El diagnóstico técnico completo
+    - Por qué necesita RHITSO (reballing, soldadura, etc.)
+    - Qué tan complejo es
+    - Quién hizo el diagnóstico
+    
+    CAMPOS:
+    - diagnostico_sic: Diagnóstico técnico del equipo (DetalleEquipo)
+    - motivo_rhitso: Por qué necesita RHITSO (OrdenServicio)
+    - descripcion_rhitso: Descripción detallada del problema (OrdenServicio)
+    - complejidad_estimada: Qué tan complejo es (OrdenServicio)
+    - tecnico_diagnostico: Quién hizo el diagnóstico (OrdenServicio)
+    """
+    
+    diagnostico_sic = forms.CharField(
+        label="Diagnóstico SIC",
+        help_text="Diagnóstico técnico completo realizado por SIC",
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 5,
+            'placeholder': 'Ej: Equipo no enciende. Se detectó problema en chip gráfico. '
+                          'Requiere reballing para reparación...',
+            'required': True,
+        })
+    )
+    
+    motivo_rhitso = forms.ChoiceField(
+        label="Motivo RHITSO",
+        help_text="Razón por la cual se envía a RHITSO",
+        choices=MOTIVO_RHITSO_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'required': True,
+        })
+    )
+    
+    descripcion_rhitso = forms.CharField(
+        label="Descripción Detallada RHITSO",
+        help_text="Descripción completa del trabajo a realizar en RHITSO",
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 4,
+            'placeholder': 'Ej: Se requiere reballing del chip gráfico GTX 1650. '
+                          'Cliente autorizado presupuesto de $1500...',
+            'required': True,
+        })
+    )
+    
+    complejidad_estimada = forms.ChoiceField(
+        label="Complejidad Estimada",
+        help_text="Nivel de complejidad del trabajo",
+        choices=COMPLEJIDAD_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'required': True,
+        })
+    )
+    
+    tecnico_diagnostico = forms.ModelChoiceField(
+        label="Técnico que Realizó el Diagnóstico",
+        help_text="Técnico responsable del diagnóstico SIC",
+        queryset=Empleado.objects.filter(activo=True).order_by('nombre_completo'),
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'required': True,
+        })
+    )
+    
+    def clean_diagnostico_sic(self):
+        """
+        Validación del campo diagnostico_sic.
+        
+        EXPLICACIÓN:
+        ============
+        Asegura que el diagnóstico tenga contenido sustancial (mínimo 20 caracteres).
+        
+        ¿Por qué?
+        El diagnóstico es crítico para que RHITSO entienda qué hacer.
+        Necesita información técnica detallada, no solo "Está malo".
+        """
+        diagnostico = self.cleaned_data.get('diagnostico_sic', '').strip()
+        
+        if len(diagnostico) < 20:
+            raise ValidationError(
+                '❌ El diagnóstico debe tener al menos 20 caracteres. '
+                'Proporciona un análisis técnico detallado del problema.'
+            )
+        
+        return diagnostico
+    
+    def clean_descripcion_rhitso(self):
+        """
+        Validación del campo descripcion_rhitso.
+        
+        EXPLICACIÓN:
+        ============
+        Asegura que la descripción para RHITSO sea completa (mínimo 15 caracteres).
+        
+        ¿Por qué?
+        RHITSO necesita instrucciones claras sobre qué trabajo realizar.
+        "Reballing" no es suficiente. Necesitan saber QUÉ componente,
+        si está autorizado, presupuesto, etc.
+        """
+        descripcion = self.cleaned_data.get('descripcion_rhitso', '').strip()
+        
+        if len(descripcion) < 15:
+            raise ValidationError(
+                '❌ La descripción RHITSO debe tener al menos 15 caracteres. '
+                'Proporciona detalles completos del trabajo a realizar.'
+            )
+        
+        return descripcion
