@@ -638,6 +638,58 @@ class ConfiguracionAdicionalForm(forms.ModelForm):
             'falla_principal': 'Descripción de la falla reportada por el cliente',
             'diagnostico_sic': 'Diagnóstico técnico completo',
         }
+    
+    def save(self, commit=True):
+        """
+        Sobrescribe el método save para preservar fechas existentes.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - Problema: Cuando envías el formulario, los campos de fecha vacíos
+          se guardan como None, borrando valores anteriores
+        - Solución: Si un campo de fecha viene vacío en el formulario PERO
+          ya tenía un valor guardado, lo preservamos
+        - Esto permite modificar fechas individualmente sin perder las demás
+        
+        Ejemplo:
+        - Tienes guardado: inicio=01/10, fin=05/10
+        - Solo cambias inicio a 02/10, dejando fin vacío en el form
+        - Sin esta función: inicio=02/10, fin=None (se borra)
+        - Con esta función: inicio=02/10, fin=05/10 (se preserva)
+        """
+        instance = super().save(commit=False)
+        
+        # Lista de campos de fecha a preservar
+        campos_fecha = [
+            'fecha_inicio_diagnostico',
+            'fecha_fin_diagnostico',
+            'fecha_inicio_reparacion',
+            'fecha_fin_reparacion',
+        ]
+        
+        # Para cada campo de fecha
+        for campo in campos_fecha:
+            # Obtener el valor del formulario
+            valor_nuevo = self.cleaned_data.get(campo)
+            
+            # Si el formulario trae None (campo vacío)
+            if valor_nuevo is None:
+                # Verificar si la instancia original tenía un valor
+                if self.instance.pk:  # Solo si ya existe en la BD
+                    # Obtener el valor actual de la base de datos
+                    try:
+                        instancia_original = DetalleEquipo.objects.get(pk=self.instance.pk)
+                        valor_existente = getattr(instancia_original, campo)
+                        
+                        # Si había un valor guardado, preservarlo
+                        if valor_existente is not None:
+                            setattr(instance, campo, valor_existente)
+                    except DetalleEquipo.DoesNotExist:
+                        pass
+        
+        if commit:
+            instance.save()
+        
+        return instance
 
 
 class ReingresoRHITSOForm(forms.ModelForm):

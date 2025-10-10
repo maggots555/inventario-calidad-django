@@ -1304,3 +1304,158 @@ form:has(#btnSubirImagenes:disabled) textarea {
     margin-left: -50px;
 }
 
+/* =============================================================================
+   SECCIONES DE FECHAS - DIAGNÓSTICO Y REPARACIÓN
+   Estilos para mejorar la visualización de fechas en Configuración Adicional
+   ============================================================================= */
+
+.fechas-seccion {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.fechas-seccion:hover {
+    transform: translateY(-2px);
+}
+
+/* Badges de estado de fechas */
+.fechas-seccion .badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+}
+
+.fechas-seccion .badge:hover {
+    transform: scale(1.05);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+}
+
+/* Contenedor de fechas con borde coloreado */
+.fechas-seccion .border {
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.fechas-seccion .border:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+/* Inputs de fecha mejorados */
+.fechas-seccion input[type="date"],
+.fechas-seccion input[type="datetime-local"] {
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.fechas-seccion input[type="date"]:focus,
+.fechas-seccion input[type="datetime-local"]:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+    outline: none;
+}
+
+.fechas-seccion input[type="date"]:hover,
+.fechas-seccion input[type="datetime-local"]:hover {
+    border-color: #b0b0b0;
+}
+
+/* Indicadores de fecha guardada */
+.fechas-seccion small.text-success {
+    font-size: 0.75rem;
+    font-weight: 500;
+    animation: fadeInUp 0.4s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Alertas de duración */
+.fechas-seccion .alert {
+    border-radius: 6px;
+    font-weight: 500;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Iconos de play/stop en labels */
+.fechas-seccion .form-label .bi-play-fill {
+    color: #28a745;
+    font-size: 1rem;
+    vertical-align: middle;
+}
+
+.fechas-seccion .form-label .bi-stop-fill {
+    color: #dc3545;
+    font-size: 1rem;
+    vertical-align: middle;
+}
+
+/* Títulos de secciones (Diagnóstico / Reparación) */
+.fechas-seccion h6 {
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 0;
+}
+
+.fechas-seccion h6 i {
+    font-size: 1.1rem;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+}
+
+/* Efectos al guardar exitosamente */
+.fechas-seccion.guardado-exitoso {
+    animation: pulseSuccess 0.6s ease;
+}
+
+@keyframes pulseSuccess {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0.3);
+    }
+}
+
+/* Responsive: Ajustes para móviles */
+@media (max-width: 576px) {
+    .fechas-seccion .col-6 {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+    
+    .fechas-seccion h6 {
+        font-size: 0.85rem;
+    }
+    
+    .fechas-seccion .badge {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+    }
+}
+

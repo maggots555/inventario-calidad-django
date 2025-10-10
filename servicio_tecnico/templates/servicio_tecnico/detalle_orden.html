@@ -264,37 +264,127 @@
                             <small class="text-muted">{{ form_config.diagnostico_sic.help_text }}</small>
                         </div>
                         
-                        <div class="row">
-                            <div class="col-6 mb-3">
-                                {{ form_config.fecha_inicio_diagnostico.errors }}
-                                <label for="{{ form_config.fecha_inicio_diagnostico.id_for_label }}" class="form-label small">
-                                    {{ form_config.fecha_inicio_diagnostico.label }}
-                                </label>
-                                {{ form_config.fecha_inicio_diagnostico }}
+                        <!-- ===================================== -->
+                        <!-- SECCIÓN: FECHAS DE DIAGNÓSTICO -->
+                        <!-- ===================================== -->
+                        <div class="fechas-seccion mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0" style="color: #17a2b8; font-weight: 600;">
+                                    <i class="bi bi-search"></i> Fechas de Diagnóstico
+                                </h6>
+                                {% if orden.detalle_equipo.fecha_inicio_diagnostico and orden.detalle_equipo.fecha_fin_diagnostico %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle-fill"></i> Completo
+                                    </span>
+                                {% elif orden.detalle_equipo.fecha_inicio_diagnostico or orden.detalle_equipo.fecha_fin_diagnostico %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-clock-fill"></i> Parcial
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-dash-circle"></i> Sin registrar
+                                    </span>
+                                {% endif %}
                             </div>
-                            <div class="col-6 mb-3">
-                                {{ form_config.fecha_fin_diagnostico.errors }}
-                                <label for="{{ form_config.fecha_fin_diagnostico.id_for_label }}" class="form-label small">
-                                    {{ form_config.fecha_fin_diagnostico.label }}
-                                </label>
-                                {{ form_config.fecha_fin_diagnostico }}
+                            
+                            <div class="border rounded p-3 bg-light" style="border-left: 4px solid #17a2b8 !important;">
+                                <div class="row">
+                                    <div class="col-6 mb-2">
+                                        {{ form_config.fecha_inicio_diagnostico.errors }}
+                                        <label for="{{ form_config.fecha_inicio_diagnostico.id_for_label }}" class="form-label small">
+                                            <i class="bi bi-play-fill text-success"></i> {{ form_config.fecha_inicio_diagnostico.label }}
+                                        </label>
+                                        {{ form_config.fecha_inicio_diagnostico }}
+                                        {% if orden.detalle_equipo.fecha_inicio_diagnostico %}
+                                            <small class="text-success d-block mt-1">
+                                                <i class="bi bi-check-circle"></i> Guardado: {{ orden.detalle_equipo.fecha_inicio_diagnostico|date:"d/m/Y" }}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-6 mb-2">
+                                        {{ form_config.fecha_fin_diagnostico.errors }}
+                                        <label for="{{ form_config.fecha_fin_diagnostico.id_for_label }}" class="form-label small">
+                                            <i class="bi bi-stop-fill text-danger"></i> {{ form_config.fecha_fin_diagnostico.label }}
+                                        </label>
+                                        {{ form_config.fecha_fin_diagnostico }}
+                                        {% if orden.detalle_equipo.fecha_fin_diagnostico %}
+                                            <small class="text-success d-block mt-1">
+                                                <i class="bi bi-check-circle"></i> Guardado: {{ orden.detalle_equipo.fecha_fin_diagnostico|date:"d/m/Y" }}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Duración del diagnóstico (si ambas fechas existen) -->
+                                {% if orden.detalle_equipo.fecha_inicio_diagnostico and orden.detalle_equipo.fecha_fin_diagnostico %}
+                                    <div class="alert alert-info mb-0 mt-2 py-2 px-3" style="font-size: 0.9rem;">
+                                        <i class="bi bi-clock-history"></i> 
+                                        <strong>Duración:</strong> 
+                                        {{ orden.detalle_equipo.duracion_diagnostico }}
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
                         
-                        <div class="row">
-                            <div class="col-6 mb-3">
-                                {{ form_config.fecha_inicio_reparacion.errors }}
-                                <label for="{{ form_config.fecha_inicio_reparacion.id_for_label }}" class="form-label small">
-                                    {{ form_config.fecha_inicio_reparacion.label }}
-                                </label>
-                                {{ form_config.fecha_inicio_reparacion }}
+                        <!-- ===================================== -->
+                        <!-- SECCIÓN: FECHAS DE REPARACIÓN -->
+                        <!-- ===================================== -->
+                        <div class="fechas-seccion mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0" style="color: #fd7e14; font-weight: 600;">
+                                    <i class="bi bi-wrench"></i> Fechas de Reparación
+                                </h6>
+                                {% if orden.detalle_equipo.fecha_inicio_reparacion and orden.detalle_equipo.fecha_fin_reparacion %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle-fill"></i> Completo
+                                    </span>
+                                {% elif orden.detalle_equipo.fecha_inicio_reparacion or orden.detalle_equipo.fecha_fin_reparacion %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-clock-fill"></i> Parcial
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-dash-circle"></i> Sin registrar
+                                    </span>
+                                {% endif %}
                             </div>
-                            <div class="col-6 mb-3">
-                                {{ form_config.fecha_fin_reparacion.errors }}
-                                <label for="{{ form_config.fecha_fin_reparacion.id_for_label }}" class="form-label small">
-                                    {{ form_config.fecha_fin_reparacion.label }}
-                                </label>
-                                {{ form_config.fecha_fin_reparacion }}
+                            
+                            <div class="border rounded p-3 bg-light" style="border-left: 4px solid #fd7e14 !important;">
+                                <div class="row">
+                                    <div class="col-6 mb-2">
+                                        {{ form_config.fecha_inicio_reparacion.errors }}
+                                        <label for="{{ form_config.fecha_inicio_reparacion.id_for_label }}" class="form-label small">
+                                            <i class="bi bi-play-fill text-success"></i> {{ form_config.fecha_inicio_reparacion.label }}
+                                        </label>
+                                        {{ form_config.fecha_inicio_reparacion }}
+                                        {% if orden.detalle_equipo.fecha_inicio_reparacion %}
+                                            <small class="text-success d-block mt-1">
+                                                <i class="bi bi-check-circle"></i> Guardado: {{ orden.detalle_equipo.fecha_inicio_reparacion|date:"d/m/Y" }}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-6 mb-2">
+                                        {{ form_config.fecha_fin_reparacion.errors }}
+                                        <label for="{{ form_config.fecha_fin_reparacion.id_for_label }}" class="form-label small">
+                                            <i class="bi bi-stop-fill text-danger"></i> {{ form_config.fecha_fin_reparacion.label }}
+                                        </label>
+                                        {{ form_config.fecha_fin_reparacion }}
+                                        {% if orden.detalle_equipo.fecha_fin_reparacion %}
+                                            <small class="text-success d-block mt-1">
+                                                <i class="bi bi-check-circle"></i> Guardado: {{ orden.detalle_equipo.fecha_fin_reparacion|date:"d/m/Y" }}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Duración de la reparación (si ambas fechas existen) -->
+                                {% if orden.detalle_equipo.fecha_inicio_reparacion and orden.detalle_equipo.fecha_fin_reparacion %}
+                                    <div class="alert alert-warning mb-0 mt-2 py-2 px-3" style="font-size: 0.9rem;">
+                                        <i class="bi bi-clock-history"></i> 
+                                        <strong>Duración:</strong> 
+                                        {{ orden.detalle_equipo.duracion_reparacion }}
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
                         
@@ -3488,6 +3578,79 @@ function verificarCategoriasVacias() {
         }
     });
 }
+
+// ============================================================================
+// FEEDBACK VISUAL AL GUARDAR FECHAS DE DIAGNÓSTICO Y REPARACIÓN
+// ============================================================================
+
+/**
+ * Agrega animación de guardado exitoso a las secciones de fechas.
+ * 
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * - Cuando el formulario de configuración se guarda exitosamente
+ * - Agregamos una animación "pulse" a las secciones de fechas
+ * - Esto da feedback visual inmediato al usuario
+ * - La animación dura 600ms y luego se remueve automáticamente
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    const formConfiguracion = document.getElementById('formConfiguracion');
+    
+    if (formConfiguracion) {
+        formConfiguracion.addEventListener('submit', function(e) {
+            // Guardar referencia a las secciones de fechas
+            const seccionesFechas = document.querySelectorAll('.fechas-seccion');
+            
+            // Agregar clase de guardado después de enviar el formulario
+            // Nota: La animación solo se ve si la página no recarga inmediatamente
+            seccionesFechas.forEach(seccion => {
+                // Esperar un momento para que el formulario se procese
+                setTimeout(() => {
+                    seccion.classList.add('guardado-exitoso');
+                    
+                    // Remover la clase después de la animación (600ms)
+                    setTimeout(() => {
+                        seccion.classList.remove('guardado-exitoso');
+                    }, 600);
+                }, 100);
+            });
+        });
+    }
+    
+    // Efecto visual al cambiar fechas
+    const inputsFechas = document.querySelectorAll(
+        'input[name="fecha_inicio_diagnostico"], ' +
+        'input[name="fecha_fin_diagnostico"], ' +
+        'input[name="fecha_inicio_reparacion"], ' +
+        'input[name="fecha_fin_reparacion"]'
+    );
+    
+    inputsFechas.forEach(input => {
+        // Agregar efecto de "cambio pendiente"
+        input.addEventListener('change', function() {
+            const seccion = this.closest('.fechas-seccion');
+            if (seccion) {
+                // Agregar borde pulsante para indicar cambio pendiente
+                seccion.style.borderLeft = '4px solid #ffc107';
+                seccion.style.paddingLeft = '8px';
+                seccion.style.transition = 'all 0.3s ease';
+                
+                // Tooltip o mensaje visual
+                const label = this.previousElementSibling;
+                if (label && label.tagName === 'LABEL') {
+                    const textoOriginal = label.innerHTML;
+                    label.innerHTML = textoOriginal + ' <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">Cambio pendiente</span>';
+                    
+                    // Limpiar el badge al hacer submit
+                    formConfiguracion.addEventListener('submit', function() {
+                        label.innerHTML = textoOriginal;
+                        seccion.style.borderLeft = '';
+                        seccion.style.paddingLeft = '';
+                    }, { once: true });
+                }
+            }
+        });
+    });
+});
 
 </script>
 

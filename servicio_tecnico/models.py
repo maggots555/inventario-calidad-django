@@ -528,6 +528,48 @@ class DetalleEquipo(models.Model):
             return (self.fecha_fin_reparacion - self.fecha_inicio_reparacion).days
         return None
     
+    @property
+    def duracion_diagnostico(self):
+        """
+        Devuelve texto descriptivo de la duración del diagnóstico.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - Esta property calcula cuánto tiempo tomó el diagnóstico
+        - Devuelve un texto legible como "2 días" o "1 día"
+        - Si no hay fechas, devuelve None
+        - Se usa en templates para mostrar información al usuario
+        """
+        dias = self.dias_diagnostico
+        if dias is not None:
+            if dias == 0:
+                return "Mismo día"
+            elif dias == 1:
+                return "1 día"
+            else:
+                return f"{dias} días"
+        return None
+    
+    @property
+    def duracion_reparacion(self):
+        """
+        Devuelve texto descriptivo de la duración de la reparación.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - Esta property calcula cuánto tiempo tomó la reparación
+        - Devuelve un texto legible como "3 días" o "1 día"
+        - Si no hay fechas, devuelve None
+        - Se usa en templates para mostrar información al usuario
+        """
+        dias = self.dias_reparacion
+        if dias is not None:
+            if dias == 0:
+                return "Mismo día"
+            elif dias == 1:
+                return "1 día"
+            else:
+                return f"{dias} días"
+        return None
+    
     def calcular_gama(self):
         """
         Calcula la gama del equipo basándose en la tabla de referencia.

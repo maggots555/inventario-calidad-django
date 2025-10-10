@@ -122,13 +122,23 @@ class PiezaVentaMostradorInline(admin.TabularInline):
         """
         Muestra el subtotal calculado (cantidad × precio_unitario) con formato de moneda.
         
-        EXPLICACIÓN:
+        EXPLICACIÓN PARA PRINCIPIANTES:
         - obj.subtotal: Es una property del modelo que calcula cantidad * precio_unitario
+        - obj.pk: Es el ID del objeto en la base de datos (None si es nuevo)
         - format_html: Django función que permite crear HTML seguro
         - ${:,.2f}: Formato de moneda con comas y 2 decimales
+        - try-except: Maneja errores si el subtotal no se puede calcular
+        
+        Esta función solo muestra el subtotal si el objeto ya existe en la BD,
+        evitando errores al crear nuevas piezas.
         """
         if obj.pk:  # Si el objeto ya existe (no es nuevo)
-            return format_html('<strong>${:,.2f}</strong>', float(obj.subtotal))
+            try:
+                # Convertir explícitamente a float para evitar errores con SafeString
+                subtotal = float(obj.subtotal)
+                return format_html('<strong>${:,.2f}</strong>', subtotal)
+            except (ValueError, TypeError, AttributeError):
+                return format_html('<strong>$0.00</strong>')
         return '-'
     subtotal_display.short_description = 'Subtotal'
 
@@ -196,15 +206,6 @@ class OrdenServicioAdmin(admin.ModelAdmin):
                 'fecha_finalizacion',
                 'fecha_entrega',
             )
-        }),
-        ('Conversión desde Venta Mostrador', {
-            'fields': (
-                'orden_venta_mostrador_previa',
-                'monto_abono_previo',
-                'notas_conversion',
-            ),
-            'classes': ('collapse',),
-            'description': 'Información sobre conversión de una venta mostrador que requirió diagnóstico completo.'
         }),
         ('Reingreso y ScoreCard', {
             'fields': (
@@ -467,21 +468,37 @@ class CotizacionAdmin(admin.ModelAdmin):
     estado_respuesta.short_description = 'Estado'
     
     def costo_total_piezas_display(self, obj):
-        """Muestra el costo total de piezas formateado"""
+        """
+        Muestra el costo total de piezas formateado.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - obj.costo_total_piezas suma el costo de todas las piezas en la cotización
+        - try-except maneja errores si el valor es None o inválido
+        - f-string con {:,.2f} formatea como moneda con 2 decimales
+        - Si hay error, muestra $0.00
+        """
         try:
             costo = float(obj.costo_total_piezas)
             return f"${costo:,.2f}"
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, AttributeError):
             return '$0.00'
     costo_total_piezas_display.short_description = 'Total Piezas'
     
     def costo_total_display(self, obj):
-        """Muestra el costo total con formato de moneda"""
+        """
+        Muestra el costo total con formato de moneda.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - obj.costo_total suma piezas + mano de obra
+        - float() convierte el Decimal a número antes de formatear
+        - format_html crea HTML seguro con negrita
+        - Si hay error, también usa format_html para mantener consistencia
+        """
         try:
             costo = float(obj.costo_total)
             return format_html('<strong>${:,.2f}</strong>', costo)
-        except (ValueError, TypeError):
-            return '<strong>$0.00</strong>'
+        except (ValueError, TypeError, AttributeError):
+            return format_html('<strong>$0.00</strong>')
     costo_total_display.short_description = 'Total'
 
 
@@ -509,11 +526,19 @@ class PiezaCotizadaAdmin(admin.ModelAdmin):
     )
     
     def costo_total_display(self, obj):
-        """Muestra el costo total formateado"""
+        """
+        Muestra el costo total formateado.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - obj.costo_total es una property que multiplica cantidad × costo_unitario
+        - try-except maneja errores si el valor es None o inválido
+        - f-string con {:,.2f} formatea como moneda con 2 decimales
+        - Esta función NO usa format_html porque devuelve texto plano, no HTML
+        """
         try:
             costo = float(obj.costo_total)
             return f"${costo:,.2f}"
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, AttributeError):
             return '$0.00'
     costo_total_display.short_description = 'Costo Total'
 
@@ -664,11 +689,25 @@ class VentaMostradorAdmin(admin.ModelAdmin):
     servicios_incluidos.short_description = 'Servicios'
     
     def total_venta_display(self, obj):
-        """Muestra el total de venta formateado en verde"""
-        return format_html(
-            '<strong style="color: green;">${:,.2f}</strong>',
-            float(obj.total_venta)  # Convertir explícitamente a float
-        )
+        """
+        Muestra el total de venta formateado en verde.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - obj.total_venta es una property que calcula el total de la venta
+        - Usamos try-except para manejar casos donde el valor podría ser None o inválido
+        - float() convierte el Decimal a número flotante ANTES de usar format_html
+        - format_html crea HTML seguro para mostrar el valor con formato de moneda
+        - Si hay un error, mostramos $0.00 como valor por defecto
+        """
+        try:
+            # Convertir explícitamente a float para evitar errores con SafeString
+            total = float(obj.total_venta)
+            return format_html(
+                '<strong style="color: green;">${:,.2f}</strong>',
+                total
+            )
+        except (ValueError, TypeError, AttributeError):
+            return format_html('<strong style="color: green;">$0.00</strong>')
     total_venta_display.short_description = 'Total'
 
 
@@ -735,16 +774,38 @@ class PiezaVentaMostradorAdmin(admin.ModelAdmin):
     )
     
     def precio_unitario_display(self, obj):
-        """Muestra el precio unitario con formato de moneda"""
+        """
+        Muestra el precio unitario con formato de moneda.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - f-string (f"...") permite insertar variables directamente en el texto
+        - obj.precio_unitario es el precio de una pieza individual
+        - {:,.2f} formatea el número con comas como separador de miles y 2 decimales
+        - Ejemplo: 1234.5 se muestra como $1,234.50
+        """
         return f"${obj.precio_unitario:,.2f}"
     precio_unitario_display.short_description = 'Precio Unitario'
     
     def subtotal_display(self, obj):
-        """Muestra el subtotal con formato de moneda y negrita"""
-        return format_html(
-            '<strong style="color: green;">${:,.2f}</strong>',
-            float(obj.subtotal)
-        )
+        """
+        Muestra el subtotal con formato de moneda y negrita.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - obj.subtotal es una property que multiplica cantidad × precio_unitario
+        - try-except maneja errores si el subtotal no se puede calcular
+        - float() convierte el Decimal a número flotante antes de formatear
+        - format_html crea HTML seguro con color verde y negrita
+        - Si hay error, muestra $0.00 como valor por defecto
+        """
+        try:
+            # Convertir explícitamente a float para evitar errores con SafeString
+            subtotal = float(obj.subtotal)
+            return format_html(
+                '<strong style="color: green;">${:,.2f}</strong>',
+                subtotal
+            )
+        except (ValueError, TypeError, AttributeError):
+            return format_html('<strong style="color: green;">$0.00</strong>')
     subtotal_display.short_description = 'Subtotal'
 
 
