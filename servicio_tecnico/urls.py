@@ -88,7 +88,7 @@ urlpatterns = [
     # Vista principal del panel RHITSO (FASE 4)
     path('rhitso/orden/<int:orden_id>/', views.gestion_rhitso, name='gestion_rhitso'),
     
-    # Vistas AJAX para gestión RHITSO (FASE 5)
+    # Vistas AJAX para gestión RHITSO (FASE 5 + FASE 8.4)
     # ========================================================================
     # Actualizar estado RHITSO de una orden
     path('rhitso/orden/<int:orden_id>/actualizar-estado/', 
@@ -109,6 +109,11 @@ urlpatterns = [
     path('rhitso/orden/<int:orden_id>/editar-diagnostico/', 
          views.editar_diagnostico_sic, 
          name='editar_diagnostico_sic'),
+    
+    # Agregar comentario manual al historial RHITSO (FASE 8.4)
+    path('rhitso/orden/<int:orden_id>/agregar-comentario/', 
+         views.agregar_comentario_rhitso, 
+         name='agregar_comentario_rhitso'),
     
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),

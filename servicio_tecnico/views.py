@@ -620,7 +620,27 @@ def detalle_orden(request, orden_id):
             form_reingreso = ReingresoRHITSOForm(request.POST, instance=orden)
             
             if form_reingreso.is_valid():
-                orden_actualizada = form_reingreso.save()
+                orden_actualizada = form_reingreso.save(commit=False)
+                
+                # ===================================================================
+                # ASIGNAR ESTADO RHITSO AUTOMÁTICO SI ES CANDIDATO
+                # ===================================================================
+                # EXPLICACIÓN: Si se marca como candidato RHITSO y NO tiene estado
+                # asignado, le ponemos automáticamente el primer estado
+                if orden_actualizada.es_candidato_rhitso and not orden_actualizada.estado_rhitso:
+                    try:
+                        primer_estado = EstadoRHITSO.objects.filter(orden=1).first()
+                        if primer_estado:
+                            orden_actualizada.estado_rhitso = primer_estado.estado
+                            messages.info(
+                                request,
+                                f'🎯 Estado RHITSO asignado automáticamente: {primer_estado.estado}'
+                            )
+                    except EstadoRHITSO.DoesNotExist:
+                        pass  # Si no hay estados, continuar sin asignar
+                
+                # Guardar la orden con el estado asignado
+                orden_actualizada.save()
                 
                 # Si se marcó como reingreso, crear incidencia de ScoreCard
                 if orden_actualizada.es_reingreso and not orden_actualizada.incidencia_scorecard:
@@ -3100,7 +3120,7 @@ def gestion_rhitso(request, orden_id):
     # PASO 7: OBTENER GALERÍA RHITSO
     # =======================================================================
     # EXPLICACIÓN: Filtramos las imágenes de la orden por tipo específico
-    # de RHITSO (envío, recepción, reparación, autorización/pass)
+    # de RHITSO (ingreso, diagnostico, reparacion, egreso, autorizacion)
     
     # Obtener parámetro de filtro de tipo de imagen (si existe)
     filtro_tipo_imagen = request.GET.get('tipo_imagen', '')
@@ -3109,15 +3129,15 @@ def gestion_rhitso(request, orden_id):
     imagenes_rhitso = orden.imagenes.select_related('subido_por')
     
     # Aplicar filtro si se especificó un tipo
-    # EXPLICACIÓN: Los tipos válidos son: envio, recepcion, reparacion,
-    # autorizacion (estos deben existir en el modelo ImagenOrden)
-    if filtro_tipo_imagen and filtro_tipo_imagen in ['envio', 'recepcion', 'reparacion', 'autorizacion']:
+    # EXPLICACIÓN: Los tipos válidos son: ingreso, diagnostico, reparacion,
+    # egreso, autorizacion (estos deben existir en el modelo ImagenOrden)
+    tipos_validos = ['ingreso', 'diagnostico', 'reparacion', 'egreso', 'autorizacion']
+    
+    if filtro_tipo_imagen and filtro_tipo_imagen in tipos_validos:
         imagenes_rhitso = imagenes_rhitso.filter(tipo=filtro_tipo_imagen)
-    else:
-        # Si no hay filtro, mostrar todas las imágenes relacionadas con RHITSO
-        imagenes_rhitso = imagenes_rhitso.filter(
-            tipo__in=['envio', 'recepcion', 'reparacion', 'autorizacion']
-        )
+    
+    # Si no hay filtro específico, mostrar todas las imágenes (sin restricción de tipo)
+    # Esto permite ver todas las imágenes de la orden en la vista RHITSO
     
     # Ordenar por fecha de subida (más recientes primero)
     imagenes_rhitso = imagenes_rhitso.order_by('-fecha_subida')
@@ -3312,9 +3332,13 @@ def actualizar_estado_rhitso(request, orden_id):
                 estado__estado=nuevo_estado
             ).order_by('-fecha_actualizacion').first()
             
-            tiempo_anterior = None
+            tiempo_anterior_dias = None
             if ultimo_seguimiento:
-                tiempo_anterior = timezone.now() - ultimo_seguimiento.fecha_actualizacion
+                tiempo_delta = timezone.now() - ultimo_seguimiento.fecha_actualizacion
+                # EXPLICACIÓN: Convertir timedelta a días (número entero)
+                # timedelta.days devuelve solo la parte de días completos
+                # timedelta.total_seconds() / 86400 da el total de días con decimales
+                tiempo_anterior_dias = tiempo_delta.days
             
             SeguimientoRHITSO.objects.create(
                 orden=orden,
@@ -3322,7 +3346,7 @@ def actualizar_estado_rhitso(request, orden_id):
                 estado_anterior=estado_anterior if estado_anterior else 'Sin estado previo',
                 observaciones=observaciones,
                 usuario_actualizacion=request.user.empleado if hasattr(request.user, 'empleado') else None,
-                tiempo_en_estado_anterior=tiempo_anterior,
+                tiempo_en_estado_anterior=tiempo_anterior_dias,
                 notificado_cliente=notificar_cliente
             )
         except EstadoRHITSO.DoesNotExist:
@@ -3747,6 +3771,115 @@ def editar_diagnostico_sic(request, orden_id):
         else:
             messages.error(request, f'❌ Error al actualizar diagnóstico: {str(e)}')
             return redirect('servicio_tecnico:gestion_rhitso', orden_id=orden.id)
+
+
+@login_required
+@require_http_methods(["POST"])
+def agregar_comentario_rhitso(request, orden_id):
+    """
+    Vista AJAX para agregar un comentario manual al historial RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Los comentarios manuales permiten a los usuarios agregar notas,
+    observaciones o actualizaciones al historial RHITSO sin cambiar
+    el estado del proceso.
+    
+    Diferencia entre:
+    - Seguimientos automáticos: Se crean automáticamente al cambiar estado
+    - Comentarios manuales: Los crea el usuario cuando quiere documentar algo
+    
+    Ejemplos de comentarios útiles:
+    - "Llamé a RHITSO para consultar estado, aún no tienen respuesta"
+    - "Cliente preguntó por el equipo, le informé que está en proceso"
+    - "Recibí cotización preliminar de RHITSO: $1,500 MXN"
+    - "RHITSO confirmó que necesitan pieza adicional, llegará mañana"
+    
+    ¿Por qué es importante?
+    - Documentación completa del proceso
+    - Comunicación entre técnicos del mismo equipo
+    - Referencia futura para casos similares
+    - Transparencia con el cliente
+    
+    Args:
+        request: HttpRequest con datos POST (comentario)
+        orden_id: ID de la orden donde agregar el comentario
+    
+    Returns:
+        JsonResponse con resultado de la operación
+    """
+    try:
+        # Paso 1: Obtener orden y validar
+        orden = get_object_or_404(OrdenServicio, pk=orden_id)
+        
+        if not orden.es_candidato_rhitso:
+            return JsonResponse({
+                'success': False,
+                'mensaje': '❌ Esta orden no es candidato RHITSO'
+            }, status=400)
+        
+        # Paso 2: Validar que haya comentario
+        comentario = request.POST.get('comentario', '').strip()
+        
+        if not comentario:
+            return JsonResponse({
+                'success': False,
+                'mensaje': '⚠️ El comentario no puede estar vacío'
+            }, status=400)
+        
+        # Validar longitud mínima
+        if len(comentario) < 10:
+            return JsonResponse({
+                'success': False,
+                'mensaje': '⚠️ El comentario debe tener al menos 10 caracteres'
+            }, status=400)
+        
+        # Validar longitud máxima (opcional, por seguridad)
+        if len(comentario) > 1000:
+            return JsonResponse({
+                'success': False,
+                'mensaje': '⚠️ El comentario no puede exceder 1000 caracteres'
+            }, status=400)
+        
+        # Paso 3: Registrar comentario en historial
+        # EXPLICACIÓN: Usamos la función registrar_historial que:
+        # - Crea un objeto HistorialOrden
+        # - Asigna tipo_evento='comentario'
+        # - Guarda el usuario que lo creó
+        # - Marca la fecha/hora actual automáticamente
+        registrar_historial(
+            orden=orden,
+            tipo_evento='comentario',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=f"💬 {comentario}",  # Emoji para identificar comentarios manuales
+            es_sistema=False
+        )
+        
+        # Paso 4: Preparar datos para respuesta JSON
+        # EXPLICACIÓN: Enviamos los datos del comentario creado para que
+        # JavaScript pueda agregarlo a la lista sin recargar la página
+        usuario_nombre = (
+            request.user.empleado.nombre_completo 
+            if hasattr(request.user, 'empleado') 
+            else request.user.username
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'mensaje': '✅ Comentario agregado correctamente al historial RHITSO',
+            'data': {
+                'comentario': comentario,
+                'usuario': usuario_nombre,
+                'fecha': timezone.now().strftime('%d/%m/%Y %H:%M'),
+                'tipo': 'comentario_manual'
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'mensaje': f'❌ Error al agregar comentario: {str(e)}'
+        }, status=500)
 
 
 # Esta vista manejaba la conversión de ventas mostrador a diagnóstico,
