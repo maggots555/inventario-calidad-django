@@ -88,6 +88,72 @@
     {% endif %}
     
     <!-- ============================================================ -->
+    <!-- ALERTA: CANDIDATO A RHITSO - ACCESO RÁPIDO (FASE 11) -->
+    <!-- ============================================================ -->
+    
+    {% if orden.es_candidato_rhitso %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info shadow-sm" role="alert" style="border-left: 5px solid #0d6efd; border-radius: 10px; background: linear-gradient(to right, #e8f4fd, #ffffff);">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="flex-grow-1">
+                        <h5 class="alert-heading mb-2" style="color: #0d6efd;">
+                            <i class="bi bi-gear-fill"></i> <strong>Candidato a RHITSO</strong>
+                            <span class="badge bg-warning text-dark ms-2">
+                                <i class="bi bi-exclamation-triangle"></i> Requiere Reparación Externa
+                            </span>
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <p class="mb-2">
+                                    <strong><i class="bi bi-clipboard-text"></i> Motivo:</strong> 
+                                    <span class="badge bg-primary">{{ orden.get_motivo_rhitso_display }}</span>
+                                </p>
+                                {% if orden.descripcion_rhitso %}
+                                <p class="mb-2">
+                                    <strong><i class="bi bi-chat-left-text"></i> Descripción:</strong>
+                                    <span class="text-muted">{{ orden.descripcion_rhitso|truncatewords:15 }}</span>
+                                </p>
+                                {% endif %}
+                                {% if orden.estado_rhitso %}
+                                <p class="mb-0">
+                                    <strong><i class="bi bi-arrow-repeat"></i> Estado RHITSO:</strong> 
+                                    <span class="badge bg-success">{{ orden.estado_rhitso }}</span>
+                                    {% if orden.dias_en_rhitso %}
+                                        <span class="badge bg-secondary ms-1">
+                                            <i class="bi bi-calendar-day"></i> {{ orden.dias_en_rhitso }} día{{ orden.dias_en_rhitso|pluralize }}
+                                        </span>
+                                    {% endif %}
+                                </p>
+                                {% else %}
+                                <p class="mb-0">
+                                    <em class="text-muted">
+                                        <i class="bi bi-info-circle"></i> Aún no se ha iniciado el proceso RHITSO
+                                    </em>
+                                </p>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 text-end d-flex align-items-center justify-content-end">
+                                <a href="{% url 'servicio_tecnico:gestion_rhitso' orden.id %}" 
+                                   class="btn btn-primary btn-lg shadow-sm"
+                                   style="min-width: 200px;"
+                                   data-bs-toggle="tooltip"
+                                   data-bs-placement="left"
+                                   title="Ir al panel de seguimiento especializado RHITSO">
+                                    <i class="bi bi-gear-wide-connected"></i> 
+                                    <strong>Gestión RHITSO</strong>
+                                    <i class="bi bi-arrow-right-circle ms-2"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- ============================================================ -->
     <!-- SECCIÓN 1: INFORMACIÓN PRINCIPAL (Solo Lectura) -->
     <!-- ============================================================ -->
     

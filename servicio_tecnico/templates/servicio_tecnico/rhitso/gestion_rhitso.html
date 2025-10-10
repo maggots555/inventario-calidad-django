@@ -243,8 +243,7 @@
                             
                             <div class="collapse mt-3" id="formCambiarEstado">
                                 <div class="card card-body">
-                                    <!-- TODO: Implementar vista actualizar_estado_rhitso en FASE 5 -->
-                                    <form method="post" action="#">
+                                    <form method="post" action="{% url 'servicio_tecnico:actualizar_estado_rhitso' orden.id %}" id="formActualizarEstado">
                                         {% csrf_token %}
                                         <div class="row">
                                             <div class="col-md-6 mb-3">
@@ -271,8 +270,8 @@
                                                 <small class="form-text text-muted">{{ form_estado.observaciones.help_text }}</small>
                                             {% endif %}
                                         </div>
-                                        <button type="submit" class="btn btn-success" disabled>
-                                            <i class="bi bi-check-circle"></i> Actualizar Estado (Próximamente)
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="bi bi-check-circle"></i> Actualizar Estado
                                         </button>
                                         <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#formCambiarEstado">
                                             Cancelar
@@ -342,8 +341,7 @@
                             
                             <div class="collapse mt-3" id="formEditarDiagnostico">
                                 <div class="card card-body">
-                                    <!-- TODO: Implementar vista editar_diagnostico_sic en FASE 5 -->
-                                    <form method="post" action="#">
+                                    <form method="post" action="{% url 'servicio_tecnico:editar_diagnostico_sic' orden.id %}" id="formEditarDiagnosticoSIC">
                                         {% csrf_token %}
                                         <div class="row">
                                             <div class="col-md-6 mb-3">
@@ -363,8 +361,8 @@
                                             {{ form_diagnostico.complejidad_estimada.label_tag }}
                                             {{ form_diagnostico.complejidad_estimada }}
                                         </div>
-                                        <button type="submit" class="btn btn-success" disabled>
-                                            <i class="bi bi-check-circle"></i> Guardar Cambios (Próximamente)
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="bi bi-check-circle"></i> Guardar Cambios
                                         </button>
                                         <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#formEditarDiagnostico">
                                             Cancelar
@@ -502,8 +500,7 @@
                         
                         <div class="collapse mt-3" id="formNuevaIncidencia">
                             <div class="card card-body">
-                                <!-- TODO: Implementar vista registrar_incidencia en FASE 5 -->
-                                <form method="post" action="#">
+                                <form method="post" action="{% url 'servicio_tecnico:registrar_incidencia' orden.id %}" id="formRegistrarIncidencia">
                                     {% csrf_token %}
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
@@ -533,8 +530,8 @@
                                             {{ form_incidencia.costo_adicional }}
                                         </div>
                                     </div>
-                                    <button type="submit" class="btn btn-danger" disabled>
-                                        <i class="bi bi-exclamation-triangle"></i> Registrar Incidencia (Próximamente)
+                                    <button type="submit" class="btn btn-danger">
+                                        <i class="bi bi-exclamation-triangle"></i> Registrar Incidencia
                                     </button>
                                     <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#formNuevaIncidencia">
                                         Cancelar
@@ -586,21 +583,22 @@
                                             
                                             <div class="collapse mt-3" id="formResolver{{ incidencia.id }}">
                                                 <div class="card card-body">
-                                                    <!-- TODO: Implementar vista resolver_incidencia en FASE 5 -->
-                                                    <form method="post" action="#">
+                                                    <form method="post" action="{% url 'servicio_tecnico:resolver_incidencia' incidencia.id %}" class="formResolverIncidencia">
                                                         {% csrf_token %}
                                                         <div class="mb-3">
-                                                            {{ form_resolver_incidencia.solucion.label_tag }}
-                                                            {{ form_resolver_incidencia.solucion }}
+                                                            <label for="accion_tomada_{{ incidencia.id }}" class="form-label">Acción Correctiva Tomada</label>
+                                                            <textarea name="accion_tomada" id="accion_tomada_{{ incidencia.id }}" class="form-control" rows="5" required
+                                                                placeholder="Ej: Se reemplazó el componente dañado sin costo para el cliente. RHITSO asumió la responsabilidad..."></textarea>
+                                                            <small class="form-text text-muted">Describe detalladamente cómo se resolvió la incidencia (mínimo 20 caracteres)</small>
                                                         </div>
                                                         <div class="mb-3">
-                                                            {{ form_resolver_incidencia.requiere_compensacion.label_tag }}
-                                                            <div class="form-check">
-                                                                {{ form_resolver_incidencia.requiere_compensacion }}
-                                                            </div>
+                                                            <label for="costo_adicional_final_{{ incidencia.id }}" class="form-label">Costo Adicional Final (MXN)</label>
+                                                            <input type="number" name="costo_adicional_final" id="costo_adicional_final_{{ incidencia.id }}" class="form-control" 
+                                                                min="0" step="0.01" placeholder="0.00">
+                                                            <small class="form-text text-muted">Costo final si cambió desde el registro inicial (opcional)</small>
                                                         </div>
-                                                        <button type="submit" class="btn btn-success" disabled>
-                                                            <i class="bi bi-check-circle"></i> Marcar como Resuelta (Próximamente)
+                                                        <button type="submit" class="btn btn-success">
+                                                            <i class="bi bi-check-circle"></i> Marcar como Resuelta
                                                         </button>
                                                         <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#formResolver{{ incidencia.id }}">
                                                             Cancelar
@@ -726,13 +724,286 @@
 
 {% block extra_js %}
 <script>
-    // JavaScript para interactividad adicional
+    /**
+     * JAVASCRIPT PARA GESTIÓN RHITSO - FASE 5
+     * 
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * ================================
+     * Este JavaScript maneja el envío de formularios mediante AJAX.
+     * 
+     * ¿Qué es AJAX?
+     * Es una técnica que permite enviar y recibir datos del servidor
+     * SIN recargar toda la página. Solo se actualiza la parte que cambió.
+     * 
+     * BENEFICIOS:
+     * - Mejor experiencia de usuario (no se pierde el scroll)
+     * - Más rápido (no recarga toda la página)
+     * - Respuesta inmediata con mensajes de éxito/error
+     * - Actualización dinámica de la UI
+     * 
+     * FLUJO COMPLETO:
+     * 1. Usuario llena formulario y hace clic en "Enviar"
+     * 2. JavaScript intercepta el submit (preventDefault)
+     * 3. JavaScript recopila datos del formulario
+     * 4. Envía datos al servidor mediante fetch() AJAX
+     * 5. Servidor procesa y retorna JSON con resultado
+     * 6. JavaScript muestra mensaje de éxito/error
+     * 7. Si éxito: actualiza UI y cierra formulario
+     * 8. Si error: muestra errores específicos de cada campo
+     */
+    
     document.addEventListener('DOMContentLoaded', function() {
-        // Auto-colapsar otros formularios cuando se abre uno nuevo
+        console.log('🔧 Inicializando sistema RHITSO...');
+        
+        // ====================================================================
+        // FUNCIÓN AUXILIAR: Obtener CSRF Token de Django
+        // ====================================================================
+        // EXPLICACIÓN: Django requiere un token de seguridad (CSRF) en todas
+        // las peticiones POST para prevenir ataques. Esta función lo obtiene
+        // de las cookies del navegador.
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken');
+        
+        // ====================================================================
+        // FUNCIÓN AUXILIAR: Mostrar Mensajes de Alerta
+        // ====================================================================
+        // EXPLICACIÓN: Crea y muestra alertas de Bootstrap al usuario
+        function mostrarMensaje(tipo, mensaje) {
+            const alertContainer = document.querySelector('.alert-container');
+            if (!alertContainer) {
+                // Si no existe contenedor de alertas, crear uno
+                const container = document.createElement('div');
+                container.className = 'alert-container position-fixed top-0 start-50 translate-middle-x p-3';
+                container.style.zIndex = '9999';
+                document.body.appendChild(container);
+            }
+            
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${tipo} alert-dismissible fade show`;
+            alert.innerHTML = `
+                ${mensaje}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            const container = document.querySelector('.alert-container');
+            container.appendChild(alert);
+            
+            // Auto-ocultar después de 5 segundos
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+        
+        // ====================================================================
+        // FORMULARIO 1: ACTUALIZAR ESTADO RHITSO (AJAX)
+        // ====================================================================
+        const formActualizarEstado = document.getElementById('formActualizarEstado');
+        if (formActualizarEstado) {
+            formActualizarEstado.addEventListener('submit', async function(e) {
+                e.preventDefault();  // Prevenir submit normal
+                
+                // Confirmación antes de enviar
+                if (!confirm('¿Estás seguro de cambiar el estado RHITSO? Esta acción quedará registrada en el historial.')) {
+                    return;
+                }
+                
+                const formData = new FormData(this);
+                const submitButton = this.querySelector('button[type="submit"]');
+                const originalText = submitButton.innerHTML;
+                
+                // Deshabilitar botón y mostrar spinner
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Actualizando...';
+                
+                try {
+                    const response = await fetch(this.action, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        mostrarMensaje('success', data.mensaje);
+                        // Recargar página para mostrar cambios
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        mostrarMensaje('danger', data.mensaje);
+                        if (data.errores) {
+                            data.errores.forEach(error => {
+                                mostrarMensaje('warning', error);
+                            });
+                        }
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalText;
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    mostrarMensaje('danger', '❌ Error de conexión. Inténtalo de nuevo.');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                }
+            });
+        }
+        
+        // ====================================================================
+        // FORMULARIO 2: REGISTRAR INCIDENCIA (AJAX)
+        // ====================================================================
+        const formRegistrarIncidencia = document.getElementById('formRegistrarIncidencia');
+        if (formRegistrarIncidencia) {
+            formRegistrarIncidencia.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                const prioridad = formData.get('prioridad');
+                
+                // Confirmación especial para incidencias críticas
+                if (prioridad === 'CRITICA') {
+                    if (!confirm('Estás registrando una incidencia CRÍTICA. Esto generará alertas automáticas. ¿Continuar?')) {
+                        return;
+                    }
+                }
+                
+                const submitButton = this.querySelector('button[type="submit"]');
+                const originalText = submitButton.innerHTML;
+                
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando...';
+                
+                try {
+                    const response = await fetch(this.action, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        mostrarMensaje('success', data.mensaje);
+                        // Recargar página para mostrar nueva incidencia
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        mostrarMensaje('danger', data.mensaje);
+                        if (data.errores) {
+                            data.errores.forEach(error => {
+                                mostrarMensaje('warning', error);
+                            });
+                        }
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalText;
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    mostrarMensaje('danger', '❌ Error de conexión. Inténtalo de nuevo.');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                }
+            });
+        }
+        
+        // ====================================================================
+        // FORMULARIO 3: RESOLVER INCIDENCIA (AJAX) - Múltiples instancias
+        // ====================================================================
+        const formsResolverIncidencia = document.querySelectorAll('.formResolverIncidencia');
+        formsResolverIncidencia.forEach(form => {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                if (!confirm('¿Estás seguro de marcar esta incidencia como resuelta?')) {
+                    return;
+                }
+                
+                const formData = new FormData(this);
+                const submitButton = this.querySelector('button[type="submit"]');
+                const originalText = submitButton.innerHTML;
+                
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Resolviendo...';
+                
+                try {
+                    const response = await fetch(this.action, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        mostrarMensaje('success', data.mensaje);
+                        // Recargar página para actualizar estado de incidencia
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        mostrarMensaje('danger', data.mensaje);
+                        if (data.errores) {
+                            data.errores.forEach(error => {
+                                mostrarMensaje('warning', error);
+                            });
+                        }
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalText;
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    mostrarMensaje('danger', '❌ Error de conexión. Inténtalo de nuevo.');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                }
+            });
+        });
+        
+        // ====================================================================
+        // FORMULARIO 4: EDITAR DIAGNÓSTICO SIC (POST normal o AJAX)
+        // ====================================================================
+        const formEditarDiagnostico = document.getElementById('formEditarDiagnosticoSIC');
+        if (formEditarDiagnostico) {
+            formEditarDiagnostico.addEventListener('submit', function(e) {
+                if (!confirm('¿Estás seguro de actualizar el diagnóstico SIC y datos RHITSO?')) {
+                    e.preventDefault();
+                }
+                // Este formulario usa POST normal (no AJAX) porque la vista
+                // puede retornar redirect o JSON según sea necesario
+            });
+        }
+        
+        // ====================================================================
+        // AUTO-COLAPSAR FORMULARIOS
+        // ====================================================================
+        // EXPLICACIÓN: Cuando se abre un formulario, cierra los demás
+        // automáticamente para evitar confusión visual
         const collapseElements = document.querySelectorAll('.collapse');
         collapseElements.forEach(function(collapseEl) {
             collapseEl.addEventListener('show.bs.collapse', function() {
-                // Cerrar otros collapses en la misma sección
                 const parent = collapseEl.closest('.card-body');
                 if (parent) {
                     parent.querySelectorAll('.collapse.show').forEach(function(otherCollapse) {
@@ -747,30 +1018,7 @@
             });
         });
         
-        // Confirmación antes de enviar formularios importantes
-        const formEstado = document.querySelector('#formCambiarEstado form');
-        if (formEstado) {
-            formEstado.addEventListener('submit', function(e) {
-                if (!confirm('¿Estás seguro de cambiar el estado RHITSO? Esta acción quedará registrada en el historial.')) {
-                    e.preventDefault();
-                }
-            });
-        }
-        
-        // Confirmación para registrar incidencias
-        const formIncidencia = document.querySelector('#formNuevaIncidencia form');
-        if (formIncidencia) {
-            formIncidencia.addEventListener('submit', function(e) {
-                const prioridad = formIncidencia.querySelector('[name="prioridad"]').value;
-                if (prioridad === 'CRITICA') {
-                    if (!confirm('Estás registrando una incidencia CRÍTICA. Esto generará alertas automáticas. ¿Continuar?')) {
-                        e.preventDefault();
-                    }
-                }
-            });
-        }
-        
-        console.log('✅ Vista RHITSO cargada correctamente');
+        console.log('✅ Sistema RHITSO cargado correctamente - FASE 5 ACTIVA');
     });
 </script>
 {% endblock %}

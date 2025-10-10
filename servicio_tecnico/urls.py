@@ -82,10 +82,33 @@ urlpatterns = [
     # Ya no es necesaria porque venta_mostrador es ahora un complemento opcional.
     
     # ========================================================================
-    # MÓDULO RHITSO - SEGUIMIENTO ESPECIALIZADO (FASE 4)
+    # MÓDULO RHITSO - SEGUIMIENTO ESPECIALIZADO (FASES 4 Y 5)
     # ========================================================================
-    # Vista principal del panel RHITSO
+    
+    # Vista principal del panel RHITSO (FASE 4)
     path('rhitso/orden/<int:orden_id>/', views.gestion_rhitso, name='gestion_rhitso'),
+    
+    # Vistas AJAX para gestión RHITSO (FASE 5)
+    # ========================================================================
+    # Actualizar estado RHITSO de una orden
+    path('rhitso/orden/<int:orden_id>/actualizar-estado/', 
+         views.actualizar_estado_rhitso, 
+         name='actualizar_estado_rhitso'),
+    
+    # Registrar nueva incidencia en proceso RHITSO
+    path('rhitso/orden/<int:orden_id>/registrar-incidencia/', 
+         views.registrar_incidencia, 
+         name='registrar_incidencia'),
+    
+    # Resolver/cerrar una incidencia existente
+    path('rhitso/incidencia/<int:incidencia_id>/resolver/', 
+         views.resolver_incidencia, 
+         name='resolver_incidencia'),
+    
+    # Editar diagnóstico SIC y datos RHITSO
+    path('rhitso/orden/<int:orden_id>/editar-diagnostico/', 
+         views.editar_diagnostico_sic, 
+         name='editar_diagnostico_sic'),
     
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),

@@ -3196,6 +3196,559 @@ def gestion_rhitso(request, orden_id):
     # el HTML final que se envía al navegador del usuario
     return render(request, 'servicio_tecnico/rhitso/gestion_rhitso.html', context)
 
+# ============================================================================
+# VISTAS AJAX PARA GESTIÓN RHITSO - FASE 5
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def actualizar_estado_rhitso(request, orden_id):
+    """
+    Vista AJAX para actualizar el estado RHITSO de una orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista procesa el formulario de cambio de estado RHITSO.
+    Cuando el usuario selecciona un nuevo estado y lo guarda:
+    1. Valida que el formulario esté correcto
+    2. Actualiza el estado_rhitso en la orden
+    3. Crea un registro automático en SeguimientoRHITSO (vía signal)
+    4. Actualiza fechas especiales (envío/recepción)
+    5. Retorna respuesta JSON con éxito o errores
+    
+    ¿Por qué JsonResponse?
+    Porque el template usa JavaScript para enviar el formulario de forma
+    asíncrona (AJAX). En lugar de recargar toda la página, solo actualizamos
+    la sección del estado.
+    
+    FLUJO COMPLETO:
+    1. Usuario llena formulario en template
+    2. JavaScript envía formulario por AJAX
+    3. Esta vista procesa y valida datos
+    4. Signal crea SeguimientoRHITSO automáticamente
+    5. Vista retorna JSON: {success: true/false, mensaje, data}
+    6. JavaScript actualiza la UI sin recargar página
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        orden_id: ID de la orden a actualizar
+    
+    Returns:
+        JsonResponse con resultado de la operación
+    """
+    try:
+        # Paso 1: Obtener orden y validar que sea candidato RHITSO
+        orden = get_object_or_404(OrdenServicio, pk=orden_id)
+        
+        if not orden.es_candidato_rhitso:
+            return JsonResponse({
+                'success': False,
+                'mensaje': '❌ Esta orden no es candidato RHITSO'
+            }, status=400)
+        
+        # Paso 2: Guardar estado anterior para el registro
+        # EXPLICACIÓN: Necesitamos saber cuál era el estado previo para
+        # el historial. Lo guardamos ANTES de hacer cualquier cambio.
+        estado_anterior = orden.estado_rhitso
+        
+        # Paso 3: Validar formulario con datos POST
+        form = ActualizarEstadoRHITSOForm(request.POST)
+        
+        if not form.is_valid():
+            # Si el formulario tiene errores, retornamos los mensajes
+            # EXPLICACIÓN: form.errors es un diccionario con los errores
+            # de cada campo. Lo convertimos a lista para mostrarlo en UI.
+            errores = []
+            for field, errors in form.errors.items():
+                for error in errors:
+                    errores.append(f"{field}: {error}")
+            
+            return JsonResponse({
+                'success': False,
+                'mensaje': '❌ Formulario inválido',
+                'errores': errores
+            }, status=400)
+        
+        # Paso 4: Obtener datos validados del formulario
+        nuevo_estado = form.cleaned_data['estado_rhitso']
+        observaciones = form.cleaned_data['observaciones']
+        notificar_cliente = form.cleaned_data.get('notificar_cliente', False)
+        
+        # Paso 5: Actualizar estado en la orden
+        orden.estado_rhitso = nuevo_estado
+        
+        # Paso 6: Actualizar fechas especiales según el estado
+        # EXPLICACIÓN: Algunos cambios de estado tienen significados especiales:
+        # - Primer envío a RHITSO → Guardar fecha_envio_rhitso
+        # - Regreso de RHITSO → Guardar fecha_recepcion_rhitso
+        
+        # Si es el primer envío a RHITSO y no tiene fecha de envío
+        if 'ENVIADO' in nuevo_estado.upper() and not orden.fecha_envio_rhitso:
+            orden.fecha_envio_rhitso = timezone.now()
+        
+        # Si regresa de RHITSO (estados como RECIBIDO_DE_RHITSO, LISTO_ENTREGA)
+        if any(keyword in nuevo_estado.upper() for keyword in ['RECIBIDO', 'LISTO', 'FINALIZADO']):
+            if not orden.fecha_recepcion_rhitso:
+                orden.fecha_recepcion_rhitso = timezone.now()
+        
+        # Paso 7: Guardar cambios en la base de datos
+        orden.save()
+        
+        # IMPORTANTE: El signal post_save de OrdenServicio se ejecuta aquí
+        # automáticamente y crea el registro en SeguimientoRHITSO con:
+        # - El estado nuevo y anterior
+        # - Las observaciones
+        # - El usuario que hizo el cambio
+        # - El tiempo que estuvo en el estado anterior
+        
+        # Paso 8: Crear registro manual en SeguimientoRHITSO con observaciones
+        # EXPLICACIÓN: Aunque el signal crea un registro automático, aquí
+        # creamos uno adicional con las observaciones del usuario y su información
+        try:
+            estado_obj = EstadoRHITSO.objects.get(estado=nuevo_estado, activo=True)
+            
+            # Calcular tiempo en estado anterior
+            ultimo_seguimiento = orden.seguimientos_rhitso.exclude(
+                estado__estado=nuevo_estado
+            ).order_by('-fecha_actualizacion').first()
+            
+            tiempo_anterior = None
+            if ultimo_seguimiento:
+                tiempo_anterior = timezone.now() - ultimo_seguimiento.fecha_actualizacion
+            
+            SeguimientoRHITSO.objects.create(
+                orden=orden,
+                estado=estado_obj,
+                estado_anterior=estado_anterior if estado_anterior else 'Sin estado previo',
+                observaciones=observaciones,
+                usuario_actualizacion=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                tiempo_en_estado_anterior=tiempo_anterior,
+                notificado_cliente=notificar_cliente
+            )
+        except EstadoRHITSO.DoesNotExist:
+            pass  # El signal ya creó el registro básico
+        
+        # Paso 9: Registrar en historial general de la orden
+        registrar_historial(
+            orden=orden,
+            tipo_evento='estado',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=f"🔄 Estado RHITSO actualizado: {estado_anterior or 'Sin estado'} → {nuevo_estado}. "
+                      f"Observaciones: {observaciones}",
+            es_sistema=False
+        )
+        
+        # Paso 10: Preparar datos para respuesta JSON
+        # EXPLICACIÓN: Enviamos información actualizada para que JavaScript
+        # pueda actualizar la UI sin recargar la página
+        dias_en_rhitso = orden.dias_en_rhitso if orden.dias_en_rhitso is not None else 0
+        
+        return JsonResponse({
+            'success': True,
+            'mensaje': f'✅ Estado RHITSO actualizado correctamente a: {nuevo_estado}',
+            'data': {
+                'nuevo_estado': nuevo_estado,
+                'estado_anterior': estado_anterior,
+                'observaciones': observaciones,
+                'fecha_actualizacion': timezone.now().strftime('%d/%m/%Y %H:%M'),
+                'usuario': request.user.empleado.nombre_completo if hasattr(request.user, 'empleado') else request.user.username,
+                'dias_en_rhitso': dias_en_rhitso,
+                'notificado_cliente': notificar_cliente
+            }
+        })
+        
+    except Exception as e:
+        # Manejar cualquier error inesperado
+        return JsonResponse({
+            'success': False,
+            'mensaje': f'❌ Error al actualizar estado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def registrar_incidencia(request, orden_id):
+    """
+    Vista AJAX para registrar una nueva incidencia RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Las incidencias son problemas que ocurren durante el proceso RHITSO.
+    Esta vista:
+    1. Valida el formulario de incidencia
+    2. Crea el registro en la base de datos
+    3. Si es incidencia CRÍTICA, crea alerta automática (vía signal)
+    4. Registra en historial de la orden
+    5. Retorna datos de la incidencia creada en JSON
+    
+    ¿Qué es una incidencia?
+    Ejemplos: daño adicional, retraso injustificado, pieza incorrecta,
+    mala comunicación, costo no autorizado, etc.
+    
+    ¿Por qué es importante?
+    Permite documentar todos los problemas y hacer seguimiento de:
+    - Qué salió mal
+    - Cuándo ocurrió
+    - Impacto al cliente
+    - Costo adicional
+    - Cómo se resolvió
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        orden_id: ID de la orden donde ocurrió la incidencia
+    
+    Returns:
+        JsonResponse con resultado y datos de la incidencia creada
+    """
+    try:
+        # Paso 1: Obtener orden y validar
+        orden = get_object_or_404(OrdenServicio, pk=orden_id)
+        
+        if not orden.es_candidato_rhitso:
+            return JsonResponse({
+                'success': False,
+                'mensaje': '❌ Esta orden no es candidato RHITSO'
+            }, status=400)
+        
+        # Paso 2: Validar formulario
+        form = RegistrarIncidenciaRHITSOForm(request.POST)
+        
+        if not form.is_valid():
+            errores = []
+            for field, errors in form.errors.items():
+                for error in errors:
+                    errores.append(f"{field}: {error}")
+            
+            return JsonResponse({
+                'success': False,
+                'mensaje': '❌ Formulario inválido',
+                'errores': errores
+            }, status=400)
+        
+        # Paso 3: Crear incidencia sin guardar aún
+        # EXPLICACIÓN: commit=False crea el objeto pero no lo guarda en BD.
+        # Esto nos permite asignar campos adicionales antes de guardar.
+        incidencia = form.save(commit=False)
+        incidencia.orden = orden
+        
+        # Asignar usuario que registra la incidencia
+        if hasattr(request.user, 'empleado'):
+            incidencia.usuario_registro = request.user.empleado
+        else:
+            # Si no tiene empleado asociado, no podemos crear la incidencia
+            return JsonResponse({
+                'success': False,
+                'mensaje': '❌ Usuario no tiene empleado asociado'
+            }, status=400)
+        
+        # Paso 4: Guardar incidencia
+        incidencia.save()
+        
+        # IMPORTANTE: Si la incidencia es CRÍTICA, el signal post_save de
+        # IncidenciaRHITSO automáticamente creará un evento en HistorialOrden
+        # con emoji ⚠️ y marcará como alerta de alta prioridad
+        
+        # Paso 5: Registrar en historial general (para todas las incidencias)
+        tipo_incidencia_str = incidencia.tipo_incidencia.nombre if incidencia.tipo_incidencia else 'Sin tipo'
+        
+        registrar_historial(
+            orden=orden,
+            tipo_evento='comentario',
+            usuario=incidencia.usuario_registro,
+            comentario=f"⚠️ Nueva incidencia registrada: {incidencia.titulo} | "
+                      f"Tipo: {tipo_incidencia_str} | "
+                      f"Prioridad: {incidencia.get_prioridad_display()} | "
+                      f"Impacto: {incidencia.get_impacto_cliente_display()}",
+            es_sistema=False
+        )
+        
+        # Paso 6: Preparar datos de la incidencia para respuesta JSON
+        # EXPLICACIÓN: Enviamos todos los datos necesarios para que JavaScript
+        # pueda agregar la nueva incidencia a la lista sin recargar la página
+        return JsonResponse({
+            'success': True,
+            'mensaje': f'✅ Incidencia "{incidencia.titulo}" registrada correctamente',
+            'data': {
+                'id': incidencia.id,
+                'titulo': incidencia.titulo,
+                'tipo_incidencia': tipo_incidencia_str,
+                'descripcion': incidencia.descripcion_detallada,
+                'estado': incidencia.get_estado_display(),
+                'prioridad': incidencia.get_prioridad_display(),
+                'impacto_cliente': incidencia.get_impacto_cliente_display(),
+                'costo_adicional': float(incidencia.costo_adicional) if incidencia.costo_adicional else 0.00,
+                'fecha_ocurrencia': incidencia.fecha_ocurrencia.strftime('%d/%m/%Y %H:%M'),
+                'usuario_registro': incidencia.usuario_registro.nombre_completo,
+                'es_critica': incidencia.tipo_incidencia.gravedad == 'CRITICA' if incidencia.tipo_incidencia else False
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'mensaje': f'❌ Error al registrar incidencia: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def resolver_incidencia(request, incidencia_id):
+    """
+    Vista AJAX para resolver/cerrar una incidencia existente.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Cuando una incidencia se resuelve, necesitamos documentar:
+    - Qué acción se tomó para resolverla
+    - Quién la resolvió
+    - Cuándo se resolvió
+    - Si hubo algún costo adicional final
+    
+    Esta vista usa el método marcar_como_resuelta() del modelo IncidenciaRHITSO,
+    que automáticamente:
+    - Cambia el estado a 'RESUELTA'
+    - Guarda la fecha/hora de resolución
+    - Asigna el usuario que resolvió
+    - Guarda la descripción de la acción tomada
+    
+    ¿Por qué es importante resolver incidencias?
+    - Cierra el ciclo de seguimiento
+    - Documenta la solución para futuras referencias
+    - Permite análisis de cuántas incidencias se resuelven
+    - Mejora la relación con RHITSO (si ellos son responsables)
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        incidencia_id: ID de la incidencia a resolver
+    
+    Returns:
+        JsonResponse con resultado de la operación
+    """
+    try:
+        # Paso 1: Obtener incidencia
+        incidencia = get_object_or_404(IncidenciaRHITSO, pk=incidencia_id)
+        
+        # Paso 2: Verificar que no esté ya resuelta
+        if incidencia.esta_resuelta:
+            return JsonResponse({
+                'success': False,
+                'mensaje': '⚠️ Esta incidencia ya está resuelta o cerrada'
+            }, status=400)
+        
+        # Paso 3: Validar formulario
+        form = ResolverIncidenciaRHITSOForm(request.POST)
+        
+        if not form.is_valid():
+            errores = []
+            for field, errors in form.errors.items():
+                for error in errors:
+                    errores.append(f"{field}: {error}")
+            
+            return JsonResponse({
+                'success': False,
+                'mensaje': '❌ Formulario inválido',
+                'errores': errores
+            }, status=400)
+        
+        # Paso 4: Obtener datos del formulario
+        accion_tomada = form.cleaned_data['accion_tomada']
+        costo_adicional_final = form.cleaned_data.get('costo_adicional_final')
+        
+        # Paso 5: Actualizar costo si se proporcionó uno nuevo
+        if costo_adicional_final is not None:
+            incidencia.costo_adicional = costo_adicional_final
+        
+        # Paso 6: Marcar incidencia como resuelta usando método del modelo
+        # EXPLICACIÓN: Este método hace todo el trabajo:
+        # - Cambia estado a 'RESUELTA'
+        # - Guarda fecha_resolucion = ahora
+        # - Asigna resuelto_por = usuario actual
+        # - Guarda accion_tomada
+        # - Llama a save()
+        if hasattr(request.user, 'empleado'):
+            incidencia.marcar_como_resuelta(
+                usuario=request.user.empleado,
+                accion_tomada=accion_tomada
+            )
+        else:
+            # Si no hay empleado, actualizar manualmente
+            incidencia.estado = 'RESUELTA'
+            incidencia.fecha_resolucion = timezone.now()
+            incidencia.accion_tomada = accion_tomada
+            incidencia.save()
+        
+        # Paso 7: Registrar en historial de la orden
+        registrar_historial(
+            orden=incidencia.orden,
+            tipo_evento='comentario',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=f"✅ Incidencia resuelta: {incidencia.titulo} | "
+                      f"Acción tomada: {accion_tomada[:100]}..." if len(accion_tomada) > 100 else accion_tomada,
+            es_sistema=False
+        )
+        
+        # Paso 8: Preparar respuesta JSON
+        return JsonResponse({
+            'success': True,
+            'mensaje': f'✅ Incidencia "{incidencia.titulo}" resuelta correctamente',
+            'data': {
+                'id': incidencia.id,
+                'titulo': incidencia.titulo,
+                'estado': incidencia.get_estado_display(),
+                'fecha_resolucion': incidencia.fecha_resolucion.strftime('%d/%m/%Y %H:%M'),
+                'resuelto_por': incidencia.resuelto_por.nombre_completo if incidencia.resuelto_por else 'Sistema',
+                'accion_tomada': incidencia.accion_tomada,
+                'costo_final': float(incidencia.costo_adicional)
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'mensaje': f'❌ Error al resolver incidencia: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def editar_diagnostico_sic(request, orden_id):
+    """
+    Vista para editar el diagnóstico SIC y datos relacionados con RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista es especial porque maneja campos de DOS modelos diferentes:
+    1. DetalleEquipo → diagnostico_sic (el diagnóstico técnico)
+    2. OrdenServicio → motivo_rhitso, descripcion_rhitso, complejidad_estimada, etc.
+    
+    ¿Cuándo se usa?
+    Cuando el técnico de SIC hace el diagnóstico inicial y determina que
+    el equipo necesita ir a RHITSO. Aquí documenta:
+    - Qué problema tiene el equipo (diagnóstico técnico)
+    - Por qué necesita ir a RHITSO (reballing, soldadura, etc.)
+    - Qué tan complejo es el trabajo
+    - Quién hizo el diagnóstico
+    
+    DIFERENCIA CON OTRAS VISTAS:
+    Las otras 3 vistas retornan JsonResponse porque son AJAX.
+    Esta vista puede:
+    - Retornar JsonResponse si se llama por AJAX
+    - Hacer redirect si se llama normalmente
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        orden_id: ID de la orden a actualizar
+    
+    Returns:
+        JsonResponse o redirect según cómo se llamó
+    """
+    try:
+        # Paso 1: Obtener orden y detalle_equipo
+        orden = get_object_or_404(OrdenServicio, pk=orden_id)
+        detalle_equipo = orden.detalle_equipo
+        
+        if not detalle_equipo:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'mensaje': '❌ Esta orden no tiene detalle de equipo'
+                }, status=400)
+            else:
+                messages.error(request, '❌ Esta orden no tiene detalle de equipo')
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
+        
+        # Paso 2: Validar formulario
+        form = EditarDiagnosticoSICForm(request.POST)
+        
+        if not form.is_valid():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                errores = []
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        errores.append(f"{field}: {error}")
+                
+                return JsonResponse({
+                    'success': False,
+                    'mensaje': '❌ Formulario inválido',
+                    'errores': errores
+                }, status=400)
+            else:
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        messages.error(request, f"{field}: {error}")
+                return redirect('servicio_tecnico:gestion_rhitso', orden_id=orden.id)
+        
+        # Paso 3: Obtener datos validados
+        diagnostico_sic = form.cleaned_data['diagnostico_sic']
+        motivo_rhitso = form.cleaned_data['motivo_rhitso']
+        descripcion_rhitso = form.cleaned_data['descripcion_rhitso']
+        complejidad_estimada = form.cleaned_data['complejidad_estimada']
+        tecnico_diagnostico = form.cleaned_data['tecnico_diagnostico']
+        
+        # Paso 4: Actualizar DetalleEquipo
+        # EXPLICACIÓN: El diagnóstico técnico va en DetalleEquipo porque
+        # es información específica del equipo, no de la orden
+        detalle_equipo.diagnostico_sic = diagnostico_sic
+        detalle_equipo.save()
+        
+        # Paso 5: Actualizar OrdenServicio
+        # EXPLICACIÓN: Los datos RHITSO van en OrdenServicio porque son
+        # específicos del proceso de reparación externa de esta orden
+        orden.motivo_rhitso = motivo_rhitso
+        orden.descripcion_rhitso = descripcion_rhitso
+        orden.complejidad_estimada = complejidad_estimada
+        orden.tecnico_diagnostico = tecnico_diagnostico
+        
+        # Si no tiene fecha de diagnóstico, asignar ahora
+        if not orden.fecha_diagnostico_sic:
+            orden.fecha_diagnostico_sic = timezone.now()
+        
+        orden.save()
+        
+        # Paso 6: Registrar en historial
+        registrar_historial(
+            orden=orden,
+            tipo_evento='actualizacion',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=f"📝 Diagnóstico SIC actualizado | "
+                      f"Motivo RHITSO: {motivo_rhitso} | "
+                      f"Complejidad: {complejidad_estimada} | "
+                      f"Técnico: {tecnico_diagnostico.nombre_completo if tecnico_diagnostico else 'No asignado'}",
+            es_sistema=False
+        )
+        
+        # Paso 7: Retornar respuesta según tipo de petición
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            # Es petición AJAX → Retornar JSON
+            return JsonResponse({
+                'success': True,
+                'mensaje': '✅ Diagnóstico SIC actualizado correctamente',
+                'data': {
+                    'diagnostico_sic': diagnostico_sic,
+                    'motivo_rhitso': motivo_rhitso,
+                    'descripcion_rhitso': descripcion_rhitso,
+                    'complejidad_estimada': complejidad_estimada,
+                    'complejidad_display': dict(form.fields['complejidad_estimada'].choices).get(complejidad_estimada, ''),
+                    'tecnico_diagnostico': tecnico_diagnostico.nombre_completo if tecnico_diagnostico else 'No asignado',
+                    'fecha_actualizacion': timezone.now().strftime('%d/%m/%Y %H:%M')
+                }
+            })
+        else:
+            # Es petición normal → Redirect con mensaje
+            messages.success(request, '✅ Diagnóstico SIC actualizado correctamente')
+            return redirect('servicio_tecnico:gestion_rhitso', orden_id=orden.id)
+        
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'mensaje': f'❌ Error al actualizar diagnóstico: {str(e)}'
+            }, status=500)
+        else:
+            messages.error(request, f'❌ Error al actualizar diagnóstico: {str(e)}')
+            return redirect('servicio_tecnico:gestion_rhitso', orden_id=orden.id)
+
+
 # Esta vista manejaba la conversión de ventas mostrador a diagnóstico,
 # creando una NUEVA orden cuando el servicio fallaba.
 # 
