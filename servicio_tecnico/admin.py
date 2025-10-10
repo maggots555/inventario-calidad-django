@@ -128,7 +128,7 @@ class PiezaVentaMostradorInline(admin.TabularInline):
         - ${:,.2f}: Formato de moneda con comas y 2 decimales
         """
         if obj.pk:  # Si el objeto ya existe (no es nuevo)
-            return format_html('<strong>${:,.2f}</strong>', obj.subtotal)
+            return format_html('<strong>${:,.2f}</strong>', float(obj.subtotal))
         return '-'
     subtotal_display.short_description = 'Subtotal'
 
@@ -242,34 +242,51 @@ class OrdenServicioAdmin(admin.ModelAdmin):
     
     def tipo_servicio_badge(self, obj):
         """
-        Muestra el tipo de servicio con un badge de color.
+        Muestra el tipo de servicio con un badge de color + indicadores de complementos.
+        
+        ACTUALIZACIÓN (Octubre 2025): Ahora muestra iconos adicionales
+        para cotización y venta_mostrador si existen, ya que pueden coexistir.
         
         EXPLICACIÓN PARA PRINCIPIANTES:
         - Este método crea un "badge" (etiqueta con color) que muestra visualmente el tipo de servicio
         - 'diagnostico': Azul (#007bff) - Servicio completo con diagnóstico técnico
         - 'venta_mostrador': Verde (#28a745) - Servicio directo sin diagnóstico
+        - Además muestra iconos: 📋 si tiene cotización, 💰 si tiene venta_mostrador
         - format_html: Función de Django que crea HTML de forma segura
         - get_tipo_servicio_display(): Método automático de Django que devuelve el texto legible del choice
         
-        Este badge ayuda a identificar rápidamente qué tipo de orden es al ver la lista en el admin.
+        Este badge ayuda a identificar rápidamente qué tipo de orden es y qué complementos tiene.
         """
         colores = {
             'diagnostico': '#007bff',      # Azul para órdenes con diagnóstico
             'venta_mostrador': '#28a745',  # Verde para ventas mostrador
         }
         color = colores.get(obj.tipo_servicio, '#6c757d')  # Gris por defecto
-        return format_html(
-            '<span style="background-color: {}; color: white; padding: 3px 10px; border-radius: 3px; font-weight: bold;">{}</span>',
-            color,
-            obj.get_tipo_servicio_display()
-        )
-    tipo_servicio_badge.short_description = 'Tipo de Servicio'
+        
+        # Badge principal de tipo
+        badge = f'<span style="background-color: {color}; color: white; padding: 3px 10px; border-radius: 3px; font-weight: bold;">{obj.get_tipo_servicio_display()}</span>'
+        
+        # NUEVO: Indicadores de complementos
+        indicadores = []
+        
+        if hasattr(obj, 'cotizacion') and obj.cotizacion:
+            indicadores.append('<span style="background-color: #0d6efd; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; margin-left: 4px;" title="Tiene cotización">📋</span>')
+        
+        if hasattr(obj, 'venta_mostrador') and obj.venta_mostrador:
+            indicadores.append('<span style="background-color: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; margin-left: 4px;" title="Tiene venta mostrador">💰</span>')
+        
+        # Combinar badge + indicadores
+        resultado = badge
+        if indicadores:
+            resultado += ''.join(indicadores)
+        
+        return format_html(resultado)
+    
+    tipo_servicio_badge.short_description = 'Tipo / Complementos'
     
     def estado_badge(self, obj):
         """
         Muestra el estado con un badge de color.
-        
-        ACTUALIZADO FASE 2: Se agregó el color para el nuevo estado 'convertida_a_diagnostico'
         """
         colores = {
             'espera': '#6c757d',
@@ -283,7 +300,6 @@ class OrdenServicioAdmin(admin.ModelAdmin):
             'finalizado': '#28a745',
             'entregado': '#28a745',
             'cancelado': '#6c757d',
-            'convertida_a_diagnostico': '#9b59b6',  # NUEVO - FASE 2: Morado para conversiones
         }
         color = colores.get(obj.estado, '#6c757d')
         return format_html(
@@ -648,9 +664,10 @@ class VentaMostradorAdmin(admin.ModelAdmin):
     servicios_incluidos.short_description = 'Servicios'
     
     def total_venta_display(self, obj):
+        """Muestra el total de venta formateado en verde"""
         return format_html(
             '<strong style="color: green;">${:,.2f}</strong>',
-            obj.total_venta
+            float(obj.total_venta)  # Convertir explícitamente a float
         )
     total_venta_display.short_description = 'Total'
 
@@ -726,7 +743,7 @@ class PiezaVentaMostradorAdmin(admin.ModelAdmin):
         """Muestra el subtotal con formato de moneda y negrita"""
         return format_html(
             '<strong style="color: green;">${:,.2f}</strong>',
-            obj.subtotal
+            float(obj.subtotal)
         )
     subtotal_display.short_description = 'Subtotal'
 

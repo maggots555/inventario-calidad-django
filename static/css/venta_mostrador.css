@@ -1,0 +1,358 @@
+/* ============================================================================
+   ESTILOS VENTA MOSTRADOR - Sistema Refactorizado (Oct 2025)
+   Descripción: Estilos contextuales para venta mostrador como complemento
+   ============================================================================ */
+
+/* ============================================================================
+   PANELES CONTEXTUALES
+   ============================================================================ */
+
+/* Panel Venta Mostrador - Variante Diagnóstico (Complemento) */
+.panel-vm-complemento {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Panel Venta Mostrador - Variante Directo (Principal) */
+.panel-vm-principal {
+    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+}
+
+/* ============================================================================
+   BADGES DE COMPLEMENTOS
+   ============================================================================ */
+
+/* Badge general para complementos */
+.badge-complemento {
+    padding: 0.4rem 0.8rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.badge-complemento:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Badge de cotización */
+.badge-cotizacion {
+    background-color: #0d6efd;
+    color: white;
+}
+
+/* Badge de venta mostrador */
+.badge-venta-mostrador {
+    background-color: #ffc107;
+    color: #000;
+}
+
+/* Badge sin servicios */
+.badge-sin-servicios {
+    background-color: #6c757d;
+    color: white;
+}
+
+/* ============================================================================
+   MINI-INDICADORES EN LISTADOS
+   ============================================================================ */
+
+/* Mini-indicadores (iconos pequeños) */
+.mini-indicador {
+    font-size: 1.1rem;
+    cursor: help;
+    transition: transform 0.2s ease, color 0.2s ease;
+    display: inline-block;
+}
+
+.mini-indicador:hover {
+    transform: scale(1.2);
+}
+
+.mini-indicador-cotizacion {
+    color: #0d6efd;
+}
+
+.mini-indicador-venta-mostrador {
+    color: #ffc107;
+}
+
+/* ============================================================================
+   ALERTAS CONTEXTUALES
+   ============================================================================ */
+
+/* Alerta para ventas adicionales (complemento) */
+.alert-vm-complemento {
+    border-left: 4px solid #667eea;
+    background-color: #f0f2ff;
+    color: #4a5568;
+}
+
+.alert-vm-complemento .alert-heading {
+    color: #667eea;
+}
+
+/* Alerta para venta principal (directo) */
+.alert-vm-principal {
+    border-left: 4px solid #fda085;
+    background-color: #fff5f0;
+    color: #4a5568;
+}
+
+.alert-vm-principal .alert-heading {
+    color: #fd7e14;
+}
+
+/* ============================================================================
+   BOTONES CONTEXTUALES
+   ============================================================================ */
+
+/* Botón para agregar ventas adicionales (complemento) */
+.btn-agregar-complemento {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-agregar-complemento:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #653a8b 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    color: white;
+}
+
+/* Botón para venta principal (directo) */
+.btn-venta-principal {
+    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+    border: none;
+    color: #000;
+    font-weight: 600;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-venta-principal:hover {
+    background: linear-gradient(135deg, #f5ca4e 0%, #fc8f6e 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(253, 160, 133, 0.4);
+    color: #000;
+}
+
+/* ============================================================================
+   CARDS Y BORDES
+   ============================================================================ */
+
+/* Card con borde de complemento */
+.card-border-complemento {
+    border-left: 4px solid #667eea !important;
+}
+
+/* Card con borde de venta principal */
+.card-border-principal {
+    border-left: 4px solid #fda085 !important;
+}
+
+/* ============================================================================
+   TOOLTIPS MEJORADOS
+   ============================================================================ */
+
+/* Asegura que los tooltips funcionen correctamente */
+[data-bs-toggle="tooltip"] {
+    cursor: help;
+}
+
+/* ============================================================================
+   ANIMACIONES
+   ============================================================================ */
+
+/* Animación suave para badges al aparecer */
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.badge-complemento,
+.mini-indicador {
+    animation: fadeInScale 0.3s ease-out;
+}
+
+/* Pulse para indicadores importantes */
+@keyframes pulse-indicator {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.05);
+    }
+}
+
+.indicator-pulse {
+    animation: pulse-indicator 2s ease-in-out infinite;
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================ */
+
+/* Tablets y dispositivos pequeños */
+@media (max-width: 768px) {
+    .badge-complemento {
+        font-size: 0.75rem;
+        padding: 0.3rem 0.6rem;
+    }
+    
+    .mini-indicador {
+        font-size: 1rem;
+    }
+}
+
+/* Móviles */
+@media (max-width: 576px) {
+    /* Ocultar texto en badges, solo mostrar iconos */
+    .badge-complemento span {
+        display: none;
+    }
+    
+    .badge-complemento i {
+        margin: 0;
+    }
+    
+    /* Reducir padding de alertas */
+    .alert-vm-complemento,
+    .alert-vm-principal {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    /* Botones más pequeños */
+    .btn-agregar-complemento,
+    .btn-venta-principal {
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+    }
+}
+
+/* ============================================================================
+   ACCESIBILIDAD
+   ============================================================================ */
+
+/* Asegurar contraste adecuado */
+.badge-complemento,
+.mini-indicador {
+    outline-offset: 2px;
+}
+
+.badge-complemento:focus,
+.mini-indicador:focus {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+/* Modo de alto contraste (para usuarios con necesidades especiales) */
+@media (prefers-contrast: high) {
+    .badge-complemento {
+        border: 2px solid currentColor;
+    }
+    
+    .alert-vm-complemento,
+    .alert-vm-principal {
+        border-width: 3px;
+    }
+}
+
+/* Reducir animaciones para usuarios que lo prefieran */
+@media (prefers-reduced-motion: reduce) {
+    .badge-complemento,
+    .mini-indicador,
+    .btn-agregar-complemento,
+    .btn-venta-principal {
+        animation: none;
+        transition: none;
+    }
+}
+
+/* ============================================================================
+   UTILIDADES
+   ============================================================================ */
+
+/* Espaciado consistente entre badges */
+.badges-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+/* Contenedor de indicadores en línea */
+.indicadores-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* Estado de carga para botones */
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.btn-loading::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spinner 0.6s linear infinite;
+}
+
+@keyframes spinner {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============================================================================
+   NOTAS PARA DESARROLLADORES
+   ============================================================================ */
+
+/*
+ * CÓMO USAR ESTOS ESTILOS:
+ * 
+ * 1. Cargar en base.html:
+ *    <link rel="stylesheet" href="{% static 'css/venta_mostrador.css' %}">
+ * 
+ * 2. Para alertas contextuales:
+ *    <div class="alert alert-vm-complemento">...</div>
+ *    <div class="alert alert-vm-principal">...</div>
+ * 
+ * 3. Para badges de complementos:
+ *    <span class="badge-complemento badge-cotizacion">
+ *        <i class="bi bi-clipboard-check"></i> Cotización
+ *    </span>
+ * 
+ * 4. Para mini-indicadores:
+ *    <i class="bi bi-cart-check mini-indicador mini-indicador-venta-mostrador"
+ *       data-bs-toggle="tooltip" title="Tiene venta mostrador"></i>
+ * 
+ * 5. Para botones contextuales:
+ *    <button class="btn btn-agregar-complemento">...</button>
+ *    <button class="btn btn-venta-principal">...</button>
+ */

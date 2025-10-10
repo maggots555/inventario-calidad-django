@@ -115,14 +115,8 @@ function inicializarEventListeners() {
         });
     }
     
-    // Formulario de conversión a diagnóstico
-    const formConvertirDiagnostico = document.getElementById('formConvertirDiagnostico');
-    if (formConvertirDiagnostico) {
-        formConvertirDiagnostico.addEventListener('submit', function(e) {
-            e.preventDefault();
-            confirmarConversionDiagnostico();
-        });
-    }
+    // ⛔ EVENT LISTENER DE CONVERSIÓN ELIMINADO (Oct 2025)
+    // Funcionalidad de conversión a diagnóstico eliminada
 }
 
 // ============================================================================
@@ -158,15 +152,62 @@ function toggleCampoCosto(checkboxId, divId) {
     
     if (!checkbox || !div) return;
     
+    // Obtener el input de costo dentro del div
+    const input = div.querySelector('input[type="number"]');
+    
     if (checkbox.checked) {
+        // Mostrar campo y habilitar validación
         div.style.display = 'block';
+        if (input) {
+            input.required = true;
+            // NO deshabilitar, solo validar cuando visible
+        }
     } else {
+        // Ocultar campo, quitar validación, poner valor por defecto
         div.style.display = 'none';
-        // Limpiar valor del input
-        const input = div.querySelector('input[type="number"]');
-        if (input) input.value = '';
+        if (input) {
+            input.required = false;
+            input.value = '0.00';  // Valor por defecto para enviar en POST
+            // NO deshabilitar para que el valor se envíe
+        }
     }
 }
+
+// ============================================================================
+// FUNCIONES WRAPPER ESPECÍFICAS (Llamadas desde template)
+// ============================================================================
+
+/**
+ * Toggle para campo de cambio de pieza
+ */
+function toggleCambioPiezaCosto() {
+    toggleCampoCosto('id_incluye_cambio_pieza', 'divCostoCambioPieza');
+}
+
+/**
+ * Toggle para campo de limpieza
+ */
+function toggleLimpiezaCosto() {
+    toggleCampoCosto('id_incluye_limpieza', 'divCostoLimpieza');
+}
+
+/**
+ * Toggle para campo de kit de limpieza
+ */
+function toggleKitCosto() {
+    toggleCampoCosto('id_incluye_kit_limpieza', 'divCostoKit');
+}
+
+/**
+ * Toggle para campo de reinstalación SO
+ */
+function toggleReinstalacionCosto() {
+    toggleCampoCosto('id_incluye_reinstalacion_so', 'divCostoReinstalacion');
+}
+
+// ============================================================================
+// CÁLCULOS
+// ============================================================================
 
 /**
  * Calcula y muestra el subtotal de una pieza
@@ -259,8 +300,14 @@ function guardarVentaMostrador() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            // ✅ NUEVO: Mensaje contextual según si es complemento o principal
+            let mensaje = data.message;
+            if (data.es_complemento) {
+                mensaje += ' ✨ (Ventas adicionales registradas)';
+            }
+            
             // Éxito
-            mostrarAlerta(data.message, 'success');
+            mostrarAlerta(mensaje, 'success');
             
             // Cerrar modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('modalVentaMostrador'));
@@ -475,90 +522,14 @@ function eliminarPiezaVentaMostrador(piezaId) {
 }
 
 // ============================================================================
-// CONVERSIÓN A DIAGNÓSTICO
+// ⛔ FUNCIONES DE CONVERSIÓN A DIAGNÓSTICO ELIMINADAS (Oct 2025)
 // ============================================================================
-
-/**
- * Abre el modal de conversión a diagnóstico
- */
-function convertirADiagnostico(ordenIdParam) {
-    const modal = new bootstrap.Modal(document.getElementById('modalConvertirDiagnostico'));
-    const form = document.getElementById('formConvertirDiagnostico');
-    
-    // Limpiar formulario
-    if (form) form.reset();
-    
-    modal.show();
-}
-
-/**
- * Confirma y ejecuta la conversión a diagnóstico
- */
-function confirmarConversionDiagnostico() {
-    const form = document.getElementById('formConvertirDiagnostico');
-    const motivo = document.getElementById('motivoConversion').value.trim();
-    
-    // Validar motivo
-    if (!motivo || motivo.length < 10) {
-        mostrarAlerta('El motivo debe tener al menos 10 caracteres', 'danger');
-        return;
-    }
-    
-    // Mostrar loading
-    const btnSubmit = form.querySelector('button[type="submit"]');
-    const textoOriginal = btnSubmit.innerHTML;
-    btnSubmit.disabled = true;
-    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Convirtiendo...';
-    
-    // Preparar datos
-    const formData = new FormData();
-    formData.append('motivo_conversion', motivo);
-    
-    // Hacer petición AJAX
-    fetch(`/servicio-tecnico/ordenes/${ordenId}/convertir-a-diagnostico/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: formData
-    })
-    .then(response => {
-        // Guardar el status code para manejo de errores
-        const status = response.status;
-        return response.json().then(data => ({ status, data }));
-    })
-    .then(({ status, data }) => {
-        if (data.success) {
-            // Éxito
-            mostrarAlerta(data.message, 'success');
-            
-            // Cerrar modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalConvertirDiagnostico'));
-            if (modal) modal.hide();
-            
-            // Redirigir a la nueva orden después de 2 segundos
-            setTimeout(() => {
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                } else {
-                    window.location.reload();
-                }
-            }, 2000);
-        } else {
-            // Error del servidor (400 o 500)
-            const errorMsg = data.error || data.message || 'Error al convertir la orden';
-            mostrarAlerta(errorMsg, 'danger');
-            btnSubmit.disabled = false;
-            btnSubmit.innerHTML = textoOriginal;
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        mostrarAlerta('Error al convertir la orden. Por favor intenta nuevamente.', 'danger');
-        btnSubmit.disabled = false;
-        btnSubmit.innerHTML = textoOriginal;
-    });
-}
+// Las funciones convertirADiagnostico() y confirmarConversionDiagnostico()
+// fueron eliminadas en la refactorización.
+//
+// Venta mostrador ahora es un complemento opcional que puede coexistir
+// con cotización en la misma orden. No se requiere "convertir".
+// ============================================================================
 
 // ============================================================================
 // FUNCIONES HELPER

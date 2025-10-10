@@ -55,7 +55,6 @@ ESTADO_ORDEN_CHOICES = [
     ('finalizado', 'Finalizado - Listo para Entrega'),
     ('entregado', 'Entregado al Cliente'),
     ('cancelado', 'Cancelado'),
-    ('convertida_a_diagnostico', 'Convertida a Diagnóstico'),  # Para ventas mostrador convertidas
 ]
 
 # ============================================================================

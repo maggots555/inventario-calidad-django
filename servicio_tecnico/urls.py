@@ -76,8 +76,10 @@ urlpatterns = [
     path('venta-mostrador/piezas/<int:pieza_id>/editar/', views.editar_pieza_venta_mostrador, name='venta_mostrador_editar_pieza'),
     path('venta-mostrador/piezas/<int:pieza_id>/eliminar/', views.eliminar_pieza_venta_mostrador, name='venta_mostrador_eliminar_pieza'),
     
-    # Conversión a diagnóstico
-    path('ordenes/<int:orden_id>/convertir-a-diagnostico/', views.convertir_venta_a_diagnostico, name='venta_mostrador_convertir'),
+    # ⛔ URL ELIMINADA: 'convertir-a-diagnostico/' 
+    # Esta URL manejaba la conversión de venta mostrador a diagnóstico.
+    # ELIMINADA EN: Octubre 2025 (Sistema Refactorizado)
+    # Ya no es necesaria porque venta_mostrador es ahora un complemento opcional.
     
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),

@@ -119,6 +119,27 @@
                                 </span>
                                 {% endif %}
                             </div>
+                            
+                            <!-- ✅ NUEVO: Indicadores de complementos activos (Oct 2025) -->
+                            <div class="mt-2">
+                                {% if tiene_cotizacion %}
+                                    <span class="badge bg-primary me-1" title="Tiene cotización de reparación" data-bs-toggle="tooltip">
+                                        <i class="bi bi-clipboard-check"></i> Cotización
+                                    </span>
+                                {% endif %}
+                                
+                                {% if tiene_venta_mostrador %}
+                                    <span class="badge bg-warning text-dark me-1" title="Tiene venta mostrador" data-bs-toggle="tooltip">
+                                        <i class="bi bi-cart-check"></i> Venta Mostrador
+                                    </span>
+                                {% endif %}
+                                
+                                {% if not tiene_cotizacion and not tiene_venta_mostrador %}
+                                    <span class="badge bg-secondary me-1" title="Sin complementos registrados" data-bs-toggle="tooltip">
+                                        <i class="bi bi-dash-circle"></i> Sin servicios
+                                    </span>
+                                {% endif %}
+                            </div>
                         </div>
                         
                         <div class="col-md-6 mb-3">
@@ -973,17 +994,38 @@
     
     <!-- ============================================================ -->
     <!-- SECCIÓN 3.5: GESTIÓN DE VENTA MOSTRADOR -->
+    <!-- SIEMPRE VISIBLE - UI Contextual según tipo_servicio (Refactor Oct 2025) -->
     <!-- ============================================================ -->
     
-    {% if orden.tipo_servicio == 'venta_mostrador' %}
     <div class="row">
         <div class="col-12">
             <div class="card section-card">
-                <div class="section-header" style="background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);">
-                    <i class="bi bi-shop"></i>
-                    Gestión de Venta Mostrador
-                    {% if venta_mostrador %}
-                        <span class="badge bg-dark ms-2">{{ venta_mostrador.folio_venta }}</span>
+                <!-- HEADER CONTEXTUAL: Cambia color y texto según tipo de orden -->
+                <div class="section-header" style="background: {% if orden.tipo_servicio == 'diagnostico' %}linear-gradient(135deg, #667eea 0%, #764ba2 100%){% else %}linear-gradient(135deg, #f6d365 0%, #fda085 100%){% endif %};">
+                    {% if orden.tipo_servicio == 'diagnostico' %}
+                        <!-- UI para DIAGNÓSTICO: Ventas adicionales (complemento) -->
+                        <div class="d-flex justify-content-between align-items-center w-100">
+                            <div>
+                                <i class="bi bi-cart-plus"></i>
+                                💰 Ventas Adicionales de Mostrador
+                                {% if venta_mostrador %}
+                                    <span class="badge bg-light text-dark ms-2">{{ venta_mostrador.folio_venta }}</span>
+                                {% endif %}
+                            </div>
+                            <span class="badge bg-light text-dark">Complemento</span>
+                        </div>
+                    {% else %}
+                        <!-- UI para DIRECTO: Venta principal -->
+                        <div class="d-flex justify-content-between align-items-center w-100">
+                            <div>
+                                <i class="bi bi-shop"></i>
+                                🛒 Venta Mostrador Principal
+                                {% if venta_mostrador %}
+                                    <span class="badge bg-dark ms-2">{{ venta_mostrador.folio_venta }}</span>
+                                {% endif %}
+                            </div>
+                            <span class="badge bg-light text-dark">Servicio Directo</span>
+                        </div>
                     {% endif %}
                 </div>
                 <div class="card-body">
@@ -992,17 +1034,30 @@
                         <!-- ========================================== -->
                         <!-- NO EXISTE VENTA MOSTRADOR - Mostrar botón crear -->
                         <!-- ========================================== -->
-                        <div class="alert alert-info d-flex align-items-center mb-4">
+                        <div class="alert {% if orden.tipo_servicio == 'diagnostico' %}alert-info{% else %}alert-warning{% endif %} d-flex align-items-center mb-4">
                             <i class="bi bi-info-circle-fill fs-3 me-3"></i>
                             <div>
-                                <h6 class="mb-1">No hay venta mostrador registrada para esta orden</h6>
-                                <p class="mb-0 small">Crea una venta mostrador para servicios directos sin diagnóstico: instalación de piezas, reinstalación de SO, limpieza, etc.</p>
+                                {% if orden.tipo_servicio == 'diagnostico' %}
+                                    <h6 class="mb-1">Ventas Adicionales Opcionales</h6>
+                                    <p class="mb-0 small">
+                                        Si el cliente adquiere <strong>accesorios, kits, cables u otros productos</strong>
+                                        durante el diagnóstico o reparación, regístralos aquí como ventas complementarias.
+                                    </p>
+                                {% else %}
+                                    <h6 class="mb-1">No hay venta mostrador registrada para esta orden</h6>
+                                    <p class="mb-0 small">Crea una venta mostrador para servicios directos sin diagnóstico: instalación de piezas, reinstalación de SO, limpieza, etc.</p>
+                                {% endif %}
                             </div>
                         </div>
                         
                         <div class="text-center">
-                            <button type="button" class="btn btn-warning btn-lg" onclick="abrirModalVentaMostrador()">
-                                <i class="bi bi-plus-circle"></i> Crear Venta Mostrador
+                            <button type="button" class="btn {% if orden.tipo_servicio == 'diagnostico' %}btn-outline-primary{% else %}btn-warning{% endif %} btn-lg" onclick="abrirModalVentaMostrador()">
+                                <i class="bi bi-plus-circle"></i>
+                                {% if orden.tipo_servicio == 'diagnostico' %}
+                                    Agregar Ventas Adicionales
+                                {% else %}
+                                    Crear Venta Mostrador
+                                {% endif %}
                             </button>
                         </div>
                     
@@ -1238,24 +1293,8 @@
                             {% endif %}
                         </div>
                         
-                        <!-- Alerta de Conversión a Diagnóstico -->
-                        {% if orden.estado not in 'finalizado,entregado,convertida_a_diagnostico' %}
-                            <div class="card border-warning">
-                                <div class="card-body">
-                                    <h6 class="card-title text-warning">
-                                        <i class="bi bi-exclamation-triangle-fill"></i> ¿Surgió un problema técnico?
-                                    </h6>
-                                    <p class="mb-3">
-                                        Si el servicio no puede completarse sin un diagnóstico técnico completo 
-                                        (ej: equipo no enciende, problema no es la pieza vendida, falla adicional detectada), 
-                                        puedes convertir esta orden a una orden con diagnóstico.
-                                    </p>
-                                    <button type="button" class="btn btn-danger" onclick="convertirADiagnostico({{ orden.id }})">
-                                        <i class="bi bi-arrow-repeat"></i> Convertir a Orden con Diagnóstico
-                                    </button>
-                                </div>
-                            </div>
-                        {% endif %}
+                        <!-- ⛔ BOTÓN DE CONVERSIÓN ELIMINADO (Oct 2025) -->
+                        <!-- Venta mostrador ahora es complemento opcional, no requiere conversión -->
                     
                     {% endif %}
                     
@@ -1263,26 +1302,6 @@
             </div>
         </div>
     </div>
-    {% elif orden.orden_venta_mostrador_previa %}
-        <!-- Alerta si fue convertida desde venta mostrador -->
-        <div class="row">
-            <div class="col-12">
-                <div class="alert alert-info d-flex align-items-center">
-                    <i class="bi bi-info-circle-fill fs-3 me-3"></i>
-                    <div>
-                        <h6 class="mb-1">Esta orden fue convertida desde Venta Mostrador</h6>
-                        <p class="mb-0">
-                            Orden original: 
-                            <a href="{% url 'servicio_tecnico:detalle_orden' orden.orden_venta_mostrador_previa.id %}" class="alert-link">
-                                {{ orden.orden_venta_mostrador_previa.numero_orden_interno }}
-                            </a>
-                            | Monto abonado: <strong>${{ orden.monto_abono_previo|floatformat:2 }}</strong>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    {% endif %}
     
     <!-- ============================================================ -->
     <!-- SECCIÓN 4: CAMBIAR ESTADO Y ASIGNAR RESPONSABLES -->
@@ -2357,52 +2376,9 @@
 </div>
 
 <!-- ============================================================================ -->
-<!-- MODAL: CONFIRMAR CONVERSIÓN A DIAGNÓSTICO -->
+<!-- ⛔ MODAL DE CONVERSIÓN A DIAGNÓSTICO ELIMINADO (Oct 2025) -->
+<!-- Funcionalidad eliminada: Venta mostrador ahora es complemento opcional -->
 <!-- ============================================================================ -->
-<div class="modal fade" id="modalConvertirDiagnostico" tabindex="-1" aria-labelledby="modalConvertirDiagnosticoLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="modalConvertirDiagnosticoLabel">
-                    <i class="bi bi-exclamation-triangle-fill"></i> Convertir a Diagnóstico
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <form id="formConvertirDiagnostico">
-                {% csrf_token %}
-                
-                <div class="modal-body">
-                    <div class="alert alert-warning">
-                        <strong>⚠️ Advertencia:</strong>
-                        <p class="mb-0">Esta acción convertirá la orden de venta mostrador en una orden con diagnóstico completo. 
-                        El monto de la venta actual se abonará a la nueva orden.</p>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="motivoConversion" class="form-label">
-                            Motivo de la Conversión <span class="text-danger">*</span>
-                        </label>
-                        <textarea class="form-control" id="motivoConversion" name="motivo_conversion" 
-                                  rows="4" required 
-                                  placeholder="Explica por qué es necesario convertir a diagnóstico (mínimo 10 caracteres)"></textarea>
-                        <small class="form-text text-muted">
-                            Ej: Equipo no enciende después de instalar RAM, se detectó problema en motherboard, etc.
-                        </small>
-                    </div>
-                </div>
-                
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-x-circle"></i> Cancelar
-                    </button>
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-arrow-repeat"></i> Confirmar Conversión
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
 {% endblock %}
 
@@ -3516,10 +3492,9 @@ function verificarCategoriasVacias() {
 </script>
 
 <!-- ============================================================================
-     VENTA MOSTRADOR - JavaScript (Solo si orden es tipo venta_mostrador)
+     VENTA MOSTRADOR - JavaScript (SIEMPRE cargado - Refactor Oct 2025)
+     Panel VM ahora visible en todas las órdenes como complemento opcional
      ============================================================================ -->
-{% if orden.tipo_servicio == 'venta_mostrador' %}
-<script src="{% static 'js/venta_mostrador.js' %}?v=1.0"></script>
-{% endif %}
+<script src="{% static 'js/venta_mostrador.js' %}?v=2.2"></script>
 
 {% endblock %}

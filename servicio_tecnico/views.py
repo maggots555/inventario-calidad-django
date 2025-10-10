@@ -1252,35 +1252,32 @@ def detalle_orden(request, orden_id):
     # ========================================================================
     
     # ========================================================================
-    # VENTA MOSTRADOR - FASE 3
+    # VENTA MOSTRADOR - FASE 3 (ACTUALIZADO: Octubre 2025)
     # ========================================================================
+    # NUEVO: El contexto de venta mostrador se carga SIEMPRE, independientemente
+    # del tipo_servicio, porque ahora es un complemento opcional disponible
+    # para todas las órdenes.
+    
+    from .forms import VentaMostradorForm, PiezaVentaMostradorForm
+    
     # Inicializar variables de venta mostrador
     venta_mostrador = None
-    form_venta_mostrador = None
-    form_pieza_venta_mostrador = None
     piezas_venta_mostrador = []
     
-    # Si la orden es tipo "venta_mostrador", preparar contexto específico
-    if orden.tipo_servicio == 'venta_mostrador':
-        from .forms import VentaMostradorForm, PiezaVentaMostradorForm
+    # Verificar si ya existe venta mostrador (independiente del tipo)
+    if hasattr(orden, 'venta_mostrador'):
+        venta_mostrador = orden.venta_mostrador
         
-        # Verificar si ya existe venta mostrador
-        if hasattr(orden, 'venta_mostrador'):
-            venta_mostrador = orden.venta_mostrador
-            
-            # Formulario de venta mostrador con datos existentes (para editar)
-            form_venta_mostrador = VentaMostradorForm(instance=venta_mostrador)
-            
-            # Obtener todas las piezas vendidas
-            piezas_venta_mostrador = venta_mostrador.piezas_vendidas.select_related(
-                'componente'
-            ).order_by('-fecha_venta')
-        else:
-            # No existe venta mostrador, preparar formulario para crear
-            form_venta_mostrador = VentaMostradorForm()
-        
-        # Formulario para agregar piezas (siempre disponible)
-        form_pieza_venta_mostrador = PiezaVentaMostradorForm()
+        # Obtener todas las piezas vendidas
+        piezas_venta_mostrador = venta_mostrador.piezas_vendidas.select_related(
+            'componente'
+        ).order_by('-fecha_venta')
+    
+    # Preparar formularios (siempre disponibles)
+    form_venta_mostrador = VentaMostradorForm(
+        instance=venta_mostrador if venta_mostrador else None
+    )
+    form_pieza_venta_mostrador = PiezaVentaMostradorForm()
     
     context = {
         'orden': orden,
@@ -1303,7 +1300,7 @@ def detalle_orden(request, orden_id):
         'form_pieza': form_pieza,
         'form_seguimiento': form_seguimiento,
         
-        # NUEVOS: Formularios de Venta Mostrador - FASE 3
+        # ACTUALIZADOS: Formularios de Venta Mostrador - SIEMPRE disponibles
         'venta_mostrador': venta_mostrador,
         'form_venta_mostrador': form_venta_mostrador,
         'form_pieza_venta_mostrador': form_pieza_venta_mostrador,
@@ -1326,8 +1323,12 @@ def detalle_orden(request, orden_id):
         # Información adicional
         'dias_en_servicio': orden.dias_en_servicio,
         'esta_retrasada': orden.esta_retrasada,
-        'esta_convertida': orden.esta_convertida,  # NUEVO: Indica si fue convertida a diagnóstico
-        'puede_modificarse': orden.puede_modificarse,  # NUEVO: Indica si puede modificarse
+        
+        # NUEVO: Variables contextuales para la UI
+        'es_orden_diagnostico': orden.tipo_servicio == 'diagnostico',
+        'es_orden_directa': orden.tipo_servicio == 'venta_mostrador',
+        'tiene_cotizacion': cotizacion is not None,
+        'tiene_venta_mostrador': venta_mostrador is not None,
         
         # Estadísticas de técnicos (para alertas) - Convertido a JSON para JavaScript
         'estadisticas_tecnicos': mark_safe(json.dumps(estadisticas_tecnicos)),
@@ -2589,12 +2590,16 @@ def crear_venta_mostrador(request, orden_id):
     """
     Crea una nueva venta mostrador asociada a una orden.
     
+    ACTUALIZACIÓN (Octubre 2025): Sistema refactorizado
+    Ya no valida tipo_servicio porque venta_mostrador es un complemento
+    opcional de cualquier orden.
+    
     EXPLICACIÓN PARA PRINCIPIANTES:
     Esta vista maneja el formulario modal para crear una venta mostrador.
     Responde con JSON para actualizar la interfaz sin recargar la página (AJAX).
     
     FLUJO:
-    1. Obtiene la orden y verifica que sea tipo 'venta_mostrador'
+    1. Obtiene la orden (cualquier tipo)
     2. Verifica que NO tenga venta mostrador existente
     3. Valida el formulario recibido
     4. Crea la venta mostrador asociada a la orden
@@ -2613,21 +2618,14 @@ def crear_venta_mostrador(request, orden_id):
     from .models import VentaMostrador
     
     try:
-        # Obtener la orden
+        # Obtener la orden (CUALQUIER tipo)
         orden = get_object_or_404(OrdenServicio, id=orden_id)
-        
-        # Verificar que sea tipo venta mostrador
-        if orden.tipo_servicio != 'venta_mostrador':
-            return JsonResponse({
-                'success': False,
-                'error': '❌ Esta orden no es de tipo "Venta Mostrador"'
-            }, status=400)
         
         # Verificar que NO tenga venta mostrador existente
         if hasattr(orden, 'venta_mostrador'):
             return JsonResponse({
                 'success': False,
-                'error': '❌ Esta orden ya tiene una venta mostrador asociada'
+                'error': '❌ Esta orden ya tiene una venta mostrador registrada'
             }, status=400)
         
         # Procesar formulario
@@ -2639,10 +2637,11 @@ def crear_venta_mostrador(request, orden_id):
             venta.save()
             
             # Registrar en historial
+            empleado_actual = request.user.empleado if hasattr(request.user, 'empleado') else None
             registrar_historial(
                 orden=orden,
                 tipo_evento='actualizacion',
-                usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                usuario=empleado_actual,
                 comentario=f"✅ Venta Mostrador creada: {venta.folio_venta} | Paquete: {venta.get_paquete_display()} | Total: ${venta.total_venta}",
                 es_sistema=False
             )
@@ -2653,6 +2652,7 @@ def crear_venta_mostrador(request, orden_id):
                 'folio_venta': venta.folio_venta,
                 'total_venta': float(venta.total_venta),
                 'paquete': venta.get_paquete_display(),
+                'es_complemento': orden.tipo_servicio == 'diagnostico',  # Info contextual
                 'redirect_url': f'/servicio-tecnico/ordenes/{orden_id}/'  # Redirigir para refrescar
             })
         else:
@@ -2887,115 +2887,19 @@ def eliminar_pieza_venta_mostrador(request, pieza_id):
         }, status=500)
 
 
-@login_required
-@require_http_methods(["POST"])
-def convertir_venta_a_diagnostico(request, orden_id):
-    """
-    Convierte una orden de venta mostrador a orden con diagnóstico.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista maneja el caso especial cuando una venta mostrador falla
-    (por ejemplo, al instalar una pieza) y se necesita hacer diagnóstico.
-    
-    ESCENARIO REAL:
-    1. Cliente compra RAM sin diagnóstico
-    2. Al instalar, el equipo no enciende
-    3. Se descubre que el problema es otra cosa (motherboard, fuente, etc.)
-    4. Se convierte a orden con diagnóstico para investigar
-    
-    FLUJO:
-    1. Verifica que la orden sea tipo 'venta_mostrador'
-    2. Verifica que tenga venta mostrador asociada
-    3. Valida que el estado permita la conversión
-    4. Recibe el motivo de conversión del usuario
-    5. Llama al método convertir_a_diagnostico() del modelo
-    6. Devuelve JSON con la nueva orden creada
-    
-    Args:
-        request: HttpRequest con POST data (motivo_conversion)
-        orden_id: ID de la orden de venta mostrador
-    
-    Returns:
-        JsonResponse con success=True/False y datos de nueva orden
-    """
-    from django.http import JsonResponse
-    
-    try:
-        orden = get_object_or_404(OrdenServicio, id=orden_id)
-        
-        # Validación 1: Debe ser tipo venta_mostrador
-        if orden.tipo_servicio != 'venta_mostrador':
-            return JsonResponse({
-                'success': False,
-                'error': '❌ Solo se pueden convertir órdenes de tipo "Venta Mostrador"'
-            }, status=400)
-        
-        # Validación 2: Debe tener venta mostrador asociada
-        if not hasattr(orden, 'venta_mostrador'):
-            return JsonResponse({
-                'success': False,
-                'error': '❌ Esta orden no tiene venta mostrador asociada'
-            }, status=400)
-        
-        # Validación 3: No debe estar ya convertida
-        if orden.estado == 'convertida_a_diagnostico':
-            return JsonResponse({
-                'success': False,
-                'error': '❌ Esta orden ya fue convertida a diagnóstico'
-            }, status=400)
-        
-        # Validación 4: Estados válidos para conversión
-        estados_validos = ['recepcion', 'reparacion', 'control_calidad']
-        if orden.estado not in estados_validos:
-            return JsonResponse({
-                'success': False,
-                'error': f'❌ No se puede convertir desde el estado "{orden.get_estado_display()}". Estados válidos: Recepción, Reparación, Control de Calidad'
-            }, status=400)
-        
-        # Obtener motivo de conversión (obligatorio)
-        motivo_conversion = request.POST.get('motivo_conversion', '').strip()
-        if not motivo_conversion or len(motivo_conversion) < 10:
-            return JsonResponse({
-                'success': False,
-                'error': '❌ Debes proporcionar un motivo detallado de conversión (mínimo 10 caracteres)'
-            }, status=400)
-        
-        # Obtener empleado actual (requerido para el historial)
-        empleado_actual = None
-        if hasattr(request.user, 'empleado'):
-            empleado_actual = request.user.empleado
-        else:
-            # Si el usuario no tiene empleado asociado, no puede hacer la conversión
-            return JsonResponse({
-                'success': False,
-                'error': '❌ Tu usuario no tiene un empleado asociado. Contacta al administrador.'
-            }, status=400)
-        
-        # Llamar al método del modelo para convertir
-        nueva_orden = orden.convertir_a_diagnostico(
-            usuario=empleado_actual,
-            motivo_conversion=motivo_conversion
-        )
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'✅ Orden convertida a diagnóstico exitosamente',
-            'orden_original': orden.numero_orden_interno,
-            'nueva_orden_id': nueva_orden.id,
-            'nueva_orden_numero': nueva_orden.numero_orden_interno,
-            'monto_abono': float(orden.venta_mostrador.total_venta),
-            'redirect_url': f'/servicio-tecnico/ordenes/{nueva_orden.id}/'
-        })
-    
-    except ValueError as e:
-        # Errores de validación del modelo
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
-    
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'❌ Error inesperado al convertir: {str(e)}'
-        }, status=500)
+# ⛔ VISTA ELIMINADA: convertir_venta_a_diagnostico()
+# 
+# Esta vista manejaba la conversión de ventas mostrador a diagnóstico,
+# creando una NUEVA orden cuando el servicio fallaba.
+# 
+# ELIMINADA EN: Octubre 2025 (Sistema Refactorizado)
+# MOTIVO: Venta mostrador ahora es un complemento opcional que puede
+#         coexistir con cotización en la MISMA orden. No se requiere
+#         duplicar órdenes para agregar diagnóstico.
+#
+# BENEFICIOS:
+# - Menos duplicación de datos
+# - Seguimiento más simple (una sola orden)
+# - Código más limpio (~107 líneas eliminadas)
+# - Mayor flexibilidad en el flujo de trabajo
+

@@ -31,10 +31,26 @@ class OrdenServicio(models.Model):
     Modelo central que representa una orden de servicio técnico.
     Gestiona todo el ciclo de vida de la reparación de un equipo.
     
+    ACTUALIZACIÓN (Octubre 2025): Sistema refactorizado para mayor flexibilidad
+    
+    tipo_servicio indica el flujo PRINCIPAL:
+    - 'diagnostico': Servicio con diagnóstico técnico (cotización)
+    - 'venta_mostrador': Servicio directo sin diagnóstico
+    
+    COMPLEMENTOS OPCIONALES (pueden coexistir):
+    - cotizacion: Reparación/diagnóstico (OneToOne con Cotizacion)
+    - venta_mostrador: Ventas adicionales (OneToOne con VentaMostrador)
+    
+    Una orden puede tener:
+    - Solo cotización (diagnóstico puro)
+    - Solo venta_mostrador (venta directa)
+    - Ambos (diagnóstico + ventas adicionales como accesorios)
+    - Ninguno (orden recién creada)
+    
     Relaciones:
     - Tiene UN DetalleEquipo (OneToOne)
-    - Puede tener UNA Cotización (OneToOne)
-    - Puede tener UNA VentaMostrador (OneToOne)
+    - Puede tener UNA Cotización (OneToOne) - OPCIONAL
+    - Puede tener UNA VentaMostrador (OneToOne) - OPCIONAL
     - Puede tener MUCHAS Imágenes (ForeignKey inverso)
     - Puede tener MUCHOS Eventos de Historial (ForeignKey inverso)
     - Puede estar relacionada con UNA Incidencia de ScoreCard si es reingreso
@@ -148,10 +164,9 @@ class OrdenServicio(models.Model):
         help_text="Motivo por el cual no se ha emitido la factura"
     )
     
-    # TIPO DE SERVICIO Y CONVERSIÓN (Sistema Venta Mostrador)
+    # TIPO DE SERVICIO (Sistema Venta Mostrador)
     # =========================================================================
-    # Estos campos permiten diferenciar entre órdenes con diagnóstico completo
-    # y ventas mostrador (servicios directos sin diagnóstico previo)
+    # Indica el flujo PRINCIPAL de la orden, pero no restringe complementos
     tipo_servicio = models.CharField(
         max_length=20,
         choices=[
@@ -160,28 +175,6 @@ class OrdenServicio(models.Model):
         ],
         default='diagnostico',
         help_text="Tipo de servicio: con diagnóstico técnico o venta mostrador directa"
-    )
-    
-    orden_venta_mostrador_previa = models.ForeignKey(
-        'self',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='orden_diagnostico_posterior',
-        help_text="Orden de venta mostrador que se convirtió a diagnóstico (si aplica)"
-    )
-    
-    monto_abono_previo = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        validators=[MinValueValidator(Decimal('0.00'))],
-        help_text="Monto a abonar por servicio de venta mostrador previo"
-    )
-    
-    notas_conversion = models.TextField(
-        blank=True,
-        help_text="Motivo y detalles de conversión de venta mostrador a diagnóstico"
     )
     
     control_calidad_requerido = models.BooleanField(
@@ -289,103 +282,27 @@ class OrdenServicio(models.Model):
         """
         Validaciones personalizadas para mantener integridad de datos.
         
-        Reglas de negocio:
-        1. Venta mostrador NO puede tener cotización
-        2. Diagnóstico NO puede tener venta mostrador directa (salvo conversión)
-        3. Si hay orden previa, debe haber monto de abono
-        4. Estados válidos según tipo de servicio
-        5. Control de calidad obligatorio para diagnósticos
+        ACTUALIZACIÓN (Octubre 2025): Sistema refactorizado
+        - Venta mostrador es ahora un complemento opcional
+        - Una orden puede tener cotización, venta_mostrador, o ambos
+        - No hay restricciones basadas en tipo_servicio
+        
+        Reglas de negocio simplificadas:
+        1. Si requiere factura, debe haber información fiscal
+        2. Estados finales requieren fechas correspondientes
         """
         from django.core.exceptions import ValidationError
         
-        # REGLA 1: Venta mostrador NO puede tener cotización
-        if self.tipo_servicio == 'venta_mostrador':
-            if hasattr(self, 'cotizacion'):
-                raise ValidationError({
-                    'tipo_servicio': (
-                        "❌ Una orden de venta mostrador no puede tener cotización asociada. "
-                        "Si necesita diagnóstico técnico, debe convertirse primero usando "
-                        "el método convertir_a_diagnostico()."
-                    )
-                })
-        
-        # REGLA 2: Diagnóstico NO puede tener venta mostrador directa (salvo conversión)
-        if self.tipo_servicio == 'diagnostico':
-            if hasattr(self, 'venta_mostrador') and not self.orden_venta_mostrador_previa:
-                raise ValidationError({
-                    'tipo_servicio': (
-                        "❌ Una orden de diagnóstico no puede tener venta mostrador directa. "
-                        "Use el sistema de cotización para agregar piezas y servicios."
-                    )
-                })
-        
-        # REGLA 3: Si hay orden previa, debe haber monto de abono > 0
-        if self.orden_venta_mostrador_previa and self.monto_abono_previo <= 0:
+        # Validación básica: Estados finales requieren fechas
+        if self.estado == 'entregado' and not self.fecha_entrega:
             raise ValidationError({
-                'monto_abono_previo': (
-                    "❌ Si hay una orden de venta mostrador previa, debe registrar el monto "
-                    f"de abono. Total de venta mostrador: ${self.orden_venta_mostrador_previa.venta_mostrador.total_venta}"
-                )
+                'fecha_entrega': 'Una orden entregada debe tener fecha de entrega'
             })
         
-        # REGLA 4: Estados válidos según tipo de servicio
-        if self.tipo_servicio == 'venta_mostrador':
-            # Venta mostrador NO puede pasar por estos estados
-            estados_invalidos = ['diagnostico', 'cotizacion', 'rechazada', 'esperando_piezas']
-            if self.estado in estados_invalidos:
-                raise ValidationError({
-                    'estado': (
-                        f"❌ Estado '{self.get_estado_display()}' no es válido para ventas mostrador. "
-                        f"Las ventas mostrador siguen un flujo directo sin diagnóstico ni cotización. "
-                        f"Estados permitidos: espera, recepcion, reparacion, control_calidad, finalizado, entregado, cancelado."
-                    )
-                })
-        
-        # REGLA 5: No se puede convertir diagnóstico → venta mostrador
-        if self.tipo_servicio == 'venta_mostrador' and self.orden_venta_mostrador_previa:
+        if self.estado == 'finalizado' and not self.fecha_finalizacion:
             raise ValidationError({
-                'tipo_servicio': (
-                    "❌ No se puede convertir una orden de diagnóstico a venta mostrador. "
-                    "La conversión solo funciona en un sentido: venta_mostrador → diagnostico."
-                )
+                'fecha_finalizacion': 'Una orden finalizada debe tener fecha de finalización'
             })
-        
-        # REGLA 6: Control de calidad obligatorio para diagnósticos
-        if self.tipo_servicio == 'diagnostico' and not self.control_calidad_requerido:
-            # Advertencia: Diagnósticos generalmente requieren QA
-            # Nota: No bloqueamos, solo documentamos que es raro
-            pass
-        
-        # REGLA 7: Orden convertida a diagnóstico NO puede cambiar de estado
-        if self.estado == 'convertida_a_diagnostico':
-            # Verificar si se está intentando cambiar el estado
-            if self.pk:  # Solo si la orden ya existe en BD
-                orden_anterior = OrdenServicio.objects.filter(pk=self.pk).first()
-                if orden_anterior and orden_anterior.estado != 'convertida_a_diagnostico':
-                    # Se está cambiando A convertida_a_diagnostico (permitido)
-                    pass
-                elif orden_anterior and orden_anterior.estado == 'convertida_a_diagnostico':
-                    # Ya estaba convertida y se intenta cambiar (BLOQUEADO)
-                    raise ValidationError({
-                        'estado': (
-                            "❌ Esta orden fue convertida a diagnóstico y ya no puede modificarse. "
-                            "La orden está cerrada y su continuación es la nueva orden de diagnóstico. "
-                            "Para ver la nueva orden, consulta el historial."
-                        )
-                    })
-    
-    @property
-    def esta_convertida(self):
-        """Retorna True si la orden fue convertida a diagnóstico"""
-        return self.estado == 'convertida_a_diagnostico'
-    
-    @property
-    def puede_modificarse(self):
-        """
-        Retorna True si la orden puede modificarse.
-        Una orden convertida a diagnóstico NO puede modificarse.
-        """
-        return not self.esta_convertida
     
     @property
     def dias_en_servicio(self):
@@ -459,143 +376,27 @@ class OrdenServicio(models.Model):
             return incidencia
         return None
     
-    def convertir_a_diagnostico(self, usuario, motivo_conversion):
-        """
-        Convierte una orden de venta mostrador a orden con diagnóstico técnico.
-        Mantiene trazabilidad completa entre ambas órdenes.
-        
-        Este método se usa cuando un servicio de venta mostrador no puede completarse
-        sin un diagnóstico técnico completo (ej: instalación de pieza falla, se detecta
-        problema adicional, etc.)
-        
-        Args:
-            usuario (Empleado): Usuario que autoriza la conversión
-            motivo_conversion (str): Razón detallada de la conversión
-        
-        Returns:
-            OrdenServicio: Nueva orden de tipo 'diagnostico'
-        
-        Raises:
-            ValueError: Si la orden no es de tipo venta_mostrador o no tiene venta asociada
-            
-        Ejemplo:
-            >>> orden_vm = OrdenServicio.objects.get(numero_orden_interno='VM-2025-0001')
-            >>> nueva_orden = orden_vm.convertir_a_diagnostico(
-            ...     usuario=empleado,
-            ...     motivo_conversion="Equipo no enciende después de instalar RAM"
-            ... )
-            >>> print(nueva_orden.numero_orden_interno)  # ORD-2025-0234
-        """
-        # VALIDACIÓN 1: Solo se pueden convertir órdenes de venta mostrador
-        if self.tipo_servicio != 'venta_mostrador':
-            raise ValueError(
-                f"Solo se pueden convertir órdenes de tipo 'venta_mostrador'. "
-                f"Esta orden es de tipo '{self.tipo_servicio}'"
-            )
-        
-        # VALIDACIÓN 2: Debe tener una venta mostrador asociada
-        if not hasattr(self, 'venta_mostrador'):
-            raise ValueError(
-                "La orden no tiene una venta mostrador asociada. "
-                "No se puede realizar la conversión."
-            )
-        
-        # VALIDACIÓN 3: Debe tener un usuario válido
-        if not usuario:
-            raise ValueError(
-                "Se requiere un usuario (empleado) para autorizar la conversión. "
-                "El usuario debe tener un empleado asociado."
-            )
-        
-        # VALIDACIÓN 4: No puede estar ya convertida
-        if self.estado == 'convertida_a_diagnostico':
-            raise ValueError(
-                "Esta orden ya fue convertida a diagnóstico previamente. "
-                "No se puede convertir dos veces."
-            )
-        
-        # PASO 1: Cambiar estado de la orden actual
-        estado_anterior = self.estado
-        self.estado = 'convertida_a_diagnostico'
-        self.save()
-        
-        # PASO 2: Crear nueva orden de diagnóstico
-        nueva_orden = OrdenServicio.objects.create(
-            sucursal=self.sucursal,
-            responsable_seguimiento=self.responsable_seguimiento,
-            tecnico_asignado_actual=self.tecnico_asignado_actual,
-            tipo_servicio='diagnostico',
-            estado='diagnostico',
-            orden_venta_mostrador_previa=self,
-            monto_abono_previo=self.venta_mostrador.total_venta,
-            notas_conversion=motivo_conversion,
-            requiere_factura=self.requiere_factura,
-            control_calidad_requerido=True,  # Diagnóstico siempre requiere QA
-        )
-        
-        # PASO 3: Copiar información del equipo si existe
-        try:
-            detalle_original = self.detalle_equipo
-            DetalleEquipo.objects.create(
-                orden=nueva_orden,
-                tipo_equipo=detalle_original.tipo_equipo,
-                marca=detalle_original.marca,
-                modelo=detalle_original.modelo,
-                numero_serie=detalle_original.numero_serie,
-                orden_cliente=detalle_original.orden_cliente,
-                gama=detalle_original.gama,
-                tiene_cargador=detalle_original.tiene_cargador,
-                numero_serie_cargador=detalle_original.numero_serie_cargador,
-                equipo_enciende=detalle_original.equipo_enciende,
-                falla_principal=detalle_original.falla_principal,
-                diagnostico_sic=detalle_original.diagnostico_sic,
-                fecha_inicio_diagnostico=timezone.now(),  # Inicia diagnóstico ahora
-            )
-        except DetalleEquipo.DoesNotExist:
-            # Si no existe detalle de equipo, crear uno básico
-            DetalleEquipo.objects.create(
-                orden=nueva_orden,
-                tipo_equipo='otro',
-                marca='N/A',
-                modelo='N/A',
-                falla_principal='Diagnóstico requerido por conversión de venta mostrador',
-                fecha_inicio_diagnostico=timezone.now(),
-            )
-        
-        # PASO 4: Registrar en historial de la orden ORIGINAL
-        HistorialOrden.objects.create(
-            orden=self,
-            tipo_evento='sistema',
-            estado_anterior=estado_anterior,
-            estado_nuevo='convertida_a_diagnostico',
-            comentario=(
-                f"⚠️ CONVERTIDA A DIAGNÓSTICO\n"
-                f"Nueva orden: {nueva_orden.numero_orden_interno}\n"
-                f"Motivo: {motivo_conversion}\n"
-                f"Monto cobrado previamente: ${self.venta_mostrador.total_venta}\n"
-                f"Autorizado por: {usuario.nombre_completo}"
-            ),
-            usuario=usuario,
-            es_sistema=False
-        )
-        
-        # PASO 5: Registrar en historial de la orden NUEVA
-        HistorialOrden.objects.create(
-            orden=nueva_orden,
-            tipo_evento='creacion',
-            comentario=(
-                f"✅ ORDEN CREADA POR CONVERSIÓN\n"
-                f"Orden original: {self.numero_orden_interno} (Venta Mostrador)\n"
-                f"Folio VM: {self.venta_mostrador.folio_venta}\n"
-                f"Monto abonado: ${self.venta_mostrador.total_venta}\n"
-                f"Motivo conversión: {motivo_conversion}\n"
-                f"Autorizado por: {usuario.nombre_completo}"
-            ),
-            usuario=usuario,
-            es_sistema=False
-        )
-        
-        return nueva_orden
+    # ⛔ MÉTODO ELIMINADO: convertir_a_diagnostico()
+    # 
+    # Este método creaba una NUEVA orden cuando una venta mostrador fallaba.
+    # En el sistema refactorizado (Octubre 2025), ya no es necesario:
+    # 
+    # ANTES (Sistema Antiguo):
+    # - Venta mostrador y diagnóstico eran excluyentes
+    # - Si una venta mostrador fallaba, se convertía creando una NUEVA orden
+    # - Generaba duplicación de órdenes y complejidad en el seguimiento
+    # 
+    # AHORA (Sistema Actual):
+    # - Venta mostrador es un complemento opcional
+    # - Puede coexistir con cotización en la MISMA orden
+    # - No se requiere duplicar órdenes
+    # - Simplemente se agregan ambos complementos a la orden según se necesiten
+    # 
+    # Beneficios del cambio:
+    # - Menos duplicación de datos
+    # - Seguimiento más simple (una sola orden)
+    # - Código más limpio (~138 líneas eliminadas)
+    # - Mayor flexibilidad en el flujo de trabajo
     
     def __str__(self):
         return f"{self.numero_orden_interno} - {self.sucursal.nombre} ({self.get_estado_display()})"
