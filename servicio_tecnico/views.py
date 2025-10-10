@@ -300,8 +300,15 @@ def lista_ordenes_activas(request):
             Q(numero_orden_interno__icontains=busqueda)
         )
     
-    # Estadísticas de equipos "No enciende" por técnico
-    equipos_no_enciende_raw = OrdenServicio.objects.exclude(
+    # ========================================================================
+    # ESTADÍSTICAS: EQUIPOS "NO ENCIENDE" POR TÉCNICO (ACTIVOS + HISTÓRICO)
+    # ========================================================================
+    # ACTUALIZACIÓN: Se divide en dos consultas para mostrar:
+    # 1. ACTIVOS: Solo equipos "No Enciende" actualmente en proceso (carga específica)
+    # 2. HISTÓRICO: Desglose de equipos por si encendían o no (experiencia detallada)
+    
+    # --- CONSULTA 1: Equipos "No Enciende" ACTIVOS (carga actual específica) ---
+    equipos_no_enciende_activos_raw = OrdenServicio.objects.exclude(
         estado__in=['entregado', 'cancelado']
     ).filter(
         detalle_equipo__equipo_enciende=False,
@@ -313,21 +320,78 @@ def lista_ordenes_activas(request):
         total_no_enciende=Count('numero_orden_interno')
     ).order_by('-total_no_enciende', 'tecnico_asignado_actual__nombre_completo')
     
-    # Procesar datos para incluir información de foto
-    equipos_no_enciende_por_tecnico = []
-    for item in equipos_no_enciende_raw:
+    # --- CONSULTA 2: Equipos HISTÓRICOS con desglose por "equipo_enciende" ---
+    # Esta consulta agrupa por técnico y por si el equipo enciende o no
+    equipos_historico_desglose_raw = OrdenServicio.objects.filter(
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
+    ).values(
+        'tecnico_asignado_actual__nombre_completo',
+        'tecnico_asignado_actual__id',
+        'detalle_equipo__equipo_enciende'
+    ).annotate(
+        total_equipos=Count('numero_orden_interno')
+    ).order_by('tecnico_asignado_actual__nombre_completo', 'detalle_equipo__equipo_enciende')
+    
+    # --- PROCESAR DATOS ACTIVOS ---
+    equipos_no_enciende_activos_dict = {}
+    for item in equipos_no_enciende_activos_raw:
         tecnico_id = item['tecnico_asignado_actual__id']
+        equipos_no_enciende_activos_dict[tecnico_id] = item['total_no_enciende']
+    
+    # --- PROCESAR DATOS HISTÓRICOS CON DESGLOSE ---
+    equipos_historico_dict = {}
+    for item in equipos_historico_desglose_raw:
+        tecnico_id = item['tecnico_asignado_actual__id']
+        equipo_enciende = item['detalle_equipo__equipo_enciende']
+        total = item['total_equipos']
+        
+        if tecnico_id not in equipos_historico_dict:
+            equipos_historico_dict[tecnico_id] = {
+                'nombre': item['tecnico_asignado_actual__nombre_completo'],
+                'si_enciende': 0,
+                'no_enciende': 0,
+                'total': 0
+            }
+        
+        if equipo_enciende:
+            equipos_historico_dict[tecnico_id]['si_enciende'] = total
+        else:
+            equipos_historico_dict[tecnico_id]['no_enciende'] = total
+        
+        equipos_historico_dict[tecnico_id]['total'] += total
+    
+    # --- COMBINAR ACTIVOS Y HISTÓRICOS ---
+    equipos_no_enciende_por_tecnico = []
+    for tecnico_id, historico_data in equipos_historico_dict.items():
         tecnico_obj = Empleado.objects.get(id=tecnico_id)
+        
         equipos_no_enciende_por_tecnico.append({
-            'tecnico_asignado_actual__id': tecnico_id,
-            'tecnico_asignado_actual__nombre_completo': item['tecnico_asignado_actual__nombre_completo'],
-            'total_no_enciende': item['total_no_enciende'],
+            'tecnico_id': tecnico_id,
+            'nombre': historico_data['nombre'],
             'foto_url': tecnico_obj.get_foto_perfil_url(),
-            'iniciales': tecnico_obj.get_iniciales()
+            'iniciales': tecnico_obj.get_iniciales(),
+            # Datos ACTIVOS (solo "No Enciende" en proceso)
+            'activos': equipos_no_enciende_activos_dict.get(tecnico_id, 0),
+            # Datos HISTÓRICOS (desglose por si enciende o no)
+            'historico': {
+                'si_enciende': historico_data['si_enciende'],
+                'no_enciende': historico_data['no_enciende'],
+                'total': historico_data['total']
+            }
         })
     
-    # Estadísticas de equipos por gama por técnico
-    equipos_por_gama_por_tecnico_raw = OrdenServicio.objects.exclude(
+    # Ordenar por total histórico descendente
+    equipos_no_enciende_por_tecnico.sort(key=lambda x: x['historico']['total'], reverse=True)
+    
+    # ========================================================================
+    # ESTADÍSTICAS: EQUIPOS POR GAMA POR TÉCNICO (ACTIVOS + HISTÓRICO)
+    # ========================================================================
+    # ACTUALIZACIÓN: Se divide en dos consultas para mostrar:
+    # 1. ACTIVOS: Carga de trabajo actual (solo órdenes en proceso)
+    # 2. HISTÓRICO: Total de equipos manejados (incluyendo cerrados)
+    
+    # --- CONSULTA 1: EQUIPOS ACTIVOS (Carga actual) ---
+    equipos_por_gama_activos_raw = OrdenServicio.objects.exclude(
         estado__in=['entregado', 'cancelado']
     ).filter(
         tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
@@ -339,9 +403,35 @@ def lista_ordenes_activas(request):
         total_equipos=Count('numero_orden_interno')
     ).order_by('tecnico_asignado_actual__nombre_completo', 'detalle_equipo__gama')
     
-    # Procesar datos para agrupar por técnico
+    # --- CONSULTA 2: EQUIPOS HISTÓRICO TOTAL (Todas las órdenes) ---
+    equipos_por_gama_historico_raw = OrdenServicio.objects.filter(
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
+    ).values(
+        'tecnico_asignado_actual__nombre_completo',
+        'tecnico_asignado_actual__id',
+        'detalle_equipo__gama'
+    ).annotate(
+        total_equipos=Count('numero_orden_interno')
+    ).order_by('tecnico_asignado_actual__nombre_completo', 'detalle_equipo__gama')
+    
+    # --- PROCESAR DATOS ACTIVOS ---
+    equipos_activos_dict = {}
+    for item in equipos_por_gama_activos_raw:
+        tecnico_id = item['tecnico_asignado_actual__id']
+        gama = item['detalle_equipo__gama']
+        total = item['total_equipos']
+        
+        if tecnico_id not in equipos_activos_dict:
+            equipos_activos_dict[tecnico_id] = {
+                'alta': 0, 'media': 0, 'baja': 0, 'total': 0
+            }
+        
+        equipos_activos_dict[tecnico_id][gama] = total
+        equipos_activos_dict[tecnico_id]['total'] += total
+    
+    # --- PROCESAR DATOS HISTÓRICOS ---
     equipos_por_gama_por_tecnico = {}
-    for item in equipos_por_gama_por_tecnico_raw:
+    for item in equipos_por_gama_historico_raw:
         tecnico_id = item['tecnico_asignado_actual__id']
         tecnico_nombre = item['tecnico_asignado_actual__nombre_completo']
         gama = item['detalle_equipo__gama']
@@ -350,21 +440,40 @@ def lista_ordenes_activas(request):
         if tecnico_id not in equipos_por_gama_por_tecnico:
             # Obtener información adicional del técnico
             tecnico_obj = Empleado.objects.get(id=tecnico_id)
+            
+            # Obtener datos activos para este técnico (si existen)
+            activos_data = equipos_activos_dict.get(tecnico_id, {
+                'alta': 0, 'media': 0, 'baja': 0, 'total': 0
+            })
+            
             equipos_por_gama_por_tecnico[tecnico_id] = {
                 'nombre': tecnico_nombre,
-                'gamas': {'alta': 0, 'media': 0, 'baja': 0},
-                'total': 0,
                 'foto_url': tecnico_obj.get_foto_perfil_url(),
-                'iniciales': tecnico_obj.get_iniciales()
+                'iniciales': tecnico_obj.get_iniciales(),
+                # Datos ACTIVOS
+                'activos': {
+                    'alta': activos_data.get('alta', 0),
+                    'media': activos_data.get('media', 0),
+                    'baja': activos_data.get('baja', 0),
+                    'total': activos_data.get('total', 0)
+                },
+                # Datos HISTÓRICOS
+                'historico': {
+                    'alta': 0,
+                    'media': 0,
+                    'baja': 0,
+                    'total': 0
+                }
             }
         
-        equipos_por_gama_por_tecnico[tecnico_id]['gamas'][gama] = total
-        equipos_por_gama_por_tecnico[tecnico_id]['total'] += total
+        # Agregar datos históricos
+        equipos_por_gama_por_tecnico[tecnico_id]['historico'][gama] = total
+        equipos_por_gama_por_tecnico[tecnico_id]['historico']['total'] += total
     
-    # Convertir a lista ordenada por total descendente
+    # Convertir a lista ordenada por total histórico descendente
     equipos_por_gama_por_tecnico = sorted(
         equipos_por_gama_por_tecnico.values(),
-        key=lambda x: x['total'],
+        key=lambda x: x['historico']['total'],
         reverse=True
     )
     
@@ -681,17 +790,9 @@ def detalle_orden(request, orden_id):
             
             if form_estado.is_valid():
                 estado_anterior = orden.estado
+                
+                # El formulario maneja automáticamente las fechas en su método save()
                 orden_actualizada = form_estado.save()
-                
-                # Actualizar fecha de finalización si cambió a 'finalizado'
-                if orden_actualizada.estado == 'finalizado' and estado_anterior != 'finalizado':
-                    orden_actualizada.fecha_finalizacion = timezone.now()
-                    orden_actualizada.save()
-                
-                # Actualizar fecha de entrega si cambió a 'entregado'
-                if orden_actualizada.estado == 'entregado' and estado_anterior != 'entregado':
-                    orden_actualizada.fecha_entrega = timezone.now()
-                    orden_actualizada.save()
                 
                 # Agregar comentario adicional si existe
                 comentario_cambio = form_estado.cleaned_data.get('comentario_cambio', '')
@@ -711,7 +812,19 @@ def detalle_orden(request, orden_id):
                 
                 return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
             else:
-                messages.error(request, '❌ Error al cambiar el estado.')
+                # DEPURACIÓN: Mostrar errores específicos del formulario
+                errores_detallados = []
+                for campo, errores in form_estado.errors.items():
+                    for error in errores:
+                        errores_detallados.append(f"{campo}: {error}")
+                
+                if errores_detallados:
+                    messages.error(
+                        request, 
+                        f'❌ Error al cambiar el estado: {" | ".join(errores_detallados)}'
+                    )
+                else:
+                    messages.error(request, '❌ Error al cambiar el estado.')
         
         # ------------------------------------------------------------------------
         # FORMULARIO 4: Asignar Responsables
@@ -996,27 +1109,14 @@ def detalle_orden(request, orden_id):
                     es_sistema=False
                 )
                 
-                # Cambiar estado a "Esperando Aprobación Cliente" si no está ya
-                if orden.estado != 'cotizacion':
-                    estado_anterior = orden.estado
-                    orden.estado = 'cotizacion'
-                    orden.save()
-                    
-                    messages.info(
-                        request,
-                        f'ℹ️ Estado actualizado automáticamente a: Esperando Aprobación Cliente'
-                    )
-                    
-                    # Registrar cambio de estado
-                    HistorialOrden.objects.create(
-                        orden=orden,
-                        tipo_evento='cambio_estado',
-                        estado_anterior=estado_anterior,
-                        estado_nuevo='cotizacion',
-                        comentario=f'Cambio automático de estado al crear cotización',
-                        usuario=empleado_actual,
-                        es_sistema=True
-                    )
+                # MODIFICACIÓN: Se eliminó el cambio automático de estado
+                # Ahora el usuario debe cambiar manualmente el estado usando
+                # el formulario de "Asignación de Estado" en la sección 2
+                # 
+                # CÓDIGO ANTERIOR (ELIMINADO):
+                # - Cambiaba automáticamente orden.estado = 'cotizacion'
+                # - Mostraba mensaje: "Estado actualizado automáticamente"
+                # - Registraba en historial como "Cambio automático de estado"
                 
                 return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
             else:

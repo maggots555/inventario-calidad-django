@@ -139,6 +139,44 @@
     color: #9ca3af;
 }
 
+/* Indicador de cotización */
+.indicador-icon.has-quotation {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.indicador-icon.no-quotation {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+}
+
+/* Indicador de venta mostrador */
+.indicador-icon.has-sale {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.indicador-icon.no-sale {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+}
+
+/* Indicador de gama del equipo */
+.indicador-icon.gama-alta {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.indicador-icon.gama-media {
+    background-color: #fed7aa;
+    color: #9a3412;
+}
+
+.indicador-icon.gama-baja {
+    background-color: #e5e7eb;
+    color: #4b5563;
+}
+
 .indicador-text-small {
     font-size: 0.6rem; /* Más reducido */
 }

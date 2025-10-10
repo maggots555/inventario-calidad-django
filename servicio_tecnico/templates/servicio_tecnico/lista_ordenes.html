@@ -90,118 +90,261 @@
                 <i class="bi bi-info-circle-fill me-2" style="font-size: 1.5rem;"></i>
                 <div>
                     <h6 class="alert-heading mb-1">
-                        <i class="bi bi-bar-chart-line"></i> Vista General de Carga de Trabajo
+                        <i class="bi bi-bar-chart-line"></i> Vista General de Estadísticas por Técnico
                     </h6>
                     <p class="mb-0">
-                        Las estadísticas muestran la carga de trabajo <strong>total</strong> de todos los técnicos
+                        <strong>"Equipos No Enciende":</strong> <span class="badge bg-warning text-dark">Activos</span> (solo "No Enciende" en proceso) vs <span class="badge bg-info">Histórico</span> (desglose: sí enciende / no enciende / total).
+                        <br>
+                        <strong>"Equipos por Gama":</strong> <span class="badge bg-warning text-dark">Activos</span> (carga actual por gama) vs <span class="badge bg-info">Histórico Total</span> (desempeño acumulado por gama).
                         {% if busqueda %}
-                            (independiente de la búsqueda activa).
-                        {% else %}
-                            en todas las órdenes activas.
+                            <br><small class="text-muted">(Estadísticas independientes de la búsqueda activa)</small>
                         {% endif %}
-                        Total de órdenes activas: <strong>{{ total_ordenes_activas }}</strong>
                     </p>
                 </div>
             </div>
         </div>
 
         <div class="row mt-4 g-4 estadisticas-tecnico-row">
-        <!-- Equipos "No enciende" por técnico -->
+        <!-- Equipos "No enciende" por técnico (ACTIVOS + HISTÓRICO) -->
         {% if equipos_no_enciende_por_tecnico %}
-            <div class="col-lg-6">
+            <div class="col-lg-12">
                 <div class="card border-warning h-100">
                     <div class="card-header bg-warning text-dark">
                         <h6 class="card-title mb-0">
-                            <i class="bi bi-exclamation-triangle"></i> Equipos "No Enciende" por Técnico
+                            <i class="bi bi-exclamation-triangle"></i> Equipos "No Enciende" por Técnico - Activos vs Histórico
                         </h6>
                     </div>
                     <div class="card-body">
-                        <div class="row g-3">
-                            {% for tecnico in equipos_no_enciende_por_tecnico %}
-                                <div class="col-12">
-                                    <div class="tecnico-no-enciende-card">
-                                        <div class="d-flex align-items-center">
-                                            <div class="tecnico-avatar">
-                                                {% if tecnico.foto_url %}
-                                                    <img src="{{ tecnico.foto_url }}" 
-                                                         alt="Foto de {{ tecnico.tecnico_asignado_actual__nombre_completo }}"
-                                                         class="tecnico-foto">
-                                                {% else %}
-                                                    <div class="tecnico-iniciales">
-                                                        {{ tecnico.iniciales }}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 30%;">Técnico</th>
+                                        <th class="text-center" style="background-color: #fff3cd; width: 35%;">
+                                            <i class="bi bi-hourglass-split"></i> Activos (Carga Actual)
+                                        </th>
+                                        <th class="text-center" style="background-color: #d1ecf1; width: 35%;">
+                                            <i class="bi bi-clock-history"></i> Histórico Total
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tecnico in equipos_no_enciende_por_tecnico %}
+                                        <tr>
+                                            <!-- Columna: Técnico con foto/iniciales -->
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="tecnico-avatar me-2">
+                                                        {% if tecnico.foto_url %}
+                                                            <img src="{{ tecnico.foto_url }}" 
+                                                                 alt="Foto de {{ tecnico.nombre }}"
+                                                                 class="tecnico-foto"
+                                                                 style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover;">
+                                                        {% else %}
+                                                            <div class="tecnico-iniciales" 
+                                                                 style="width: 46px; height: 46px; border-radius: 50%; background-color: #6c757d; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: bold;">
+                                                                {{ tecnico.iniciales }}
+                                                            </div>
+                                                        {% endif %}
                                                     </div>
-                                                {% endif %}
-                                            </div>
-                                            <div class="ms-2 flex-grow-1">
-                                                <div class="tecnico-nombre fw-bold">{{ tecnico.tecnico_asignado_actual__nombre_completo }}</div>
-                                                <div class="tecnico-count">
-                                                    <span class="badge bg-danger">{{ tecnico.total_no_enciende }}</span>
-                                                    <small class="text-muted">equipo(s) no enciende</small>
+                                                    <div>
+                                                        <div class="fw-bold" style="font-size: 0.9rem;">{{ tecnico.nombre }}</div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endfor %}
+                                            </td>
+                                            
+                                            <!-- SECCIÓN: ACTIVOS -->
+                                            <td class="text-center" style="background-color: #fffbf0;">
+                                                {% if tecnico.activos > 0 %}
+                                                    <span class="badge bg-danger fs-6 px-3 py-2">
+                                                        <i class="bi bi-exclamation-triangle-fill"></i> {{ tecnico.activos }}
+                                                    </span>
+                                                    <br>
+                                                    <small class="text-muted">equipo(s) en proceso</small>
+                                                {% else %}
+                                                    <span class="text-muted">Sin equipos activos</span>
+                                                {% endif %}
+                                            </td>
+                                            
+                                            <!-- SECCIÓN: HISTÓRICO CON DESGLOSE -->
+                                            <td class="text-center" style="background-color: #f0f8ff;">
+                                                <div class="d-flex justify-content-around align-items-center">
+                                                    <!-- Sí Enciende -->
+                                                    <div class="text-center">
+                                                        <span class="badge bg-success fs-6 px-2 py-1">
+                                                            <i class="bi bi-power"></i> {{ tecnico.historico.si_enciende }}
+                                                        </span>
+                                                        <br>
+                                                        <small class="text-muted" style="font-size: 0.75rem;">Sí enciende</small>
+                                                    </div>
+                                                    
+                                                    <!-- No Enciende -->
+                                                    <div class="text-center">
+                                                        <span class="badge bg-danger fs-6 px-2 py-1">
+                                                            <i class="bi bi-x-circle"></i> {{ tecnico.historico.no_enciende }}
+                                                        </span>
+                                                        <br>
+                                                        <small class="text-muted" style="font-size: 0.75rem;">No enciende</small>
+                                                    </div>
+                                                    
+                                                    <!-- Total -->
+                                                    <div class="text-center">
+                                                        <span class="badge bg-secondary fs-6 px-2 py-1">
+                                                            <i class="bi bi-archive-fill"></i> {{ tecnico.historico.total }}
+                                                        </span>
+                                                        <br>
+                                                        <small class="text-muted" style="font-size: 0.75rem;">Total</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Leyenda explicativa -->
+                        <div class="alert alert-light border mt-3 mb-0" role="alert">
+                            <small>
+                                <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
+                                <ul class="mb-0 mt-1" style="font-size: 0.85rem;">
+                                    <li><strong>Activos:</strong> Equipos "No Enciende" actualmente en reparación (carga crítica específica)</li>
+                                    <li><strong>Histórico Total:</strong> Desglose completo de todos los equipos manejados - <span class="badge bg-success">Sí enciende</span>, <span class="badge bg-danger">No enciende</span> y <span class="badge bg-secondary">Total</span></li>
+                                </ul>
+                            </small>
                         </div>
                     </div>
                 </div>
             </div>
         {% endif %}
 
-        <!-- Equipos por gama por técnico -->
+        <!-- Equipos por gama por técnico (HISTÓRICO COMPLETO) -->
         {% if equipos_por_gama_por_tecnico %}
-            <div class="col-lg-6">
+            <div class="col-lg-12">
                 <div class="card border-info h-100">
                     <div class="card-header bg-info text-white">
                         <h6 class="card-title mb-0">
-                            <i class="bi bi-bar-chart"></i> Equipos por Gama por Técnico
+                            <i class="bi bi-bar-chart-line"></i> Equipos por Gama por Técnico - Activos vs Histórico
                         </h6>
                     </div>
                     <div class="card-body">
-                        <div class="row g-3">
-                            {% for tecnico in equipos_por_gama_por_tecnico %}
-                                <div class="col-12">
-                                    <div class="tecnico-gama-card">
-                                        <div class="d-flex align-items-center justify-content-between mb-2">
-                                            <div class="d-flex align-items-center">
-                                                <div class="tecnico-avatar">
-                                                    {% if tecnico.foto_url %}
-                                                        <img src="{{ tecnico.foto_url }}" 
-                                                             alt="Foto de {{ tecnico.nombre }}"
-                                                             class="tecnico-foto">
-                                                    {% else %}
-                                                        <div class="tecnico-iniciales">
-                                                            {{ tecnico.iniciales }}
-                                                        </div>
-                                                    {% endif %}
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 20%;">Técnico</th>
+                                        <th class="text-center" colspan="4" style="background-color: #fff3cd;">
+                                            <i class="bi bi-hourglass-split"></i> Activos (Carga Actual)
+                                        </th>
+                                        <th class="text-center" colspan="4" style="background-color: #d1ecf1;">
+                                            <i class="bi bi-clock-history"></i> Histórico Total
+                                        </th>
+                                    </tr>
+                                    <tr>
+                                        <th></th>
+                                        <!-- Columnas ACTIVOS -->
+                                        <th class="text-center" style="background-color: #fff3cd;"><i class="bi bi-star-fill text-success"></i> Alta</th>
+                                        <th class="text-center" style="background-color: #fff3cd;"><i class="bi bi-dash-circle-fill text-warning"></i> Media</th>
+                                        <th class="text-center" style="background-color: #fff3cd;"><i class="bi bi-circle-fill text-secondary"></i> Baja</th>
+                                        <th class="text-center" style="background-color: #fff3cd;"><strong>Total</strong></th>
+                                        <!-- Columnas HISTÓRICO -->
+                                        <th class="text-center" style="background-color: #d1ecf1;"><i class="bi bi-star-fill text-success"></i> Alta</th>
+                                        <th class="text-center" style="background-color: #d1ecf1;"><i class="bi bi-dash-circle-fill text-warning"></i> Media</th>
+                                        <th class="text-center" style="background-color: #d1ecf1;"><i class="bi bi-circle-fill text-secondary"></i> Baja</th>
+                                        <th class="text-center" style="background-color: #d1ecf1;"><strong>Total</strong></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tecnico in equipos_por_gama_por_tecnico %}
+                                        <tr>
+                                            <!-- Columna: Técnico con foto/iniciales -->
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="tecnico-avatar me-2">
+                                                        {% if tecnico.foto_url %}
+                                                            <img src="{{ tecnico.foto_url }}" 
+                                                                 alt="Foto de {{ tecnico.nombre }}"
+                                                                 class="tecnico-foto"
+                                                                 style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover;">
+                                                        {% else %}
+                                                            <div class="tecnico-iniciales" 
+                                                                 style="width: 46px; height: 46px; border-radius: 50%; background-color: #6c757d; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: bold;">
+                                                                {{ tecnico.iniciales }}
+                                                            </div>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-bold" style="font-size: 0.9rem;">{{ tecnico.nombre }}</div>
+                                                    </div>
                                                 </div>
-                                                <div class="ms-2">
-                                                    <div class="tecnico-nombre fw-bold">{{ tecnico.nombre }}</div>
-                                                    <small class="text-muted">Total: {{ tecnico.total }} equipo(s)</small>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="gama-badges">
-                                            {% if tecnico.gamas.alta > 0 %}
-                                                <span class="badge bg-success me-1">
-                                                    <i class="bi bi-star"></i> Alta: {{ tecnico.gamas.alta }}
-                                                </span>
-                                            {% endif %}
-                                            {% if tecnico.gamas.media > 0 %}
-                                                <span class="badge bg-warning me-1">
-                                                    <i class="bi bi-dash-circle"></i> Media: {{ tecnico.gamas.media }}
-                                                </span>
-                                            {% endif %}
-                                            {% if tecnico.gamas.baja > 0 %}
-                                                <span class="badge bg-secondary">
-                                                    <i class="bi bi-circle"></i> Baja: {{ tecnico.gamas.baja }}
-                                                </span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endfor %}
+                                            </td>
+
+                                            <!-- SECCIÓN: ACTIVOS -->
+                                            <td class="text-center" style="background-color: #fffbf0;">
+                                                {% if tecnico.activos.alta > 0 %}
+                                                    <span class="badge bg-success">{{ tecnico.activos.alta }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center" style="background-color: #fffbf0;">
+                                                {% if tecnico.activos.media > 0 %}
+                                                    <span class="badge bg-warning">{{ tecnico.activos.media }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center" style="background-color: #fffbf0;">
+                                                {% if tecnico.activos.baja > 0 %}
+                                                    <span class="badge bg-secondary">{{ tecnico.activos.baja }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center fw-bold" style="background-color: #fff3cd;">
+                                                {{ tecnico.activos.total }}
+                                            </td>
+                                            
+                                            <!-- SECCIÓN: HISTÓRICO -->
+                                            <td class="text-center" style="background-color: #f0f8ff;">
+                                                {% if tecnico.historico.alta > 0 %}
+                                                    <span class="badge bg-success">{{ tecnico.historico.alta }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center" style="background-color: #f0f8ff;">
+                                                {% if tecnico.historico.media > 0 %}
+                                                    <span class="badge bg-warning">{{ tecnico.historico.media }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center" style="background-color: #f0f8ff;">
+                                                {% if tecnico.historico.baja > 0 %}
+                                                    <span class="badge bg-secondary">{{ tecnico.historico.baja }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center fw-bold" style="background-color: #d1ecf1;">
+                                                {{ tecnico.historico.total }}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Leyenda explicativa -->
+                        <div class="alert alert-light border mt-3 mb-0" role="alert">
+                            <small>
+                                <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
+                                <ul class="mb-0 mt-1" style="font-size: 0.85rem;">
+                                    <li><strong>Activos:</strong> Equipos actualmente en proceso (carga de trabajo presente)</li>
+                                    <li><strong>Histórico:</strong> Total de equipos manejados incluyendo cerrados (desempeño acumulado)</li>
+                                </ul>
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -323,6 +466,77 @@
                                             {% endif %}
                                         </strong>
                                     </div>
+                                </div>
+
+                                <!-- Indicador de cotización -->
+                                <div class="indicador">
+                                    {% if orden.cotizacion %}
+                                        <div class="indicador-icon has-quotation" title="Tiene cotización creada">
+                                            <i class="bi bi-receipt"></i>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted d-block" style="font-size: 0.6rem;">COTIZACIÓN</small>
+                                            <strong style="font-size: 0.75rem;">Creada</strong>
+                                        </div>
+                                    {% else %}
+                                        <div class="indicador-icon no-quotation" title="Sin cotización">
+                                            <i class="bi bi-receipt"></i>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted d-block" style="font-size: 0.6rem;">COTIZACIÓN</small>
+                                            <strong style="font-size: 0.75rem;">Pendiente</strong>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Indicador de venta mostrador -->
+                                <div class="indicador">
+                                    {% if orden.venta_mostrador %}
+                                        <div class="indicador-icon has-sale" title="Tiene venta mostrador registrada">
+                                            <i class="bi bi-cart-check"></i>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted d-block" style="font-size: 0.6rem;">VENTA</small>
+                                            <strong style="font-size: 0.75rem;">Registrada</strong>
+                                        </div>
+                                    {% else %}
+                                        <div class="indicador-icon no-sale" title="Sin venta mostrador">
+                                            <i class="bi bi-cart-x"></i>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted d-block" style="font-size: 0.6rem;">VENTA</small>
+                                            <strong style="font-size: 0.75rem;">Sin venta</strong>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Indicador de gama del equipo -->
+                                <div class="indicador">
+                                    {% if orden.detalle_equipo.gama == 'alta' %}
+                                        <div class="indicador-icon gama-alta" title="Gama Alta">
+                                            <i class="bi bi-star-fill"></i>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted d-block" style="font-size: 0.6rem;">GAMA</small>
+                                            <strong style="font-size: 0.75rem;">Alta</strong>
+                                        </div>
+                                    {% elif orden.detalle_equipo.gama == 'media' %}
+                                        <div class="indicador-icon gama-media" title="Gama Media">
+                                            <i class="bi bi-dash-circle-fill"></i>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted d-block" style="font-size: 0.6rem;">GAMA</small>
+                                            <strong style="font-size: 0.75rem;">Media</strong>
+                                        </div>
+                                    {% else %}
+                                        <div class="indicador-icon gama-baja" title="Gama Baja">
+                                            <i class="bi bi-circle-fill"></i>
+                                        </div>
+                                        <div>
+                                            <small class="text-muted d-block" style="font-size: 0.6rem;">GAMA</small>
+                                            <strong style="font-size: 0.75rem;">Baja</strong>
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>

@@ -822,6 +822,75 @@ class CambioEstadoForm(forms.ModelForm):
         help_texts = {
             'estado': 'Selecciona el nuevo estado de la orden',
         }
+    
+    def clean(self):
+        """
+        Validación personalizada que asigna fechas ANTES de la validación del modelo.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Este método se ejecuta durante form.is_valid(), ANTES de que Django
+        valide el modelo completo con instance.clean().
+        
+        ¿Por qué es importante?
+        El modelo OrdenServicio tiene una validación que requiere que:
+        - Si estado = 'finalizado', debe existir fecha_finalizacion
+        - Si estado = 'entregado', debe existir fecha_entrega
+        
+        Si no asignamos estas fechas AQUÍ, la validación del modelo fallará
+        y el usuario verá un error.
+        
+        Flujo:
+        1. Usuario envía formulario
+        2. is_valid() llama a form.clean() ← ESTAMOS AQUÍ
+        3. Asignamos las fechas necesarias
+        4. is_valid() llama a instance.clean() ← Ya tenemos las fechas
+        5. ✅ Validación exitosa
+        
+        Returns:
+            dict: Los datos limpios del formulario
+        """
+        from django.utils import timezone
+        
+        # Llamar al clean() de la clase padre primero
+        cleaned_data = super().clean()
+        
+        # Obtener el nuevo estado del formulario
+        nuevo_estado = cleaned_data.get('estado')
+        
+        # Obtener el estado anterior de la instancia
+        estado_anterior = self.instance.estado if self.instance.pk else None
+        
+        # Asignar fechas ANTES de la validación del modelo si es necesario
+        if nuevo_estado == 'finalizado' and estado_anterior != 'finalizado':
+            if not self.instance.fecha_finalizacion:
+                self.instance.fecha_finalizacion = timezone.now()
+        
+        if nuevo_estado == 'entregado' and estado_anterior != 'entregado':
+            if not self.instance.fecha_entrega:
+                self.instance.fecha_entrega = timezone.now()
+        
+        return cleaned_data
+    
+    def save(self, commit=True):
+        """
+        Guarda la orden con las fechas ya asignadas en clean().
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Este método simplemente guarda la orden. Las fechas ya fueron
+        asignadas en el método clean() que se ejecuta durante is_valid().
+        
+        No necesitamos lógica compleja aquí porque clean() ya hizo el trabajo.
+        
+        Parámetros:
+            commit (bool): Si True, guarda en la base de datos. Si False, solo prepara.
+        
+        Returns:
+            OrdenServicio: El objeto guardado o preparado
+        """
+        # Las fechas ya fueron asignadas en clean(), solo guardamos
+        return super().save(commit=commit)
 
 
 class AsignarResponsablesForm(forms.ModelForm):

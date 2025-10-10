@@ -335,19 +335,25 @@ class OrdenServicio(models.Model):
         Reglas de negocio simplificadas:
         1. Si requiere factura, debe haber información fiscal
         2. Estados finales requieren fechas correspondientes
+        
+        NOTA: Las validaciones de fecha se hacen con ValidationError simple
+        (sin diccionario de campos) para evitar errores cuando se usan
+        formularios que no incluyen esos campos.
         """
         from django.core.exceptions import ValidationError
         
         # Validación básica: Estados finales requieren fechas
+        # Usamos ValidationError simple (mensaje de texto) en lugar de diccionario
+        # para evitar errores "has no field named" en formularios parciales
         if self.estado == 'entregado' and not self.fecha_entrega:
-            raise ValidationError({
-                'fecha_entrega': 'Una orden entregada debe tener fecha de entrega'
-            })
+            raise ValidationError(
+                'Una orden con estado "entregado" debe tener fecha de entrega.'
+            )
         
         if self.estado == 'finalizado' and not self.fecha_finalizacion:
-            raise ValidationError({
-                'fecha_finalizacion': 'Una orden finalizada debe tener fecha de finalización'
-            })
+            raise ValidationError(
+                'Una orden con estado "finalizado" debe tener fecha de finalización.'
+            )
     
     @property
     def dias_en_servicio(self):
