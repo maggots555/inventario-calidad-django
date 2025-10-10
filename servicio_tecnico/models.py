@@ -19,6 +19,13 @@ from config.constants import (
     ESTADO_PIEZA_CHOICES,
     MOTIVO_RHITSO_CHOICES,
     obtener_precio_paquete,
+    OWNER_RHITSO_CHOICES,
+    COMPLEJIDAD_CHOICES,
+    GRAVEDAD_INCIDENCIA_CHOICES,
+    ESTADO_INCIDENCIA_CHOICES,
+    IMPACTO_CLIENTE_CHOICES,
+    PRIORIDAD_CHOICES,
+    TIPO_CONFIG_CHOICES,
 )
 
 
@@ -149,6 +156,44 @@ class OrdenServicio(models.Model):
         blank=True,
         help_text="Descripción detallada del motivo RHITSO"
     )
+    
+    # RHITSO - Campos adicionales del módulo de seguimiento especializado
+    estado_rhitso = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Estado actual en el proceso RHITSO"
+    )
+    fecha_envio_rhitso = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha de envío del equipo a RHITSO"
+    )
+    fecha_recepcion_rhitso = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha de recepción del equipo desde RHITSO"
+    )
+    tecnico_diagnostico = models.ForeignKey(
+        Empleado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='diagnosticos_realizados',
+        help_text="Técnico que realizó el diagnóstico SIC"
+    )
+    fecha_diagnostico_sic = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha del diagnóstico realizado en SIC"
+    )
+    complejidad_estimada = models.CharField(
+        max_length=10,
+        choices=COMPLEJIDAD_CHOICES,
+        default='MEDIA',
+        blank=True,
+        help_text="Complejidad estimada de la reparación"
+    )
+
     
     # FACTURACIÓN
     requiere_factura = models.BooleanField(
@@ -317,6 +362,24 @@ class OrdenServicio(models.Model):
         if self.estado != 'entregado' and self.dias_en_servicio > 15:
             return True
         return False
+    
+    @property
+    def dias_en_rhitso(self):
+        """
+        Calcula los días que el equipo ha estado en RHITSO.
+        
+        Returns:
+            int: Días desde fecha_envio_rhitso hasta fecha_recepcion_rhitso o hasta ahora
+        """
+        if not self.fecha_envio_rhitso:
+            return 0
+        
+        if self.fecha_recepcion_rhitso:
+            delta = self.fecha_recepcion_rhitso - self.fecha_envio_rhitso
+        else:
+            delta = timezone.now() - self.fecha_envio_rhitso
+        
+        return delta.days
     
     def crear_incidencia_reingreso(self, usuario=None):
         """
@@ -1409,5 +1472,507 @@ class HistorialOrden(models.Model):
             models.Index(fields=['-fecha_evento']),
             models.Index(fields=['orden', '-fecha_evento']),
         ]
+
+
+# ============================================================================
+# MÓDULO RHITSO - SISTEMA DE SEGUIMIENTO ESPECIALIZADO
+# ============================================================================
+
+# ============================================================================
+# MODELO 11: ESTADO RHITSO (Catálogo de Estados del Proceso)
+# ============================================================================
+
+class EstadoRHITSO(models.Model):
+    """
+    Catálogo de estados del proceso RHITSO con responsables asignados.
+    
+    Define los diferentes estados por los que puede pasar un equipo durante
+    el proceso de reparación especializada RHITSO, incluyendo el responsable
+    de cada estado (SIC, RHITSO, Cliente, Compras).
+    
+    Ejemplo:
+        - "EQUIPO EN RHITSO" → Owner: RHITSO
+        - "EN ESPERA DE PIEZA POR SIC" → Owner: SIC
+        - "CLIENTE ACEPTA COTIZACIÓN" → Owner: CLIENTE
+    """
+    estado = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Nombre del estado (ej: 'EN DIAGNOSTICO', 'ESPERANDO PIEZAS')"
+    )
+    owner = models.CharField(
+        max_length=20,
+        choices=OWNER_RHITSO_CHOICES,
+        help_text="Responsable del estado actual"
+    )
+    descripcion = models.TextField(
+        blank=True,
+        help_text="Descripción detallada del estado"
+    )
+    color = models.CharField(
+        max_length=20,
+        default='secondary',
+        help_text="Color para badges Bootstrap: info, warning, success, danger, primary, secondary, dark"
+    )
+    orden = models.IntegerField(
+        default=0,
+        help_text="Orden de aparición (1-32)"
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text="¿Estado activo y disponible para usar?"
+    )
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Fecha de creación del registro"
+    )
+    
+    def __str__(self):
+        return self.estado
+    
+    @classmethod
+    def obtener_primer_estado(cls):
+        """
+        Retorna el estado con menor orden (el primero del flujo).
+        
+        Returns:
+            EstadoRHITSO: Primer estado del flujo RHITSO o None si no hay estados
+        """
+        return cls.objects.filter(activo=True).order_by('orden').first()
+    
+    def get_badge_class(self):
+        """
+        Retorna la clase CSS de Bootstrap según el owner del estado.
+        
+        Returns:
+            str: Clase CSS para badge (ej: 'badge bg-info')
+        """
+        badge_map = {
+            'SIC': 'badge bg-info',
+            'RHITSO': 'badge bg-primary',
+            'CLIENTE': 'badge bg-warning text-dark',
+            'COMPRAS': 'badge bg-secondary',
+            'CERRADO': 'badge bg-dark',
+        }
+        return badge_map.get(self.owner, 'badge bg-secondary')
+    
+    class Meta:
+        ordering = ['orden']
+        verbose_name = "Estado RHITSO"
+        verbose_name_plural = "Estados RHITSO"
+
+
+# ============================================================================
+# MODELO 12: CATEGORÍA DE DIAGNÓSTICO
+# ============================================================================
+
+class CategoriaDiagnostico(models.Model):
+    """
+    Categorías técnicas de problemas que típicamente requieren RHITSO.
+    
+    Define tipos de fallas o problemas que necesitan reparación especializada,
+    con información de complejidad y tiempo estimado.
+    
+    Ejemplos:
+        - Reballing de GPU
+        - Cortocircuito en placa madre
+        - Daño por líquidos con corrosión
+    """
+    nombre = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Nombre de la categoría (ej: 'Reballing', 'Soldadura SMD')"
+    )
+    descripcion = models.TextField(
+        blank=True,
+        help_text="Descripción técnica de la categoría"
+    )
+    requiere_rhitso = models.BooleanField(
+        default=True,
+        help_text="¿Requiere envío a RHITSO?"
+    )
+    tiempo_estimado_dias = models.IntegerField(
+        default=7,
+        validators=[MinValueValidator(1)],
+        help_text="Tiempo estimado de reparación en días"
+    )
+    complejidad_tipica = models.CharField(
+        max_length=10,
+        choices=COMPLEJIDAD_CHOICES,
+        default='MEDIA',
+        help_text="Complejidad típica de esta categoría"
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text="¿Categoría activa?"
+    )
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True
+    )
+    
+    def __str__(self):
+        return self.nombre
+    
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = "Categoría de Diagnóstico"
+        verbose_name_plural = "Categorías de Diagnóstico"
+
+
+# ============================================================================
+# MODELO 13: TIPO DE INCIDENCIA RHITSO
+# ============================================================================
+
+class TipoIncidenciaRHITSO(models.Model):
+    """
+    Catálogo de tipos de incidencias que pueden ocurrir con RHITSO.
+    
+    Define los tipos de problemas o incidencias que se pueden registrar
+    durante el proceso de reparación externa.
+    
+    Ejemplos:
+        - Daño adicional al equipo
+        - Retraso en la entrega
+        - Falta de comunicación
+        - Pieza incorrecta recibida
+    """
+    nombre = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Nombre del tipo de incidencia"
+    )
+    descripcion = models.TextField(
+        blank=True,
+        help_text="Descripción del tipo de incidencia"
+    )
+    gravedad = models.CharField(
+        max_length=10,
+        choices=GRAVEDAD_INCIDENCIA_CHOICES,
+        default='MEDIA',
+        help_text="Gravedad típica de este tipo de incidencia"
+    )
+    color = models.CharField(
+        max_length=20,
+        default='warning',
+        help_text="Color para badges: info, warning, success, danger"
+    )
+    requiere_accion_inmediata = models.BooleanField(
+        default=False,
+        help_text="¿Requiere acción inmediata al registrarse?"
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text="¿Tipo de incidencia activo?"
+    )
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True
+    )
+    
+    def __str__(self):
+        return self.nombre
+    
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = "Tipo de Incidencia RHITSO"
+        verbose_name_plural = "Tipos de Incidencias RHITSO"
+
+
+# ============================================================================
+# MODELO 14: SEGUIMIENTO RHITSO (Historial de Estados)
+# ============================================================================
+
+class SeguimientoRHITSO(models.Model):
+    """
+    Historial completo de cambios de estado RHITSO de una orden.
+    
+    Registra cada cambio de estado por el que pasa una orden durante
+    el proceso RHITSO, incluyendo observaciones, tiempo en estado anterior
+    y usuario que realizó el cambio.
+    
+    Este modelo permite reconstruir todo el timeline del proceso RHITSO.
+    """
+    orden = models.ForeignKey(
+        'OrdenServicio',
+        on_delete=models.CASCADE,
+        related_name='seguimientos_rhitso',
+        help_text="Orden de servicio asociada"
+    )
+    estado = models.ForeignKey(
+        EstadoRHITSO,
+        on_delete=models.PROTECT,
+        help_text="Estado RHITSO al que cambió"
+    )
+    estado_anterior = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Estado anterior (para referencia)"
+    )
+    observaciones = models.TextField(
+        blank=True,
+        help_text="Observaciones sobre el cambio de estado"
+    )
+    fecha_actualizacion = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Fecha y hora del cambio"
+    )
+    usuario_actualizacion = models.ForeignKey(
+        Empleado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Usuario que realizó el cambio (null si es sistema)"
+    )
+    tiempo_en_estado_anterior = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Días que estuvo en el estado anterior"
+    )
+    notificado_cliente = models.BooleanField(
+        default=False,
+        help_text="¿Se notificó al cliente de este cambio?"
+    )
+    
+    def __str__(self):
+        return f"{self.orden.numero_orden_interno} → {self.estado.estado}"
+    
+    def calcular_tiempo_en_estado(self):
+        """
+        Calcula los días que estuvo en este estado.
+        
+        Returns:
+            int: Días desde esta actualización hasta la siguiente o hasta ahora
+        """
+        siguiente = SeguimientoRHITSO.objects.filter(
+            orden=self.orden,
+            fecha_actualizacion__gt=self.fecha_actualizacion
+        ).order_by('fecha_actualizacion').first()
+        
+        if siguiente:
+            delta = siguiente.fecha_actualizacion - self.fecha_actualizacion
+        else:
+            delta = timezone.now() - self.fecha_actualizacion
+        
+        return delta.days
+    
+    class Meta:
+        ordering = ['-fecha_actualizacion']
+        verbose_name = "Seguimiento RHITSO"
+        verbose_name_plural = "Seguimientos RHITSO"
+        indexes = [
+            models.Index(fields=['orden', '-fecha_actualizacion']),
+            models.Index(fields=['estado']),
+            models.Index(fields=['-fecha_actualizacion']),
+        ]
+
+
+# ============================================================================
+# MODELO 15: INCIDENCIA RHITSO
+# ============================================================================
+
+class IncidenciaRHITSO(models.Model):
+    """
+    Registro de problemas e incidencias durante el proceso RHITSO.
+    
+    Permite registrar cualquier problema, retraso o incidencia que ocurra
+    durante la reparación externa, con seguimiento de su resolución.
+    
+    Ejemplos:
+        - Daño adicional causado por RHITSO
+        - Retraso en la entrega sin justificación
+        - Pieza incorrecta instalada
+        - Falta de comunicación sobre avances
+    """
+    orden = models.ForeignKey(
+        'OrdenServicio',
+        on_delete=models.CASCADE,
+        related_name='incidencias_rhitso',
+        help_text="Orden de servicio afectada"
+    )
+    tipo_incidencia = models.ForeignKey(
+        TipoIncidenciaRHITSO,
+        on_delete=models.PROTECT,
+        help_text="Tipo de incidencia"
+    )
+    titulo = models.CharField(
+        max_length=255,
+        help_text="Título breve de la incidencia"
+    )
+    descripcion_detallada = models.TextField(
+        help_text="Descripción completa del problema"
+    )
+    fecha_ocurrencia = models.DateTimeField(
+        default=timezone.now,
+        help_text="Fecha y hora en que ocurrió la incidencia"
+    )
+    estado = models.CharField(
+        max_length=15,
+        choices=ESTADO_INCIDENCIA_CHOICES,
+        default='ABIERTA',
+        help_text="Estado actual de la incidencia"
+    )
+    impacto_cliente = models.CharField(
+        max_length=10,
+        choices=IMPACTO_CLIENTE_CHOICES,
+        default='BAJO',
+        help_text="Impacto de la incidencia hacia el cliente"
+    )
+    accion_tomada = models.TextField(
+        blank=True,
+        help_text="Descripción de la acción correctiva tomada"
+    )
+    resuelto_por = models.ForeignKey(
+        Empleado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='incidencias_resueltas',
+        help_text="Empleado que resolvió la incidencia"
+    )
+    fecha_resolucion = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha y hora de resolución"
+    )
+    usuario_registro = models.ForeignKey(
+        Empleado,
+        on_delete=models.PROTECT,
+        related_name='incidencias_registradas',
+        help_text="Empleado que registró la incidencia"
+    )
+    costo_adicional = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Costo adicional generado por la incidencia"
+    )
+    requiere_seguimiento = models.BooleanField(
+        default=True,
+        help_text="¿Requiere seguimiento continuo?"
+    )
+    prioridad = models.CharField(
+        max_length=10,
+        choices=PRIORIDAD_CHOICES,
+        default='MEDIA',
+        help_text="Prioridad de atención"
+    )
+    
+    def __str__(self):
+        return f"{self.orden.numero_orden_interno} - {self.titulo}"
+    
+    @property
+    def dias_abierta(self):
+        """
+        Calcula los días que la incidencia ha estado abierta.
+        
+        Returns:
+            int: Días desde la ocurrencia hasta la resolución o hasta ahora
+        """
+        if self.fecha_resolucion:
+            delta = self.fecha_resolucion - self.fecha_ocurrencia
+        else:
+            delta = timezone.now() - self.fecha_ocurrencia
+        return delta.days
+    
+    @property
+    def esta_resuelta(self):
+        """
+        Verifica si la incidencia está resuelta.
+        
+        Returns:
+            bool: True si el estado es RESUELTA o CERRADA
+        """
+        return self.estado in ['RESUELTA', 'CERRADA']
+    
+    def marcar_como_resuelta(self, usuario, accion_tomada):
+        """
+        Marca la incidencia como resuelta.
+        
+        Args:
+            usuario (Empleado): Usuario que resuelve la incidencia
+            accion_tomada (str): Descripción de la acción correctiva
+        """
+        self.estado = 'RESUELTA'
+        self.resuelto_por = usuario
+        self.fecha_resolucion = timezone.now()
+        self.accion_tomada = accion_tomada
+        self.save()
+    
+    class Meta:
+        ordering = ['-fecha_ocurrencia']
+        verbose_name = "Incidencia RHITSO"
+        verbose_name_plural = "Incidencias RHITSO"
+        indexes = [
+            models.Index(fields=['orden', '-fecha_ocurrencia']),
+            models.Index(fields=['tipo_incidencia']),
+            models.Index(fields=['estado']),
+        ]
+
+
+# ============================================================================
+# MODELO 16: CONFIGURACIÓN RHITSO
+# ============================================================================
+
+class ConfiguracionRHITSO(models.Model):
+    """
+    Configuración global del módulo RHITSO.
+    
+    Almacena configuraciones del sistema como:
+    - Tiempo máximo sin actualización antes de alerta
+    - Email de notificaciones
+    - Tiempo estimado default de reparación
+    - Configuraciones de notificaciones automáticas
+    
+    Ejemplo:
+        clave='tiempo_maximo_sin_actualizacion', valor='7', tipo='INTEGER'
+    """
+    clave = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Clave de configuración (ej: 'tiempo_maximo_alerta')"
+    )
+    valor = models.TextField(
+        blank=True,
+        help_text="Valor de la configuración"
+    )
+    descripcion = models.TextField(
+        blank=True,
+        help_text="Descripción de qué controla esta configuración"
+    )
+    tipo = models.CharField(
+        max_length=10,
+        choices=TIPO_CONFIG_CHOICES,
+        default='STRING',
+        help_text="Tipo de dato del valor"
+    )
+    fecha_actualizacion = models.DateTimeField(
+        auto_now=True,
+        help_text="Última actualización"
+    )
+    
+    def __str__(self):
+        return f"{self.clave} = {self.valor}"
+    
+    @classmethod
+    def obtener(cls, clave, default=None):
+        """
+        Obtiene el valor de una configuración.
+        
+        Args:
+            clave (str): Clave de la configuración
+            default: Valor por defecto si no existe
+        
+        Returns:
+            str: Valor de la configuración o default
+        """
+        try:
+            config = cls.objects.get(clave=clave)
+            return config.valor
+        except cls.DoesNotExist:
+            return default
+    
+    class Meta:
+        verbose_name = "Configuración RHITSO"
+        verbose_name_plural = "Configuraciones RHITSO"
 
 

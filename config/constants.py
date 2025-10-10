@@ -131,7 +131,7 @@ TIPO_IMAGEN_CHOICES = [
     ('diagnostico', 'Durante Diagnóstico'),
     ('reparacion', 'Durante Reparación'),
     ('egreso', 'Egreso - Estado Final'),
-    ('otras', 'Otras'),
+    ('autorizacion', 'Autorización/Pass - RHITSO'),
 ]
 
 # ============================================================================
@@ -255,3 +255,65 @@ def paquete_genera_comision(codigo_paquete):
     """
     # Los paquetes premium, oro y plata siempre generan comisión
     return codigo_paquete in ['premium', 'oro', 'plata']
+
+
+# ============================================================================
+# MÓDULO RHITSO - Sistema de Seguimiento Especializado
+# ============================================================================
+
+# RESPONSABLES DE ESTADOS RHITSO
+OWNER_RHITSO_CHOICES = [
+    ('SIC', 'SIC - Sistema de Información del Cliente'),
+    ('RHITSO', 'RHITSO - Centro de Reparación Especializada'),
+    ('CLIENTE', 'Cliente - Usuario Final'),
+    ('COMPRAS', 'Compras - Departamento de Adquisiciones'),
+    ('CERRADO', 'Cerrado - Proceso Finalizado'),
+]
+
+# COMPLEJIDAD DE REPARACIONES
+COMPLEJIDAD_CHOICES = [
+    ('BAJA', 'Baja - Reparación simple'),
+    ('MEDIA', 'Media - Complejidad moderada'),
+    ('ALTA', 'Alta - Requiere experiencia especializada'),
+    ('CRITICA', 'Crítica - Máxima complejidad técnica'),
+]
+
+# GRAVEDAD DE INCIDENCIAS
+GRAVEDAD_INCIDENCIA_CHOICES = [
+    ('BAJA', 'Baja - Sin impacto significativo'),
+    ('MEDIA', 'Media - Impacto moderado'),
+    ('ALTA', 'Alta - Impacto considerable'),
+    ('CRITICA', 'Crítica - Requiere atención inmediata'),
+]
+
+# ESTADO DE INCIDENCIAS
+ESTADO_INCIDENCIA_CHOICES = [
+    ('ABIERTA', 'Abierta - Sin resolver'),
+    ('EN_REVISION', 'En Revisión - Siendo analizada'),
+    ('RESUELTA', 'Resuelta - Acción completada'),
+    ('CERRADA', 'Cerrada - Finalizada'),
+]
+
+# IMPACTO AL CLIENTE
+IMPACTO_CLIENTE_CHOICES = [
+    ('NINGUNO', 'Ninguno - Sin impacto'),
+    ('BAJO', 'Bajo - Impacto mínimo'),
+    ('MEDIO', 'Medio - Impacto moderado'),
+    ('ALTO', 'Alto - Impacto significativo'),
+]
+
+# PRIORIDAD DE INCIDENCIAS
+PRIORIDAD_CHOICES = [
+    ('BAJA', 'Baja - Puede esperar'),
+    ('MEDIA', 'Media - Atención normal'),
+    ('ALTA', 'Alta - Requiere prioridad'),
+    ('URGENTE', 'Urgente - Atención inmediata'),
+]
+
+# TIPOS DE CONFIGURACIÓN RHITSO
+TIPO_CONFIG_CHOICES = [
+    ('STRING', 'Texto'),
+    ('INTEGER', 'Número Entero'),
+    ('BOOLEAN', 'Booleano (Sí/No)'),
+    ('JSON', 'JSON - Datos estructurados'),
+]
