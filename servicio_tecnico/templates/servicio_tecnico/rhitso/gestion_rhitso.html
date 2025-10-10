@@ -1,0 +1,776 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}RHITSO - Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=4.4">
+<link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}?v=1.0">
+<style>
+/* Estilos específicos para RHITSO */
+.rhitso-badge {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+}
+
+.alert-dias-rhitso {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-left: 5px solid #ffc107;
+}
+
+.alert-dias-rhitso.critico {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    border-left: 5px solid #dc3545;
+}
+
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 30px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 70px;
+    padding-bottom: 30px;
+}
+
+.timeline-icon {
+    position: absolute;
+    left: 17px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.timeline-icon.sistema {
+    background: #007bff;
+    color: white;
+}
+
+.timeline-icon.manual {
+    background: #28a745;
+    color: white;
+}
+
+.incidencia-card {
+    border-left: 4px solid;
+    margin-bottom: 1rem;
+}
+
+.incidencia-card.abierta {
+    border-color: #dc3545;
+}
+
+.incidencia-card.en-revision {
+    border-color: #ffc107;
+}
+
+.incidencia-card.resuelta {
+    border-color: #28a745;
+}
+
+.imagen-rhitso {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+.imagen-rhitso:hover {
+    transform: scale(1.05);
+}
+
+.imagen-rhitso img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.imagen-tipo-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    
+    <!-- ============================================================ -->
+    <!-- ENCABEZADO CON INFORMACIÓN PRINCIPAL -->
+    <!-- ============================================================ -->
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-2">
+                        <i class="bi bi-gear-wide-connected"></i> 
+                        RHITSO - {{ orden.numero_orden_interno }}
+                    </h2>
+                    <p class="text-muted mb-0">
+                        <i class="bi bi-calendar"></i> 
+                        Ingreso: {{ orden.fecha_ingreso|date:"d/m/Y H:i" }}
+                    </p>
+                </div>
+                <div class="text-end">
+                    <a href="{% url 'servicio_tecnico:detalle_orden' orden.id %}" class="btn btn-outline-secondary me-2">
+                        <i class="bi bi-eye"></i> Ver Orden Completa
+                    </a>
+                    <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 1: INFORMACIÓN DEL EQUIPO -->
+    <!-- ============================================================ -->
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header">
+                    <i class="bi bi-laptop"></i>
+                    <span>Información del Equipo</span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong><i class="bi bi-tag"></i> Marca:</strong> 
+                                {{ equipo_info.marca|default:"No especificada" }}
+                            </p>
+                            <p class="mb-2">
+                                <strong><i class="bi bi-hash"></i> Modelo:</strong> 
+                                {{ equipo_info.modelo|default:"No especificado" }}
+                            </p>
+                            <p class="mb-2">
+                                <strong><i class="bi bi-cpu"></i> Tipo:</strong> 
+                                {{ equipo_info.tipo_equipo|default:"No especificado" }}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong><i class="bi bi-star"></i> Gama:</strong>
+                                {% if equipo_info.gama %}
+                                    <span class="badge bg-info">{{ equipo_info.gama }}</span>
+                                {% else %}
+                                    <span class="text-muted">No especificada</span>
+                                {% endif %}
+                            </p>
+                            <p class="mb-2">
+                                <strong><i class="bi bi-upc"></i> Serie:</strong> 
+                                {{ equipo_info.serie|default:"No especificada" }}
+                            </p>
+                            <p class="mb-2">
+                                <strong><i class="bi bi-wrench"></i> Estado Físico:</strong> 
+                                {{ equipo_info.estado_fisico|default:"No especificado" }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 2: ESTADO RHITSO ACTUAL -->
+    <!-- ============================================================ -->
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header">
+                    <i class="bi bi-activity"></i>
+                    <span>Estado RHITSO Actual</span>
+                </div>
+                <div class="card-body">
+                    {% if estado_rhitso_info %}
+                        <div class="row align-items-center mb-3">
+                            <div class="col-md-6">
+                                <h4 class="mb-0">
+                                    <span class="badge bg-primary rhitso-badge">
+                                        {{ estado_rhitso_info.descripcion }}
+                                    </span>
+                                </h4>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <p class="mb-0">
+                                    <strong>Días en RHITSO:</strong> 
+                                    <span class="badge bg-secondary">{{ estado_rhitso_info.dias_en_rhitso }} días</span>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        {% if estado_rhitso_info.alerta %}
+                            <div class="alert {% if estado_rhitso_info.alerta == 'CRITICO' %}alert-dias-rhitso critico{% else %}alert-dias-rhitso{% endif %} mb-3">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                <strong>¡Atención!</strong>
+                                {% if estado_rhitso_info.alerta == 'CRITICO' %}
+                                    La orden lleva más de {{ estado_rhitso_info.dias_en_rhitso }} días en RHITSO. Se ha superado el umbral crítico.
+                                {% else %}
+                                    La orden está cerca de superar el umbral de días permitidos en RHITSO.
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Formulario para Cambiar Estado -->
+                        <div class="mt-4">
+                            <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#formCambiarEstado">
+                                <i class="bi bi-arrow-repeat"></i> Cambiar Estado RHITSO
+                            </button>
+                            
+                            <div class="collapse mt-3" id="formCambiarEstado">
+                                <div class="card card-body">
+                                    <!-- TODO: Implementar vista actualizar_estado_rhitso en FASE 5 -->
+                                    <form method="post" action="#">
+                                        {% csrf_token %}
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                {{ form_estado.estado_rhitso.label_tag }}
+                                                {{ form_estado.estado_rhitso }}
+                                                {% if form_estado.estado_rhitso.help_text %}
+                                                    <small class="form-text text-muted">{{ form_estado.estado_rhitso.help_text }}</small>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                {{ form_estado.notificar_cliente.label_tag }}
+                                                <div class="form-check">
+                                                    {{ form_estado.notificar_cliente }}
+                                                </div>
+                                                {% if form_estado.notificar_cliente.help_text %}
+                                                    <small class="form-text text-muted">{{ form_estado.notificar_cliente.help_text }}</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            {{ form_estado.observaciones.label_tag }}
+                                            {{ form_estado.observaciones }}
+                                            {% if form_estado.observaciones.help_text %}
+                                                <small class="form-text text-muted">{{ form_estado.observaciones.help_text }}</small>
+                                            {% endif %}
+                                        </div>
+                                        <button type="submit" class="btn btn-success" disabled>
+                                            <i class="bi bi-check-circle"></i> Actualizar Estado (Próximamente)
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#formCambiarEstado">
+                                            Cancelar
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No hay información de estado RHITSO disponible.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 3: DIAGNÓSTICO SIC -->
+    <!-- ============================================================ -->
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header">
+                    <i class="bi bi-file-medical"></i>
+                    <span>Diagnóstico SIC (Servicio Interno de Calidad)</span>
+                </div>
+                <div class="card-body">
+                    {% if diagnostico_info %}
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <p class="mb-2">
+                                    <strong><i class="bi bi-folder"></i> Categoría:</strong> 
+                                    {{ diagnostico_info.categoria|default:"No especificada" }}
+                                </p>
+                                <p class="mb-2">
+                                    <strong><i class="bi bi-folder-symlink"></i> Subcategoría:</strong> 
+                                    {{ diagnostico_info.subcategoria|default:"No especificada" }}
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2">
+                                    <strong><i class="bi bi-person-badge"></i> Técnico:</strong> 
+                                    {{ diagnostico_info.tecnico|default:"No asignado" }}
+                                </p>
+                                <p class="mb-2">
+                                    <strong><i class="bi bi-speedometer2"></i> Complejidad:</strong> 
+                                    {{ diagnostico_info.complejidad|default:"No especificada" }}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        {% if diagnostico_info.descripcion %}
+                            <div class="mb-3">
+                                <strong><i class="bi bi-text-paragraph"></i> Descripción RHITSO:</strong>
+                                <p class="mt-2 p-3" style="background-color: #f8f9fa; border-radius: 5px;">
+                                    {{ diagnostico_info.descripcion }}
+                                </p>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Formulario para Editar Diagnóstico SIC -->
+                        <div class="mt-4">
+                            <button class="btn btn-warning" type="button" data-bs-toggle="collapse" data-bs-target="#formEditarDiagnostico">
+                                <i class="bi bi-pencil"></i> Editar Diagnóstico SIC
+                            </button>
+                            
+                            <div class="collapse mt-3" id="formEditarDiagnostico">
+                                <div class="card card-body">
+                                    <!-- TODO: Implementar vista editar_diagnostico_sic en FASE 5 -->
+                                    <form method="post" action="#">
+                                        {% csrf_token %}
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                {{ form_diagnostico.categoria_diagnostico.label_tag }}
+                                                {{ form_diagnostico.categoria_diagnostico }}
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                {{ form_diagnostico.subcategoria_diagnostico.label_tag }}
+                                                {{ form_diagnostico.subcategoria_diagnostico }}
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            {{ form_diagnostico.descripcion_rhitso.label_tag }}
+                                            {{ form_diagnostico.descripcion_rhitso }}
+                                        </div>
+                                        <div class="mb-3">
+                                            {{ form_diagnostico.complejidad_estimada.label_tag }}
+                                            {{ form_diagnostico.complejidad_estimada }}
+                                        </div>
+                                        <button type="submit" class="btn btn-success" disabled>
+                                            <i class="bi bi-check-circle"></i> Guardar Cambios (Próximamente)
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#formEditarDiagnostico">
+                                            Cancelar
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <p class="text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            No hay diagnóstico SIC registrado aún.
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 4: HISTORIAL DE SEGUIMIENTO -->
+    <!-- ============================================================ -->
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header">
+                    <i class="bi bi-clock-history"></i>
+                    <span>Historial de Seguimiento RHITSO</span>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <!-- Seguimientos del Sistema (Automáticos) -->
+                        {% for seguimiento in seguimientos_sistema %}
+                            <div class="timeline-item">
+                                <div class="timeline-icon sistema">
+                                    <i class="bi bi-robot"></i>
+                                </div>
+                                <div class="timeline-content">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>Sistema: {{ seguimiento.estado.descripcion }}</strong>
+                                        <small class="text-muted">
+                                            {{ seguimiento.fecha_actualizacion|date:"d/m/Y H:i" }}
+                                        </small>
+                                    </div>
+                                    {% if seguimiento.observaciones %}
+                                        <p class="mb-0 mt-2">{{ seguimiento.observaciones }}</p>
+                                    {% endif %}
+                                    {% if seguimiento.usuario_actualizacion %}
+                                        <small class="text-muted">
+                                            <i class="bi bi-person"></i> {{ seguimiento.usuario_actualizacion.nombre_completo }}
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% empty %}
+                            <p class="text-muted">No hay seguimientos del sistema registrados.</p>
+                        {% endfor %}
+                        
+                        <!-- Comentarios Manuales -->
+                        {% for comentario in comentarios_manuales %}
+                            <div class="timeline-item">
+                                <div class="timeline-icon manual">
+                                    <i class="bi bi-chat-text"></i>
+                                </div>
+                                <div class="timeline-content">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>Comentario Manual</strong>
+                                        <small class="text-muted">
+                                            {{ comentario.fecha_actualizacion|date:"d/m/Y H:i" }}
+                                        </small>
+                                    </div>
+                                    <p class="mb-0 mt-2">{{ comentario.observaciones }}</p>
+                                    {% if comentario.usuario_actualizacion %}
+                                        <small class="text-muted">
+                                            <i class="bi bi-person"></i> {{ comentario.usuario_actualizacion.nombre_completo }}
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% empty %}
+                            <p class="text-muted">No hay comentarios manuales registrados.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 5: GESTIÓN DE INCIDENCIAS -->
+    <!-- ============================================================ -->
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header">
+                    <i class="bi bi-exclamation-octagon"></i>
+                    <span>Gestión de Incidencias RHITSO</span>
+                </div>
+                <div class="card-body">
+                    <!-- Estadísticas de Incidencias -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0">{{ incidencias_stats.total }}</h3>
+                                <small class="text-muted">Total</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-danger text-white rounded">
+                                <h3 class="mb-0">{{ incidencias_stats.abiertas }}</h3>
+                                <small>Abiertas</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-warning text-dark rounded">
+                                <h3 class="mb-0">{{ incidencias_stats.criticas }}</h3>
+                                <small>Críticas</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-success text-white rounded">
+                                <h3 class="mb-0">{{ incidencias_stats.resueltas }}</h3>
+                                <small>Resueltas</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Botón para Registrar Nueva Incidencia -->
+                    <div class="mb-4">
+                        <button class="btn btn-danger" type="button" data-bs-toggle="collapse" data-bs-target="#formNuevaIncidencia">
+                            <i class="bi bi-plus-circle"></i> Registrar Nueva Incidencia
+                        </button>
+                        
+                        <div class="collapse mt-3" id="formNuevaIncidencia">
+                            <div class="card card-body">
+                                <!-- TODO: Implementar vista registrar_incidencia en FASE 5 -->
+                                <form method="post" action="#">
+                                    {% csrf_token %}
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            {{ form_incidencia.tipo_incidencia.label_tag }}
+                                            {{ form_incidencia.tipo_incidencia }}
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            {{ form_incidencia.prioridad.label_tag }}
+                                            {{ form_incidencia.prioridad }}
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form_incidencia.titulo.label_tag }}
+                                        {{ form_incidencia.titulo }}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form_incidencia.descripcion_detallada.label_tag }}
+                                        {{ form_incidencia.descripcion_detallada }}
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            {{ form_incidencia.impacto_cliente.label_tag }}
+                                            {{ form_incidencia.impacto_cliente }}
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            {{ form_incidencia.costo_adicional.label_tag }}
+                                            {{ form_incidencia.costo_adicional }}
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-danger" disabled>
+                                        <i class="bi bi-exclamation-triangle"></i> Registrar Incidencia (Próximamente)
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#formNuevaIncidencia">
+                                        Cancelar
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Lista de Incidencias -->
+                    <div class="accordion" id="accordionIncidencias">
+                        {% for incidencia in incidencias %}
+                            <div class="incidencia-card card {% if incidencia.estado == 'ABIERTA' %}abierta{% elif incidencia.estado == 'EN_REVISION' %}en-revision{% else %}resuelta{% endif %}">
+                                <div class="card-header" id="heading{{ incidencia.id }}">
+                                    <h5 class="mb-0">
+                                        <button class="btn btn-link w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ incidencia.id }}">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>{{ incidencia.titulo }}</strong>
+                                                    <span class="badge {% if incidencia.prioridad == 'CRITICA' %}bg-danger{% elif incidencia.prioridad == 'ALTA' %}bg-warning{% else %}bg-info{% endif %} ms-2">
+                                                        {{ incidencia.get_prioridad_display }}
+                                                    </span>
+                                                    <span class="badge {% if incidencia.estado == 'ABIERTA' %}bg-danger{% elif incidencia.estado == 'EN_REVISION' %}bg-warning{% else %}bg-success{% endif %} ms-1">
+                                                        {{ incidencia.get_estado_display }}
+                                                    </span>
+                                                </div>
+                                                <small class="text-muted">
+                                                    {{ incidencia.fecha_ocurrencia|date:"d/m/Y" }}
+                                                </small>
+                                            </div>
+                                        </button>
+                                    </h5>
+                                </div>
+                                <div id="collapse{{ incidencia.id }}" class="collapse" data-bs-parent="#accordionIncidencias">
+                                    <div class="card-body">
+                                        <p><strong>Tipo:</strong> {{ incidencia.tipo_incidencia.nombre }}</p>
+                                        <p><strong>Descripción:</strong></p>
+                                        <p>{{ incidencia.descripcion_detallada }}</p>
+                                        <p><strong>Impacto al Cliente:</strong> {{ incidencia.get_impacto_cliente_display }}</p>
+                                        {% if incidencia.costo_adicional %}
+                                            <p><strong>Costo Adicional:</strong> ${{ incidencia.costo_adicional }}</p>
+                                        {% endif %}
+                                        <p><strong>Reportado por:</strong> {{ incidencia.usuario_registro.get_full_name|default:incidencia.usuario_registro.username }}</p>
+                                        
+                                        {% if incidencia.estado != 'RESUELTA' and incidencia.estado != 'CERRADA' %}
+                                            <button class="btn btn-success btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#formResolver{{ incidencia.id }}">
+                                                <i class="bi bi-check-circle"></i> Resolver Incidencia
+                                            </button>
+                                            
+                                            <div class="collapse mt-3" id="formResolver{{ incidencia.id }}">
+                                                <div class="card card-body">
+                                                    <!-- TODO: Implementar vista resolver_incidencia en FASE 5 -->
+                                                    <form method="post" action="#">
+                                                        {% csrf_token %}
+                                                        <div class="mb-3">
+                                                            {{ form_resolver_incidencia.solucion.label_tag }}
+                                                            {{ form_resolver_incidencia.solucion }}
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            {{ form_resolver_incidencia.requiere_compensacion.label_tag }}
+                                                            <div class="form-check">
+                                                                {{ form_resolver_incidencia.requiere_compensacion }}
+                                                            </div>
+                                                        </div>
+                                                        <button type="submit" class="btn btn-success" disabled>
+                                                            <i class="bi bi-check-circle"></i> Marcar como Resuelta (Próximamente)
+                                                        </button>
+                                                        <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#formResolver{{ incidencia.id }}">
+                                                            Cancelar
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="alert alert-success mt-3">
+                                                <strong><i class="bi bi-check-circle"></i> Incidencia Resuelta</strong>
+                                                {% if incidencia.solucion %}
+                                                    <p class="mb-0 mt-2">{{ incidencia.solucion }}</p>
+                                                {% endif %}
+                                                {% if incidencia.fecha_resolucion %}
+                                                    <small class="text-muted d-block mt-1">
+                                                        Resuelta el {{ incidencia.fecha_resolucion|date:"d/m/Y H:i" }}
+                                                    </small>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <p class="text-muted">
+                                <i class="bi bi-info-circle"></i>
+                                No hay incidencias registradas para esta orden.
+                            </p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 6: GALERÍA DE IMÁGENES RHITSO -->
+    <!-- ============================================================ -->
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card section-card">
+                <div class="section-header">
+                    <i class="bi bi-images"></i>
+                    <span>Galería de Imágenes RHITSO</span>
+                </div>
+                <div class="card-body">
+                    <!-- Filtros de Tipo de Imagen -->
+                    <div class="mb-4">
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'servicio_tecnico:gestion_rhitso' orden.id %}" class="btn {% if not filtro_tipo_imagen %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                Todas
+                            </a>
+                            <a href="{% url 'servicio_tecnico:gestion_rhitso' orden.id %}?tipo=envio" class="btn {% if filtro_tipo_imagen == 'envio' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                Envío
+                            </a>
+                            <a href="{% url 'servicio_tecnico:gestion_rhitso' orden.id %}?tipo=recepcion" class="btn {% if filtro_tipo_imagen == 'recepcion' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                Recepción
+                            </a>
+                            <a href="{% url 'servicio_tecnico:gestion_rhitso' orden.id %}?tipo=reparacion" class="btn {% if filtro_tipo_imagen == 'reparacion' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                Reparación
+                            </a>
+                            <a href="{% url 'servicio_tecnico:gestion_rhitso' orden.id %}?tipo=autorizacion" class="btn {% if filtro_tipo_imagen == 'autorizacion' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                Autorización
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Grid de Imágenes -->
+                    <div class="row">
+                        {% for imagen in imagenes_rhitso %}
+                            <div class="col-md-4 col-lg-3 mb-3">
+                                <div class="imagen-rhitso" data-bs-toggle="modal" data-bs-target="#modalImagen{{ imagen.id }}">
+                                    <span class="badge bg-primary imagen-tipo-badge">
+                                        {{ imagen.get_tipo_display }}
+                                    </span>
+                                    <img src="{{ imagen.imagen.url }}" alt="{{ imagen.descripcion }}">
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    {{ imagen.fecha_subida|date:"d/m/Y H:i" }}
+                                </small>
+                            </div>
+                            
+                            <!-- Modal para Ver Imagen en Grande -->
+                            <div class="modal fade" id="modalImagen{{ imagen.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-lg modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">
+                                                <span class="badge bg-primary">{{ imagen.get_tipo_display }}</span>
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body text-center">
+                                            <img src="{{ imagen.imagen.url }}" class="img-fluid" alt="{{ imagen.descripcion }}">
+                                            {% if imagen.descripcion %}
+                                                <p class="mt-3">{{ imagen.descripcion }}</p>
+                                            {% endif %}
+                                            <small class="text-muted d-block">
+                                                Subida el {{ imagen.fecha_subida|date:"d/m/Y H:i" }}
+                                                por {{ imagen.subido_por.get_full_name|default:imagen.subido_por.username }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="col-12">
+                                <p class="text-muted text-center">
+                                    <i class="bi bi-image"></i>
+                                    No hay imágenes RHITSO disponibles{% if filtro_tipo_imagen %} para el tipo "{{ filtro_tipo_imagen }}"{% endif %}.
+                                </p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // JavaScript para interactividad adicional
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-colapsar otros formularios cuando se abre uno nuevo
+        const collapseElements = document.querySelectorAll('.collapse');
+        collapseElements.forEach(function(collapseEl) {
+            collapseEl.addEventListener('show.bs.collapse', function() {
+                // Cerrar otros collapses en la misma sección
+                const parent = collapseEl.closest('.card-body');
+                if (parent) {
+                    parent.querySelectorAll('.collapse.show').forEach(function(otherCollapse) {
+                        if (otherCollapse !== collapseEl) {
+                            const bsCollapse = bootstrap.Collapse.getInstance(otherCollapse);
+                            if (bsCollapse) {
+                                bsCollapse.hide();
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        
+        // Confirmación antes de enviar formularios importantes
+        const formEstado = document.querySelector('#formCambiarEstado form');
+        if (formEstado) {
+            formEstado.addEventListener('submit', function(e) {
+                if (!confirm('¿Estás seguro de cambiar el estado RHITSO? Esta acción quedará registrada en el historial.')) {
+                    e.preventDefault();
+                }
+            });
+        }
+        
+        // Confirmación para registrar incidencias
+        const formIncidencia = document.querySelector('#formNuevaIncidencia form');
+        if (formIncidencia) {
+            formIncidencia.addEventListener('submit', function(e) {
+                const prioridad = formIncidencia.querySelector('[name="prioridad"]').value;
+                if (prioridad === 'CRITICA') {
+                    if (!confirm('Estás registrando una incidencia CRÍTICA. Esto generará alertas automáticas. ¿Continuar?')) {
+                        e.preventDefault();
+                    }
+                }
+            });
+        }
+        
+        console.log('✅ Vista RHITSO cargada correctamente');
+    });
+</script>
+{% endblock %}

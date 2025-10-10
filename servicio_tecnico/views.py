@@ -18,7 +18,18 @@ from django.views.decorators.http import require_http_methods
 from PIL import Image
 import os
 import json
-from .models import OrdenServicio, DetalleEquipo, HistorialOrden, ImagenOrden
+from .models import (
+    OrdenServicio, 
+    DetalleEquipo, 
+    HistorialOrden, 
+    ImagenOrden,
+    EstadoRHITSO,
+    SeguimientoRHITSO,
+    IncidenciaRHITSO,
+    TipoIncidenciaRHITSO,
+    CategoriaDiagnostico,
+    ConfiguracionRHITSO,
+)
 from inventario.models import Empleado
 from config.constants import ESTADO_ORDEN_CHOICES
 from .forms import (
@@ -33,6 +44,10 @@ from .forms import (
     EditarInformacionEquipoForm,
     CrearCotizacionForm,
     GestionarCotizacionForm,
+    ActualizarEstadoRHITSOForm,
+    RegistrarIncidenciaRHITSOForm,
+    ResolverIncidenciaRHITSOForm,
+    EditarDiagnosticoSICForm,
 )
 
 
@@ -2889,6 +2904,298 @@ def eliminar_pieza_venta_mostrador(request, pieza_id):
 
 # ⛔ VISTA ELIMINADA: convertir_venta_a_diagnostico()
 # 
+
+
+# ============================================================================
+# RHITSO - SISTEMA DE SEGUIMIENTO ESPECIALIZADO
+# ============================================================================
+
+@login_required
+def gestion_rhitso(request, orden_id):
+    """
+    Vista principal del módulo RHITSO - Panel de gestión completo.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista es el centro de control para órdenes que requieren reparación
+    externa especializada (RHITSO). Muestra toda la información relevante:
+    - Información del equipo y diagnóstico SIC
+    - Estado actual RHITSO y timeline completo
+    - Incidencias registradas y su seguimiento
+    - Galería de imágenes específica RHITSO
+    - Formularios para gestionar el proceso
+    
+    FLUJO DE LA VISTA:
+    1. Obtiene la orden y valida que sea candidato RHITSO
+    2. Prepara información del equipo y diagnóstico
+    3. Obtiene estado RHITSO actual y calcula métricas
+    4. Consulta historial de seguimientos e incidencias
+    5. Filtra galería de imágenes RHITSO
+    6. Prepara formularios para acciones
+    7. Renderiza template con todo el contexto
+    
+    Args:
+        request: HttpRequest object
+        orden_id: ID de la orden de servicio
+    
+    Returns:
+        HttpResponse con el template renderizado o redirect si hay error
+    """
+    # =======================================================================
+    # PASO 1: OBTENER ORDEN Y VALIDAR
+    # =======================================================================
+    orden = get_object_or_404(OrdenServicio, pk=orden_id)
+    
+    # Validar que la orden es candidato RHITSO
+    # EXPLICACIÓN: es_candidato_rhitso es un campo booleano que indica si
+    # la orden requiere reparación externa especializada
+    if not orden.es_candidato_rhitso:
+        messages.error(
+            request,
+            '❌ Esta orden no está marcada como candidato RHITSO. '
+            'Primero debe completar el diagnóstico inicial.'
+        )
+        return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
+    
+    # =======================================================================
+    # PASO 2: OBTENER INFORMACIÓN DEL EQUIPO
+    # =======================================================================
+    # EXPLICACIÓN: detalle_equipo es una relación OneToOne que contiene
+    # toda la información técnica del equipo (marca, modelo, serie, etc.)
+    detalle_equipo = orden.detalle_equipo
+    
+    # Preparar diccionario con información del equipo
+    # EXPLICACIÓN: Organizamos la información en un diccionario para
+    # facilitar su uso en el template
+    equipo_info = {
+        'marca': detalle_equipo.marca if detalle_equipo else 'N/A',
+        'modelo': detalle_equipo.modelo if detalle_equipo else 'N/A',
+        'serie': detalle_equipo.numero_serie if detalle_equipo else 'N/A',
+        'tipo_equipo': detalle_equipo.get_tipo_equipo_display() if detalle_equipo else 'N/A',
+        'gama': detalle_equipo.get_gama_display() if detalle_equipo else 'N/A',
+        'sucursal': orden.sucursal.nombre if orden.sucursal else 'N/A',
+        'enciende': detalle_equipo.equipo_enciende if detalle_equipo else None,
+        'falla_principal': detalle_equipo.falla_principal if detalle_equipo else 'N/A',
+    }
+    
+    # =======================================================================
+    # PASO 3: OBTENER ESTADO RHITSO ACTUAL Y CALCULAR MÉTRICAS
+    # =======================================================================
+    estado_rhitso_info = None
+    
+    if orden.estado_rhitso:
+        try:
+            # Buscar el estado en la tabla EstadoRHITSO para obtener detalles
+            # EXPLICACIÓN: EstadoRHITSO contiene información adicional como
+            # el color para mostrar en la UI y el responsable (owner)
+            estado_obj = EstadoRHITSO.objects.get(estado=orden.estado_rhitso)
+            
+            # Calcular días en RHITSO usando property del modelo
+            # EXPLICACIÓN: dias_en_rhitso es una property que calcula
+            # automáticamente los días transcurridos desde el envío
+            dias_en_rhitso = orden.dias_en_rhitso
+            
+            # Obtener configuración para alertas (días máximos permitidos)
+            # EXPLICACIÓN: ConfiguracionRHITSO almacena parámetros del sistema
+            # como días máximos antes de alertar
+            config = ConfiguracionRHITSO.objects.first()
+            dias_alerta = config.dias_maximos_rhitso if config else 7
+            
+            # Determinar si hay alerta por exceso de tiempo
+            tiene_alerta = dias_en_rhitso > dias_alerta if dias_en_rhitso else False
+            
+            estado_rhitso_info = {
+                'estado': estado_obj.estado,
+                'estado_display': estado_obj.descripcion or estado_obj.estado,
+                'color': estado_obj.color,
+                'owner': estado_obj.owner,
+                'orden': estado_obj.orden,
+                'dias': dias_en_rhitso,
+                'tiene_alerta': tiene_alerta,
+                'dias_alerta': dias_alerta,
+            }
+        except EstadoRHITSO.DoesNotExist:
+            # Si el estado no existe en el catálogo, usar valores por defecto
+            estado_rhitso_info = {
+                'estado': orden.estado_rhitso,
+                'estado_display': orden.estado_rhitso,
+                'color': 'secondary',
+                'owner': 'SIC',
+                'orden': 1,
+                'dias': orden.dias_en_rhitso,
+                'tiene_alerta': False,
+                'dias_alerta': 7,
+            }
+    
+    # =======================================================================
+    # PASO 4: OBTENER DIAGNÓSTICO SIC
+    # =======================================================================
+    # EXPLICACIÓN: El diagnóstico SIC es el diagnóstico inicial realizado
+    # por el técnico de SIC antes de enviar el equipo a RHITSO
+    diagnostico_info = {
+        'diagnostico_sic': detalle_equipo.diagnostico_sic if detalle_equipo else '',
+        'motivo_rhitso': orden.get_motivo_rhitso_display() if orden.motivo_rhitso else 'No especificado',
+        'motivo_rhitso_code': orden.motivo_rhitso,
+        'descripcion_rhitso': orden.descripcion_rhitso or '',
+        'complejidad': orden.get_complejidad_estimada_display() if orden.complejidad_estimada else 'No especificada',
+        'complejidad_code': orden.complejidad_estimada,
+        'tecnico': orden.tecnico_diagnostico,
+        'fecha_diagnostico': orden.fecha_diagnostico_sic,
+    }
+    
+    # =======================================================================
+    # PASO 5: OBTENER HISTORIAL RHITSO
+    # =======================================================================
+    # EXPLICACIÓN: Obtenemos dos tipos de registros históricos:
+    # 1. Seguimientos del sistema (cambios de estado automáticos)
+    # 2. Comentarios manuales (agregados por usuarios)
+    
+    # Seguimientos del sistema (cambios de estado RHITSO)
+    # EXPLICACIÓN: select_related optimiza la consulta pre-cargando
+    # las relaciones para evitar múltiples queries a la base de datos
+    seguimientos_sistema = orden.seguimientos_rhitso.select_related(
+        'estado',
+        'usuario_actualizacion'
+    ).all()
+    
+    # Comentarios manuales del historial general
+    # EXPLICACIÓN: Filtramos el historial general por tipo_evento='comentario'
+    # para obtener solo los comentarios agregados manualmente
+    comentarios_manuales = orden.historial.filter(
+        tipo_evento='comentario'
+    ).select_related('usuario').order_by('-fecha_evento')
+    
+    # Obtener último comentario para mostrar en resumen
+    ultimo_comentario = comentarios_manuales.first()
+    
+    # =======================================================================
+    # PASO 6: OBTENER INCIDENCIAS Y CALCULAR ESTADÍSTICAS
+    # =======================================================================
+    # EXPLICACIÓN: Las incidencias son problemas o eventos negativos que
+    # ocurren durante el proceso RHITSO (retrasos, daños, costos extra)
+    
+    # Obtener todas las incidencias de la orden
+    incidencias = orden.incidencias_rhitso.select_related(
+        'tipo_incidencia',
+        'usuario_registro',
+        'resuelto_por'
+    ).order_by('-fecha_ocurrencia')
+    
+    # Calcular estadísticas de incidencias
+    # EXPLICACIÓN: Usamos aggregate y filter para contar incidencias
+    # por diferentes criterios sin hacer múltiples queries
+    incidencias_stats = {
+        'total': incidencias.count(),
+        'abiertas': incidencias.filter(estado__in=['ABIERTA', 'EN_REVISION']).count(),
+        'criticas_abiertas': incidencias.filter(
+            estado__in=['ABIERTA', 'EN_REVISION'],
+            impacto_cliente='ALTO'
+        ).count(),
+        'resueltas': incidencias.filter(estado__in=['RESUELTA', 'CERRADA']).count(),
+        'costo_total_incidencias': sum(
+            i.costo_adicional or 0 for i in incidencias
+        ),
+    }
+    
+    # =======================================================================
+    # PASO 7: OBTENER GALERÍA RHITSO
+    # =======================================================================
+    # EXPLICACIÓN: Filtramos las imágenes de la orden por tipo específico
+    # de RHITSO (envío, recepción, reparación, autorización/pass)
+    
+    # Obtener parámetro de filtro de tipo de imagen (si existe)
+    filtro_tipo_imagen = request.GET.get('tipo_imagen', '')
+    
+    # Consulta base de imágenes
+    imagenes_rhitso = orden.imagenes.select_related('subido_por')
+    
+    # Aplicar filtro si se especificó un tipo
+    # EXPLICACIÓN: Los tipos válidos son: envio, recepcion, reparacion,
+    # autorizacion (estos deben existir en el modelo ImagenOrden)
+    if filtro_tipo_imagen and filtro_tipo_imagen in ['envio', 'recepcion', 'reparacion', 'autorizacion']:
+        imagenes_rhitso = imagenes_rhitso.filter(tipo=filtro_tipo_imagen)
+    else:
+        # Si no hay filtro, mostrar todas las imágenes relacionadas con RHITSO
+        imagenes_rhitso = imagenes_rhitso.filter(
+            tipo__in=['envio', 'recepcion', 'reparacion', 'autorizacion']
+        )
+    
+    # Ordenar por fecha de subida (más recientes primero)
+    imagenes_rhitso = imagenes_rhitso.order_by('-fecha_subida')
+    
+    # =======================================================================
+    # PASO 8: PREPARAR FORMULARIOS
+    # =======================================================================
+    # EXPLICACIÓN: Instanciamos los 4 formularios que permiten gestionar
+    # el proceso RHITSO. Estos formularios fueron creados en la Fase 3
+    
+    # Formulario para cambiar estado RHITSO
+    # EXPLICACIÓN: Este formulario carga dinámicamente los estados
+    # disponibles desde la base de datos
+    form_estado = ActualizarEstadoRHITSOForm()
+    
+    # Formulario para registrar incidencias
+    # EXPLICACIÓN: ModelForm que valida y crea objetos IncidenciaRHITSO
+    form_incidencia = RegistrarIncidenciaRHITSOForm()
+    
+    # Formulario para resolver incidencias
+    # EXPLICACIÓN: Form simple para documentar la resolución de una incidencia
+    form_resolver_incidencia = ResolverIncidenciaRHITSOForm()
+    
+    # Formulario para editar diagnóstico SIC
+    # EXPLICACIÓN: Formulario multi-modelo que actualiza DetalleEquipo y OrdenServicio
+    # Pre-llenamos con valores actuales usando 'initial'
+    form_diagnostico = EditarDiagnosticoSICForm(initial={
+        'diagnostico_sic': detalle_equipo.diagnostico_sic if detalle_equipo else '',
+        'motivo_rhitso': orden.motivo_rhitso,
+        'descripcion_rhitso': orden.descripcion_rhitso,
+        'complejidad_estimada': orden.complejidad_estimada,
+        'tecnico_diagnostico': orden.tecnico_diagnostico,
+    })
+    
+    # =======================================================================
+    # PASO 9: PREPARAR CONTEXTO COMPLETO
+    # =======================================================================
+    # EXPLICACIÓN: El contexto es un diccionario que contiene todos los
+    # datos que necesita el template para renderizar la página
+    context = {
+        # Orden y equipo
+        'orden': orden,
+        'detalle_equipo': detalle_equipo,
+        'equipo_info': equipo_info,
+        
+        # Estado RHITSO
+        'estado_rhitso_info': estado_rhitso_info,
+        
+        # Diagnóstico
+        'diagnostico_info': diagnostico_info,
+        
+        # Historial
+        'seguimientos_sistema': seguimientos_sistema,
+        'comentarios_manuales': comentarios_manuales,
+        'ultimo_comentario': ultimo_comentario,
+        
+        # Incidencias
+        'incidencias': incidencias,
+        'incidencias_stats': incidencias_stats,
+        
+        # Galería
+        'imagenes_rhitso': imagenes_rhitso,
+        'filtro_tipo_imagen': filtro_tipo_imagen,
+        
+        # Formularios
+        'form_estado': form_estado,
+        'form_incidencia': form_incidencia,
+        'form_resolver_incidencia': form_resolver_incidencia,
+        'form_diagnostico': form_diagnostico,
+    }
+    
+    # =======================================================================
+    # PASO 10: RENDERIZAR TEMPLATE
+    # =======================================================================
+    # EXPLICACIÓN: render() toma el template y el contexto, y genera
+    # el HTML final que se envía al navegador del usuario
+    return render(request, 'servicio_tecnico/rhitso/gestion_rhitso.html', context)
+
 # Esta vista manejaba la conversión de ventas mostrador a diagnóstico,
 # creando una NUEVA orden cuando el servicio fallaba.
 # 

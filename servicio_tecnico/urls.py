@@ -81,6 +81,12 @@ urlpatterns = [
     # ELIMINADA EN: Octubre 2025 (Sistema Refactorizado)
     # Ya no es necesaria porque venta_mostrador es ahora un complemento opcional.
     
+    # ========================================================================
+    # MÓDULO RHITSO - SEGUIMIENTO ESPECIALIZADO (FASE 4)
+    # ========================================================================
+    # Vista principal del panel RHITSO
+    path('rhitso/orden/<int:orden_id>/', views.gestion_rhitso, name='gestion_rhitso'),
+    
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]
