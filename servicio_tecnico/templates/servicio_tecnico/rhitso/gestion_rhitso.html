@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load rhitso_filters %}
 
 {% block title %}RHITSO - Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
@@ -128,6 +129,58 @@
 .pulse-animation {
     animation: pulse 2s infinite;
 }
+
+/* Estilos para Dropdown de Estados Agrupados */
+#id_estado_rhitso {
+    font-size: 0.95rem;
+}
+
+#id_estado_rhitso optgroup {
+    font-weight: bold;
+    font-size: 0.9rem;
+    background-color: #f8f9fa;
+    color: #495057;
+    padding: 8px 10px;
+    font-style: normal;
+    margin-top: 5px;
+}
+
+#id_estado_rhitso option {
+    padding: 8px 15px;
+    font-weight: normal;
+    font-size: 0.9rem;
+}
+
+/* Colores para los bloques de optgroup según responsable */
+#id_estado_rhitso optgroup:nth-of-type(1) {
+    /* Bloque SIC - Azul claro */
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    color: #0c5460;
+}
+
+#id_estado_rhitso optgroup:nth-of-type(2) {
+    /* Bloque RHITSO - Púrpura claro */
+    background: linear-gradient(135deg, #e7d9f5 0%, #d8c4e8 100%);
+    color: #4a148c;
+}
+
+#id_estado_rhitso optgroup:nth-of-type(3) {
+    /* Bloque CLIENTE - Amarillo claro */
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    color: #856404;
+}
+
+#id_estado_rhitso optgroup:nth-of-type(4) {
+    /* Bloque COMPRAS - Naranja claro */
+    background: linear-gradient(135deg, #ffe5d0 0%, #ffd4ad 100%);
+    color: #8a4a00;
+}
+
+#id_estado_rhitso optgroup:nth-of-type(5) {
+    /* Bloque CERRADO - Verde/Gris */
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+}
 </style>
 {% endblock %}
 
@@ -152,7 +205,7 @@
                                 <span class="text-muted">Orden:</span> 
                                 <span class="badge bg-dark fs-6">{{ orden.numero_orden_interno }}</span>
                                 {% if estado_rhitso_info %}
-                                    <span class="badge rhitso-badge" style="background-color: {{ estado_rhitso_info.color }}; color: white;">
+                                    <span class="badge rhitso-badge" style="background-color: {{ estado_rhitso_info.estado|color_estado_especifico }}; color: {{ estado_rhitso_info.estado|color_estado_especifico|text_color_for_bg }};">
                                         {{ estado_rhitso_info.estado_display }}
                                     </span>
                                 {% endif %}
@@ -246,39 +299,61 @@
                         <!-- Barra de Progreso Visual -->
                         <div class="mb-4">
                             <label class="form-label fw-bold small text-muted">PROGRESO DEL PROCESO RHITSO</label>
-                            <div class="progress" style="height: 30px;">
+                            <div class="progress" style="height: 35px; border-radius: 10px;">
                                 {% with orden_estado=estado_rhitso_info.orden %}
-                                    {% if orden_estado <= 3 %}
-                                        <!-- Fase Inicial (azul) -->
-                                        <div class="progress-bar bg-primary" role="progressbar" 
-                                             style="width: {{ orden_estado|floatformat:0 }}0%" 
-                                             aria-valuenow="{{ orden_estado }}" aria-valuemin="0" aria-valuemax="10">
-                                            Fase Inicial {{ orden_estado|floatformat:0 }}0%
+                                    {# Calcular porcentaje real basado en 32 estados totales #}
+                                    {% widthratio orden_estado 32 100 as porcentaje %}
+                                    
+                                    {# Determinar color y fase según el número de estado #}
+                                    {% if orden_estado <= 11 %}
+                                        <!-- Fase 1: Estados SIC (1-11) - Azul -->
+                                        <div class="progress-bar bg-info" role="progressbar" 
+                                             style="width: {{ porcentaje }}%;" 
+                                             aria-valuenow="{{ porcentaje }}" aria-valuemin="0" aria-valuemax="100">
+                                            <strong>Fase SIC: {{ porcentaje }}%</strong> (Estado {{ orden_estado }}/32)
                                         </div>
-                                    {% elif orden_estado <= 7 %}
-                                        <!-- Fase Intermedia (amarillo) -->
+                                    {% elif orden_estado <= 24 %}
+                                        <!-- Fase 2: Estados RHITSO (12-24) - Púrpura -->
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: {{ porcentaje }}%; background-color: #6610f2;" 
+                                             aria-valuenow="{{ porcentaje }}" aria-valuemin="0" aria-valuemax="100">
+                                            <strong>Fase RHITSO: {{ porcentaje }}%</strong> (Estado {{ orden_estado }}/32)
+                                        </div>
+                                    {% elif orden_estado <= 28 %}
+                                        <!-- Fase 3: Estados CLIENTE (25-28) - Amarillo -->
                                         <div class="progress-bar bg-warning text-dark" role="progressbar" 
-                                             style="width: {{ orden_estado|floatformat:0 }}0%" 
-                                             aria-valuenow="{{ orden_estado }}" aria-valuemin="0" aria-valuemax="10">
-                                            En Proceso {{ orden_estado|floatformat:0 }}0%
+                                             style="width: {{ porcentaje }}%;" 
+                                             aria-valuenow="{{ porcentaje }}" aria-valuemin="0" aria-valuemax="100">
+                                            <strong>Esperando Cliente: {{ porcentaje }}%</strong> (Estado {{ orden_estado }}/32)
+                                        </div>
+                                    {% elif orden_estado <= 31 %}
+                                        <!-- Fase 4: Estados COMPRAS (29-31) - Naranja -->
+                                        <div class="progress-bar" role="progressbar" 
+                                             style="width: {{ porcentaje }}%; background-color: #fd7e14;" 
+                                             aria-valuenow="{{ porcentaje }}" aria-valuemin="0" aria-valuemax="100">
+                                            <strong>Esperando Compras: {{ porcentaje }}%</strong> (Estado {{ orden_estado }}/32)
                                         </div>
                                     {% else %}
-                                        <!-- Fase Final (verde) -->
+                                        <!-- Fase 5: CERRADO (32) - Verde -->
                                         <div class="progress-bar bg-success" role="progressbar" 
-                                             style="width: {{ orden_estado|floatformat:0 }}0%" 
-                                             aria-valuenow="{{ orden_estado }}" aria-valuemin="0" aria-valuemax="10">
-                                            Casi Completado {{ orden_estado|floatformat:0 }}0%
+                                             style="width: 100%;" 
+                                             aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
+                                            <strong>✅ COMPLETADO: 100%</strong> (Estado 32/32)
                                         </div>
                                     {% endif %}
                                 {% endwith %}
                             </div>
+                            <small class="text-muted d-block mt-1">
+                                <i class="bi bi-info-circle"></i> 
+                                La barra muestra el progreso basado en la numeración de estados (1 a 32)
+                            </small>
                         </div>
                         
                         <!-- Información del Estado Actual -->
                         <div class="row align-items-center mb-3">
                             <div class="col-md-8">
                                 <h4 class="mb-3">
-                                    <span class="badge rhitso-badge" style="background-color: {{ estado_rhitso_info.color }}; color: white; font-size: 1.1rem;">
+                                    <span class="badge rhitso-badge" style="background-color: {{ estado_rhitso_info.estado|color_estado_especifico }}; color: {{ estado_rhitso_info.estado|color_estado_especifico|text_color_for_bg }}; font-size: 1.1rem;">
                                         {{ estado_rhitso_info.estado_display }}
                                     </span>
                                     <!-- Badge de Responsable (Owner) -->
@@ -313,22 +388,20 @@
                                     {% endif %}
                                 </div>
                                 
-                                <!-- Último Comentario (Preview) -->
-                                {% if ultimo_comentario %}
+                                <!-- Observaciones del Estado Actual -->
+                                {% if ultimo_seguimiento_rhitso and ultimo_seguimiento_rhitso.observaciones %}
                                     <div class="alert alert-light border-start border-primary border-4 mt-3">
-                                        <small class="text-muted fw-bold d-block mb-1">
-                                            <i class="bi bi-chat-quote"></i> ÚLTIMO COMENTARIO
+                                        <small class="text-muted fw-bold d-block mb-2">
+                                            <i class="bi bi-chat-square-text"></i> OBSERVACIONES DEL ESTADO ACTUAL
                                         </small>
                                         <p class="mb-0">
-                                            {% if ultimo_comentario.descripcion|length > 100 %}
-                                                {{ ultimo_comentario.descripcion|truncatechars:100 }}
-                                            {% else %}
-                                                {{ ultimo_comentario.descripcion }}
-                                            {% endif %}
+                                            {{ ultimo_seguimiento_rhitso.observaciones }}
                                         </p>
                                         <small class="text-muted">
-                                            {{ ultimo_comentario.fecha_evento|date:"d/m/Y H:i" }} - 
-                                            {{ ultimo_comentario.usuario.nombre_completo|default:ultimo_comentario.usuario }}
+                                            <i class="bi bi-calendar-event"></i> {{ ultimo_seguimiento_rhitso.fecha_actualizacion|date:"d/m/Y H:i" }}
+                                            {% if ultimo_seguimiento_rhitso.usuario_actualizacion %}
+                                                - <i class="bi bi-person"></i> {{ ultimo_seguimiento_rhitso.usuario_actualizacion.nombre_completo|default:ultimo_seguimiento_rhitso.usuario_actualizacion }}
+                                            {% endif %}
                                         </small>
                                     </div>
                                 {% endif %}
@@ -403,6 +476,35 @@
                                             <small class="form-text text-muted">{{ form_estado.observaciones.help_text }}</small>
                                         {% endif %}
                                     </div>
+                                    
+                                    <!-- Campos de Fechas RHITSO -->
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            {{ form_estado.fecha_envio_rhitso.label_tag }}
+                                            {{ form_estado.fecha_envio_rhitso }}
+                                            {% if form_estado.fecha_envio_rhitso.help_text %}
+                                                <small class="form-text text-muted">{{ form_estado.fecha_envio_rhitso.help_text }}</small>
+                                            {% endif %}
+                                            {% if orden.fecha_envio_rhitso %}
+                                                <small class="text-success d-block mt-1">
+                                                    <i class="bi bi-check-circle"></i> Registrada: {{ orden.fecha_envio_rhitso|date:"d/m/Y H:i" }}
+                                                </small>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            {{ form_estado.fecha_recepcion_rhitso.label_tag }}
+                                            {{ form_estado.fecha_recepcion_rhitso }}
+                                            {% if form_estado.fecha_recepcion_rhitso.help_text %}
+                                                <small class="form-text text-muted">{{ form_estado.fecha_recepcion_rhitso.help_text }}</small>
+                                            {% endif %}
+                                            {% if orden.fecha_recepcion_rhitso %}
+                                                <small class="text-success d-block mt-1">
+                                                    <i class="bi bi-check-circle"></i> Registrada: {{ orden.fecha_recepcion_rhitso|date:"d/m/Y H:i" }}
+                                                </small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
                                     <button type="submit" class="btn btn-success">
                                         <i class="bi bi-check-circle"></i> Actualizar Estado
                                     </button>
@@ -436,15 +538,25 @@
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <p class="mb-2">
-                                    <strong><i class="bi bi-person-badge text-primary"></i> Técnico Diagnóstico:</strong> 
-                                    {% if diagnostico_info.tecnico %}
-                                        <span class="badge bg-info">{{ diagnostico_info.tecnico.nombre_completo|default:diagnostico_info.tecnico }}</span>
+                                    <strong><i class="bi bi-person-check text-success"></i> Técnico Responsable Orden:</strong> 
+                                    {% if orden.tecnico_asignado_actual %}
+                                        <span class="badge bg-success">{{ orden.tecnico_asignado_actual.nombre_completo }}</span>
                                     {% else %}
                                         <span class="text-muted">No asignado</span>
                                     {% endif %}
                                 </p>
                                 <p class="mb-2">
-                                    <strong><i class="bi bi-calendar-check text-success"></i> Fecha Diagnóstico:</strong> 
+                                    <strong><i class="bi bi-stethoscope text-primary"></i> Técnico que Diagnosticó RHITSO:</strong> 
+                                    {% if diagnostico_info.tecnico %}
+                                        <span class="badge bg-info">{{ diagnostico_info.tecnico.nombre_completo|default:diagnostico_info.tecnico }}</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-exclamation-triangle"></i> Pendiente asignar
+                                        </span>
+                                    {% endif %}
+                                </p>
+                                <p class="mb-2">
+                                    <strong><i class="bi bi-calendar-check text-info"></i> Fecha Diagnóstico:</strong> 
                                     {% if diagnostico_info.fecha_diagnostico %}
                                         {{ diagnostico_info.fecha_diagnostico|date:"d/m/Y H:i" }}
                                     {% else %}
@@ -459,27 +571,30 @@
                                 </p>
                                 <p class="mb-2">
                                     <strong><i class="bi bi-speedometer2"></i> Complejidad Estimada:</strong> 
-                                    {% if diagnostico_info.complejidad_code == 'BAJA' %}
-                                        <span class="badge bg-success">
-                                            <i class="bi bi-check-circle"></i> {{ diagnostico_info.complejidad }}
-                                        </span>
-                                    {% elif diagnostico_info.complejidad_code == 'MEDIA' %}
-                                        <span class="badge bg-info">
-                                            <i class="bi bi-info-circle"></i> {{ diagnostico_info.complejidad }}
-                                        </span>
-                                    {% elif diagnostico_info.complejidad_code == 'ALTA' %}
-                                        <span class="badge bg-warning">
-                                            <i class="bi bi-exclamation-triangle"></i> {{ diagnostico_info.complejidad }}
-                                        </span>
-                                    {% elif diagnostico_info.complejidad_code == 'CRITICA' %}
-                                        <span class="badge bg-danger">
-                                            <i class="bi bi-x-octagon"></i> {{ diagnostico_info.complejidad }}
-                                        </span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">{{ diagnostico_info.complejidad }}</span>
-                                    {% endif %}
+                                    <span class="badge" style="background-color: {{ diagnostico_info.complejidad_code|color_complejidad }}; color: {{ diagnostico_info.complejidad_code|color_complejidad|text_color_for_bg }};">
+                                        {% if diagnostico_info.complejidad_code == 'BAJA' %}
+                                            <i class="bi bi-check-circle"></i>
+                                        {% elif diagnostico_info.complejidad_code == 'MEDIA' %}
+                                            <i class="bi bi-info-circle"></i>
+                                        {% elif diagnostico_info.complejidad_code == 'ALTA' %}
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                        {% elif diagnostico_info.complejidad_code == 'CRITICA' %}
+                                            <i class="bi bi-x-octagon"></i>
+                                        {% endif %}
+                                        {{ diagnostico_info.complejidad }}
+                                    </span>
                                 </p>
                             </div>
+                        </div>
+                        
+                        <!-- Info Box: Diferencia entre los técnicos -->
+                        <div class="alert alert-light border-start border-info border-4 mb-3">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Nota:</strong> El <em>Técnico Responsable</em> gestiona toda la orden. 
+                                El <em>Técnico que Diagnosticó</em> es quien determinó que el equipo necesita RHITSO 
+                                (pueden ser la misma persona o diferentes).
+                            </small>
                         </div>
                         
                         <!-- Diagnóstico SIC Completo -->
@@ -512,28 +627,62 @@
                                 <div class="card card-body bg-light">
                                     <form method="post" action="{% url 'servicio_tecnico:editar_diagnostico_sic' orden.id %}" id="formEditarDiagnosticoSIC">
                                         {% csrf_token %}
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3">
-                                                {{ form_diagnostico.categoria_diagnostico.label_tag }}
-                                                {{ form_diagnostico.categoria_diagnostico }}
-                                            </div>
-                                            <div class="col-md-6 mb-3">
-                                                {{ form_diagnostico.subcategoria_diagnostico.label_tag }}
-                                                {{ form_diagnostico.subcategoria_diagnostico }}
-                                            </div>
+                                        
+                                        <!-- Diagnóstico SIC (DetalleEquipo) -->
+                                        <div class="mb-3">
+                                            {{ form_diagnostico.diagnostico_sic.label_tag }}
+                                            {{ form_diagnostico.diagnostico_sic }}
+                                            {% if form_diagnostico.diagnostico_sic.help_text %}
+                                                <small class="form-text text-muted d-block mt-1">
+                                                    <i class="bi bi-info-circle"></i> {{ form_diagnostico.diagnostico_sic.help_text }}
+                                                </small>
+                                            {% endif %}
                                         </div>
+                                        
+                                        <!-- Motivo RHITSO (OrdenServicio) -->
+                                        <div class="mb-3">
+                                            {{ form_diagnostico.motivo_rhitso.label_tag }}
+                                            {{ form_diagnostico.motivo_rhitso }}
+                                            {% if form_diagnostico.motivo_rhitso.help_text %}
+                                                <small class="form-text text-muted d-block mt-1">
+                                                    <i class="bi bi-info-circle"></i> {{ form_diagnostico.motivo_rhitso.help_text }}
+                                                </small>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <!-- Descripción Detallada RHITSO (OrdenServicio) -->
                                         <div class="mb-3">
                                             {{ form_diagnostico.descripcion_rhitso.label_tag }}
                                             {{ form_diagnostico.descripcion_rhitso }}
+                                            {% if form_diagnostico.descripcion_rhitso.help_text %}
+                                                <small class="form-text text-muted d-block mt-1">
+                                                    <i class="bi bi-info-circle"></i> {{ form_diagnostico.descripcion_rhitso.help_text }}
+                                                </small>
+                                            {% endif %}
                                         </div>
-                                        <div class="mb-3">
-                                            {{ form_diagnostico.complejidad_estimada.label_tag }}
-                                            {{ form_diagnostico.complejidad_estimada }}
-                                            <small class="form-text text-muted d-block mt-1">
-                                                <i class="bi bi-info-circle"></i> 
-                                                La complejidad ayuda a estimar tiempos y costos de reparación
-                                            </small>
+                                        
+                                        <!-- Complejidad y Técnico -->
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                {{ form_diagnostico.complejidad_estimada.label_tag }}
+                                                {{ form_diagnostico.complejidad_estimada }}
+                                                {% if form_diagnostico.complejidad_estimada.help_text %}
+                                                    <small class="form-text text-muted d-block mt-1">
+                                                        <i class="bi bi-info-circle"></i> {{ form_diagnostico.complejidad_estimada.help_text }}
+                                                    </small>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                {{ form_diagnostico.tecnico_diagnostico.label_tag }}
+                                                {{ form_diagnostico.tecnico_diagnostico }}
+                                                {% if form_diagnostico.tecnico_diagnostico.help_text %}
+                                                    <small class="form-text text-muted d-block mt-1">
+                                                        <i class="bi bi-info-circle"></i> {{ form_diagnostico.tecnico_diagnostico.help_text }}
+                                                    </small>
+                                                {% endif %}
+                                            </div>
                                         </div>
+                                        
                                         <button type="submit" class="btn btn-success">
                                             <i class="bi bi-check-circle"></i> Guardar Cambios
                                         </button>
@@ -604,16 +753,16 @@
                                 <div class="timeline">
                                     {% for seguimiento in seguimientos_sistema %}
                                         <div class="timeline-item">
-                                            <div class="timeline-icon sistema" style="background-color: {{ seguimiento.estado.color }};">
+                                            <div class="timeline-icon sistema" style="background-color: {{ seguimiento.estado.estado|color_estado_especifico }};">
                                                 <i class="bi bi-arrow-repeat"></i>
                                             </div>
                                             <div class="timeline-content">
-                                                <div class="card mb-2 border-start" style="border-left-color: {{ seguimiento.estado.color }} !important; border-left-width: 4px !important;">
+                                                <div class="card mb-2 border-start" style="border-left-color: {{ seguimiento.estado.estado|color_estado_especifico }} !important; border-left-width: 4px !important;">
                                                     <div class="card-body">
                                                         <div class="d-flex justify-content-between align-items-start mb-2">
                                                             <div>
                                                                 <h6 class="mb-1">
-                                                                    <span class="badge" style="background-color: {{ seguimiento.estado.color }}; color: white;">
+                                                                    <span class="badge" style="background-color: {{ seguimiento.estado.estado|color_estado_especifico }}; color: {{ seguimiento.estado.estado|color_estado_especifico|text_color_for_bg }};">
                                                                         {{ seguimiento.estado.descripcion }}
                                                                     </span>
                                                                     <!-- Badge de Owner -->
@@ -636,7 +785,7 @@
                                                                 <strong>Cambio:</strong> 
                                                                 <span class="badge bg-secondary">{{ seguimiento.estado_anterior }}</span>
                                                                 <i class="bi bi-arrow-right mx-2"></i>
-                                                                <span class="badge" style="background-color: {{ seguimiento.estado.color }};">{{ seguimiento.estado.estado }}</span>
+                                                                <span class="badge" style="background-color: {{ seguimiento.estado.estado|color_estado_especifico }}; color: {{ seguimiento.estado.estado|color_estado_especifico|text_color_for_bg }};">{{ seguimiento.estado.estado }}</span>
                                                             </p>
                                                         {% endif %}
                                                         
@@ -861,10 +1010,10 @@
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <div>
                                                     <strong>{{ incidencia.titulo }}</strong>
-                                                    <span class="badge {% if incidencia.prioridad == 'CRITICA' %}bg-danger{% elif incidencia.prioridad == 'ALTA' %}bg-warning{% else %}bg-info{% endif %} ms-2">
+                                                    <span class="badge ms-2" style="background-color: {{ incidencia.prioridad|color_prioridad }}; color: {{ incidencia.prioridad|color_prioridad|text_color_for_bg }};">
                                                         {{ incidencia.get_prioridad_display }}
                                                     </span>
-                                                    <span class="badge {% if incidencia.estado == 'ABIERTA' %}bg-danger{% elif incidencia.estado == 'EN_REVISION' %}bg-warning{% else %}bg-success{% endif %} ms-1">
+                                                    <span class="badge ms-1" style="background-color: {{ incidencia.estado|color_estado_incidencia }}; color: {{ incidencia.estado|color_estado_incidencia|text_color_for_bg }};">
                                                         {{ incidencia.get_estado_display }}
                                                     </span>
                                                 </div>
@@ -880,7 +1029,12 @@
                                         <p><strong>Tipo:</strong> {{ incidencia.tipo_incidencia.nombre }}</p>
                                         <p><strong>Descripción:</strong></p>
                                         <p>{{ incidencia.descripcion_detallada }}</p>
-                                        <p><strong>Impacto al Cliente:</strong> {{ incidencia.get_impacto_cliente_display }}</p>
+                                        <p>
+                                            <strong>Impacto al Cliente:</strong> 
+                                            <span class="badge" style="background-color: {{ incidencia.impacto_cliente|color_impacto_cliente }}; color: {{ incidencia.impacto_cliente|color_impacto_cliente|text_color_for_bg }};">
+                                                {{ incidencia.get_impacto_cliente_display }}
+                                            </span>
+                                        </p>
                                         {% if incidencia.costo_adicional %}
                                             <p><strong>Costo Adicional:</strong> ${{ incidencia.costo_adicional }}</p>
                                         {% endif %}

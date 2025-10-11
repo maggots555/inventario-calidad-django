@@ -17,6 +17,13 @@ from .models import (
     PiezaVentaMostrador,  # NUEVO - FASE 2
     ImagenOrden,
     HistorialOrden,
+    # MODELOS RHITSO - Módulo de Reparación Especializada
+    EstadoRHITSO,
+    CategoriaDiagnostico,
+    TipoIncidenciaRHITSO,
+    SeguimientoRHITSO,
+    IncidenciaRHITSO,
+    ConfiguracionRHITSO,
 )
 
 
@@ -909,6 +916,541 @@ class HistorialOrdenAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         """El historial solo se crea automáticamente"""
         return False
+
+
+# ============================================================================
+# ADMIN: MODELOS RHITSO - REPARACIÓN ESPECIALIZADA
+# ============================================================================
+
+@admin.register(EstadoRHITSO)
+class EstadoRHITSOAdmin(admin.ModelAdmin):
+    """
+    Administración de Estados RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Este admin permite crear y gestionar los estados del proceso RHITSO
+    - Cada estado tiene un responsable (owner): SIC, RHITSO, CLIENTE, o COMPRAS
+    - Los estados se muestran en orden secuencial según el campo 'orden'
+    - El badge de color ayuda a identificar visualmente cada estado
+    """
+    list_display = (
+        'orden',
+        'estado',
+        'owner_badge',
+        'color_preview',
+        'activo',
+        'fecha_creacion',
+    )
+    list_filter = ('owner', 'activo', 'color')
+    search_fields = ('estado', 'descripcion')
+    ordering = ['orden']
+    
+    fieldsets = (
+        ('Información del Estado', {
+            'fields': ('estado', 'owner', 'descripcion')
+        }),
+        ('Visualización', {
+            'fields': ('color', 'orden')
+        }),
+        ('Estado', {
+            'fields': ('activo',)
+        }),
+    )
+    
+    readonly_fields = ('fecha_creacion',)
+    
+    def owner_badge(self, obj):
+        """
+        Muestra el responsable con un badge de color según el owner.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - format_html: Función de Django que crea HTML seguro
+        - obj.get_badge_class(): Método del modelo que retorna la clase CSS apropiada
+        - Este método hace que en la lista se vea un badge colorido en lugar de texto plano
+        """
+        return format_html(
+            '<span class="{}">{}</span>',
+            obj.get_badge_class(),
+            obj.owner
+        )
+    owner_badge.short_description = 'Responsable'
+    
+    def color_preview(self, obj):
+        """
+        Muestra un preview visual del color del badge.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - Crea un pequeño cuadrado con el color del badge
+        - Ayuda a visualizar cómo se verá el estado en la interfaz
+        - Los colores de Bootstrap: primary (azul), success (verde), warning (amarillo), danger (rojo), etc.
+        """
+        colores_bootstrap = {
+            'primary': '#0d6efd',
+            'secondary': '#6c757d',
+            'success': '#198754',
+            'danger': '#dc3545',
+            'warning': '#ffc107',
+            'info': '#0dcaf0',
+            'dark': '#212529',
+        }
+        color_hex = colores_bootstrap.get(obj.color, '#6c757d')
+        return format_html(
+            '<div style="width: 20px; height: 20px; background-color: {}; border: 1px solid #ccc; border-radius: 3px;"></div>',
+            color_hex
+        )
+    color_preview.short_description = 'Color'
+
+
+@admin.register(CategoriaDiagnostico)
+class CategoriaDiagnosticoAdmin(admin.ModelAdmin):
+    """
+    Administración de Categorías de Diagnóstico.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Define tipos de problemas técnicos que requieren RHITSO
+    - Cada categoría tiene un tiempo estimado de reparación
+    - La complejidad indica qué tan difícil es la reparación
+    - Ejemplos: Reballing de GPU, Soldadura SMD, Daño por líquidos
+    """
+    list_display = (
+        'nombre',
+        'complejidad_badge',
+        'tiempo_estimado_dias',
+        'requiere_rhitso',
+        'activo',
+    )
+    list_filter = ('complejidad_tipica', 'requiere_rhitso', 'activo')
+    search_fields = ('nombre', 'descripcion')
+    ordering = ['nombre']
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'descripcion')
+        }),
+        ('Configuración Técnica', {
+            'fields': (
+                'requiere_rhitso',
+                'complejidad_tipica',
+                'tiempo_estimado_dias',
+            )
+        }),
+        ('Estado', {
+            'fields': ('activo',)
+        }),
+    )
+    
+    readonly_fields = ('fecha_creacion',)
+    
+    def complejidad_badge(self, obj):
+        """Muestra la complejidad con un badge de color"""
+        colores = {
+            'BAJA': 'success',
+            'MEDIA': 'info',
+            'ALTA': 'warning',
+            'CRITICA': 'danger',
+        }
+        color = colores.get(obj.complejidad_tipica, 'secondary')
+        return format_html(
+            '<span class="badge bg-{}">{}</span>',
+            color,
+            obj.get_complejidad_tipica_display()
+        )
+    complejidad_badge.short_description = 'Complejidad'
+
+
+@admin.register(TipoIncidenciaRHITSO)
+class TipoIncidenciaRHITSOAdmin(admin.ModelAdmin):
+    """
+    Administración de Tipos de Incidencias RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Define los tipos de problemas que pueden ocurrir con RHITSO
+    - Gravedad indica qué tan serio es el problema (BAJA, MEDIA, ALTA, CRITICA)
+    - requiere_accion_inmediata marca si necesita atención urgente
+    - Ejemplos: Daño adicional, Retraso en entrega, Pieza incorrecta
+    """
+    list_display = (
+        'nombre',
+        'gravedad_badge',
+        'requiere_accion_inmediata',
+        'color_preview',
+        'activo',
+    )
+    list_filter = ('gravedad', 'requiere_accion_inmediata', 'activo')
+    search_fields = ('nombre', 'descripcion')
+    ordering = ['nombre']
+    
+    fieldsets = (
+        ('Información del Tipo', {
+            'fields': ('nombre', 'descripcion')
+        }),
+        ('Configuración', {
+            'fields': (
+                'gravedad',
+                'color',
+                'requiere_accion_inmediata',
+            )
+        }),
+        ('Estado', {
+            'fields': ('activo',)
+        }),
+    )
+    
+    readonly_fields = ('fecha_creacion',)
+    
+    def gravedad_badge(self, obj):
+        """Muestra la gravedad con un badge de color"""
+        colores = {
+            'BAJA': 'success',
+            'MEDIA': 'info',
+            'ALTA': 'warning',
+            'CRITICA': 'danger',
+        }
+        color = colores.get(obj.gravedad, 'secondary')
+        return format_html(
+            '<span class="badge bg-{}">{}</span>',
+            color,
+            obj.gravedad
+        )
+    gravedad_badge.short_description = 'Gravedad'
+    
+    def color_preview(self, obj):
+        """Muestra un preview del color del tipo de incidencia"""
+        colores_bootstrap = {
+            'primary': '#0d6efd',
+            'secondary': '#6c757d',
+            'success': '#198754',
+            'danger': '#dc3545',
+            'warning': '#ffc107',
+            'info': '#0dcaf0',
+        }
+        color_hex = colores_bootstrap.get(obj.color, '#6c757d')
+        return format_html(
+            '<div style="width: 20px; height: 20px; background-color: {}; border: 1px solid #ccc; border-radius: 3px;"></div>',
+            color_hex
+        )
+    color_preview.short_description = 'Color'
+
+
+@admin.register(SeguimientoRHITSO)
+class SeguimientoRHITSOAdmin(admin.ModelAdmin):
+    """
+    Administración de Seguimientos RHITSO (Historial de Estados).
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Registra cada cambio de estado en el proceso RHITSO
+    - Es como un timeline o historial completo de la orden
+    - Muestra quién hizo el cambio, cuándo, y observaciones
+    - tiempo_en_estado_anterior: Días que estuvo en el estado previo
+    - Este modelo es principalmente de solo lectura (creado por el sistema)
+    """
+    list_display = (
+        'orden_link',
+        'estado',
+        'estado_anterior',
+        'fecha_actualizacion',
+        'usuario_actualizacion',
+        'tiempo_en_estado_anterior',
+        'notificado_cliente',
+    )
+    list_filter = ('estado', 'notificado_cliente', 'fecha_actualizacion')
+    search_fields = (
+        'orden__numero_orden_interno',
+        'estado__estado',
+        'observaciones',
+    )
+    date_hierarchy = 'fecha_actualizacion'
+    ordering = ['-fecha_actualizacion']
+    
+    readonly_fields = ('fecha_actualizacion',)
+    
+    fieldsets = (
+        ('Orden y Estado', {
+            'fields': ('orden', 'estado', 'estado_anterior')
+        }),
+        ('Detalles del Cambio', {
+            'fields': (
+                'observaciones',
+                'tiempo_en_estado_anterior',
+                'usuario_actualizacion',
+            )
+        }),
+        ('Notificaciones', {
+            'fields': ('notificado_cliente',)
+        }),
+    )
+    
+    def orden_link(self, obj):
+        """
+        Crea un link clicable a la orden de servicio.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - reverse: Genera la URL del admin de OrdenServicio
+        - format_html: Crea un link HTML seguro
+        - Permite ir directamente a la orden desde el seguimiento
+        """
+        url = reverse('admin:servicio_tecnico_ordenservicio_change', args=[obj.orden.id])
+        return format_html('<a href="{}">{}</a>', url, obj.orden.numero_orden_interno)
+    orden_link.short_description = 'Orden'
+    
+    def has_add_permission(self, request):
+        """
+        Los seguimientos se crean automáticamente por el sistema.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - has_add_permission = False: No permite crear seguimientos manualmente
+        - Se crean automáticamente cuando se cambia el estado RHITSO de una orden
+        - Esto mantiene la integridad del historial
+        """
+        return False
+
+
+@admin.register(IncidenciaRHITSO)
+class IncidenciaRHITSOAdmin(admin.ModelAdmin):
+    """
+    Administración de Incidencias RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Registra problemas que ocurren durante el proceso RHITSO
+    - Ejemplos: Daño adicional, retrasos, piezas incorrectas
+    - Permite hacer seguimiento hasta su resolución
+    - Incluye impacto al cliente, prioridad, y costos adicionales
+    """
+    list_display = (
+        'orden_link',
+        'tipo_incidencia',
+        'titulo_corto',
+        'estado_badge',
+        'gravedad_badge',
+        'prioridad_badge',
+        'impacto_cliente_badge',
+        'fecha_ocurrencia',
+        'dias_abierta_display',
+    )
+    list_filter = (
+        'estado',
+        'tipo_incidencia__gravedad',
+        'prioridad',
+        'impacto_cliente',
+        'requiere_seguimiento',
+        'fecha_ocurrencia',
+    )
+    search_fields = (
+        'orden__numero_orden_interno',
+        'titulo',
+        'descripcion_detallada',
+        'accion_tomada',
+    )
+    date_hierarchy = 'fecha_ocurrencia'
+    ordering = ['-fecha_ocurrencia']
+    
+    fieldsets = (
+        ('Información de la Incidencia', {
+            'fields': (
+                'orden',
+                'tipo_incidencia',
+                'titulo',
+                'descripcion_detallada',
+            )
+        }),
+        ('Clasificación', {
+            'fields': (
+                'estado',
+                'prioridad',
+                'impacto_cliente',
+                'requiere_seguimiento',
+            )
+        }),
+        ('Fechas', {
+            'fields': (
+                'fecha_ocurrencia',
+                'fecha_resolucion',
+            )
+        }),
+        ('Resolución', {
+            'fields': (
+                'accion_tomada',
+                'resuelto_por',
+            )
+        }),
+        ('Información Adicional', {
+            'fields': (
+                'usuario_registro',
+                'costo_adicional',
+            )
+        }),
+    )
+    
+    readonly_fields = ('fecha_ocurrencia',)
+    
+    def orden_link(self, obj):
+        """Crea un link clicable a la orden"""
+        url = reverse('admin:servicio_tecnico_ordenservicio_change', args=[obj.orden.id])
+        return format_html('<a href="{}">{}</a>', url, obj.orden.numero_orden_interno)
+    orden_link.short_description = 'Orden'
+    
+    def titulo_corto(self, obj):
+        """Muestra el título truncado si es muy largo"""
+        if len(obj.titulo) > 50:
+            return obj.titulo[:50] + '...'
+        return obj.titulo
+    titulo_corto.short_description = 'Título'
+    
+    def estado_badge(self, obj):
+        """Muestra el estado con un badge de color"""
+        colores = {
+            'ABIERTA': 'danger',
+            'EN_PROCESO': 'warning',
+            'RESUELTA': 'success',
+            'CERRADA': 'secondary',
+        }
+        color = colores.get(obj.estado, 'secondary')
+        return format_html(
+            '<span class="badge bg-{}">{}</span>',
+            color,
+            obj.get_estado_display()
+        )
+    estado_badge.short_description = 'Estado'
+    
+    def gravedad_badge(self, obj):
+        """Muestra la gravedad del tipo de incidencia"""
+        colores = {
+            'BAJA': 'success',
+            'MEDIA': 'info',
+            'ALTA': 'warning',
+            'CRITICA': 'danger',
+        }
+        color = colores.get(obj.tipo_incidencia.gravedad, 'secondary')
+        return format_html(
+            '<span class="badge bg-{}">{}</span>',
+            color,
+            obj.tipo_incidencia.gravedad
+        )
+    gravedad_badge.short_description = 'Gravedad'
+    
+    def prioridad_badge(self, obj):
+        """Muestra la prioridad con un badge de color"""
+        colores = {
+            'BAJA': 'success',
+            'MEDIA': 'info',
+            'ALTA': 'warning',
+            'CRITICA': 'danger',
+        }
+        color = colores.get(obj.prioridad, 'secondary')
+        return format_html(
+            '<span class="badge bg-{}">{}</span>',
+            color,
+            obj.get_prioridad_display()
+        )
+    prioridad_badge.short_description = 'Prioridad'
+    
+    def impacto_cliente_badge(self, obj):
+        """Muestra el impacto al cliente con un badge de color"""
+        colores = {
+            'BAJO': 'success',
+            'MEDIO': 'info',
+            'ALTO': 'warning',
+            'CRITICO': 'danger',
+        }
+        color = colores.get(obj.impacto_cliente, 'secondary')
+        return format_html(
+            '<span class="badge bg-{}">{}</span>',
+            color,
+            obj.get_impacto_cliente_display()
+        )
+    impacto_cliente_badge.short_description = 'Impacto Cliente'
+    
+    def dias_abierta_display(self, obj):
+        """
+        Muestra los días que la incidencia ha estado abierta.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - obj.dias_abierta: Es una property del modelo que calcula automáticamente los días
+        - Si está resuelta: días desde ocurrencia hasta resolución
+        - Si está abierta: días desde ocurrencia hasta hoy
+        - Color rojo si lleva más de 7 días abierta
+        """
+        dias = obj.dias_abierta
+        if obj.esta_resuelta:
+            return format_html(
+                '<span style="color: green;">{} días</span>',
+                dias
+            )
+        elif dias > 7:
+            return format_html(
+                '<span style="color: red; font-weight: bold;">{} días ⚠️</span>',
+                dias
+            )
+        else:
+            return f'{dias} días'
+    dias_abierta_display.short_description = 'Días Abierta'
+
+
+@admin.register(ConfiguracionRHITSO)
+class ConfiguracionRHITSOAdmin(admin.ModelAdmin):
+    """
+    Administración de Configuraciones RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Almacena configuraciones globales del módulo RHITSO
+    - Ejemplos: tiempo máximo sin actualización, email de notificaciones
+    - tipo: Define si el valor es STRING, INTEGER, BOOLEAN, EMAIL, o URL
+    - Se usa para ajustar el comportamiento del sistema sin cambiar código
+    """
+    list_display = (
+        'clave',
+        'valor_preview',
+        'tipo_badge',
+        'fecha_actualizacion',
+    )
+    list_filter = ('tipo',)
+    search_fields = ('clave', 'descripcion', 'valor')
+    ordering = ['clave']
+    
+    fieldsets = (
+        ('Identificación', {
+            'fields': ('clave', 'tipo')
+        }),
+        ('Valor', {
+            'fields': ('valor',)
+        }),
+        ('Descripción', {
+            'fields': ('descripcion',)
+        }),
+    )
+    
+    readonly_fields = ('fecha_actualizacion',)
+    
+    def valor_preview(self, obj):
+        """
+        Muestra el valor truncado si es muy largo.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - Si el valor tiene más de 50 caracteres, lo corta y agrega "..."
+        - Hace más legible la lista cuando hay valores largos
+        - El valor completo se puede ver al editar la configuración
+        """
+        if len(obj.valor) > 50:
+            return obj.valor[:50] + '...'
+        return obj.valor
+    valor_preview.short_description = 'Valor'
+    
+    def tipo_badge(self, obj):
+        """Muestra el tipo de dato con un badge de color"""
+        colores = {
+            'STRING': 'primary',
+            'INTEGER': 'success',
+            'BOOLEAN': 'info',
+            'EMAIL': 'warning',
+            'URL': 'secondary',
+        }
+        color = colores.get(obj.tipo, 'secondary')
+        return format_html(
+            '<span class="badge bg-{}">{}</span>',
+            color,
+            obj.get_tipo_display()
+        )
+    tipo_badge.short_description = 'Tipo'
 
 
 # Configuración del sitio admin

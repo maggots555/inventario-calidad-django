@@ -2133,6 +2133,28 @@ class ActualizarEstadoRHITSOForm(forms.Form):
         })
     )
     
+    fecha_envio_rhitso = forms.DateTimeField(
+        label="Fecha de Envío a RHITSO",
+        help_text="Fecha y hora en que el equipo fue enviado a RHITSO",
+        required=False,
+        widget=forms.DateTimeInput(attrs={
+            'class': 'form-control',
+            'type': 'datetime-local',
+            'placeholder': 'YYYY-MM-DD HH:MM',
+        })
+    )
+    
+    fecha_recepcion_rhitso = forms.DateTimeField(
+        label="Fecha de Retorno a SIC",
+        help_text="Fecha y hora en que el equipo regresó de RHITSO a SIC",
+        required=False,
+        widget=forms.DateTimeInput(attrs={
+            'class': 'form-control',
+            'type': 'datetime-local',
+            'placeholder': 'YYYY-MM-DD HH:MM',
+        })
+    )
+    
     notificar_cliente = forms.BooleanField(
         label="¿Notificar al cliente?",
         help_text="Marca esta casilla si deseas que se notifique al cliente sobre este cambio",
@@ -2150,7 +2172,11 @@ class ActualizarEstadoRHITSOForm(forms.Form):
         Este método se ejecuta cuando se crea el formulario.
         
         Aquí cargamos los estados ACTIVOS desde la base de datos para
-        poblar el dropdown dinámicamente.
+        poblar el dropdown dinámicamente AGRUPADOS POR RESPONSABLE (OWNER).
+        
+        ¿Por qué agrupado?
+        Facilita la selección visual al usuario. Los estados se muestran
+        organizados por bloques según el responsable: SIC, RHITSO, CLIENTE, etc.
         
         ¿Por qué dinámico?
         Porque los estados pueden cambiar en el admin sin tocar código.
@@ -2158,16 +2184,43 @@ class ActualizarEstadoRHITSOForm(forms.Form):
         """
         super().__init__(*args, **kwargs)
         
-        # Cargar estados activos desde la base de datos
-        estados_activos = EstadoRHITSO.objects.filter(activo=True).order_by('orden')
+        # Cargar estados activos desde la base de datos ordenados por owner y orden
+        estados_activos = EstadoRHITSO.objects.filter(activo=True).order_by('owner', 'orden')
         
-        # Convertir a lista de tuplas (valor, etiqueta) para choices
-        self.fields['estado_rhitso'].choices = [
-            ('', '--- Selecciona un estado ---')  # Opción vacía por defecto
-        ] + [
-            (estado.estado, f'{estado.estado} - {estado.descripcion}')
-            for estado in estados_activos
+        # Agrupar estados por OWNER para crear optgroups
+        # EXPLICACIÓN: Organizamos los estados en un diccionario donde:
+        # - La clave es el OWNER (SIC, RHITSO, CLIENTE, etc.)
+        # - El valor es una lista de tuplas (estado, etiqueta)
+        from collections import defaultdict
+        estados_por_owner = defaultdict(list)
+        
+        for estado in estados_activos:
+            # Crear etiqueta con número de orden para mejor visualización
+            etiqueta = f"{estado.orden}. {estado.estado}"
+            estados_por_owner[estado.owner].append((estado.estado, etiqueta))
+        
+        # Definir orden de los bloques y sus etiquetas visuales
+        # EXPLICACIÓN: Este orden determina cómo aparecen los bloques en el dropdown
+        ORDEN_BLOQUES = [
+            ('SIC', '🏢 BLOQUE SIC - Estados bajo responsabilidad de SIC'),
+            ('RHITSO', '🔧 BLOQUE RHITSO - Estados de RHITSO'),
+            ('CLIENTE', '👤 BLOQUE CLIENTE - Pendiente de Cliente'),
+            ('COMPRAS', '🛒 BLOQUE COMPRAS - Esperando Compras'),
+            ('CERRADO', '✅ CERRADO - Proceso Finalizado'),
         ]
+        
+        # Construir choices con optgroups
+        # EXPLICACIÓN: choices es una lista que puede contener:
+        # - Tuplas simples: (valor, etiqueta)
+        # - Tuplas con sublista: (nombre_grupo, [(valor1, etiqueta1), (valor2, etiqueta2)])
+        choices = [('', '--- Selecciona un estado ---')]
+        
+        for owner_code, owner_label in ORDEN_BLOQUES:
+            if owner_code in estados_por_owner:
+                # Agregar el grupo con sus estados
+                choices.append((owner_label, estados_por_owner[owner_code]))
+        
+        self.fields['estado_rhitso'].choices = choices
     
     def clean_estado_rhitso(self):
         """

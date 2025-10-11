@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load rhitso_filters %}
 
 {% block title %}Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
@@ -118,7 +119,7 @@
                                 {% if orden.estado_rhitso %}
                                 <p class="mb-0">
                                     <strong><i class="bi bi-arrow-repeat"></i> Estado RHITSO:</strong> 
-                                    <span class="badge bg-success">{{ orden.estado_rhitso }}</span>
+                                    <span class="badge" style="background-color: {{ orden.estado_rhitso|color_estado_especifico }}; color: {{ orden.estado_rhitso|color_estado_especifico|text_color_for_bg }};">{{ orden.estado_rhitso }}</span>
                                     {% if orden.dias_en_rhitso %}
                                         <span class="badge bg-secondary ms-1">
                                             <i class="bi bi-calendar-day"></i> {{ orden.dias_en_rhitso }} día{{ orden.dias_en_rhitso|pluralize }}

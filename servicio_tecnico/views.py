@@ -3184,8 +3184,11 @@ def gestion_rhitso(request, orden_id):
         tipo_evento='comentario'
     ).select_related('usuario').order_by('-fecha_evento')
     
-    # Obtener último comentario para mostrar en resumen
-    ultimo_comentario = comentarios_manuales.first()
+    # Obtener último seguimiento RHITSO (con observaciones del estado actual)
+    # EXPLICACIÓN: En lugar de mostrar el último comentario general,
+    # mostramos las observaciones del último cambio de estado RHITSO
+    # Esto permite ver la descripción y contexto del estado actual
+    ultimo_seguimiento_rhitso = seguimientos_sistema.first() if seguimientos_sistema else None
     
     # =======================================================================
     # PASO 6: OBTENER INCIDENCIAS Y CALCULAR ESTADÍSTICAS
@@ -3264,12 +3267,16 @@ def gestion_rhitso(request, orden_id):
     # Formulario para editar diagnóstico SIC
     # EXPLICACIÓN: Formulario multi-modelo que actualiza DetalleEquipo y OrdenServicio
     # Pre-llenamos con valores actuales usando 'initial'
+    # LÓGICA MEJORADA: Si no hay tecnico_diagnostico asignado, usa el técnico actual de la orden
+    # Esto permite flexibilidad (se puede cambiar) pero automatiza el proceso inicial
+    tecnico_inicial = orden.tecnico_diagnostico or orden.tecnico_asignado_actual
+    
     form_diagnostico = EditarDiagnosticoSICForm(initial={
         'diagnostico_sic': detalle_equipo.diagnostico_sic if detalle_equipo else '',
         'motivo_rhitso': orden.motivo_rhitso,
         'descripcion_rhitso': orden.descripcion_rhitso,
         'complejidad_estimada': orden.complejidad_estimada,
-        'tecnico_diagnostico': orden.tecnico_diagnostico,
+        'tecnico_diagnostico': tecnico_inicial,  # Auto-inicializa con fallback
     })
     
     # =======================================================================
@@ -3292,7 +3299,7 @@ def gestion_rhitso(request, orden_id):
         # Historial
         'seguimientos_sistema': seguimientos_sistema,
         'comentarios_manuales': comentarios_manuales,
-        'ultimo_comentario': ultimo_comentario,
+        'ultimo_seguimiento_rhitso': ultimo_seguimiento_rhitso,
         
         # Incidencias
         'incidencias': incidencias,
@@ -3393,22 +3400,30 @@ def actualizar_estado_rhitso(request, orden_id):
         nuevo_estado = form.cleaned_data['estado_rhitso']
         observaciones = form.cleaned_data['observaciones']
         notificar_cliente = form.cleaned_data.get('notificar_cliente', False)
+        fecha_envio = form.cleaned_data.get('fecha_envio_rhitso')
+        fecha_recepcion = form.cleaned_data.get('fecha_recepcion_rhitso')
         
         # Paso 5: Actualizar estado en la orden
         orden.estado_rhitso = nuevo_estado
         
-        # Paso 6: Actualizar fechas especiales según el estado
-        # EXPLICACIÓN: Algunos cambios de estado tienen significados especiales:
-        # - Primer envío a RHITSO → Guardar fecha_envio_rhitso
-        # - Regreso de RHITSO → Guardar fecha_recepcion_rhitso
+        # Paso 6: Actualizar fechas especiales
+        # EXPLICACIÓN: Se actualizan las fechas según lo ingresado en el formulario
+        # o automáticamente según el estado seleccionado
         
-        # Si es el primer envío a RHITSO y no tiene fecha de envío
-        if 'ENVIADO' in nuevo_estado.upper() and not orden.fecha_envio_rhitso:
-            orden.fecha_envio_rhitso = timezone.now()
+        # Si el usuario proporcionó una fecha de envío, usarla
+        if fecha_envio:
+            orden.fecha_envio_rhitso = fecha_envio
+        # Si no, detectar automáticamente si es un estado de envío
+        elif 'ENVIADO' in nuevo_estado.upper() or 'ACEPTA ENVIO' in nuevo_estado.upper():
+            if not orden.fecha_envio_rhitso:  # Solo si no tiene fecha previa
+                orden.fecha_envio_rhitso = timezone.now()
         
-        # Si regresa de RHITSO (estados como RECIBIDO_DE_RHITSO, LISTO_ENTREGA)
-        if any(keyword in nuevo_estado.upper() for keyword in ['RECIBIDO', 'LISTO', 'FINALIZADO']):
-            if not orden.fecha_recepcion_rhitso:
+        # Si el usuario proporcionó una fecha de recepción, usarla
+        if fecha_recepcion:
+            orden.fecha_recepcion_rhitso = fecha_recepcion
+        # Si no, detectar automáticamente si es un estado de retorno
+        elif 'RETORNADO' in nuevo_estado.upper() or 'EQUIPO RETORNADO' in nuevo_estado.upper():
+            if not orden.fecha_recepcion_rhitso:  # Solo si no tiene fecha previa
                 orden.fecha_recepcion_rhitso = timezone.now()
         
         # Paso 7: Guardar cambios en la base de datos
