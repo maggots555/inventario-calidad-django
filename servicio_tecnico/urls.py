@@ -88,6 +88,9 @@ urlpatterns = [
     # Dashboard consolidado de candidatos RHITSO (Octubre 2025)
     path('rhitso/dashboard/', views.dashboard_rhitso, name='dashboard_rhitso'),
     
+    # Exportación Excel de dashboard RHITSO con openpyxl (Octubre 2025)
+    path('rhitso/exportar-excel/', views.exportar_excel_rhitso, name='exportar_excel_rhitso'),
+    
     # Vista principal del panel RHITSO (FASE 4)
     path('rhitso/orden/<int:orden_id>/', views.gestion_rhitso, name='gestion_rhitso'),
     

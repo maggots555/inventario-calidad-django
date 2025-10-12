@@ -12,12 +12,15 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Count, Q, Prefetch
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_http_methods
 from PIL import Image
 import os
 import json
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
 from .models import (
     OrdenServicio, 
     DetalleEquipo, 
@@ -4872,3 +4875,400 @@ def dashboard_rhitso(request):
     }
     
     return render(request, 'servicio_tecnico/rhitso/dashboard_rhitso.html', context)
+
+
+# =============================================================================
+# EXPORTACIÓN EXCEL RHITSO CON OPENPYXL
+# =============================================================================
+
+@login_required
+def exportar_excel_rhitso(request):
+    """
+    Genera y descarga un reporte Excel profesional de candidatos RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista genera un archivo Excel (.xlsx) con información de RHITSO usando openpyxl.
+    openpyxl es una librería Python que permite crear y modificar archivos Excel con
+    control total sobre estilos, colores, bordes y formato.
+    
+    ¿Por qué usar openpyxl en vez de XLSX.js?
+    - Control total sobre estilos (colores, fuentes, bordes, alineación)
+    - Funciona en el servidor (backend), más estable y confiable
+    - Mismo estilo profesional que el Excel de inventario
+    - No depende de versiones PRO o de pago
+    
+    Estructura del Excel:
+    - Hoja 1: Activos (órdenes en proceso activo)
+    - Hoja 2: Pendientes (órdenes pendientes de confirmación)
+    - Hoja 3: Excluidos (órdenes cerradas o rechazadas)
+    
+    Cada hoja tiene 17 columnas con información completa:
+    1. Servicio Cliente      10. Incidencias
+    2. N° Serie              11. Fecha Envío RHITSO
+    3. Marca                 12. Días Hábiles SIC
+    4. Modelo                13. Días Hábiles RHITSO
+    5. Fecha Ingreso SIC     14. Días en estatus
+    6. Sucursal              15. Estado Proceso
+    7. Estado General        16. Fecha Último Comentario
+    8. Estado RHITSO         17. Comentario
+    9. Owner
+    
+    Estilos aplicados (como inventario):
+    - Encabezados: Azul #366092, texto blanco, negrita
+    - Filas coloreadas según estado y urgencia
+    - Bordes en todas las celdas
+    - Texto centrado en encabezados
+    - Texto envuelto en comentarios
+    - Anchos de columna optimizados
+    
+    Args:
+        request: HttpRequest object
+    
+    Returns:
+        HttpResponse con archivo Excel para descarga
+    """
+    # =========================================================================
+    # PASO 1: PREPARAR DATOS (REUTILIZAR LÓGICA DEL DASHBOARD)
+    # =========================================================================
+    
+    # EXPLICACIÓN: Reutilizamos la misma consulta optimizada del dashboard
+    candidatos_rhitso = OrdenServicio.objects.filter(
+        es_candidato_rhitso=True
+    ).select_related(
+        'detalle_equipo',
+        'sucursal',
+        'tecnico_asignado_actual',
+        'responsable_seguimiento'
+    ).prefetch_related(
+        Prefetch(
+            'seguimientos_rhitso',
+            queryset=SeguimientoRHITSO.objects.select_related('estado', 'usuario_actualizacion').order_by('-fecha_actualizacion'),
+            to_attr='seguimientos_ordenados'
+        ),
+        Prefetch(
+            'incidencias_rhitso',
+            queryset=IncidenciaRHITSO.objects.filter(estado__in=['ABIERTA', 'EN_REVISION']),
+            to_attr='incidencias_abiertas'
+        ),
+        Prefetch(
+            'incidencias_rhitso',
+            queryset=IncidenciaRHITSO.objects.filter(estado='RESUELTA'),
+            to_attr='incidencias_resueltas_lista'
+        ),
+    ).order_by('-fecha_ingreso')
+    
+    # Estados para clasificación
+    estados_excluidos = ['CERRADO', 'USUARIO NO ACEPTA ENVIO A RHITSO']
+    estados_pendientes = ['PENDIENTE DE CONFIRMAR ENVIO A RHITSO']
+    
+    # Listas para separar órdenes por categoría
+    activos = []
+    pendientes = []
+    excluidos = []
+    
+    # Procesar cada orden
+    for orden in candidatos_rhitso:
+        detalle = orden.detalle_equipo
+        
+        # Estado RHITSO actual
+        estado_rhitso_nombre = orden.estado_rhitso if orden.estado_rhitso else 'Pendiente'
+        estado_rhitso_display = estado_rhitso_nombre
+        
+        # Buscar owner del estado
+        try:
+            estado_obj = EstadoRHITSO.objects.get(estado=estado_rhitso_nombre)
+            owner_actual = estado_obj.owner
+        except EstadoRHITSO.DoesNotExist:
+            owner_actual = ''
+        
+        # Calcular días hábiles en SIC
+        if orden.fecha_envio_rhitso:
+            dias_habiles_sic = calcular_dias_habiles(orden.fecha_ingreso, orden.fecha_envio_rhitso)
+        else:
+            dias_habiles_sic = calcular_dias_habiles(orden.fecha_ingreso)
+        
+        # Calcular días hábiles en RHITSO
+        dias_habiles_rhitso = 0
+        if orden.fecha_envio_rhitso:
+            if orden.fecha_recepcion_rhitso:
+                dias_habiles_rhitso = calcular_dias_habiles(orden.fecha_envio_rhitso, orden.fecha_recepcion_rhitso)
+            else:
+                dias_habiles_rhitso = calcular_dias_habiles(orden.fecha_envio_rhitso)
+        
+        # Calcular días sin actualización
+        ultimo_seguimiento_usuario = None
+        if hasattr(orden, 'seguimientos_ordenados') and orden.seguimientos_ordenados:
+            for seg in orden.seguimientos_ordenados:
+                if not seg.es_cambio_automatico:
+                    ultimo_seguimiento_usuario = seg
+                    break
+        
+        if ultimo_seguimiento_usuario:
+            dias_sin_actualizar = calcular_dias_en_estatus(ultimo_seguimiento_usuario.fecha_actualizacion)
+            fecha_ultimo_comentario = ultimo_seguimiento_usuario.fecha_actualizacion
+            ultimo_comentario = ultimo_seguimiento_usuario.observaciones
+        else:
+            dias_sin_actualizar = calcular_dias_en_estatus(orden.fecha_ingreso)
+            fecha_ultimo_comentario = None
+            ultimo_comentario = ''
+        
+        # Contar incidencias
+        incidencias_abiertas_count = len(orden.incidencias_abiertas) if hasattr(orden, 'incidencias_abiertas') else 0
+        incidencias_resueltas_count = len(orden.incidencias_resueltas_lista) if hasattr(orden, 'incidencias_resueltas_lista') else 0
+        total_incidencias = incidencias_abiertas_count + incidencias_resueltas_count
+        
+        # Determinar estado del proceso
+        estado_proceso = obtener_estado_proceso_rhitso(orden)
+        
+        # Construir diccionario con toda la información
+        orden_data = {
+            'orden_cliente': detalle.orden_cliente if detalle else 'Sin orden',
+            'numero_serie': detalle.numero_serie if detalle else 'N/A',
+            'marca': detalle.marca if detalle else 'N/A',
+            'modelo': detalle.modelo if detalle else 'N/A',
+            'fecha_ingreso': orden.fecha_ingreso,
+            'sucursal': orden.sucursal.nombre if orden.sucursal else 'N/A',
+            'estado_orden': orden.get_estado_display(),
+            'estado_rhitso_display': estado_rhitso_display,
+            'owner_actual': owner_actual,
+            'total_incidencias': f"{incidencias_abiertas_count}/{total_incidencias}",
+            'fecha_envio_rhitso': orden.fecha_envio_rhitso,
+            'dias_habiles_sic': dias_habiles_sic,
+            'dias_habiles_rhitso': dias_habiles_rhitso,
+            'dias_sin_actualizar': dias_sin_actualizar,
+            'estado_proceso': estado_proceso,
+            'fecha_ultimo_comentario': fecha_ultimo_comentario,
+            'ultimo_comentario': ultimo_comentario if ultimo_comentario else 'Sin comentario',
+        }
+        
+        # Clasificar orden en categoría correspondiente
+        if estado_rhitso_nombre in estados_excluidos:
+            excluidos.append(orden_data)
+        elif estado_rhitso_nombre in estados_pendientes:
+            pendientes.append(orden_data)
+        else:
+            activos.append(orden_data)
+    
+    # =========================================================================
+    # PASO 2: CREAR WORKBOOK DE EXCEL
+    # =========================================================================
+    
+    # EXPLICACIÓN: Workbook es el archivo Excel completo
+    wb = openpyxl.Workbook()
+    
+    # Eliminar la hoja por defecto
+    if 'Sheet' in wb.sheetnames:
+        del wb['Sheet']
+    
+    # =========================================================================
+    # PASO 3: DEFINIR ESTILOS PROFESIONALES (COMO INVENTARIO)
+    # =========================================================================
+    
+    # EXPLICACIÓN: Definimos estilos reutilizables para mantener consistencia
+    
+    # Fuente para encabezados: Blanco, negrita, tamaño 11
+    header_font = Font(
+        name='Calibri',
+        bold=True,
+        color="FFFFFF",
+        size=11
+    )
+    
+    # Relleno azul para encabezados (#366092 es el azul corporativo)
+    header_fill = PatternFill(
+        start_color="366092",
+        end_color="366092",
+        fill_type="solid"
+    )
+    
+    # Alineación centrada para encabezados
+    header_alignment = Alignment(
+        horizontal='center',
+        vertical='center',
+        wrap_text=True
+    )
+    
+    # Bordes para todas las celdas
+    thin_border = Border(
+        left=Side(style='thin', color='000000'),
+        right=Side(style='thin', color='000000'),
+        top=Side(style='thin', color='000000'),
+        bottom=Side(style='thin', color='000000')
+    )
+    
+    # Fuente normal para datos
+    normal_font = Font(name='Calibri', size=10)
+    
+    # Alineación para comentarios (con wrap text)
+    wrap_alignment = Alignment(
+        horizontal='left',
+        vertical='top',
+        wrap_text=True
+    )
+    
+    # =========================================================================
+    # PASO 4: DEFINIR ENCABEZADOS (17 COLUMNAS)
+    # =========================================================================
+    
+    # EXPLICACIÓN: Estos son los títulos de las columnas que aparecerán en Excel
+    headers = [
+        'Servicio Cliente',
+        'N° Serie',
+        'Marca',
+        'Modelo',
+        'Fecha Ingreso a SIC',
+        'Sucursal',
+        'Estado General',
+        'Estado RHITSO',
+        'Owner',
+        'Incidencias',
+        'Fecha Envío RHITSO',
+        'Días Hábiles SIC',
+        'Días Hábiles RHITSO',
+        'Días en estatus',
+        'Estado Proceso',
+        'Fecha Último Comentario',
+        'Comentario'
+    ]
+    
+    # Anchos óptimos para cada columna (en caracteres)
+    column_widths = [20, 15, 15, 15, 18, 15, 18, 25, 15, 12, 18, 18, 18, 15, 20, 20, 50]
+    
+    # =========================================================================
+    # PASO 5: FUNCIÓN AUXILIAR PARA CREAR HOJAS FORMATEADAS
+    # =========================================================================
+    
+    def crear_hoja_excel(nombre_hoja, datos_lista, color_categoria):
+        """
+        Crea una hoja de Excel con formato profesional.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Esta función crea una hoja nueva en el archivo Excel, agrega los encabezados,
+        llena los datos y aplica los estilos (colores, bordes, fuentes).
+        
+        Args:
+            nombre_hoja: Nombre de la pestaña (ej: "Activos (15)")
+            datos_lista: Lista de diccionarios con los datos de las órdenes
+            color_categoria: Color base para esta categoría (no usado por ahora)
+        """
+        # Crear la hoja
+        ws = wb.create_sheet(nombre_hoja)
+        
+        # PASO 5.1: Agregar encabezados con estilo
+        for col_num, header in enumerate(headers, start=1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        
+        # PASO 5.2: Configurar anchos de columna
+        for col_num, width in enumerate(column_widths, start=1):
+            column_letter = get_column_letter(col_num)
+            ws.column_dimensions[column_letter].width = width
+        
+        # PASO 5.3: Congelar primera fila (encabezados)
+        # EXPLICACIÓN: freeze_panes permite que los encabezados permanezcan
+        # visibles cuando el usuario hace scroll hacia abajo
+        ws.freeze_panes = 'A2'
+        
+        # PASO 5.4: Agregar datos fila por fila
+        for row_num, orden in enumerate(datos_lista, start=2):
+            # Preparar los valores de cada columna
+            valores = [
+                orden['orden_cliente'],
+                orden['numero_serie'],
+                orden['marca'],
+                orden['modelo'],
+                orden['fecha_ingreso'].strftime('%d/%m/%Y') if orden['fecha_ingreso'] else '',
+                orden['sucursal'],
+                orden['estado_orden'],
+                orden['estado_rhitso_display'],
+                orden['owner_actual'],
+                orden['total_incidencias'],
+                orden['fecha_envio_rhitso'].strftime('%d/%m/%Y') if orden['fecha_envio_rhitso'] else 'No enviado',
+                orden['dias_habiles_sic'],
+                orden['dias_habiles_rhitso'],
+                orden['dias_sin_actualizar'],
+                orden['estado_proceso'],
+                orden['fecha_ultimo_comentario'].strftime('%d/%m/%Y %H:%M') if orden['fecha_ultimo_comentario'] else 'Sin comentario',
+                orden['ultimo_comentario']
+            ]
+            
+            # Escribir valores en las celdas
+            for col_num, valor in enumerate(valores, start=1):
+                cell = ws.cell(row=row_num, column=col_num, value=valor)
+                cell.font = normal_font
+                cell.border = thin_border
+                
+                # Aplicar wrap text en la columna de comentarios (última columna)
+                if col_num == len(headers):  # Columna de comentario
+                    cell.alignment = wrap_alignment
+                else:
+                    cell.alignment = Alignment(horizontal='left', vertical='center')
+            
+            # PASO 5.5: Colorear fila según estado y urgencia
+            # EXPLICACIÓN: Aplicamos colores para identificar visualmente el estado
+            
+            estado_proc = orden['estado_proceso']
+            dias_sin_act = orden['dias_sin_actualizar']
+            
+            # Determinar color de fila
+            row_fill = None
+            
+            if estado_proc == 'Completado':
+                # Verde claro para órdenes completadas
+                row_fill = PatternFill(start_color="D4EDDA", end_color="D4EDDA", fill_type="solid")
+            elif estado_proc == 'En RHITSO':
+                # Amarillo claro para órdenes en RHITSO
+                row_fill = PatternFill(start_color="FFF3CD", end_color="FFF3CD", fill_type="solid")
+            elif estado_proc == 'Solo en SIC':
+                # Gris claro para órdenes solo en SIC
+                row_fill = PatternFill(start_color="E2E3E5", end_color="E2E3E5", fill_type="solid")
+            
+            # Sobrescribir con rojo si tiene más de 5 días sin actualizar (URGENTE)
+            if dias_sin_act > 5:
+                row_fill = PatternFill(start_color="F8D7DA", end_color="F8D7DA", fill_type="solid")
+            
+            # Aplicar el color a toda la fila
+            if row_fill:
+                for col_num in range(1, len(headers) + 1):
+                    ws.cell(row=row_num, column=col_num).fill = row_fill
+        
+        # PASO 5.6: Agregar auto-filtro a los encabezados
+        # EXPLICACIÓN: Permite al usuario filtrar datos directamente en Excel
+        ws.auto_filter.ref = ws.dimensions
+    
+    # =========================================================================
+    # PASO 6: CREAR LAS 3 HOJAS
+    # =========================================================================
+    
+    # Hoja 1: Activos
+    crear_hoja_excel(f"Activos ({len(activos)})", activos, "FFF3CD")
+    
+    # Hoja 2: Pendientes
+    crear_hoja_excel(f"Pendientes ({len(pendientes)})", pendientes, "E2E3E5")
+    
+    # Hoja 3: Excluidos
+    crear_hoja_excel(f"Excluidos ({len(excluidos)})", excluidos, "F8D7DA")
+    
+    # =========================================================================
+    # PASO 7: PREPARAR RESPUESTA HTTP PARA DESCARGA
+    # =========================================================================
+    
+    # EXPLICACIÓN: Creamos una respuesta HTTP con el tipo de contenido adecuado
+    # para que el navegador sepa que es un archivo Excel y lo descargue
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    
+    # Definir el nombre del archivo con fecha y hora actual
+    nombre_archivo = f'Reporte_RHITSO_{timezone.now().strftime("%Y%m%d_%H%M")}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+    
+    # Guardar el workbook en la respuesta
+    wb.save(response)
+    
+    return response
+

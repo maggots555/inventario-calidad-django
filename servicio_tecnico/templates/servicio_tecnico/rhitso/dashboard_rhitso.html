@@ -169,10 +169,11 @@
                 </span>
             </div>
             <div class="table-actions">
-                <button id="exportExcelRhitso" class="btn btn-success" type="button">
+                <!-- Botón Excel ahora usa openpyxl en el backend -->
+                <a href="{% url 'servicio_tecnico:exportar_excel_rhitso' %}" class="btn btn-success" type="button">
                     <i class="bi bi-file-earmark-excel me-2"></i>
                     Exportar Excel
-                </button>
+                </a>
                 <button id="reporteRhitso" class="btn btn-info" type="button">
                     <i class="bi bi-file-earmark-spreadsheet me-2"></i>
                     Reporte RHITSO
@@ -250,7 +251,13 @@
                             </thead>
                             <tbody>
                                 {% for orden in activos %}
-                                <tr>
+                                <tr data-orden-cliente="{{ orden.orden_cliente|default:'Sin orden' }}"
+                                    data-dias-sic="{{ orden.dias_habiles_sic }}"
+                                    data-dias-rhitso="{{ orden.dias_habiles_rhitso }}"
+                                    data-dias-estatus="{{ orden.dias_sin_actualizar }}"
+                                    data-estado-proceso="{{ orden.estado_proceso }}"
+                                    data-fecha-comentario="{% if orden.fecha_ultimo_comentario %}{{ orden.fecha_ultimo_comentario|date:'d/m/Y H:i' }}{% else %}Sin comentario{% endif %}"
+                                    data-comentario="{{ orden.ultimo_comentario|striptags|default:'Sin comentario' }}">
                                     <!-- Número de Serie -->
                                     <td>
                                         <strong>{{ orden.numero_serie }}</strong>
@@ -404,7 +411,13 @@
                             </thead>
                             <tbody>
                                 {% for orden in pendientes %}
-                                <tr>
+                                <tr data-orden-cliente="{{ orden.orden_cliente|default:'Sin orden' }}"
+                                    data-dias-sic="{{ orden.dias_habiles_sic }}"
+                                    data-dias-rhitso="{{ orden.dias_habiles_rhitso }}"
+                                    data-dias-estatus="{{ orden.dias_sin_actualizar }}"
+                                    data-estado-proceso="{{ orden.estado_proceso }}"
+                                    data-fecha-comentario="{% if orden.fecha_ultimo_comentario %}{{ orden.fecha_ultimo_comentario|date:'d/m/Y H:i' }}{% else %}Sin comentario{% endif %}"
+                                    data-comentario="{{ orden.ultimo_comentario|striptags|default:'Sin comentario' }}">
                                     <td>
                                         <strong>{{ orden.numero_serie }}</strong>
                                         {% if orden.orden_cliente %}
@@ -527,7 +540,13 @@
                             </thead>
                             <tbody>
                                 {% for orden in excluidos %}
-                                <tr>
+                                <tr data-orden-cliente="{{ orden.orden_cliente|default:'Sin orden' }}"
+                                    data-dias-sic="{{ orden.dias_habiles_sic }}"
+                                    data-dias-rhitso="{{ orden.dias_habiles_rhitso }}"
+                                    data-dias-estatus="{{ orden.dias_sin_actualizar }}"
+                                    data-estado-proceso="{{ orden.estado_proceso }}"
+                                    data-fecha-comentario="{% if orden.fecha_ultimo_comentario %}{{ orden.fecha_ultimo_comentario|date:'d/m/Y H:i' }}{% else %}Sin comentario{% endif %}"
+                                    data-comentario="{{ orden.ultimo_comentario|striptags|default:'Sin comentario' }}">
                                     <td>
                                         <strong>{{ orden.numero_serie }}</strong>
                                         {% if orden.orden_cliente %}
