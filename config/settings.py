@@ -168,6 +168,47 @@ JEFE_CALIDAD_NOMBRE = config('JEFE_CALIDAD_NOMBRE', default='Jefe de Calidad')
 JEFE_CALIDAD_2_EMAIL = config('JEFE_CALIDAD_2_EMAIL', default='')
 JEFE_CALIDAD_2_NOMBRE = config('JEFE_CALIDAD_2_NOMBRE', default='Segundo Jefe de Calidad')
 
+# ============================================================================
+# CONFIGURACIÓN DE CORREOS PARA SERVICIO TÉCNICO - RHITSO
+# ============================================================================
+# Destinatarios principales para envío de equipos a RHITSO
+# Estos correos se leen desde .env por seguridad
+# Estructura: cada contacto tiene nombre y email configurables
+
+def _build_rhitso_recipients():
+    """
+    Función auxiliar para construir la lista de destinatarios RHITSO desde .env
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta función lee las variables de entorno del archivo .env y construye
+    una lista de diccionarios con los destinatarios de RHITSO.
+    Solo incluye contactos que tengan email configurado (no vacío).
+    """
+    recipients = []
+    # Iteramos sobre 4 posibles contactos (puedes agregar más si necesitas)
+    for i in range(1, 5):
+        nombre = config(f'RHITSO_CONTACTO_{i}_NOMBRE', default='')
+        email = config(f'RHITSO_CONTACTO_{i}_EMAIL', default='')
+        
+        # Solo agregar si el email está configurado
+        if email:
+            recipients.append({
+                'nombre': nombre,
+                'email': email,
+                'grupo': 'rhitso_principal',
+                'descripcion': f'Contacto {i} RHITSO'
+            })
+    
+    return recipients
+
+# Lista de destinatarios RHITSO generada dinámicamente desde .env
+RHITSO_EMAIL_RECIPIENTS = _build_rhitso_recipients()
+
+# Áreas de empleados que pueden recibir copia de notificaciones RHITSO
+# Los empleados de estas áreas aparecerán en la sección "Con copia a:" del modal
+# La búsqueda es case-insensitive (no distingue mayúsculas/minúsculas)
+RHITSO_AREAS_COPIA = ['CALIDAD', 'FRONTDESK', 'COMPRAS']
+
 # Email del Jefe General (también recibe copia de todas las notificaciones)
 JEFE_GENERAL_EMAIL = config('JEFE_GENERAL_EMAIL', default='')
 JEFE_GENERAL_NOMBRE = config('JEFE_GENERAL_NOMBRE', default='Jefe General')

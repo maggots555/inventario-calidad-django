@@ -115,6 +115,20 @@ urlpatterns = [
          views.agregar_comentario_rhitso, 
          name='agregar_comentario_rhitso'),
     
+    # Enviar correo con formato a RHITSO (FASE 10)
+    path('rhitso/orden/<int:orden_id>/enviar-correo/', 
+         views.enviar_correo_rhitso, 
+         name='enviar_correo_rhitso'),
+    
+    # ========================================================================
+    # VISTA DE PRUEBA: GENERACIÓN DE PDF RHITSO (FASE 10.2)
+    # ========================================================================
+    # Esta vista es temporal para probar la generación de PDF
+    # Una vez integrado al modal de correo, se puede eliminar
+    path('rhitso/orden/<int:orden_id>/generar-pdf-prueba/', 
+         views.generar_pdf_rhitso_prueba, 
+         name='generar_pdf_rhitso_prueba'),
+    
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]
