@@ -85,6 +85,9 @@ urlpatterns = [
     # MÓDULO RHITSO - SEGUIMIENTO ESPECIALIZADO (FASES 4 Y 5)
     # ========================================================================
     
+    # Dashboard consolidado de candidatos RHITSO (Octubre 2025)
+    path('rhitso/dashboard/', views.dashboard_rhitso, name='dashboard_rhitso'),
+    
     # Vista principal del panel RHITSO (FASE 4)
     path('rhitso/orden/<int:orden_id>/', views.gestion_rhitso, name='gestion_rhitso'),
     

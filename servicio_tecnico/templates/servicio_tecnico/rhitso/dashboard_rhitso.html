@@ -1,0 +1,637 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard RHITSO - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<!-- CSS específico para el dashboard RHITSO -->
+<link rel="stylesheet" href="{% static 'css/dashboard_rhitso.css' %}?v=1.0">
+<link rel="stylesheet" href="{% static 'css/rhitso.css' %}?v=2.3">
+
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    
+    <!-- ============================================================ -->
+    <!-- HEADER DEL DASHBOARD -->
+    <!-- ============================================================ -->
+    <div class="dashboard-header mb-4">
+        <div class="dashboard-header-content">
+            <div class="dashboard-title-section">
+                <h1 class="dashboard-title">
+                    <i class="bi bi-microchip text-primary"></i>
+                    Dashboard RHITSO
+                </h1>
+                <p class="dashboard-subtitle">
+                    Control y seguimiento de equipos para reparación especializada
+                    <span class="update-time">
+                        <i class="bi bi-clock"></i>
+                        Actualizado: {{ fecha_actualizacion|date:"d/m/Y H:i" }}
+                    </span>
+                </p>
+            </div>
+            <div class="dashboard-actions">
+                <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i>
+                    Volver a Órdenes
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECCIÓN DE ESTADÍSTICAS (STATS CARDS) -->
+    <!-- ============================================================ -->
+    <div class="stats-grid mb-4">
+        
+        <!-- CARD 1: Total Candidatos -->
+        <div class="stat-card stat-primary" data-stat="total">
+            <div class="stat-icon">
+                <i class="bi bi-microchip"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ total_candidatos }}</div>
+                <div class="stat-label">Total Candidatos</div>
+                <div class="stat-description">Equipos marcados para RHITSO</div>
+            </div>
+            <div class="stat-trend">
+                <i class="bi bi-layer-group"></i>
+            </div>
+        </div>
+
+        <!-- CARD 2: Con Diagnóstico -->
+        <div class="stat-card stat-info" data-stat="diagnostico">
+            <div class="stat-icon">
+                <i class="bi bi-stethoscope"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ total_con_diagnostico }}</div>
+                <div class="stat-label">Con Diagnóstico</div>
+                <div class="stat-description">Diagnóstico SIC completado</div>
+            </div>
+            <div class="stat-trend">
+                <i class="bi bi-clipboard-check"></i>
+            </div>
+        </div>
+
+        <!-- CARD 3: Enviados a RHITSO -->
+        <div class="stat-card stat-success" data-stat="enviados">
+            <div class="stat-icon">
+                <i class="bi bi-send-check"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ total_enviados }}</div>
+                <div class="stat-label">Enviados</div>
+                <div class="stat-description">Ya enviados a RHITSO</div>
+            </div>
+            <div class="stat-trend">
+                <i class="bi bi-paper-plane"></i>
+            </div>
+        </div>
+
+        <!-- CARD 4: Incidencias Abiertas -->
+        <div class="stat-card stat-warning" data-stat="incidencias">
+            <div class="stat-icon">
+                <i class="bi bi-exclamation-triangle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ total_incidencias_abiertas }}</div>
+                <div class="stat-label">Incidencias</div>
+                <div class="stat-description">Incidencias abiertas</div>
+            </div>
+            <div class="stat-trend">
+                <i class="bi bi-flag"></i>
+            </div>
+        </div>
+
+        <!-- CARDS ADICIONALES: Por Sucursal -->
+        {% if stats_sucursal.satelite > 0 %}
+        <div class="stat-card stat-secondary" data-stat="satelite">
+            <div class="stat-icon">
+                <i class="bi bi-building"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats_sucursal.satelite }}</div>
+                <div class="stat-label">Satelite</div>
+                <div class="stat-description">Candidatos de Satelite</div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if stats_sucursal.drop > 0 %}
+        <div class="stat-card stat-secondary" data-stat="drop">
+            <div class="stat-icon">
+                <i class="bi bi-box-seam"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats_sucursal.drop }}</div>
+                <div class="stat-label">Drop</div>
+                <div class="stat-description">Candidatos de Drop</div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if stats_sucursal.mis > 0 %}
+        <div class="stat-card stat-secondary" data-stat="mis">
+            <div class="stat-icon">
+                <i class="bi bi-info-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-number">{{ stats_sucursal.mis }}</div>
+                <div class="stat-label">MIS</div>
+                <div class="stat-description">Candidatos de MIS</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TABLA DE CANDIDATOS RHITSO CON PESTAÑAS -->
+    <!-- ============================================================ -->
+    <div class="data-table-container">
+        
+        <!-- Header de la tabla con título y botones -->
+        <div class="table-header">
+            <div class="table-title-section">
+                <h2 class="table-heading">
+                    <i class="bi bi-list me-2"></i>
+                    Candidatos RHITSO
+                </h2>
+                <span class="table-count">
+                    Total: {{ total_candidatos }} equipos 
+                    (Activos: {{ count_activos }}, 
+                     Pendientes: {{ count_pendientes }}, 
+                     Excluidos: {{ count_excluidos }})
+                </span>
+            </div>
+            <div class="table-actions">
+                <button id="exportExcelRhitso" class="btn btn-success" type="button">
+                    <i class="bi bi-file-earmark-excel me-2"></i>
+                    Exportar Excel
+                </button>
+                <button id="reporteRhitso" class="btn btn-info" type="button">
+                    <i class="bi bi-file-earmark-spreadsheet me-2"></i>
+                    Reporte RHITSO
+                </button>
+            </div>
+        </div>
+
+        <!-- Pestañas Bootstrap para las 3 categorías -->
+        <ul class="nav nav-tabs mb-3" id="rhitsoTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="activos-tab" data-bs-toggle="tab" 
+                        data-bs-target="#activos" type="button" role="tab" 
+                        aria-controls="activos" aria-selected="true">
+                    <i class="bi bi-microchip me-2"></i>
+                    Activos ({{ count_activos }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="pendientes-tab" data-bs-toggle="tab" 
+                        data-bs-target="#pendientes" type="button" role="tab" 
+                        aria-controls="pendientes" aria-selected="false">
+                    <i class="bi bi-clock-history me-2"></i>
+                    Pendientes ({{ count_pendientes }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="excluidos-tab" data-bs-toggle="tab" 
+                        data-bs-target="#excluidos" type="button" role="tab" 
+                        aria-controls="excluidos" aria-selected="false">
+                    <i class="bi bi-x-circle me-2"></i>
+                    Excluidos ({{ count_excluidos }})
+                </button>
+            </li>
+        </ul>
+
+        <!-- Contenido de las pestañas -->
+        <div class="tab-content" id="rhitsoTabContent">
+            
+            <!-- ============================================================ -->
+            <!-- PESTAÑA 1: ACTIVOS -->
+            <!-- ============================================================ -->
+            <div class="tab-pane fade show active" id="activos" role="tabpanel" aria-labelledby="activos-tab">
+                <div class="table-wrapper">
+                    <!-- Filtro por estado RHITSO -->
+                    <div class="mb-3 d-flex align-items-center gap-2">
+                        <label for="filtro_estado_rhitso_activos" class="mb-0">
+                            <i class="bi bi-filter"></i> Filtrar por Estado RHITSO:
+                        </label>
+                        <select id="filtro_estado_rhitso_activos" class="form-select" style="width: 300px;">
+                            <option value="">Todos los estados</option>
+                            {% for estado in estados_activos %}
+                                <option value="{{ estado }}">{{ estado }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- DataTable para órdenes activas -->
+                    <div class="table-responsive">
+                        <table class="table table-hover table-modern" id="candidatosRhitsoTableActivos">
+                            <thead>
+                                <tr>
+                                    <th><i class="bi bi-upc-scan me-1"></i>N° Serie</th>
+                                    <th><i class="bi bi-tag me-1"></i>Marca</th>
+                                    <th><i class="bi bi-laptop me-1"></i>Modelo</th>
+                                    <th><i class="bi bi-calendar me-1"></i>Fecha Ingreso</th>
+                                    <th><i class="bi bi-building me-1"></i>Sucursal</th>
+                                    <th><i class="bi bi-traffic-light me-1"></i>Estado SIC</th>
+                                    <th><i class="bi bi-gear-wide-connected me-1"></i>Estado RHITSO</th>
+                                    <th><i class="bi bi-flag me-1"></i>Incidencias</th>
+                                    <th><i class="bi bi-send me-1"></i>Fecha Envío</th>
+                                    <th><i class="bi bi-hourglass-split me-1"></i>Tiempo</th>
+                                    <th><i class="bi bi-clock me-1"></i>Días sin actualizar</th>
+                                    <th><i class="bi bi-gear me-1"></i>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for orden in activos %}
+                                <tr>
+                                    <!-- Número de Serie -->
+                                    <td>
+                                        <strong>{{ orden.numero_serie }}</strong>
+                                        {% if orden.orden_cliente %}
+                                            <br><small class="text-muted">{{ orden.orden_cliente }}</small>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Marca -->
+                                    <td>{{ orden.marca }}</td>
+
+                                    <!-- Modelo -->
+                                    <td>{{ orden.modelo }}</td>
+
+                                    <!-- Fecha de Ingreso -->
+                                    <td>
+                                        <small>{{ orden.fecha_ingreso|date:"d/m/Y" }}</small>
+                                    </td>
+
+                                    <!-- Sucursal -->
+                                    <td>{{ orden.sucursal }}</td>
+
+                                    <!-- Estado General (SIC) -->
+                                    <td>
+                                        <span class="badge bg-secondary">{{ orden.estado_orden }}</span>
+                                    </td>
+
+                                    <!-- Estado RHITSO -->
+                                    <td data-estado="{{ orden.estado_rhitso_display }}">
+                                        <span class="badge bg-primary">{{ orden.estado_rhitso_display }}</span>
+                                        {% if orden.owner_actual %}
+                                            <br><small class="text-muted"><i class="bi bi-person"></i> {{ orden.owner_actual }}</small>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Incidencias -->
+                                    <td>
+                                        {% if orden.total_incidencias > 0 %}
+                                            {% if orden.incidencias_abiertas > 0 %}
+                                                <span class="badge bg-danger">
+                                                    <i class="bi bi-exclamation-triangle"></i>
+                                                    {{ orden.incidencias_abiertas }} activa(s)
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle"></i>
+                                                    {{ orden.incidencias_resueltas }} resuelta(s)
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">Sin incidencias</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Fecha de Envío a RHITSO -->
+                                    <td data-order="{% if orden.fecha_envio_rhitso %}{{ orden.fecha_envio_rhitso|date:"U" }}{% else %}0{% endif %}">
+                                        {% if orden.fecha_envio_rhitso %}
+                                            {{ orden.fecha_envio_rhitso|date:"d/m/Y" }}
+                                        {% else %}
+                                            <span class="text-muted">No enviado</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Tiempo Transcurrido -->
+                                    <td>
+                                        <div>
+                                            <strong>{{ orden.dias_habiles_sic }}</strong> días (SIC)
+                                        </div>
+                                        {% if orden.dias_habiles_rhitso > 0 %}
+                                            <div>
+                                                <span class="badge bg-{{ orden.color_badge_dias }}">
+                                                    {{ orden.dias_habiles_rhitso }} días (RHITSO)
+                                                </span>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Días sin Actualizar -->
+                                    <td>
+                                        <span class="badge bg-info">
+                                            {{ orden.dias_sin_actualizar }} días
+                                        </span>
+                                    </td>
+
+                                    <!-- Acciones -->
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'servicio_tecnico:gestion_rhitso' orden.id %}" 
+                                               class="btn btn-sm btn-primary" 
+                                               title="Ver seguimiento RHITSO">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'servicio_tecnico:detalle_orden' orden.id %}" 
+                                               class="btn btn-sm btn-info" 
+                                               title="Ver orden completa">
+                                                <i class="bi bi-file-text"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="12" class="text-center text-muted py-4">
+                                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                                        <p class="mt-2">No hay órdenes activas en RHITSO</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- PESTAÑA 2: PENDIENTES -->
+            <!-- ============================================================ -->
+            <div class="tab-pane fade" id="pendientes" role="tabpanel" aria-labelledby="pendientes-tab">
+                <div class="table-wrapper">
+                    <!-- Filtro por estado RHITSO -->
+                    <div class="mb-3 d-flex align-items-center gap-2">
+                        <label for="filtro_estado_rhitso_pendientes" class="mb-0">
+                            <i class="bi bi-filter"></i> Filtrar por Estado RHITSO:
+                        </label>
+                        <select id="filtro_estado_rhitso_pendientes" class="form-select" style="width: 300px;">
+                            <option value="">Todos los estados</option>
+                            {% for estado in estados_pendientes %}
+                                <option value="{{ estado }}">{{ estado }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- DataTable para órdenes pendientes -->
+                    <div class="table-responsive">
+                        <table class="table table-hover table-modern" id="candidatosRhitsoTablePendientes">
+                            <thead>
+                                <tr>
+                                    <th><i class="bi bi-upc-scan me-1"></i>N° Serie</th>
+                                    <th><i class="bi bi-tag me-1"></i>Marca</th>
+                                    <th><i class="bi bi-laptop me-1"></i>Modelo</th>
+                                    <th><i class="bi bi-calendar me-1"></i>Fecha Ingreso</th>
+                                    <th><i class="bi bi-building me-1"></i>Sucursal</th>
+                                    <th><i class="bi bi-traffic-light me-1"></i>Estado SIC</th>
+                                    <th><i class="bi bi-gear-wide-connected me-1"></i>Estado RHITSO</th>
+                                    <th><i class="bi bi-flag me-1"></i>Incidencias</th>
+                                    <th><i class="bi bi-send me-1"></i>Fecha Envío</th>
+                                    <th><i class="bi bi-hourglass-split me-1"></i>Tiempo</th>
+                                    <th><i class="bi bi-clock me-1"></i>Días sin actualizar</th>
+                                    <th><i class="bi bi-gear me-1"></i>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for orden in pendientes %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ orden.numero_serie }}</strong>
+                                        {% if orden.orden_cliente %}
+                                            <br><small class="text-muted">{{ orden.orden_cliente }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ orden.marca }}</td>
+                                    <td>{{ orden.modelo }}</td>
+                                    <td><small>{{ orden.fecha_ingreso|date:"d/m/Y" }}</small></td>
+                                    <td>{{ orden.sucursal }}</td>
+                                    <td><span class="badge bg-secondary">{{ orden.estado_orden }}</span></td>
+                                    <td data-estado="{{ orden.estado_rhitso_display }}">
+                                        <span class="badge bg-warning">{{ orden.estado_rhitso_display }}</span>
+                                        {% if orden.owner_actual %}
+                                            <br><small class="text-muted"><i class="bi bi-person"></i> {{ orden.owner_actual }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if orden.total_incidencias > 0 %}
+                                            {% if orden.incidencias_abiertas > 0 %}
+                                                <span class="badge bg-danger">
+                                                    <i class="bi bi-exclamation-triangle"></i>
+                                                    {{ orden.incidencias_abiertas }} activa(s)
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle"></i>
+                                                    {{ orden.incidencias_resueltas }} resuelta(s)
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">Sin incidencias</span>
+                                        {% endif %}
+                                    </td>
+                                    <td data-order="{% if orden.fecha_envio_rhitso %}{{ orden.fecha_envio_rhitso|date:"U" }}{% else %}0{% endif %}">
+                                        {% if orden.fecha_envio_rhitso %}
+                                            {{ orden.fecha_envio_rhitso|date:"d/m/Y" }}
+                                        {% else %}
+                                            <span class="text-muted">No enviado</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div><strong>{{ orden.dias_habiles_sic }}</strong> días (SIC)</div>
+                                        {% if orden.dias_habiles_rhitso > 0 %}
+                                            <div>
+                                                <span class="badge bg-{{ orden.color_badge_dias }}">
+                                                    {{ orden.dias_habiles_rhitso }} días (RHITSO)
+                                                </span>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ orden.dias_sin_actualizar }} días</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'servicio_tecnico:gestion_rhitso' orden.id %}" 
+                                               class="btn btn-sm btn-primary" 
+                                               title="Ver seguimiento RHITSO">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'servicio_tecnico:detalle_orden' orden.id %}" 
+                                               class="btn btn-sm btn-info" 
+                                               title="Ver orden completa">
+                                                <i class="bi bi-file-text"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="12" class="text-center text-muted py-4">
+                                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                                        <p class="mt-2">No hay órdenes pendientes</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- PESTAÑA 3: EXCLUIDOS -->
+            <!-- ============================================================ -->
+            <div class="tab-pane fade" id="excluidos" role="tabpanel" aria-labelledby="excluidos-tab">
+                <div class="table-wrapper">
+                    <!-- Filtro por estado RHITSO -->
+                    <div class="mb-3 d-flex align-items-center gap-2">
+                        <label for="filtro_estado_rhitso_excluidos" class="mb-0">
+                            <i class="bi bi-filter"></i> Filtrar por Estado RHITSO:
+                        </label>
+                        <select id="filtro_estado_rhitso_excluidos" class="form-select" style="width: 300px;">
+                            <option value="">Todos los estados</option>
+                            {% for estado in estados_excluidos %}
+                                <option value="{{ estado }}">{{ estado }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- DataTable para órdenes excluidas -->
+                    <div class="table-responsive">
+                        <table class="table table-hover table-modern" id="candidatosRhitsoTableExcluidos">
+                            <thead>
+                                <tr>
+                                    <th><i class="bi bi-upc-scan me-1"></i>N° Serie</th>
+                                    <th><i class="bi bi-tag me-1"></i>Marca</th>
+                                    <th><i class="bi bi-laptop me-1"></i>Modelo</th>
+                                    <th><i class="bi bi-calendar me-1"></i>Fecha Ingreso</th>
+                                    <th><i class="bi bi-building me-1"></i>Sucursal</th>
+                                    <th><i class="bi bi-traffic-light me-1"></i>Estado SIC</th>
+                                    <th><i class="bi bi-gear-wide-connected me-1"></i>Estado RHITSO</th>
+                                    <th><i class="bi bi-flag me-1"></i>Incidencias</th>
+                                    <th><i class="bi bi-send me-1"></i>Fecha Envío</th>
+                                    <th><i class="bi bi-hourglass-split me-1"></i>Tiempo</th>
+                                    <th><i class="bi bi-clock me-1"></i>Días sin actualizar</th>
+                                    <th><i class="bi bi-gear me-1"></i>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for orden in excluidos %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ orden.numero_serie }}</strong>
+                                        {% if orden.orden_cliente %}
+                                            <br><small class="text-muted">{{ orden.orden_cliente }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ orden.marca }}</td>
+                                    <td>{{ orden.modelo }}</td>
+                                    <td><small>{{ orden.fecha_ingreso|date:"d/m/Y" }}</small></td>
+                                    <td>{{ orden.sucursal }}</td>
+                                    <td><span class="badge bg-secondary">{{ orden.estado_orden }}</span></td>
+                                    <td data-estado="{{ orden.estado_rhitso_display }}">
+                                        <span class="badge bg-dark">{{ orden.estado_rhitso_display }}</span>
+                                        {% if orden.owner_actual %}
+                                            <br><small class="text-muted"><i class="bi bi-person"></i> {{ orden.owner_actual }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if orden.total_incidencias > 0 %}
+                                            {% if orden.incidencias_abiertas > 0 %}
+                                                <span class="badge bg-danger">
+                                                    <i class="bi bi-exclamation-triangle"></i>
+                                                    {{ orden.incidencias_abiertas }} activa(s)
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle"></i>
+                                                    {{ orden.incidencias_resueltas }} resuelta(s)
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">Sin incidencias</span>
+                                        {% endif %}
+                                    </td>
+                                    <td data-order="{% if orden.fecha_envio_rhitso %}{{ orden.fecha_envio_rhitso|date:"U" }}{% else %}0{% endif %}">
+                                        {% if orden.fecha_envio_rhitso %}
+                                            {{ orden.fecha_envio_rhitso|date:"d/m/Y" }}
+                                        {% else %}
+                                            <span class="text-muted">No enviado</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div><strong>{{ orden.dias_habiles_sic }}</strong> días (SIC)</div>
+                                        {% if orden.dias_habiles_rhitso > 0 %}
+                                            <div>
+                                                <span class="badge bg-{{ orden.color_badge_dias }}">
+                                                    {{ orden.dias_habiles_rhitso }} días (RHITSO)
+                                                </span>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ orden.dias_sin_actualizar }} días</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'servicio_tecnico:gestion_rhitso' orden.id %}" 
+                                               class="btn btn-sm btn-primary" 
+                                               title="Ver seguimiento RHITSO">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'servicio_tecnico:detalle_orden' orden.id %}" 
+                                               class="btn btn-sm btn-info" 
+                                               title="Ver orden completa">
+                                                <i class="bi bi-file-text"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="12" class="text-center text-muted py-4">
+                                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                                        <p class="mt-2">No hay órdenes excluidas</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- Fin tab-content -->
+    </div> <!-- Fin data-table-container -->
+
+</div> <!-- Fin container-fluid -->
+{% endblock %}
+
+{% block extra_js %}
+<!-- jQuery (DEBE cargarse PRIMERO - requerido por DataTables) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<!-- DataTables JS -->
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+
+<!-- SheetJS para exportación a Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- JavaScript personalizado del dashboard -->
+<script src="{% static 'js/dashboard_rhitso.js' %}?v=1.0"></script>
+
+<!-- Nota: Los datos ya están en las tablas HTML, JavaScript los leerá de ahí -->
+{% endblock %}

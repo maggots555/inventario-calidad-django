@@ -10,7 +10,7 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Prefetch
 from django.utils import timezone
 from django.http import JsonResponse
 from django.utils.safestring import mark_safe
@@ -32,6 +32,13 @@ from .models import (
 )
 from inventario.models import Empleado
 from config.constants import ESTADO_ORDEN_CHOICES
+from .utils_rhitso import (
+    calcular_dias_habiles,
+    calcular_dias_en_estatus,
+    obtener_color_por_dias_rhitso,
+    formatear_tiempo_transcurrido,
+    obtener_estado_proceso_rhitso,
+)
 from .forms import (
     NuevaOrdenForm,
     NuevaOrdenVentaMostradorForm,
@@ -4550,3 +4557,318 @@ def generar_pdf_rhitso_prueba(request, orden_id):
         traceback.print_exc()
         
         return redirect('servicio_tecnico:lista_ordenes')
+
+
+# ============================================================================
+# DASHBOARD RHITSO - VISTA CONSOLIDADA DE CANDIDATOS
+# ============================================================================
+
+@login_required
+def dashboard_rhitso(request):
+    """
+    Dashboard consolidado de todos los candidatos RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Este dashboard replica la funcionalidad del sistema PHP, mostrando:
+    - Estadísticas generales (total candidatos, enviados, con diagnóstico, incidencias)
+    - Estadísticas por sucursal (Satelite, Drop, MIS)
+    - 3 pestañas con tablas filtradas: Activos, Pendientes, Excluidos
+    - Filtros dinámicos por estado RHITSO
+    - Exportación a Excel
+    
+    ¿Por qué un dashboard separado?
+    - Vista rápida de TODAS las órdenes RHITSO (no solo una)
+    - Métricas agregadas para toma de decisiones
+    - Identificación rápida de problemas y retrasos
+    - Reportes y exportaciones
+    
+    Flujo de la vista:
+    1. Consultar todas las órdenes candidatas a RHITSO
+    2. Calcular estadísticas generales y por sucursal
+    3. Preparar datos de cada orden (días hábiles, incidencias, etc.)
+    4. Separar órdenes en 3 categorías (activos, pendientes, excluidos)
+    5. Preparar datos para exportación Excel
+    6. Renderizar template con contexto completo
+    
+    Args:
+        request: HttpRequest object
+    
+    Returns:
+        HttpResponse con el dashboard renderizado
+    """
+    # =======================================================================
+    # PASO 1: CONSULTA OPTIMIZADA DE CANDIDATOS RHITSO
+    # =======================================================================
+    
+    # EXPLICACIÓN: select_related() carga las relaciones en una sola consulta
+    # Esto evita el "N+1 problem" (hacer una consulta por cada relación)
+    candidatos_rhitso = OrdenServicio.objects.filter(
+        es_candidato_rhitso=True
+    ).select_related(
+        'detalle_equipo',              # Información del equipo
+        'sucursal',                    # Sucursal de la orden
+        'tecnico_asignado_actual',     # Técnico asignado
+        'responsable_seguimiento'      # Responsable del seguimiento
+    ).prefetch_related(
+        # EXPLICACIÓN: prefetch_related() hace una consulta separada optimizada
+        # para relaciones many-to-many o reverse foreign keys
+        Prefetch(
+            'seguimientos_rhitso',
+            queryset=SeguimientoRHITSO.objects.select_related('estado', 'usuario_actualizacion').order_by('-fecha_actualizacion'),
+            to_attr='seguimientos_ordenados'
+        ),
+        Prefetch(
+            'incidencias_rhitso',
+            queryset=IncidenciaRHITSO.objects.filter(estado__in=['ABIERTA', 'EN_REVISION']),
+            to_attr='incidencias_abiertas'
+        ),
+        Prefetch(
+            'incidencias_rhitso',
+            queryset=IncidenciaRHITSO.objects.filter(estado='RESUELTA'),
+            to_attr='incidencias_resueltas_lista'
+        ),
+    ).order_by('-fecha_ingreso')
+    
+    # =======================================================================
+    # PASO 2: CALCULAR ESTADÍSTICAS GENERALES
+    # =======================================================================
+    
+    # EXPLICACIÓN: Count() es una función agregada que cuenta registros
+    # Usamos Q() para condiciones complejas (OR, AND, NOT)
+    total_candidatos = candidatos_rhitso.count()
+    total_enviados = candidatos_rhitso.filter(fecha_envio_rhitso__isnull=False).count()
+    total_con_diagnostico = candidatos_rhitso.exclude(detalle_equipo__diagnostico_sic='').count()
+    
+    # Contar incidencias abiertas (en todas las órdenes)
+    total_incidencias_abiertas = IncidenciaRHITSO.objects.filter(
+        orden__in=candidatos_rhitso,
+        estado__in=['ABIERTA', 'EN_REVISION']
+    ).count()
+    
+    # =======================================================================
+    # PASO 3: CALCULAR ESTADÍSTICAS POR SUCURSAL
+    # =======================================================================
+    
+    # EXPLICACIÓN: Contamos cuántas órdenes hay en cada sucursal
+    # Estas son las 3 sucursales principales según el sistema PHP
+    stats_sucursal = {
+        'satelite': candidatos_rhitso.filter(sucursal__nombre__icontains='Satelite').count(),
+        'drop': candidatos_rhitso.filter(sucursal__nombre__icontains='Drop').count(),
+        'mis': candidatos_rhitso.filter(sucursal__nombre__icontains='MIS').count(),
+    }
+    
+    # =======================================================================
+    # PASO 4: PREPARAR DATOS DETALLADOS DE CADA ORDEN
+    # =======================================================================
+    
+    # EXPLICACIÓN: Estados que indican órdenes "excluidas" del proceso activo
+    estados_excluidos = ['CERRADO', 'USUARIO NO ACEPTA ENVIO A RHITSO']
+    estados_pendientes = ['PENDIENTE DE CONFIRMAR ENVIO A RHITSO']
+    
+    # Listas para separar órdenes por categoría
+    activos = []
+    pendientes = []
+    excluidos = []
+    
+    # Iterar sobre cada orden para preparar sus datos
+    for orden in candidatos_rhitso:
+        # ===================================================================
+        # 4.1: INFORMACIÓN BÁSICA
+        # ===================================================================
+        detalle = orden.detalle_equipo
+        
+        # Estado RHITSO actual (campo de texto simple)
+        estado_rhitso_nombre = orden.estado_rhitso if orden.estado_rhitso else 'Pendiente'
+        estado_rhitso_display = estado_rhitso_nombre
+        
+        # Buscar owner del estado (si existe en catálogo)
+        try:
+            estado_obj = EstadoRHITSO.objects.get(estado=estado_rhitso_nombre)
+            owner_actual = estado_obj.owner
+        except EstadoRHITSO.DoesNotExist:
+            owner_actual = ''
+        
+        # ===================================================================
+        # 4.2: CALCULAR DÍAS HÁBILES
+        # ===================================================================
+        
+        # Días hábiles en SIC (desde ingreso hasta hoy o hasta envío a RHITSO)
+        if orden.fecha_envio_rhitso:
+            # Si ya se envió a RHITSO, contar hasta esa fecha
+            dias_habiles_sic = calcular_dias_habiles(
+                orden.fecha_ingreso,
+                orden.fecha_envio_rhitso
+            )
+        else:
+            # Si no se ha enviado, contar hasta hoy
+            dias_habiles_sic = calcular_dias_habiles(orden.fecha_ingreso)
+        
+        # Días hábiles en RHITSO (si aplica)
+        dias_habiles_rhitso = 0
+        if orden.fecha_envio_rhitso:
+            if orden.fecha_recepcion_rhitso:
+                # Ya regresó de RHITSO
+                dias_habiles_rhitso = calcular_dias_habiles(
+                    orden.fecha_envio_rhitso,
+                    orden.fecha_recepcion_rhitso
+                )
+            else:
+                # Todavía en RHITSO
+                dias_habiles_rhitso = calcular_dias_habiles(
+                    orden.fecha_envio_rhitso
+                )
+        
+        # ===================================================================
+        # 4.3: CALCULAR DÍAS SIN ACTUALIZACIÓN
+        # ===================================================================
+        
+        # EXPLICACIÓN: Buscamos el último comentario de usuario (no del sistema)
+        ultimo_seguimiento_usuario = None
+        if hasattr(orden, 'seguimientos_ordenados') and orden.seguimientos_ordenados:
+            # Buscar el último seguimiento que NO sea automático
+            for seg in orden.seguimientos_ordenados:
+                if not seg.es_cambio_automatico:
+                    ultimo_seguimiento_usuario = seg
+                    break
+        
+        if ultimo_seguimiento_usuario:
+            dias_sin_actualizar = calcular_dias_en_estatus(
+                ultimo_seguimiento_usuario.fecha_actualizacion
+            )
+            fecha_ultimo_comentario = ultimo_seguimiento_usuario.fecha_actualizacion
+            ultimo_comentario = ultimo_seguimiento_usuario.observaciones
+        else:
+            # Si no hay seguimientos, contar desde fecha de ingreso
+            dias_sin_actualizar = calcular_dias_en_estatus(orden.fecha_ingreso)
+            fecha_ultimo_comentario = None
+            ultimo_comentario = ''
+        
+        # ===================================================================
+        # 4.4: CONTAR INCIDENCIAS
+        # ===================================================================
+        
+        # EXPLICACIÓN: Usamos los prefetch que definimos arriba
+        incidencias_abiertas_count = len(orden.incidencias_abiertas) if hasattr(orden, 'incidencias_abiertas') else 0
+        incidencias_resueltas_count = len(orden.incidencias_resueltas_lista) if hasattr(orden, 'incidencias_resueltas_lista') else 0
+        total_incidencias = incidencias_abiertas_count + incidencias_resueltas_count
+        
+        # ===================================================================
+        # 4.5: DETERMINAR ESTADO DEL PROCESO
+        # ===================================================================
+        
+        estado_proceso = obtener_estado_proceso_rhitso(orden)
+        
+        # ===================================================================
+        # 4.6: DETERMINAR COLOR SEGÚN DÍAS EN RHITSO
+        # ===================================================================
+        
+        color_badge_dias = obtener_color_por_dias_rhitso(dias_habiles_rhitso)
+        
+        # ===================================================================
+        # 4.7: CONSTRUIR DICCIONARIO CON TODA LA INFORMACIÓN
+        # ===================================================================
+        
+        orden_data = {
+            # Información básica
+            'id': orden.id,
+            'numero_orden_interno': orden.numero_orden_interno,
+            'fecha_ingreso': orden.fecha_ingreso,
+            'estado_orden': orden.get_estado_display(),
+            
+            # Información del equipo
+            'servicio': detalle.falla_principal if detalle else 'Sin observaciones',
+            'numero_serie': detalle.numero_serie if detalle else 'N/A',
+            'marca': detalle.marca if detalle else 'N/A',
+            'modelo': detalle.modelo if detalle else 'N/A',
+            'orden_cliente': detalle.orden_cliente if detalle else 'N/A',
+            
+            # Sucursal
+            'sucursal': orden.sucursal.nombre if orden.sucursal else 'N/A',
+            
+            # Estado RHITSO
+            'estado_rhitso_nombre': estado_rhitso_nombre,
+            'estado_rhitso_display': estado_rhitso_display,
+            'owner_actual': owner_actual,
+            
+            # Incidencias
+            'incidencias_abiertas': incidencias_abiertas_count,
+            'incidencias_resueltas': incidencias_resueltas_count,
+            'total_incidencias': total_incidencias,
+            
+            # Fechas y tiempos
+            'fecha_envio_rhitso': orden.fecha_envio_rhitso,
+            'dias_habiles_sic': dias_habiles_sic,
+            'dias_habiles_rhitso': dias_habiles_rhitso,
+            'dias_sin_actualizar': dias_sin_actualizar,
+            'fecha_ultimo_comentario': fecha_ultimo_comentario,
+            'ultimo_comentario': ultimo_comentario,
+            
+            # Estado del proceso
+            'estado_proceso': estado_proceso,
+            'color_badge_dias': color_badge_dias,
+            
+            # Diagnóstico
+            'tiene_diagnostico': bool(detalle and detalle.diagnostico_sic),
+        }
+        
+        # ===================================================================
+        # 4.8: CLASIFICAR ORDEN EN CATEGORÍA CORRESPONDIENTE
+        # ===================================================================
+        
+        # EXPLICACIÓN: Separamos las órdenes según su estado RHITSO
+        if estado_rhitso_nombre in estados_excluidos:
+            excluidos.append(orden_data)
+        elif estado_rhitso_nombre in estados_pendientes:
+            pendientes.append(orden_data)
+        else:
+            activos.append(orden_data)
+    
+    # =======================================================================
+    # PASO 5: OBTENER LISTA DE ESTADOS RHITSO PARA FILTROS
+    # =======================================================================
+    
+    # EXPLICACIÓN: Creamos listas de estados únicos para los dropdowns de filtro
+    estados_activos = list(set(orden['estado_rhitso_display'] for orden in activos))
+    estados_pendientes_lista = list(set(orden['estado_rhitso_display'] for orden in pendientes))
+    estados_excluidos_lista = list(set(orden['estado_rhitso_display'] for orden in excluidos))
+    
+    # Ordenar alfabéticamente
+    estados_activos.sort()
+    estados_pendientes_lista.sort()
+    estados_excluidos_lista.sort()
+    
+    # =======================================================================
+    # PASO 6: PREPARAR CONTEXTO PARA EL TEMPLATE
+    # =======================================================================
+    
+    context = {
+        # Estadísticas generales
+        'total_candidatos': total_candidatos,
+        'total_enviados': total_enviados,
+        'total_con_diagnostico': total_con_diagnostico,
+        'total_incidencias_abiertas': total_incidencias_abiertas,
+        
+        # Estadísticas por sucursal
+        'stats_sucursal': stats_sucursal,
+        
+        # Órdenes por categoría
+        'activos': activos,
+        'pendientes': pendientes,
+        'excluidos': excluidos,
+        
+        # Contadores para pestañas
+        'count_activos': len(activos),
+        'count_pendientes': len(pendientes),
+        'count_excluidos': len(excluidos),
+        
+        # Listas de estados para filtros
+        'estados_activos': estados_activos,
+        'estados_pendientes': estados_pendientes_lista,
+        'estados_excluidos': estados_excluidos_lista,
+        
+        # Información adicional
+        'fecha_actualizacion': timezone.now(),
+    }
+    
+    return render(request, 'servicio_tecnico/rhitso/dashboard_rhitso.html', context)
