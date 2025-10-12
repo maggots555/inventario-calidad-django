@@ -1891,6 +1891,10 @@ class SeguimientoRHITSO(models.Model):
         default=False,
         help_text="¿Se notificó al cliente de este cambio?"
     )
+    es_cambio_automatico = models.BooleanField(
+        default=False,
+        help_text="True si el cambio fue generado automáticamente por el sistema (signals), False si fue manual (usuario)"
+    )
     
     def __str__(self):
         return f"{self.orden.numero_orden_interno} → {self.estado.estado}"

@@ -1320,7 +1320,7 @@ def detalle_orden(request, orden_id):
         'diagnostico': orden.imagenes.filter(tipo='diagnostico').order_by('-fecha_subida'),
         'reparacion': orden.imagenes.filter(tipo='reparacion').order_by('-fecha_subida'),
         'egreso': orden.imagenes.filter(tipo='egreso').order_by('-fecha_subida'),
-        'otras': orden.imagenes.filter(tipo='otras').order_by('-fecha_subida'),
+        'autorizacion': orden.imagenes.filter(tipo='autorizacion').order_by('-fecha_subida'),
     }
     
     total_imagenes = orden.imagenes.count()
@@ -3085,16 +3085,21 @@ def gestion_rhitso(request, orden_id):
     
     # Preparar diccionario con información del equipo
     # EXPLICACIÓN: Organizamos la información en un diccionario para
-    # facilitar su uso en el template
+    # facilitar su uso en el template. Incluye datos de la orden y del equipo.
     equipo_info = {
-        'marca': detalle_equipo.marca if detalle_equipo else 'N/A',
-        'modelo': detalle_equipo.modelo if detalle_equipo else 'N/A',
-        'serie': detalle_equipo.numero_serie if detalle_equipo else 'N/A',
-        'tipo_equipo': detalle_equipo.get_tipo_equipo_display() if detalle_equipo else 'N/A',
-        'gama': detalle_equipo.get_gama_display() if detalle_equipo else 'N/A',
-        'sucursal': orden.sucursal.nombre if orden.sucursal else 'N/A',
-        'enciende': detalle_equipo.equipo_enciende if detalle_equipo else None,
-        'falla_principal': detalle_equipo.falla_principal if detalle_equipo else 'N/A',
+        # Información básica del equipo
+        'marca': detalle_equipo.marca if detalle_equipo else 'No especificada',
+        'modelo': detalle_equipo.modelo if detalle_equipo else 'No especificado',
+        'numero_serie': detalle_equipo.numero_serie if detalle_equipo else 'No especificado',
+        
+        # Información de la orden
+        'sucursal': orden.sucursal.nombre if orden.sucursal else 'No especificada',
+        'fecha_ingreso': orden.fecha_ingreso,
+        'estado_orden': orden.get_estado_display(),
+        
+        # Orden del cliente y accesorios
+        'orden_cliente': detalle_equipo.orden_cliente if (detalle_equipo and detalle_equipo.orden_cliente) else 'No especificada',
+        'numero_serie_cargador': detalle_equipo.numero_serie_cargador if (detalle_equipo and detalle_equipo.numero_serie_cargador) else 'No incluye',
     }
     
     # =======================================================================
@@ -3166,29 +3171,36 @@ def gestion_rhitso(request, orden_id):
     # PASO 5: OBTENER HISTORIAL RHITSO
     # =======================================================================
     # EXPLICACIÓN: Obtenemos dos tipos de registros históricos:
-    # 1. Seguimientos del sistema (cambios de estado automáticos)
-    # 2. Comentarios manuales (agregados por usuarios)
+    # 1. Seguimientos automáticos (cambios detectados por signals del sistema)
+    # 2. Seguimientos manuales (cambios registrados por usuarios mediante formulario)
     
-    # Seguimientos del sistema (cambios de estado RHITSO)
-    # EXPLICACIÓN: select_related optimiza la consulta pre-cargando
-    # las relaciones para evitar múltiples queries a la base de datos
-    seguimientos_sistema = orden.seguimientos_rhitso.select_related(
+    # Seguimientos automáticos del sistema (es_cambio_automatico=True)
+    # EXPLICACIÓN: Estos son cambios que el sistema detectó automáticamente,
+    # como cuando se guarda una orden y cambia el estado_rhitso por programación
+    seguimientos_sistema = orden.seguimientos_rhitso.filter(
+        es_cambio_automatico=True
+    ).select_related(
         'estado',
         'usuario_actualizacion'
-    ).all()
+    ).order_by('-fecha_actualizacion')
     
-    # Comentarios manuales del historial general
-    # EXPLICACIÓN: Filtramos el historial general por tipo_evento='comentario'
-    # para obtener solo los comentarios agregados manualmente
-    comentarios_manuales = orden.historial.filter(
-        tipo_evento='comentario'
-    ).select_related('usuario').order_by('-fecha_evento')
+    # Seguimientos manuales (es_cambio_automatico=False)
+    # EXPLICACIÓN: Estos son cambios que un usuario registró manualmente usando
+    # el formulario "Actualizar Estado RHITSO" con observaciones
+    seguimientos_manuales = orden.seguimientos_rhitso.filter(
+        es_cambio_automatico=False
+    ).select_related(
+        'estado',
+        'usuario_actualizacion'
+    ).order_by('-fecha_actualizacion')
     
-    # Obtener último seguimiento RHITSO (con observaciones del estado actual)
-    # EXPLICACIÓN: En lugar de mostrar el último comentario general,
-    # mostramos las observaciones del último cambio de estado RHITSO
-    # Esto permite ver la descripción y contexto del estado actual
-    ultimo_seguimiento_rhitso = seguimientos_sistema.first() if seguimientos_sistema else None
+    # Obtener último seguimiento RHITSO (de cualquier tipo)
+    # EXPLICACIÓN: Para mostrar las observaciones del estado actual,
+    # priorizamos los seguimientos manuales porque tienen más contexto
+    ultimo_seguimiento_rhitso = (
+        seguimientos_manuales.first() or 
+        seguimientos_sistema.first()
+    )
     
     # =======================================================================
     # PASO 6: OBTENER INCIDENCIAS Y CALCULAR ESTADÍSTICAS
@@ -3222,28 +3234,22 @@ def gestion_rhitso(request, orden_id):
     # =======================================================================
     # PASO 7: OBTENER GALERÍA RHITSO
     # =======================================================================
-    # EXPLICACIÓN: Filtramos las imágenes de la orden por tipo específico
-    # de RHITSO (ingreso, diagnostico, reparacion, egreso, autorizacion)
+    # EXPLICACIÓN: Preparamos las imágenes de la orden organizadas por tipo
+    # para mostrarlas en tabs en la galería RHITSO
     
-    # Obtener parámetro de filtro de tipo de imagen (si existe)
-    filtro_tipo_imagen = request.GET.get('tipo_imagen', '')
+    # Obtener todas las imágenes de la orden
+    imagenes_rhitso = orden.imagenes.select_related('subido_por').order_by('-fecha_subida')
     
-    # Consulta base de imágenes
-    imagenes_rhitso = orden.imagenes.select_related('subido_por')
-    
-    # Aplicar filtro si se especificó un tipo
-    # EXPLICACIÓN: Los tipos válidos son: ingreso, diagnostico, reparacion,
-    # egreso, autorizacion (estos deben existir en el modelo ImagenOrden)
-    tipos_validos = ['ingreso', 'diagnostico', 'reparacion', 'egreso', 'autorizacion']
-    
-    if filtro_tipo_imagen and filtro_tipo_imagen in tipos_validos:
-        imagenes_rhitso = imagenes_rhitso.filter(tipo=filtro_tipo_imagen)
-    
-    # Si no hay filtro específico, mostrar todas las imágenes (sin restricción de tipo)
-    # Esto permite ver todas las imágenes de la orden en la vista RHITSO
-    
-    # Ordenar por fecha de subida (más recientes primero)
-    imagenes_rhitso = imagenes_rhitso.order_by('-fecha_subida')
+    # Organizar imágenes por tipo (igual que en detalle_orden)
+    # EXPLICACIÓN: Creamos un diccionario con las imágenes separadas por tipo
+    # para poder mostrarlas en tabs específicos en el template
+    imagenes_por_tipo_rhitso = {
+        'ingreso': orden.imagenes.filter(tipo='ingreso').order_by('-fecha_subida'),
+        'diagnostico': orden.imagenes.filter(tipo='diagnostico').order_by('-fecha_subida'),
+        'reparacion': orden.imagenes.filter(tipo='reparacion').order_by('-fecha_subida'),
+        'egreso': orden.imagenes.filter(tipo='egreso').order_by('-fecha_subida'),
+        'autorizacion': orden.imagenes.filter(tipo='autorizacion').order_by('-fecha_subida'),
+    }
     
     # =======================================================================
     # PASO 8: PREPARAR FORMULARIOS
@@ -3298,7 +3304,7 @@ def gestion_rhitso(request, orden_id):
         
         # Historial
         'seguimientos_sistema': seguimientos_sistema,
-        'comentarios_manuales': comentarios_manuales,
+        'seguimientos_manuales': seguimientos_manuales,
         'ultimo_seguimiento_rhitso': ultimo_seguimiento_rhitso,
         
         # Incidencias
@@ -3307,7 +3313,7 @@ def gestion_rhitso(request, orden_id):
         
         # Galería
         'imagenes_rhitso': imagenes_rhitso,
-        'filtro_tipo_imagen': filtro_tipo_imagen,
+        'imagenes_por_tipo_rhitso': imagenes_por_tipo_rhitso,
         
         # Formularios
         'form_estado': form_estado,
@@ -3462,7 +3468,8 @@ def actualizar_estado_rhitso(request, orden_id):
                 observaciones=observaciones,
                 usuario_actualizacion=request.user.empleado if hasattr(request.user, 'empleado') else None,
                 tiempo_en_estado_anterior=tiempo_anterior_dias,
-                notificado_cliente=notificar_cliente
+                notificado_cliente=notificar_cliente,
+                es_cambio_automatico=False  # 🔧 MARCADO COMO MANUAL (usuario hizo el cambio)
             )
         except EstadoRHITSO.DoesNotExist:
             pass  # El signal ya creó el registro básico

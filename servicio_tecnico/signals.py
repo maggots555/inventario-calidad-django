@@ -117,7 +117,8 @@ def tracking_cambio_estado_rhitso(sender, instance, created, **kwargs):
                     observaciones='Estado RHITSO inicial al crear la orden',
                     usuario_actualizacion=None,  # Sistema
                     tiempo_en_estado_anterior=None,
-                    notificado_cliente=False
+                    notificado_cliente=False,
+                    es_cambio_automatico=True  # 🔧 MARCADO COMO AUTOMÁTICO
                 )
                 
                 # Registrar en historial general
@@ -167,7 +168,8 @@ def tracking_cambio_estado_rhitso(sender, instance, created, **kwargs):
         observaciones=f'Cambio automático de estado detectado por el sistema',
         usuario_actualizacion=None,  # None = Sistema automático
         tiempo_en_estado_anterior=tiempo_en_estado_anterior,
-        notificado_cliente=False
+        notificado_cliente=False,
+        es_cambio_automatico=True  # 🔧 MARCADO COMO AUTOMÁTICO
     )
     
     # 4. Registrar también en el HistorialOrden general
