@@ -5,183 +5,10 @@
 {% block title %}RHITSO - Orden {{ orden.detalle_equipo.orden_cliente|default:orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=4.4">
+<!-- CSS Específico para el módulo RHITSO -->
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=4.5">
+<link rel="stylesheet" href="{% static 'css/rhitso.css' %}?v=2.3">
 <link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}?v=1.0">
-<style>
-/* Estilos específicos para RHITSO */
-.rhitso-badge {
-    font-size: 0.9rem;
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
-}
-
-.alert-dias-rhitso {
-    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-    border-left: 5px solid #ffc107;
-}
-
-.alert-dias-rhitso.critico {
-    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-    border-left: 5px solid #dc3545;
-}
-
-.timeline {
-    position: relative;
-    padding: 20px 0;
-}
-
-.timeline::before {
-    content: '';
-    position: absolute;
-    left: 30px;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: #dee2e6;
-}
-
-.timeline-item {
-    position: relative;
-    padding-left: 70px;
-    padding-bottom: 30px;
-}
-
-.timeline-icon {
-    position: absolute;
-    left: 17px;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-}
-
-.timeline-icon.sistema {
-    background: #007bff;
-    color: white;
-}
-
-.timeline-icon.manual {
-    background: #28a745;
-    color: white;
-}
-
-.incidencia-card {
-    border-left: 4px solid;
-    margin-bottom: 1rem;
-}
-
-.incidencia-card.abierta {
-    border-color: #dc3545;
-}
-
-.incidencia-card.en-revision {
-    border-color: #ffc107;
-}
-
-.incidencia-card.resuelta {
-    border-color: #28a745;
-}
-
-.imagen-rhitso {
-    position: relative;
-    overflow: hidden;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: transform 0.3s;
-}
-
-.imagen-rhitso:hover {
-    transform: scale(1.05);
-}
-
-.imagen-rhitso img {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-}
-
-.imagen-tipo-badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 1;
-}
-
-/* Animación de Pulso para Incidencias Críticas (FASE 9.2) */
-@keyframes pulse {
-    0% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
-    }
-    50% {
-        transform: scale(1.02);
-        box-shadow: 0 0 20px 5px rgba(220, 53, 69, 0.3);
-    }
-    100% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
-    }
-}
-
-.pulse-animation {
-    animation: pulse 2s infinite;
-}
-
-/* Estilos para Dropdown de Estados Agrupados */
-#id_estado_rhitso {
-    font-size: 0.95rem;
-}
-
-#id_estado_rhitso optgroup {
-    font-weight: bold;
-    font-size: 0.9rem;
-    background-color: #f8f9fa;
-    color: #495057;
-    padding: 8px 10px;
-    font-style: normal;
-    margin-top: 5px;
-}
-
-#id_estado_rhitso option {
-    padding: 8px 15px;
-    font-weight: normal;
-    font-size: 0.9rem;
-}
-
-/* Colores para los bloques de optgroup según responsable */
-#id_estado_rhitso optgroup:nth-of-type(1) {
-    /* Bloque SIC - Azul claro */
-    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
-    color: #0c5460;
-}
-
-#id_estado_rhitso optgroup:nth-of-type(2) {
-    /* Bloque RHITSO - Púrpura claro */
-    background: linear-gradient(135deg, #e7d9f5 0%, #d8c4e8 100%);
-    color: #4a148c;
-}
-
-#id_estado_rhitso optgroup:nth-of-type(3) {
-    /* Bloque CLIENTE - Amarillo claro */
-    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-    color: #856404;
-}
-
-#id_estado_rhitso optgroup:nth-of-type(4) {
-    /* Bloque COMPRAS - Naranja claro */
-    background: linear-gradient(135deg, #ffe5d0 0%, #ffd4ad 100%);
-    color: #8a4a00;
-}
-
-#id_estado_rhitso optgroup:nth-of-type(5) {
-    /* Bloque CERRADO - Verde/Gris */
-    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-    color: #155724;
-}
-</style>
 {% endblock %}
 
 {% block content %}
@@ -1338,78 +1165,101 @@
             </div>
             
             <!-- Cuerpo del Modal -->
-            <div class="modal-body">
+            <div class="modal-body" style="padding: 1.5rem;">
                 <form id="formEnviarRHITSO" method="post" action="{% url 'servicio_tecnico:enviar_correo_rhitso' orden.id %}">
                     {% csrf_token %}
                     
                     <!-- SECCIÓN 1: DESTINATARIOS PRINCIPALES -->
                     <div class="mb-4">
-                        <h6 class="text-primary mb-3">
-                            <i class="bi bi-people"></i> Para: (Destinatarios principales)
-                        </h6>
-                        <div class="row">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-people-fill text-primary fs-5 me-2"></i>
+                            <h6 class="mb-0 text-primary fw-bold">Para: (Destinatarios principales)</h6>
+                        </div>
+                        
+                        {% if destinatarios_rhitso %}
+                        <div class="row g-2">
                             {% for destinatario in destinatarios_rhitso %}
-                            <div class="col-md-6 mb-2">
-                                <div class="form-check">
-                                    <input 
-                                        class="form-check-input" 
-                                        type="checkbox" 
-                                        name="destinatarios_principales" 
-                                        value="{{ destinatario.email }}" 
-                                        id="dest_{{ forloop.counter }}"
-                                        checked>
-                                    <label class="form-check-label" for="dest_{{ forloop.counter }}">
-                                        <strong>{{ destinatario.nombre }}</strong><br>
-                                        <small class="text-muted">{{ destinatario.email }}</small>
-                                    </label>
-                                </div>
-                            </div>
-                            {% empty %}
-                            <div class="col-12">
-                                <div class="alert alert-warning">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                    No hay destinatarios RHITSO configurados. Revisa la configuración en .env
-                                </div>
+                            <div class="col-lg-6 col-md-12">
+                                <label class="destinatario-card p-3 border rounded bg-light hover-shadow d-block mb-0 cursor-pointer" for="dest_{{ forloop.counter }}">
+                                    <div class="d-flex align-items-center">
+                                        <input 
+                                            class="form-check-input me-3 flex-shrink-0" 
+                                            type="checkbox" 
+                                            name="destinatarios_principales" 
+                                            value="{{ destinatario.email }}" 
+                                            id="dest_{{ forloop.counter }}"
+                                            checked>
+                                        <i class="bi bi-person-circle text-primary fs-3 me-2 flex-shrink-0"></i>
+                                        <div class="flex-grow-1" style="min-width: 0;">
+                                            <div class="fw-bold text-truncate">{{ destinatario.nombre }}</div>
+                                            <small class="text-muted d-block text-truncate">{{ destinatario.email }}</small>
+                                        </div>
+                                    </div>
+                                </label>
                             </div>
                             {% endfor %}
                         </div>
+                        {% else %}
+                        <div class="alert alert-warning mb-0">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Sin destinatarios:</strong> No hay destinatarios RHITSO configurados. Revisa la configuración en .env
+                        </div>
+                        {% endif %}
                     </div>
                     
-                    <hr>
+                    <hr class="my-4">
                     
                     <!-- SECCIÓN 2: CON COPIA A (EMPLEADOS) -->
                     <div class="mb-4">
-                        <h6 class="text-info mb-3">
-                            <i class="bi bi-file-earmark-text"></i> Con copia a:
-                        </h6>
-                        <div class="row">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-file-earmark-text-fill text-info fs-5 me-2"></i>
+                            <h6 class="mb-0 text-info fw-bold">Con copia a: (Empleados internos)</h6>
+                        </div>
+                        
+                        {% if empleados_copia %}
+                        <div class="row g-2">
                             {% for empleado in empleados_copia %}
-                            <div class="col-md-6 mb-2">
-                                <div class="form-check">
-                                    <input 
-                                        class="form-check-input" 
-                                        type="checkbox" 
-                                        name="copia_empleados" 
-                                        value="{{ empleado.email }}" 
-                                        id="emp_{{ empleado.id }}">
-                                    <label class="form-check-label" for="emp_{{ empleado.id }}">
-                                        <strong>{{ empleado.nombre_completo }}</strong> - {{ empleado.area }}<br>
-                                        <small class="text-muted">{{ empleado.email }}</small>
-                                    </label>
-                                </div>
-                            </div>
-                            {% empty %}
-                            <div class="col-12">
-                                <div class="alert alert-info">
-                                    <i class="bi bi-info-circle"></i>
-                                    No hay empleados de las áreas CALIDAD, FRONTDESK o COMPRAS con email configurado.
-                                </div>
+                            <div class="col-lg-6 col-md-12">
+                                <label class="destinatario-card p-3 border rounded bg-light hover-shadow d-block mb-0 cursor-pointer" for="emp_{{ empleado.id }}">
+                                    <div class="d-flex align-items-center">
+                                        <input 
+                                            class="form-check-input me-3 flex-shrink-0" 
+                                            type="checkbox" 
+                                            name="copia_empleados" 
+                                            value="{{ empleado.email }}" 
+                                            id="emp_{{ empleado.id }}">
+                                        
+                                        <!-- Mostrar foto del empleado si existe, sino mostrar icono -->
+                                        {% if empleado.foto_perfil %}
+                                            <img src="{{ empleado.foto_perfil.url }}" 
+                                                 alt="{{ empleado.nombre_completo }}" 
+                                                 class="rounded-circle me-2 flex-shrink-0 empleado-foto"
+                                                 style="width: 48px; height: 48px; object-fit: cover; border: 2px solid #17a2b8;">
+                                        {% else %}
+                                            <i class="bi bi-person-badge text-info fs-3 me-2 flex-shrink-0"></i>
+                                        {% endif %}
+                                        
+                                        <div class="flex-grow-1" style="min-width: 0;">
+                                            <div class="fw-bold text-truncate">{{ empleado.nombre_completo }}</div>
+                                            <small class="text-muted d-block">
+                                                <span class="badge bg-secondary me-1">{{ empleado.area }}</span>
+                                                <span class="text-truncate d-inline-block" style="max-width: 180px; vertical-align: middle;">{{ empleado.email }}</span>
+                                            </small>
+                                        </div>
+                                    </div>
+                                </label>
                             </div>
                             {% endfor %}
                         </div>
+                        {% else %}
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Sin empleados:</strong> No hay empleados de las áreas CALIDAD, FRONTDESK o COMPRAS con email configurado.
+                        </div>
+                        {% endif %}
                     </div>
                     
-                    <hr>
+                    <hr class="my-4">
                     
                     <!-- SECCIÓN 3: INFORMACIÓN QUE SE ENVIARÁ -->
                     <div class="mb-4">
@@ -1483,24 +1333,93 @@
                         {% endif %}
                     </div>
                     
-                    <hr>
+                    <hr class="my-4">
                     
                     <!-- SECCIÓN 5: PREVISUALIZACIÓN DEL CORREO -->
                     <div class="mb-4">
-                        <h6 class="mb-3">
-                            <i class="bi bi-eye"></i> Previsualización del correo:
-                        </h6>
-                        
-                        <!-- Asunto -->
-                        <div class="mb-3">
-                            <div class="p-3 bg-primary text-white rounded">
-                                <strong>Asunto:</strong> {{ previsualizacion_correo.asunto }}
-                            </div>
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-eye-fill text-success fs-5 me-2"></i>
+                            <h6 class="mb-0 text-success fw-bold">Previsualización del correo</h6>
                         </div>
                         
-                        <!-- Cuerpo -->
-                        <div class="border rounded p-3 bg-white">
-                            <div style="white-space: pre-line; font-family: monospace;">{{ previsualizacion_correo.cuerpo }}</div>
+                        <div class="alert alert-info border-start border-info border-4 mb-3">
+                            <i class="bi bi-info-circle"></i>
+                            <small><strong>Vista previa:</strong> Así se verá el correo que recibirán los destinatarios.</small>
+                        </div>
+                        
+                        <!-- Simulación de cliente de correo -->
+                        <div class="border rounded overflow-hidden shadow-sm">
+                            <!-- Encabezado del correo (estilo email) -->
+                            <div class="bg-light border-bottom p-3">
+                                <div class="row g-2">
+                                    <div class="col-12">
+                                        <small class="text-muted d-block mb-1"><strong>De:</strong></small>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-building text-primary fs-5 me-2"></i>
+                                            <span>{{ request.user.empleado.nombre_completo|default:"Sistema SIC" }}</span>
+                                            <small class="text-muted ms-2">&lt;{{ request.user.email }}&gt;</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <small class="text-muted d-block mb-1"><strong>Para:</strong></small>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            {% for dest in destinatarios_rhitso %}
+                                                <span class="badge bg-primary">{{ dest.nombre }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% if empleados_copia %}
+                                    <div class="col-12">
+                                        <small class="text-muted d-block mb-1"><strong>CC:</strong></small>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            {% for emp in empleados_copia %}
+                                                <span class="badge bg-secondary">{{ emp.nombre_completo }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    <div class="col-12 mt-2">
+                                        <small class="text-muted d-block mb-1"><strong>Asunto:</strong></small>
+                                        <div class="p-2 bg-white border rounded">
+                                            <strong class="text-dark">{{ previsualizacion_correo.asunto }}</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <small class="text-muted d-block mb-1"><strong>Archivos adjuntos:</strong></small>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <span class="badge bg-danger d-flex align-items-center">
+                                                <i class="bi bi-file-pdf me-1"></i>
+                                                formato_rhitso_{{ orden.numero_orden_interno }}.pdf
+                                            </span>
+                                            {% if archivos_adjuntos.cantidad_imagenes_ingreso > 0 %}
+                                                <span class="badge bg-info d-flex align-items-center">
+                                                    <i class="bi bi-images me-1"></i>
+                                                    {{ archivos_adjuntos.cantidad_imagenes_ingreso }} imagen(es)
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Cuerpo del correo -->
+                            <div class="p-4 bg-white">
+                                <div class="correo-preview">
+                                    {{ previsualizacion_correo.cuerpo|linebreaks }}
+                                </div>
+                                
+                                <!-- Firma del correo -->
+                                <div class="mt-4 pt-3 border-top">
+                                    <small class="text-muted">
+                                        <strong>{{ request.user.empleado.nombre_completo|default:"Sistema Integral SIC" }}</strong><br>
+                                        {% if request.user.empleado %}
+                                            {{ request.user.empleado.cargo }}<br>
+                                            {{ request.user.empleado.area }}<br>
+                                        {% endif %}
+                                        {{ request.user.email }}
+                                    </small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -1512,8 +1431,8 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                     <i class="bi bi-x-circle"></i> Cancelar
                 </button>
-                <button type="submit" form="formEnviarRHITSO" class="btn btn-success">
-                    <i class="bi bi-send"></i> Enviar Correo
+                <button type="submit" form="formEnviarRHITSO" class="btn btn-success btn-lg">
+                    <i class="bi bi-send-fill"></i> Enviar Correo
                 </button>
             </div>
         </div>

@@ -174,7 +174,8 @@
     background-color: white;
     border: 2px solid var(--gray-300);
     border-radius: var(--border-radius-sm);
-    transition: all var(--transition-fast);
+    /* TRANSICIÓN ELIMINADA: Los checkboxes deben ser estáticos sin animaciones */
+    /* transition: all var(--transition-fast); */
     cursor: pointer;
     position: relative;
 }

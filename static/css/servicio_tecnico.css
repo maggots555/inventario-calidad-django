@@ -3,6 +3,19 @@
    Descripción: Estilos para cards de órdenes de servicio con diseño moderno
    ============================================================================= */
 
+/* ===== GRID PERSONALIZADO: 5 COLUMNAS EN DESKTOP ===== */
+/* EXPLICACIÓN PARA PRINCIPIANTES:
+   Bootstrap solo tiene divisiones de 12 columnas (1, 2, 3, 4, 6, 12)
+   Para tener exactamente 5 tarjetas por fila, necesitamos CSS personalizado
+   Calculamos: 100% ÷ 5 = 20% de ancho para cada tarjeta
+*/
+@media (min-width: 992px) {
+    .col-lg-5-cols {
+        flex: 0 0 20%;
+        max-width: 20%;
+    }
+}
+
 /* ===== CARDS DE SERVICIO TÉCNICO ===== */
 .service-card {
     border: 2px solid #e0e0e0;
@@ -913,6 +926,24 @@ form:has(#btnSubirImagenes:disabled) textarea {
     border-color: #880e4f;
 }
 
+/* ===== ESTILO ESPECIAL PARA ÓRDENES MX_CIS_MX_ (MORADO CLARO) ===== */
+/* EXPLICACIÓN PARA PRINCIPIANTES:
+   - Estas son órdenes con nomenclatura especial MX_CIS_MX_
+   - Se pintan de morado claro para identificarlas rápidamente
+   - El gradiente va de morado muy claro a morado medio
+*/
+.orden-mx-cis {
+    background: linear-gradient(135deg, #e1bee7 0%, #ba68c8 100%);
+    border-color: #9c27b0;
+    box-shadow: 0 2px 8px rgba(156, 39, 176, 0.15);
+}
+
+.orden-mx-cis:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(156, 39, 176, 0.25);
+    border-color: #7b1fa2;
+}
+
 /* ===== CUADRO INFORMATIVO: EQUIPOS "NO ENCIENDE" POR TÉCNICO ===== */
 .tecnico-no-enciende-card {
     background: #f8f9fa;
@@ -1099,13 +1130,14 @@ form:has(#btnSubirImagenes:disabled) textarea {
     border-color: #0d6efd;
 }
 
-.form-check:hover {
+/* HOVER ELIMINADO: Causaba movimiento en los checkboxes */
+/* .form-check:hover {
     background-color: rgba(13, 110, 253, 0.05);
     border-radius: 4px;
     padding: 4px;
     margin: -4px;
     transition: background-color 0.2s ease;
-}
+} */
 
 /* ===== RESALTADO DE INFORMACIÓN IMPORTANTE ===== */
 .alert-info.d-flex {

@@ -357,8 +357,8 @@
     {% if ordenes %}
         <div class="row g-2">
             {% for orden in ordenes %}
-                <div class="col-lg-2 col-md-4 col-sm-6">
-                    <div class="service-card {% if orden.detalle_equipo.orden_cliente|slice:":3" == "FL-" %}orden-fl{% elif orden.detalle_equipo.orden_cliente|slice:":4" == "OOW-" %}orden-oow{% endif %}">
+                <div class="col-lg-5-cols col-md-6 col-sm-6">
+                    <div class="service-card {% if orden.detalle_equipo.orden_cliente|slice:":3" == "FL-" %}orden-fl{% elif orden.detalle_equipo.orden_cliente|slice:":4" == "OOW-" %}orden-oow{% elif orden.detalle_equipo.orden_cliente|slice:":10" == "MX_CIS_MX_" %}orden-mx-cis{% endif %}">
                         <!-- Header: Estado y fecha -->
                         <div class="service-card-header">
                             <span class="badge badge-estado badge-{{ orden.estado }}">

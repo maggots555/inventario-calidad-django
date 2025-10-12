@@ -1,0 +1,540 @@
+/**
+ * RHITSO.CSS
+ * ===========================================================================
+ * Estilos específicos para el módulo de gestión RHITSO
+ * 
+ * PARA PRINCIPIANTES - ¿Por qué separar CSS?
+ * - Mantenibilidad: Es más fácil encontrar y modificar estilos
+ * - Reutilización: Puedes usar estos estilos en múltiples páginas
+ * - Performance: El navegador puede cachear este archivo
+ * - Organización: Código más limpio y profesional
+ * ===========================================================================
+ */
+
+/* ========================================================================== */
+/* 0. RESET GLOBAL: ELIMINAR TRANSICIONES EN CHECKBOXES (MÁXIMA PRIORIDAD) */
+/* ========================================================================== */
+
+/**
+ * EXPLICACIÓN CRÍTICA:
+ * 
+ * Este bloque DEBE ir al inicio del archivo para tener máxima prioridad.
+ * Elimina TODAS las transiciones en checkboxes en cualquier parte de RHITSO.
+ * 
+ * ¿Por qué tantos selectores?
+ * - Para cubrir TODAS las posibilidades: clases, tipos, pseudo-estados
+ * - Para sobrescribir estilos de Bootstrap, forms.css, y base.css
+ * - Para garantizar checkboxes estáticos sin excepciones
+ */
+
+/* Selector universal para todos los checkboxes */
+input[type="checkbox"],
+.form-check-input,
+.form-check-input[type="checkbox"] {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+/* Todos los estados posibles del checkbox */
+input[type="checkbox"]:hover,
+input[type="checkbox"]:focus,
+input[type="checkbox"]:active,
+input[type="checkbox"]:checked,
+.form-check-input:hover,
+.form-check-input:focus,
+.form-check-input:active,
+.form-check-input:checked {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+/* Contenedores de checkboxes */
+.form-check,
+.form-check:hover {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+    background-color: transparent !important;
+}
+
+/* Labels asociados a checkboxes */
+.form-check-label,
+.form-check-label:hover {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+/* ========================================================================== */
+/* 1. BADGES Y ETIQUETAS RHITSO */
+/* ========================================================================== */
+
+.rhitso-badge {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+}
+
+/* ========================================================================== */
+/* 2. ALERTAS DE DÍAS EN RHITSO */
+/* ========================================================================== */
+
+.alert-dias-rhitso {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-left: 5px solid #ffc107;
+}
+
+.alert-dias-rhitso.critico {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    border-left: 5px solid #dc3545;
+}
+
+/* ========================================================================== */
+/* 3. LÍNEA DE TIEMPO (TIMELINE) */
+/* ========================================================================== */
+
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 30px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 70px;
+    padding-bottom: 30px;
+}
+
+.timeline-icon {
+    position: absolute;
+    left: 17px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.timeline-icon.sistema {
+    background: #007bff;
+    color: white;
+}
+
+.timeline-icon.manual {
+    background: #28a745;
+    color: white;
+}
+
+/* ========================================================================== */
+/* 4. TARJETAS DE INCIDENCIAS */
+/* ========================================================================== */
+
+.incidencia-card {
+    border-left: 4px solid;
+    margin-bottom: 1rem;
+}
+
+.incidencia-card.abierta {
+    border-color: #dc3545;
+}
+
+.incidencia-card.en-revision {
+    border-color: #ffc107;
+}
+
+.incidencia-card.resuelta {
+    border-color: #28a745;
+}
+
+/* ========================================================================== */
+/* 5. GALERÍA DE IMÁGENES RHITSO */
+/* ========================================================================== */
+
+.imagen-rhitso {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+.imagen-rhitso:hover {
+    transform: scale(1.05);
+}
+
+.imagen-rhitso img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.imagen-tipo-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1;
+}
+
+/* ========================================================================== */
+/* 6. ANIMACIÓN DE PULSO PARA INCIDENCIAS CRÍTICAS (FASE 9.2) */
+/* ========================================================================== */
+
+/* Animación que llama la atención sobre elementos críticos */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 0 20px 5px rgba(220, 53, 69, 0.3);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+    }
+}
+
+.pulse-animation {
+    animation: pulse 2s infinite;
+}
+
+/* ========================================================================== */
+/* 7. DROPDOWN DE ESTADOS AGRUPADOS */
+/* ========================================================================== */
+
+/* Estilos para el select de estados RHITSO */
+#id_estado_rhitso {
+    font-size: 0.95rem;
+}
+
+/* Grupos de estados (optgroup) */
+#id_estado_rhitso optgroup {
+    font-weight: bold;
+    font-size: 0.9rem;
+    background-color: #f8f9fa;
+    color: #495057;
+    padding: 8px 10px;
+    font-style: normal;
+    margin-top: 5px;
+}
+
+/* Opciones individuales dentro de los grupos */
+#id_estado_rhitso option {
+    padding: 8px 15px;
+    font-weight: normal;
+    font-size: 0.9rem;
+}
+
+/* Colores para los bloques de optgroup según responsable */
+
+/* Bloque 1: SIC (Servicio Interno de Calidad) - Azul claro */
+#id_estado_rhitso optgroup:nth-of-type(1) {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    color: #0c5460;
+}
+
+/* Bloque 2: RHITSO - Púrpura claro */
+#id_estado_rhitso optgroup:nth-of-type(2) {
+    background: linear-gradient(135deg, #e7d9f5 0%, #d8c4e8 100%);
+    color: #4a148c;
+}
+
+/* Bloque 3: CLIENTE - Amarillo claro */
+#id_estado_rhitso optgroup:nth-of-type(3) {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    color: #856404;
+}
+
+/* Bloque 4: COMPRAS - Naranja claro */
+#id_estado_rhitso optgroup:nth-of-type(4) {
+    background: linear-gradient(135deg, #ffe5d0 0%, #ffd4ad 100%);
+    color: #8a4a00;
+}
+
+/* Bloque 5: CERRADO - Verde/Gris */
+#id_estado_rhitso optgroup:nth-of-type(5) {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+}
+
+/* ========================================================================== */
+/* 8. FIX: CHECKBOXES SIN MOVIMIENTO NI ANIMACIONES */
+/* ========================================================================== */
+
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * 
+ * Problema: Los checkboxes heredan estilos globales que incluyen transiciones
+ * (animaciones suaves al cambiar de estado). Esto causa un "movimiento" visual.
+ * 
+ * Solución: Sobrescribir todos los estilos de transición SOLO en páginas RHITSO
+ * usando !important para forzar la precedencia sobre los estilos globales.
+ * 
+ * ¿Qué hace cada regla?
+ * - transition: none !important --> Elimina TODAS las animaciones
+ * - transform: none !important --> Evita movimientos de escala/rotación
+ * - padding/margin preservados --> Mantiene el hover sin movimiento
+ */
+
+/* Eliminar transiciones de los checkboxes */
+.form-check-input {
+    transition: none !important;
+    transform: none !important;
+}
+
+/* Eliminar efecto hover que causa movimiento en el contenedor */
+.form-check:hover {
+    background-color: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    transition: none !important;
+    transform: none !important;
+}
+
+/* Asegurar que el estado checked no tenga animación */
+.form-check-input:checked {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+/* Eliminar transición del focus (el borde azul al hacer clic) */
+.form-check-input:focus {
+    transition: none !important;
+    transform: none !important;
+}
+
+/* Eliminar cualquier animación en el label también */
+.form-check-label {
+    transition: none !important;
+    transform: none !important;
+}
+
+/* Asegurar estabilidad en toda la estructura del checkbox */
+.form-check {
+    transition: none !important;
+    transform: none !important;
+}
+
+/**
+ * NOTA IMPORTANTE:
+ * El uso de !important es necesario aquí porque estamos sobrescribiendo
+ * estilos globales que vienen de forms.css y servicio_tecnico.css.
+ * En CSS, la especificidad determina qué estilo se aplica, y !important
+ * tiene la máxima prioridad.
+ */
+
+/* ========================================================================== */
+/* 9. FIX ESPECÍFICO: CHECKBOXES EN MODAL DE ENVÍO RHITSO */
+/* ========================================================================== */
+
+/**
+ * EXPLICACIÓN DEL PROBLEMA:
+ * 
+ * Los checkboxes dentro del modal #modalEnviarRHITSO siguen teniendo animación.
+ * Esto puede deberse a:
+ * 1. Estilos específicos de Bootstrap para modales
+ * 2. Herencia de estilos del modal
+ * 3. Especificidad CSS insuficiente
+ * 
+ * SOLUCIÓN: Usar selectores MUY específicos con el ID del modal
+ */
+
+/* Eliminar transiciones en checkboxes dentro del modal RHITSO */
+#modalEnviarRHITSO .form-check-input,
+#modalEnviarRHITSO input[type="checkbox"] {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+/* Eliminar efectos hover en el contenedor de checkbox dentro del modal */
+#modalEnviarRHITSO .form-check:hover,
+#modalEnviarRHITSO .form-check {
+    background-color: transparent !important;
+    padding: 0 !important;
+    margin-bottom: 0.5rem !important;
+    transition: none !important;
+    transform: none !important;
+}
+
+/* Estado checked sin animación en modal */
+#modalEnviarRHITSO .form-check-input:checked,
+#modalEnviarRHITSO input[type="checkbox"]:checked {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+/* Focus sin animación en modal */
+#modalEnviarRHITSO .form-check-input:focus,
+#modalEnviarRHITSO input[type="checkbox"]:focus {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+/* Labels sin animación en modal */
+#modalEnviarRHITSO .form-check-label {
+    transition: none !important;
+    transform: none !important;
+}
+
+/* Asegurar que los contenedores col-md-6 tampoco tengan animación */
+#modalEnviarRHITSO .col-md-6 {
+    transition: none !important;
+    transform: none !important;
+}
+
+/**
+ * FORZAR ESTABILIDAD TOTAL:
+ * Eliminar CUALQUIER posible animación en todos los elementos
+ * relacionados con checkboxes dentro del modal
+ */
+#modalEnviarRHITSO .form-check *,
+#modalEnviarRHITSO .form-check-input *,
+#modalEnviarRHITSO .form-check-label * {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+/* ========================================================================== */
+/* 10. ESTILOS MEJORADOS PARA MODAL DE ENVÍO RHITSO */
+/* ========================================================================== */
+
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * 
+ * Estos estilos mejoran la apariencia del modal de envío de correos:
+ * - hover-shadow: Efecto sutil de sombra al pasar el mouse (sin mover el elemento)
+ * - Mejor espaciado y organización visual
+ * - Cards más profesionales para cada destinatario
+ */
+
+/* Efecto hover suave en las tarjetas de destinatarios */
+.hover-shadow {
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    border-color: #dee2e6 !important;
+}
+
+.hover-shadow:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    border-color: #0d6efd !important;
+}
+
+/* Asegurar que el contenedor no se mueva con el hover */
+#modalEnviarRHITSO .hover-shadow {
+    transform: none !important;
+}
+
+#modalEnviarRHITSO .hover-shadow:hover {
+    transform: none !important;
+}
+
+/* Mejorar la apariencia de los badges en el modal */
+#modalEnviarRHITSO .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Espaciado mejorado para los iconos */
+#modalEnviarRHITSO .bi-person-circle,
+#modalEnviarRHITSO .bi-person-badge {
+    flex-shrink: 0;
+}
+
+/* Truncar texto largo en emails */
+#modalEnviarRHITSO .text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Estilo para las tarjetas de destinatarios (clickeables) */
+.destinatario-card {
+    cursor: pointer;
+    user-select: none;
+}
+
+.destinatario-card:hover {
+    background-color: #f8f9fa !important;
+}
+
+/* Asegurar que el checkbox tenga el tamaño correcto */
+.destinatario-card .form-check-input {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-top: 0;
+}
+
+/* Clase auxiliar para cursor pointer */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Estilos para fotos de empleados en el modal */
+.empleado-foto {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.destinatario-card:hover .empleado-foto {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Asegurar que las fotos circulares tengan buen aspecto */
+.empleado-foto {
+    object-fit: cover;
+    border: 2px solid #17a2b8;
+    background-color: #fff;
+}
+
+/* ========================================================================== */
+/* 11. ESTILOS PARA PREVISUALIZACIÓN DE CORREO */
+/* ========================================================================== */
+
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * 
+ * Estos estilos hacen que la previsualización del correo se vea como
+ * un cliente de correo real (Gmail, Outlook, etc.)
+ */
+
+/* Contenedor general del correo */
+.correo-preview {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+}
+
+/* Hacer que los párrafos en la previsualización tengan buen espaciado */
+.correo-preview p {
+    margin-bottom: 0.8rem;
+}
+
+/* Badges en el encabezado del correo */
+#modalEnviarRHITSO .badge {
+    font-weight: 500;
+    font-size: 0.75rem;
+}
+
+/* Sombra suave para el contenedor del correo */
+#modalEnviarRHITSO .shadow-sm {
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
+}
