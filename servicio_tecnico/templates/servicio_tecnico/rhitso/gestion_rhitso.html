@@ -2,7 +2,7 @@
 {% load static %}
 {% load rhitso_filters %}
 
-{% block title %}RHITSO - Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
+{% block title %}RHITSO - Orden {{ orden.detalle_equipo.orden_cliente|default:orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=4.4">
@@ -202,8 +202,9 @@
                                 <strong>Seguimiento RHITSO</strong>
                             </h2>
                             <p class="mb-2">
-                                <span class="text-muted">Orden:</span> 
-                                <span class="badge bg-dark fs-6">{{ orden.numero_orden_interno }}</span>
+                                <span class="text-muted">Orden Cliente:</span> 
+                                <span class="badge bg-dark fs-6">{{ orden.detalle_equipo.orden_cliente|default:"No especificada" }}</span>
+                                <span class="text-muted small">(Interna: {{ orden.numero_orden_interno }})</span>
                                 {% if estado_rhitso_info %}
                                     <span class="badge rhitso-badge" style="background-color: {{ estado_rhitso_info.estado|color_estado_especifico }}; color: {{ estado_rhitso_info.estado|color_estado_especifico|text_color_for_bg }};">
                                         {{ estado_rhitso_info.estado_display }}
@@ -445,7 +446,7 @@
                                 <i class="bi bi-arrow-repeat"></i> Actualizar Estado RHITSO
                             </button>
                             
-                            <button class="btn btn-outline-secondary" type="button" disabled title="Función próximamente disponible">
+                            <button class="btn btn-success btn-lg" type="button" data-bs-toggle="modal" data-bs-target="#modalEnviarRHITSO" title="Enviar correo a RHITSO con datos del equipo">
                                 <i class="bi bi-envelope"></i> 📧 Enviar correo y formato
                             </button>
                         </div>
@@ -1322,6 +1323,203 @@
     
 </div>
 
+<!-- ============================================================================ -->
+<!-- MODAL: ENVIAR CORREO Y FORMATO RHITSO - FASE 10 -->
+<!-- ============================================================================ -->
+<div class="modal fade" id="modalEnviarRHITSO" tabindex="-1" aria-labelledby="modalEnviarRHITSOLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <!-- Encabezado del Modal -->
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="modalEnviarRHITSOLabel">
+                    <i class="bi bi-envelope"></i> ✉️ Enviar correo y formato RHITSO
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <!-- Cuerpo del Modal -->
+            <div class="modal-body">
+                <form id="formEnviarRHITSO" method="post" action="{% url 'servicio_tecnico:enviar_correo_rhitso' orden.id %}">
+                    {% csrf_token %}
+                    
+                    <!-- SECCIÓN 1: DESTINATARIOS PRINCIPALES -->
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="bi bi-people"></i> Para: (Destinatarios principales)
+                        </h6>
+                        <div class="row">
+                            {% for destinatario in destinatarios_rhitso %}
+                            <div class="col-md-6 mb-2">
+                                <div class="form-check">
+                                    <input 
+                                        class="form-check-input" 
+                                        type="checkbox" 
+                                        name="destinatarios_principales" 
+                                        value="{{ destinatario.email }}" 
+                                        id="dest_{{ forloop.counter }}"
+                                        checked>
+                                    <label class="form-check-label" for="dest_{{ forloop.counter }}">
+                                        <strong>{{ destinatario.nombre }}</strong><br>
+                                        <small class="text-muted">{{ destinatario.email }}</small>
+                                    </label>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12">
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    No hay destinatarios RHITSO configurados. Revisa la configuración en .env
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- SECCIÓN 2: CON COPIA A (EMPLEADOS) -->
+                    <div class="mb-4">
+                        <h6 class="text-info mb-3">
+                            <i class="bi bi-file-earmark-text"></i> Con copia a:
+                        </h6>
+                        <div class="row">
+                            {% for empleado in empleados_copia %}
+                            <div class="col-md-6 mb-2">
+                                <div class="form-check">
+                                    <input 
+                                        class="form-check-input" 
+                                        type="checkbox" 
+                                        name="copia_empleados" 
+                                        value="{{ empleado.email }}" 
+                                        id="emp_{{ empleado.id }}">
+                                    <label class="form-check-label" for="emp_{{ empleado.id }}">
+                                        <strong>{{ empleado.nombre_completo }}</strong> - {{ empleado.area }}<br>
+                                        <small class="text-muted">{{ empleado.email }}</small>
+                                    </label>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i>
+                                    No hay empleados de las áreas CALIDAD, FRONTDESK o COMPRAS con email configurado.
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- SECCIÓN 3: INFORMACIÓN QUE SE ENVIARÁ -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="bi bi-info-circle"></i> Información que se enviará:
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Orden:</strong> <span class="badge bg-primary">{{ datos_correo.orden }}</span></p>
+                                <p class="mb-2"><strong>Serie:</strong> {{ datos_correo.serie }}</p>
+                                <p class="mb-2"><strong>Modelo:</strong> {{ datos_correo.modelo }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Motivo RHITSO:</strong> {{ datos_correo.motivo_rhitso }}</p>
+                                <p class="mb-2"><strong>Cargador:</strong> 
+                                    {% if 'SIN CARGADOR' in datos_correo.cargador %}
+                                        <span class="badge bg-secondary">{{ datos_correo.cargador }}</span>
+                                    {% else %}
+                                        <span class="badge bg-success">{{ datos_correo.cargador }}</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- SECCIÓN 4: ARCHIVOS QUE SE ADJUNTARÁN -->
+                    <div class="mb-4">
+                        <h6 class="text-warning mb-3">
+                            <i class="bi bi-paperclip"></i> Archivos que se adjuntarán:
+                        </h6>
+                        
+                        <!-- PDF Formato RHITSO -->
+                        <div class="d-flex align-items-center mb-3 p-3 border rounded bg-light">
+                            <i class="bi bi-file-pdf text-danger fs-2 me-3"></i>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">
+                                    📄 PDF Formato RHITSO 
+                                    <span class="badge bg-success ms-2">Generado automáticamente</span>
+                                </h6>
+                                <small class="text-muted">
+                                    Incluye datos del equipo + 
+                                    {% if archivos_adjuntos.tiene_imagenes_autorizacion %}
+                                        {{ archivos_adjuntos.cantidad_autorizacion }} imagen(es) de Autorización/Pass
+                                    {% else %}
+                                        <span class="text-warning">⚠️ Sin imágenes de autorización</span>
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <!-- Imágenes de Envío -->
+                        <div class="d-flex align-items-center mb-3 p-3 border rounded bg-light">
+                            <i class="bi bi-images text-primary fs-2 me-3"></i>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">
+                                    🖼️ Imágenes de Envío 
+                                    <span class="badge bg-primary ms-2">{{ archivos_adjuntos.cantidad_imagenes_ingreso }} imágenes</span>
+                                </h6>
+                                <small class="text-muted">Se adjuntan como archivos separados (comprimidas automáticamente)</small>
+                            </div>
+                        </div>
+                        
+                        {% if archivos_adjuntos.cantidad_imagenes_ingreso == 0 %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Advertencia:</strong> No hay imágenes de tipo "Ingreso" para adjuntar. 
+                            Se recomienda subir al menos una imagen antes de enviar el correo.
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- SECCIÓN 5: PREVISUALIZACIÓN DEL CORREO -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="bi bi-eye"></i> Previsualización del correo:
+                        </h6>
+                        
+                        <!-- Asunto -->
+                        <div class="mb-3">
+                            <div class="p-3 bg-primary text-white rounded">
+                                <strong>Asunto:</strong> {{ previsualizacion_correo.asunto }}
+                            </div>
+                        </div>
+                        
+                        <!-- Cuerpo -->
+                        <div class="border rounded p-3 bg-white">
+                            <div style="white-space: pre-line; font-family: monospace;">{{ previsualizacion_correo.cuerpo }}</div>
+                        </div>
+                    </div>
+                    
+                </form>
+            </div>
+            
+            <!-- Footer del Modal -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="submit" form="formEnviarRHITSO" class="btn btn-success">
+                    <i class="bi bi-send"></i> Enviar Correo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -1620,8 +1818,164 @@
             });
         });
         
+        // ====================================================================
+        // FORMULARIO 5: ENVIAR CORREO RHITSO (AJAX) - FASE 10
+        // ====================================================================
+        const formEnviarRHITSO = document.getElementById('formEnviarRHITSO');
+        if (formEnviarRHITSO) {
+            formEnviarRHITSO.addEventListener('submit', async function(e) {
+                e.preventDefault();  // Prevenir submit normal
+                
+                // Validar que haya al menos un destinatario seleccionado
+                const destinatarios = document.querySelectorAll('input[name="destinatarios_principales"]:checked');
+                if (destinatarios.length === 0) {
+                    mostrarMensaje('warning', '⚠️ Debe seleccionar al menos un destinatario principal.');
+                    return;
+                }
+                
+                // Confirmación antes de enviar
+                const numDestinatarios = destinatarios.length;
+                const copias = document.querySelectorAll('input[name="copia_empleados"]:checked').length;
+                const mensaje = `¿Estás seguro de enviar el correo a RHITSO?\n\n` +
+                               `• ${numDestinatarios} destinatario(s) principal(es)\n` +
+                               `• ${copias} copia(s)\n\n` +
+                               `Se adjuntarán el PDF y las imágenes de ingreso.`;
+                
+                if (!confirm(mensaje)) {
+                    return;
+                }
+                
+                const formData = new FormData(this);
+                
+                // Buscar el botón de submit que está en el modal-footer con form="formEnviarRHITSO"
+                const submitButton = document.querySelector('button[form="formEnviarRHITSO"]');
+                const originalText = submitButton ? submitButton.innerHTML : '';
+                
+                // Deshabilitar botón y mostrar spinner
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando correo...';
+                }
+                
+                try {
+                    const response = await fetch(this.action, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Construir mensaje HTML detallado con la información del correo
+                        let mensajeHTML = `
+                            <div class="text-center mb-3">
+                                <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                            </div>
+                            <h5 class="text-center mb-3">${data.mensaje}</h5>
+                        `;
+                        
+                        if (data.data && data.data.correo) {
+                            mensajeHTML += `
+                                <div class="alert alert-info mb-0">
+                                    <h6 class="mb-3"><i class="bi bi-info-circle"></i> 📊 Detalles del envío:</h6>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-2">
+                                            <strong>📄 PDF:</strong> ${data.data.pdf.tamaño_mb} MB
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <strong>🖼️ Imágenes:</strong> ${data.data.imagenes.adjuntas} adjunta(s)
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <strong>• Tamaño original:</strong> ${data.data.imagenes.tamaño_original_mb} MB
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <strong>• Comprimido:</strong> ${data.data.imagenes.tamaño_comprimido_mb} MB
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <strong>• Ahorro:</strong> <span class="text-success">${data.data.imagenes.reduccion_mb} MB</span>
+                                        </div>
+                                        <div class="col-md-6 mb-2">
+                                            <strong>📦 Total:</strong> ${data.data.correo.tamaño_total_mb} MB (${data.data.correo.porcentaje_usado}%)
+                                        </div>
+                                    </div>
+                            `;
+                            
+                            if (data.data.imagenes.excluidas > 0) {
+                                mensajeHTML += `
+                                    <div class="alert alert-warning mt-3 mb-0">
+                                        <i class="bi bi-exclamation-triangle"></i> 
+                                        <strong>Nota:</strong> ${data.data.imagenes.excluidas} imagen(es) fueron excluidas por tamaño excesivo.
+                                    </div>
+                                `;
+                            }
+                            
+                            mensajeHTML += `</div>`;
+                        }
+                        
+                        // Cerrar modal de envío
+                        const modalEnviar = bootstrap.Modal.getInstance(document.getElementById('modalEnviarRHITSO'));
+                        if (modalEnviar) {
+                            modalEnviar.hide();
+                        }
+                        
+                        // Mostrar modal de confirmación personalizado con SweetAlert2 o alert nativo mejorado
+                        // Usaremos un modal de Bootstrap personalizado
+                        const modalConfirmacionHTML = `
+                            <div class="modal fade" id="modalConfirmacionEnvio" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-success text-white">
+                                            <h5 class="modal-title">
+                                                <i class="bi bi-envelope-check"></i> Correo Enviado
+                                            </h5>
+                                        </div>
+                                        <div class="modal-body">
+                                            ${mensajeHTML}
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-primary" onclick="location.reload()">
+                                                <i class="bi bi-check-lg"></i> Aceptar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Agregar modal al DOM si no existe
+                        let modalConfirmacion = document.getElementById('modalConfirmacionEnvio');
+                        if (modalConfirmacion) {
+                            modalConfirmacion.remove();
+                        }
+                        document.body.insertAdjacentHTML('beforeend', modalConfirmacionHTML);
+                        
+                        // Mostrar modal de confirmación
+                        modalConfirmacion = new bootstrap.Modal(document.getElementById('modalConfirmacionEnvio'));
+                        modalConfirmacion.show();
+                        
+                    } else {
+                        mostrarMensaje('danger', data.mensaje);
+                        if (submitButton) {
+                            submitButton.disabled = false;
+                            submitButton.innerHTML = originalText;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    mostrarMensaje('danger', '❌ Error de conexión. Inténtalo de nuevo.');
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalText;
+                    }
+                }
+            });
+        }
         
-        console.log('✅ Sistema RHITSO cargado correctamente - FASE 5 ACTIVA');
+        console.log('✅ Sistema RHITSO cargado correctamente - FASE 10 ACTIVA');
     });
 </script>
 

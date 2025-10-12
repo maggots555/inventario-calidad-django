@@ -3286,6 +3286,101 @@ def gestion_rhitso(request, orden_id):
     })
     
     # =======================================================================
+    # PASO 8.5: PREPARAR DATOS PARA MODAL DE ENVÍO DE CORREO RHITSO
+    # =======================================================================
+    # EXPLICACIÓN: Preparamos los datos necesarios para el modal de envío
+    # de correo a RHITSO, incluyendo destinatarios, empleados y archivos
+    
+    # Importar settings para obtener destinatarios RHITSO
+    from django.conf import settings
+    
+    # A) DESTINATARIOS PRINCIPALES - Desde settings.py
+    # EXPLICACIÓN: Estos son los correos fijos de RHITSO configurados en .env
+    destinatarios_rhitso = settings.RHITSO_EMAIL_RECIPIENTS
+    
+    # B) EMPLEADOS PARA "CON COPIA A" - Filtrados por área
+    # EXPLICACIÓN: Filtramos empleados activos de las áreas especificadas
+    # y que tengan email configurado. La búsqueda es case-insensitive.
+    from django.db.models import Q
+    
+    # Crear filtros case-insensitive para las áreas
+    areas_filtro = Q()
+    for area in settings.RHITSO_AREAS_COPIA:
+        areas_filtro |= Q(area__iexact=area)
+    
+    # Obtener empleados que cumplan los criterios
+    empleados_copia = Empleado.objects.filter(
+        areas_filtro,
+        activo=True,
+        email__isnull=False
+    ).exclude(
+        email=''
+    ).order_by('area', 'nombre_completo')
+    
+    # C) DATOS DEL EQUIPO PARA EL CORREO
+    # EXPLICACIÓN: Preparamos la información que se mostrará en el correo
+    # Usamos la orden del cliente (OOW-5544, FL-1234) en lugar de la orden interna
+    orden_cliente = detalle_equipo.orden_cliente if (detalle_equipo and detalle_equipo.orden_cliente) else 'No especificada'
+    
+    datos_correo = {
+        'orden': orden_cliente,  # Orden del cliente (OOW-5544, FL-1234, etc.)
+        'orden_interna': orden.numero_orden_interno,  # Orden interna para referencia (ORD-2025-0010)
+        'serie': detalle_equipo.numero_serie if detalle_equipo else 'No especificado',
+        'modelo': f"{detalle_equipo.marca} {detalle_equipo.modelo}" if detalle_equipo else 'No especificado',
+        'motivo_rhitso': orden.descripcion_rhitso or 'No especificado',
+        'cargador': 'SIN CARGADOR',  # Por defecto
+    }
+    
+    # Verificar si tiene cargador y su serie
+    if detalle_equipo and detalle_equipo.tiene_cargador:
+        if detalle_equipo.numero_serie_cargador:
+            datos_correo['cargador'] = detalle_equipo.numero_serie_cargador
+        else:
+            datos_correo['cargador'] = 'CON CARGADOR (sin número de serie)'
+    
+    # D) ARCHIVOS QUE SE ADJUNTARÁN
+    # EXPLICACIÓN: Contamos las imágenes que se adjuntarán al correo
+    
+    # 1. Imágenes para el PDF (tipo 'autorizacion')
+    imagenes_autorizacion = orden.imagenes.filter(tipo='autorizacion').count()
+    
+    # 2. Imágenes para adjuntar (tipo 'ingreso')
+    imagenes_ingreso = orden.imagenes.filter(tipo='ingreso')
+    cantidad_imagenes_ingreso = imagenes_ingreso.count()
+    
+    archivos_adjuntos = {
+        'tiene_imagenes_autorizacion': imagenes_autorizacion > 0,
+        'cantidad_autorizacion': imagenes_autorizacion,
+        'cantidad_imagenes_ingreso': cantidad_imagenes_ingreso,
+        'imagenes_ingreso': imagenes_ingreso,  # Para previsualización
+    }
+    
+    # E) PREVISUALIZACIÓN DEL CORREO
+    # EXPLICACIÓN: Generamos el asunto y cuerpo del correo que se enviará
+    asunto_correo = f"ENVIO DE EQUIPO RHITSO: {orden_cliente} - {datos_correo['modelo']}"
+    
+    cuerpo_correo = f"""Buen día Team Rhitso:
+
+Envío los datos del equipo para su revisión.
+
+Orden: {datos_correo['orden']}
+Serie: {datos_correo['serie']}
+Modelo: {datos_correo['modelo']}
+Motivo RHITSO: {datos_correo['motivo_rhitso']}
+Cargador: {datos_correo['cargador']}
+
+Adjunto encontrarán:
+- PDF con datos del equipo e imágenes de autorización
+- {cantidad_imagenes_ingreso} imagen(es) de ingreso del equipo
+
+Saludos cordiales."""
+    
+    previsualizacion_correo = {
+        'asunto': asunto_correo,
+        'cuerpo': cuerpo_correo,
+    }
+    
+    # =======================================================================
     # PASO 9: PREPARAR CONTEXTO COMPLETO
     # =======================================================================
     # EXPLICACIÓN: El contexto es un diccionario que contiene todos los
@@ -3320,6 +3415,13 @@ def gestion_rhitso(request, orden_id):
         'form_incidencia': form_incidencia,
         'form_resolver_incidencia': form_resolver_incidencia,
         'form_diagnostico': form_diagnostico,
+        
+        # DATOS PARA MODAL DE ENVÍO DE CORREO RHITSO (FASE 10)
+        'destinatarios_rhitso': destinatarios_rhitso,
+        'empleados_copia': empleados_copia,
+        'datos_correo': datos_correo,
+        'archivos_adjuntos': archivos_adjuntos,
+        'previsualizacion_correo': previsualizacion_correo,
     }
     
     # =======================================================================
@@ -4018,3 +4120,433 @@ def agregar_comentario_rhitso(request, orden_id):
 # - Código más limpio (~107 líneas eliminadas)
 # - Mayor flexibilidad en el flujo de trabajo
 
+
+# ============================================================================
+# VISTA: ENVIAR CORREO Y FORMATO RHITSO - FASE 10
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def enviar_correo_rhitso(request, orden_id):
+    """
+    Vista para enviar correo electrónico a RHITSO con información del equipo.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista procesa el formulario del modal de envío de correo a RHITSO.
+    Realiza las siguientes acciones:
+    
+    1. Valida que la orden sea candidato RHITSO
+    2. Recopila destinatarios principales y empleados en copia
+    3. Prepara los datos del equipo para el correo
+    4. Genera PDF con información del equipo e imágenes de autorización
+    5. Comprime imágenes de ingreso para adjuntar
+    6. Envía el correo con todos los adjuntos
+    7. Registra el envío en el historial de la orden
+    8. Limpia archivos temporales
+    
+    FLUJO DEL CORREO:
+    - Para: Destinatarios RHITSO (configurados en .env)
+    - CC: Empleados seleccionados (CALIDAD, FRONTDESK, COMPRAS)
+    - Asunto: 🔧 Envío de Equipo RHITSO - Orden #[NUMERO]
+    - Adjuntos:
+      * PDF con datos del equipo e imágenes de autorización
+      * Imágenes de ingreso (comprimidas)
+    
+    Args:
+        request: HttpRequest object con datos POST del formulario
+        orden_id: ID de la orden de servicio
+    
+    Returns:
+        JsonResponse con resultado del envío o redirect en caso de error
+    """
+    import os
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from .utils.pdf_generator import PDFGeneratorRhitso
+    from .utils.image_compressor import ImageCompressor
+    
+    try:
+        # =======================================================================
+        # PASO 1: OBTENER Y VALIDAR LA ORDEN
+        # =======================================================================
+        orden = get_object_or_404(OrdenServicio, pk=orden_id)
+        
+        if not orden.es_candidato_rhitso:
+            return JsonResponse({
+                'success': False,
+                'mensaje': '❌ Esta orden no está marcada como candidato RHITSO.'
+            }, status=400)
+        
+        # =======================================================================
+        # PASO 2: OBTENER DESTINATARIOS DEL FORMULARIO
+        # =======================================================================
+        destinatarios_principales = request.POST.getlist('destinatarios_principales')
+        copia_empleados = request.POST.getlist('copia_empleados')
+        
+        # Validar que haya al menos un destinatario
+        if not destinatarios_principales:
+            return JsonResponse({
+                'success': False,
+                'mensaje': '❌ Debe seleccionar al menos un destinatario principal.'
+            }, status=400)
+        
+        # =======================================================================
+        # PASO 3: GENERAR PDF CON DATOS DEL EQUIPO E IMÁGENES DE AUTORIZACIÓN
+        # =======================================================================
+        print(f"📄 Generando PDF para Orden {orden.numero_orden_interno}...")
+        
+        # Obtener imágenes de autorización para incluir en el PDF
+        imagenes_autorizacion = list(orden.imagenes.filter(tipo='autorizacion'))
+        
+        # Generar el PDF usando el generador existente
+        generator = PDFGeneratorRhitso(orden, imagenes_autorizacion)
+        resultado_pdf = generator.generar_pdf()
+        
+        if not resultado_pdf.get('success'):
+            error_msg = resultado_pdf.get('error', 'Error desconocido')
+            print(f"❌ Error generando PDF: {error_msg}")
+            return JsonResponse({
+                'success': False,
+                'mensaje': f"❌ Error al generar PDF: {error_msg}"
+            }, status=500)
+        
+        pdf_path = resultado_pdf['ruta']
+        print(f"✅ PDF generado: {pdf_path}")
+        
+        # =======================================================================
+        # PASO 4: COMPRIMIR Y ANALIZAR IMÁGENES DE INGRESO PARA ADJUNTAR
+        # =======================================================================
+        print(f"🖼️ Procesando imágenes de ingreso...")
+        
+        imagenes_ingreso = list(orden.imagenes.filter(tipo='ingreso'))
+        compressor = ImageCompressor()
+        
+        # Preparar lista de imágenes para calcular tamaño
+        imagenes_para_correo = []
+        for imagen in imagenes_ingreso:
+            imagenes_para_correo.append({
+                'ruta': imagen.imagen.path,
+                'nombre': os.path.basename(imagen.imagen.path)
+            })
+        
+        # Calcular tamaño total del correo con análisis completo
+        print(f"📊 Analizando tamaño del correo...")
+        analisis = compressor.calcular_tamaño_correo(
+            ruta_pdf=pdf_path,
+            imagenes=imagenes_para_correo,
+            contenido_html=""  # El HTML es pequeño, no afecta mucho
+        )
+        
+        if not analisis['success']:
+            return JsonResponse({
+                'success': False,
+                'mensaje': f"❌ Error al analizar tamaño del correo: {analisis.get('error', 'Error desconocido')}"
+            }, status=500)
+        
+        # Mostrar información detallada del análisis
+        print(f"\n📦 ANÁLISIS DEL CORREO:")
+        print(f"  📄 PDF: {analisis['detalles']['pdf']['tamaño_mb']} MB")
+        print(f"  🖼️ Imágenes:")
+        print(f"     • Original: {analisis['detalles']['imagenes']['tamaño_original_mb']} MB")
+        print(f"     • Comprimido: {analisis['detalles']['imagenes']['tamaño_comprimido_mb']} MB")
+        print(f"     • Reducción: {analisis['detalles']['imagenes']['reduccion_total_mb']} MB")
+        print(f"  📊 TOTAL: {analisis['tamaño_total_mb']} MB / 25 MB")
+        
+        # Verificar si excede el límite
+        if analisis['excede_limite']:
+            print(f"\n⚠️ ADVERTENCIA: El correo excede el límite de Gmail!")
+            for recomendacion in analisis['recomendaciones']:
+                print(f"  {recomendacion}")
+            
+            return JsonResponse({
+                'success': False,
+                'mensaje': f"❌ El correo excede el límite de Gmail ({analisis['tamaño_total_mb']} MB). "
+                          f"Reduce el número de imágenes o usa un servicio de transferencia de archivos.",
+                'data': {
+                    'tamaño_total_mb': analisis['tamaño_total_mb'],
+                    'limite_mb': 25,
+                    'imagenes_validas': analisis['imagenes_validas_count'],
+                    'imagenes_excluidas': analisis['imagenes_excluidas_count']
+                }
+            }, status=400)
+        
+        # Mostrar imágenes excluidas si las hay
+        if analisis['imagenes_excluidas_count'] > 0:
+            print(f"\n⚠️ {analisis['imagenes_excluidas_count']} imagen(es) excluidas:")
+            for img_excluida in analisis['imagenes_excluidas']:
+                print(f"  • {img_excluida['nombre']}: {img_excluida['razon']}")
+        
+        # Mostrar recomendaciones
+        print(f"\n💡 RECOMENDACIONES:")
+        for recomendacion in analisis['recomendaciones']:
+            print(f"  {recomendacion}")
+        
+        # Usar las imágenes comprimidas
+        imagenes_paths = [img['ruta_comprimida'] for img in analisis['imagenes_validas']]
+        print(f"\n✅ {len(imagenes_paths)} imágenes listas para adjuntar")
+        
+        # =======================================================================
+        # PASO 5: PREPARAR CONTENIDO HTML DEL CORREO
+        # =======================================================================
+        print(f"📧 Preparando contenido del correo...")
+        
+        # Obtener fecha y hora actual
+        ahora = timezone.now()
+        fecha_actual = ahora.strftime('%d/%m/%Y')
+        hora_actual = ahora.strftime('%H:%M')
+        
+        # Preparar contexto para la plantilla HTML
+        context = {
+            'orden': orden,
+            'fecha_actual': fecha_actual,
+            'hora_actual': hora_actual,
+            # Datos de contacto (puedes personalizar estos valores)
+            'agente_nombre': 'Equipo de Soporte Técnico',
+            'agente_celular': '55-35-45-81-92',
+            'agente_correo': settings.DEFAULT_FROM_EMAIL,
+        }
+        
+        # Renderizar plantilla HTML
+        html_content = render_to_string(
+            'servicio_tecnico/emails/rhitso_envio.html',
+            context
+        )
+        
+        # =======================================================================
+        # PASO 6: CREAR Y ENVIAR EL CORREO ELECTRÓNICO
+        # =======================================================================
+        print(f"✉️ Enviando correo electrónico...")
+        
+        # Determinar qué orden usar en el asunto (preferir orden del cliente)
+        orden_para_asunto = orden.numero_orden_interno
+        if orden.detalle_equipo and orden.detalle_equipo.orden_cliente:
+            orden_para_asunto = orden.detalle_equipo.orden_cliente
+        
+        # Crear asunto del correo en mayúsculas
+        asunto = f'🔧ENVIO DE EQUIPO RHITSO - {orden_para_asunto}'
+        
+        # Crear lista completa de destinatarios (principal + copias)
+        todos_destinatarios = list(destinatarios_principales)
+        if copia_empleados:
+            todos_destinatarios.extend(copia_empleados)
+        
+        # Personalizar el remitente para RHITSO
+        # Extraer solo el email del DEFAULT_FROM_EMAIL si tiene formato "Nombre <email>"
+        from_email_base = settings.DEFAULT_FROM_EMAIL
+        if '<' in from_email_base and '>' in from_email_base:
+            # Extraer solo el email entre < >
+            email_address = from_email_base.split('<')[1].split('>')[0]
+        else:
+            email_address = from_email_base
+        
+        # Crear remitente personalizado para RHITSO
+        from_email_rhitso = f'RHITSO System <{email_address}>'
+        
+        # Crear mensaje de correo
+        email = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=from_email_rhitso,  # Remitente personalizado para RHITSO
+            to=destinatarios_principales,
+            cc=copia_empleados if copia_empleados else None,
+        )
+        
+        # Indicar que el contenido es HTML
+        email.content_subtype = 'html'
+        
+        # Adjuntar el PDF
+        if os.path.exists(pdf_path):
+            with open(pdf_path, 'rb') as pdf_file:
+                email.attach(os.path.basename(pdf_path), pdf_file.read(), 'application/pdf')
+            print(f"  📎 PDF adjuntado: {os.path.basename(pdf_path)}")
+        
+        # Adjuntar las imágenes comprimidas
+        for imagen_path in imagenes_paths:
+            if os.path.exists(imagen_path):
+                filename = os.path.basename(imagen_path)
+                with open(imagen_path, 'rb') as img_file:
+                    email.attach(filename, img_file.read(), 'image/jpeg')
+                print(f"  📎 Imagen adjuntada: {filename}")
+        
+        # Enviar el correo
+        email.send()
+        print(f"✅ Correo enviado exitosamente")
+        
+        # =======================================================================
+        # PASO 7: REGISTRAR EN HISTORIAL
+        # =======================================================================
+        comentario = f"📧 Correo RHITSO enviado a: {', '.join(destinatarios_principales[:2])}"
+        if len(destinatarios_principales) > 2:
+            comentario += f" y {len(destinatarios_principales) - 2} más"
+        if copia_empleados:
+            comentario += f" (con {len(copia_empleados)} copia(s))"
+        
+        registrar_historial(
+            orden=orden,
+            tipo_evento='sistema',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=comentario,
+            es_sistema=False
+        )
+        
+        # =======================================================================
+        # PASO 8: LIMPIAR ARCHIVOS TEMPORALES
+        # =======================================================================
+        print(f"🧹 Limpiando archivos temporales...")
+        
+        # Eliminar PDF temporal
+        if os.path.exists(pdf_path):
+            try:
+                os.remove(pdf_path)
+                print(f"  🗑️ PDF eliminado: {pdf_path}")
+            except Exception as e:
+                print(f"  ⚠️ No se pudo eliminar PDF: {e}")
+        
+        # Eliminar imágenes comprimidas temporales
+        for imagen_path in imagenes_paths:
+            if 'compressed' in imagen_path and os.path.exists(imagen_path):
+                try:
+                    os.remove(imagen_path)
+                    print(f"  🗑️ Imagen eliminada: {imagen_path}")
+                except Exception as e:
+                    print(f"  ⚠️ No se pudo eliminar imagen: {e}")
+        
+        # =======================================================================
+        # PASO 9: RESPUESTA DE ÉXITO CON INFORMACIÓN DETALLADA
+        # =======================================================================
+        return JsonResponse({
+            'success': True,
+            'mensaje': f'✅ Correo enviado exitosamente a {len(destinatarios_principales)} destinatario(s)',
+            'data': {
+                'destinatarios': len(destinatarios_principales),
+                'copias': len(copia_empleados),
+                'pdf': {
+                    'generado': True,
+                    'tamaño_mb': analisis['detalles']['pdf']['tamaño_mb']
+                },
+                'imagenes': {
+                    'adjuntas': len(imagenes_paths),
+                    'excluidas': analisis['imagenes_excluidas_count'],
+                    'tamaño_original_mb': analisis['detalles']['imagenes']['tamaño_original_mb'],
+                    'tamaño_comprimido_mb': analisis['detalles']['imagenes']['tamaño_comprimido_mb'],
+                    'reduccion_mb': analisis['detalles']['imagenes']['reduccion_total_mb']
+                },
+                'correo': {
+                    'tamaño_total_mb': analisis['tamaño_total_mb'],
+                    'limite_mb': 25,
+                    'porcentaje_usado': round((analisis['tamaño_total_mb'] / 25) * 100, 1)
+                }
+            }
+        })
+        
+    except Exception as e:
+        # Registrar error en consola
+        print(f"❌ Error al enviar correo RHITSO: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return JsonResponse({
+            'success': False,
+            'mensaje': f'❌ Error al enviar el correo: {str(e)}'
+        }, status=500)
+
+
+# ============================================================================
+# VISTA DE PRUEBA: GENERAR PDF RHITSO
+# ============================================================================
+
+@login_required
+def generar_pdf_rhitso_prueba(request, orden_id):
+    """
+    Vista de prueba para generar el PDF RHITSO.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista es temporal para probar que el generador de PDF funciona correctamente.
+    Una vez integrado al modal, esta vista se puede eliminar.
+    
+    ¿Qué hace?
+    1. Busca la orden de servicio por ID
+    2. Obtiene las imágenes de autorización (si existen)
+    3. Genera el PDF usando PDFGeneratorRhitso
+    4. Devuelve el PDF para descargar o muestra un error
+    
+    Args:
+        request: Objeto HttpRequest de Django
+        orden_id: ID de la orden de servicio
+        
+    Returns:
+        - Si success=True: Descarga del PDF
+        - Si success=False: Página con mensaje de error
+    """
+    try:
+        # Importar el generador de PDF
+        from .utils.pdf_generator import PDFGeneratorRhitso
+        from django.http import FileResponse
+        
+        # Buscar la orden (lanza 404 si no existe)
+        orden = get_object_or_404(OrdenServicio, id=orden_id)
+        
+        # Verificar que sea candidato RHITSO
+        if not orden.es_candidato_rhitso:
+            messages.warning(request, '⚠️ Esta orden no está marcada como candidato RHITSO.')
+        
+        # Obtener imágenes de autorización/pass (tipo específico)
+        imagenes_autorizacion = ImagenOrden.objects.filter(
+            orden=orden,
+            tipo='autorizacion'
+        ).order_by('-fecha_subida')
+        
+        # Crear instancia del generador
+        generador = PDFGeneratorRhitso(
+            orden=orden,
+            imagenes_autorizacion=list(imagenes_autorizacion)
+        )
+        
+        # Generar el PDF
+        resultado = generador.generar_pdf()
+        
+        if resultado['success']:
+            # Abrir el archivo PDF generado
+            pdf_file = open(resultado['ruta'], 'rb')
+            
+            # Crear respuesta HTTP para descargar el archivo
+            response = FileResponse(
+                pdf_file,
+                content_type='application/pdf'
+            )
+            
+            # Configurar headers para descarga
+            response['Content-Disposition'] = f'attachment; filename="{resultado["archivo"]}"'
+            
+            # Mensaje de éxito (se mostrará en la próxima página que visite el usuario)
+            messages.success(
+                request, 
+                f'✅ PDF generado exitosamente: {resultado["archivo"]} '
+                f'({resultado["size"] / 1024:.1f} KB)'
+            )
+            
+            return response
+        else:
+            # Si hubo error al generar
+            messages.error(
+                request,
+                f'❌ Error al generar el PDF: {resultado.get("error", "Error desconocido")}'
+            )
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden_id)
+    
+    except Exception as e:
+        # Capturar cualquier otro error
+        messages.error(
+            request,
+            f'❌ Error inesperado al generar PDF: {str(e)}'
+        )
+        
+        # Log del error para debugging
+        import traceback
+        print("Error generando PDF RHITSO:")
+        traceback.print_exc()
+        
+        return redirect('servicio_tecnico:lista_ordenes')
