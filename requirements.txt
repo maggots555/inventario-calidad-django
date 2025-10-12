@@ -3,3 +3,4 @@ openpyxl==3.1.2
 qrcode[pil]==7.4.2
 Pillow==11.3.0
 python-decouple==3.8
+reportlab==4.2.5
