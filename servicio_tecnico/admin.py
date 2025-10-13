@@ -166,6 +166,7 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         'dias_en_servicio_display',
         'es_reingreso',
         'es_candidato_rhitso',
+        'estado_rhitso_display',  # NUEVO - Muestra estado RHITSO con indicadores de fechas
         'requiere_factura',
     )
     list_filter = (
@@ -174,6 +175,9 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         'sucursal',
         'es_reingreso',
         'es_candidato_rhitso',
+        'estado_rhitso',  # NUEVO - Filtrar por estado RHITSO
+        'fecha_envio_rhitso',  # NUEVO - Filtrar por fecha de envío a RHITSO
+        'fecha_recepcion_rhitso',  # NUEVO - Filtrar por fecha de recepción desde RHITSO
         'requiere_factura',
         'año',
         'mes',
@@ -222,13 +226,20 @@ class OrdenServicioAdmin(admin.ModelAdmin):
             ),
             'classes': ('collapse',)
         }),
-        ('RHITSO', {
+        ('RHITSO - Seguimiento Especializado', {
             'fields': (
                 'es_candidato_rhitso',
                 'motivo_rhitso',
                 'descripcion_rhitso',
+                'estado_rhitso',
+                'fecha_envio_rhitso',
+                'fecha_recepcion_rhitso',
+                'tecnico_diagnostico',
+                'fecha_diagnostico_sic',
+                'complejidad_estimada',
             ),
-            'classes': ('collapse',)
+            'classes': ('collapse',),
+            'description': '🔧 Gestión completa del proceso RHITSO. Las fechas de envío y recepción son MANUALES (no automáticas).'
         }),
         ('Facturación', {
             'fields': (
@@ -327,6 +338,46 @@ class OrdenServicioAdmin(admin.ModelAdmin):
             )
         return f"{dias} días"
     dias_en_servicio_display.short_description = 'Días en Servicio'
+    
+    def estado_rhitso_display(self, obj):
+        """
+        Muestra el estado RHITSO actual con indicadores visuales de fechas.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Este método crea una visualización del estado RHITSO con:
+        - Badge con el estado actual (si existe)
+        - Iconos que indican si las fechas están registradas:
+          📤 = Tiene fecha de envío
+          📥 = Tiene fecha de recepción
+        - Color distintivo para identificar rápidamente el estado
+        """
+        if not obj.es_candidato_rhitso:
+            return format_html('<span style="color: #999;">No aplica</span>')
+        
+        if not obj.estado_rhitso:
+            return format_html('<span style="color: #ffc107; font-weight: bold;">⚠️ Sin estado</span>')
+        
+        # Badge del estado
+        badge = f'<span style="background-color: #0d6efd; color: white; padding: 3px 8px; border-radius: 3px; font-size: 0.85em;">{obj.estado_rhitso[:30]}</span>'
+        
+        # Indicadores de fechas
+        indicadores = []
+        if obj.fecha_envio_rhitso:
+            indicadores.append('<span title="Fecha de envío registrada: {}">📤</span>'.format(
+                obj.fecha_envio_rhitso.strftime('%d/%m/%Y %H:%M')
+            ))
+        if obj.fecha_recepcion_rhitso:
+            indicadores.append('<span title="Fecha de recepción registrada: {}">📥</span>'.format(
+                obj.fecha_recepcion_rhitso.strftime('%d/%m/%Y %H:%M')
+            ))
+        
+        resultado = badge
+        if indicadores:
+            resultado += ' ' + ' '.join(indicadores)
+        
+        return format_html(resultado)
+    
+    estado_rhitso_display.short_description = 'Estado RHITSO'
 
 
 # ============================================================================

@@ -129,50 +129,83 @@ COLORES_IMPACTO_CLIENTE = {
 # DICCIONARIO DE COLORES PARA ESTADOS ESPECÍFICOS DE RHITSO
 # =============================================================================
 
+# PALETA DE COLORES PERSONALIZADA RHITSO
+# Definición de códigos hexadecimales para cada nombre de color
+PALETA_COLORES_RHITSO = {
+    'rosa-claro': '#FFB6C1',          # Light Pink
+    'rhitso-rosa-claro': '#FFC0CB',   # Rosa específico RHITSO
+    'azul-cian': '#00CED1',           # Dark Turquoise / Cian
+    'verde-lima': '#32CD32',          # Lime Green
+    'rojo-intenso': '#DC143C',        # Crimson
+    'naranja-claro': '#FFB347',       # Light Orange
+    'naranja': '#FF8C00',             # Dark Orange
+    'verde-fuerte': '#228B22',        # Forest Green
+    'azul-electrico': '#0080FF',      # Electric Blue
+    'morado-claro': '#B19CD9',        # Light Purple
+    'azul-claro': '#87CEEB',          # Sky Blue
+    'amarillo-claro': '#FFE66D',      # Light Yellow
+    'morado-fuerte': '#8B00FF',       # Violet / Purple
+    'rojo': '#FF0000',                # Red
+    'verde-agua': '#40E0D0',          # Turquoise
+    'verde': '#00FF00',               # Lime / Green
+    'verde-claro': '#90EE90',         # Light Green
+    'magenta': '#FF00FF',             # Magenta / Fuchsia
+    'marron-claro': '#D2B48C',        # Tan / Light Brown
+    'azul-marino': '#000080',         # Navy Blue
+    'coral': '#FF7F50',               # Coral
+    'gris': '#808080',                # Gray
+}
+
 COLORES_ESTADO_ESPECIFICO = {
-    # ===== CATEGORÍA: ÉXITOS Y ACEPTACIONES (VERDE) =====
-    'USUARIO ACEPTA ENVIO A RHITSO': '#198754',          # Verde success
-    'CLIENTE ACEPTA COTIZACIÓN': '#198754',              # Verde success
-    'EQUIPO REPARADO': '#198754',                        # Verde success
-    'EQUIPO RETORNADO A SIC': '#198754',                 # Verde success
+    # ===== ESTADOS SIC - INICIO DEL PROCESO =====
+    'CANDIDATO RHITSO': PALETA_COLORES_RHITSO['rhitso-rosa-claro'],
+    'PENDIENTE DE CONFIRMAR ENVIO A RHITSO': PALETA_COLORES_RHITSO['azul-cian'],
+    'USUARIO ACEPTA ENVIO A RHITSO': PALETA_COLORES_RHITSO['verde-lima'],
+    'USUARIO NO ACEPTA ENVIO A RHITSO': PALETA_COLORES_RHITSO['rojo-intenso'],
+    'EN ESPERA DE ENTREGAR EQUIPO A RHITSO': PALETA_COLORES_RHITSO['rosa-claro'],
     
-    # ===== CATEGORÍA: RECHAZOS, PROBLEMAS E INCIDENCIAS (ROJO) =====
-    'USUARIO NO ACEPTA ENVIO A RHITSO': '#dc3545',       # Rojo danger
-    'CLIENTE NO ACEPTA COTIZACIÓN': '#dc3545',           # Rojo danger
-    'NO APTO PARA REPARACIÓN': '#dc3545',                # Rojo danger
-    'INCIDENCIA SIC': '#dc3545',                         # Rojo danger
-    'INCIDENCIA RHITSO': '#dc3545',                      # Rojo danger
-    'PIEZA DOA': '#dc3545',                              # Rojo danger
+    # ===== INCIDENCIAS Y COTIZACIONES SIC =====
+    'INCIDENCIA SIC': PALETA_COLORES_RHITSO['rojo-intenso'],
+    'COTIZACIÓN ENVIADA A SIC': PALETA_COLORES_RHITSO['naranja-claro'],
+    'EN ESPERA DE PIEZA POR SIC': PALETA_COLORES_RHITSO['naranja'],
+    'PIEZA DE SIC ENVIADA A RHITSO': PALETA_COLORES_RHITSO['naranja'],
     
-    # ===== CATEGORÍA: ADVERTENCIAS Y ESPERAS (AMARILLO/NARANJA) =====
-    'PENDIENTE DE CONFIRMAR ENVIO A RHITSO': '#ffc107',  # Amarillo warning
-    'EN ESPERA DE ENTREGAR EQUIPO A RHITSO': '#ffc107',  # Amarillo warning
-    'EN ESPERA DE PIEZA POR SIC': '#ffc107',             # Amarillo warning
-    'PIEZA DE SIC ENVIADA A RHITSO': '#ffc107',          # Amarillo warning
-    'EN ESPERA DE CONFIRMAR INGRESO': '#ffc107',         # Amarillo warning
-    'EN ESPERA DE PARTES/COMPONENTE': '#ffc107',         # Amarillo warning
-    'EN ESPERA DEL RETORNO DEL EQUIPO': '#ffc107',       # Amarillo warning
-    'COTIZACIÓN ENVIADA AL CLIENTE': '#ffc107',          # Amarillo warning
-    'PETICIÓN AL CLIENTE': '#ffc107',                    # Amarillo warning
-    'EN ESPERA DE LA OC': '#ffc107',                     # Amarillo warning
-    'PIEZA WBP': '#fd7e14',                              # Naranja (problema leve)
+    # ===== RETORNO Y PRUEBAS EN SIC =====
+    'EQUIPO RETORNADO A SIC': PALETA_COLORES_RHITSO['verde-fuerte'],
+    'EN PRUEBAS SIC': PALETA_COLORES_RHITSO['azul-electrico'],
     
-    # ===== CATEGORÍA: INFORMACIÓN Y ESTADOS NORMALES (AZUL) =====
-    'CANDIDATO RHITSO': '#17a2b8',                       # Cian info
-    'COTIZACIÓN ENVIADA A SIC': '#17a2b8',               # Cian info
-    'EQUIPO EN RHITSO': '#0dcaf0',                       # Cian claro
-    'QR COMPARTIDO (EN DIAGNOSTICO)': '#17a2b8',         # Cian info
-    'EN PRUEBAS SIC': '#17a2b8',                         # Cian info
-    'EN PRUEBAS (DE DIAGNOSTICO)': '#17a2b8',            # Cian info
-    'EN PRUEBAS (REPARADO)': '#17a2b8',                  # Cian info
+    # ===== ESTADOS RHITSO - INGRESO Y DIAGNÓSTICO =====
+    'EN ESPERA DE CONFIRMAR INGRESO': PALETA_COLORES_RHITSO['azul-cian'],
+    'EQUIPO EN RHITSO': PALETA_COLORES_RHITSO['morado-claro'],
+    'QR COMPARTIDO (EN DIAGNOSTICO)': PALETA_COLORES_RHITSO['azul-electrico'],
+    'DIAGNOSTICO FINAL': PALETA_COLORES_RHITSO['azul-claro'],
     
-    # ===== CATEGORÍA: PROCESOS ESPECIALES RHITSO (PÚRPURA) =====
-    'DIAGNOSTICO FINAL': '#6610f2',                      # Índigo/Púrpura
-    'EN PROCESO DE RESPALDO': '#6f42c1',                 # Púrpura
-    'EN PROCESO DE REBALLING': '#6610f2',                # Índigo/Púrpura
+    # ===== PROCESOS TÉCNICOS RHITSO =====
+    'EN PROCESO DE RESPALDO': PALETA_COLORES_RHITSO['amarillo-claro'],
+    'EN PROCESO DE REBALLING': PALETA_COLORES_RHITSO['morado-fuerte'],
+    'EN PRUEBAS (DE DIAGNOSTICO)': PALETA_COLORES_RHITSO['amarillo-claro'],
+    'NO APTO PARA REPARACIÓN': PALETA_COLORES_RHITSO['rojo'],
     
-    # ===== CATEGORÍA: CERRADO (GRIS OSCURO) =====
-    'CERRADO': '#212529',                                # Gris oscuro/negro
+    # ===== ESPERAS Y REPARACIÓN RHITSO =====
+    'EN ESPERA DE PARTES/COMPONENTE': PALETA_COLORES_RHITSO['verde-agua'],
+    'EN PRUEBAS (REPARADO)': PALETA_COLORES_RHITSO['verde'],
+    'EQUIPO REPARADO': PALETA_COLORES_RHITSO['verde-claro'],
+    'INCIDENCIA RHITSO': PALETA_COLORES_RHITSO['magenta'],
+    'EN ESPERA DEL RETORNO DEL EQUIPO': PALETA_COLORES_RHITSO['marron-claro'],
+    
+    # ===== ESTADOS CLIENTE =====
+    'CLIENTE ACEPTA COTIZACIÓN': PALETA_COLORES_RHITSO['verde-lima'],
+    'COTIZACIÓN ENVIADA AL CLIENTE': PALETA_COLORES_RHITSO['morado-claro'],
+    'CLIENTE NO ACEPTA COTIZACIÓN': PALETA_COLORES_RHITSO['rojo-intenso'],  # Cambiado de 'rojo-claro'
+    'PETICIÓN AL USUARIO': PALETA_COLORES_RHITSO['azul-marino'],
+    
+    # ===== ESTADOS COMPRAS Y PIEZAS =====
+    'EN ESPERA DE LA OC': PALETA_COLORES_RHITSO['marron-claro'],
+    'PIEZA DOA': PALETA_COLORES_RHITSO['coral'],
+    'PIEZA WPB': PALETA_COLORES_RHITSO['coral'],
+    
+    # ===== ESTADO FINAL =====
+    'CERRADO': PALETA_COLORES_RHITSO['gris'],
     
     # Color por defecto para estados no definidos
     'default': '#6c757d',                                # Gris neutro

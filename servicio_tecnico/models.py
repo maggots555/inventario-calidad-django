@@ -363,6 +363,42 @@ class OrdenServicio(models.Model):
         return (timezone.now().date() - self.fecha_ingreso.date()).days
     
     @property
+    def dias_habiles_en_servicio(self):
+        """
+        Calcula los días HÁBILES que lleva la orden en el sistema.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Esta propiedad calcula solo días laborables (lunes a viernes),
+        excluyendo fines de semana. Es más realista para medir tiempos
+        de servicio porque los técnicos no trabajan sábados ni domingos.
+        
+        ¿Por qué usar días hábiles?
+        - Refleja el tiempo real de trabajo
+        - Métricas más precisas de rendimiento
+        - Permite comparar órdenes de forma justa
+        
+        Reutiliza la función calcular_dias_habiles() del módulo utils_rhitso.
+        
+        Returns:
+            int: Número de días hábiles desde ingreso hasta entrega o hasta hoy
+        
+        Ejemplo:
+            orden.fecha_ingreso = 2025-01-01 (miércoles)
+            orden.fecha_entrega = 2025-01-08 (miércoles siguiente)
+            dias_naturales = 7 días
+            dias_habiles = 5 días (excluye sábado 4 y domingo 5)
+        """
+        from .utils_rhitso import calcular_dias_habiles
+        
+        if self.fecha_entrega:
+            # Si ya fue entregada, calcular desde ingreso hasta entrega
+            return calcular_dias_habiles(self.fecha_ingreso, self.fecha_entrega)
+        else:
+            # Si aún está en proceso, calcular desde ingreso hasta hoy
+            return calcular_dias_habiles(self.fecha_ingreso)
+    
+    @property
     def esta_retrasada(self):
         """Determina si la orden está retrasada (más de 15 días sin entregar)"""
         if self.estado != 'entregado' and self.dias_en_servicio > 15:

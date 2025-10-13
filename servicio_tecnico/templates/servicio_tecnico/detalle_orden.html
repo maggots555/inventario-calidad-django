@@ -210,8 +210,20 @@
                         </div>
                         
                         <div class="col-md-6 mb-3">
-                            <label class="form-label text-muted small">Días en Servicio</label>
-                            <div class="dias-servicio">{{ dias_en_servicio }} días</div>
+                            <label class="form-label text-muted small">
+                                Días Hábiles en Servicio
+                                <i class="bi bi-info-circle-fill text-info ms-1" 
+                                   data-bs-toggle="tooltip" 
+                                   title="Solo cuenta días laborables (lunes a viernes), excluyendo fines de semana"></i>
+                            </label>
+                            <div class="dias-servicio">
+                                <strong style="font-size: 1.2rem; color: #0d6efd;">
+                                    <i class="bi bi-calendar-week"></i> {{ dias_habiles_en_servicio }} días hábiles
+                                </strong>
+                                <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+                                    ({{ dias_en_servicio }} días naturales)
+                                </small>
+                            </div>
                         </div>
                         
                         <!-- Información del Equipo -->
@@ -2554,6 +2566,18 @@ const estadisticasTecnicos = {{ estadisticas_tecnicos|safe }};
 // ALERTA DINÁMICA DE CARGA DE TRABAJO DEL TÉCNICO
 // ============================================================================
 document.addEventListener('DOMContentLoaded', function() {
+    // ============================================================================
+    // INICIALIZAR TOOLTIPS DE BOOTSTRAP
+    // ============================================================================
+    // Los tooltips necesitan inicializarse manualmente para funcionar
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // ============================================================================
+    // ALERTA DE CARGA DE TRABAJO DEL TÉCNICO
+    // ============================================================================
     const selectTecnico = document.getElementById('id_tecnico_select');
     const divAlerta = document.getElementById('alertaTecnico');
     

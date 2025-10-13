@@ -26,13 +26,23 @@ from django.utils import timezone
 
 def calcular_dias_habiles(fecha_inicio, fecha_fin=None):
     """
-    Calcula los días hábiles transcurridos entre dos fechas.
+    Calcula los días hábiles TRANSCURRIDOS entre dos fechas.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     ================================
     Los "días hábiles" son días laborables (lunes a viernes), excluyendo
     fines de semana (sábado y domingo). Esta función cuenta cuántos días
-    hábiles han pasado entre dos fechas.
+    hábiles COMPLETOS han transcurrido entre dos fechas.
+    
+    IMPORTANTE - Lógica de Conteo:
+    -------------------------------
+    - NO cuenta el día de inicio (solo días posteriores)
+    - SÍ cuenta el día final (si es día hábil)
+    - Si ambas fechas son el mismo día, retorna 0
+    
+    Esto es intuitivo para medir "tiempo transcurrido":
+    - "La orden ingresó hoy" → 0 días transcurridos
+    - "La orden ingresó ayer" → 1 día transcurrido (hoy)
     
     ¿Por qué usar días hábiles en lugar de días naturales?
     - Es más realista para medir tiempos de trabajo
@@ -45,24 +55,27 @@ def calcular_dias_habiles(fecha_inicio, fecha_fin=None):
                                                Si es None, usa la fecha actual
     
     Returns:
-        int: Número de días hábiles transcurridos
+        int: Número de días hábiles transcurridos (no incluye día de inicio)
     
     Ejemplos:
-        # Calcular días hábiles desde el 1 de enero hasta hoy
-        dias = calcular_dias_habiles('2025-01-01')
+        # Orden creada el viernes 11/10/2025, hoy es lunes 14/10/2025
+        dias = calcular_dias_habiles('2025-10-11')
+        # Resultado: 1 día hábil (solo lunes 14, no cuenta viernes 11)
         
-        # Calcular días hábiles entre dos fechas específicas
-        dias = calcular_dias_habiles('2025-01-01', '2025-01-15')
+        # Orden creada el miércoles 09/10/2025, hoy es lunes 14/10/2025
+        dias = calcular_dias_habiles('2025-10-09')
+        # Resultado: 3 días hábiles (jueves 10, viernes 11, lunes 14)
+        # No cuenta: miércoles 9 (inicio), sábado 12, domingo 13
         
-        # Usar con objetos datetime
-        orden = OrdenServicio.objects.get(pk=1)
-        dias = calcular_dias_habiles(orden.fecha_ingreso)
+        # Orden creada y cerrada el mismo día
+        dias = calcular_dias_habiles('2025-10-14', '2025-10-14')
+        # Resultado: 0 días (no ha transcurrido tiempo)
     
     Detalles de implementación:
         - weekday() retorna: 0=Lunes, 1=Martes, ..., 6=Domingo
         - Días hábiles: 0-4 (Lunes a Viernes)
         - Fin de semana: 5-6 (Sábado y Domingo)
-        - Se cuenta el día actual solo si es día hábil
+        - Comienza a contar desde fecha_inicio + 1 día
     
     Notas:
         - NO considera días festivos (puedes agregar esa funcionalidad después)
@@ -87,11 +100,17 @@ def calcular_dias_habiles(fecha_inicio, fecha_fin=None):
     if fecha_inicio > fecha_fin:
         return 0
     
+    # Si son el mismo día, retornar 0 (no ha transcurrido tiempo completo)
+    if fecha_inicio == fecha_fin:
+        return 0
+    
     # Contador de días hábiles
     dias_habiles = 0
-    fecha_actual = fecha_inicio
+    # IMPORTANTE: Empezamos desde el día SIGUIENTE al inicio
+    # Esto cuenta días TRANSCURRIDOS, no el día de inicio
+    fecha_actual = fecha_inicio + timedelta(days=1)
     
-    # Iterar día por día desde fecha_inicio hasta fecha_fin
+    # Iterar día por día desde el día siguiente al inicio hasta fecha_fin (inclusive)
     while fecha_actual <= fecha_fin:
         # weekday(): 0=Lunes, 1=Martes, 2=Miércoles, 3=Jueves, 4=Viernes, 5=Sábado, 6=Domingo
         # Días hábiles son de 0 a 4 (Lunes a Viernes)

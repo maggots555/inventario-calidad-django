@@ -1466,7 +1466,8 @@ def detalle_orden(request, orden_id):
         'total_imagenes': total_imagenes,
         
         # Información adicional
-        'dias_en_servicio': orden.dias_en_servicio,
+        'dias_en_servicio': orden.dias_en_servicio,  # Días naturales (mantener por compatibilidad)
+        'dias_habiles_en_servicio': orden.dias_habiles_en_servicio,  # Días hábiles (nuevo)
         'esta_retrasada': orden.esta_retrasada,
         
         # NUEVO: Variables contextuales para la UI
@@ -3524,25 +3525,23 @@ def actualizar_estado_rhitso(request, orden_id):
         # Paso 5: Actualizar estado en la orden
         orden.estado_rhitso = nuevo_estado
         
-        # Paso 6: Actualizar fechas especiales
-        # EXPLICACIÓN: Se actualizan las fechas según lo ingresado en el formulario
-        # o automáticamente según el estado seleccionado
+        # Paso 6: Actualizar fechas especiales (SOLO SI EL USUARIO LAS PROPORCIONA)
+        # EXPLICACIÓN: Las fechas de envío y recepción son EXCLUSIVAMENTE MANUALES.
+        # No hay detección automática basada en estados. El usuario debe ingresar
+        # explícitamente las fechas en el formulario cuando ocurran estos eventos.
+        # 
+        # ¿Por qué exclusivamente manual?
+        # - Mayor control y precisión sobre las fechas reales de los eventos
+        # - Evita registros automáticos incorrectos por cambios de estado
+        # - El usuario ingresa la fecha exacta cuando ocurre el evento real
         
         # Si el usuario proporcionó una fecha de envío, usarla
         if fecha_envio:
             orden.fecha_envio_rhitso = fecha_envio
-        # Si no, detectar automáticamente si es un estado de envío
-        elif 'ENVIADO' in nuevo_estado.upper() or 'ACEPTA ENVIO' in nuevo_estado.upper():
-            if not orden.fecha_envio_rhitso:  # Solo si no tiene fecha previa
-                orden.fecha_envio_rhitso = timezone.now()
         
         # Si el usuario proporcionó una fecha de recepción, usarla
         if fecha_recepcion:
             orden.fecha_recepcion_rhitso = fecha_recepcion
-        # Si no, detectar automáticamente si es un estado de retorno
-        elif 'RETORNADO' in nuevo_estado.upper() or 'EQUIPO RETORNADO' in nuevo_estado.upper():
-            if not orden.fecha_recepcion_rhitso:  # Solo si no tiene fecha previa
-                orden.fecha_recepcion_rhitso = timezone.now()
         
         # Paso 7: Guardar cambios en la base de datos
         orden.save()

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load rhitso_filters %}
 
 {% block title %}Dashboard RHITSO - {{ block.super }}{% endblock %}
 
@@ -287,7 +288,9 @@
 
                                     <!-- Estado RHITSO -->
                                     <td data-estado="{{ orden.estado_rhitso_display }}">
-                                        <span class="badge bg-primary">{{ orden.estado_rhitso_display }}</span>
+                                        <span class="badge" style="background-color: {{ orden.estado_rhitso_display|color_estado_especifico }}; color: {{ orden.estado_rhitso_display|color_estado_especifico|text_color_for_bg }};">
+                                            {{ orden.estado_rhitso_display }}
+                                        </span>
                                         {% if orden.owner_actual %}
                                             <br><small class="text-muted"><i class="bi bi-person"></i> {{ orden.owner_actual }}</small>
                                         {% endif %}
@@ -430,7 +433,9 @@
                                     <td>{{ orden.sucursal }}</td>
                                     <td><span class="badge bg-secondary">{{ orden.estado_orden }}</span></td>
                                     <td data-estado="{{ orden.estado_rhitso_display }}">
-                                        <span class="badge bg-warning">{{ orden.estado_rhitso_display }}</span>
+                                        <span class="badge" style="background-color: {{ orden.estado_rhitso_display|color_estado_especifico }}; color: {{ orden.estado_rhitso_display|color_estado_especifico|text_color_for_bg }};">
+                                            {{ orden.estado_rhitso_display }}
+                                        </span>
                                         {% if orden.owner_actual %}
                                             <br><small class="text-muted"><i class="bi bi-person"></i> {{ orden.owner_actual }}</small>
                                         {% endif %}
@@ -559,7 +564,9 @@
                                     <td>{{ orden.sucursal }}</td>
                                     <td><span class="badge bg-secondary">{{ orden.estado_orden }}</span></td>
                                     <td data-estado="{{ orden.estado_rhitso_display }}">
-                                        <span class="badge bg-dark">{{ orden.estado_rhitso_display }}</span>
+                                        <span class="badge" style="background-color: {{ orden.estado_rhitso_display|color_estado_especifico }}; color: {{ orden.estado_rhitso_display|color_estado_especifico|text_color_for_bg }};">
+                                            {{ orden.estado_rhitso_display }}
+                                        </span>
                                         {% if orden.owner_actual %}
                                             <br><small class="text-muted"><i class="bi bi-person"></i> {{ orden.owner_actual }}</small>
                                         {% endif %}

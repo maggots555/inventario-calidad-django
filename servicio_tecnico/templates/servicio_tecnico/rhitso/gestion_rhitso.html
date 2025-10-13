@@ -309,7 +309,12 @@
                                         {% endif %}
                                     </div>
                                     
-                                    <!-- Campos de Fechas RHITSO -->
+                                    <!-- Campos de Fechas RHITSO (EXCLUSIVAMENTE MANUALES) -->
+                                    <div class="alert alert-info border-start border-info border-4 mb-3">
+                                        <i class="bi bi-info-circle"></i>
+                                        <strong>Importante:</strong> Las fechas de envío y recepción son <strong>exclusivamente manuales</strong>. 
+                                        Ingresa la fecha exacta cuando ocurra el evento real. No se registran automáticamente al cambiar el estado.
+                                    </div>
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
                                             {{ form_estado.fecha_envio_rhitso.label_tag }}
@@ -320,6 +325,10 @@
                                             {% if orden.fecha_envio_rhitso %}
                                                 <small class="text-success d-block mt-1">
                                                     <i class="bi bi-check-circle"></i> Registrada: {{ orden.fecha_envio_rhitso|date:"d/m/Y H:i" }}
+                                                </small>
+                                            {% else %}
+                                                <small class="text-muted d-block mt-1">
+                                                    <i class="bi bi-clock-history"></i> Aún no registrada - Ingrésala manualmente cuando envíes el equipo
                                                 </small>
                                             {% endif %}
                                         </div>
@@ -332,6 +341,10 @@
                                             {% if orden.fecha_recepcion_rhitso %}
                                                 <small class="text-success d-block mt-1">
                                                     <i class="bi bi-check-circle"></i> Registrada: {{ orden.fecha_recepcion_rhitso|date:"d/m/Y H:i" }}
+                                                </small>
+                                            {% else %}
+                                                <small class="text-muted d-block mt-1">
+                                                    <i class="bi bi-clock-history"></i> Aún no registrada - Ingrésala manualmente cuando regrese el equipo
                                                 </small>
                                             {% endif %}
                                         </div>

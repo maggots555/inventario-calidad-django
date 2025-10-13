@@ -616,22 +616,34 @@ class ConfiguracionAdicionalForm(forms.ModelForm):
                 'rows': 4,
                 'placeholder': 'Diagnóstico técnico detallado del equipo...',
             }),
-            'fecha_inicio_diagnostico': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date',
-            }),
-            'fecha_fin_diagnostico': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date',
-            }),
-            'fecha_inicio_reparacion': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date',
-            }),
-            'fecha_fin_reparacion': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date',
-            }),
+            'fecha_inicio_diagnostico': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={
+                    'class': 'form-control',
+                    'type': 'date',
+                }
+            ),
+            'fecha_fin_diagnostico': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={
+                    'class': 'form-control',
+                    'type': 'date',
+                }
+            ),
+            'fecha_inicio_reparacion': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={
+                    'class': 'form-control',
+                    'type': 'date',
+                }
+            ),
+            'fecha_fin_reparacion': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={
+                    'class': 'form-control',
+                    'type': 'date',
+                }
+            ),
         }
         
         labels = {
@@ -2134,8 +2146,8 @@ class ActualizarEstadoRHITSOForm(forms.Form):
     )
     
     fecha_envio_rhitso = forms.DateTimeField(
-        label="Fecha de Envío a RHITSO",
-        help_text="Fecha y hora en que el equipo fue enviado a RHITSO",
+        label="Fecha de Envío a RHITSO (Manual)",
+        help_text="⚠️ Ingresa manualmente la fecha y hora exacta cuando el equipo sea enviado físicamente a RHITSO. NO se registra automáticamente.",
         required=False,
         widget=forms.DateTimeInput(attrs={
             'class': 'form-control',
@@ -2145,8 +2157,8 @@ class ActualizarEstadoRHITSOForm(forms.Form):
     )
     
     fecha_recepcion_rhitso = forms.DateTimeField(
-        label="Fecha de Retorno a SIC",
-        help_text="Fecha y hora en que el equipo regresó de RHITSO a SIC",
+        label="Fecha de Retorno a SIC (Manual)",
+        help_text="⚠️ Ingresa manualmente la fecha y hora exacta cuando el equipo regrese de RHITSO a SIC. NO se registra automáticamente.",
         required=False,
         widget=forms.DateTimeInput(attrs={
             'class': 'form-control',

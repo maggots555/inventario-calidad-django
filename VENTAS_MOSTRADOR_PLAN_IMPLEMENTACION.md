@@ -1278,13 +1278,13 @@ def estadisticas_ventas_mostrador():
 
 ---
 
-### FASE 5: Pruebas (2 horas) - PENDIENTE
-- [ ] Agregar sección de Venta Mostrador en `detalle_orden.html`
-- [ ] Crear modal de venta mostrador
-- [ ] Crear modal de piezas
-- [ ] Agregar JavaScript AJAX
-- [ ] Agregar alerta de conversión
-- [ ] Actualizar badges de estado
+### FASE 5: Pruebas (2 horas) - COMPLETADO
+- [x] Agregar sección de Venta Mostrador en `detalle_orden.html`
+- [x] Crear modal de venta mostrador
+- [x] Crear modal de piezas
+- [x] Agregar JavaScript AJAX
+- [x] Agregar alerta de conversión
+- [x] Actualizar badges de estado
 
 ### FASE 5: Pruebas (2 horas) - PENDIENTE
 - [ ] Crear orden de venta mostrador básica
