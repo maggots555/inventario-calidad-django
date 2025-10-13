@@ -151,7 +151,7 @@ PALETA_COLORES_RHITSO = {
     'verde-claro': '#90EE90',         # Light Green
     'magenta': '#FF00FF',             # Magenta / Fuchsia
     'marron-claro': '#D2B48C',        # Tan / Light Brown
-    'azul-marino': '#000080',         # Navy Blue
+    'azul-marino': "#0C0C68",         # Navy Blue
     'coral': '#FF7F50',               # Coral
     'gris': '#808080',                # Gray
 }

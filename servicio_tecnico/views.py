@@ -4695,15 +4695,17 @@ def dashboard_rhitso(request):
         # 4.2: CALCULAR DÍAS HÁBILES
         # ===================================================================
         
-        # Días hábiles en SIC (desde ingreso hasta hoy o hasta envío a RHITSO)
-        if orden.fecha_envio_rhitso:
-            # Si ya se envió a RHITSO, contar hasta esa fecha
+        # Días hábiles en SIC (tiempo total del proceso desde ingreso hasta completar)
+        # EXPLICACIÓN: Este cálculo representa el tiempo TOTAL de la orden, incluyendo
+        # todo el ciclo: diagnóstico SIC + envío a RHITSO + recepción de RHITSO
+        if orden.fecha_recepcion_rhitso:
+            # Si ya regresó de RHITSO, contar desde ingreso hasta recepción (proceso completado)
             dias_habiles_sic = calcular_dias_habiles(
                 orden.fecha_ingreso,
-                orden.fecha_envio_rhitso
+                orden.fecha_recepcion_rhitso
             )
         else:
-            # Si no se ha enviado, contar hasta hoy
+            # Si no ha regresado (o nunca se envió), contar hasta hoy
             dias_habiles_sic = calcular_dias_habiles(orden.fecha_ingreso)
         
         # Días hábiles en RHITSO (si aplica)
@@ -4981,9 +4983,9 @@ def exportar_excel_rhitso(request):
         except EstadoRHITSO.DoesNotExist:
             owner_actual = ''
         
-        # Calcular días hábiles en SIC
-        if orden.fecha_envio_rhitso:
-            dias_habiles_sic = calcular_dias_habiles(orden.fecha_ingreso, orden.fecha_envio_rhitso)
+        # Calcular días hábiles en SIC (tiempo total del proceso)
+        if orden.fecha_recepcion_rhitso:
+            dias_habiles_sic = calcular_dias_habiles(orden.fecha_ingreso, orden.fecha_recepcion_rhitso)
         else:
             dias_habiles_sic = calcular_dias_habiles(orden.fecha_ingreso)
         
