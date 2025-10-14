@@ -1540,3 +1540,96 @@ form:has(#btnSubirImagenes:disabled) textarea {
     }
 }
 
+/* =============================================================================
+   ESTILOS PARA SELECCIÓN DE PIEZAS EN MODAL DE SEGUIMIENTO
+   Descripción: Mejora la visualización y selección de checkboxes de piezas
+   ============================================================================= */
+
+/* Contenedor de checkboxes de piezas */
+#listaPiezasDisponibles .form-check {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+/* Hover sobre la tarjeta de pieza */
+#listaPiezasDisponibles .form-check:hover {
+    background-color: #f0f8ff !important;
+    border-color: #17a2b8 !important;
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Efecto cuando está seleccionada */
+#listaPiezasDisponibles .form-check:has(input:checked) {
+    background-color: #d1ecf1 !important;
+    border-color: #17a2b8 !important;
+    border-width: 2px !important;
+}
+
+/* Estilo del checkbox */
+#listaPiezasDisponibles .form-check-input {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-top: 0.25rem;
+    cursor: pointer;
+    border: 2px solid #6c757d;
+    transition: all 0.2s ease;
+}
+
+/* Checkbox cuando está hover */
+#listaPiezasDisponibles .form-check-input:hover {
+    border-color: #17a2b8;
+    box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.15);
+}
+
+/* Checkbox cuando está seleccionado */
+#listaPiezasDisponibles .form-check-input:checked {
+    background-color: #17a2b8;
+    border-color: #17a2b8;
+}
+
+/* Label interactivo */
+#listaPiezasDisponibles .form-check-label {
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Animación suave al seleccionar */
+#listaPiezasDisponibles .form-check-input:checked + .form-check-label {
+    animation: checkAnimation 0.3s ease;
+}
+
+@keyframes checkAnimation {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Badge de precio */
+#listaPiezasDisponibles .badge {
+    transition: all 0.3s ease;
+}
+
+#listaPiezasDisponibles .form-check:has(input:checked) .badge {
+    background-color: #0c7a89 !important;
+    transform: scale(1.1);
+}
+
+/* Responsive para móviles */
+@media (max-width: 768px) {
+    #listaPiezasDisponibles .col-md-6 {
+        width: 100%;
+    }
+    
+    #listaPiezasDisponibles .form-check {
+        margin-bottom: 0.5rem;
+    }
+}
+

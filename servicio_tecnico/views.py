@@ -947,8 +947,8 @@ def detalle_orden(request, orden_id):
                 
                 try:
                     for imagen_file in imagenes_files:
-                        # Validar tamaño (6MB = 6 * 1024 * 1024 bytes)
-                        if imagen_file.size > 6 * 1024 * 1024:
+                        # Validar tamaño (7MB = 7 * 1024 * 1024 bytes)
+                        if imagen_file.size > 7 * 1024 * 1024:
                             imagenes_omitidas.append(imagen_file.name)
                             continue
                         
@@ -1152,14 +1152,6 @@ def detalle_orden(request, orden_id):
                 # NUEVO: Obtener las piezas seleccionadas desde el POST
                 piezas_seleccionadas_ids = request.POST.getlist('piezas_seleccionadas')
                 
-                # VALIDACIÓN: Si acepta, debe tener al menos una pieza seleccionada
-                if accion == 'aceptar' and not piezas_seleccionadas_ids:
-                    messages.error(
-                        request,
-                        '❌ Debes seleccionar al menos una pieza para aceptar la cotización.'
-                    )
-                    return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
-                
                 # Guardar la cotización
                 cotizacion_actualizada = form_gestionar_cotizacion.save()
                 
@@ -1170,15 +1162,17 @@ def detalle_orden(request, orden_id):
                 
                 if accion == 'aceptar':
                     # Si acepta, actualizar cada pieza según si fue seleccionada
-                    for pieza in todas_las_piezas:
-                        if str(pieza.id) in piezas_seleccionadas_ids:
-                            pieza.aceptada_por_cliente = True
-                            piezas_aceptadas_count += 1
-                        else:
-                            pieza.aceptada_por_cliente = False
-                            pieza.motivo_rechazo_pieza = 'Cliente decidió no incluir esta pieza'
-                            piezas_rechazadas_count += 1
-                        pieza.save()
+                    # NOTA: Solo procesar piezas si existen en la cotización
+                    if todas_las_piezas.exists():
+                        for pieza in todas_las_piezas:
+                            if str(pieza.id) in piezas_seleccionadas_ids:
+                                pieza.aceptada_por_cliente = True
+                                piezas_aceptadas_count += 1
+                            else:
+                                pieza.aceptada_por_cliente = False
+                                pieza.motivo_rechazo_pieza = 'Cliente decidió no incluir esta pieza'
+                                piezas_rechazadas_count += 1
+                            pieza.save()
                 elif accion == 'rechazar':
                     # Si rechaza toda la cotización, todas las piezas se rechazan
                     for pieza in todas_las_piezas:
@@ -1189,21 +1183,26 @@ def detalle_orden(request, orden_id):
                 
                 # Mensaje según la decisión
                 if accion == 'aceptar':
-                    mensaje_piezas = f'{piezas_aceptadas_count} pieza(s) aceptada(s)'
-                    if piezas_rechazadas_count > 0:
-                        mensaje_piezas += f' y {piezas_rechazadas_count} pieza(s) rechazada(s)'
+                    # Construir mensaje según si hay piezas o solo mano de obra
+                    if todas_las_piezas.exists():
+                        mensaje_piezas = f'{piezas_aceptadas_count} pieza(s) aceptada(s)'
+                        if piezas_rechazadas_count > 0:
+                            mensaje_piezas += f' y {piezas_rechazadas_count} pieza(s) rechazada(s)'
+                        mensaje_completo = f'✅ Cotización ACEPTADA por el cliente ({mensaje_piezas}). Continúa con la reparación.'
+                    else:
+                        # Solo hay mano de obra
+                        mensaje_completo = f'✅ Cotización ACEPTADA por el cliente (Solo mano de obra: ${cotizacion_actualizada.costo_mano_obra}). Continúa con la reparación.'
                     
-                    messages.success(
-                        request,
-                        f'✅ Cotización ACEPTADA por el cliente ({mensaje_piezas}). Continúa con la reparación.'
-                    )
+                    messages.success(request, mensaje_completo)
                     
                     # Cambiar estado a "Esperando Piezas" o "En Reparación" según el caso
-                    # Si hay piezas pendientes de llegar, estado = esperando_piezas
-                    # Si todas las piezas están, estado = reparacion
-                    tiene_seguimientos_pendientes = orden.cotizacion.seguimientos_piezas.exclude(
-                        estado='recibido'
-                    ).exists()
+                    # Si hay piezas aceptadas pendientes de llegar, estado = esperando_piezas
+                    # Si NO hay piezas o todas están recibidas, estado = reparacion
+                    tiene_seguimientos_pendientes = False
+                    if piezas_aceptadas_count > 0:
+                        tiene_seguimientos_pendientes = orden.cotizacion.seguimientos_piezas.exclude(
+                            estado='recibido'
+                        ).exists()
                     
                     if tiene_seguimientos_pendientes:
                         nuevo_estado = 'esperando_piezas'
@@ -1232,8 +1231,12 @@ def detalle_orden(request, orden_id):
                             es_sistema=True
                         )
                     
-                    # Registrar en historial con detalle de piezas
-                    comentario_historial = f'Cliente ACEPTÓ la cotización - {mensaje_piezas} - Total: ${cotizacion_actualizada.costo_piezas_aceptadas + cotizacion_actualizada.costo_mano_obra}'
+                    # Registrar en historial con detalle
+                    if todas_las_piezas.exists():
+                        comentario_historial = f'Cliente ACEPTÓ la cotización - {piezas_aceptadas_count} pieza(s) aceptada(s) - Total: ${cotizacion_actualizada.costo_piezas_aceptadas + cotizacion_actualizada.costo_mano_obra}'
+                    else:
+                        comentario_historial = f'Cliente ACEPTÓ la cotización - Solo mano de obra - Total: ${cotizacion_actualizada.costo_mano_obra}'
+                    
                     HistorialOrden.objects.create(
                         orden=orden,
                         tipo_evento='cotizacion',

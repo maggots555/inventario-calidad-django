@@ -5,7 +5,7 @@
 {% block title %}Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=4.4">
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=4.5">
 <link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}?v=1.0">
 {% endblock %}
 
@@ -1726,7 +1726,7 @@
                                            accept="image/jpeg,image/jpg,image/png,image/gif"
                                            multiple>
                                     <small class="text-muted d-block">
-                                        <i class="bi bi-info-circle"></i> Máximo 6MB por imagen. Formatos: JPG, PNG, GIF
+                                        <i class="bi bi-info-circle"></i> Máximo 7MB por imagen. Formatos: JPG, PNG, GIF
                                     </small>
                                 </div>
                                 
@@ -2188,16 +2188,53 @@
                             <i class="bi bi-tools"></i> Piezas a Rastrear
                             <small class="text-muted">(opcional)</small>
                         </h6>
-                        <p class="small text-muted mb-2">
+                        <p class="small text-muted mb-3">
                             <i class="bi bi-info-circle"></i> 
                             Selecciona las piezas específicas que se están pidiendo en este pedido.
                             Solo aparecen las piezas que el cliente aceptó.
                         </p>
-                        <div id="listaPiezasDisponibles">
-                            {{ form_seguimiento.piezas }}
+                        
+                        <!-- Renderizado manual de checkboxes con Bootstrap -->
+                        <div id="listaPiezasDisponibles" class="row g-2">
+                            {% if form_seguimiento.piezas.field.queryset %}
+                                {% for pieza in form_seguimiento.piezas.field.queryset %}
+                                <div class="col-md-6">
+                                    <div class="form-check p-3 border rounded" style="background-color: white;">
+                                        <input class="form-check-input pieza-checkbox" 
+                                               type="checkbox" 
+                                               name="piezas" 
+                                               value="{{ pieza.id }}" 
+                                               id="pieza_{{ pieza.id }}"
+                                               {% if pieza in form_seguimiento.piezas.value %}checked{% endif %}>
+                                        <label class="form-check-label w-100" for="pieza_{{ pieza.id }}" style="cursor: pointer;">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <strong>{{ pieza.componente.nombre }}</strong>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        Cantidad: {{ pieza.cantidad }} × ${{ pieza.costo_unitario|floatformat:2 }}
+                                                    </small>
+                                                </div>
+                                                <div class="text-end">
+                                                    <span class="badge bg-info">${{ pieza.costo_total|floatformat:2 }}</span>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="col-12">
+                                    <div class="alert alert-warning mb-0">
+                                        <i class="bi bi-exclamation-triangle"></i> 
+                                        No hay piezas disponibles para rastrear. Asegúrate de que la cotización tenga piezas aceptadas.
+                                    </div>
+                                </div>
+                            {% endif %}
                         </div>
-                        <small class="form-text text-muted d-block mt-2">
-                            Puedes seleccionar múltiples piezas si el pedido incluye varias
+                        
+                        <small class="form-text text-muted d-block mt-3">
+                            <i class="bi bi-hand-index"></i> Haz clic en cualquier parte de la tarjeta para seleccionar/deseleccionar
                         </small>
                     </div>
                     
@@ -2772,7 +2809,7 @@ formSubirImagenes.addEventListener('submit', function(e) {
                     
                     // Agregar advertencias si hay imágenes omitidas
                     if (data.imagenes_omitidas && data.imagenes_omitidas.length > 0) {
-                        mensajeDetalle += `<br><small class="text-warning">⚠️ ${data.imagenes_omitidas.length} imagen(es) omitida(s) por exceder 6MB</small>`;
+                        mensajeDetalle += `<br><small class="text-warning">⚠️ ${data.imagenes_omitidas.length} imagen(es) omitida(s) por exceder 7MB</small>`;
                     }
                     
                     // Agregar errores si los hay
@@ -3477,28 +3514,37 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Si acepta, validar que haya al menos una pieza seleccionada
+        // Si acepta, procesar piezas seleccionadas (si existen)
         if (accionSeleccionada.value === 'aceptar') {
             const piezasSeleccionadas = Array.from(checkboxesPiezas).filter(cb => cb.checked);
             
-            if (piezasSeleccionadas.length === 0) {
-                e.preventDefault();
-                alert('❌ Debes seleccionar al menos una pieza para aceptar la cotización.');
-                return;
+            // NUEVO: Ya no se requiere que haya piezas seleccionadas
+            // Se permite aceptar cotizaciones con solo mano de obra
+            
+            // CRÍTICO: Copiar los checkboxes al formulario antes de enviar (solo si hay piezas)
+            // Los checkboxes están fuera del form, así que debemos clonarlos
+            if (piezasSeleccionadas.length > 0) {
+                piezasSeleccionadas.forEach(checkbox => {
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'piezas_seleccionadas';
+                    hiddenInput.value = checkbox.value;
+                    formGestionar.appendChild(hiddenInput);
+                });
             }
             
-            // CRÍTICO: Copiar los checkboxes al formulario antes de enviar
-            // Los checkboxes están fuera del form, así que debemos clonarlos
-            piezasSeleccionadas.forEach(checkbox => {
-                const hiddenInput = document.createElement('input');
-                hiddenInput.type = 'hidden';
-                hiddenInput.name = 'piezas_seleccionadas';
-                hiddenInput.value = checkbox.value;
-                formGestionar.appendChild(hiddenInput);
-            });
+            // Confirmación con resumen adaptado
+            let mensaje;
+            if (piezasSeleccionadas.length > 0) {
+                mensaje = `¿Confirmar aceptación de ${piezasSeleccionadas.length} pieza(s)?`;
+            } else if (checkboxesPiezas.length > 0) {
+                // Hay piezas disponibles pero no seleccionó ninguna
+                mensaje = '¿Confirmar aceptación de la cotización SIN piezas (solo mano de obra)?';
+            } else {
+                // No hay piezas en la cotización
+                mensaje = '¿Confirmar aceptación de la cotización (solo mano de obra)?';
+            }
             
-            // Confirmación con resumen
-            const mensaje = `¿Confirmar aceptación de ${piezasSeleccionadas.length} pieza(s)?`;
             if (!confirm(mensaje)) {
                 e.preventDefault();
                 return;
