@@ -65,22 +65,32 @@ python manage.py runserver
 ## Estructura del Proyecto
 
 ```
-inventario_calidad/
+mi_proyecto_django/
 ├── config/                 # Configuración del proyecto Django
 │   ├── settings.py
 │   ├── urls.py
+│   ├── constants.py       # Constantes del sistema
 │   └── wsgi.py
-├── inventario/            # App principal
-│   ├── models.py          # Modelo Producto
-│   ├── views.py           # Vistas del CRUD
-│   ├── forms.py           # Formularios
-│   ├── urls.py            # URLs de la app
-│   └── templates/         # Templates de la app
+├── inventario/            # App de gestión de inventario
+├── servicio_tecnico/      # App de servicio técnico
+├── scorecard/             # App de control de calidad
+├── venta_mostrador/       # App de ventas mostrador
 ├── templates/             # Templates base
-│   └── base.html
+├── static/                # Archivos estáticos
+├── media/                 # Archivos subidos por usuarios
+├── docs/                  # 📚 Documentación completa del proyecto
+│   ├── README.md          # Índice de documentación
+│   ├── implementaciones/  # Docs por módulo (RHITSO, Scorecard, etc.)
+│   └── guias/             # Guías de setup y referencias
+├── scripts/               # 🔧 Scripts de utilidades
+│   ├── poblado/           # Scripts para datos iniciales
+│   ├── verificacion/      # Scripts de validación
+│   └── testing/           # Scripts de pruebas
 ├── manage.py
 └── requirements.txt
 ```
+
+> **📖 Documentación Completa**: Ver [`docs/README.md`](./docs/README.md) para acceso a toda la documentación técnica, guías de implementación y scripts de utilidades.
 
 ## Tecnologías
 
