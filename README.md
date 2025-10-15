@@ -1,8 +1,73 @@
 # 🏥 Sistema Integrado de Gestión Técnica y Control de Calidad
 
+<!-- Badges -->
+<p align="center">
+  <img src="https://img.shields.io/badge/Django-5.2.5-092E20?style=for-the-badge&logo=django&logoColor=white" alt="Django 5.2.5">
+  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/Bootstrap-5.3.2-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white" alt="Bootstrap 5.3.2">
+  <img src="https://img.shields.io/badge/Chart.js-4.4.0-FF6384?style=for-the-badge&logo=chartdotjs&logoColor=white" alt="Chart.js">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Production-success?style=for-the-badge" alt="Status">
+  <img src="https://img.shields.io/badge/Version-2.0-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/Modules-4-orange?style=for-the-badge" alt="Modules">
+</p>
+
+---
+
 **Sistema empresarial completo** para centros de servicio técnico de equipos de cómputo, desarrollado en Django 5.2.5.
 
 Combina gestión de órdenes de servicio, control de calidad, seguimiento de incidencias, análisis de rendimiento técnico y sistema RHITSO para casos complejos.
+
+---
+
+## 📸 Capturas de Pantalla
+
+### Dashboard Principal - Score Card
+<p align="center">
+  <img src="docs/screenshots/dashboard_scorecard.png" alt="Dashboard Score Card" width="800">
+  <br>
+  <em>Dashboard interactivo con métricas en tiempo real, gráficas de tendencias y KPIs principales</em>
+</p>
+
+### Gestión de Órdenes de Servicio
+<p align="center">
+  <img src="docs/screenshots/lista_ordenes.png" alt="Lista de Órdenes" width="800">
+  <br>
+  <em>Sistema de gestión de órdenes con 21 estados de seguimiento y filtros avanzados</em>
+</p>
+
+### Detalle de Orden con RHITSO
+<p align="center">
+  <img src="docs/screenshots/detalle_orden_rhitso.png" alt="Detalle Orden RHITSO" width="800">
+  <br>
+  <em>Vista detallada con seguimiento RHITSO, timeline de eventos e incidencias</em>
+</p>
+
+### Registro de Incidencias de Calidad
+<p align="center">
+  <img src="docs/screenshots/form_incidencia.png" alt="Formulario Incidencia" width="800">
+  <br>
+  <em>Formulario inteligente con autocompletado, detección de reincidencias y drag & drop de imágenes</em>
+</p>
+
+### Reportes Avanzados con 7 Tabs
+<p align="center">
+  <img src="docs/screenshots/reportes_avanzados.png" alt="Reportes Avanzados" width="800">
+  <br>
+  <em>Sistema de reportes con Pareto, heatmaps, análisis de atribuibilidad y exportación Excel</em>
+</p>
+
+### Sistema de Notificaciones
+<p align="center">
+  <img src="docs/screenshots/notificaciones.png" alt="Sistema de Notificaciones" width="800">
+  <br>
+  <em>Historial de notificaciones enviadas con seguimiento de éxito/fallo</em>
+</p>
+
+> **Nota**: Las capturas de pantalla se encuentran en la carpeta [`docs/screenshots/`](./docs/screenshots/). Si no las ves, significa que aún no se han agregado al repositorio.
 
 ---
 
