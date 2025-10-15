@@ -235,9 +235,39 @@
     color: #3730a3; 
 }
 
+/* NUEVO - Oct 2025 */
+.badge-equipo_diagnosticado { 
+    background-color: #dbeafe; 
+    color: #1e40af; 
+}
+
+/* NUEVO - Oct 2025 */
+.badge-diagnostico_enviado_cliente { 
+    background-color: #bfdbfe; 
+    color: #1e3a8a; 
+}
+
+/* NUEVO - Oct 2025 */
+.badge-cotizacion_enviada_proveedor { 
+    background-color: #fed7aa; 
+    color: #92400e; 
+}
+
+/* NUEVO - Oct 2025 */
+.badge-cotizacion_recibida_proveedor { 
+    background-color: #dbeafe; 
+    color: #1e40af; 
+}
+
 .badge-cotizacion { 
     background-color: #fce7f3; 
     color: #831843; 
+}
+
+/* NUEVO - Oct 2025 */
+.badge-cliente_acepta_cotizacion { 
+    background-color: #d1fae5; 
+    color: #065f46; 
 }
 
 .badge-rechazada { 
@@ -245,9 +275,39 @@
     color: #991b1b; 
 }
 
+/* NUEVO - Oct 2025 */
+.badge-partes_solicitadas_proveedor { 
+    background-color: #fed7aa; 
+    color: #92400e; 
+}
+
 .badge-esperando_piezas { 
     background-color: #fed7aa; 
     color: #92400e; 
+}
+
+/* NUEVO - Oct 2025 */
+.badge-piezas_recibidas { 
+    background-color: #d1fae5; 
+    color: #065f46; 
+}
+
+/* NUEVO - Oct 2025 */
+.badge-wpb_pieza_incorrecta { 
+    background-color: #fef3c7; 
+    color: #92400e; 
+}
+
+/* NUEVO - Oct 2025 */
+.badge-doa_pieza_danada { 
+    background-color: #fee2e2; 
+    color: #991b1b; 
+}
+
+/* NUEVO - Oct 2025 */
+.badge-pnc_parte_no_disponible { 
+    background-color: #e5e7eb; 
+    color: #4b5563; 
 }
 
 .badge-reparacion { 

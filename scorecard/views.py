@@ -523,76 +523,344 @@ def api_datos_dashboard(request):
 @login_required
 def api_exportar_excel(request):
     """
-    API para exportar incidencias a Excel
+    API para exportar incidencias a Excel con múltiples hojas de análisis
+    
+    Estructura del Excel:
+    - Hoja 1: Resumen General (KPIs y métricas principales)
+    - Hoja 2: Análisis por Centro de Servicio
+    - Hoja 3: Análisis Temporal (Quarter, Mes, Semana)
+    - Hoja 4: Consolidado de Empleados
+    - Hoja 5+: Hoja individual por cada empleado con incidencias
+    
     Requiere: openpyxl instalado (pip install openpyxl)
     """
     try:
         from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
         from openpyxl.utils import get_column_letter
-    except ImportError:
+        from .excel_exporters import (
+            get_header_style, get_title_style, get_kpi_title_style, get_kpi_value_style,
+            get_severidad_color, apply_cell_style, auto_adjust_column_width,
+            calcular_metricas_generales, calcular_tendencia_mensual,
+            calcular_distribucion_severidad, calcular_estadisticas_por_sucursal,
+            calcular_analisis_temporal, calcular_estadisticas_por_empleado
+        )
+    except ImportError as e:
         return JsonResponse({
             'success': False,
-            'error': 'Librería openpyxl no instalada. Ejecuta: pip install openpyxl'
+            'error': f'Error al importar librerías: {str(e)}'
         })
     
-    # Crear workbook
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Incidencias"
-    
-    # Encabezados
-    headers = [
-        'Folio', 'Fecha Detección', 'Tipo Equipo', 'Marca', 'Modelo',
-        'No. Serie', 'Sucursal', 'Técnico', 'Inspector', 'Categoría',
-        'Severidad', 'Estado', 'Componente', 'Descripción', 'Días Abierta'
-    ]
-    
-    # Estilo de encabezados
-    header_fill = PatternFill(start_color="0d6efd", end_color="0d6efd", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF")
-    
-    for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_num)
-        cell.value = header
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-    
-    # Obtener incidencias
+    # Obtener todas las incidencias
     incidencias = Incidencia.objects.all().select_related(
         'sucursal', 'tecnico_responsable', 'inspector_calidad',
         'tipo_incidencia', 'componente_afectado'
     ).order_by('-fecha_deteccion')
     
-    # Escribir datos
-    for row_num, inc in enumerate(incidencias, 2):
-        ws.cell(row=row_num, column=1).value = inc.folio
-        ws.cell(row=row_num, column=2).value = inc.fecha_deteccion.strftime('%d/%m/%Y')
-        ws.cell(row=row_num, column=3).value = inc.get_tipo_equipo_display()
-        ws.cell(row=row_num, column=4).value = inc.marca
-        ws.cell(row=row_num, column=5).value = inc.modelo
-        ws.cell(row=row_num, column=6).value = inc.numero_serie
-        ws.cell(row=row_num, column=7).value = inc.sucursal.nombre if inc.sucursal else ''
-        ws.cell(row=row_num, column=8).value = inc.tecnico_responsable.nombre_completo if inc.tecnico_responsable else ''
-        ws.cell(row=row_num, column=9).value = inc.inspector_calidad.nombre_completo if inc.inspector_calidad else ''
-        ws.cell(row=row_num, column=10).value = inc.tipo_incidencia.nombre if inc.tipo_incidencia else ''
-        ws.cell(row=row_num, column=11).value = inc.get_grado_severidad_display()
-        ws.cell(row=row_num, column=12).value = inc.get_estado_display()
-        ws.cell(row=row_num, column=13).value = inc.componente_afectado.nombre if inc.componente_afectado else ''
-        ws.cell(row=row_num, column=14).value = inc.descripcion_incidencia[:100]  # Truncar para Excel
-        ws.cell(row=row_num, column=15).value = inc.dias_abierta
+    # Crear workbook
+    wb = Workbook()
+    wb.remove(wb.active)  # Eliminar hoja predeterminada
     
-    # Ajustar anchos de columna
-    for col_num in range(1, len(headers) + 1):
-        column_letter = get_column_letter(col_num)
-        ws.column_dimensions[column_letter].width = 15
+    # ==========================================
+    # HOJA 1: RESUMEN GENERAL
+    # ==========================================
+    ws1 = wb.create_sheet("Resumen General")
     
-    # Crear respuesta HTTP
+    # Título principal
+    ws1.merge_cells('A1:F1')
+    title_cell = ws1['A1']
+    title_cell.value = f"REPORTE GENERAL DE INCIDENCIAS - {datetime.now().strftime('%d/%m/%Y')}"
+    apply_cell_style(title_cell, get_title_style())
+    ws1.row_dimensions[1].height = 25
+    
+    # Calcular métricas generales
+    metricas = calcular_metricas_generales(incidencias)
+    
+    # KPIs Principales (fila 3)
+    row = 3
+    ws1.merge_cells(f'A{row}:F{row}')
+    kpi_section = ws1[f'A{row}']
+    kpi_section.value = "INDICADORES CLAVE (KPIs)"
+    apply_cell_style(kpi_section, get_kpi_title_style())
+    
+    # Mostrar KPIs en formato tabla
+    row += 2
+    kpis_data = [
+        ('Total de Incidencias', metricas['total_incidencias']),
+        ('Incidencias Abiertas', metricas['incidencias_abiertas']),
+        ('Incidencias Críticas', metricas['incidencias_criticas']),
+        ('Incidencias Cerradas', metricas['incidencias_cerradas']),
+        ('Reincidencias', metricas['reincidencias']),
+        ('% Reincidencias', f"{metricas['porcentaje_reincidencias']}%"),
+        ('% Cerradas', f"{metricas['porcentaje_cerradas']}%"),
+        ('Promedio Días Cierre', metricas['promedio_dias_cierre'])
+    ]
+    
+    for kpi_name, kpi_value in kpis_data:
+        ws1[f'A{row}'] = kpi_name
+        ws1[f'B{row}'] = kpi_value
+        apply_cell_style(ws1[f'A{row}'], get_kpi_title_style())
+        apply_cell_style(ws1[f'B{row}'], get_kpi_value_style())
+        row += 1
+    
+    # Tendencia Mensual (últimos 6 meses)
+    row += 2
+    ws1.merge_cells(f'A{row}:F{row}')
+    trend_section = ws1[f'A{row}']
+    trend_section.value = "TENDENCIA MENSUAL (Ultimos 6 meses)"
+    apply_cell_style(trend_section, get_kpi_title_style())
+    
+    row += 1
+    tendencia = calcular_tendencia_mensual(incidencias, meses=6)
+    ws1[f'A{row}'] = 'Mes'
+    ws1[f'B{row}'] = 'Cantidad'
+    apply_cell_style(ws1[f'A{row}'], get_header_style())
+    apply_cell_style(ws1[f'B{row}'], get_header_style())
+    
+    row += 1
+    for mes, cantidad in tendencia:
+        mes_formateado = datetime.strptime(mes, '%Y-%m').strftime('%b %Y')
+        ws1[f'A{row}'] = mes_formateado
+        ws1[f'B{row}'] = cantidad
+        row += 1
+    
+    # Distribución por Severidad
+    row += 2
+    ws1.merge_cells(f'D{row}:F{row}')
+    sev_section = ws1[f'D{row}']
+    sev_section.value = "DISTRIBUCION POR SEVERIDAD"
+    apply_cell_style(sev_section, get_kpi_title_style())
+    
+    row += 1
+    ws1[f'D{row}'] = 'Severidad'
+    ws1[f'E{row}'] = 'Cantidad'
+    ws1[f'F{row}'] = '% del Total'
+    apply_cell_style(ws1[f'D{row}'], get_header_style())
+    apply_cell_style(ws1[f'E{row}'], get_header_style())
+    apply_cell_style(ws1[f'F{row}'], get_header_style())
+    
+    row += 1
+    distribucion_sev = calcular_distribucion_severidad(incidencias)
+    severidad_nombres = {
+        'critico': 'Crítico',
+        'alto': 'Alto',
+        'medio': 'Medio',
+        'bajo': 'Bajo'
+    }
+    
+    for item in distribucion_sev:
+        sev_nombre = severidad_nombres.get(item['grado_severidad'], item['grado_severidad'])
+        ws1[f'D{row}'] = sev_nombre
+        ws1[f'E{row}'] = item['count']
+        porcentaje = round((item['count'] / metricas['total_incidencias'] * 100), 2) if metricas['total_incidencias'] > 0 else 0
+        ws1[f'F{row}'] = f"{porcentaje}%"
+        
+        # Aplicar color según severidad
+        color = get_severidad_color(item['grado_severidad'])
+        ws1[f'D{row}'].fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+        ws1[f'D{row}'].font = Font(bold=True, color="FFFFFF")
+        
+        row += 1
+    
+    auto_adjust_column_width(ws1)
+    
+    # ==========================================
+    # HOJA 2: ANÁLISIS POR CENTRO DE SERVICIO
+    # ==========================================
+    ws2 = wb.create_sheet("Por Centro de Servicio")
+    
+    # Título
+    ws2.merge_cells('A1:G1')
+    title_cell = ws2['A1']
+    title_cell.value = "ANÁLISIS POR CENTRO DE SERVICIO"
+    apply_cell_style(title_cell, get_title_style())
+    ws2.row_dimensions[1].height = 25
+    
+    # Encabezados
+    headers_sucursal = ['Sucursal', 'Total', 'Abiertas', 'Cerradas', 'Críticas', 'Reincidencias', '% del Total']
+    for col_num, header in enumerate(headers_sucursal, 1):
+        cell = ws2.cell(row=3, column=col_num)
+        cell.value = header
+        apply_cell_style(cell, get_header_style())
+    
+    # Datos por sucursal
+    sucursales_stats = calcular_estadisticas_por_sucursal(incidencias)
+    row = 4
+    for stats in sucursales_stats:
+        ws2.cell(row=row, column=1).value = stats['sucursal']
+        ws2.cell(row=row, column=2).value = stats['total']
+        ws2.cell(row=row, column=3).value = stats['abiertas']
+        ws2.cell(row=row, column=4).value = stats['cerradas']
+        ws2.cell(row=row, column=5).value = stats['criticas']
+        ws2.cell(row=row, column=6).value = stats['reincidencias']
+        ws2.cell(row=row, column=7).value = f"{stats['porcentaje_total']}%"
+        row += 1
+    
+    auto_adjust_column_width(ws2)
+    
+    # ==========================================
+    # HOJA 3: ANÁLISIS TEMPORAL
+    # ==========================================
+    ws3 = wb.create_sheet("Analisis Temporal")
+    
+    # Título
+    ws3.merge_cells('A1:F1')
+    title_cell = ws3['A1']
+    title_cell.value = "ANÁLISIS TEMPORAL - QUARTERS, MES Y SEMANA"
+    apply_cell_style(title_cell, get_title_style())
+    ws3.row_dimensions[1].height = 25
+    
+    # Calcular análisis temporal
+    analisis_temporal = calcular_analisis_temporal(incidencias)
+    
+    row = 3
+    # Quarter Actual
+    ws3[f'A{row}'] = f"📊 {analisis_temporal['quarter_actual']['numero']} - Quarter Actual"
+    apply_cell_style(ws3[f'A{row}'], get_kpi_title_style())
+    row += 1
+    ws3[f'A{row}'] = 'Total Incidencias'
+    ws3[f'B{row}'] = analisis_temporal['quarter_actual']['total']
+    row += 1
+    ws3[f'A{row}'] = 'Incidencias Críticas'
+    ws3[f'B{row}'] = analisis_temporal['quarter_actual']['criticas']
+    
+    # Último Mes
+    row += 3
+    ws3[f'A{row}'] = "📊 Último Mes"
+    apply_cell_style(ws3[f'A{row}'], get_kpi_title_style())
+    row += 1
+    ws3[f'A{row}'] = 'Total Incidencias'
+    ws3[f'B{row}'] = analisis_temporal['ultimo_mes']['total']
+    row += 1
+    ws3[f'A{row}'] = 'Incidencias Críticas'
+    ws3[f'B{row}'] = analisis_temporal['ultimo_mes']['criticas']
+    
+    # Última Semana
+    row += 3
+    ws3[f'A{row}'] = "📊 Última Semana (7 días)"
+    apply_cell_style(ws3[f'A{row}'], get_kpi_title_style())
+    row += 1
+    ws3[f'A{row}'] = 'Total Incidencias'
+    ws3[f'B{row}'] = analisis_temporal['ultima_semana']['total']
+    row += 1
+    ws3[f'A{row}'] = 'Incidencias Críticas'
+    ws3[f'B{row}'] = analisis_temporal['ultima_semana']['criticas']
+    
+    auto_adjust_column_width(ws3)
+    
+    # ==========================================
+    # HOJA 4: CONSOLIDADO DE EMPLEADOS
+    # ==========================================
+    ws4 = wb.create_sheet("Consolidado Empleados")
+    
+    # Título
+    ws4.merge_cells('A1:G1')
+    title_cell = ws4['A1']
+    title_cell.value = "ANÁLISIS CONSOLIDADO POR EMPLEADO"
+    apply_cell_style(title_cell, get_title_style())
+    ws4.row_dimensions[1].height = 25
+    
+    # Encabezados
+    headers_empleado = ['Técnico', 'Total', 'Críticas', '% Críticas', 'Reincidencias', '% Reincidencias']
+    for col_num, header in enumerate(headers_empleado, 1):
+        cell = ws4.cell(row=3, column=col_num)
+        cell.value = header
+        apply_cell_style(cell, get_header_style())
+    
+    # Datos por empleado
+    empleados_stats = calcular_estadisticas_por_empleado(incidencias)
+    row = 4
+    for stats in empleados_stats:
+        ws4.cell(row=row, column=1).value = stats['nombre']
+        ws4.cell(row=row, column=2).value = stats['total']
+        ws4.cell(row=row, column=3).value = stats['criticas']
+        ws4.cell(row=row, column=4).value = f"{stats['porcentaje_criticas']}%"
+        ws4.cell(row=row, column=5).value = stats['reincidencias']
+        ws4.cell(row=row, column=6).value = f"{stats['porcentaje_reincidencias']}%"
+        row += 1
+    
+    auto_adjust_column_width(ws4)
+    
+    # ==========================================
+    # HOJAS INDIVIDUALES POR EMPLEADO
+    # ==========================================
+    for empleado_stat in empleados_stats:
+        # Crear hoja con nombre del empleado (limitar a 31 caracteres para Excel)
+        nombre_hoja = empleado_stat['nombre'][:28]  # Sin emoji, limite de Excel es 31
+        ws_emp = wb.create_sheet(nombre_hoja)
+        
+        # Título con nombre del empleado
+        ws_emp.merge_cells('A1:H1')
+        title_cell = ws_emp['A1']
+        title_cell.value = f"REPORTE INDIVIDUAL - {empleado_stat['nombre']}"
+        apply_cell_style(title_cell, get_title_style())
+        ws_emp.row_dimensions[1].height = 25
+        
+        # Resumen de estadísticas personales
+        row = 3
+        ws_emp[f'A{row}'] = "📊 ESTADÍSTICAS PERSONALES"
+        apply_cell_style(ws_emp[f'A{row}'], get_kpi_title_style())
+        row += 2
+        
+        ws_emp[f'A{row}'] = 'Total de Incidencias:'
+        ws_emp[f'B{row}'] = empleado_stat['total']
+        row += 1
+        ws_emp[f'A{row}'] = 'Incidencias Críticas:'
+        ws_emp[f'B{row}'] = empleado_stat['criticas']
+        row += 1
+        ws_emp[f'A{row}'] = 'Porcentaje Críticas:'
+        ws_emp[f'B{row}'] = f"{empleado_stat['porcentaje_criticas']}%"
+        row += 1
+        ws_emp[f'A{row}'] = 'Reincidencias:'
+        ws_emp[f'B{row}'] = empleado_stat['reincidencias']
+        row += 1
+        ws_emp[f'A{row}'] = 'Porcentaje Reincidencias:'
+        ws_emp[f'B{row}'] = f"{empleado_stat['porcentaje_reincidencias']}%"
+        
+        # Detalle de incidencias
+        row += 3
+        ws_emp[f'A{row}'] = "📋 DETALLE DE INCIDENCIAS"
+        apply_cell_style(ws_emp[f'A{row}'], get_kpi_title_style())
+        row += 1
+        
+        # Encabezados del detalle
+        headers_detalle = ['Folio', 'Fecha', 'Equipo', 'Marca', 'Sucursal', 'Severidad', 'Estado', 'Días Abierta']
+        for col_num, header in enumerate(headers_detalle, 1):
+            cell = ws_emp.cell(row=row, column=col_num)
+            cell.value = header
+            apply_cell_style(cell, get_header_style())
+        
+        # Obtener incidencias del empleado
+        inc_empleado = incidencias.filter(tecnico_responsable__id=empleado_stat['id'])
+        
+        row += 1
+        for inc in inc_empleado:
+            ws_emp.cell(row=row, column=1).value = inc.folio
+            ws_emp.cell(row=row, column=2).value = inc.fecha_deteccion.strftime('%d/%m/%Y')
+            ws_emp.cell(row=row, column=3).value = inc.get_tipo_equipo_display()
+            ws_emp.cell(row=row, column=4).value = inc.marca
+            ws_emp.cell(row=row, column=5).value = inc.sucursal.nombre if inc.sucursal else ''
+            ws_emp.cell(row=row, column=6).value = inc.get_grado_severidad_display()
+            ws_emp.cell(row=row, column=7).value = inc.get_estado_display()
+            ws_emp.cell(row=row, column=8).value = inc.dias_abierta
+            
+            # Colorear según severidad
+            color = get_severidad_color(inc.grado_severidad)
+            ws_emp.cell(row=row, column=6).fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+            ws_emp.cell(row=row, column=6).font = Font(bold=True, color="FFFFFF")
+            
+            row += 1
+        
+        auto_adjust_column_width(ws_emp)
+    
+    # ==========================================
+    # GENERAR RESPUESTA HTTP
+    # ==========================================
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    response['Content-Disposition'] = f'attachment; filename=incidencias_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    filename = f'reporte_scorecard_completo_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename={filename}'
     
     wb.save(response)
     return response
