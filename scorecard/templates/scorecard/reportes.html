@@ -25,9 +25,9 @@
         </div>
         <div class="col-md-4 text-end no-print">
             <div class="export-buttons">
-                <a href="{% url 'scorecard:api_exportar_excel' %}" class="btn btn-success" download>
+                <button onclick="descargarExcel()" class="btn btn-success">
                     <i class="bi bi-file-earmark-excel"></i> Exportar Excel
-                </a>
+                </button>
                 <button onclick="window.print()" class="btn btn-secondary">
                     <i class="bi bi-printer"></i> Imprimir
                 </button>
@@ -920,4 +920,50 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <!-- Script de reportes -->
 <script src="{% static 'js/reportes.js' %}"></script>
+
+<script>
+/**
+ * Función para descargar el Excel completo
+ * Maneja la descarga del archivo con múltiples hojas de análisis
+ */
+function descargarExcel() {
+    // Mostrar overlay de carga
+    document.getElementById('loading-overlay').style.display = 'flex';
+    
+    // Crear un enlace temporal para forzar la descarga
+    fetch("{% url 'scorecard:api_exportar_excel' %}")
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al generar el Excel');
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            // Crear URL temporal del blob
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            // Nombre del archivo con fecha actual
+            const fecha = new Date().toISOString().split('T')[0].replace(/-/g, '');
+            a.download = `reporte_scorecard_completo_${fecha}.xlsx`;
+            
+            document.body.appendChild(a);
+            a.click();
+            
+            // Limpiar
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            // Ocultar overlay
+            document.getElementById('loading-overlay').style.display = 'none';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al descargar el archivo Excel. Por favor, intenta nuevamente.');
+            document.getElementById('loading-overlay').style.display = 'none';
+        });
+}
+</script>
 {% endblock %}

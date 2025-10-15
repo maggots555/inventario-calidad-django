@@ -42,14 +42,32 @@ GAMA_EQUIPO_CHOICES = [
 
 # ============================================================================
 # ESTADOS DE ORDEN DE SERVICIO - Workflow completo
+# Actualizado: Octubre 2025 - Se agregaron 10 nuevos estados (de 11 a 21)
 # ============================================================================
 ESTADO_ORDEN_CHOICES = [
+    # === FASE 1: INGRESO Y DIAGNÓSTICO ===
     ('espera', 'En Espera'),
     ('recepcion', 'En Recepción'),
     ('diagnostico', 'En Diagnóstico'),
+    ('equipo_diagnosticado', 'Equipo Diagnosticado'),  # NUEVO - Oct 2025
+    ('diagnostico_enviado_cliente', 'Diagnóstico Enviado al Cliente'),  # NUEVO - Oct 2025
+    
+    # === FASE 2: COTIZACIÓN Y APROBACIÓN ===
+    ('cotizacion_enviada_proveedor', 'Envío de Cotización al Proveedor'),  # NUEVO - Oct 2025
+    ('cotizacion_recibida_proveedor', 'Se Recibe Cotización de Proveedores'),  # NUEVO - Oct 2025
     ('cotizacion', 'Esperando Aprobación Cliente'),
+    ('cliente_acepta_cotizacion', 'Cliente Acepta Cotización'),  # NUEVO - Oct 2025
     ('rechazada', 'Cotización Rechazada'),
+    
+    # === FASE 3: GESTIÓN DE PIEZAS Y COMPONENTES ===
+    ('partes_solicitadas_proveedor', 'Partes Solicitadas a Proveedor'),  # NUEVO - Oct 2025
     ('esperando_piezas', 'Esperando Llegada de Piezas'),
+    ('piezas_recibidas', 'Piezas Recibidas'),  # NUEVO - Oct 2025
+    ('wpb_pieza_incorrecta', 'WPB - Pieza Incorrecta'),  # NUEVO - Oct 2025
+    ('doa_pieza_danada', 'DOA - Pieza Dañada'),  # NUEVO - Oct 2025
+    ('pnc_parte_no_disponible', 'PNC - Parte No Disponible'),  # NUEVO - Oct 2025
+    
+    # === FASE 4: REPARACIÓN Y ENTREGA ===
     ('reparacion', 'En Reparación'),
     ('control_calidad', 'Control de Calidad'),
     ('finalizado', 'Finalizado - Listo para Entrega'),

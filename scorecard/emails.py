@@ -13,25 +13,51 @@ import json
 import os
 
 
-def comprimir_imagen(ruta_imagen, calidad=60, max_ancho=800):
+def comprimir_imagen(ruta_imagen, calidad=85, max_ancho=1920, umbral_mb=1.0):
     """
-    Comprime una imagen para reducir su tamaño antes de adjuntarla al email
+    Comprime una imagen inteligentemente basándose en su tamaño
+    
+    LÓGICA DE COMPRESIÓN INTELIGENTE:
+    - Imágenes < 1MB (umbral_mb): NO se comprimen, se envían tal cual (calidad original)
+    - Imágenes >= 1MB: Se comprimen con calidad 85 (alta calidad) y se redimensionan si es necesario
     
     Parámetros:
     - ruta_imagen: Ruta completa a la imagen
-    - calidad: Calidad de compresión JPEG (1-100, default 60)
-    - max_ancho: Ancho máximo en píxeles (default 800)
+    - calidad: Calidad de compresión JPEG (1-100, default 85 - alta calidad)
+    - max_ancho: Ancho máximo en píxeles (default 1920 para mantener buena resolución)
+    - umbral_mb: Tamaño mínimo en MB para activar compresión (default 1.0 MB)
     
     Retorna:
-    - BytesIO con la imagen comprimida, o None si hay error
+    - BytesIO con la imagen procesada, o None si hay error
     """
     try:
+        # Verificar el tamaño del archivo original
+        tamaño_bytes = os.path.getsize(ruta_imagen)
+        tamaño_mb = tamaño_bytes / (1024 * 1024)  # Convertir a MB
+        
+        print(f"📸 Procesando imagen: {os.path.basename(ruta_imagen)}")
+        print(f"   Tamaño original: {tamaño_mb:.2f} MB ({tamaño_bytes:,} bytes)")
+        
         # Abrir la imagen
         img = Image.open(ruta_imagen)
+        dimensiones_originales = img.size
+        print(f"   Dimensiones originales: {dimensiones_originales[0]}x{dimensiones_originales[1]} px")
+        
+        # Si la imagen es menor al umbral (1MB por defecto), enviarla sin compresión
+        if tamaño_mb < umbral_mb:
+            print(f"   ✅ Imagen < {umbral_mb}MB: Enviando SIN compresión (calidad original)")
+            output = BytesIO()
+            with open(ruta_imagen, 'rb') as f:
+                output.write(f.read())
+            output.seek(0)
+            return output
+        
+        # Si la imagen es >= umbral, aplicar compresión inteligente
+        print(f"   ⚙️ Imagen >= {umbral_mb}MB: Aplicando compresión inteligente...")
         
         # Convertir a RGB si es necesario (para JPEGs)
         if img.mode in ('RGBA', 'LA', 'P'):
-            # Crear fondo blanco
+            # Crear fondo blanco para transparencias
             background = Image.new('RGB', img.size, (255, 255, 255))
             if img.mode == 'P':
                 img = img.convert('RGBA')
@@ -40,21 +66,36 @@ def comprimir_imagen(ruta_imagen, calidad=60, max_ancho=800):
         elif img.mode != 'RGB':
             img = img.convert('RGB')
         
-        # Redimensionar si es muy grande
-        if img.width > max_ancho:
+        # Redimensionar solo si excede el ancho máximo
+        necesita_redimension = img.width > max_ancho
+        if necesita_redimension:
             ratio = max_ancho / img.width
             nuevo_alto = int(img.height * ratio)
             img = img.resize((max_ancho, nuevo_alto), Image.LANCZOS)
+            print(f"   📐 Redimensionada a: {max_ancho}x{nuevo_alto} px")
+        else:
+            print(f"   📐 Dimensiones mantenidas (< {max_ancho}px de ancho)")
         
-        # Guardar en BytesIO con compresión
+        # Guardar en BytesIO con compresión de alta calidad
         output = BytesIO()
         img.save(output, format='JPEG', quality=calidad, optimize=True)
         output.seek(0)
         
+        # Calcular tamaño final
+        tamaño_final_bytes = len(output.getvalue())
+        tamaño_final_mb = tamaño_final_bytes / (1024 * 1024)
+        reduccion_porcentaje = ((tamaño_bytes - tamaño_final_bytes) / tamaño_bytes) * 100
+        
+        print(f"   ✅ Compresión completada:")
+        print(f"      - Tamaño final: {tamaño_final_mb:.2f} MB ({tamaño_final_bytes:,} bytes)")
+        print(f"      - Reducción: {reduccion_porcentaje:.1f}%")
+        print(f"      - Calidad: {calidad}/100")
+        
+        output.seek(0)
         return output
         
     except Exception as e:
-        print(f"Error al comprimir imagen {ruta_imagen}: {e}")
+        print(f"❌ Error al procesar imagen {ruta_imagen}: {e}")
         return None
 
 
@@ -163,8 +204,14 @@ def enviar_notificacion_incidencia(incidencia, destinatarios_seleccionados, mens
                 ruta_imagen = evidencia.imagen.path
                 
                 if os.path.exists(ruta_imagen):
-                    # Comprimir la imagen
-                    imagen_comprimida = comprimir_imagen(ruta_imagen, calidad=60, max_ancho=800)
+                    # Comprimir la imagen inteligentemente (solo si > 1MB)
+                    # Calidad 85 (alta), max 1920px ancho, umbral 1MB
+                    imagen_comprimida = comprimir_imagen(
+                        ruta_imagen, 
+                        calidad=85,      # Alta calidad
+                        max_ancho=1920,  # Resolución Full HD
+                        umbral_mb=1.0    # Solo comprimir si > 1MB
+                    )
                     
                     if imagen_comprimida:
                         # Obtener el nombre del archivo original
