@@ -40,6 +40,13 @@ ALLOWED_HOSTS = [
     '*'                  # Permitir cualquier host (solo para desarrollo)
 ]
 
+# CSRF: Configuración para permitir solicitudes desde dominios externos
+# Necesario para ngrok y otras herramientas de túnel
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.ngrok-free.app',  # Dominios de ngrok
+    'https://*.ngrok.io',         # Dominios alternativos de ngrok
+]
+
 # Application definition
 
 INSTALLED_APPS = [
