@@ -132,9 +132,10 @@ def auto_adjust_column_width(ws, min_width=10, max_width=50):
 def calcular_metricas_generales(incidencias):
     """
     Calcula métricas generales del sistema
+    MEJORADO: Incluye métricas de atribuibilidad
     
     Returns:
-        dict con KPIs principales
+        dict con KPIs principales incluyendo incidencias no atribuibles
     """
     total = incidencias.count()
     abiertas = incidencias.filter(estado='abierta').count()
@@ -142,10 +143,16 @@ def calcular_metricas_generales(incidencias):
     cerradas = incidencias.filter(estado='cerrada').count()
     reincidencias = incidencias.filter(es_reincidencia=True).count()
     
+    # Incidencias NO atribuibles al técnico
+    no_atribuibles = incidencias.filter(es_atribuible=False).count()
+    atribuibles = incidencias.filter(es_atribuible=True).count()
+    
     # Calcular porcentajes
     porcentaje_reincidencias = round((reincidencias / total * 100), 2) if total > 0 else 0
     porcentaje_cerradas = round((cerradas / total * 100), 2) if total > 0 else 0
     porcentaje_abiertas = round((abiertas / total * 100), 2) if total > 0 else 0
+    porcentaje_no_atribuibles = round((no_atribuibles / total * 100), 2) if total > 0 else 0
+    porcentaje_atribuibles = round((atribuibles / total * 100), 2) if total > 0 else 0
     
     # Promedio de días para cerrar
     incidencias_cerradas = incidencias.filter(estado='cerrada')
@@ -164,7 +171,12 @@ def calcular_metricas_generales(incidencias):
         'porcentaje_reincidencias': porcentaje_reincidencias,
         'porcentaje_cerradas': porcentaje_cerradas,
         'porcentaje_abiertas': porcentaje_abiertas,
-        'promedio_dias_cierre': promedio_dias_cierre
+        'promedio_dias_cierre': promedio_dias_cierre,
+        # Nuevas métricas de atribuibilidad
+        'incidencias_no_atribuibles': no_atribuibles,
+        'incidencias_atribuibles': atribuibles,
+        'porcentaje_no_atribuibles': porcentaje_no_atribuibles,
+        'porcentaje_atribuibles': porcentaje_atribuibles
     }
 
 
@@ -209,23 +221,26 @@ def calcular_distribucion_severidad(incidencias):
 def calcular_estadisticas_por_sucursal(incidencias):
     """
     Calcula estadísticas detalladas por sucursal
+    CORREGIDO: Evita duplicados usando set() para nombres únicos
     
     Returns:
         Lista de diccionarios con estadísticas por sucursal
     """
     sucursales_stats = []
     
-    sucursales = incidencias.values_list('sucursal__nombre', flat=True).distinct()
+    # Obtener nombres únicos de sucursales usando set() para evitar duplicados
+    sucursales_nombres = set()
+    for inc in incidencias.select_related('sucursal'):
+        if inc.sucursal and inc.sucursal.nombre:
+            sucursales_nombres.add(inc.sucursal.nombre)
     
-    for sucursal in sucursales:
-        if not sucursal:
-            continue
-            
-        inc_sucursal = incidencias.filter(sucursal__nombre=sucursal)
+    # Calcular estadísticas para cada sucursal única
+    for sucursal_nombre in sucursales_nombres:
+        inc_sucursal = incidencias.filter(sucursal__nombre=sucursal_nombre)
         total = inc_sucursal.count()
         
         sucursales_stats.append({
-            'sucursal': sucursal,
+            'sucursal': sucursal_nombre,
             'total': total,
             'abiertas': inc_sucursal.filter(estado='abierta').count(),
             'cerradas': inc_sucursal.filter(estado='cerrada').count(),
@@ -288,37 +303,51 @@ def calcular_analisis_temporal(incidencias):
 def calcular_estadisticas_por_empleado(incidencias):
     """
     Calcula estadísticas consolidadas por empleado
+    MEJORADO: Evita duplicados asegurando IDs únicos de técnicos
     
     Returns:
         Lista de diccionarios con estadísticas por técnico
     """
     empleados_stats = []
     
+    # Obtener técnicos únicos usando annotate para evitar duplicados
+    # Agrupa por ID de técnico para garantizar unicidad
     tecnicos = incidencias.values(
         'tecnico_responsable__id',
         'tecnico_responsable__nombre_completo'
-    ).distinct()
+    ).annotate(
+        total_incidencias=Count('id')
+    ).filter(
+        tecnico_responsable__id__isnull=False
+    ).order_by('tecnico_responsable__id').distinct()
     
+    # Calcular estadísticas detalladas para cada técnico único
     for tecnico in tecnicos:
-        if not tecnico['tecnico_responsable__id']:
-            continue
-            
-        inc_tecnico = incidencias.filter(
-            tecnico_responsable__id=tecnico['tecnico_responsable__id']
-        )
+        tecnico_id = tecnico['tecnico_responsable__id']
+        
+        # Filtrar incidencias del técnico
+        inc_tecnico = incidencias.filter(tecnico_responsable__id=tecnico_id)
         
         total = inc_tecnico.count()
         criticas = inc_tecnico.filter(grado_severidad='critico').count()
         reincidencias = inc_tecnico.filter(es_reincidencia=True).count()
         
+        # Métricas de atribuibilidad
+        atribuibles = inc_tecnico.filter(es_atribuible=True).count()
+        no_atribuibles = inc_tecnico.filter(es_atribuible=False).count()
+        
         empleados_stats.append({
-            'id': tecnico['tecnico_responsable__id'],
+            'id': tecnico_id,
             'nombre': tecnico['tecnico_responsable__nombre_completo'],
             'total': total,
             'criticas': criticas,
             'reincidencias': reincidencias,
+            'atribuibles': atribuibles,
+            'no_atribuibles': no_atribuibles,
             'porcentaje_criticas': round((criticas / total * 100), 2) if total > 0 else 0,
-            'porcentaje_reincidencias': round((reincidencias / total * 100), 2) if total > 0 else 0
+            'porcentaje_reincidencias': round((reincidencias / total * 100), 2) if total > 0 else 0,
+            'porcentaje_atribuibles': round((atribuibles / total * 100), 2) if total > 0 else 0,
+            'porcentaje_no_atribuibles': round((no_atribuibles / total * 100), 2) if total > 0 else 0
         })
     
     return sorted(empleados_stats, key=lambda x: x['total'], reverse=True)

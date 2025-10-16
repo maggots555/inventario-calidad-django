@@ -603,6 +603,34 @@ def api_exportar_excel(request):
         apply_cell_style(ws1[f'B{row}'], get_kpi_value_style())
         row += 1
     
+    # Sección de Atribuibilidad
+    row += 2
+    ws1.merge_cells(f'A{row}:F{row}')
+    atrib_section = ws1[f'A{row}']
+    atrib_section.value = "ANÁLISIS DE ATRIBUIBILIDAD"
+    apply_cell_style(atrib_section, get_kpi_title_style())
+    
+    row += 2
+    atrib_data = [
+        ('Incidencias Atribuibles al Técnico', metricas['incidencias_atribuibles']),
+        ('% Atribuibles', f"{metricas['porcentaje_atribuibles']}%"),
+        ('Incidencias NO Atribuibles', metricas['incidencias_no_atribuibles']),
+        ('% NO Atribuibles', f"{metricas['porcentaje_no_atribuibles']}%"),
+    ]
+    
+    for attr_name, attr_value in atrib_data:
+        ws1[f'A{row}'] = attr_name
+        ws1[f'B{row}'] = attr_value
+        apply_cell_style(ws1[f'A{row}'], get_kpi_title_style())
+        apply_cell_style(ws1[f'B{row}'], get_kpi_value_style())
+        
+        # Colorear según tipo
+        if 'NO Atribuibles' in attr_name and isinstance(attr_value, int):
+            ws1[f'B{row}'].fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+            ws1[f'B{row}'].font = Font(bold=True, size=16, color="FFFFFF")
+        
+        row += 1
+    
     # Tendencia Mensual (últimos 6 meses)
     row += 2
     ws1.merge_cells(f'A{row}:F{row}')
@@ -754,20 +782,24 @@ def api_exportar_excel(request):
     ws4 = wb.create_sheet("Consolidado Empleados")
     
     # Título
-    ws4.merge_cells('A1:G1')
+    ws4.merge_cells('A1:J1')
     title_cell = ws4['A1']
-    title_cell.value = "ANÁLISIS CONSOLIDADO POR EMPLEADO"
+    title_cell.value = "ANÁLISIS CONSOLIDADO POR EMPLEADO (Incluye Atribuibilidad)"
     apply_cell_style(title_cell, get_title_style())
     ws4.row_dimensions[1].height = 25
     
-    # Encabezados
-    headers_empleado = ['Técnico', 'Total', 'Críticas', '% Críticas', 'Reincidencias', '% Reincidencias']
+    # Encabezados ampliados con atribuibilidad
+    headers_empleado = [
+        'Técnico', 'Total', 'Críticas', '% Críticas', 
+        'Reincidencias', '% Reincidencias', 
+        'Atribuibles', '% Atribuibles', 'NO Atribuibles', '% NO Atribuibles'
+    ]
     for col_num, header in enumerate(headers_empleado, 1):
         cell = ws4.cell(row=3, column=col_num)
         cell.value = header
         apply_cell_style(cell, get_header_style())
     
-    # Datos por empleado
+    # Datos por empleado con atribuibilidad
     empleados_stats = calcular_estadisticas_por_empleado(incidencias)
     row = 4
     for stats in empleados_stats:
@@ -777,6 +809,15 @@ def api_exportar_excel(request):
         ws4.cell(row=row, column=4).value = f"{stats['porcentaje_criticas']}%"
         ws4.cell(row=row, column=5).value = stats['reincidencias']
         ws4.cell(row=row, column=6).value = f"{stats['porcentaje_reincidencias']}%"
+        ws4.cell(row=row, column=7).value = stats['atribuibles']
+        ws4.cell(row=row, column=8).value = f"{stats['porcentaje_atribuibles']}%"
+        ws4.cell(row=row, column=9).value = stats['no_atribuibles']
+        ws4.cell(row=row, column=10).value = f"{stats['porcentaje_no_atribuibles']}%"
+        
+        # Colorear NO Atribuibles en verde (es positivo)
+        ws4.cell(row=row, column=9).fill = PatternFill(start_color="d4edda", end_color="d4edda", fill_type="solid")
+        ws4.cell(row=row, column=9).font = Font(bold=True, color="155724")
+        
         row += 1
     
     auto_adjust_column_width(ws4)
@@ -790,7 +831,7 @@ def api_exportar_excel(request):
         ws_emp = wb.create_sheet(nombre_hoja)
         
         # Título con nombre del empleado
-        ws_emp.merge_cells('A1:H1')
+        ws_emp.merge_cells('A1:O1')
         title_cell = ws_emp['A1']
         title_cell.value = f"REPORTE INDIVIDUAL - {empleado_stat['nombre']}"
         apply_cell_style(title_cell, get_title_style())
@@ -817,21 +858,47 @@ def api_exportar_excel(request):
         ws_emp[f'A{row}'] = 'Porcentaje Reincidencias:'
         ws_emp[f'B{row}'] = f"{empleado_stat['porcentaje_reincidencias']}%"
         
-        # Detalle de incidencias
+        # Sección de Atribuibilidad
+        row += 2
+        ws_emp[f'A{row}'] = "🎯 ANÁLISIS DE ATRIBUIBILIDAD"
+        apply_cell_style(ws_emp[f'A{row}'], get_kpi_title_style())
+        row += 2
+        
+        ws_emp[f'A{row}'] = 'Incidencias Atribuibles:'
+        ws_emp[f'B{row}'] = empleado_stat['atribuibles']
+        row += 1
+        ws_emp[f'A{row}'] = 'Porcentaje Atribuibles:'
+        ws_emp[f'B{row}'] = f"{empleado_stat['porcentaje_atribuibles']}%"
+        row += 1
+        ws_emp[f'A{row}'] = 'Incidencias NO Atribuibles:'
+        ws_emp[f'B{row}'] = empleado_stat['no_atribuibles']
+        # Colorear en verde (positivo)
+        ws_emp[f'B{row}'].fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+        ws_emp[f'B{row}'].font = Font(bold=True, size=16, color="FFFFFF")
+        row += 1
+        ws_emp[f'A{row}'] = 'Porcentaje NO Atribuibles:'
+        ws_emp[f'B{row}'] = f"{empleado_stat['porcentaje_no_atribuibles']}%"
+        
+        # Detalle de incidencias con MUCHO MÁS INFORMACIÓN
         row += 3
-        ws_emp[f'A{row}'] = "📋 DETALLE DE INCIDENCIAS"
+        ws_emp[f'A{row}'] = "📋 DETALLE COMPLETO DE INCIDENCIAS"
         apply_cell_style(ws_emp[f'A{row}'], get_kpi_title_style())
         row += 1
         
-        # Encabezados del detalle
-        headers_detalle = ['Folio', 'Fecha', 'Equipo', 'Marca', 'Sucursal', 'Severidad', 'Estado', 'Días Abierta']
+        # Encabezados del detalle AMPLIADOS con Atribuibilidad
+        headers_detalle = [
+            'Folio', 'Fecha', 'Equipo', 'Marca', 'Modelo', 'No. Serie', 
+            'No. Orden', 'Sucursal', 'Área Detectora', 'Categoría Fallo',
+            'Severidad', 'Estado', 'Días Abierta', 'Atribuible', 
+            'Motivo NO Atribuible', 'Descripción Incidencia'
+        ]
         for col_num, header in enumerate(headers_detalle, 1):
             cell = ws_emp.cell(row=row, column=col_num)
             cell.value = header
             apply_cell_style(cell, get_header_style())
         
         # Obtener incidencias del empleado
-        inc_empleado = incidencias.filter(tecnico_responsable__id=empleado_stat['id'])
+        inc_empleado = incidencias.filter(tecnico_responsable__id=empleado_stat['id']).order_by('-fecha_deteccion')
         
         row += 1
         for inc in inc_empleado:
@@ -839,19 +906,115 @@ def api_exportar_excel(request):
             ws_emp.cell(row=row, column=2).value = inc.fecha_deteccion.strftime('%d/%m/%Y')
             ws_emp.cell(row=row, column=3).value = inc.get_tipo_equipo_display()
             ws_emp.cell(row=row, column=4).value = inc.marca
-            ws_emp.cell(row=row, column=5).value = inc.sucursal.nombre if inc.sucursal else ''
-            ws_emp.cell(row=row, column=6).value = inc.get_grado_severidad_display()
-            ws_emp.cell(row=row, column=7).value = inc.get_estado_display()
-            ws_emp.cell(row=row, column=8).value = inc.dias_abierta
+            ws_emp.cell(row=row, column=5).value = inc.modelo if inc.modelo else 'N/A'
+            ws_emp.cell(row=row, column=6).value = inc.numero_serie
+            ws_emp.cell(row=row, column=7).value = inc.numero_orden if inc.numero_orden else 'N/A'
+            ws_emp.cell(row=row, column=8).value = inc.sucursal.nombre if inc.sucursal else ''
+            ws_emp.cell(row=row, column=9).value = inc.get_area_detectora_display()
+            ws_emp.cell(row=row, column=10).value = inc.get_categoria_fallo_display()
+            ws_emp.cell(row=row, column=11).value = inc.get_grado_severidad_display()
+            ws_emp.cell(row=row, column=12).value = inc.get_estado_display()
+            ws_emp.cell(row=row, column=13).value = inc.dias_abierta
+            ws_emp.cell(row=row, column=14).value = 'SÍ' if inc.es_atribuible else 'NO'
+            ws_emp.cell(row=row, column=15).value = inc.justificacion_no_atribuible if not inc.es_atribuible and inc.justificacion_no_atribuible else 'N/A'
+            ws_emp.cell(row=row, column=16).value = inc.descripcion_incidencia[:200] if inc.descripcion_incidencia else 'Sin descripción'
             
             # Colorear según severidad
             color = get_severidad_color(inc.grado_severidad)
-            ws_emp.cell(row=row, column=6).fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
-            ws_emp.cell(row=row, column=6).font = Font(bold=True, color="FFFFFF")
+            ws_emp.cell(row=row, column=11).fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+            ws_emp.cell(row=row, column=11).font = Font(bold=True, color="FFFFFF")
+            
+            # Colorear columna Atribuible (verde = NO, rojo = SÍ)
+            if not inc.es_atribuible:
+                ws_emp.cell(row=row, column=14).fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+                ws_emp.cell(row=row, column=14).font = Font(bold=True, color="FFFFFF")
+            else:
+                ws_emp.cell(row=row, column=14).fill = PatternFill(start_color="dc3545", end_color="dc3545", fill_type="solid")
+                ws_emp.cell(row=row, column=14).font = Font(bold=True, color="FFFFFF")
             
             row += 1
         
         auto_adjust_column_width(ws_emp)
+    
+    # ==========================================
+    # HOJA FINAL: TODAS LAS INCIDENCIAS - DETALLE COMPLETO
+    # ==========================================
+    ws_all = wb.create_sheet("Todas las Incidencias")
+    
+    # Título
+    ws_all.merge_cells('A1:U1')
+    title_cell = ws_all['A1']
+    title_cell.value = f"REPORTE COMPLETO - TODAS LAS INCIDENCIAS ({incidencias.count()} registros)"
+    apply_cell_style(title_cell, get_title_style())
+    ws_all.row_dimensions[1].height = 25
+    
+    # Encabezados completos con Atribuibilidad
+    headers_all = [
+        'Folio', 'Fecha Detección', 'Fecha Registro', 'Equipo', 'Marca', 'Modelo', 
+        'No. Serie', 'No. Orden', 'Servicio', 'Sucursal', 'Técnico Responsable',
+        'Área Técnico', 'Inspector', 'Área Detectora', 'Tipo Incidencia',
+        'Categoría Fallo', 'Severidad', 'Estado', 'Días Abierta', 
+        'Atribuible', 'Motivo NO Atribuible',
+        'Descripción', 'Acciones Tomadas', 'Causa Raíz'
+    ]
+    
+    for col_num, header in enumerate(headers_all, 1):
+        cell = ws_all.cell(row=3, column=col_num)
+        cell.value = header
+        apply_cell_style(cell, get_header_style())
+    
+    # Datos de todas las incidencias
+    row = 4
+    for inc in incidencias:
+        ws_all.cell(row=row, column=1).value = inc.folio
+        ws_all.cell(row=row, column=2).value = inc.fecha_deteccion.strftime('%d/%m/%Y')
+        ws_all.cell(row=row, column=3).value = inc.fecha_registro.strftime('%d/%m/%Y %H:%M')
+        ws_all.cell(row=row, column=4).value = inc.get_tipo_equipo_display()
+        ws_all.cell(row=row, column=5).value = inc.marca
+        ws_all.cell(row=row, column=6).value = inc.modelo if inc.modelo else 'N/A'
+        ws_all.cell(row=row, column=7).value = inc.numero_serie
+        ws_all.cell(row=row, column=8).value = inc.numero_orden if inc.numero_orden else 'N/A'
+        ws_all.cell(row=row, column=9).value = inc.servicio_realizado.nombre if inc.servicio_realizado else 'N/A'
+        ws_all.cell(row=row, column=10).value = inc.sucursal.nombre if inc.sucursal else ''
+        ws_all.cell(row=row, column=11).value = inc.tecnico_responsable.nombre_completo if inc.tecnico_responsable else ''
+        ws_all.cell(row=row, column=12).value = inc.area_tecnico if inc.area_tecnico else 'N/A'
+        ws_all.cell(row=row, column=13).value = inc.inspector_calidad.nombre_completo if inc.inspector_calidad else ''
+        ws_all.cell(row=row, column=14).value = inc.get_area_detectora_display()
+        ws_all.cell(row=row, column=15).value = inc.tipo_incidencia.nombre if inc.tipo_incidencia else 'N/A'
+        ws_all.cell(row=row, column=16).value = inc.get_categoria_fallo_display()
+        ws_all.cell(row=row, column=17).value = inc.get_grado_severidad_display()
+        ws_all.cell(row=row, column=18).value = inc.get_estado_display()
+        ws_all.cell(row=row, column=19).value = inc.dias_abierta
+        ws_all.cell(row=row, column=20).value = 'SÍ' if inc.es_atribuible else 'NO'
+        ws_all.cell(row=row, column=21).value = inc.justificacion_no_atribuible if not inc.es_atribuible and inc.justificacion_no_atribuible else 'N/A'
+        ws_all.cell(row=row, column=22).value = inc.descripcion_incidencia if inc.descripcion_incidencia else 'Sin descripción'
+        ws_all.cell(row=row, column=23).value = inc.acciones_tomadas if inc.acciones_tomadas else 'Sin acciones registradas'
+        ws_all.cell(row=row, column=24).value = inc.causa_raiz if inc.causa_raiz else 'Sin análisis de causa raíz'
+        
+        # Colorear severidad
+        color = get_severidad_color(inc.grado_severidad)
+        ws_all.cell(row=row, column=17).fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+        ws_all.cell(row=row, column=17).font = Font(bold=True, color="FFFFFF")
+        
+        # Colorear estado
+        if inc.estado == 'cerrada':
+            ws_all.cell(row=row, column=18).fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+            ws_all.cell(row=row, column=18).font = Font(bold=True, color="FFFFFF")
+        elif inc.estado == 'abierta':
+            ws_all.cell(row=row, column=18).fill = PatternFill(start_color="ffc107", end_color="ffc107", fill_type="solid")
+            ws_all.cell(row=row, column=18).font = Font(bold=True, color="000000")
+        
+        # Colorear Atribuible (verde = NO, rojo = SÍ)
+        if not inc.es_atribuible:
+            ws_all.cell(row=row, column=20).fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+            ws_all.cell(row=row, column=20).font = Font(bold=True, color="FFFFFF")
+        else:
+            ws_all.cell(row=row, column=20).fill = PatternFill(start_color="dc3545", end_color="dc3545", fill_type="solid")
+            ws_all.cell(row=row, column=20).font = Font(bold=True, color="FFFFFF")
+        
+        row += 1
+    
+    auto_adjust_column_width(ws_all)
     
     # ==========================================
     # GENERAR RESPUESTA HTTP
