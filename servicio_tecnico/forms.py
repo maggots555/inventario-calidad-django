@@ -1401,9 +1401,20 @@ class GestionarCotizacionForm(forms.ModelForm):
         required=True,
     )
     
+    # Campo para aplicar descuento de mano de obra (Octubre 2025)
+    descontar_mano_obra = forms.BooleanField(
+        required=False,
+        label='🎁 Descontar mano de obra como beneficio',
+        help_text='Al aceptar la cotización, el diagnóstico será gratuito como incentivo',
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'id': 'id_descontar_mano_obra',
+        }),
+    )
+    
     class Meta:
         model = Cotizacion
-        fields = ['motivo_rechazo', 'detalle_rechazo']
+        fields = ['motivo_rechazo', 'detalle_rechazo', 'descontar_mano_obra']
         
         widgets = {
             'motivo_rechazo': forms.Select(attrs={
@@ -1444,6 +1455,7 @@ class GestionarCotizacionForm(forms.ModelForm):
         EXPLICACIÓN:
         Validación personalizada del formulario.
         Si rechaza, debe indicar al menos el motivo.
+        El descuento solo es válido si acepta la cotización.
         
         NOTA: La validación de piezas seleccionadas se hace en la vista,
         no aquí, porque los checkboxes están fuera del formulario.
@@ -1451,6 +1463,7 @@ class GestionarCotizacionForm(forms.ModelForm):
         cleaned_data = super().clean()
         accion = cleaned_data.get('accion')
         motivo_rechazo = cleaned_data.get('motivo_rechazo')
+        descontar_mano_obra = cleaned_data.get('descontar_mano_obra', False)
         
         # Si rechaza, el motivo es obligatorio
         if accion == 'rechazar' and not motivo_rechazo:
@@ -1462,6 +1475,10 @@ class GestionarCotizacionForm(forms.ModelForm):
         if accion == 'aceptar':
             cleaned_data['motivo_rechazo'] = ''
             cleaned_data['detalle_rechazo'] = ''
+        
+        # Si rechaza, NO puede aplicar descuento (lógica de negocio)
+        if accion == 'rechazar' and descontar_mano_obra:
+            cleaned_data['descontar_mano_obra'] = False
         
         return cleaned_data
     

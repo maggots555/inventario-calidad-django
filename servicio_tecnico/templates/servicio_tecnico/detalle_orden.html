@@ -723,6 +723,42 @@
                                                     </div>
                                                 </div>
                                                 
+                                                <!-- 🆕 NUEVO: Descuento de Mano de Obra (solo visible al aceptar) -->
+                                                <div id="divDescontoManoObra" style="display: none;">
+                                                    <div class="alert alert-success mb-3" style="border-left: 4px solid #28a745;">
+                                                        <div class="form-check">
+                                                            {{ form_gestionar_cotizacion.descontar_mano_obra }}
+                                                            <label for="id_descontar_mano_obra" class="form-check-label">
+                                                                <strong>{{ form_gestionar_cotizacion.descontar_mano_obra.label }}</strong>
+                                                                <br>
+                                                                <small class="text-muted">
+                                                                    💵 Costo actual de mano de obra: <strong>${{ cotizacion.costo_mano_obra|floatformat:2 }}</strong>
+                                                                    - Si activas esta opción, el diagnóstico será gratuito
+                                                                </small>
+                                                            </label>
+                                                        </div>
+                                                        <div class="mt-3 p-2" style="background-color: rgba(255,255,255,0.6); border-radius: 6px;">
+                                                            <div class="d-flex justify-content-between align-items-center">
+                                                                <span class="text-muted">💰 Total con piezas:</span>
+                                                                <span id="totalSinDescuento" class="fw-bold">
+                                                                    ${{ cotizacion.costo_total_piezas|add:cotizacion.costo_mano_obra|floatformat:2 }}
+                                                                </span>
+                                                            </div>
+                                                            <div class="d-flex justify-content-between align-items-center mt-1" id="filaDescuento" style="display:none;">
+                                                                <span class="text-danger">✂️ Descuento mano de obra:</span>
+                                                                <span class="text-danger fw-bold">-${{ cotizacion.costo_mano_obra|floatformat:2 }}</span>
+                                                            </div>
+                                                            <hr class="my-2" id="separadorTotal" style="display:none;">
+                                                            <div class="d-flex justify-content-between align-items-center" id="filaTotalFinal" style="display:none;">
+                                                                <span class="text-success fw-bold">🎁 TOTAL A PAGAR:</span>
+                                                                <span class="text-success fw-bold fs-5" id="totalConDescuento">
+                                                                    ${{ cotizacion.costo_total_piezas|floatformat:2 }}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
                                                 <!-- Campos de Rechazo (solo visibles si rechaza) -->
                                                 <div id="camposRechazo" style="display: none;">
                                                     <div class="mb-3">
@@ -764,7 +800,14 @@
                                         <table class="table table-sm table-borderless">
                                             <tr>
                                                 <td class="text-muted">Mano de Obra:</td>
-                                                <td class="text-end"><strong>${{ cotizacion.costo_mano_obra|floatformat:2 }}</strong></td>
+                                                <td class="text-end">
+                                                    <strong>${{ cotizacion.costo_mano_obra|floatformat:2 }}</strong>
+                                                    {% if cotizacion.descontar_mano_obra and cotizacion.usuario_acepto %}
+                                                        <span class="badge bg-success ms-1" title="Descuento aplicado">
+                                                            🎁 GRATIS
+                                                        </span>
+                                                    {% endif %}
+                                                </td>
                                             </tr>
                                             <tr>
                                                 <td class="text-muted">Total Piezas Cotizadas:</td>
@@ -789,15 +832,46 @@
                                                 <td class="text-muted"><strong>TOTAL COTIZACIÓN:</strong></td>
                                                 <td class="text-end"><h5 class="mb-0 text-primary">${{ cotizacion.costo_total|floatformat:2 }}</h5></td>
                                             </tr>
-                                            {% if cotizacion.usuario_acepto and cotizacion.costo_piezas_aceptadas != cotizacion.costo_total_piezas %}
-                                                <tr style="border-top: 2px solid #28a745;">
-                                                    <td class="text-success"><strong>TOTAL A PAGAR:</strong></td>
+                                            
+                                            <!-- 🆕 NUEVO: Mostrar descuento de mano de obra si aplica -->
+                                            {% if cotizacion.usuario_acepto and cotizacion.descontar_mano_obra %}
+                                                <tr style="border-top: 2px solid #ffc107;">
+                                                    <td class="text-danger">
+                                                        <strong><i class="bi bi-scissors"></i> Descuento Mano de Obra:</strong>
+                                                    </td>
                                                     <td class="text-end">
-                                                        <h5 class="mb-0 text-success">
-                                                            ${{ cotizacion.costo_piezas_aceptadas|add:cotizacion.costo_mano_obra|floatformat:2 }}
+                                                        <h5 class="mb-0 text-danger">
+                                                            -${{ cotizacion.monto_descuento_mano_obra|floatformat:2 }}
                                                         </h5>
                                                     </td>
                                                 </tr>
+                                            {% endif %}
+                                            
+                                            <!-- Total a pagar (actualizado para usar costo_total_final) -->
+                                            {% if cotizacion.usuario_acepto %}
+                                                <tr style="border-top: 2px solid #28a745;">
+                                                    <td class="text-success"><strong>🎯 TOTAL A PAGAR:</strong></td>
+                                                    <td class="text-end">
+                                                        <h5 class="mb-0 text-success">
+                                                            ${{ cotizacion.costo_total_final|floatformat:2 }}
+                                                        </h5>
+                                                    </td>
+                                                </tr>
+                                                
+                                                <!-- Mostrar ahorro si hay descuento -->
+                                                {% if cotizacion.descontar_mano_obra %}
+                                                    <tr>
+                                                        <td colspan="2" class="text-center">
+                                                            <div class="alert alert-success mb-0 mt-2 py-2" style="border-left: 4px solid #28a745;">
+                                                                <small>
+                                                                    <i class="bi bi-gift-fill"></i>
+                                                                    <strong>¡Beneficio aplicado!</strong>
+                                                                    El cliente ahorra <strong>${{ cotizacion.monto_descuento_mano_obra|floatformat:2 }}</strong> en mano de obra
+                                                                </small>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
                                             {% endif %}
                                         </table>
                                         
@@ -2928,7 +3002,7 @@ if (modalEditarInfo) {
 }
 
 // ============================================================================
-// GESTIÓN DE COTIZACIÓN - Mostrar/Ocultar campos de rechazo
+// GESTIÓN DE COTIZACIÓN - Mostrar/Ocultar campos de rechazo y descuento
 // ============================================================================
 document.addEventListener('DOMContentLoaded', function() {
     const formGestionar = document.getElementById('formGestionarCotizacion');
@@ -2938,32 +3012,85 @@ document.addEventListener('DOMContentLoaded', function() {
         const camposRechazo = document.getElementById('camposRechazo');
         const selectMotivo = document.querySelector('select[name="motivo_rechazo"]');
         
-        // Función para mostrar/ocultar campos de rechazo
+        // 🆕 NUEVO: Elementos del descuento de mano de obra
+        const divDescontoManoObra = document.getElementById('divDescontoManoObra');
+        const checkboxDescuento = document.getElementById('id_descontar_mano_obra');
+        const filaDescuento = document.getElementById('filaDescuento');
+        const filaTotalFinal = document.getElementById('filaTotalFinal');
+        const separadorTotal = document.getElementById('separadorTotal');
+        
+        // Función para mostrar/ocultar campos según acción seleccionada
         function toggleCamposRechazo() {
             const accionSeleccionada = document.querySelector('input[name="accion"]:checked');
             
             if (accionSeleccionada && accionSeleccionada.value === 'rechazar') {
+                // RECHAZAR: Mostrar campos de rechazo, ocultar descuento
                 camposRechazo.style.display = 'block';
-                // Hacer el motivo obligatorio
                 if (selectMotivo) {
                     selectMotivo.required = true;
                 }
-            } else {
+                
+                // Ocultar y desactivar descuento
+                if (divDescontoManoObra) {
+                    divDescontoManoObra.style.display = 'none';
+                    if (checkboxDescuento) {
+                        checkboxDescuento.checked = false;
+                        checkboxDescuento.disabled = true;
+                    }
+                }
+            } else if (accionSeleccionada && accionSeleccionada.value === 'aceptar') {
+                // ACEPTAR: Ocultar campos de rechazo, mostrar descuento
                 camposRechazo.style.display = 'none';
-                // Quitar obligatoriedad
                 if (selectMotivo) {
                     selectMotivo.required = false;
+                }
+                
+                // Mostrar y habilitar descuento
+                if (divDescontoManoObra) {
+                    divDescontoManoObra.style.display = 'block';
+                    if (checkboxDescuento) {
+                        checkboxDescuento.disabled = false;
+                    }
+                }
+            } else {
+                // Sin selección: ocultar todo
+                camposRechazo.style.display = 'none';
+                if (divDescontoManoObra) {
+                    divDescontoManoObra.style.display = 'none';
                 }
             }
         }
         
-        // Escuchar cambios en los radio buttons
+        // 🆕 NUEVO: Función para actualizar el resumen de totales
+        function actualizarResumenDescuento() {
+            if (!checkboxDescuento || !filaDescuento || !filaTotalFinal) return;
+            
+            if (checkboxDescuento.checked) {
+                // Mostrar descuento y total final
+                filaDescuento.style.display = 'flex';
+                separadorTotal.style.display = 'block';
+                filaTotalFinal.style.display = 'flex';
+            } else {
+                // Ocultar descuento y total final
+                filaDescuento.style.display = 'none';
+                separadorTotal.style.display = 'none';
+                filaTotalFinal.style.display = 'none';
+            }
+        }
+        
+        // Escuchar cambios en los radio buttons de acción
         radiosAccion.forEach(radio => {
             radio.addEventListener('change', toggleCamposRechazo);
         });
         
+        // 🆕 NUEVO: Escuchar cambios en el checkbox de descuento
+        if (checkboxDescuento) {
+            checkboxDescuento.addEventListener('change', actualizarResumenDescuento);
+        }
+        
         // Inicializar al cargar
         toggleCamposRechazo();
+        actualizarResumenDescuento();
         
         // Confirmación antes de enviar
         formGestionar.addEventListener('submit', function(e) {
@@ -2976,9 +3103,22 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             const accion = accionSeleccionada.value;
-            const mensaje = accion === 'aceptar' 
-                ? '¿Confirmas que el cliente ACEPTÓ la cotización? Esto cambiará el estado de la orden.'
-                : '¿Confirmas que el cliente RECHAZÓ la cotización? Esto cambiará el estado de la orden.';
+            
+            // 🆕 NUEVO: Mensaje personalizado si aplica descuento
+            let mensaje;
+            if (accion === 'aceptar') {
+                if (checkboxDescuento && checkboxDescuento.checked) {
+                    mensaje = '¿Confirmas que el cliente ACEPTÓ la cotización con DESCUENTO de mano de obra?\n\n' +
+                              '🎁 El diagnóstico será GRATUITO como beneficio.\n' +
+                              'Esto cambiará el estado de la orden.';
+                } else {
+                    mensaje = '¿Confirmas que el cliente ACEPTÓ la cotización?\n' +
+                              'Esto cambiará el estado de la orden.';
+                }
+            } else {
+                mensaje = '¿Confirmas que el cliente RECHAZÓ la cotización?\n' +
+                          'Esto cambiará el estado de la orden.';
+            }
             
             if (!confirm(mensaje)) {
                 e.preventDefault();

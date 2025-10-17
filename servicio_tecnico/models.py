@@ -1001,6 +1001,12 @@ class Cotizacion(models.Model):
         help_text="Costo de mano de obra"
     )
     
+    # DESCUENTOS Y BENEFICIOS (Octubre 2025)
+    descontar_mano_obra = models.BooleanField(
+        default=False,
+        help_text="¿Se descuenta la mano de obra como beneficio por aceptar la cotización?"
+    )
+    
     @property
     def costo_total_piezas(self):
         """Calcula el costo total de todas las piezas cotizadas"""
@@ -1029,6 +1035,53 @@ class Cotizacion(models.Model):
     def costo_total(self):
         """Calcula el costo total (piezas + mano de obra)"""
         return self.costo_total_piezas + self.costo_mano_obra
+    
+    @property
+    def costo_mano_obra_aplicado(self):
+        """
+        Calcula el costo de mano de obra que realmente se cobra.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - Si descontar_mano_obra = True y el cliente aceptó → retorna 0.00 (gratis)
+        - Si descontar_mano_obra = False o cliente rechazó → retorna el costo completo
+        
+        Esto permite ofrecer el diagnóstico gratis como incentivo al aceptar.
+        """
+        if self.descontar_mano_obra and self.usuario_acepto:
+            return Decimal('0.00')
+        return self.costo_mano_obra
+    
+    @property
+    def monto_descuento_mano_obra(self):
+        """
+        Calcula el monto descontado de la mano de obra.
+        
+        EXPLICACIÓN:
+        - Si se aplicó descuento → retorna el valor original (lo que se ahorró)
+        - Si no → retorna 0.00
+        
+        Útil para mostrar al cliente cuánto se ahorró.
+        """
+        if self.descontar_mano_obra and self.usuario_acepto:
+            return self.costo_mano_obra
+        return Decimal('0.00')
+    
+    @property
+    def costo_total_final(self):
+        """
+        Calcula el costo total FINAL que pagará el cliente.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Esta es la propiedad más importante para facturación.
+        - Suma las piezas aceptadas
+        - Suma la mano de obra (aplicando descuento si corresponde)
+        
+        Ejemplos:
+        - Piezas: $500, Mano obra: $100, Sin descuento → $600
+        - Piezas: $500, Mano obra: $100, CON descuento → $500 (ahorro de $100)
+        - Solo mano obra: $100, CON descuento → $0 (todo gratis)
+        """
+        return self.costo_piezas_aceptadas + self.costo_mano_obra_aplicado
     
     @property
     def dias_sin_respuesta(self):

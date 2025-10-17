@@ -1183,33 +1183,34 @@ def detalle_orden(request, orden_id):
                 
                 # Mensaje según la decisión
                 if accion == 'aceptar':
+                    # Obtener información del descuento
+                    se_aplico_descuento = cotizacion_actualizada.descontar_mano_obra
+                    
                     # Construir mensaje según si hay piezas o solo mano de obra
                     if todas_las_piezas.exists():
                         mensaje_piezas = f'{piezas_aceptadas_count} pieza(s) aceptada(s)'
                         if piezas_rechazadas_count > 0:
                             mensaje_piezas += f' y {piezas_rechazadas_count} pieza(s) rechazada(s)'
-                        mensaje_completo = f'✅ Cotización ACEPTADA por el cliente ({mensaje_piezas}). Continúa con la reparación.'
+                        
+                        # Agregar información de descuento si aplica
+                        if se_aplico_descuento:
+                            mensaje_completo = f'✅ Cotización ACEPTADA por el cliente ({mensaje_piezas}). 🎁 Mano de obra DESCONTADA como beneficio (ahorro: ${cotizacion_actualizada.costo_mano_obra}).'
+                        else:
+                            mensaje_completo = f'✅ Cotización ACEPTADA por el cliente ({mensaje_piezas}). Continúa con la reparación.'
                     else:
                         # Solo hay mano de obra
-                        mensaje_completo = f'✅ Cotización ACEPTADA por el cliente (Solo mano de obra: ${cotizacion_actualizada.costo_mano_obra}). Continúa con la reparación.'
+                        if se_aplico_descuento:
+                            mensaje_completo = f'✅ Cotización ACEPTADA por el cliente (Solo mano de obra). 🎁 Diagnóstico GRATUITO como beneficio (ahorro: ${cotizacion_actualizada.costo_mano_obra}).'
+                        else:
+                            mensaje_completo = f'✅ Cotización ACEPTADA por el cliente (Solo mano de obra: ${cotizacion_actualizada.costo_mano_obra}). Continúa con la reparación.'
                     
                     messages.success(request, mensaje_completo)
                     
-                    # Cambiar estado a "Esperando Piezas" o "En Reparación" según el caso
-                    # Si hay piezas aceptadas pendientes de llegar, estado = esperando_piezas
-                    # Si NO hay piezas o todas están recibidas, estado = reparacion
-                    tiene_seguimientos_pendientes = False
-                    if piezas_aceptadas_count > 0:
-                        tiene_seguimientos_pendientes = orden.cotizacion.seguimientos_piezas.exclude(
-                            estado='recibido'
-                        ).exists()
-                    
-                    if tiene_seguimientos_pendientes:
-                        nuevo_estado = 'esperando_piezas'
-                        mensaje_estado = 'Esperando Llegada de Piezas'
-                    else:
-                        nuevo_estado = 'reparacion'
-                        mensaje_estado = 'En Reparación'
+                    # 🆕 ACTUALIZACIÓN (Oct 2025): Cambiar estado a "Cliente Acepta Cotización"
+                    # Independientemente de si hay piezas pendientes o no, el flujo ahora
+                    # requiere que primero pase por este estado antes de ir a reparación
+                    nuevo_estado = 'cliente_acepta_cotizacion'
+                    mensaje_estado = 'Cliente Acepta Cotización'
                     
                     if orden.estado != nuevo_estado:
                         estado_anterior = orden.estado
@@ -1226,16 +1227,36 @@ def detalle_orden(request, orden_id):
                             tipo_evento='cambio_estado',
                             estado_anterior=estado_anterior,
                             estado_nuevo=nuevo_estado,
-                            comentario=f'Cambio automático: cotización aceptada',
+                            comentario=f'Cambio automático: cotización aceptada por el cliente',
                             usuario=empleado_actual,
                             es_sistema=True
                         )
                     
                     # Registrar en historial con detalle
                     if todas_las_piezas.exists():
-                        comentario_historial = f'Cliente ACEPTÓ la cotización - {piezas_aceptadas_count} pieza(s) aceptada(s) - Total: ${cotizacion_actualizada.costo_piezas_aceptadas + cotizacion_actualizada.costo_mano_obra}'
+                        # Construir comentario con información de descuento
+                        if cotizacion_actualizada.descontar_mano_obra:
+                            comentario_historial = (
+                                f'✅ Cliente ACEPTÓ la cotización - {piezas_aceptadas_count} pieza(s) aceptada(s)\n'
+                                f'   💰 Piezas: ${cotizacion_actualizada.costo_piezas_aceptadas}\n'
+                                f'   🎁 Mano de obra DESCONTADA: ${cotizacion_actualizada.costo_mano_obra} (GRATIS)\n'
+                                f'   📊 Total a pagar: ${cotizacion_actualizada.costo_total_final} (ahorro de ${cotizacion_actualizada.monto_descuento_mano_obra})'
+                            )
+                        else:
+                            comentario_historial = (
+                                f'✅ Cliente ACEPTÓ la cotización - {piezas_aceptadas_count} pieza(s) aceptada(s)\n'
+                                f'   💰 Total: ${cotizacion_actualizada.costo_piezas_aceptadas + cotizacion_actualizada.costo_mano_obra}'
+                            )
                     else:
-                        comentario_historial = f'Cliente ACEPTÓ la cotización - Solo mano de obra - Total: ${cotizacion_actualizada.costo_mano_obra}'
+                        # Solo mano de obra
+                        if cotizacion_actualizada.descontar_mano_obra:
+                            comentario_historial = (
+                                f'✅ Cliente ACEPTÓ la cotización - Solo mano de obra\n'
+                                f'   🎁 Diagnóstico GRATUITO como beneficio (ahorro: ${cotizacion_actualizada.costo_mano_obra})\n'
+                                f'   📊 Total a pagar: $0.00'
+                            )
+                        else:
+                            comentario_historial = f'Cliente ACEPTÓ la cotización - Solo mano de obra - Total: ${cotizacion_actualizada.costo_mano_obra}'
                     
                     HistorialOrden.objects.create(
                         orden=orden,
