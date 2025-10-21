@@ -1193,7 +1193,7 @@
                                                                 </div>
                                                             {% endif %}
                                                             
-                                                            <!-- Fila 2: Editar y Eliminar -->
+                                                            <!-- Fila 2: Editar, Eliminar y Reenviar -->
                                                             <div class="btn-group btn-group-sm w-100" role="group">
                                                                 <button type="button" class="btn btn-outline-primary" 
                                                                         onclick="editarSeguimiento({{ seguimiento.id }})" 
@@ -1205,6 +1205,13 @@
                                                                         title="Eliminar">
                                                                     🗑️ Eliminar
                                                                 </button>
+                                                                {% if seguimiento.estado == 'recibido' %}
+                                                                    <button type="button" class="btn btn-outline-warning" 
+                                                                            onclick="reenviarNotificacion({{ seguimiento.id }})" 
+                                                                            title="Reenviar notificación al técnico">
+                                                                        🔄 Reenviar
+                                                                    </button>
+                                                                {% endif %}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -3512,6 +3519,53 @@ async function marcarRecibido(seguimientoId) {
     } catch (error) {
         console.error('Error:', error);
         mostrarToast('Error de conexión', 'danger');
+    }
+}
+
+/**
+ * Reenvía la notificación de pieza recibida al técnico
+ * 
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Esta función permite reintentar el envío del email cuando el envío original falló.
+ * Por ejemplo, si hubo un problema con el servidor de correo o el email del técnico
+ * estaba mal configurado, se puede corregir y luego usar este botón para reenviar.
+ * 
+ * @param {number} seguimientoId - ID del seguimiento de la pieza recibida
+ */
+async function reenviarNotificacion(seguimientoId) {
+    // Confirmar acción con el usuario
+    if (!confirm('¿Deseas reenviar la notificación de pieza recibida al técnico?')) {
+        return;
+    }
+    
+    // Construir URL de reenvío
+    const url = "{% url 'servicio_tecnico:reenviar_notificacion' 0 %}".replace('/0/', `/${seguimientoId}/`);
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    try {
+        // Mostrar indicador de carga
+        mostrarToast('📧 Reenviando notificación...', 'info');
+        
+        // Realizar petición AJAX
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        // Procesar respuesta
+        if (data.success) {
+            mostrarToast(data.message, 'success');
+            // Recargar para mostrar el nuevo registro en el historial
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            mostrarToast(data.message || 'Error al reenviar la notificación', 'danger');
+        }
+    } catch (error) {
+        console.error('Error al reenviar notificación:', error);
+        mostrarToast('❌ Error de conexión al reenviar', 'danger');
     }
 }
 

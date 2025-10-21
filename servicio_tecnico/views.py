@@ -569,7 +569,11 @@ def lista_ordenes_activas(request):
         'tecnico_asignado_actual',
         'detalle_equipo'
     ).prefetch_related(
-        'imagenes'  # Para contar imágenes eficientemente
+        'imagenes',  # Para contar imágenes eficientemente
+        Prefetch(
+            'historial',
+            queryset=HistorialOrden.objects.filter(tipo_evento='cambio_estado').order_by('-fecha_evento')
+        )  # Para calcular días sin actualización de estado eficientemente
     ).order_by('-fecha_ingreso')
     
     # Aplicar búsqueda si existe
@@ -2688,22 +2692,150 @@ def marcar_pieza_recibida(request, seguimiento_id):
         seguimiento.fecha_entrega_real = fecha_entrega_real
         seguimiento.save()
         
-        # Enviar notificación por email
-        _enviar_notificacion_pieza_recibida(orden, seguimiento)
+        # Enviar notificación por email y capturar resultado
+        resultado_email = _enviar_notificacion_pieza_recibida(orden, seguimiento)
+        
+        # =================================================================
+        # REGISTRAR EN HISTORIAL CON DETALLES DEL ENVÍO
+        # =================================================================
+        if resultado_email['success']:
+            # Construir mensaje de éxito con destinatarios
+            destinatarios_str = ', '.join(resultado_email['destinatarios'])
+            mensaje_historial = f"📬 Pieza recibida - {seguimiento.proveedor}\n"
+            mensaje_historial += f"✉️ Email enviado a: {destinatarios_str}"
+            
+            if resultado_email['destinatarios_copia']:
+                cc_str = ', '.join(resultado_email['destinatarios_copia'])
+                mensaje_historial += f"\n📧 Con copia a: {cc_str}"
+        else:
+            # Construir mensaje de error
+            mensaje_historial = f"📬 Pieza recibida - {seguimiento.proveedor}\n"
+            mensaje_historial += f"❌ Error al enviar email: {resultado_email['message']}\n"
+            mensaje_historial += f"⚠️ El técnico NO fue notificado automáticamente"
         
         # Registrar en historial
         registrar_historial(
             orden=orden,
             tipo_evento='cotizacion',
             usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
-            comentario=f"📬 Pieza recibida - {seguimiento.proveedor} - Notificación enviada a técnico",
+            comentario=mensaje_historial,
             es_sistema=False
         )
         
+        # =================================================================
+        # RESPUESTA JSON CON INFORMACIÓN DEL ENVÍO
+        # =================================================================
+        mensaje_respuesta = '✅ Pieza marcada como recibida.'
+        if resultado_email['success']:
+            mensaje_respuesta += ' Email enviado al técnico.'
+        else:
+            mensaje_respuesta += f" ⚠️ No se pudo enviar el email: {resultado_email['message']}"
+        
         return JsonResponse({
             'success': True,
-            'message': f'✅ Pieza marcada como recibida. Email enviado al técnico.',
+            'message': mensaje_respuesta,
+            'email_enviado': resultado_email['success'],
             'seguimiento_html': _render_seguimiento_card(seguimiento)
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def reenviar_notificacion_pieza(request, seguimiento_id):
+    """
+    Reenvía la notificación de pieza recibida al técnico.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista permite reintentar el envío de la notificación cuando el 
+    envío inicial falló (por problemas de SMTP, email inválido, etc.)
+    
+    CASO DE USO:
+    1. Se marca una pieza como recibida
+    2. El email falla por algún motivo
+    3. Se muestra un botón "Reenviar Notificación"
+    4. Al hacer clic, se llama a esta vista
+    5. Se intenta enviar nuevamente el email
+    6. Se registra el resultado en el historial
+    
+    SEGURIDAD:
+    - Solo usuarios autenticados pueden reenviar
+    - Solo se puede reenviar si el seguimiento ya está marcado como "recibido"
+    
+    Args:
+        request: HttpRequest con el usuario autenticado
+        seguimiento_id: ID del seguimiento de la pieza
+    
+    Returns:
+        JsonResponse con el resultado del reenvío
+    """
+    from django.http import JsonResponse
+    from .models import SeguimientoPieza
+    
+    try:
+        # Obtener el seguimiento
+        seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        cotizacion = seguimiento.cotizacion
+        orden = cotizacion.orden
+        
+        # =================================================================
+        # VALIDACIÓN: Solo se puede reenviar si está marcado como recibido
+        # =================================================================
+        if seguimiento.estado != 'recibido':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Solo se pueden reenviar notificaciones de piezas marcadas como recibidas'
+            }, status=400)
+        
+        # =================================================================
+        # INTENTAR ENVIAR EL EMAIL NUEVAMENTE
+        # =================================================================
+        resultado_email = _enviar_notificacion_pieza_recibida(orden, seguimiento)
+        
+        # =================================================================
+        # REGISTRAR EN HISTORIAL EL INTENTO DE REENVÍO
+        # =================================================================
+        if resultado_email['success']:
+            # Éxito en el reenvío
+            destinatarios_str = ', '.join(resultado_email['destinatarios'])
+            mensaje_historial = f"🔄 Notificación reenviada - {seguimiento.proveedor}\n"
+            mensaje_historial += f"✉️ Email enviado a: {destinatarios_str}"
+            
+            if resultado_email['destinatarios_copia']:
+                cc_str = ', '.join(resultado_email['destinatarios_copia'])
+                mensaje_historial += f"\n📧 Con copia a: {cc_str}"
+            
+            mensaje_respuesta = '✅ Notificación reenviada exitosamente al técnico'
+        else:
+            # Error en el reenvío
+            mensaje_historial = f"🔄 Intento de reenvío - {seguimiento.proveedor}\n"
+            mensaje_historial += f"❌ Error al enviar email: {resultado_email['message']}\n"
+            mensaje_historial += f"⚠️ El técnico NO fue notificado"
+            
+            mensaje_respuesta = f"❌ Error al reenviar: {resultado_email['message']}"
+        
+        # Registrar en historial
+        registrar_historial(
+            orden=orden,
+            tipo_evento='cotizacion',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=mensaje_historial,
+            es_sistema=False
+        )
+        
+        # =================================================================
+        # RETORNAR RESPUESTA
+        # =================================================================
+        return JsonResponse({
+            'success': resultado_email['success'],
+            'message': mensaje_respuesta,
+            'email_enviado': resultado_email['success']
         })
     
     except Exception as e:
@@ -2955,69 +3087,172 @@ def _enviar_notificacion_pieza_recibida(orden, seguimiento):
     """
     Envía email al técnico notificando que una pieza fue recibida.
     
-    EXPLICACIÓN:
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
     Esta función se ejecuta automáticamente cuando se marca un seguimiento
-    como "recibido". Envía un email al técnico asignado para que sepa
-    que ya puede continuar con la reparación.
+    como "recibido". Envía un email al técnico asignado con copia a su
+    jefe directo y al jefe de calidad.
+    
+    DESTINATARIOS:
+    - TO (Para): Técnico asignado a la orden
+    - CC (Copia): Jefe directo del técnico (si existe)
+    - CC (Copia): Jefe de Calidad (desde .env)
     
     CONTENIDO DEL EMAIL:
-    - Número de orden
-    - Cliente
+    - Orden del cliente (no la orden interna)
+    - Información del equipo (marca, modelo, serie)
     - Proveedor de la pieza
     - Descripción de las piezas recibidas
     - Fecha de recepción
+    
+    RETORNA:
+    dict con 'success': True/False, 'message': str, 'destinatarios': list
+    
+    Args:
+        orden (OrdenServicio): Orden de servicio
+        seguimiento (SeguimientoPieza): Seguimiento de la pieza recibida
+    
+    Returns:
+        dict: Estado del envío con detalles
+            {
+                'success': True,
+                'message': 'Email enviado correctamente',
+                'destinatarios': ['tecnico@sic.com', 'jefe@sic.com'],
+                'destinatarios_copia': ['calidad@sic.com']
+            }
     """
-    from django.core.mail import send_mail
+    from django.core.mail import EmailMessage
     from django.conf import settings
+    import os
     
     try:
-        # Verificar que hay técnico asignado
-        if not orden.tecnico_asignado or not orden.tecnico_asignado.correo:
-            print(f"⚠️ No se envió email: Orden #{orden.numero_orden} no tiene técnico con email")
-            return
+        # =================================================================
+        # VALIDACIÓN 1: Verificar que hay técnico asignado con email
+        # =================================================================
+        if not orden.tecnico_asignado_actual:
+            return {
+                'success': False,
+                'message': '⚠️ La orden no tiene técnico asignado',
+                'destinatarios': [],
+                'destinatarios_copia': []
+            }
         
-        # Construir email
-        asunto = f'📬 Pieza Recibida - Orden #{orden.numero_orden}'
+        if not orden.tecnico_asignado_actual.email:
+            return {
+                'success': False,
+                'message': f'⚠️ El técnico {orden.tecnico_asignado_actual.nombre_completo} no tiene email configurado',
+                'destinatarios': [],
+                'destinatarios_copia': []
+            }
         
-        mensaje = f'''
-Hola {orden.tecnico_asignado.usuario.first_name},
+        # =================================================================
+        # CONSTRUCCIÓN DE DESTINATARIOS
+        # =================================================================
+        destinatarios_principales = [orden.tecnico_asignado_actual.email]
+        destinatarios_copia = []
+        
+        # Agregar jefe directo del técnico (si existe y tiene email)
+        if (orden.tecnico_asignado_actual.jefe_directo and 
+            orden.tecnico_asignado_actual.jefe_directo.email):
+            destinatarios_copia.append(orden.tecnico_asignado_actual.jefe_directo.email)
+        
+        # IMPORTANTE: Agregar Jefe de Calidad desde .env
+        # Este email SIEMPRE debe estar en copia
+        jefe_calidad_email = os.getenv('JEFE_CALIDAD_EMAIL', '').strip()
+        if jefe_calidad_email:
+            # Evitar duplicados (por si el jefe directo es el mismo que el jefe de calidad)
+            if jefe_calidad_email not in destinatarios_copia:
+                destinatarios_copia.append(jefe_calidad_email)
+                print(f"🔔 Agregando Jefe de Calidad en CC: {jefe_calidad_email}")
+        else:
+            print("⚠️ ADVERTENCIA: JEFE_CALIDAD_EMAIL no está configurado en .env")
+        
+        # =================================================================
+        # CONSTRUCCIÓN DEL EMAIL
+        # =================================================================
+        # Obtener nombre del técnico (solo primer nombre)
+        nombre_tecnico = orden.tecnico_asignado_actual.nombre_completo.split()[0]
+        
+        # Obtener información del equipo
+        detalle = orden.detalle_equipo
+        orden_cliente = detalle.orden_cliente if detalle.orden_cliente else 'Sin orden de cliente'
+        
+        # Construir asunto
+        asunto = f'📬 Pieza Recibida - Orden Cliente: {orden_cliente}'
+        
+        # Construir cuerpo del mensaje
+        mensaje = f'''Hola {nombre_tecnico},
 
 Te informamos que ha llegado una pieza para la orden que tienes asignada:
 
-📋 INFORMACIÓN DE LA ORDEN:
+📋 INFORMACIÓN DE LA ORDEN
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Orden: #{orden.numero_orden}
-• Cliente: {orden.cliente.nombre}
-• Equipo: {orden.tipo_equipo} - {orden.marca}
+• Orden Cliente: {orden_cliente}
+• Orden Interna: {orden.numero_orden_interno}
+• Equipo: {detalle.get_tipo_equipo_display()} {detalle.marca} {detalle.modelo}
+• N° Serie: {detalle.numero_serie}
+• Estado actual: {orden.get_estado_display()}
 
-📦 INFORMACIÓN DE LA PIEZA:
+📦 PIEZA RECIBIDA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • Proveedor: {seguimiento.proveedor}
-• Piezas: {seguimiento.descripcion_piezas}
+• Descripción: {seguimiento.descripcion_piezas}
 • Fecha de recepción: {seguimiento.fecha_entrega_real.strftime('%d/%m/%Y')}
 {f'• Número de pedido: {seguimiento.numero_pedido}' if seguimiento.numero_pedido else ''}
 
-Ya puedes recoger la pieza en almacén y continuar con la reparación.
+✅ PRÓXIMOS PASOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Recoge la pieza en almacén
+2. Actualiza el estado de la orden a "En reparación"
+3. Instala y verifica la pieza
+4. Actualiza el progreso en el sistema
 
 ---
-Sistema de Servicio Técnico
-Este es un mensaje automático, por favor no responder.
-        '''
+Sistema de Servicio Técnico SIC
+Este es un mensaje automático. Si tienes dudas, contacta al responsable del seguimiento.
+'''
         
-        # Enviar email
-        send_mail(
+        # =================================================================
+        # ENVÍO DEL EMAIL
+        # =================================================================
+        # Usar remitente personalizado para Servicio Técnico (si existe)
+        # Si no existe, usar el remitente por defecto del sistema
+        from_email = os.getenv('SERVICIO_TECNICO_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)
+        
+        email = EmailMessage(
             subject=asunto,
-            message=mensaje,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[orden.tecnico_asignado.correo],
-            fail_silently=False,
+            body=mensaje,
+            from_email=from_email,
+            to=destinatarios_principales,
+            cc=destinatarios_copia if destinatarios_copia else None,
         )
         
-        print(f"✅ Email enviado a {orden.tecnico_asignado.correo} - Pieza recibida Orden #{orden.numero_orden}")
+        email.send(fail_silently=False)
+        
+        # Log exitoso
+        print(f"✅ Email enviado correctamente")
+        print(f"   TO: {', '.join(destinatarios_principales)}")
+        if destinatarios_copia:
+            print(f"   CC: {', '.join(destinatarios_copia)}")
+        
+        return {
+            'success': True,
+            'message': 'Email enviado correctamente',
+            'destinatarios': destinatarios_principales,
+            'destinatarios_copia': destinatarios_copia
+        }
     
     except Exception as e:
+        # Log de error
         print(f"❌ Error al enviar email de notificación: {str(e)}")
-        # No levantamos la excepción para no afectar el flujo principal
+        
+        return {
+            'success': False,
+            'message': f'Error al enviar email: {str(e)}',
+            'destinatarios': [],
+            'destinatarios_copia': [],
+            'error_detalle': str(e)
+        }
 
 
 # ============================================================================

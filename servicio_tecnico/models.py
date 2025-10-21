@@ -423,6 +423,87 @@ class OrdenServicio(models.Model):
         
         return delta.days
     
+    @property
+    def dias_sin_actualizacion_estado(self):
+        """
+        Calcula los días HÁBILES que han pasado desde la última actualización del estado.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Esta propiedad es crucial para detectar órdenes "estancadas" que no han
+        tenido avances. Usa días hábiles (lunes a viernes) porque el trabajo
+        solo se realiza en días laborables.
+        
+        ¿Cómo funciona?
+        1. Busca el último evento de cambio de estado en el historial
+        2. Si lo encuentra, calcula días hábiles desde esa fecha hasta hoy
+        3. Si no hay historial de cambios, usa la fecha de ingreso de la orden
+        
+        ¿Por qué es importante?
+        - Identifica órdenes sin progreso
+        - Permite alertas visuales en el dashboard
+        - Ayuda a priorizar el seguimiento
+        
+        Returns:
+            int: Número de días hábiles sin actualización de estado (0 o más)
+        
+        Ejemplos:
+            # Orden creada hoy → 0 días
+            # Orden cambiada de estado hace 3 días hábiles → 3 días
+            # Orden sin cambios hace 2 semanas (10 días hábiles) → 10 días
+        
+        Colores sugeridos para visualización:
+            0-2 días: Verde (reciente)
+            3-5 días: Amarillo (requiere atención)
+            6+ días: Rojo (urgente)
+        """
+        from .utils_rhitso import calcular_dias_en_estatus
+        
+        # Buscar el último cambio de estado en el historial
+        ultimo_cambio = self.historial.filter(
+            tipo_evento='cambio_estado'
+        ).order_by('-fecha_evento').first()
+        
+        if ultimo_cambio:
+            # Calcular días hábiles desde el último cambio de estado
+            return calcular_dias_en_estatus(ultimo_cambio.fecha_evento)
+        else:
+            # Si no hay cambios de estado registrados, usar fecha de ingreso
+            # (esto sucede con órdenes muy antiguas o recién creadas)
+            return calcular_dias_en_estatus(self.fecha_ingreso)
+    
+    @property
+    def color_dias_sin_actualizacion(self):
+        """
+        Retorna el color CSS de Bootstrap según los días sin actualización.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Esta propiedad implementa un sistema de "semáforo" visual para
+        identificar rápidamente qué órdenes necesitan atención.
+        
+        Rangos establecidos:
+            0-2 días: 'success' (verde) - Actualización reciente
+            3-5 días: 'warning' (amarillo) - Requiere atención
+            6+ días: 'danger' (rojo) - Urgente, sin avances
+        
+        Returns:
+            str: Clase CSS de Bootstrap ('success', 'warning', 'danger')
+        
+        Uso en templates:
+            <span class="badge bg-{{ orden.color_dias_sin_actualizacion }}">
+                {{ orden.dias_sin_actualizacion_estado }} días
+            </span>
+        """
+        dias = self.dias_sin_actualizacion_estado
+        
+        if dias <= 2:
+            return 'success'    # Verde - Reciente
+        elif dias <= 5:
+            return 'warning'    # Amarillo - Atención
+        else:
+            return 'danger'     # Rojo - Urgente
+    
     # ========================================================================
     # PROPERTIES ADICIONALES PARA MÓDULO RHITSO (Fase 2)
     # ========================================================================

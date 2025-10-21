@@ -367,6 +367,13 @@
                             {% if orden.es_candidato_rhitso %}
                                 <span class="badge badge-rhitso">RHITSO</span>
                             {% endif %}
+                            
+                            <!-- NUEVO: Indicador de días sin actualización -->
+                            <span class="badge badge-dias-sin-actualizacion bg-{{ orden.color_dias_sin_actualizacion }}" 
+                                  title="Días hábiles sin actualización de estado">
+                                <i class="bi bi-clock-history"></i> {{ orden.dias_sin_actualizacion_estado }}d
+                            </span>
+                            
                             <small class="text-muted">
                                 {{ orden.fecha_ingreso|date:"d/m/Y" }}
                             </small>
