@@ -50,6 +50,45 @@ COLORES_ESTADO_RHITSO = {
 
 
 # =============================================================================
+# DICCIONARIO DE COLORES PARA ESTADOS DE ORDEN DE SERVICIO
+# =============================================================================
+
+COLORES_ESTADO_ORDEN = {
+    # === FASE 1: INGRESO Y DIAGNÓSTICO ===
+    'espera': '#6c757d',                              # Gris - En espera de procesamiento
+    'recepcion': '#0d6efd',                           # Azul - Recibiendo equipo
+    'diagnostico': '#ffc107',                         # Amarillo - En proceso de diagnóstico
+    'equipo_diagnosticado': '#17a2b8',                # Cian - Diagnóstico completado
+    'diagnostico_enviado_cliente': '#0d6efd',        # Azul - Información enviada
+    
+    # === FASE 2: COTIZACIÓN Y APROBACIÓN ===
+    'cotizacion_enviada_proveedor': '#0d6efd',       # Azul - Enviado a proveedor
+    'cotizacion_recibida_proveedor': '#ffc107',      # Amarillo - Esperando respuesta del proveedor
+    'cotizacion': '#ffc107',                          # Amarillo - Esperando aprobación cliente
+    'cliente_acepta_cotizacion': '#198754',           # Verde - Cliente aprobó
+    'rechazada': '#dc3545',                           # Rojo - Cotización rechazada
+    
+    # === FASE 3: GESTIÓN DE PIEZAS Y COMPONENTES ===
+    'partes_solicitadas_proveedor': '#0d6efd',       # Azul - Piezas pedidas
+    'esperando_piezas': '#fd7e14',                    # Naranja - Esperando llegada de piezas
+    'piezas_recibidas': '#198754',                    # Verde - Piezas llegaron
+    'wpb_pieza_incorrecta': '#dc3545',                # Rojo - Pieza incorrecta
+    'doa_pieza_danada': '#dc3545',                    # Rojo - Pieza dañada (Dead On Arrival)
+    'pnc_parte_no_disponible': '#ffc107',             # Amarillo - Parte no disponible
+    
+    # === FASE 4: REPARACIÓN Y ENTREGA ===
+    'reparacion': '#6610f2',                          # Púrpura - En reparación
+    'control_calidad': '#0d6efd',                     # Azul - Verificando calidad
+    'finalizado': '#198754',                          # Verde - Listo para entregar
+    'entregado': '#198754',                           # Verde - Entregado exitosamente
+    'cancelado': '#6c757d',                           # Gris - Orden cancelada
+    
+    # Color por defecto para estados no definidos
+    'default': '#6c757d',                             # Gris - Estado desconocido
+}
+
+
+# =============================================================================
 # DICCIONARIO DE COLORES PARA COMPLEJIDAD
 # =============================================================================
 
@@ -253,6 +292,113 @@ def color_estado_rhitso(owner):
     
     # Buscar el color correspondiente
     return COLORES_ESTADO_RHITSO.get(owner_clean, COLORES_ESTADO_RHITSO['default'])
+
+
+# =============================================================================
+# FILTRO 1.5: COLOR SEGÚN ESTADO DE ORDEN DE SERVICIO
+# =============================================================================
+
+@register.filter(name='color_estado_orden')
+def color_estado_orden(codigo_estado):
+    """
+    Retorna el color hexadecimal y clase Bootstrap según el código de estado de orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Este filtro mapea cada estado posible de una orden de servicio a un color.
+    
+    Estados del workflow:
+    ✅ Colores verdes: Estados finales exitosos (entregado, finalizado, cliente_acepta_cotizacion)
+    ⚠️ Colores amarillos/naranjas: Estados de espera o transición
+    🔵 Colores azules: Estados de información y control
+    🔴 Colores rojos: Estados problemáticos (rechazada, piezas dañadas)
+    ⚫ Colores grises: Estados iniciales, cancelado, desconocido
+    
+    Args:
+        codigo_estado (str): Código del estado (ej: 'reparacion', 'cotizacion', 'entregado')
+    
+    Returns:
+        str: Código de color Bootstrap (ej: 'success', 'warning', 'danger') para usar en clases
+    
+    Ejemplo de uso en template:
+        {% load rhitso_filters %}
+        <span class="badge bg-{{ orden.estado|color_estado_orden }}">
+            {{ orden.get_estado_display }}
+        </span>
+    
+    O también:
+        {% load rhitso_filters %}
+        <span class="badge" style="background-color: {{ orden.estado|color_estado_orden_hex }};">
+            {{ orden.get_estado_display }}
+        </span>
+    """
+    if not codigo_estado:
+        return 'secondary'
+    
+    # Convertir a minúsculas y limpiar espacios
+    estado_clean = str(codigo_estado).lower().strip()
+    
+    # Retornar clases Bootstrap en lugar de códigos hex para este filtro
+    # Esto hace que sea más fácil de usar en templates de Bootstrap
+    colores_bootstrap = {
+        # === FASE 1: INGRESO Y DIAGNÓSTICO ===
+        'espera': 'secondary',               # Gris
+        'recepcion': 'primary',              # Azul
+        'diagnostico': 'warning',            # Amarillo
+        'equipo_diagnosticado': 'info',      # Cian
+        'diagnostico_enviado_cliente': 'primary',  # Azul
+        
+        # === FASE 2: COTIZACIÓN Y APROBACIÓN ===
+        'cotizacion_enviada_proveedor': 'primary',  # Azul
+        'cotizacion_recibida_proveedor': 'warning', # Amarillo
+        'cotizacion': 'warning',             # Amarillo
+        'cliente_acepta_cotizacion': 'success',    # Verde
+        'rechazada': 'danger',               # Rojo
+        
+        # === FASE 3: GESTIÓN DE PIEZAS Y COMPONENTES ===
+        'partes_solicitadas_proveedor': 'primary',  # Azul
+        'esperando_piezas': 'warning',      # Amarillo/Naranja
+        'piezas_recibidas': 'success',      # Verde
+        'wpb_pieza_incorrecta': 'danger',   # Rojo
+        'doa_pieza_danada': 'danger',       # Rojo
+        'pnc_parte_no_disponible': 'warning',  # Amarillo
+        
+        # === FASE 4: REPARACIÓN Y ENTREGA ===
+        'reparacion': 'primary',             # Púrpura (usamos primary en Bootstrap 5)
+        'control_calidad': 'primary',        # Azul
+        'finalizado': 'success',             # Verde
+        'entregado': 'success',              # Verde
+        'cancelado': 'secondary',            # Gris
+    }
+    
+    return colores_bootstrap.get(estado_clean, 'secondary')
+
+
+# =============================================================================
+# FILTRO 1.6: COLOR HEXADECIMAL SEGÚN ESTADO DE ORDEN DE SERVICIO
+# =============================================================================
+
+@register.filter(name='color_estado_orden_hex')
+def color_estado_orden_hex(codigo_estado):
+    """
+    Retorna el color hexadecimal según el código de estado de orden.
+    
+    Similar a color_estado_orden pero retorna hexadecimal en lugar de clase Bootstrap.
+    Útil cuando necesitas más control sobre estilos inline.
+    
+    Args:
+        codigo_estado (str): Código del estado
+    
+    Returns:
+        str: Color hexadecimal (ej: '#198754')
+    """
+    if not codigo_estado:
+        return COLORES_ESTADO_ORDEN['default']
+    
+    # Convertir a minúsculas y limpiar espacios
+    estado_clean = str(codigo_estado).lower().strip()
+    
+    return COLORES_ESTADO_ORDEN.get(estado_clean, COLORES_ESTADO_ORDEN['default'])
 
 
 # =============================================================================

@@ -1,0 +1,635 @@
+/* ========================================
+   DASHBOARD DE SERVICIO TÉCNICO
+   Estilos específicos para la página de inicio
+   del módulo de Servicio Técnico
+   ======================================== */
+
+/* ===== HERO SECTION ===== */
+.st-hero {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+    padding: 3rem 0;
+    margin-bottom: 2rem;
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-xl);
+    position: relative;
+    overflow: hidden;
+}
+
+.st-hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 400px;
+    height: 400px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+}
+
+.st-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    left: -5%;
+    width: 300px;
+    height: 300px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 50%;
+}
+
+.st-hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+.st-hero-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.st-hero-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.95;
+    font-weight: 300;
+}
+
+/* ===== MÉTRICAS PRINCIPALES (CARDS) ===== */
+.st-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.st-metric-card {
+    background: white;
+    border-radius: var(--border-radius-lg);
+    padding: 1.75rem;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+    position: relative;
+    overflow: hidden;
+}
+
+.st-metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: var(--primary-light);
+    border-radius: 50%;
+    transform: translate(30%, -30%);
+    opacity: 0.1;
+}
+
+.st-metric-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Colores de borde según tipo de métrica */
+.st-metric-card.primary {
+    border-left-color: var(--primary-color);
+}
+
+.st-metric-card.success {
+    border-left-color: var(--success-color);
+}
+
+.st-metric-card.warning {
+    border-left-color: var(--warning-color);
+}
+
+.st-metric-card.danger {
+    border-left-color: var(--danger-color);
+}
+
+.st-metric-card.info {
+    border-left-color: var(--info-color);
+}
+
+.st-metric-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.8;
+}
+
+.st-metric-card.primary .st-metric-icon {
+    color: var(--primary-color);
+}
+
+.st-metric-card.success .st-metric-icon {
+    color: var(--success-color);
+}
+
+.st-metric-card.warning .st-metric-icon {
+    color: var(--warning-color);
+}
+
+.st-metric-card.danger .st-metric-icon {
+    color: var(--danger-color);
+}
+
+.st-metric-card.info .st-metric-icon {
+    color: var(--info-color);
+}
+
+.st-metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.st-metric-label {
+    color: var(--gray-600);
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.st-metric-sublabel {
+    color: var(--gray-500);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+/* ===== SECCIONES DE DASHBOARD ===== */
+.st-section {
+    background: white;
+    border-radius: var(--border-radius-lg);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+}
+
+.st-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.st-section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.st-section-title i {
+    font-size: 1.75rem;
+    color: var(--primary-color);
+}
+
+.st-section-action {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* ===== TABLA DE ESTADOS ===== */
+.st-estado-table {
+    width: 100%;
+}
+
+.st-estado-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+    margin-bottom: 0.75rem;
+    background: var(--gray-50);
+    transition: all 0.2s ease;
+}
+
+.st-estado-row:hover {
+    background: var(--gray-100);
+    transform: translateX(5px);
+}
+
+.st-estado-badge {
+    min-width: 140px;
+}
+
+.st-estado-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.st-estado-bar {
+    flex: 1;
+    margin: 0 1rem;
+}
+
+.st-estado-bar-fill {
+    height: 8px;
+    background: var(--primary-color);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* ===== TÉCNICOS ACTIVOS ===== */
+.st-tecnicos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.25rem;
+}
+
+.st-tecnico-card {
+    background: var(--gray-50);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.st-tecnico-card:hover {
+    background: white;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow);
+    transform: translateY(-3px);
+}
+
+.st-tecnico-avatar {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    margin: 0 auto 1rem;
+    border: 3px solid var(--primary-color);
+    overflow: hidden;
+}
+
+.st-tecnico-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.st-tecnico-avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--primary-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.st-tecnico-nombre {
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.st-tecnico-ordenes {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.25rem;
+}
+
+.st-tecnico-label {
+    font-size: 0.85rem;
+    color: var(--gray-600);
+}
+
+/* ===== ÓRDENES RECIENTES ===== */
+.st-ordenes-recientes {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.st-orden-item {
+    background: var(--gray-50);
+    border-radius: var(--border-radius-md);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid var(--primary-color);
+    transition: all 0.2s ease;
+}
+
+.st-orden-item:hover {
+    background: var(--gray-100);
+    transform: translateX(5px);
+}
+
+.st-orden-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.st-orden-numero {
+    font-weight: 700;
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
+
+.st-orden-fecha {
+    font-size: 0.85rem;
+    color: var(--gray-600);
+}
+
+.st-orden-equipo {
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.st-orden-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.st-orden-tecnico {
+    font-size: 0.85rem;
+    color: var(--gray-600);
+}
+
+/* ===== GRÁFICO DE GAMA ===== */
+.st-gama-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.st-gama-card {
+    background: var(--gray-50);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.st-gama-card:hover {
+    background: white;
+    box-shadow: var(--shadow);
+    transform: translateY(-3px);
+}
+
+.st-gama-card.alta {
+    border-top: 4px solid #198754;
+}
+
+.st-gama-card.media {
+    border-top: 4px solid #ffc107;
+}
+
+.st-gama-card.baja {
+    border-top: 4px solid #6c757d;
+}
+
+.st-gama-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.st-gama-card.alta .st-gama-icon {
+    color: #198754;
+}
+
+.st-gama-card.media .st-gama-icon {
+    color: #ffc107;
+}
+
+.st-gama-card.baja .st-gama-icon {
+    color: #6c757d;
+}
+
+.st-gama-numero {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.st-gama-card.alta .st-gama-numero {
+    color: #198754;
+}
+
+.st-gama-card.media .st-gama-numero {
+    color: #ffc107;
+}
+
+.st-gama-card.baja .st-gama-numero {
+    color: #6c757d;
+}
+
+.st-gama-label {
+    color: var(--gray-600);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+/* ===== ALERTAS ===== */
+.st-alertas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.st-alerta-card {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: var(--border-radius-md);
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s ease;
+}
+
+.st-alerta-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow);
+}
+
+.st-alerta-card.danger {
+    background: #f8d7da;
+    border-color: #dc3545;
+}
+
+.st-alerta-icon {
+    font-size: 2rem;
+    color: #ffc107;
+}
+
+.st-alerta-card.danger .st-alerta-icon {
+    color: #dc3545;
+}
+
+.st-alerta-content {
+    flex: 1;
+}
+
+.st-alerta-numero {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #856404;
+}
+
+.st-alerta-card.danger .st-alerta-numero {
+    color: #721c24;
+}
+
+.st-alerta-texto {
+    font-size: 0.9rem;
+    color: #856404;
+}
+
+.st-alerta-card.danger .st-alerta-texto {
+    color: #721c24;
+}
+
+/* ===== BOTONES DE ACCIÓN ===== */
+.st-action-buttons {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.st-action-btn {
+    flex: 1;
+    min-width: 200px;
+    padding: 1.25rem 1.5rem;
+    border-radius: var(--border-radius-md);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.st-action-btn i {
+    font-size: 1.5rem;
+}
+
+.st-action-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 1200px) {
+    .st-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .st-tecnicos-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .st-hero-title {
+        font-size: 2rem;
+    }
+    
+    .st-hero-subtitle {
+        font-size: 1rem;
+    }
+    
+    .st-metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .st-gama-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .st-tecnicos-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .st-section {
+        padding: 1.5rem;
+    }
+    
+    .st-section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .st-estado-row {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: flex-start;
+    }
+    
+    .st-estado-bar {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .st-orden-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .st-tecnicos-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .st-alertas-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .st-action-buttons {
+        flex-direction: column;
+    }
+    
+    .st-action-btn {
+        width: 100%;
+    }
+}
+
+/* ===== ANIMACIONES ===== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.st-metric-card,
+.st-section,
+.st-orden-item {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+/* Retrasos escalonados para las tarjetas */
+.st-metric-card:nth-child(1) { animation-delay: 0.1s; }
+.st-metric-card:nth-child(2) { animation-delay: 0.2s; }
+.st-metric-card:nth-child(3) { animation-delay: 0.3s; }
+.st-metric-card:nth-child(4) { animation-delay: 0.4s; }
+.st-metric-card:nth-child(5) { animation-delay: 0.5s; }
+.st-metric-card:nth-child(6) { animation-delay: 0.6s; }

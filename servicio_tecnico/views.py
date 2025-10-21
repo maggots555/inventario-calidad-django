@@ -96,34 +96,304 @@ def registrar_historial(orden, tipo_evento, usuario, comentario='', es_sistema=F
 @login_required
 def inicio(request):
     """
-    Vista principal de Servicio Técnico
-    Muestra un dashboard con estadísticas básicas
+    Vista principal de Servicio Técnico - Dashboard Completo
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista recopila TODAS las estadísticas importantes del sistema
+    de servicio técnico y las envía al template para mostrarlas de forma
+    visual y organizada.
+    
+    MÉTRICAS CALCULADAS:
+    1. Estadísticas Generales: Total de órdenes, activas, retrasadas, finalizadas
+    2. Órdenes por Estado: Distribución de órdenes en cada etapa del proceso
+    3. Órdenes por Técnico: Carga de trabajo de cada técnico
+    4. Órdenes por Gama: Distribución por tipo de equipo (alta/media/baja)
+    5. Órdenes por Sucursal: Distribución geográfica
+    6. Cotizaciones: Pendientes, aceptadas, rechazadas
+    7. RHITSO: Órdenes en reparación especializada
+    8. Tiempos Promedio: KPIs de rendimiento
+    9. Órdenes Recientes: Últimas 10 órdenes ingresadas
+    10. Alertas: Situaciones que requieren atención inmediata
+    
+    Returns:
+        HttpResponse con el template renderizado y todas las métricas
     """
-    # Estadísticas generales
+    from django.db.models import Avg, Max, Min, F
+    from django.db.models.functions import Coalesce
+    from datetime import timedelta
+    
+    # ========================================================================
+    # SECCIÓN 1: ESTADÍSTICAS GENERALES
+    # ========================================================================
     total_ordenes = OrdenServicio.objects.count()
-    ordenes_activas = OrdenServicio.objects.exclude(estado__in=['entregado', 'cancelado']).count()
-    ordenes_retrasadas = OrdenServicio.objects.filter(
-        estado__in=['diagnostico', 'reparacion', 'esperando_piezas']
+    
+    # Órdenes activas (no entregadas ni canceladas)
+    ordenes_activas_qs = OrdenServicio.objects.exclude(estado__in=['entregado', 'cancelado'])
+    ordenes_activas = ordenes_activas_qs.count()
+    
+    # Órdenes finalizadas este mes
+    from django.utils import timezone
+    inicio_mes = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    ordenes_finalizadas_mes = OrdenServicio.objects.filter(
+        estado='entregado',
+        fecha_entrega__gte=inicio_mes
     ).count()
     
-    # Órdenes por estado
-    ordenes_por_estado = OrdenServicio.objects.values('estado').annotate(
+    # Órdenes retrasadas (más de 15 días sin entregar)
+    fecha_limite_retraso = timezone.now() - timedelta(days=15)
+    ordenes_retrasadas = ordenes_activas_qs.filter(
+        fecha_ingreso__lt=fecha_limite_retraso
+    ).count()
+    
+    # ========================================================================
+    # SECCIÓN 2: ÓRDENES POR ESTADO (Con nombres legibles)
+    # ========================================================================
+    ordenes_por_estado_raw = OrdenServicio.objects.values('estado').annotate(
         total=Count('numero_orden_interno')
     ).order_by('-total')
     
-    # Órdenes recientes (últimas 10)
-    ordenes_recientes = OrdenServicio.objects.select_related(
+    # Convertir a lista con nombres legibles
+    ordenes_por_estado = []
+    estado_dict = dict(ESTADO_ORDEN_CHOICES)
+    for item in ordenes_por_estado_raw:
+        ordenes_por_estado.append({
+            'estado': item['estado'],
+            'estado_display': estado_dict.get(item['estado'], item['estado']),
+            'total': item['total']
+        })
+    
+    # ========================================================================
+    # SECCIÓN 3: ÓRDENES POR TÉCNICO (Solo técnicos de laboratorio activos)
+    # ========================================================================
+    ordenes_por_tecnico = OrdenServicio.objects.filter(
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
+        tecnico_asignado_actual__activo=True
+    ).exclude(
+        estado__in=['entregado', 'cancelado']
+    ).values(
+        'tecnico_asignado_actual__nombre_completo',
+        'tecnico_asignado_actual__id'
+    ).annotate(
+        total_ordenes=Count('numero_orden_interno')
+    ).order_by('-total_ordenes')
+    
+    # Enriquecer con información adicional del técnico
+    ordenes_por_tecnico_enriquecido = []
+    for item in ordenes_por_tecnico:
+        try:
+            tecnico = Empleado.objects.get(id=item['tecnico_asignado_actual__id'])
+            ordenes_por_tecnico_enriquecido.append({
+                'tecnico_nombre': item['tecnico_asignado_actual__nombre_completo'],
+                'total_ordenes': item['total_ordenes'],
+                'foto_url': tecnico.get_foto_perfil_url(),
+                'iniciales': tecnico.get_iniciales(),
+            })
+        except Empleado.DoesNotExist:
+            pass
+    
+    # ========================================================================
+    # SECCIÓN 4: ÓRDENES POR GAMA DE EQUIPO
+    # ========================================================================
+    ordenes_por_gama = OrdenServicio.objects.exclude(
+        estado__in=['entregado', 'cancelado']
+    ).values(
+        'detalle_equipo__gama'
+    ).annotate(
+        total=Count('numero_orden_interno')
+    ).order_by('-total')
+    
+    # Convertir a diccionario para fácil acceso
+    ordenes_gama_dict = {item['detalle_equipo__gama']: item['total'] for item in ordenes_por_gama}
+    ordenes_gama_alta = ordenes_gama_dict.get('alta', 0)
+    ordenes_gama_media = ordenes_gama_dict.get('media', 0)
+    ordenes_gama_baja = ordenes_gama_dict.get('baja', 0)
+    
+    # ========================================================================
+    # SECCIÓN 5: ÓRDENES POR SUCURSAL
+    # ========================================================================
+    ordenes_por_sucursal = OrdenServicio.objects.exclude(
+        estado__in=['entregado', 'cancelado']
+    ).values(
+        'sucursal__nombre'
+    ).annotate(
+        total=Count('numero_orden_interno')
+    ).order_by('-total')
+    
+    # ========================================================================
+    # SECCIÓN 6: ESTADÍSTICAS DE COTIZACIONES
+    # ========================================================================
+    from servicio_tecnico.models import Cotizacion
+    
+    # Cotizaciones pendientes de respuesta
+    cotizaciones_pendientes = Cotizacion.objects.filter(
+        usuario_acepto__isnull=True
+    ).count()
+    
+    # Cotizaciones aceptadas
+    cotizaciones_aceptadas = Cotizacion.objects.filter(
+        usuario_acepto=True
+    ).count()
+    
+    # Cotizaciones rechazadas
+    cotizaciones_rechazadas = Cotizacion.objects.filter(
+        usuario_acepto=False
+    ).count()
+    
+    # ========================================================================
+    # SECCIÓN 7: ÓRDENES RHITSO
+    # ========================================================================
+    ordenes_rhitso_activas = OrdenServicio.objects.filter(
+        es_candidato_rhitso=True
+    ).exclude(
+        estado__in=['entregado', 'cancelado']
+    ).count()
+    
+    # ========================================================================
+    # SECCIÓN 8: TIEMPOS PROMEDIO (KPIs de Rendimiento)
+    # ========================================================================
+    # Calcular tiempo promedio de servicio (solo órdenes entregadas)
+    ordenes_entregadas = OrdenServicio.objects.filter(estado='entregado')
+    
+    if ordenes_entregadas.exists():
+        # Calcular días promedio usando días hábiles
+        tiempos = []
+        for orden in ordenes_entregadas[:100]:  # Últimas 100 órdenes para no sobrecargar
+            tiempos.append(orden.dias_habiles_en_servicio)
+        
+        tiempo_promedio_servicio = sum(tiempos) / len(tiempos) if tiempos else 0
+    else:
+        tiempo_promedio_servicio = 0
+    
+    # ========================================================================
+    # SECCIÓN 9: ÓRDENES SIN ACTUALIZACIÓN DE ESTADO (Top 10)
+    # ========================================================================
+    # Calculamos la última fecha de cambio de estado registrada en el historial
+    # Si no existe un cambio de estado, usamos la fecha de ingreso como referencia
+    from django.db.models import Q
+    ordenes_sin_actualizacion_qs = OrdenServicio.objects.exclude(
+        estado__in=['entregado', 'cancelado']
+    ).select_related(
         'sucursal',
         'tecnico_asignado_actual',
         'detalle_equipo'
-    ).order_by('-fecha_ingreso')[:10]
+    ).annotate(
+        last_estado_date=Coalesce(
+            Max('historial__fecha_evento', filter=Q(historial__tipo_evento='cambio_estado')),
+            F('fecha_ingreso')
+        )
+    )
+
+    # Construir lista en Python con días desde la última actualización de estado
+    ordenes_sin_actualizacion_list = []
+    ahora = timezone.now()
+    for orden in ordenes_sin_actualizacion_qs:
+        last_date = orden.last_estado_date or orden.fecha_ingreso
+        dias = (ahora - last_date).days if last_date else 0
+        detalle = getattr(orden, 'detalle_equipo', None)
+        ordenes_sin_actualizacion_list.append({
+            'pk': orden.pk,
+            'orden_cliente': detalle.orden_cliente if detalle and getattr(detalle, 'orden_cliente', None) else '',
+            'numero_orden_interno': orden.numero_orden_interno,
+            'fecha_ultimo_estado': last_date,
+            'dias_sin_actualizacion': dias,
+            'marca': getattr(detalle, 'marca', '') if detalle else '',
+            'modelo': getattr(detalle, 'modelo', '') if detalle else '',
+            'numero_serie': getattr(detalle, 'numero_serie', '') if detalle else '',
+            'tecnico_nombre': orden.tecnico_asignado_actual.nombre_completo if orden.tecnico_asignado_actual else '',
+            'estado': orden.estado,
+            'estado_display': orden.get_estado_display(),
+        })
+
+    # Ordenar por días sin actualización descendente y tomar top 10
+    ordenes_sin_actualizacion_list.sort(key=lambda x: x['dias_sin_actualizacion'], reverse=True)
+    ordenes_sin_actualizacion = ordenes_sin_actualizacion_list[:10]
     
+    # ========================================================================
+    # SECCIÓN 10: ALERTAS Y SITUACIONES CRÍTICAS
+    # ========================================================================
+    
+    # Órdenes en "Esperando Cotización" por más de 3 días
+    fecha_limite_cotizacion = timezone.now() - timedelta(days=3)
+    ordenes_esperando_cotizacion = OrdenServicio.objects.filter(
+        estado='cotizacion',
+        fecha_ingreso__lt=fecha_limite_cotizacion
+    ).count()
+    
+    # Órdenes en "Esperando Piezas" por más de 7 días
+    fecha_limite_piezas = timezone.now() - timedelta(days=7)
+    ordenes_esperando_piezas = OrdenServicio.objects.filter(
+        estado='esperando_piezas',
+        fecha_ingreso__lt=fecha_limite_piezas
+    ).count()
+    
+    # Órdenes finalizadas pero no entregadas (más de 5 días)
+    fecha_limite_entrega = timezone.now() - timedelta(days=5)
+    ordenes_finalizadas_pendientes = OrdenServicio.objects.filter(
+        estado='finalizado',
+        fecha_finalizacion__lt=fecha_limite_entrega
+    ).count()
+
+    # Indicadores rápidos adicionales (reemplazan accesos directos al admin)
+    # Incidencias abiertas (no resueltas ni cerradas)
+    try:
+        incidencias_abiertas = IncidenciaRHITSO.objects.exclude(estado__in=['RESUELTA', 'CERRADA']).count()
+    except Exception:
+        incidencias_abiertas = 0
+
+    # Pedidos de piezas retrasados (seguimientos de piezas cuya fecha estimada ya pasó y no han llegado)
+    try:
+        from .models import SeguimientoPieza
+        piezas_retrasadas = SeguimientoPieza.objects.filter(
+            fecha_entrega_real__isnull=True,
+            fecha_entrega_estimada__lt=timezone.now().date()
+        ).count()
+    except Exception:
+        piezas_retrasadas = 0
+    
+    # ========================================================================
+    # CONTEXTO COMPLETO PARA EL TEMPLATE
+    # ========================================================================
     context = {
+        # Estadísticas Generales
         'total_ordenes': total_ordenes,
         'ordenes_activas': ordenes_activas,
+        'ordenes_finalizadas_mes': ordenes_finalizadas_mes,
         'ordenes_retrasadas': ordenes_retrasadas,
+        
+        # Distribuciones
         'ordenes_por_estado': ordenes_por_estado,
-        'ordenes_recientes': ordenes_recientes,
+        'ordenes_por_tecnico': ordenes_por_tecnico_enriquecido,
+        'ordenes_por_sucursal': ordenes_por_sucursal,
+        
+        # Órdenes por Gama
+        'ordenes_gama_alta': ordenes_gama_alta,
+        'ordenes_gama_media': ordenes_gama_media,
+        'ordenes_gama_baja': ordenes_gama_baja,
+        
+        # Cotizaciones
+        'cotizaciones_pendientes': cotizaciones_pendientes,
+        'cotizaciones_aceptadas': cotizaciones_aceptadas,
+        'cotizaciones_rechazadas': cotizaciones_rechazadas,
+        
+        # RHITSO
+        'ordenes_rhitso_activas': ordenes_rhitso_activas,
+        
+        # KPIs
+        'tiempo_promedio_servicio': round(tiempo_promedio_servicio, 1),
+        
+    # Órdenes sin actualización de estado (Top 10)
+    'ordenes_sin_actualizacion': ordenes_sin_actualizacion,
+        
+        # Alertas
+        'ordenes_esperando_cotizacion': ordenes_esperando_cotizacion,
+        'ordenes_esperando_piezas': ordenes_esperando_piezas,
+        'ordenes_finalizadas_pendientes': ordenes_finalizadas_pendientes,
+        
+        # Total de alertas (para badge)
+        'total_alertas': ordenes_esperando_cotizacion + ordenes_esperando_piezas + ordenes_finalizadas_pendientes + ordenes_retrasadas,
+        # Indicadores rápidos
+        'incidencias_abiertas': incidencias_abiertas,
+        'piezas_retrasadas': piezas_retrasadas,
     }
     
     return render(request, 'servicio_tecnico/inicio.html', context)
