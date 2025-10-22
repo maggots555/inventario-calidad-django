@@ -127,14 +127,22 @@ urlpatterns = [
          views.enviar_correo_rhitso, 
          name='enviar_correo_rhitso'),
     
-    # ========================================================================
-    # VISTA DE PRUEBA: GENERACIÓN DE PDF RHITSO (FASE 10.2)
+    # Vista de prueba: GENERACIÓN DE PDF RHITSO (FASE 10.2)
     # ========================================================================
     # Esta vista es temporal para probar la generación de PDF
     # Una vez integrado al modal de correo, se puede eliminar
     path('rhitso/orden/<int:orden_id>/generar-pdf-prueba/', 
          views.generar_pdf_rhitso_prueba, 
          name='generar_pdf_rhitso_prueba'),
+    
+    # ========================================================================
+    # DASHBOARD DE SEGUIMIENTO OOW-/FL- (Octubre 2025)
+    # ========================================================================
+    # Dashboard especializado para seguimiento de órdenes con prefijo OOW- y FL-
+    # Incluye métricas, KPIs, gráficos interactivos y análisis por responsable
+    path('dashboard/seguimiento-oow-fl/', 
+         views.dashboard_seguimiento_oow_fl, 
+         name='dashboard_seguimiento_oow_fl'),
     
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),

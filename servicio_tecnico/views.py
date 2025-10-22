@@ -34,7 +34,7 @@ from .models import (
     CategoriaDiagnostico,
     ConfiguracionRHITSO,
 )
-from inventario.models import Empleado
+from inventario.models import Empleado, Sucursal
 from config.constants import ESTADO_ORDEN_CHOICES
 from .utils_rhitso import (
     calcular_dias_habiles,
@@ -2757,13 +2757,25 @@ def reenviar_notificacion_pieza(request, seguimiento_id):
     Esta vista permite reintentar el envío de la notificación cuando el 
     envío inicial falló (por problemas de SMTP, email inválido, etc.)
     
+    IMPORTANTE (Octubre 2025):
+    ==========================
+    Esta función utiliza la MISMA lógica mejorada que incluye información
+    sobre piezas pendientes de otros proveedores. Así que cuando reenvíes,
+    el técnico recibirá el email completo actualizado con el estado actual
+    de TODAS las piezas (recibidas y pendientes).
+    
     CASO DE USO:
     1. Se marca una pieza como recibida
-    2. El email falla por algún motivo
+    2. El email falla por algún motivo (SMTP, email inválido, etc.)
     3. Se muestra un botón "Reenviar Notificación"
     4. Al hacer clic, se llama a esta vista
-    5. Se intenta enviar nuevamente el email
+    5. Se intenta enviar nuevamente el email (con info actualizada)
     6. Se registra el resultado en el historial
+    
+    VENTAJA DEL REENVÍO:
+    Si han pasado días desde el primer intento, el reenvío mostrará el
+    estado ACTUALIZADO de las piezas pendientes (pueden haber llegado más
+    piezas o cambiar estados mientras tanto).
     
     SEGURIDAD:
     - Solo usuarios autenticados pueden reenviar
@@ -3094,6 +3106,18 @@ def _enviar_notificacion_pieza_recibida(orden, seguimiento):
     como "recibido". Envía un email al técnico asignado con copia a su
     jefe directo y al jefe de calidad.
     
+    NUEVA FUNCIONALIDAD (Octubre 2025):
+    ====================================
+    Ahora el email incluye información sobre OTRAS PIEZAS PENDIENTES de 
+    diferentes proveedores. Esto permite al técnico saber si:
+    - Puede proceder con la reparación con la pieza recibida
+    - Debe esperar más piezas antes de continuar
+    - Qué piezas siguen en camino y cuándo llegarán
+    
+    EJEMPLO DE ESCENARIO:
+    - Llega SSD de Amazon → Email notifica la pieza recibida
+    - Email también avisa: "Aún pendiente: RAM de MercadoLibre (en tránsito)"
+    
     DESTINATARIOS:
     - TO (Para): Técnico asignado a la orden
     - CC (Copia): Jefe directo del técnico (si existe)
@@ -3102,9 +3126,11 @@ def _enviar_notificacion_pieza_recibida(orden, seguimiento):
     CONTENIDO DEL EMAIL:
     - Orden del cliente (no la orden interna)
     - Información del equipo (marca, modelo, serie)
-    - Proveedor de la pieza
-    - Descripción de las piezas recibidas
+    - Proveedor de la pieza RECIBIDA
+    - Descripción de las piezas RECIBIDAS
     - Fecha de recepción
+    - ⚠️ NUEVO: Listado de piezas PENDIENTES de otros proveedores
+    - ⚠️ NUEVO: Estado y días de retraso de cada pieza pendiente
     
     RETORNA:
     dict con 'success': True/False, 'message': str, 'destinatarios': list
@@ -3178,6 +3204,59 @@ def _enviar_notificacion_pieza_recibida(orden, seguimiento):
         detalle = orden.detalle_equipo
         orden_cliente = detalle.orden_cliente if detalle.orden_cliente else 'Sin orden de cliente'
         
+        # =================================================================
+        # CONSULTAR PIEZAS PENDIENTES DE OTROS PROVEEDORES
+        # =================================================================
+        # NUEVA FUNCIONALIDAD (Octubre 2025):
+        # Consultar TODOS los seguimientos de la misma cotización
+        # y filtrar solo los que NO estén recibidos (estados pendientes)
+        from django.utils import timezone
+        
+        cotizacion = seguimiento.cotizacion
+        seguimientos_pendientes = cotizacion.seguimientos_piezas.exclude(
+            estado='recibido'
+        ).exclude(
+            id=seguimiento.id  # Excluir el seguimiento actual (que acaba de ser recibido)
+        )
+        
+        # Construir sección de piezas pendientes si existen
+        seccion_piezas_pendientes = ""
+        
+        if seguimientos_pendientes.exists():
+            seccion_piezas_pendientes = "\n\n⚠️ PIEZAS PENDIENTES DE OTROS PROVEEDORES\n"
+            seccion_piezas_pendientes += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            
+            hoy = timezone.now().date()
+            
+            for seg_pendiente in seguimientos_pendientes:
+                # Calcular días de retraso (si aplica)
+                info_retraso = ""
+                if seg_pendiente.fecha_entrega_estimada:
+                    if hoy > seg_pendiente.fecha_entrega_estimada:
+                        dias_retraso = (hoy - seg_pendiente.fecha_entrega_estimada).days
+                        info_retraso = f" ⏰ RETRASADO {dias_retraso} días"
+                    else:
+                        dias_restantes = (seg_pendiente.fecha_entrega_estimada - hoy).days
+                        info_retraso = f" (Estimado en {dias_restantes} días)"
+                
+                # Obtener estado legible
+                estado_display = seg_pendiente.get_estado_display()
+                
+                # Obtener piezas vinculadas a este seguimiento
+                piezas_vinculadas = seg_pendiente.piezas.all()
+                if piezas_vinculadas.exists():
+                    descripcion_piezas = ", ".join([f"{p.componente.nombre} × {p.cantidad}" for p in piezas_vinculadas])
+                else:
+                    descripcion_piezas = seg_pendiente.descripcion_piezas
+                
+                seccion_piezas_pendientes += f"\n• Proveedor: {seg_pendiente.proveedor}\n"
+                seccion_piezas_pendientes += f"  Estado: {estado_display}{info_retraso}\n"
+                seccion_piezas_pendientes += f"  Descripción: {descripcion_piezas}\n"
+                if seg_pendiente.fecha_entrega_estimada:
+                    seccion_piezas_pendientes += f"  Fecha estimada: {seg_pendiente.fecha_entrega_estimada.strftime('%d/%m/%Y')}\n"
+            
+            seccion_piezas_pendientes += "\n💡 NOTA: Aún hay piezas en camino. Te notificaremos cuando lleguen.\n"
+        
         # Construir asunto
         asunto = f'📬 Pieza Recibida - Orden Cliente: {orden_cliente}'
         
@@ -3199,18 +3278,19 @@ Te informamos que ha llegado una pieza para la orden que tienes asignada:
 • Proveedor: {seguimiento.proveedor}
 • Descripción: {seguimiento.descripcion_piezas}
 • Fecha de recepción: {seguimiento.fecha_entrega_real.strftime('%d/%m/%Y')}
-{f'• Número de pedido: {seguimiento.numero_pedido}' if seguimiento.numero_pedido else ''}
+{f'• Número de pedido: {seguimiento.numero_pedido}' if seguimiento.numero_pedido else ''}{seccion_piezas_pendientes}
 
 ✅ PRÓXIMOS PASOS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. Recoge la pieza en almacén
-2. Actualiza el estado de la orden a "En reparación"
+2. {"Verifica si puedes proceder con esta pieza o espera las pendientes" if seguimientos_pendientes.exists() else "Actualiza el estado de la orden a 'En reparación'"}
 3. Instala y verifica la pieza
 4. Actualiza el progreso en el sistema
 
 ---
 Sistema de Servicio Técnico SIC
 Este es un mensaje automático. Si tienes dudas, contacta al responsable del seguimiento.
+Hecho por Jorge Magos todos los derechos reservados.
 '''
         
         # =================================================================
@@ -5804,4 +5884,456 @@ def exportar_excel_rhitso(request):
     wb.save(response)
     
     return response
+
+
+# ============================================================================
+# DASHBOARD DE SEGUIMIENTO ESPECIALIZADO OOW-/FL-
+# ============================================================================
+
+@login_required
+def dashboard_seguimiento_oow_fl(request):
+    """
+    Dashboard especializado para seguimiento de órdenes con prefijo OOW- y FL-.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista crea un dashboard completo con métricas, KPIs, gráficos y análisis
+    detallado de las órdenes que tienen orden_cliente que empieza con "OOW-" o "FL-".
+    
+    ¿Qué hace esta vista?
+    1. Filtra órdenes por prefijo OOW-/FL-
+    2. Aplica filtros adicionales (responsable, fechas, estado, sucursal)
+    3. Calcula métricas generales (totales, promedios, tasas)
+    4. Agrupa datos por responsable de seguimiento
+    5. Calcula días promedio por cada estado del proceso
+    6. Genera datos mensuales para comparativas
+    7. Identifica alertas (órdenes retrasadas, sin actualización, etc.)
+    8. Prepara datos para gráficos (Chart.js)
+    
+    Filtros disponibles (GET parameters):
+    - responsable_id: ID del empleado responsable
+    - fecha_desde: Fecha de inicio (formato: YYYY-MM-DD)
+    - fecha_hasta: Fecha fin (formato: YYYY-MM-DD)
+    - estado: Estado de la orden
+    - sucursal_id: ID de la sucursal
+    - prefijo: 'OOW', 'FL', o 'ambos' (default: 'ambos')
+    
+    Returns:
+        HttpResponse: Renderiza el template con todo el contexto de datos
+    """
+    from django.db.models import Q, Count, Sum, Avg, F, When, Case, Value, CharField
+    from django.db.models.functions import Coalesce
+    from decimal import Decimal
+    from datetime import timedelta
+    from .utils_rhitso import (
+        calcular_dias_habiles,
+        calcular_dias_por_estatus,
+        calcular_promedio_dias_por_estatus,
+        agrupar_ordenes_por_mes
+    )
+    
+    # =========================================================================
+    # PASO 1: OBTENER FILTROS DE LA URL
+    # =========================================================================
+    
+    responsable_id = request.GET.get('responsable_id', '')
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+    estado_filtro = request.GET.get('estado', '')
+    sucursal_id = request.GET.get('sucursal_id', '')
+    prefijo_filtro = request.GET.get('prefijo', 'ambos')  # 'OOW', 'FL', o 'ambos'
+    
+    # =========================================================================
+    # PASO 2: CONSTRUIR QUERY BASE (FILTRO PRINCIPAL POR PREFIJO)
+    # =========================================================================
+    
+    # Query base: órdenes con prefijo OOW- o FL- en orden_cliente
+    if prefijo_filtro == 'OOW':
+        ordenes = OrdenServicio.objects.filter(
+            detalle_equipo__orden_cliente__istartswith='OOW-'
+        )
+    elif prefijo_filtro == 'FL':
+        ordenes = OrdenServicio.objects.filter(
+            detalle_equipo__orden_cliente__istartswith='FL-'
+        )
+    else:  # 'ambos' (default)
+        ordenes = OrdenServicio.objects.filter(
+            Q(detalle_equipo__orden_cliente__istartswith='OOW-') |
+            Q(detalle_equipo__orden_cliente__istartswith='FL-')
+        )
+    
+    # Optimizar consultas con select_related y prefetch_related
+    ordenes = ordenes.select_related(
+        'detalle_equipo',
+        'sucursal',
+        'responsable_seguimiento',
+        'tecnico_asignado_actual',
+        'venta_mostrador',
+        'cotizacion'
+    ).prefetch_related(
+        'historial'
+    )
+    
+    # =========================================================================
+    # PASO 3: APLICAR FILTROS ADICIONALES
+    # =========================================================================
+    
+    if responsable_id:
+        ordenes = ordenes.filter(responsable_seguimiento_id=responsable_id)
+    
+    if fecha_desde:
+        try:
+            from datetime import datetime
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            ordenes = ordenes.filter(fecha_ingreso__date__gte=fecha_desde_obj)
+        except ValueError:
+            pass  # Ignorar si el formato es inválido
+    
+    if fecha_hasta:
+        try:
+            from datetime import datetime
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            ordenes = ordenes.filter(fecha_ingreso__date__lte=fecha_hasta_obj)
+        except ValueError:
+            pass
+    
+    if estado_filtro:
+        ordenes = ordenes.filter(estado=estado_filtro)
+    
+    if sucursal_id:
+        ordenes = ordenes.filter(sucursal_id=sucursal_id)
+    
+    # =========================================================================
+    # PASO 4: CALCULAR MÉTRICAS GENERALES
+    # =========================================================================
+    
+    total_ordenes = ordenes.count()
+    
+    # Contar por estado
+    ordenes_activas = ordenes.exclude(estado__in=['entregado', 'cancelado']).count()
+    ordenes_finalizadas = ordenes.filter(estado='finalizado').count()
+    ordenes_entregadas = ordenes.filter(estado='entregado').count()
+    
+    # Contar ventas mostrador
+    total_ventas_mostrador = ordenes.filter(venta_mostrador__isnull=False).count()
+    
+    # Contar con cotización
+    total_con_cotizacion = ordenes.filter(cotizacion__isnull=False).count()
+    cotizaciones_aceptadas = ordenes.filter(
+        cotizacion__isnull=False,
+        cotizacion__usuario_acepto=True
+    ).count()
+    cotizaciones_pendientes = ordenes.filter(
+        cotizacion__isnull=False,
+        cotizacion__usuario_acepto__isnull=True
+    ).count()
+    
+    # Calcular montos totales
+    monto_total_ventas_mostrador = Decimal('0.00')
+    monto_total_cotizaciones = Decimal('0.00')
+    
+    for orden in ordenes:
+        if hasattr(orden, 'venta_mostrador') and orden.venta_mostrador:
+            monto_total_ventas_mostrador += orden.venta_mostrador.total_venta
+        
+        if hasattr(orden, 'cotizacion') and orden.cotizacion:
+            if orden.cotizacion.usuario_acepto:
+                monto_total_cotizaciones += orden.cotizacion.costo_total_final
+    
+    monto_total_general = monto_total_ventas_mostrador + monto_total_cotizaciones
+    
+    # Calcular tiempo promedio (días hábiles)
+    total_dias_habiles = 0
+    ordenes_con_tiempo = 0
+    
+    for orden in ordenes:
+        dias = orden.dias_habiles_en_servicio
+        if dias >= 0:
+            total_dias_habiles += dias
+            ordenes_con_tiempo += 1
+    
+    tiempo_promedio = round(total_dias_habiles / ordenes_con_tiempo, 1) if ordenes_con_tiempo > 0 else 0
+    
+    # Calcular % en tiempo (<= 15 días hábiles)
+    ordenes_en_tiempo = sum(1 for orden in ordenes if orden.dias_habiles_en_servicio <= 15)
+    porcentaje_en_tiempo = round((ordenes_en_tiempo / total_ordenes) * 100, 1) if total_ordenes > 0 else 0
+    
+    # Calcular ingreso promedio diario
+    if fecha_desde and fecha_hasta:
+        try:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            dias_rango = calcular_dias_habiles(fecha_desde_obj, fecha_hasta_obj)
+            if dias_rango > 0:
+                ingreso_promedio_dia = round(total_ordenes / dias_rango, 1)
+            else:
+                ingreso_promedio_dia = 0
+        except:
+            ingreso_promedio_dia = 0
+    else:
+        ingreso_promedio_dia = 0
+    
+    # =========================================================================
+    # PASO 5: AGRUPAR POR RESPONSABLE DE SEGUIMIENTO
+    # =========================================================================
+    
+    responsables_data = {}
+    
+    for orden in ordenes:
+        resp_id = orden.responsable_seguimiento.id
+        resp_nombre = orden.responsable_seguimiento.nombre_completo
+        
+        if resp_id not in responsables_data:
+            responsables_data[resp_id] = {
+                'id': resp_id,
+                'nombre': resp_nombre,
+                'total_ordenes': 0,
+                'ordenes_activas': 0,
+                'ordenes_finalizadas': 0,
+                'ordenes_entregadas': 0,
+                'ventas_mostrador': 0,
+                'con_cotizacion': 0,
+                'cotizaciones_aceptadas': 0,
+                'monto_ventas_mostrador': Decimal('0.00'),
+                'monto_cotizaciones': Decimal('0.00'),
+                'dias_acumulados': 0,
+            }
+        
+        # Acumular estadísticas
+        responsables_data[resp_id]['total_ordenes'] += 1
+        
+        if orden.estado not in ['entregado', 'cancelado']:
+            responsables_data[resp_id]['ordenes_activas'] += 1
+        
+        if orden.estado == 'finalizado':
+            responsables_data[resp_id]['ordenes_finalizadas'] += 1
+        
+        if orden.estado == 'entregado':
+            responsables_data[resp_id]['ordenes_entregadas'] += 1
+        
+        if hasattr(orden, 'venta_mostrador') and orden.venta_mostrador:
+            responsables_data[resp_id]['ventas_mostrador'] += 1
+            responsables_data[resp_id]['monto_ventas_mostrador'] += orden.venta_mostrador.total_venta
+        
+        if hasattr(orden, 'cotizacion') and orden.cotizacion:
+            responsables_data[resp_id]['con_cotizacion'] += 1
+            if orden.cotizacion.usuario_acepto:
+                responsables_data[resp_id]['cotizaciones_aceptadas'] += 1
+                responsables_data[resp_id]['monto_cotizaciones'] += orden.cotizacion.costo_total_final
+        
+        responsables_data[resp_id]['dias_acumulados'] += orden.dias_habiles_en_servicio
+    
+    # Calcular promedios y montos totales por responsable
+    for resp_id, data in responsables_data.items():
+        if data['total_ordenes'] > 0:
+            data['tiempo_promedio'] = round(data['dias_acumulados'] / data['total_ordenes'], 1)
+            # Tasa de finalización = porcentaje de órdenes ENTREGADAS
+            data['tasa_finalizacion'] = round(
+                (data['ordenes_entregadas'] / data['total_ordenes']) * 100,
+                1
+            )
+        else:
+            data['tiempo_promedio'] = 0
+            data['tasa_finalizacion'] = 0
+        
+        data['monto_total'] = data['monto_ventas_mostrador'] + data['monto_cotizaciones']
+    
+    # Convertir a lista y ordenar por total de órdenes (descendente)
+    responsables_lista = sorted(
+        responsables_data.values(),
+        key=lambda x: x['total_ordenes'],
+        reverse=True
+    )
+    
+    # =========================================================================
+    # PASO 6: CALCULAR DÍAS PROMEDIO POR ESTATUS
+    # =========================================================================
+    
+    dias_por_estatus_promedio = calcular_promedio_dias_por_estatus(ordenes)
+    
+    # =========================================================================
+    # PASO 7: GENERAR DATOS MENSUALES
+    # =========================================================================
+    
+    datos_mensuales = agrupar_ordenes_por_mes(ordenes)
+    
+    # =========================================================================
+    # PASO 8: IDENTIFICAR ALERTAS
+    # =========================================================================
+    
+    alertas = {
+        'retrasadas': [],  # >15 días hábiles
+        'sin_actualizacion': [],  # >5 días sin cambio de estado
+        'cotizaciones_pendientes': [],  # >7 días sin respuesta
+        'en_reparacion_larga': [],  # >10 días en estado 'reparacion'
+    }
+    
+    for orden in ordenes:
+        # Retrasadas (>15 días hábiles sin entregar)
+        if orden.estado != 'entregado' and orden.dias_habiles_en_servicio > 15:
+            alertas['retrasadas'].append({
+                'orden': orden,
+                'dias': orden.dias_habiles_en_servicio,
+            })
+        
+        # Sin actualización (>5 días hábiles)
+        dias_sin_act = orden.dias_sin_actualizacion_estado
+        if dias_sin_act > 5 and orden.estado not in ['entregado', 'cancelado']:
+            alertas['sin_actualizacion'].append({
+                'orden': orden,
+                'dias': dias_sin_act,
+            })
+        
+        # Cotizaciones pendientes (>7 días sin respuesta)
+        if hasattr(orden, 'cotizacion') and orden.cotizacion:
+            if orden.cotizacion.usuario_acepto is None and orden.cotizacion.dias_sin_respuesta > 7:
+                alertas['cotizaciones_pendientes'].append({
+                    'orden': orden,
+                    'dias': orden.cotizacion.dias_sin_respuesta,
+                })
+        
+        # En reparación prolongada (>10 días en estado reparacion)
+        if orden.estado == 'reparacion':
+            dias_por_estado = calcular_dias_por_estatus(orden)
+            dias_reparacion = dias_por_estado.get('reparacion', 0)
+            if dias_reparacion > 10:
+                alertas['en_reparacion_larga'].append({
+                    'orden': orden,
+                    'dias': dias_reparacion,
+                })
+    
+    # =========================================================================
+    # PASO 9: PREPARAR DATOS PARA GRÁFICOS (Chart.js)
+    # =========================================================================
+    
+    # Gráfico 1: Órdenes por responsable
+    grafico_responsables = {
+        'labels': [r['nombre'] for r in responsables_lista],
+        'data': [r['total_ordenes'] for r in responsables_lista],
+    }
+    
+    # Gráfico 2: Días promedio por estatus
+    # Ordenar estados en el orden lógico del proceso
+    orden_estados = ['espera', 'diagnostico', 'cotizacion', 'reparacion', 'finalizado', 'control_calidad']
+    estados_ordenados = []
+    dias_ordenados = []
+    
+    for estado in orden_estados:
+        if estado in dias_por_estatus_promedio:
+            estados_ordenados.append(estado.replace('_', ' ').title())
+            dias_ordenados.append(dias_por_estatus_promedio[estado]['promedio'])
+    
+    grafico_dias_estatus = {
+        'labels': estados_ordenados,
+        'data': dias_ordenados,
+    }
+    
+    # Gráfico 3: Evolución mensual (últimos 6 meses)
+    meses_recientes = datos_mensuales[-6:] if len(datos_mensuales) > 6 else datos_mensuales
+    
+    grafico_evolucion_mensual = {
+        'labels': [m['mes'] for m in meses_recientes],
+        'data_ordenes': [m['total_ordenes'] for m in meses_recientes],
+        'data_finalizadas': [m['ordenes_finalizadas'] for m in meses_recientes],
+        'data_entregadas': [m['ordenes_entregadas'] for m in meses_recientes],
+    }
+    
+    # Gráfico 4: Distribución por estado
+    estados_distribucion = {}
+    for orden in ordenes:
+        estado = orden.get_estado_display()
+        estados_distribucion[estado] = estados_distribucion.get(estado, 0) + 1
+    
+    grafico_distribucion_estados = {
+        'labels': list(estados_distribucion.keys()),
+        'data': list(estados_distribucion.values()),
+    }
+    
+    # =========================================================================
+    # PASO 10: OBTENER LISTAS PARA FILTROS
+    # =========================================================================
+    
+    # Lista de responsables para filtro
+    lista_responsables = Empleado.objects.filter(
+        ordenes_responsable__in=ordenes
+    ).distinct().order_by('nombre_completo')
+    
+    # Lista de sucursales para filtro
+    lista_sucursales = Sucursal.objects.filter(
+        ordenes_servicio__in=ordenes
+    ).distinct().order_by('nombre')
+    
+    # Lista de estados para filtro (choices del modelo)
+    from config.constants import ESTADO_ORDEN_CHOICES
+    lista_estados = ESTADO_ORDEN_CHOICES
+    
+    # =========================================================================
+    # PASO 11: PREPARAR CONTEXTO COMPLETO
+    # =========================================================================
+    
+    context = {
+        # Filtros actuales
+        'filtros': {
+            'responsable_id': responsable_id,
+            'fecha_desde': fecha_desde,
+            'fecha_hasta': fecha_hasta,
+            'estado': estado_filtro,
+            'sucursal_id': sucursal_id,
+            'prefijo': prefijo_filtro,
+        },
+        
+        # Listas para selectores de filtros
+        'lista_responsables': lista_responsables,
+        'lista_sucursales': lista_sucursales,
+        'lista_estados': lista_estados,
+        
+        # Métricas generales
+        'metricas': {
+            'total_ordenes': total_ordenes,
+            'ordenes_activas': ordenes_activas,
+            'ordenes_finalizadas': ordenes_finalizadas,
+            'ordenes_entregadas': ordenes_entregadas,
+            'total_ventas_mostrador': total_ventas_mostrador,
+            'total_con_cotizacion': total_con_cotizacion,
+            'cotizaciones_aceptadas': cotizaciones_aceptadas,
+            'cotizaciones_pendientes': cotizaciones_pendientes,
+            'monto_ventas_mostrador': monto_total_ventas_mostrador,
+            'monto_cotizaciones': monto_total_cotizaciones,
+            'monto_total': monto_total_general,
+            'tiempo_promedio': tiempo_promedio,
+            'porcentaje_en_tiempo': porcentaje_en_tiempo,
+            'ingreso_promedio_dia': ingreso_promedio_dia,
+        },
+        
+        # Datos por responsable
+        'responsables': responsables_lista,
+        
+        # Días por estatus
+        'dias_por_estatus': dias_por_estatus_promedio,
+        
+        # Datos mensuales
+        'datos_mensuales': datos_mensuales,
+        'meses_recientes': meses_recientes,
+        
+        # Alertas
+        'alertas': alertas,
+        'total_alertas': (
+            len(alertas['retrasadas']) +
+            len(alertas['sin_actualizacion']) +
+            len(alertas['cotizaciones_pendientes']) +
+            len(alertas['en_reparacion_larga'])
+        ),
+        
+        # Datos para gráficos
+        'grafico_responsables': grafico_responsables,
+        'grafico_dias_estatus': grafico_dias_estatus,
+        'grafico_evolucion_mensual': grafico_evolucion_mensual,
+        'grafico_distribucion_estados': grafico_distribucion_estados,
+        
+        # Órdenes completas (para tabla detallada)
+        'ordenes': ordenes[:100],  # Limitar a 100 para rendimiento inicial
+        'total_ordenes_tabla': ordenes.count(),
+    }
+    
+    return render(request, 'servicio_tecnico/dashboard_seguimiento_oow_fl.html', context)
 

@@ -1,0 +1,899 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Seguimiento OOW-/FL- - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<!-- Estilos específicos del dashboard OOW-/FL- -->
+<link rel="stylesheet" href="{% static 'css/dashboard_oow_fl.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    
+    <!-- ====================================================================
+         ENCABEZADO DEL DASHBOARD
+         ==================================================================== -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="bi bi-graph-up-arrow"></i>
+                        Dashboard de Seguimiento OOW-/FL-
+                    </h2>
+                    <p class="text-muted mb-0">
+                        Análisis completo y métricas de órdenes con prefijo OOW- y FL-
+                    </p>
+                </div>
+                <div>
+                    {% if total_alertas > 0 %}
+                    <span class="badge bg-danger fs-5">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        {{ total_alertas }} Alerta{{ total_alertas|pluralize }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ====================================================================
+         SECCIÓN DE FILTROS
+         ==================================================================== -->
+    <div class="filter-section">
+        <form method="get" id="formFiltros" class="row g-3">
+            <div class="col-md-3">
+                <label for="prefijo" class="form-label fw-bold">
+                    <i class="bi bi-funnel"></i> Prefijo
+                </label>
+                <select name="prefijo" id="prefijo" class="form-select">
+                    <option value="ambos" {% if filtros.prefijo == 'ambos' %}selected{% endif %}>
+                        OOW- y FL- (Ambos)
+                    </option>
+                    <option value="OOW" {% if filtros.prefijo == 'OOW' %}selected{% endif %}>
+                        Solo OOW-
+                    </option>
+                    <option value="FL" {% if filtros.prefijo == 'FL' %}selected{% endif %}>
+                        Solo FL-
+                    </option>
+                </select>
+            </div>
+            
+            <div class="col-md-3">
+                <label for="responsable_id" class="form-label fw-bold">
+                    <i class="bi bi-person-badge"></i> Responsable
+                </label>
+                <select name="responsable_id" id="responsable_id" class="form-select">
+                    <option value="">Todos los responsables</option>
+                    {% for responsable in lista_responsables %}
+                    <option value="{{ responsable.id }}" 
+                            {% if filtros.responsable_id|stringformat:"s" == responsable.id|stringformat:"s" %}selected{% endif %}>
+                        {{ responsable.nombre_completo }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-2">
+                <label for="fecha_desde" class="form-label fw-bold">
+                    <i class="bi bi-calendar-event"></i> Desde
+                </label>
+                <input type="date" name="fecha_desde" id="fecha_desde" 
+                       class="form-control" value="{{ filtros.fecha_desde }}">
+            </div>
+            
+            <div class="col-md-2">
+                <label for="fecha_hasta" class="form-label fw-bold">
+                    <i class="bi bi-calendar-event"></i> Hasta
+                </label>
+                <input type="date" name="fecha_hasta" id="fecha_hasta" 
+                       class="form-control" value="{{ filtros.fecha_hasta }}">
+            </div>
+            
+            <div class="col-md-2">
+                <label for="estado" class="form-label fw-bold">
+                    <i class="bi bi-list-check"></i> Estado
+                </label>
+                <select name="estado" id="estado" class="form-select">
+                    <option value="">Todos los estados</option>
+                    {% for codigo, nombre in lista_estados %}
+                    <option value="{{ codigo }}" {% if filtros.estado == codigo %}selected{% endif %}>
+                        {{ nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-3">
+                <label for="sucursal_id" class="form-label fw-bold">
+                    <i class="bi bi-building"></i> Sucursal
+                </label>
+                <select name="sucursal_id" id="sucursal_id" class="form-select">
+                    <option value="">Todas las sucursales</option>
+                    {% for sucursal in lista_sucursales %}
+                    <option value="{{ sucursal.id }}" 
+                            {% if filtros.sucursal_id|stringformat:"s" == sucursal.id|stringformat:"s" %}selected{% endif %}>
+                        {{ sucursal.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-9 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Aplicar Filtros
+                </button>
+                <a href="{% url 'servicio_tecnico:dashboard_seguimiento_oow_fl' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-clockwise"></i> Limpiar
+                </a>
+                <button type="button" class="btn btn-success" onclick="exportarExcel()">
+                    <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- ====================================================================
+         TARJETAS DE MÉTRICAS GENERALES
+         ==================================================================== -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card metric-card h-100" style="border-left-color: #667eea;">
+                <div class="card-body">
+                    <p class="metric-value text-primary">{{ metricas.total_ordenes }}</p>
+                    <p class="metric-label">Total Órdenes OOW-/FL-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card metric-card h-100" style="border-left-color: #f093fb;">
+                <div class="card-body">
+                    <p class="metric-value text-info">{{ metricas.total_ventas_mostrador }}</p>
+                    <p class="metric-label">Ventas Mostrador</p>
+                    <small class="text-muted">${{ metricas.monto_ventas_mostrador|floatformat:2 }}</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card metric-card h-100" style="border-left-color: #4facfe;">
+                <div class="card-body">
+                    <p class="metric-value text-success">{{ metricas.ordenes_activas }}</p>
+                    <p class="metric-label">Órdenes en Proceso</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card metric-card h-100" style="border-left-color: #43e97b;">
+                <div class="card-body">
+                    <p class="metric-value text-dark">{{ metricas.ordenes_entregadas }}</p>
+                    <p class="metric-label">Órdenes Entregadas</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Segunda fila de métricas -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card metric-card h-100" style="border-left-color: #fa709a;">
+                <div class="card-body">
+                    <p class="metric-value text-warning">${{ metricas.monto_total|floatformat:2 }}</p>
+                    <p class="metric-label">Monto Total Generado</p>
+                    <small class="text-muted">
+                        Ventas + Cotizaciones
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card metric-card h-100" style="border-left-color: #fccb90;">
+                <div class="card-body">
+                    <p class="metric-value">{{ metricas.tiempo_promedio }}</p>
+                    <p class="metric-label">Días Promedio (Hábiles)</p>
+                    <small class="text-muted">Tiempo de servicio</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card metric-card h-100" style="border-left-color: #a8edea;">
+                <div class="card-body">
+                    <p class="metric-value">{{ metricas.cotizaciones_aceptadas }}/{{ metricas.total_con_cotizacion }}</p>
+                    <p class="metric-label">Cotizaciones Aceptadas</p>
+                    <small class="text-muted">
+                        {{ metricas.cotizaciones_pendientes }} pendiente{{ metricas.cotizaciones_pendientes|pluralize }}
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card metric-card h-100" style="border-left-color: #d299c2;">
+                <div class="card-body">
+                    <p class="metric-value">{{ metricas.porcentaje_en_tiempo }}%</p>
+                    <p class="metric-label">En Tiempo (≤15 días)</p>
+                    <small class="text-muted">Cumplimiento SLA</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ====================================================================
+         ALERTAS Y ATENCIÓN REQUERIDA
+         ==================================================================== -->
+    {% if total_alertas > 0 %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        Alertas y Atención Requerida ({{ total_alertas }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% if alertas.retrasadas %}
+                        <div class="col-md-6 mb-3">
+                            <div class="alert alert-danger mb-0">
+                                <h6 class="alert-heading">
+                                    <i class="bi bi-clock-history"></i>
+                                    Órdenes Retrasadas (>15 días)
+                                    <span class="badge bg-dark">{{ alertas.retrasadas|length }}</span>
+                                </h6>
+                                <ul class="mb-0 ps-3">
+                                    {% for item in alertas.retrasadas|slice:":5" %}
+                                    <li>
+                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" class="text-dark">
+                                            {{ item.orden.detalle_equipo.orden_cliente }} - 
+                                            <strong>{{ item.dias }} días hábiles</strong>
+                                        </a>
+                                    </li>
+                                    {% endfor %}
+                                    {% if alertas.retrasadas|length > 5 %}
+                                    <li class="text-muted">... y {{ alertas.retrasadas|length|add:"-5" }} más</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if alertas.sin_actualizacion %}
+                        <div class="col-md-6 mb-3">
+                            <div class="alert alert-warning mb-0">
+                                <h6 class="alert-heading">
+                                    <i class="bi bi-hourglass-split"></i>
+                                    Sin Actualización (>5 días)
+                                    <span class="badge bg-dark">{{ alertas.sin_actualizacion|length }}</span>
+                                </h6>
+                                <ul class="mb-0 ps-3">
+                                    {% for item in alertas.sin_actualizacion|slice:":5" %}
+                                    <li>
+                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" class="text-dark">
+                                            {{ item.orden.detalle_equipo.orden_cliente }} - 
+                                            <strong>{{ item.dias }} días hábiles</strong>
+                                        </a>
+                                    </li>
+                                    {% endfor %}
+                                    {% if alertas.sin_actualizacion|length > 5 %}
+                                    <li class="text-muted">... y {{ alertas.sin_actualizacion|length|add:"-5" }} más</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if alertas.cotizaciones_pendientes %}
+                        <div class="col-md-6 mb-3">
+                            <div class="alert alert-info mb-0">
+                                <h6 class="alert-heading">
+                                    <i class="bi bi-file-earmark-text"></i>
+                                    Cotizaciones Pendientes (>7 días)
+                                    <span class="badge bg-dark">{{ alertas.cotizaciones_pendientes|length }}</span>
+                                </h6>
+                                <ul class="mb-0 ps-3">
+                                    {% for item in alertas.cotizaciones_pendientes|slice:":5" %}
+                                    <li>
+                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" class="text-dark">
+                                            {{ item.orden.detalle_equipo.orden_cliente }} - 
+                                            <strong>{{ item.dias }} días sin respuesta</strong>
+                                        </a>
+                                    </li>
+                                    {% endfor %}
+                                    {% if alertas.cotizaciones_pendientes|length > 5 %}
+                                    <li class="text-muted">... y {{ alertas.cotizaciones_pendientes|length|add:"-5" }} más</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if alertas.en_reparacion_larga %}
+                        <div class="col-md-6 mb-3">
+                            <div class="alert alert-secondary mb-0">
+                                <h6 class="alert-heading">
+                                    <i class="bi bi-wrench"></i>
+                                    En Reparación Prolongada (>10 días)
+                                    <span class="badge bg-dark">{{ alertas.en_reparacion_larga|length }}</span>
+                                </h6>
+                                <ul class="mb-0 ps-3">
+                                    {% for item in alertas.en_reparacion_larga|slice:":5" %}
+                                    <li>
+                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" class="text-dark">
+                                            {{ item.orden.detalle_equipo.orden_cliente }} - 
+                                            <strong>{{ item.dias }} días en reparación</strong>
+                                        </a>
+                                    </li>
+                                    {% endfor %}
+                                    {% if alertas.en_reparacion_larga|length > 5 %}
+                                    <li class="text-muted">... y {{ alertas.en_reparacion_larga|length|add:"-5" }} más</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- ====================================================================
+         GRÁFICOS PRINCIPALES
+         ==================================================================== -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-bar-chart-fill"></i>
+                        Órdenes por Responsable de Seguimiento
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chartResponsables"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-pie-chart-fill"></i>
+                        Distribución por Estado
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chartDistribucionEstados"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0">
+                        <i class="bi bi-hourglass-split"></i>
+                        Días Promedio por Estatus (Días Hábiles)
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chartDiasEstatus"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-graph-up"></i>
+                        Evolución Mensual (Últimos 6 Meses)
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chartEvolucionMensual"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ====================================================================
+         DATOS POR RESPONSABLE DE SEGUIMIENTO
+         ==================================================================== -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-people-fill"></i>
+                        Desempeño por Responsable de Seguimiento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if responsables %}
+                        {% for resp in responsables %}
+                        <div class="responsable-section">
+                            <div class="responsable-header" data-bs-toggle="collapse" 
+                                 data-bs-target="#responsable{{ resp.id }}" 
+                                 aria-expanded="false">
+                                <div>
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-person-circle"></i>
+                                        {{ resp.nombre }}
+                                    </h6>
+                                    <small>{{ resp.total_ordenes }} orden{{ resp.total_ordenes|pluralize:"es" }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-light text-dark me-2">
+                                        {{ resp.tiempo_promedio }} días promedio
+                                    </span>
+                                    <i class="bi bi-chevron-down"></i>
+                                </div>
+                            </div>
+                            <div class="collapse responsable-body" id="responsable{{ resp.id }}">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="card bg-light mb-2">
+                                            <div class="card-body py-2">
+                                                <small class="text-muted d-block">Activas</small>
+                                                <strong class="fs-5">{{ resp.ordenes_activas }}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card bg-light mb-2">
+                                            <div class="card-body py-2">
+                                                <small class="text-muted d-block">Entregadas</small>
+                                                <strong class="fs-5">{{ resp.ordenes_entregadas }}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card bg-light mb-2">
+                                            <div class="card-body py-2">
+                                                <small class="text-muted d-block">Ventas Mostrador</small>
+                                                <strong class="fs-5">{{ resp.ventas_mostrador }}</strong>
+                                                <small class="text-muted d-block">${{ resp.monto_ventas_mostrador|floatformat:2 }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card bg-light mb-2">
+                                            <div class="card-body py-2">
+                                                <small class="text-muted d-block">Cotizaciones</small>
+                                                <strong class="fs-5">{{ resp.cotizaciones_aceptadas }}/{{ resp.con_cotizacion }}</strong>
+                                                <small class="text-muted d-block">${{ resp.monto_cotizaciones|floatformat:2 }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mt-2">
+                                    <div class="col-md-6">
+                                        <div class="card bg-success text-white">
+                                            <div class="card-body py-2">
+                                                <small class="d-block">Monto Total Generado</small>
+                                                <strong class="fs-5">${{ resp.monto_total|floatformat:2 }}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-info text-white">
+                                            <div class="card-body py-2">
+                                                <small class="d-block">Tasa de Entrega</small>
+                                                <strong class="fs-5">{{ resp.tasa_finalizacion }}%</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <a href="?responsable_id={{ resp.id }}&prefijo={{ filtros.prefijo }}" 
+                                       class="btn btn-sm btn-primary">
+                                        <i class="bi bi-filter"></i> Filtrar solo este responsable
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center mb-0">
+                            No hay datos de responsables con los filtros aplicados.
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ====================================================================
+         TABLA: DÍAS PROMEDIO POR ESTATUS
+         ==================================================================== -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history"></i>
+                        Días Promedio por Estatus (Días Hábiles)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if dias_por_estatus %}
+                    <div class="table-responsive">
+                        <table class="table table-dashboard table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Estado</th>
+                                    <th>Promedio (días hábiles)</th>
+                                    <th>Mínimo</th>
+                                    <th>Máximo</th>
+                                    <th>Total Órdenes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for estado, stats in dias_por_estatus.items %}
+                                <tr>
+                                    <td><strong>{{ estado|title }}</strong></td>
+                                    <td>
+                                        <span class="badge {% if stats.promedio <= 2 %}bg-success{% elif stats.promedio <= 5 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ stats.promedio }} días
+                                        </span>
+                                    </td>
+                                    <td>{{ stats.min }} días</td>
+                                    <td>{{ stats.max }} días</td>
+                                    <td>{{ stats.total_ordenes }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center mb-0">
+                        No hay datos suficientes para calcular promedios por estatus.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ====================================================================
+         TABLA: EVOLUCIÓN MENSUAL
+         ==================================================================== -->
+    {% if datos_mensuales %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-calendar3"></i>
+                        Evolución Mensual
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-dashboard table-bordered table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Mes</th>
+                                    <th>Total Órdenes</th>
+                                    <th>Finalizadas</th>
+                                    <th>Entregadas</th>
+                                    <th>Ventas Mostrador</th>
+                                    <th>Cotizaciones Aceptadas</th>
+                                    <th>Monto Total</th>
+                                    <th>Días Promedio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mes in datos_mensuales %}
+                                <tr>
+                                    <td><strong>{{ mes.mes }}</strong></td>
+                                    <td>{{ mes.total_ordenes }}</td>
+                                    <td>{{ mes.ordenes_finalizadas }}</td>
+                                    <td>{{ mes.ordenes_entregadas }}</td>
+                                    <td>{{ mes.ventas_mostrador }}</td>
+                                    <td>{{ mes.cotizaciones_aceptadas }}</td>
+                                    <td>${{ mes.monto_total|floatformat:2 }}</td>
+                                    <td>
+                                        <span class="badge {% if mes.dias_promedio <= 10 %}bg-success{% elif mes.dias_promedio <= 15 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ mes.dias_promedio }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- ====================================================================
+         TABLA DETALLADA DE ÓRDENES
+         ==================================================================== -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-ul"></i>
+                        Órdenes Detalladas
+                        <span class="badge bg-light text-dark">{{ total_ordenes_tabla }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if ordenes %}
+                    <div class="table-responsive">
+                        <table class="table table-dashboard table-bordered table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Orden Cliente</th>
+                                    <th>N° Orden</th>
+                                    <th>Tipo Equipo</th>
+                                    <th>Marca/Modelo</th>
+                                    <th>Responsable</th>
+                                    <th>Estado</th>
+                                    <th>Días Hábiles</th>
+                                    <th>Sucursal</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for orden in ordenes %}
+                                <tr>
+                                    <td><strong>{{ orden.detalle_equipo.orden_cliente }}</strong></td>
+                                    <td>{{ orden.numero_orden_interno }}</td>
+                                    <td>{{ orden.detalle_equipo.get_tipo_equipo_display }}</td>
+                                    <td>
+                                        {{ orden.detalle_equipo.marca }}
+                                        <small class="text-muted d-block">{{ orden.detalle_equipo.modelo|truncatechars:30 }}</small>
+                                    </td>
+                                    <td>{{ orden.responsable_seguimiento.nombre_completo|truncatechars:25 }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if orden.estado == 'entregado' %}bg-success
+                                            {% elif orden.estado == 'finalizado' %}bg-info
+                                            {% elif orden.estado == 'reparacion' %}bg-warning
+                                            {% elif orden.estado == 'cancelado' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ orden.get_estado_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ orden.color_dias_sin_actualizacion }}">
+                                            {{ orden.dias_habiles_en_servicio }}
+                                        </span>
+                                        {% if orden.dias_sin_actualizacion_estado > 5 %}
+                                        <i class="bi bi-exclamation-triangle-fill text-danger" 
+                                           title="{{ orden.dias_sin_actualizacion_estado }} días sin actualizar"></i>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ orden.sucursal.nombre|truncatechars:20 }}</td>
+                                    <td>
+                                        <a href="{% url 'servicio_tecnico:detalle_orden' orden.id %}" 
+                                           class="btn btn-sm btn-primary" 
+                                           title="Ver detalle completo">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if total_ordenes_tabla > 100 %}
+                    <div class="alert alert-info mt-3 mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Nota:</strong> Mostrando las primeras 100 órdenes de {{ total_ordenes_tabla }} totales.
+                        Usa los filtros para refinar los resultados.
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <p class="text-muted text-center mb-0">
+                        No hay órdenes con los filtros aplicados.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js para gráficos -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+// ========================================================================
+// CONFIGURACIÓN DE GRÁFICOS CON CHART.JS
+// ========================================================================
+
+// GRÁFICO 1: Órdenes por Responsable
+const ctxResponsables = document.getElementById('chartResponsables');
+if (ctxResponsables) {
+    new Chart(ctxResponsables, {
+        type: 'bar',
+        data: {
+            labels: {{ grafico_responsables.labels|safe }},
+            datasets: [{
+                label: 'Órdenes',
+                data: {{ grafico_responsables.data|safe }},
+                backgroundColor: 'rgba(102, 126, 234, 0.7)',
+                borderColor: 'rgba(102, 126, 234, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+// GRÁFICO 2: Distribución por Estado (Pie)
+const ctxDistribucion = document.getElementById('chartDistribucionEstados');
+if (ctxDistribucion) {
+    new Chart(ctxDistribucion, {
+        type: 'pie',
+        data: {
+            labels: {{ grafico_distribucion_estados.labels|safe }},
+            datasets: [{
+                data: {{ grafico_distribucion_estados.data|safe }},
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(54, 162, 235, 0.7)',
+                    'rgba(255, 206, 86, 0.7)',
+                    'rgba(75, 192, 192, 0.7)',
+                    'rgba(153, 102, 255, 0.7)',
+                    'rgba(255, 159, 64, 0.7)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                }
+            }
+        }
+    });
+}
+
+// GRÁFICO 3: Días por Estatus
+const ctxDiasEstatus = document.getElementById('chartDiasEstatus');
+if (ctxDiasEstatus) {
+    new Chart(ctxDiasEstatus, {
+        type: 'bar',
+        data: {
+            labels: {{ grafico_dias_estatus.labels|safe }},
+            datasets: [{
+                label: 'Días Hábiles Promedio',
+                data: {{ grafico_dias_estatus.data|safe }},
+                backgroundColor: 'rgba(255, 193, 7, 0.7)',
+                borderColor: 'rgba(255, 193, 7, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// GRÁFICO 4: Evolución Mensual
+const ctxEvolucion = document.getElementById('chartEvolucionMensual');
+if (ctxEvolucion) {
+    new Chart(ctxEvolucion, {
+        type: 'line',
+        data: {
+            labels: {{ grafico_evolucion_mensual.labels|safe }},
+            datasets: [
+                {
+                    label: 'Total Órdenes',
+                    data: {{ grafico_evolucion_mensual.data_ordenes|safe }},
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Finalizadas',
+                    data: {{ grafico_evolucion_mensual.data_finalizadas|safe }},
+                    borderColor: 'rgba(255, 206, 86, 1)',
+                    backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                    tension: 0.4
+                },
+                {
+                    label: 'Entregadas',
+                    data: {{ grafico_evolucion_mensual.data_entregadas|safe }},
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 5
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ========================================================================
+// FUNCIÓN DE EXPORTACIÓN A EXCEL (Placeholder)
+// ========================================================================
+function exportarExcel() {
+    alert('Función de exportación a Excel en desarrollo.\nPróximamente podrás descargar el reporte completo.');
+    // TODO: Implementar exportación real
+}
+</script>
+{% endblock %}

@@ -307,3 +307,312 @@ def obtener_estado_proceso_rhitso(orden):
         return 'Completado'
     else:
         return 'En RHITSO'
+
+
+# ============================================================================
+# FUNCIONES PARA DASHBOARD DE SEGUIMIENTO OOW-/FL-
+# ============================================================================
+
+def calcular_dias_por_estatus(orden):
+    """
+    Calcula cuántos días hábiles ha permanecido la orden en cada estado.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta función analiza el historial completo de una orden y calcula
+    cuánto tiempo (en días hábiles) estuvo en cada estado del proceso.
+    
+    ¿Para qué sirve?
+    - Identificar cuellos de botella en el proceso
+    - Medir eficiencia de cada etapa
+    - Comparar tiempos entre diferentes órdenes
+    - Generar promedios por estado
+    
+    ¿Cómo funciona?
+    1. Obtiene todos los eventos de cambio de estado del historial
+    2. Para cada estado, calcula días hábiles desde que entró hasta que salió
+    3. Si aún está en un estado, calcula hasta hoy
+    
+    Args:
+        orden (OrdenServicio): Instancia del modelo OrdenServicio
+    
+    Returns:
+        dict: Diccionario con estado como key y días hábiles como value
+              Ejemplo: {'espera': 1, 'diagnostico': 3, 'reparacion': 5}
+    
+    Ejemplo de uso:
+        orden = OrdenServicio.objects.get(pk=1)
+        dias_por_estado = calcular_dias_por_estatus(orden)
+        
+        print(f"En diagnóstico: {dias_por_estado.get('diagnostico', 0)} días")
+        print(f"En reparación: {dias_por_estado.get('reparacion', 0)} días")
+    
+    Nota:
+        - Solo cuenta días hábiles (lunes a viernes)
+        - Si no hay historial, usa el estado actual con días desde ingreso
+        - Requiere que el modelo HistorialOrden esté correctamente poblado
+    """
+    from servicio_tecnico.models import HistorialOrden
+    
+    # Diccionario para almacenar días por estado
+    dias_por_estado = {}
+    
+    # Obtener todos los cambios de estado ordenados cronológicamente
+    cambios_estado = orden.historial.filter(
+        tipo_evento='cambio_estado'
+    ).order_by('fecha_evento')
+    
+    if not cambios_estado.exists():
+        # Si no hay historial de cambios, usar el estado actual
+        # y calcular días desde ingreso
+        dias_habiles = calcular_dias_habiles(orden.fecha_ingreso)
+        dias_por_estado[orden.estado] = dias_habiles
+        return dias_por_estado
+    
+    # Recorrer cada cambio de estado
+    fecha_entrada_estado = orden.fecha_ingreso
+    estado_actual = cambios_estado.first().estado_anterior or orden.estado
+    
+    for cambio in cambios_estado:
+        # Calcular días en el estado anterior
+        if estado_actual:
+            dias = calcular_dias_habiles(fecha_entrada_estado, cambio.fecha_evento)
+            if estado_actual in dias_por_estado:
+                dias_por_estado[estado_actual] += dias
+            else:
+                dias_por_estado[estado_actual] = dias
+        
+        # Actualizar para el siguiente estado
+        estado_actual = cambio.estado_nuevo
+        fecha_entrada_estado = cambio.fecha_evento
+    
+    # Calcular días en el estado actual (desde último cambio hasta ahora)
+    if estado_actual:
+        dias = calcular_dias_habiles(fecha_entrada_estado)
+        if estado_actual in dias_por_estado:
+            dias_por_estado[estado_actual] += dias
+        else:
+            dias_por_estado[estado_actual] = dias
+    
+    return dias_por_estado
+
+
+def calcular_promedio_dias_por_estatus(ordenes_queryset):
+    """
+    Calcula el promedio de días hábiles por estado para un conjunto de órdenes.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta función toma varias órdenes y calcula el promedio de tiempo que
+    han permanecido en cada estado del proceso.
+    
+    ¿Para qué sirve?
+    - Dashboard de métricas generales
+    - Identificar estados problemáticos (cuellos de botella)
+    - Establecer benchmarks de tiempo esperado
+    - Comparar rendimiento entre diferentes períodos
+    
+    ¿Cómo funciona?
+    1. Para cada orden, obtiene sus días por estado
+    2. Suma todos los días de cada estado
+    3. Divide entre el número de órdenes que pasaron por ese estado
+    
+    Args:
+        ordenes_queryset (QuerySet): Conjunto de órdenes a analizar
+    
+    Returns:
+        dict: Diccionario con estado como key y diccionario de stats como value
+              Ejemplo: {
+                  'espera': {'promedio': 1.5, 'total_ordenes': 10, 'min': 0, 'max': 3},
+                  'diagnostico': {'promedio': 3.2, 'total_ordenes': 8, 'min': 1, 'max': 7}
+              }
+    
+    Ejemplo de uso:
+        # Obtener órdenes OOW-/FL- del último mes
+        ordenes = OrdenServicio.objects.filter(
+            Q(detalle_equipo__orden_cliente__istartswith='OOW-') |
+            Q(detalle_equipo__orden_cliente__istartswith='FL-'),
+            fecha_ingreso__gte=timezone.now() - timedelta(days=30)
+        )
+        
+        promedios = calcular_promedio_dias_por_estatus(ordenes)
+        
+        print(f"Promedio en diagnóstico: {promedios['diagnostico']['promedio']:.1f} días")
+    
+    Nota:
+        - Solo incluye estados por los que al menos una orden ha pasado
+        - El promedio es redondeado a 1 decimal
+        - Incluye min/max para ver el rango completo
+    """
+    # Diccionario para acumular días por estado
+    acumulado_por_estado = {}
+    contador_por_estado = {}
+    min_por_estado = {}
+    max_por_estado = {}
+    
+    # Recorrer cada orden
+    for orden in ordenes_queryset:
+        dias_por_estado = calcular_dias_por_estatus(orden)
+        
+        for estado, dias in dias_por_estado.items():
+            # Acumular días
+            if estado in acumulado_por_estado:
+                acumulado_por_estado[estado] += dias
+                contador_por_estado[estado] += 1
+                min_por_estado[estado] = min(min_por_estado[estado], dias)
+                max_por_estado[estado] = max(max_por_estado[estado], dias)
+            else:
+                acumulado_por_estado[estado] = dias
+                contador_por_estado[estado] = 1
+                min_por_estado[estado] = dias
+                max_por_estado[estado] = dias
+    
+    # Calcular promedios
+    promedios = {}
+    for estado in acumulado_por_estado:
+        if contador_por_estado[estado] > 0:
+            promedio = acumulado_por_estado[estado] / contador_por_estado[estado]
+            promedios[estado] = {
+                'promedio': round(promedio, 1),
+                'total_ordenes': contador_por_estado[estado],
+                'min': min_por_estado[estado],
+                'max': max_por_estado[estado],
+            }
+    
+    return promedios
+
+
+def agrupar_ordenes_por_mes(ordenes_queryset):
+    """
+    Agrupa órdenes por mes y calcula estadísticas.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta función organiza las órdenes por mes de ingreso y calcula
+    estadísticas para cada mes (cantidad, ingresos, promedios, etc.)
+    
+    ¿Para qué sirve?
+    - Gráficos de evolución mensual
+    - Comparar rendimiento mes a mes
+    - Identificar tendencias y patrones
+    - Reportes ejecutivos mensuales
+    
+    Args:
+        ordenes_queryset (QuerySet): Conjunto de órdenes a analizar
+    
+    Returns:
+        list: Lista de diccionarios, uno por mes, ordenados cronológicamente
+              Ejemplo: [
+                  {
+                      'mes': 'Enero 2025',
+                      'año': 2025,
+                      'mes_numero': 1,
+                      'total_ordenes': 45,
+                      'ordenes_finalizadas': 38,
+                      'ventas_mostrador': 15,
+                      'monto_total': 125000.00,
+                      'dias_promedio': 8.5
+                  },
+                  ...
+              ]
+    
+    Ejemplo de uso:
+        ordenes = OrdenServicio.objects.filter(
+            fecha_ingreso__year=2025
+        )
+        
+        datos_mensuales = agrupar_ordenes_por_mes(ordenes)
+        
+        for mes_data in datos_mensuales:
+            print(f"{mes_data['mes']}: {mes_data['total_ordenes']} órdenes")
+    """
+    from django.db.models import Count, Sum, Avg
+    from decimal import Decimal
+    
+    # Diccionario para acumular datos por mes
+    meses_data = {}
+    
+    for orden in ordenes_queryset.select_related('detalle_equipo', 'venta_mostrador', 'cotizacion'):
+        # Obtener mes y año
+        mes_numero = orden.fecha_ingreso.month
+        año = orden.fecha_ingreso.year
+        mes_key = f"{año}-{mes_numero:02d}"
+        
+        # Inicializar si no existe
+        if mes_key not in meses_data:
+            meses_nombres = [
+                'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+            ]
+            meses_data[mes_key] = {
+                'mes': f"{meses_nombres[mes_numero - 1]} {año}",
+                'año': año,
+                'mes_numero': mes_numero,
+                'mes_key': mes_key,
+                'total_ordenes': 0,
+                'ordenes_finalizadas': 0,
+                'ordenes_entregadas': 0,
+                'ventas_mostrador': 0,
+                'con_cotizacion': 0,
+                'cotizaciones_aceptadas': 0,
+                'monto_ventas_mostrador': Decimal('0.00'),
+                'monto_cotizaciones': Decimal('0.00'),
+                'dias_acumulados': 0,
+            }
+        
+        # Acumular estadísticas
+        meses_data[mes_key]['total_ordenes'] += 1
+        
+        if orden.estado == 'finalizado':
+            meses_data[mes_key]['ordenes_finalizadas'] += 1
+        
+        if orden.estado == 'entregado':
+            meses_data[mes_key]['ordenes_entregadas'] += 1
+        
+        # Venta mostrador
+        if hasattr(orden, 'venta_mostrador') and orden.venta_mostrador:
+            meses_data[mes_key]['ventas_mostrador'] += 1
+            meses_data[mes_key]['monto_ventas_mostrador'] += orden.venta_mostrador.total_venta
+        
+        # Cotización
+        if hasattr(orden, 'cotizacion') and orden.cotizacion:
+            meses_data[mes_key]['con_cotizacion'] += 1
+            if orden.cotizacion.usuario_acepto:
+                meses_data[mes_key]['cotizaciones_aceptadas'] += 1
+                meses_data[mes_key]['monto_cotizaciones'] += orden.cotizacion.costo_total_final
+        
+        # Acumular días en servicio (para calcular promedio)
+        meses_data[mes_key]['dias_acumulados'] += orden.dias_habiles_en_servicio
+    
+    # Convertir a lista y calcular promedios
+    resultado = []
+    for mes_key in sorted(meses_data.keys()):
+        mes_data = meses_data[mes_key]
+        
+        # Calcular promedio de días
+        if mes_data['total_ordenes'] > 0:
+            mes_data['dias_promedio'] = round(
+                mes_data['dias_acumulados'] / mes_data['total_ordenes'], 
+                1
+            )
+        else:
+            mes_data['dias_promedio'] = 0
+        
+        # Calcular monto total
+        mes_data['monto_total'] = mes_data['monto_ventas_mostrador'] + mes_data['monto_cotizaciones']
+        
+        # Calcular porcentajes
+        if mes_data['total_ordenes'] > 0:
+            mes_data['porcentaje_finalizadas'] = round(
+                (mes_data['ordenes_finalizadas'] / mes_data['total_ordenes']) * 100, 
+                1
+            )
+        else:
+            mes_data['porcentaje_finalizadas'] = 0
+        
+        # Eliminar campo temporal
+        del mes_data['dias_acumulados']
+        
+        resultado.append(mes_data)
+    
+    return resultado
