@@ -19,6 +19,7 @@ from PIL import Image
 import os
 import json
 import openpyxl
+from decouple import config
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 from .models import (
@@ -3158,7 +3159,7 @@ def _enviar_notificacion_pieza_recibida(orden, seguimiento):
         
         # IMPORTANTE: Agregar Jefe de Calidad desde .env
         # Este email SIEMPRE debe estar en copia
-        jefe_calidad_email = os.getenv('JEFE_CALIDAD_EMAIL', '').strip()
+        jefe_calidad_email = config('JEFE_CALIDAD_EMAIL', default='').strip()
         if jefe_calidad_email:
             # Evitar duplicados (por si el jefe directo es el mismo que el jefe de calidad)
             if jefe_calidad_email not in destinatarios_copia:
@@ -3217,7 +3218,9 @@ Este es un mensaje automático. Si tienes dudas, contacta al responsable del seg
         # =================================================================
         # Usar remitente personalizado para Servicio Técnico (si existe)
         # Si no existe, usar el remitente por defecto del sistema
-        from_email = os.getenv('SERVICIO_TECNICO_FROM_EMAIL', settings.DEFAULT_FROM_EMAIL)
+        # IMPORTANTE: Usar config() de python-decouple, NO os.getenv()
+        # os.getenv() solo lee variables del sistema, NO del archivo .env
+        from_email = config('SERVICIO_TECNICO_FROM_EMAIL', default=settings.DEFAULT_FROM_EMAIL)
         
         email = EmailMessage(
             subject=asunto,
