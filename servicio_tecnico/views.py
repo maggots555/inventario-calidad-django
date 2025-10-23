@@ -94,6 +94,134 @@ def registrar_historial(orden, tipo_evento, usuario, comentario='', es_sistema=F
     )
 
 
+# ============================================================================
+# FUNCIONES AUXILIARES PARA ANÁLISIS DE VENTAS MOSTRADOR
+# ============================================================================
+
+def determinar_categoria_venta(venta_mostrador):
+    """
+    Determina la categoría principal de una VentaMostrador.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta función analiza una venta mostrador y retorna qué tipo de producto
+    fue vendido. La lógica de prioridad es:
+    1. Si hay paquete (premium/oro/plata) → Mostrar paquete
+    2. Si hay piezas individuales → Mostrar cantidad de piezas
+    3. Si hay servicios → Mostrar tipo de servicio
+    4. Si nada → Mostrar "Otros Servicios"
+    
+    PARÁMETROS:
+    - venta_mostrador: Instancia de VentaMostrador
+    
+    RETORNA:
+    dict con keys:
+        'categoria': str (ej: "Paquete Premium", "Piezas (3 unidades)")
+        'icono': str (emoji para visual)
+    """
+    from .models import VentaMostrador
+    
+    # OPCIÓN 1: Si hay paquete (premium/oro/plata)
+    if venta_mostrador.paquete != 'ninguno':
+        paquete_nombre = venta_mostrador.paquete.capitalize()
+        return {
+            'categoria': f'Paquete {paquete_nombre}',
+            'icono': '📦'
+        }
+    
+    # OPCIÓN 2: Si hay piezas individuales vendidas
+    cantidad_piezas = venta_mostrador.piezas_vendidas.count()
+    if cantidad_piezas > 0:
+        plural = "unidad" if cantidad_piezas == 1 else "unidades"
+        return {
+            'categoria': f'Piezas ({cantidad_piezas} {plural})',
+            'icono': '⚙️'
+        }
+    
+    # OPCIÓN 3: Si hay servicios adicionales
+    if venta_mostrador.incluye_cambio_pieza:
+        return {
+            'categoria': 'Cambio de Pieza',
+            'icono': '🔧'
+        }
+    
+    if venta_mostrador.incluye_limpieza:
+        return {
+            'categoria': 'Limpieza & Mantenimiento',
+            'icono': '🧹'
+        }
+    
+    if venta_mostrador.incluye_kit_limpieza:
+        return {
+            'categoria': 'Kit Limpieza',
+            'icono': '🧽'
+        }
+    
+    if venta_mostrador.incluye_reinstalacion_so:
+        return {
+            'categoria': 'Reinstalación SO',
+            'icono': '💾'
+        }
+    
+    # OPCIÓN 4: Si nada de lo anterior
+    return {
+        'categoria': 'Otros Servicios',
+        'icono': '📝'
+    }
+
+
+def obtener_top_productos_vendidos(ordenes, limite=5):
+    """
+    Obtiene los TOP N productos más vendidos en las órdenes dadas.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta función recorre todas las órdenes con ventas mostrador y cuenta
+    cuáles piezas individuales fueron vendidas más veces. Retorna el TOP N.
+    
+    Útil para ver qué productos son más populares en mostrador.
+    
+    PARÁMETROS:
+    - ordenes: QuerySet de OrdenServicio
+    - limite: Cantidad de top productos a retornar (default: 5)
+    
+    RETORNA:
+    list de dicts con keys:
+        'descripcion': str (nombre de la pieza)
+        'cantidad': int (total vendidas)
+        'subtotal': Decimal (monto total generado)
+    """
+    from collections import defaultdict
+    from decimal import Decimal
+    from .models import VentaMostrador
+    
+    # Diccionario para acumular datos por pieza
+    piezas_vendidas = defaultdict(lambda: {'cantidad': 0, 'subtotal': Decimal('0.00')})
+    
+    # Recorrer todas las órdenes con venta mostrador
+    for orden in ordenes:
+        if hasattr(orden, 'venta_mostrador') and orden.venta_mostrador:
+            venta = orden.venta_mostrador
+            # Contar cada pieza vendida
+            for pieza in venta.piezas_vendidas.all():
+                clave = pieza.descripcion_pieza
+                piezas_vendidas[clave]['cantidad'] += pieza.cantidad
+                piezas_vendidas[clave]['subtotal'] += pieza.subtotal
+    
+    # Convertir a lista y ordenar por cantidad descendente
+    piezas_lista = [
+        {
+            'descripcion': desc,
+            'cantidad': data['cantidad'],
+            'subtotal': data['subtotal']
+        }
+        for desc, data in piezas_vendidas.items()
+    ]
+    
+    piezas_lista.sort(key=lambda x: x['cantidad'], reverse=True)
+    
+    # Retornar solo los top N
+    return piezas_lista[:limite]
+
+
 @login_required
 def inicio(request):
     """
@@ -6027,6 +6155,10 @@ def dashboard_seguimiento_oow_fl(request):
         cotizacion__isnull=False,
         cotizacion__usuario_acepto__isnull=True
     ).count()
+    cotizaciones_rechazadas = ordenes.filter(
+        cotizacion__isnull=False,
+        cotizacion__usuario_acepto=False
+    ).count()
     
     # Calcular montos totales
     monto_total_ventas_mostrador = Decimal('0.00')
@@ -6094,6 +6226,8 @@ def dashboard_seguimiento_oow_fl(request):
                 'ventas_mostrador': 0,
                 'con_cotizacion': 0,
                 'cotizaciones_aceptadas': 0,
+                'cotizaciones_pendientes': 0,
+                'cotizaciones_rechazadas': 0,
                 'monto_ventas_mostrador': Decimal('0.00'),
                 'monto_cotizaciones': Decimal('0.00'),
                 'dias_acumulados': 0,
@@ -6117,9 +6251,14 @@ def dashboard_seguimiento_oow_fl(request):
         
         if hasattr(orden, 'cotizacion') and orden.cotizacion:
             responsables_data[resp_id]['con_cotizacion'] += 1
-            if orden.cotizacion.usuario_acepto:
+            if orden.cotizacion.usuario_acepto is True:
                 responsables_data[resp_id]['cotizaciones_aceptadas'] += 1
                 responsables_data[resp_id]['monto_cotizaciones'] += orden.cotizacion.costo_total_final
+            elif orden.cotizacion.usuario_acepto is False:
+                responsables_data[resp_id]['cotizaciones_rechazadas'] += 1
+            else:
+                # Si es None (null), está pendiente
+                responsables_data[resp_id]['cotizaciones_pendientes'] += 1
         
         responsables_data[resp_id]['dias_acumulados'] += orden.dias_habiles_en_servicio
     
@@ -6144,6 +6283,164 @@ def dashboard_seguimiento_oow_fl(request):
         key=lambda x: x['total_ordenes'],
         reverse=True
     )
+    
+    # =========================================================================
+    # PASO 5.5: PREPARAR GRÁFICO 1 - VENTAS MOSTRADOR POR RESPONSABLE + CATEGORÍA
+    # =========================================================================
+    
+    # Crear estructura con datos de ventas mostrador por responsable
+    # Incluyendo la categoría de producto vendido
+    grafico_ventas_mostrador_responsables = {
+        'labels': [],  # Nombres de responsables
+        'data': [],  # Montos en $
+        'categorias': [],  # Categoría de producto vendido
+        'iconos': [],  # Emojis para visual
+        'desglose': [],  # NUEVO: Desglose completo de productos por responsable
+    }
+    
+    # Filtrar responsables que tengan ventas mostrador > 0
+    responsables_con_ventas = [
+        r for r in responsables_lista 
+        if r['ventas_mostrador'] > 0
+    ]
+    
+    # Para cada responsable con ventas, obtener categoría de producto
+    for responsable in responsables_con_ventas:
+        resp_id = responsable['id']
+        
+        # Obtener todas las órdenes de este responsable con venta mostrador
+        ordenes_resp = [o for o in ordenes if o.responsable_seguimiento.id == resp_id]
+        
+        # NUEVO: Crear desglose detallado de productos vendidos por este responsable
+        productos_responsable = {}  # {descripcion: {cantidad, subtotal, categoria}}
+        categorias_contador = {}
+        
+        for orden in ordenes_resp:
+            if hasattr(orden, 'venta_mostrador') and orden.venta_mostrador:
+                venta = orden.venta_mostrador
+                
+                # ===== INCLUIR PAQUETES =====
+                if venta.paquete != 'ninguno':
+                    desc_paquete = f"Paquete {venta.paquete.upper()}"
+                    costo_paq = float(venta.costo_paquete)
+                    
+                    if desc_paquete not in productos_responsable:
+                        productos_responsable[desc_paquete] = {
+                            'cantidad': 0,
+                            'subtotal': 0
+                        }
+                    
+                    productos_responsable[desc_paquete]['cantidad'] += 1
+                    productos_responsable[desc_paquete]['subtotal'] += costo_paq
+                
+                # ===== INCLUIR SERVICIOS =====
+                servicios_venta = []
+                
+                if venta.incluye_cambio_pieza and venta.costo_cambio_pieza > 0:
+                    servicios_venta.append({
+                        'nombre': 'Cambio de Pieza',
+                        'costo': float(venta.costo_cambio_pieza)
+                    })
+                
+                if venta.incluye_limpieza and venta.costo_limpieza > 0:
+                    servicios_venta.append({
+                        'nombre': 'Limpieza y Mantenimiento',
+                        'costo': float(venta.costo_limpieza)
+                    })
+                
+                if venta.incluye_kit_limpieza and venta.costo_kit > 0:
+                    servicios_venta.append({
+                        'nombre': 'Kit de Limpieza',
+                        'costo': float(venta.costo_kit)
+                    })
+                
+                if venta.incluye_reinstalacion_so and venta.costo_reinstalacion > 0:
+                    servicios_venta.append({
+                        'nombre': 'Reinstalación SO',
+                        'costo': float(venta.costo_reinstalacion)
+                    })
+                
+                # Agregar servicios al desglose
+                for servicio in servicios_venta:
+                    desc_servicio = servicio['nombre']
+                    costo_servicio = servicio['costo']
+                    
+                    if desc_servicio not in productos_responsable:
+                        productos_responsable[desc_servicio] = {
+                            'cantidad': 0,
+                            'subtotal': 0
+                        }
+                    
+                    productos_responsable[desc_servicio]['cantidad'] += 1
+                    productos_responsable[desc_servicio]['subtotal'] += costo_servicio
+                
+                # ===== INCLUIR PIEZAS INDIVIDUALES =====
+                piezas = venta.piezas_vendidas.all()
+                for pieza in piezas:
+                    desc = pieza.descripcion_pieza[:50]  # Truncar descripción
+                    
+                    if desc not in productos_responsable:
+                        productos_responsable[desc] = {
+                            'cantidad': 0,
+                            'subtotal': 0
+                        }
+                    
+                    productos_responsable[desc]['cantidad'] += pieza.cantidad
+                    productos_responsable[desc]['subtotal'] += float(pieza.subtotal)
+                
+                # Contar categorías
+                cat_info = determinar_categoria_venta(venta)
+                categoria = cat_info['categoria']
+                categorias_contador[categoria] = categorias_contador.get(categoria, 0) + 1
+        
+        # Obtener la categoría más vendida
+        if categorias_contador:
+            categoria_principal = max(categorias_contador, key=categorias_contador.get)
+            # Obtener información de la primera venta para obtener icono
+            primera_venta = None
+            for orden in ordenes_resp:
+                if hasattr(orden, 'venta_mostrador') and orden.venta_mostrador:
+                    primera_venta = orden.venta_mostrador
+                    break
+            
+            cat_info = determinar_categoria_venta(primera_venta) if primera_venta else {'categoria': 'Desconocido', 'icono': '❓'}
+        else:
+            cat_info = {'categoria': 'Sin categoría', 'icono': '❌'}
+        
+        # NUEVO: Ordenar productos por subtotal (mayor primero)
+        productos_ordenados = sorted(
+            productos_responsable.items(),
+            key=lambda x: x[1]['subtotal'],
+            reverse=True
+        )
+        
+        # Convertir a formato para tooltip
+        desglose_texto = []
+        for desc, info in productos_ordenados[:10]:  # Top 10 productos
+            desglose_texto.append({
+                'descripcion': desc,
+                'cantidad': info['cantidad'],
+                'subtotal': info['subtotal']
+            })
+        
+        # Agregar datos al gráfico
+        grafico_ventas_mostrador_responsables['labels'].append(responsable['nombre'])
+        grafico_ventas_mostrador_responsables['data'].append(float(responsable['monto_ventas_mostrador']))
+        grafico_ventas_mostrador_responsables['categorias'].append(cat_info['categoria'])
+        grafico_ventas_mostrador_responsables['iconos'].append(cat_info['icono'])
+        grafico_ventas_mostrador_responsables['desglose'].append(desglose_texto)
+    
+    # =========================================================================
+    # PASO 5.6: PREPARAR GRÁFICO 2 - TOP PRODUCTOS VENDIDOS
+    # =========================================================================
+    
+    top_productos = obtener_top_productos_vendidos(ordenes, limite=5)
+    
+    grafico_top_productos = {
+        'labels': [p['descripcion'][:30] for p in top_productos],  # Truncar descripciones largas
+        'data': [int(p['cantidad']) for p in top_productos],
+        'montos': [float(p['subtotal']) for p in top_productos],
+    }
     
     # =========================================================================
     # PASO 6: CALCULAR DÍAS PROMEDIO POR ESTATUS
@@ -6297,6 +6594,7 @@ def dashboard_seguimiento_oow_fl(request):
             'total_con_cotizacion': total_con_cotizacion,
             'cotizaciones_aceptadas': cotizaciones_aceptadas,
             'cotizaciones_pendientes': cotizaciones_pendientes,
+            'cotizaciones_rechazadas': cotizaciones_rechazadas,
             'monto_ventas_mostrador': monto_total_ventas_mostrador,
             'monto_cotizaciones': monto_total_cotizaciones,
             'monto_total': monto_total_general,
@@ -6329,6 +6627,10 @@ def dashboard_seguimiento_oow_fl(request):
         'grafico_dias_estatus': grafico_dias_estatus,
         'grafico_evolucion_mensual': grafico_evolucion_mensual,
         'grafico_distribucion_estados': grafico_distribucion_estados,
+        
+        # NUEVOS GRÁFICOS: Ventas Mostrador
+        'grafico_ventas_mostrador_responsables': grafico_ventas_mostrador_responsables,
+        'grafico_top_productos': grafico_top_productos,
         
         # Órdenes completas (para tabla detallada)
         'ordenes': ordenes[:100],  # Limitar a 100 para rendimiento inicial

@@ -203,11 +203,43 @@
         <div class="col-md-3 mb-3">
             <div class="card metric-card h-100" style="border-left-color: #a8edea;">
                 <div class="card-body">
-                    <p class="metric-value">{{ metricas.cotizaciones_aceptadas }}/{{ metricas.total_con_cotizacion }}</p>
-                    <p class="metric-label">Cotizaciones Aceptadas</p>
-                    <small class="text-muted">
-                        {{ metricas.cotizaciones_pendientes }} pendiente{{ metricas.cotizaciones_pendientes|pluralize }}
-                    </small>
+                    <!-- ENCABEZADO: TOTAL -->
+                    <div class="mb-3 pb-3 border-bottom">
+                        <p class="text-muted small mb-2">
+                            <i class="bi bi-file-earmark-text"></i> Total Cotizaciones
+                        </p>
+                        <p class="metric-value text-primary mb-0">{{ metricas.total_con_cotizacion }}</p>
+                    </div>
+                    
+                    <!-- DESGLOSE: 3 FILAS CON COLORES DIFERENCIADOS -->
+                    <div class="cotizaciones-desglose">
+                        <!-- ACEPTADAS -->
+                        <div class="estado-item estado-aceptadas">
+                            <strong class="text-success">{{ metricas.cotizaciones_aceptadas }}</strong>
+                            <small>
+                                <span class="d-block fw-bold">✅ Aceptadas</span>
+                                <span class="text-muted">Listas para reparar</span>
+                            </small>
+                        </div>
+                        
+                        <!-- PENDIENTES -->
+                        <div class="estado-item estado-pendientes">
+                            <strong class="text-warning">{{ metricas.cotizaciones_pendientes }}</strong>
+                            <small>
+                                <span class="d-block fw-bold">⏳ Pendientes</span>
+                                <span class="text-muted">Esperando respuesta</span>
+                            </small>
+                        </div>
+                        
+                        <!-- RECHAZADAS -->
+                        <div class="estado-item estado-rechazadas">
+                            <strong class="text-danger">{{ metricas.cotizaciones_rechazadas }}</strong>
+                            <small>
+                                <span class="d-block fw-bold">❌ Rechazadas</span>
+                                <span class="text-muted">Cliente no aceptó</span>
+                            </small>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -416,6 +448,69 @@
     </div>
     
     <!-- ====================================================================
+         NUEVOS GRÁFICOS: VENTAS MOSTRADOR
+         ==================================================================== -->
+    <div class="row mb-4">
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100 chart-card">
+                <div class="card-header d-flex align-items-center gap-2">
+                    <i class="bi bi-cart-fill" style="color: #f093fb; font-size: 1.25rem;"></i>
+                    <h6 class="mb-0" style="color: #333;">
+                        Ventas Mostrador por Responsable
+                    </h6>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    {% if grafico_ventas_mostrador_responsables.labels|length > 0 %}
+                        <div class="chart-container chart-horizontal flex-grow-1">
+                            <canvas id="chartVentasMostradorResponsables"></canvas>
+                        </div>
+                        <div class="mt-3 small text-muted">
+                            <p class="mb-0">
+                                <strong>📊 Información:</strong>
+                                Muestra el monto total en ventas mostrador por cada responsable,
+                                con el tipo de producto predominante.
+                            </p>
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center mb-0 align-self-center">
+                            <i class="bi bi-inbox"></i> No hay datos de ventas mostrador para mostrar.
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100 chart-card">
+                <div class="card-header d-flex align-items-center gap-2 top-productos">
+                    <i class="bi bi-star-fill" style="color: #43e97b; font-size: 1.25rem;"></i>
+                    <h6 class="mb-0" style="color: #333;">
+                        TOP 5 Productos Más Vendidos
+                    </h6>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    {% if grafico_top_productos.labels|length > 0 %}
+                        <div class="chart-container chart-vertical flex-grow-1">
+                            <canvas id="chartTopProductos"></canvas>
+                        </div>
+                        <div class="mt-3 small text-muted">
+                            <p class="mb-0">
+                                <strong>📈 Información:</strong>
+                                Ranking de las 5 piezas/productos más vendidas en mostrador,
+                                ordenadas por cantidad de unidades vendidas.
+                            </p>
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center mb-0 align-self-center">
+                            <i class="bi bi-inbox"></i> No hay productos vendidos para mostrar.
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ====================================================================
          DATOS POR RESPONSABLE DE SEGUIMIENTO
          ==================================================================== -->
     <div class="row mb-4">
@@ -476,11 +571,36 @@
                                         </div>
                                     </div>
                                     <div class="col-md-3">
-                                        <div class="card bg-light mb-2">
+                                        <div class="card h-100 mb-2">
                                             <div class="card-body py-2">
-                                                <small class="text-muted d-block">Cotizaciones</small>
-                                                <strong class="fs-5">{{ resp.cotizaciones_aceptadas }}/{{ resp.con_cotizacion }}</strong>
-                                                <small class="text-muted d-block">${{ resp.monto_cotizaciones|floatformat:2 }}</small>
+                                                <small class="text-muted d-block mb-2">
+                                                    <i class="bi bi-file-earmark-check"></i> Cotizaciones
+                                                </small>
+                                                
+                                                {% if resp.con_cotizacion > 0 %}
+                                                    <!-- Desglose de cotizaciones -->
+                                                    <div class="cotizaciones-desglose-compact">
+                                                        <div class="estado-item-compact estado-aceptadas-compact" title="Cotizaciones Aceptadas">
+                                                            <span class="estado-numero">✅ {{ resp.cotizaciones_aceptadas }}</span>
+                                                        </div>
+                                                        {% if resp.cotizaciones_pendientes > 0 %}
+                                                        <div class="estado-item-compact estado-pendientes-compact" title="Cotizaciones Pendientes">
+                                                            <span class="estado-numero">⏳ {{ resp.cotizaciones_pendientes }}</span>
+                                                        </div>
+                                                        {% endif %}
+                                                        {% if resp.cotizaciones_rechazadas > 0 %}
+                                                        <div class="estado-item-compact estado-rechazadas-compact" title="Cotizaciones Rechazadas">
+                                                            <span class="estado-numero">❌ {{ resp.cotizaciones_rechazadas }}</span>
+                                                        </div>
+                                                        {% endif %}
+                                                    </div>
+                                                    
+                                                    <small class="text-muted d-block mt-2">
+                                                        Total: ${{ resp.monto_cotizaciones|floatformat:2 }}
+                                                    </small>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Sin cotizaciones</span>
+                                                {% endif %}
                                             </div>
                                         </div>
                                     </div>
@@ -511,6 +631,35 @@
                                         <i class="bi bi-filter"></i> Filtrar solo este responsable
                                     </a>
                                 </div>
+                                
+                                <!-- TABLA: DESGLOSE DE VENTAS MOSTRADOR POR RESPONSABLE -->
+                                {% if resp.monto_ventas_mostrador > 0 %}
+                                <div class="mt-4 pt-3 border-top">
+                                    <h6 class="mb-3">
+                                        <i class="bi bi-basket-fill"></i>
+                                        Desglose de Ventas Mostrador
+                                    </h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width: 50%;">Producto / Servicio</th>
+                                                    <th style="width: 15%;" class="text-center">Cantidad</th>
+                                                    <th style="width: 35%;" class="text-end">Subtotal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% comment %} Esta tabla será poblada por JavaScript usando los datos del gráfico {% endcomment %}
+                                                <tr id="desglose-{{ resp.id }}-empty">
+                                                    <td colspan="3" class="text-center text-muted">
+                                                        Cargando datos...
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}
@@ -889,11 +1038,228 @@ if (ctxEvolucion) {
 }
 
 // ========================================================================
+// GRÁFICO 5: VENTAS MOSTRADOR POR RESPONSABLE (NUEVO)
+// ========================================================================
+const ctxVentasMostrador = document.getElementById('chartVentasMostradorResponsables');
+if (ctxVentasMostrador && {{ grafico_ventas_mostrador_responsables.labels|safe|length }} > 0) {
+    // Preparar tooltips con desglose detallado de productos
+    const desgloseData = {{ grafico_ventas_mostrador_responsables.desglose|safe }};
+    
+    const ventasTooltip = {
+        callbacks: {
+            title: function(context) {
+                return context[0].label + ' - Total: $' + 
+                       context[0].parsed.x.toLocaleString('es-CO', {
+                           minimumFractionDigits: 0,
+                           maximumFractionDigits: 0
+                       });
+            },
+            label: function(context) {
+                return '';  // Vacío para que no muestre la línea por defecto
+            },
+            afterLabel: function(context) {
+                const respIndex = context.dataIndex;
+                const productos = desgloseData[respIndex];
+                
+                if (!productos || productos.length === 0) {
+                    return 'Sin desglose disponible';
+                }
+                
+                let lineas = [];
+                productos.forEach((producto, idx) => {
+                    const desc = producto.descripcion.substring(0, 35);
+                    const cantidad = producto.cantidad;
+                    const monto = producto.subtotal.toLocaleString('es-CO', {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                    });
+                    lineas.push('  • ' + desc + ' - ' + cantidad + 'x ($' + monto + ')');
+                });
+                
+                return lineas.join('\n');
+            },
+            padding: 10,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            borderColor: '#f093fb',
+            borderWidth: 1
+        }
+    };
+    
+    new Chart(ctxVentasMostrador, {
+        type: 'bar',
+        data: {
+            labels: {{ grafico_ventas_mostrador_responsables.labels|safe }},
+            datasets: [{
+                label: 'Ventas Mostrador ($)',
+                data: {{ grafico_ventas_mostrador_responsables.data|safe }},
+                backgroundColor: 'rgba(240, 147, 251, 0.7)',
+                borderColor: 'rgba(240, 147, 251, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: ventasTooltip
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toLocaleString('es-CO', {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ========================================================================
+// GRÁFICO 6: TOP PRODUCTOS VENDIDOS (NUEVO)
+// ========================================================================
+const ctxTopProductos = document.getElementById('chartTopProductos');
+if (ctxTopProductos && {{ grafico_top_productos.labels|safe|length }} > 0) {
+    // Preparar tooltips con monto total
+    const productosTooltip = {
+        callbacks: {
+            label: function(context) {
+                const cantidad = context.parsed.y;
+                const montoIndex = context.dataIndex;
+                const montos = {{ grafico_top_productos.montos|safe }};
+                const monto = montos[montoIndex];
+                
+                return [
+                    'Unidades: ' + cantidad,
+                    'Total: $' + monto.toLocaleString('es-CO', {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2
+                    })
+                ];
+            }
+        }
+    };
+    
+    new Chart(ctxTopProductos, {
+        type: 'bar',
+        data: {
+            labels: {{ grafico_top_productos.labels|safe }},
+            datasets: [{
+                label: 'Cantidad Vendida (unidades)',
+                data: {{ grafico_top_productos.data|safe }},
+                backgroundColor: 'rgba(67, 233, 123, 0.7)',
+                borderColor: 'rgba(67, 233, 123, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'x',
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: productosTooltip
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ========================================================================
+// FUNCIÓN: POBLAR TABLAS DE DESGLOSE DE VENTAS POR RESPONSABLE
+// ========================================================================
+function poblarTableasDesglose() {
+    // Obtener datos del gráfico de ventas mostrador
+    const labels = {{ grafico_ventas_mostrador_responsables.labels|safe }};
+    const desgloseData = {{ grafico_ventas_mostrador_responsables.desglose|safe }};
+    
+    // Obtener los IDs de responsables desde el HTML
+    const responsableSections = document.querySelectorAll('.responsable-section');
+    let indiceGrafico = 0;
+    
+    responsableSections.forEach((section) => {
+        // Obtener el ID del responsable desde el atributo data-bs-target del header
+        const header = section.querySelector('.responsable-header');
+        const targetId = header.getAttribute('data-bs-target');
+        const respId = targetId.replace('#responsable', '');
+        
+        // Obtener la tabla de desglose de este responsable
+        const tabla = section.querySelector('tbody');
+        const emptyRow = section.querySelector('[id^="desglose-"]');
+        
+        if (tabla && emptyRow) {
+            // Buscar si este responsable tiene desglose en los datos del gráfico
+            const respIndex = labels.findIndex(label => {
+                // Comparar el índice con el orden en que aparecen en responsables
+                return tabla.closest('.collapse').id.includes(respId);
+            });
+            
+            // Usar el índice del responsable que tiene ventas mostrador
+            const desgloseResponsable = desgloseData[indiceGrafico];
+            
+            if (desgloseResponsable && desgloseResponsable.length > 0) {
+                // Limpiar la fila vacía
+                emptyRow.remove();
+                
+                // Agregar cada producto al desglose
+                desgloseResponsable.forEach((producto) => {
+                    const fila = document.createElement('tr');
+                    const descripcion = producto.descripcion.substring(0, 50);
+                    const cantidad = producto.cantidad;
+                    const subtotal = producto.subtotal.toLocaleString('es-CO', {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                        currency: 'COP'
+                    });
+                    
+                    fila.innerHTML = `
+                        <td>${descripcion}</td>
+                        <td class="text-center"><span class="badge bg-info">${cantidad}</span></td>
+                        <td class="text-end"><strong>$${subtotal}</strong></td>
+                    `;
+                    
+                    tabla.appendChild(fila);
+                });
+                
+                indiceGrafico++;
+            }
+        }
+    });
+}
+
+// ========================================================================
 // FUNCIÓN DE EXPORTACIÓN A EXCEL (Placeholder)
 // ========================================================================
 function exportarExcel() {
     alert('Función de exportación a Excel en desarrollo.\nPróximamente podrás descargar el reporte completo.');
     // TODO: Implementar exportación real
 }
+
+// ========================================================================
+// INICIALIZAR TABLAS DE DESGLOSE
+// ========================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    poblarTableasDesglose();
+});
 </script>
 {% endblock %}
