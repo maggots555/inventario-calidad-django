@@ -62,3 +62,6 @@ ssl_certs/
 # Other projects (not part of inventario-calidad-django)
 inventario_calidad_backup/
 mi_sitio_descontinuado/
+
+# Dependencias de Node.js
+/node_modules

@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    /* Opciones Base */
+    "target": "ES6", // Compila a JavaScript ES6 (compatible con navegadores modernos)
+    "module": "ES6", // Usa módulos modernos
+    "strict": true, // ¡La magia de TypeScript! Activa todos los chequeos estrictos.
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Opciones Clave para Django */
+    "outDir": "static/js", // ¡IMPORTANTE! Aquí es donde guardará los .js compilados.
+    "sourceMap": true, // Crea archivos .map para depurar tu .ts original en el navegador
+  },
+  /* Dónde buscará TypeScript */
+  "include": [
+    "static/ts/**/*.ts" // ¡IMPORTANTE! Le dice que busque todos los archivos .ts dentro de una nueva carpeta 'static/ts'
+  ]
+}

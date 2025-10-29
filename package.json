@@ -1,0 +1,29 @@
+{
+  "name": "mi_proyecto_django",
+  "version": "1.0.0",
+  "description": "<!-- Badges -->\r <p align=\"center\">\r   <img src=\"https://img.shields.io/badge/Django-5.2.5-092E20?style=for-the-badge&logo=django&logoColor=white\" alt=\"Django 5.2.5\">\r   <img src=\"https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white\" alt=\"Python 3.10+\">\r   <img src=\"https://img.shields.io/badge/Bootstrap-5.3.2-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white\" alt=\"Bootstrap 5.3.2\">\r   <img src=\"https://img.shields.io/badge/Chart.js-4.4.0-FF6384?style=for-the-badge&logo=chartdotjs&logoColor=white\" alt=\"Chart.js\">\r </p>",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maggots555/inventario-calidad-django.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/maggots555/inventario-calidad-django/issues"
+  },
+  "homepage": "https://github.com/maggots555/inventario-calidad-django#readme",
+  "devDependencies": {
+    "@types/bootstrap": "^5.2.10",
+    "typescript": "^5.9.3"
+  }
+}
