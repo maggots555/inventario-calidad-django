@@ -1067,7 +1067,7 @@ class SubirImagenesForm(forms.Form):
             'accept': 'image/jpeg,image/jpg,image/png,image/gif',
         }),
         label='Seleccionar Imágenes',
-        help_text='Puedes seleccionar múltiples imágenes (máximo 30, 6MB cada una)',
+        help_text='Puedes seleccionar múltiples imágenes (máximo 30, 50MB cada una)',
         required=False,
     )
     

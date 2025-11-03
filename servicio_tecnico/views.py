@@ -1322,9 +1322,30 @@ def detalle_orden(request, orden_id):
                 messages.error(request, '❌ Error al agregar el comentario.')
         
         # ------------------------------------------------------------------------
-        # FORMULARIO 6: Subir Imágenes
+        # FORMULARIO 6: Subir Imágenes - MEJORADO CON LOGGING
         # ------------------------------------------------------------------------
         elif form_type == 'subir_imagenes':
+            # LOGGING: Información inicial para diagnóstico
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"📷 Inicio procesamiento de imágenes para orden {orden.numero_orden_interno}")
+            logger.info(f"   - POST data: {request.POST.keys()}")
+            logger.info(f"   - FILES data: {request.FILES.keys()}")
+            logger.info(f"   - Content-Type: {request.content_type}")
+            
+            # Verificar si hay archivos en la petición
+            if not request.FILES:
+                logger.warning("⚠️ No se recibieron archivos en request.FILES")
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No se recibieron imágenes. Verifica que hayas seleccionado archivos.',
+                    'debug_info': {
+                        'content_type': request.content_type,
+                        'post_keys': list(request.POST.keys()),
+                        'files_keys': list(request.FILES.keys())
+                    }
+                })
+            
             form_imagenes = SubirImagenesForm(request.POST, request.FILES)
             
             if form_imagenes.is_valid():
@@ -1333,10 +1354,22 @@ def detalle_orden(request, orden_id):
                 tipo_imagen = form_imagenes.cleaned_data['tipo']
                 descripcion = form_imagenes.cleaned_data.get('descripcion', '')
                 
+                logger.info(f"   - Tipo de imagen: {tipo_imagen}")
+                logger.info(f"   - Cantidad de archivos recibidos: {len(imagenes_files)}")
+                
+                # Validar que haya imágenes
+                if not imagenes_files:
+                    logger.warning("⚠️ Lista de imágenes vacía")
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'No se detectaron imágenes en el formulario. Intenta seleccionarlas nuevamente.',
+                    })
+                
                 # Validar cantidad máxima (30 imágenes POR CARGA, no total)
                 imagenes_a_subir = len(imagenes_files)
                 
                 if imagenes_a_subir > 30:
+                    logger.warning(f"⚠️ Intentó subir {imagenes_a_subir} imágenes (máximo: 30)")
                     # Retornar JSON con error en lugar de redirect
                     return JsonResponse({
                         'success': False,
@@ -1349,14 +1382,30 @@ def detalle_orden(request, orden_id):
                 errores_procesamiento = []
                 
                 try:
-                    for imagen_file in imagenes_files:
-                        # Validar tamaño (7MB = 7 * 1024 * 1024 bytes)
-                        if imagen_file.size > 7 * 1024 * 1024:
-                            imagenes_omitidas.append(imagen_file.name)
+                    for idx, imagen_file in enumerate(imagenes_files):
+                        logger.info(f"   - Procesando imagen {idx+1}/{len(imagenes_files)}: {imagen_file.name} ({imagen_file.size} bytes)")
+                        
+                        # Validar tamaño (50MB = 50 * 1024 * 1024 bytes)
+                        if imagen_file.size > 50 * 1024 * 1024:
+                            logger.warning(f"   ⚠️ Imagen {imagen_file.name} excede 50MB: {imagen_file.size / (1024*1024):.2f}MB")
+                            imagenes_omitidas.append(f"{imagen_file.name} (tamaño: {imagen_file.size / (1024*1024):.2f}MB)")
+                            continue
+                        
+                        # Validar formato de imagen
+                        try:
+                            from PIL import Image as PILImage
+                            img_test = PILImage.open(imagen_file)
+                            img_test.verify()  # Verificar que sea una imagen válida
+                            imagen_file.seek(0)  # Resetear el cursor del archivo
+                            logger.info(f"   ✓ Imagen válida: {img_test.format} {img_test.size}")
+                        except Exception as e:
+                            logger.error(f"   ❌ Imagen inválida {imagen_file.name}: {str(e)}")
+                            errores_procesamiento.append(f"{imagen_file.name}: No es una imagen válida o está corrupta")
                             continue
                         
                         # Comprimir y guardar imagen
                         try:
+                            logger.info(f"   → Iniciando compresión y guardado...")
                             imagen_orden = comprimir_y_guardar_imagen(
                                 orden=orden,
                                 imagen_file=imagen_file,
@@ -1365,7 +1414,9 @@ def detalle_orden(request, orden_id):
                                 empleado=empleado_actual
                             )
                             imagenes_guardadas += 1
+                            logger.info(f"   ✅ Imagen guardada exitosamente: ID {imagen_orden.pk}")
                         except Exception as e:
+                            logger.error(f"   ❌ Error al guardar {imagen_file.name}: {str(e)}", exc_info=True)
                             errores_procesamiento.append(f"{imagen_file.name}: {str(e)}")
                     
                     # Preparar respuesta
@@ -1449,19 +1500,21 @@ def detalle_orden(request, orden_id):
                     # Capturar cualquier error inesperado y retornarlo
                     import traceback
                     error_detallado = traceback.format_exc()
-                    print(f"❌ ERROR AL PROCESAR IMÁGENES: {error_detallado}")
+                    logger.critical(f"❌ ERROR CRÍTICO AL PROCESAR IMÁGENES: {error_detallado}")
                     return JsonResponse({
                         'success': False,
                         'error': f'Error inesperado al procesar imágenes: {str(e)}',
                         'error_type': type(e).__name__,
-                        'imagenes_guardadas': imagenes_guardadas
+                        'imagenes_guardadas': imagenes_guardadas,
+                        'traceback': error_detallado if request.user.is_superuser else None  # Solo para superusers
                     }, status=500)
             else:
                 # Formulario no válido
+                logger.error(f"❌ Formulario de imágenes inválido: {form_imagenes.errors}")
                 return JsonResponse({
                     'success': False,
                     'error': 'Error en el formulario. Verifica los datos enviados.',
-                    'form_errors': form_imagenes.errors
+                    'form_errors': dict(form_imagenes.errors)
                 })
         
         # ------------------------------------------------------------------------

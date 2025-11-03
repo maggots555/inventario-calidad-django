@@ -155,6 +155,13 @@ STATICFILES_DIRS = [
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# ============================================================================
+# CONFIGURACIÓN DE LÍMITES DE CARGA DE ARCHIVOS
+# ============================================================================
+# Aumentado a 50MB para permitir imágenes de alta resolución desde celulares
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
+
 # Email Configuration (SMTP)
 # https://docs.djangoproject.com/en/5.2/topics/email/
 # Configuración para envío de notificaciones de Score Card
