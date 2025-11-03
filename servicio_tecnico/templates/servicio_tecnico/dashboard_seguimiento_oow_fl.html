@@ -1248,11 +1248,47 @@ function poblarTableasDesglose() {
 }
 
 // ========================================================================
-// FUNCIÓN DE EXPORTACIÓN A EXCEL (Placeholder)
+// FUNCIÓN DE EXPORTACIÓN A EXCEL
 // ========================================================================
 function exportarExcel() {
-    alert('Función de exportación a Excel en desarrollo.\nPróximamente podrás descargar el reporte completo.');
-    // TODO: Implementar exportación real
+    // Construir URL con los filtros actuales aplicados
+    const baseUrl = "{% url 'servicio_tecnico:exportar_excel_dashboard_oow_fl' %}";
+    
+    // Obtener valores de los filtros del formulario
+    const prefijo = document.getElementById('prefijo').value;
+    const responsableId = document.getElementById('responsable_id').value;
+    const fechaDesde = document.getElementById('fecha_desde').value;
+    const fechaHasta = document.getElementById('fecha_hasta').value;
+    const estado = document.getElementById('estado').value;
+    const sucursalId = document.getElementById('sucursal_id').value;
+    
+    // Construir query string con los filtros
+    const params = new URLSearchParams();
+    
+    if (prefijo) {
+        params.append('prefijo', prefijo);
+    }
+    if (responsableId) {
+        params.append('responsable_id', responsableId);
+    }
+    if (fechaDesde) {
+        params.append('fecha_desde', fechaDesde);
+    }
+    if (fechaHasta) {
+        params.append('fecha_hasta', fechaHasta);
+    }
+    if (estado) {
+        params.append('estado', estado);
+    }
+    if (sucursalId) {
+        params.append('sucursal_id', sucursalId);
+    }
+    
+    // Construir URL completa
+    const fullUrl = baseUrl + (params.toString() ? '?' + params.toString() : '');
+    
+    // Abrir en nueva ventana (esto descargará el archivo)
+    window.location.href = fullUrl;
 }
 
 // ========================================================================

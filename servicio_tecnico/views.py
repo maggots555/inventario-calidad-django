@@ -6692,3 +6692,716 @@ def dashboard_seguimiento_oow_fl(request):
     
     return render(request, 'servicio_tecnico/dashboard_seguimiento_oow_fl.html', context)
 
+
+def exportar_excel_dashboard_oow_fl(request):
+    """
+    Exporta el dashboard OOW-/FL- a Excel con múltiples hojas de análisis
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista genera un archivo Excel (.xlsx) con múltiples hojas que contienen:
+    - Hoja 1: Resumen General con KPIs
+    - Hoja 2: Consolidado por Responsable
+    - Hoja 3: Top Productos Vendidos
+    - Hoja 4: Análisis por Sucursal
+    - Hojas 5+: Detalle individual por cada responsable (activas y cerradas separadas)
+    - Hoja Final: Todas las órdenes (lista maestra completa)
+    
+    El archivo respeta los filtros aplicados en el dashboard (responsable, fechas, etc.)
+    y genera un nombre descriptivo del archivo según los filtros activos.
+    
+    Requiere: openpyxl instalado (pip install openpyxl)
+    
+    Returns:
+        HttpResponse: Archivo Excel para descarga
+    """
+    from django.http import HttpResponse
+    from django.db.models import Q
+    from datetime import datetime
+    
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from .excel_exporters import (
+            get_header_style, get_title_style, get_kpi_title_style, get_kpi_value_style,
+            get_estado_color, apply_cell_style, auto_adjust_column_width,
+            calcular_metricas_generales, calcular_distribucion_estados,
+            calcular_estadisticas_por_responsable, calcular_top_productos,
+            calcular_estadisticas_por_sucursal
+        )
+    except ImportError as e:
+        from django.http import JsonResponse
+        return JsonResponse({
+            'success': False,
+            'error': f'Error al importar librerías: {str(e)}. Asegúrate de tener openpyxl instalado.'
+        })
+    
+    # =========================================================================
+    # PASO 1: OBTENER FILTROS Y CONSTRUIR QUERY (IGUAL QUE EL DASHBOARD)
+    # =========================================================================
+    
+    responsable_id = request.GET.get('responsable_id', '')
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
+    estado_filtro = request.GET.get('estado', '')
+    sucursal_id = request.GET.get('sucursal_id', '')
+    prefijo_filtro = request.GET.get('prefijo', 'ambos')
+    
+    # Query base: órdenes con prefijo OOW- o FL-
+    if prefijo_filtro == 'OOW':
+        ordenes = OrdenServicio.objects.filter(
+            detalle_equipo__orden_cliente__istartswith='OOW-'
+        )
+    elif prefijo_filtro == 'FL':
+        ordenes = OrdenServicio.objects.filter(
+            detalle_equipo__orden_cliente__istartswith='FL-'
+        )
+    else:  # 'ambos' (default)
+        ordenes = OrdenServicio.objects.filter(
+            Q(detalle_equipo__orden_cliente__istartswith='OOW-') |
+            Q(detalle_equipo__orden_cliente__istartswith='FL-')
+        )
+    
+    # Optimizar consultas
+    ordenes = ordenes.select_related(
+        'detalle_equipo',
+        'sucursal',
+        'responsable_seguimiento',
+        'tecnico_asignado_actual',
+        'venta_mostrador',
+        'cotizacion'
+    ).prefetch_related('historial')
+    
+    # Aplicar filtros adicionales
+    if responsable_id:
+        ordenes = ordenes.filter(responsable_seguimiento_id=responsable_id)
+    
+    if fecha_desde:
+        try:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            ordenes = ordenes.filter(fecha_ingreso__date__gte=fecha_desde_obj)
+        except ValueError:
+            pass
+    
+    if fecha_hasta:
+        try:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            ordenes = ordenes.filter(fecha_ingreso__date__lte=fecha_hasta_obj)
+        except ValueError:
+            pass
+    
+    if estado_filtro:
+        ordenes = ordenes.filter(estado=estado_filtro)
+    
+    if sucursal_id:
+        ordenes = ordenes.filter(sucursal_id=sucursal_id)
+    
+    # Ordenar por fecha de ingreso
+    ordenes = ordenes.order_by('-fecha_ingreso')
+    
+    # =========================================================================
+    # PASO 2: CALCULAR MÉTRICAS Y ESTADÍSTICAS
+    # =========================================================================
+    
+    metricas = calcular_metricas_generales(ordenes)
+    distribucion_estados = calcular_distribucion_estados(ordenes)
+    responsables_stats = calcular_estadisticas_por_responsable(ordenes)
+    top_productos = calcular_top_productos(ordenes, limite=10)
+    sucursales_stats = calcular_estadisticas_por_sucursal(ordenes)
+    
+    # =========================================================================
+    # PASO 3: CREAR WORKBOOK
+    # =========================================================================
+    
+    wb = Workbook()
+    wb.remove(wb.active)  # Eliminar hoja predeterminada
+    
+    # =========================================================================
+    # HOJA 1: RESUMEN GENERAL
+    # =========================================================================
+    
+    ws1 = wb.create_sheet("Resumen General")
+    
+    # Título principal
+    ws1.merge_cells('A1:F1')
+    title_cell = ws1['A1']
+    
+    # Determinar texto de filtros para el título
+    filtros_texto = []
+    if prefijo_filtro != 'ambos':
+        filtros_texto.append(f"Prefijo: {prefijo_filtro}-")
+    if responsable_id:
+        try:
+            resp = Empleado.objects.get(id=responsable_id)
+            filtros_texto.append(f"Responsable: {resp.nombre_completo}")
+        except:
+            pass
+    if fecha_desde or fecha_hasta:
+        rango = f"Desde: {fecha_desde or 'inicio'} Hasta: {fecha_hasta or 'hoy'}"
+        filtros_texto.append(rango)
+    
+    filtros_str = " | ".join(filtros_texto) if filtros_texto else "Todos los registros"
+    
+    title_cell.value = f"DASHBOARD OOW-/FL- - {datetime.now().strftime('%d/%m/%Y')} - {filtros_str}"
+    apply_cell_style(title_cell, get_title_style())
+    ws1.row_dimensions[1].height = 30
+    
+    # KPIs Principales
+    row = 3
+    ws1.merge_cells(f'A{row}:F{row}')
+    kpi_section = ws1[f'A{row}']
+    kpi_section.value = "📊 INDICADORES CLAVE (KPIs)"
+    apply_cell_style(kpi_section, get_kpi_title_style())
+    
+    row += 2
+    kpis_data = [
+        ('Total de Órdenes OOW-/FL-', metricas['total_ordenes']),
+        ('Órdenes Activas', metricas['ordenes_activas']),
+        ('Órdenes Entregadas', metricas['ordenes_entregadas']),
+        ('Órdenes Finalizadas', metricas['ordenes_finalizadas']),
+        ('', ''),  # Separador
+        ('Ventas Mostrador', metricas['total_ventas_mostrador']),
+        ('Monto Ventas Mostrador', f"${metricas['monto_ventas_mostrador']:,.2f}"),
+        ('', ''),  # Separador
+        ('Total con Cotización', metricas['total_con_cotizacion']),
+        ('Cotizaciones Aceptadas ✅', metricas['cotizaciones_aceptadas']),
+        ('Cotizaciones Pendientes ⏳', metricas['cotizaciones_pendientes']),
+        ('Cotizaciones Rechazadas ❌', metricas['cotizaciones_rechazadas']),
+        ('Monto Cotizaciones', f"${metricas['monto_cotizaciones']:,.2f}"),
+        ('', ''),  # Separador
+        ('Monto Total Generado', f"${metricas['monto_total']:,.2f}"),
+        ('Tiempo Promedio (días hábiles)', metricas['tiempo_promedio']),
+        ('% en Tiempo (≤15 días)', f"{metricas['porcentaje_en_tiempo']}%"),
+    ]
+    
+    for kpi_name, kpi_value in kpis_data:
+        if kpi_name == '':  # Fila vacía como separador
+            row += 1
+            continue
+            
+        ws1[f'A{row}'] = kpi_name
+        ws1[f'B{row}'] = kpi_value
+        apply_cell_style(ws1[f'A{row}'], get_kpi_title_style())
+        apply_cell_style(ws1[f'B{row}'], get_kpi_value_style())
+        row += 1
+    
+    # Distribución por Estado
+    row += 2
+    ws1.merge_cells(f'A{row}:C{row}')
+    dist_section = ws1[f'A{row}']
+    dist_section.value = "📈 DISTRIBUCIÓN POR ESTADO"
+    apply_cell_style(dist_section, get_kpi_title_style())
+    
+    row += 1
+    ws1[f'A{row}'] = 'Estado'
+    ws1[f'B{row}'] = 'Cantidad'
+    ws1[f'C{row}'] = '% del Total'
+    apply_cell_style(ws1[f'A{row}'], get_header_style())
+    apply_cell_style(ws1[f'B{row}'], get_header_style())
+    apply_cell_style(ws1[f'C{row}'], get_header_style())
+    
+    row += 1
+    for estado, cantidad in distribucion_estados.items():
+        porcentaje = round((cantidad / metricas['total_ordenes'] * 100), 1) if metricas['total_ordenes'] > 0 else 0
+        ws1[f'A{row}'] = estado
+        ws1[f'B{row}'] = cantidad
+        ws1[f'C{row}'] = f"{porcentaje}%"
+        row += 1
+    
+    auto_adjust_column_width(ws1)
+    
+    # =========================================================================
+    # HOJA 2: CONSOLIDADO POR RESPONSABLE
+    # =========================================================================
+    
+    ws2 = wb.create_sheet("Consolidado Responsables")
+    
+    # Título
+    ws2.merge_cells('A1:K1')
+    title_cell = ws2['A1']
+    title_cell.value = "ANÁLISIS CONSOLIDADO POR RESPONSABLE DE SEGUIMIENTO"
+    apply_cell_style(title_cell, get_title_style())
+    ws2.row_dimensions[1].height = 25
+    
+    # Encabezados
+    headers_resp = [
+        'Responsable', 'Total Órdenes', 'Activas', 'Entregadas',
+        'Ventas Mostrador', 'Monto VM', 'Cotizaciones Aceptadas',
+        'Monto Cotizaciones', 'Monto Total', 'Tiempo Promedio (días)',
+        'Tasa Entrega (%)'
+    ]
+    for col_num, header in enumerate(headers_resp, 1):
+        cell = ws2.cell(row=3, column=col_num)
+        cell.value = header
+        apply_cell_style(cell, get_header_style())
+    
+    # Datos por responsable
+    row = 4
+    for resp in responsables_stats:
+        ws2.cell(row=row, column=1).value = resp['nombre']
+        ws2.cell(row=row, column=2).value = resp['total_ordenes']
+        ws2.cell(row=row, column=3).value = resp['ordenes_activas']
+        ws2.cell(row=row, column=4).value = resp['ordenes_entregadas']
+        ws2.cell(row=row, column=5).value = resp['ventas_mostrador']
+        ws2.cell(row=row, column=6).value = f"${resp['monto_ventas_mostrador']:,.2f}"
+        ws2.cell(row=row, column=7).value = resp['cotizaciones_aceptadas']
+        ws2.cell(row=row, column=8).value = f"${resp['monto_cotizaciones']:,.2f}"
+        ws2.cell(row=row, column=9).value = f"${resp['monto_total']:,.2f}"
+        ws2.cell(row=row, column=10).value = resp['tiempo_promedio']
+        ws2.cell(row=row, column=11).value = f"{resp['tasa_entrega']}%"
+        row += 1
+    
+    auto_adjust_column_width(ws2)
+    
+    # =========================================================================
+    # HOJA 3: TOP PRODUCTOS VENDIDOS
+    # =========================================================================
+    
+    ws3 = wb.create_sheet("Top Productos")
+    
+    # Título
+    ws3.merge_cells('A1:D1')
+    title_cell = ws3['A1']
+    title_cell.value = "TOP PRODUCTOS/SERVICIOS MÁS VENDIDOS (VENTAS MOSTRADOR)"
+    apply_cell_style(title_cell, get_title_style())
+    ws3.row_dimensions[1].height = 25
+    
+    # Encabezados
+    headers_prod = ['#', 'Producto/Servicio', 'Cantidad Vendida', 'Monto Total']
+    for col_num, header in enumerate(headers_prod, 1):
+        cell = ws3.cell(row=3, column=col_num)
+        cell.value = header
+        apply_cell_style(cell, get_header_style())
+    
+    # Datos de productos
+    row = 4
+    for idx, prod in enumerate(top_productos, 1):
+        ws3.cell(row=row, column=1).value = idx
+        ws3.cell(row=row, column=2).value = prod['descripcion']
+        ws3.cell(row=row, column=3).value = prod['cantidad']
+        ws3.cell(row=row, column=4).value = f"${prod['monto']:,.2f}"
+        
+        # Resaltar top 3
+        if idx <= 3:
+            color = '28a745' if idx == 1 else 'ffc107' if idx == 2 else '17a2b8'
+            ws3.cell(row=row, column=1).fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+            ws3.cell(row=row, column=1).font = Font(bold=True, color="FFFFFF", size=12)
+        
+        row += 1
+    
+    auto_adjust_column_width(ws3)
+    
+    # =========================================================================
+    # HOJA 4: ANÁLISIS POR SUCURSAL
+    # =========================================================================
+    
+    ws4 = wb.create_sheet("Por Sucursal")
+    
+    # Título
+    ws4.merge_cells('A1:E1')
+    title_cell = ws4['A1']
+    title_cell.value = "ANÁLISIS POR SUCURSAL"
+    apply_cell_style(title_cell, get_title_style())
+    ws4.row_dimensions[1].height = 25
+    
+    # Encabezados
+    headers_suc = ['Sucursal', 'Total Órdenes', 'Ventas Mostrador', 'Cotizaciones', 'Monto Total']
+    for col_num, header in enumerate(headers_suc, 1):
+        cell = ws4.cell(row=3, column=col_num)
+        cell.value = header
+        apply_cell_style(cell, get_header_style())
+    
+    # Datos por sucursal
+    row = 4
+    for suc in sucursales_stats:
+        ws4.cell(row=row, column=1).value = suc['nombre']
+        ws4.cell(row=row, column=2).value = suc['total_ordenes']
+        ws4.cell(row=row, column=3).value = suc['ventas_mostrador']
+        ws4.cell(row=row, column=4).value = suc['cotizaciones']
+        ws4.cell(row=row, column=5).value = f"${suc['monto_total']:,.2f}"
+        row += 1
+    
+    auto_adjust_column_width(ws4)
+    
+    # =========================================================================
+    # HOJAS INDIVIDUALES POR RESPONSABLE (CON SEPARACIÓN ACTIVAS/CERRADAS)
+    # =========================================================================
+    
+    for resp_stat in responsables_stats:
+        # Crear hoja con nombre del responsable (límite de 31 caracteres para Excel)
+        nombre_hoja = resp_stat['nombre'][:28]
+        ws_resp = wb.create_sheet(nombre_hoja)
+        
+        # Título con nombre del responsable
+        ws_resp.merge_cells('A1:P1')
+        title_cell = ws_resp['A1']
+        title_cell.value = f"REPORTE INDIVIDUAL - {resp_stat['nombre']}"
+        apply_cell_style(title_cell, get_title_style())
+        ws_resp.row_dimensions[1].height = 25
+        
+        # Resumen de estadísticas personales
+        row = 3
+        ws_resp[f'A{row}'] = "📊 ESTADÍSTICAS PERSONALES"
+        apply_cell_style(ws_resp[f'A{row}'], get_kpi_title_style())
+        row += 2
+        
+        stats_personales = [
+            ('Total de Órdenes:', resp_stat['total_ordenes']),
+            ('Órdenes Activas:', resp_stat['ordenes_activas']),
+            ('Órdenes Entregadas:', resp_stat['ordenes_entregadas']),
+            ('Tiempo Promedio:', f"{resp_stat['tiempo_promedio']} días"),
+            ('Tasa de Entrega:', f"{resp_stat['tasa_entrega']}%"),
+            ('', ''),  # Separador
+            ('Ventas Mostrador:', resp_stat['ventas_mostrador']),
+            ('Monto Ventas Mostrador:', f"${resp_stat['monto_ventas_mostrador']:,.2f}"),
+            ('', ''),  # Separador
+            ('Cotizaciones Aceptadas:', resp_stat['cotizaciones_aceptadas']),
+            ('Cotizaciones Pendientes:', resp_stat['cotizaciones_pendientes']),
+            ('Cotizaciones Rechazadas:', resp_stat['cotizaciones_rechazadas']),
+            ('Monto Cotizaciones:', f"${resp_stat['monto_cotizaciones']:,.2f}"),
+            ('', ''),  # Separador
+            ('MONTO TOTAL GENERADO:', f"${resp_stat['monto_total']:,.2f}"),
+        ]
+        
+        for stat_name, stat_value in stats_personales:
+            if stat_name == '':
+                row += 1
+                continue
+            
+            ws_resp[f'A{row}'] = stat_name
+            ws_resp[f'B{row}'] = stat_value
+            apply_cell_style(ws_resp[f'A{row}'], get_kpi_title_style())
+            
+            # Resaltar el monto total
+            if 'MONTO TOTAL' in stat_name:
+                ws_resp[f'B{row}'].fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+                ws_resp[f'B{row}'].font = Font(bold=True, size=14, color="FFFFFF")
+            else:
+                apply_cell_style(ws_resp[f'B{row}'], get_kpi_value_style())
+            
+            row += 1
+        
+        # Obtener órdenes del responsable
+        ordenes_resp = ordenes.filter(responsable_seguimiento__id=resp_stat['id'])
+        
+        # ============== SECCIÓN: ÓRDENES ACTIVAS ==============
+        row += 2
+        ws_resp.merge_cells(f'A{row}:P{row}')
+        activas_section = ws_resp[f'A{row}']
+        ordenes_activas_resp = ordenes_resp.exclude(estado__in=['entregado', 'cancelado'])
+        activas_section.value = f"🔄 ÓRDENES ACTIVAS ({ordenes_activas_resp.count()})"
+        activas_section.fill = PatternFill(start_color="ffc107", end_color="ffc107", fill_type="solid")
+        activas_section.font = Font(bold=True, size=12, color="000000")
+        activas_section.alignment = Alignment(horizontal="left", vertical="center")
+        
+        row += 1
+        
+        # Encabezados de la tabla de órdenes activas
+        headers_orden = [
+            'N° Orden Cliente', 'N° Orden Interno', 'Tipo Equipo', 'Marca',
+            'Modelo', 'Estado', 'Días Hábiles', 'Días Sin Actualizar',
+            'Tipo de Orden', 'Monto', 'Sucursal', 'Fecha Ingreso',
+            'Última Actualización', 'Cotización', 'Observaciones'
+        ]
+        for col_num, header in enumerate(headers_orden, 1):
+            cell = ws_resp.cell(row=row, column=col_num)
+            cell.value = header
+            apply_cell_style(cell, get_header_style())
+        
+        row += 1
+        
+        # Datos de órdenes activas
+        for orden in ordenes_activas_resp.order_by('-fecha_ingreso'):
+            ws_resp.cell(row=row, column=1).value = orden.detalle_equipo.orden_cliente
+            ws_resp.cell(row=row, column=2).value = orden.numero_orden_interno if orden.numero_orden_interno else 'N/A'
+            ws_resp.cell(row=row, column=3).value = orden.detalle_equipo.get_tipo_equipo_display()
+            ws_resp.cell(row=row, column=4).value = orden.detalle_equipo.marca
+            ws_resp.cell(row=row, column=5).value = orden.detalle_equipo.modelo[:30] if orden.detalle_equipo.modelo else 'N/A'
+            ws_resp.cell(row=row, column=6).value = orden.get_estado_display()
+            ws_resp.cell(row=row, column=7).value = orden.dias_habiles_en_servicio
+            ws_resp.cell(row=row, column=8).value = orden.dias_sin_actualizacion_estado
+            
+            # Tipo de orden
+            tipo_orden = 'Servicio Normal'
+            monto = 0
+            if hasattr(orden, 'venta_mostrador') and orden.venta_mostrador:
+                tipo_orden = 'Venta Mostrador'
+                monto = float(orden.venta_mostrador.total_venta)
+            elif hasattr(orden, 'cotizacion') and orden.cotizacion:
+                if orden.cotizacion.usuario_acepto:
+                    tipo_orden = 'Cotización Aceptada'
+                    monto = float(orden.cotizacion.costo_total_final)
+                elif orden.cotizacion.usuario_acepto is False:
+                    tipo_orden = 'Cotización Rechazada'
+                else:
+                    tipo_orden = 'Cotización Pendiente'
+            
+            ws_resp.cell(row=row, column=9).value = tipo_orden
+            ws_resp.cell(row=row, column=10).value = f"${monto:,.2f}" if monto > 0 else 'N/A'
+            ws_resp.cell(row=row, column=11).value = orden.sucursal.nombre
+            ws_resp.cell(row=row, column=12).value = orden.fecha_ingreso.strftime('%d/%m/%Y')
+            
+            # Última actualización (del historial)
+            ultima_act = orden.historial.order_by('-fecha_evento').first()
+            ws_resp.cell(row=row, column=13).value = ultima_act.fecha_evento.strftime('%d/%m/%Y') if ultima_act else 'N/A'
+            
+            # Estado de cotización
+            cotiz_estado = 'N/A'
+            if hasattr(orden, 'cotizacion') and orden.cotizacion:
+                if orden.cotizacion.usuario_acepto is True:
+                    cotiz_estado = '✅ Aceptada'
+                elif orden.cotizacion.usuario_acepto is False:
+                    cotiz_estado = '❌ Rechazada'
+                else:
+                    cotiz_estado = '⏳ Pendiente'
+            ws_resp.cell(row=row, column=14).value = cotiz_estado
+            
+            # Observaciones/Alertas
+            alertas = []
+            if orden.dias_habiles_en_servicio > 15:
+                alertas.append('⚠️ RETRASADA')
+            if orden.dias_sin_actualizacion_estado > 5:
+                alertas.append(f'🔴 Sin actualizar {orden.dias_sin_actualizacion_estado}d')
+            ws_resp.cell(row=row, column=15).value = ' | '.join(alertas) if alertas else 'OK'
+            
+            # Colorear estado
+            color_estado = get_estado_color(orden.estado)
+            ws_resp.cell(row=row, column=6).fill = PatternFill(start_color=color_estado, end_color=color_estado, fill_type="solid")
+            ws_resp.cell(row=row, column=6).font = Font(bold=True, color="FFFFFF")
+            
+            # Colorear días si está retrasada
+            if orden.dias_habiles_en_servicio > 15:
+                ws_resp.cell(row=row, column=7).fill = PatternFill(start_color="dc3545", end_color="dc3545", fill_type="solid")
+                ws_resp.cell(row=row, column=7).font = Font(bold=True, color="FFFFFF")
+            
+            row += 1
+        
+        # ============== SECCIÓN: ÓRDENES CERRADAS (ENTREGADAS) ==============
+        row += 2
+        ws_resp.merge_cells(f'A{row}:P{row}')
+        cerradas_section = ws_resp[f'A{row}']
+        ordenes_cerradas_resp = ordenes_resp.filter(estado__in=['entregado', 'cancelado'])
+        cerradas_section.value = f"✅ ÓRDENES CERRADAS/ENTREGADAS ({ordenes_cerradas_resp.count()})"
+        cerradas_section.fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+        cerradas_section.font = Font(bold=True, size=12, color="FFFFFF")
+        cerradas_section.alignment = Alignment(horizontal="left", vertical="center")
+        
+        row += 1
+        
+        # Encabezados (mismos que activas)
+        for col_num, header in enumerate(headers_orden, 1):
+            cell = ws_resp.cell(row=row, column=col_num)
+            cell.value = header
+            apply_cell_style(cell, get_header_style())
+        
+        row += 1
+        
+        # Datos de órdenes cerradas
+        for orden in ordenes_cerradas_resp.order_by('-fecha_ingreso'):
+            ws_resp.cell(row=row, column=1).value = orden.detalle_equipo.orden_cliente
+            ws_resp.cell(row=row, column=2).value = orden.numero_orden_interno if orden.numero_orden_interno else 'N/A'
+            ws_resp.cell(row=row, column=3).value = orden.detalle_equipo.get_tipo_equipo_display()
+            ws_resp.cell(row=row, column=4).value = orden.detalle_equipo.marca
+            ws_resp.cell(row=row, column=5).value = orden.detalle_equipo.modelo[:30] if orden.detalle_equipo.modelo else 'N/A'
+            ws_resp.cell(row=row, column=6).value = orden.get_estado_display()
+            ws_resp.cell(row=row, column=7).value = orden.dias_habiles_en_servicio
+            ws_resp.cell(row=row, column=8).value = orden.dias_sin_actualizacion_estado
+            
+            # Tipo de orden y monto
+            tipo_orden = 'Servicio Normal'
+            monto = 0
+            if hasattr(orden, 'venta_mostrador') and orden.venta_mostrador:
+                tipo_orden = 'Venta Mostrador'
+                monto = float(orden.venta_mostrador.total_venta)
+            elif hasattr(orden, 'cotizacion') and orden.cotizacion:
+                if orden.cotizacion.usuario_acepto:
+                    tipo_orden = 'Cotización Aceptada'
+                    monto = float(orden.cotizacion.costo_total_final)
+                elif orden.cotizacion.usuario_acepto is False:
+                    tipo_orden = 'Cotización Rechazada'
+                else:
+                    tipo_orden = 'Cotización Pendiente'
+            
+            ws_resp.cell(row=row, column=9).value = tipo_orden
+            ws_resp.cell(row=row, column=10).value = f"${monto:,.2f}" if monto > 0 else 'N/A'
+            ws_resp.cell(row=row, column=11).value = orden.sucursal.nombre
+            ws_resp.cell(row=row, column=12).value = orden.fecha_ingreso.strftime('%d/%m/%Y')
+            
+            ultima_act = orden.historial.order_by('-fecha_evento').first()
+            ws_resp.cell(row=row, column=13).value = ultima_act.fecha_evento.strftime('%d/%m/%Y') if ultima_act else 'N/A'
+            
+            cotiz_estado = 'N/A'
+            if hasattr(orden, 'cotizacion') and orden.cotizacion:
+                if orden.cotizacion.usuario_acepto is True:
+                    cotiz_estado = '✅ Aceptada'
+                elif orden.cotizacion.usuario_acepto is False:
+                    cotiz_estado = '❌ Rechazada'
+                else:
+                    cotiz_estado = '⏳ Pendiente'
+            ws_resp.cell(row=row, column=14).value = cotiz_estado
+            
+            # Para órdenes cerradas, solo mostrar si fue cancelada
+            ws_resp.cell(row=row, column=15).value = '❌ CANCELADA' if orden.estado == 'cancelado' else 'Completada'
+            
+            # Colorear estado
+            color_estado = get_estado_color(orden.estado)
+            ws_resp.cell(row=row, column=6).fill = PatternFill(start_color=color_estado, end_color=color_estado, fill_type="solid")
+            ws_resp.cell(row=row, column=6).font = Font(bold=True, color="FFFFFF")
+            
+            row += 1
+        
+        auto_adjust_column_width(ws_resp)
+    
+    # =========================================================================
+    # HOJA FINAL: TODAS LAS ÓRDENES (LISTA MAESTRA COMPLETA)
+    # =========================================================================
+    
+    ws_all = wb.create_sheet("Todas las Órdenes")
+    
+    # Título
+    ws_all.merge_cells('A1:Q1')
+    title_cell = ws_all['A1']
+    title_cell.value = f"LISTA MAESTRA - TODAS LAS ÓRDENES OOW-/FL- ({ordenes.count()} registros)"
+    apply_cell_style(title_cell, get_title_style())
+    ws_all.row_dimensions[1].height = 25
+    
+    # Encabezados completos
+    headers_all = [
+        'N° Orden Cliente', 'N° Orden Interno', 'Tipo Equipo', 'Marca',
+        'Modelo', 'Estado', 'Responsable Seguimiento', 'Técnico Asignado',
+        'Días Hábiles', 'Días Sin Actualizar', 'Tipo de Orden', 'Monto',
+        'Sucursal', 'Fecha Ingreso', 'Última Actualización', 'Cotización',
+        'Observaciones/Alertas'
+    ]
+    
+    for col_num, header in enumerate(headers_all, 1):
+        cell = ws_all.cell(row=3, column=col_num)
+        cell.value = header
+        apply_cell_style(cell, get_header_style())
+    
+    # Datos de todas las órdenes
+    row = 4
+    for orden in ordenes:
+        ws_all.cell(row=row, column=1).value = orden.detalle_equipo.orden_cliente
+        ws_all.cell(row=row, column=2).value = orden.numero_orden_interno if orden.numero_orden_interno else 'N/A'
+        ws_all.cell(row=row, column=3).value = orden.detalle_equipo.get_tipo_equipo_display()
+        ws_all.cell(row=row, column=4).value = orden.detalle_equipo.marca
+        ws_all.cell(row=row, column=5).value = orden.detalle_equipo.modelo[:30] if orden.detalle_equipo.modelo else 'N/A'
+        ws_all.cell(row=row, column=6).value = orden.get_estado_display()
+        ws_all.cell(row=row, column=7).value = orden.responsable_seguimiento.nombre_completo
+        ws_all.cell(row=row, column=8).value = orden.tecnico_asignado_actual.nombre_completo if orden.tecnico_asignado_actual else 'No asignado'
+        ws_all.cell(row=row, column=9).value = orden.dias_habiles_en_servicio
+        ws_all.cell(row=row, column=10).value = orden.dias_sin_actualizacion_estado
+        
+        # Tipo de orden y monto
+        tipo_orden = 'Servicio Normal'
+        monto = 0
+        if hasattr(orden, 'venta_mostrador') and orden.venta_mostrador:
+            tipo_orden = 'Venta Mostrador'
+            monto = float(orden.venta_mostrador.total_venta)
+        elif hasattr(orden, 'cotizacion') and orden.cotizacion:
+            if orden.cotizacion.usuario_acepto:
+                tipo_orden = 'Cotización Aceptada'
+                monto = float(orden.cotizacion.costo_total_final)
+            elif orden.cotizacion.usuario_acepto is False:
+                tipo_orden = 'Cotización Rechazada'
+            else:
+                tipo_orden = 'Cotización Pendiente'
+        
+        ws_all.cell(row=row, column=11).value = tipo_orden
+        ws_all.cell(row=row, column=12).value = f"${monto:,.2f}" if monto > 0 else 'N/A'
+        ws_all.cell(row=row, column=13).value = orden.sucursal.nombre
+        ws_all.cell(row=row, column=14).value = orden.fecha_ingreso.strftime('%d/%m/%Y %H:%M')
+        
+        # Última actualización
+        ultima_act = orden.historial.order_by('-fecha_evento').first()
+        ws_all.cell(row=row, column=15).value = ultima_act.fecha_evento.strftime('%d/%m/%Y %H:%M') if ultima_act else 'N/A'
+        
+        # Estado de cotización
+        cotiz_estado = 'N/A'
+        if hasattr(orden, 'cotizacion') and orden.cotizacion:
+            if orden.cotizacion.usuario_acepto is True:
+                cotiz_estado = '✅ Aceptada'
+            elif orden.cotizacion.usuario_acepto is False:
+                cotiz_estado = '❌ Rechazada'
+            else:
+                cotiz_estado = '⏳ Pendiente'
+        ws_all.cell(row=row, column=16).value = cotiz_estado
+        
+        # Observaciones/Alertas
+        alertas = []
+        if orden.estado not in ['entregado', 'cancelado']:
+            if orden.dias_habiles_en_servicio > 15:
+                alertas.append('⚠️ RETRASADA')
+            if orden.dias_sin_actualizacion_estado > 5:
+                alertas.append(f'🔴 Sin actualizar {orden.dias_sin_actualizacion_estado}d')
+        else:
+            if orden.estado == 'cancelado':
+                alertas.append('❌ CANCELADA')
+            else:
+                alertas.append('✅ Completada')
+        
+        ws_all.cell(row=row, column=17).value = ' | '.join(alertas) if alertas else 'OK'
+        
+        # Colorear estado
+        color_estado = get_estado_color(orden.estado)
+        ws_all.cell(row=row, column=6).fill = PatternFill(start_color=color_estado, end_color=color_estado, fill_type="solid")
+        ws_all.cell(row=row, column=6).font = Font(bold=True, color="FFFFFF")
+        
+        # Colorear días si está retrasada
+        if orden.estado not in ['entregado', 'cancelado'] and orden.dias_habiles_en_servicio > 15:
+            ws_all.cell(row=row, column=9).fill = PatternFill(start_color="dc3545", end_color="dc3545", fill_type="solid")
+            ws_all.cell(row=row, column=9).font = Font(bold=True, color="FFFFFF")
+        
+        row += 1
+    
+    auto_adjust_column_width(ws_all)
+    
+    # =========================================================================
+    # GENERAR NOMBRE DEL ARCHIVO Y RESPUESTA HTTP
+    # =========================================================================
+    
+    # Generar nombre descriptivo del archivo
+    fecha_str = datetime.now().strftime('%Y-%m-%d')
+    
+    # Determinar si hay filtros específicos
+    nombre_archivo_partes = ['Dashboard_OOW_FL']
+    
+    if prefijo_filtro != 'ambos':
+        nombre_archivo_partes.append(f'Prefijo_{prefijo_filtro}')
+    
+    if responsable_id:
+        try:
+            resp = Empleado.objects.get(id=responsable_id)
+            # Limpiar nombre para usar en archivo
+            nombre_limpio = resp.nombre_completo.replace(' ', '_')[:20]
+            nombre_archivo_partes.append(f'Resp_{nombre_limpio}')
+        except:
+            pass
+    
+    if estado_filtro:
+        nombre_archivo_partes.append(f'Estado_{estado_filtro}')
+    
+    if sucursal_id:
+        try:
+            suc = Sucursal.objects.get(id=sucursal_id)
+            nombre_limpio = suc.nombre.replace(' ', '_')[:15]
+            nombre_archivo_partes.append(f'Suc_{nombre_limpio}')
+        except:
+            pass
+    
+    nombre_archivo_partes.append(fecha_str)
+    nombre_archivo = '_'.join(nombre_archivo_partes) + '.xlsx'
+    
+    # Preparar respuesta HTTP
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+    
+    # Guardar el workbook en la respuesta
+    wb.save(response)
+    
+    return response
+
+

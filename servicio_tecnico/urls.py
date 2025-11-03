@@ -144,6 +144,12 @@ urlpatterns = [
          views.dashboard_seguimiento_oow_fl, 
          name='dashboard_seguimiento_oow_fl'),
     
+    # Exportación a Excel del dashboard OOW-/FL-
+    # Genera archivo Excel con múltiples hojas: resumen, responsables, productos, etc.
+    path('dashboard/seguimiento-oow-fl/exportar-excel/', 
+         views.exportar_excel_dashboard_oow_fl, 
+         name='exportar_excel_dashboard_oow_fl'),
+    
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]
