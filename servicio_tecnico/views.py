@@ -7671,6 +7671,7 @@ def dashboard_cotizaciones(request):
                 'recall': metricas_ml.get('recall', 0) * 100,
                 'f1_score': metricas_ml.get('f1_score', 0) * 100,
                 'total_muestras': metricas_ml.get('total_muestras', 0),
+                'datos_entrenamiento': metricas_ml.get('total_muestras', 0),  # Agregado para el template
                 'fecha_entrenamiento': metricas_ml.get('fecha_entrenamiento', ''),
                 'sugerencias': sugerencias,
                 'feature_importance': feature_importance
@@ -7699,8 +7700,11 @@ def dashboard_cotizaciones(request):
                     visualizer.grafico_prediccion_ml(prob_aceptacion, prob_rechazo)
                 )
                 
-                ml_insights['ejemplo_prediccion'] = {
+                # CORRECCIÓN: Cambiar 'ejemplo_prediccion' a 'prediccion_ejemplo' para que coincida con el template
+                ml_insights['prediccion_ejemplo'] = {
+                    'cotizacion_id': ultima['cotizacion_id'],
                     'orden': ultima['numero_orden'],
+                    'costo': ultima['costo_total'],
                     'prob_aceptacion': prob_aceptacion * 100,
                     'prob_rechazo': prob_rechazo * 100
                 }
