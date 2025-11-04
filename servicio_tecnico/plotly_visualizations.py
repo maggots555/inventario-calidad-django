@@ -612,6 +612,62 @@ class DashboardCotizacionesVisualizer:
         
         return fig
     
+    def grafico_top_piezas_aceptadas(self, df_piezas, top_n=10):
+        """
+        Barras horizontales: Top N piezas más aceptadas.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Identifica qué componentes son aceptados con mayor frecuencia por los clientes.
+        Útil para entender qué piezas tienen mejor recepción y pueden ser priorizadas
+        en futuras cotizaciones. Complementa el análisis de piezas rechazadas.
+        
+        Args:
+            df_piezas (DataFrame): DataFrame de piezas cotizadas
+            top_n (int): Número de piezas a mostrar (default: 10)
+        
+        Returns:
+            Figure: Gráfico de Plotly
+        """
+        
+        if df_piezas.empty:
+            return self._crear_grafico_vacio("No hay datos de piezas")
+        
+        # Filtrar solo piezas aceptadas
+        aceptadas = df_piezas[df_piezas['aceptada'] == True].copy()
+        
+        if aceptadas.empty:
+            return self._crear_grafico_vacio("No hay piezas aceptadas")
+        
+        # Contar por componente
+        top_aceptadas = aceptadas.groupby('componente').size().reset_index(name='count')
+        top_aceptadas = top_aceptadas.sort_values('count', ascending=True).tail(top_n)
+        
+        # Crear gráfico
+        fig = go.Figure(go.Bar(
+            y=top_aceptadas['componente'],
+            x=top_aceptadas['count'],
+            orientation='h',
+            marker=dict(color=self.colores['success']),
+            text=top_aceptadas['count'],
+            textposition='auto',
+            hovertemplate='<b>%{y}</b><br>Aceptaciones: %{x}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text=f'✅ Top {top_n} Piezas Más Aceptadas',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=18, color=self.colores['dark'])
+            ),
+            xaxis=dict(title='Número de Aceptaciones'),
+            yaxis=dict(title=''),
+            height=500
+        )
+        
+        return fig
+    
     def grafico_sugerencias_tecnico(self, df_piezas):
         """
         Sankey Diagram: Flujo de piezas sugeridas → Aceptadas/Rechazadas.
@@ -1265,6 +1321,224 @@ class DashboardCotizacionesVisualizer:
         
         return fig
     
+    def grafico_motivos_rechazo(self, df):
+        """
+        Gráfico de barras: Motivos por los cuales los clientes rechazan cotizaciones.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Analiza y visualiza las razones específicas por las que los clientes
+        deciden NO aceptar una cotización. Esto ayuda a identificar:
+        - Problemas recurrentes (ej: costos altos, muchas piezas)
+        - Áreas de mejora en el servicio
+        - Patrones de rechazo que se pueden prevenir
+        
+        Los motivos vienen del campo 'motivo_rechazo' del modelo Cotizacion.
+        
+        Args:
+            df (DataFrame): DataFrame de cotizaciones
+        
+        Returns:
+            Figure: Gráfico de Plotly
+        """
+        
+        if df.empty:
+            return self._crear_grafico_vacio("No hay datos de cotizaciones")
+        
+        # Filtrar solo cotizaciones rechazadas que tengan motivo registrado
+        df_rechazadas = df[(df['aceptada'] == False) & (df['motivo_rechazo'].notna())].copy()
+        
+        if df_rechazadas.empty:
+            return self._crear_grafico_vacio("No hay cotizaciones rechazadas con motivo registrado")
+        
+        # Contar por motivo
+        motivos_count = df_rechazadas['motivo_rechazo'].value_counts().reset_index()
+        motivos_count.columns = ['motivo', 'count']
+        
+        # Diccionario de etiquetas legibles (basado en MOTIVO_RECHAZO_COTIZACION)
+        labels_motivos = {
+            'costo_alto': 'Costo muy elevado',
+            'muchas_piezas': 'Demasiadas piezas',
+            'tiempo_largo': 'Tiempo muy largo',
+            'falta_justificacion': 'Falta justificación',
+            'no_vale_pena': 'No vale la pena reparar',
+            'no_hay_partes': 'No hay partes disponibles',
+            'otro': 'Otro motivo',
+        }
+        
+        # Aplicar etiquetas legibles
+        motivos_count['motivo_label'] = motivos_count['motivo'].map(
+            lambda x: labels_motivos.get(x, x.replace('_', ' ').title())
+        )
+        
+        # Ordenar de mayor a menor
+        motivos_count = motivos_count.sort_values('count', ascending=True)
+        
+        # Calcular porcentajes
+        total_rechazadas = motivos_count['count'].sum()
+        motivos_count['porcentaje'] = (motivos_count['count'] / total_rechazadas * 100).round(1)
+        
+        # Crear gráfico de barras horizontales
+        fig = go.Figure(go.Bar(
+            y=motivos_count['motivo_label'],
+            x=motivos_count['count'],
+            orientation='h',
+            marker=dict(
+                color=motivos_count['count'],
+                colorscale='Reds',
+                showscale=False
+            ),
+            text=[f"{count} ({pct}%)" for count, pct in zip(motivos_count['count'], motivos_count['porcentaje'])],
+            textposition='auto',
+            hovertemplate='<b>%{y}</b><br>Rechazos: %{x}<br>Porcentaje: %{text}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text=f'❌ Motivos de Rechazo de Cotizaciones ({total_rechazadas} rechazos)',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=18, color=self.colores['dark'])
+            ),
+            xaxis=dict(title='Número de Rechazos'),
+            yaxis=dict(title=''),
+            height=500
+        )
+        
+        return fig
+    
+    def grafico_motivos_rechazo_vs_costos(self, df):
+        """
+        Boxplot: Distribución de costos por motivo de rechazo.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Este gráfico cruza dos variables importantes:
+        - MOTIVO por el que rechazan (eje X)
+        - COSTO de la cotización rechazada (eje Y)
+        
+        Un "boxplot" (diagrama de caja) muestra:
+        - La MEDIANA (línea central) = costo típico para ese motivo
+        - El RANGO intercuartílico (caja) = donde están el 50% de los casos
+        - Los VALORES ATÍPICOS (puntos) = casos extremos
+        
+        INSIGHTS CLAVE QUE REVELA:
+        1. ¿Es verdad que rechazan por "costo alto" solo en cotizaciones caras?
+        2. ¿"No vale la pena" aparece en cotizaciones baratas o caras?
+        3. ¿Hay motivos asociados con rangos de costo específicos?
+        4. ¿Los costos altos garantizan cierto tipo de rechazo?
+        
+        Args:
+            df (DataFrame): DataFrame de cotizaciones
+        
+        Returns:
+            Figure: Gráfico de Plotly
+        """
+        
+        if df.empty:
+            return self._crear_grafico_vacio("No hay datos de cotizaciones")
+        
+        # Filtrar solo cotizaciones rechazadas con motivo y costo
+        df_rechazadas = df[
+            (df['aceptada'] == False) & 
+            (df['motivo_rechazo'].notna()) & 
+            (df['costo_total'].notna())
+        ].copy()
+        
+        if df_rechazadas.empty:
+            return self._crear_grafico_vacio("No hay cotizaciones rechazadas con motivo y costo registrados")
+        
+        # Diccionario de etiquetas legibles
+        labels_motivos = {
+            'costo_alto': 'Costo muy elevado',
+            'muchas_piezas': 'Demasiadas piezas',
+            'tiempo_largo': 'Tiempo muy largo',
+            'falta_justificacion': 'Falta justificación',
+            'no_vale_pena': 'No vale la pena',
+            'no_hay_partes': 'No hay partes',
+            'otro': 'Otro motivo',
+        }
+        
+        # Aplicar etiquetas legibles
+        df_rechazadas['motivo_label'] = df_rechazadas['motivo_rechazo'].map(
+            lambda x: labels_motivos.get(x, x.replace('_', ' ').title())
+        )
+        
+        # Obtener motivos únicos ordenados por mediana de costo (descendente)
+        medianas = df_rechazadas.groupby('motivo_label')['costo_total'].median().sort_values(ascending=False)
+        motivos_ordenados = medianas.index.tolist()
+        
+        # Crear figura
+        fig = go.Figure()
+        
+        # Paleta de colores para cada motivo
+        colores_motivos = [
+            self.colores['danger'],
+            self.colores['warning'],
+            self.colores['orange'],
+            self.colores['purple'],
+            self.colores['info'],
+            self.colores['secondary'],
+            self.colores['pink'],
+        ]
+        
+        # Agregar un boxplot por cada motivo
+        for idx, motivo in enumerate(motivos_ordenados):
+            df_motivo = df_rechazadas[df_rechazadas['motivo_label'] == motivo]
+            costos = df_motivo['costo_total']
+            
+            # Calcular estadísticas
+            cantidad = len(costos)
+            mediana = costos.median()
+            promedio = costos.mean()
+            minimo = costos.min()
+            maximo = costos.max()
+            
+            fig.add_trace(go.Box(
+                y=costos,
+                name=motivo,
+                marker=dict(color=colores_motivos[idx % len(colores_motivos)]),
+                boxmean='sd',  # Muestra media y desviación estándar
+                hovertemplate=(
+                    f'<b>{motivo}</b><br>'
+                    'Costo: $%{y:,.0f}<br>'
+                    f'Casos: {cantidad}<br>'
+                    f'Mediana: ${mediana:,.0f}<br>'
+                    f'Promedio: ${promedio:,.0f}<br>'
+                    '<extra></extra>'
+                )
+            ))
+        
+        # Calcular estadística global
+        costo_mediano_global = df_rechazadas['costo_total'].median()
+        
+        # Agregar línea de referencia del costo mediano global
+        fig.add_hline(
+            y=costo_mediano_global,
+            line_dash="dash",
+            line_color="gray",
+            annotation_text=f"Mediana Global: ${costo_mediano_global:,.0f}",
+            annotation_position="right"
+        )
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='💰 Distribución de Costos por Motivo de Rechazo',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=18, color=self.colores['dark'])
+            ),
+            yaxis=dict(
+                title='Costo Total de la Cotización ($)',
+                tickformat='$,.0f'
+            ),
+            xaxis=dict(title='Motivo de Rechazo'),
+            showlegend=False,
+            height=600
+        )
+        
+        return fig
+    
     def grafico_funnel_conversion(self, df):
         """
         Embudo de conversión: Etapas del proceso de cotización.
@@ -1680,6 +1954,9 @@ class DashboardCotizacionesVisualizer:
                 graficos['top_piezas_rechazadas'] = convertir_figura_a_html(
                     self.grafico_top_piezas_rechazadas(df_piezas)
                 )
+                graficos['top_piezas_aceptadas'] = convertir_figura_a_html(
+                    self.grafico_top_piezas_aceptadas(df_piezas)
+                )
                 graficos['sugerencias_tecnico'] = convertir_figura_a_html(
                     self.grafico_sugerencias_tecnico(df_piezas)
                 )
@@ -1717,6 +1994,12 @@ class DashboardCotizacionesVisualizer:
             # TIEMPOS Y EFICIENCIA
             graficos['tiempos_respuesta'] = convertir_figura_a_html(
                 self.grafico_tiempos_respuesta(df)
+            )
+            graficos['motivos_rechazo'] = convertir_figura_a_html(
+                self.grafico_motivos_rechazo(df)
+            )
+            graficos['motivos_rechazo_vs_costos'] = convertir_figura_a_html(
+                self.grafico_motivos_rechazo_vs_costos(df)
             )
             graficos['funnel_conversion'] = convertir_figura_a_html(
                 self.grafico_funnel_conversion(df)

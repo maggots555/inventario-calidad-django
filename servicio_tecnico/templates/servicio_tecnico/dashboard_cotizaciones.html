@@ -611,6 +611,16 @@
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" 
+                    id="respuestas-tab" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#respuestas" 
+                    type="button" 
+                    role="tab">
+                <i class="bi bi-chat-left-text"></i> Análisis de Respuesta
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" 
                     id="proveedores-tab" 
                     data-bs-toggle="tab" 
                     data-bs-target="#proveedores" 
@@ -785,6 +795,24 @@
                     </div>
                 </div>
                 
+                <!-- Top Piezas Aceptadas -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-check-circle"></i> Top Piezas Aceptadas</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.top_piezas_aceptadas %}
+                                {{ graficos.top_piezas_aceptadas|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay piezas aceptadas en el período.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Necesarias vs Opcionales -->
                 <div class="col-md-6">
                     <div class="grafico-card card">
@@ -804,7 +832,7 @@
                 </div>
                 
                 <!-- Sugerencias del Técnico -->
-                <div class="col-12">
+                <div class="col-md-6">
                     <div class="grafico-card card">
                         <div class="card-header">
                             <h5><i class="bi bi-lightbulb"></i> Flujo de Sugerencias del Técnico</h5>
@@ -825,7 +853,79 @@
         </div>
         
         <!-- ========================================
-             TAB 3: ANÁLISIS DE PROVEEDORES
+             TAB 3: ANÁLISIS DE RESPUESTA
+             ======================================== -->
+        <div class="tab-pane fade" id="respuestas" role="tabpanel">
+            <div class="row">
+                
+                <!-- Tiempos de Respuesta -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-clock-history"></i> Tiempos de Respuesta del Cliente</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.tiempos_respuesta %}
+                                {{ graficos.tiempos_respuesta|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos suficientes de tiempos de respuesta.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Motivos de Rechazo -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-x-octagon"></i> Motivos de Rechazo</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.motivos_rechazo %}
+                                {{ graficos.motivos_rechazo|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de cotizaciones rechazadas.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Motivos de Rechazo vs Costos -->
+                <div class="col-lg-6 offset-lg-3">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-cash-coin"></i> Análisis de Costos por Motivo de Rechazo</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.motivos_rechazo_vs_costos %}
+                                {{ graficos.motivos_rechazo_vs_costos|safe }}
+                                <div class="alert alert-info alert-dashboard mt-3">
+                                    <strong><i class="bi bi-info-circle"></i> Cómo interpretar este gráfico:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Caja:</strong> Rango donde está el 50% de los costos para ese motivo</li>
+                                        <li><strong>Línea central:</strong> Costo mediano (típico) de ese motivo</li>
+                                        <li><strong>Puntos aislados:</strong> Casos extremos (muy baratos o muy caros)</li>
+                                        <li><strong>Línea gris punteada:</strong> Costo mediano global de todas las cotizaciones rechazadas</li>
+                                    </ul>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos suficientes para el análisis de costos.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>>
+        
+        <!-- ========================================
+             TAB 4: ANÁLISIS DE PROVEEDORES
              ======================================== -->
         <div class="tab-pane fade" id="proveedores" role="tabpanel">
             <div class="row">
@@ -866,29 +966,11 @@
                     </div>
                 </div>
                 
-                <!-- Tiempos de Respuesta -->
-                <div class="col-12">
-                    <div class="grafico-card card">
-                        <div class="card-header">
-                            <h5><i class="bi bi-clock-history"></i> Tiempos de Respuesta</h5>
-                        </div>
-                        <div class="card-body">
-                            {% if graficos.tiempos_respuesta %}
-                                {{ graficos.tiempos_respuesta|safe }}
-                            {% else %}
-                                <div class="alert alert-info alert-dashboard">
-                                    <i class="bi bi-info-circle"></i> No hay datos suficientes de tiempos de respuesta.
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                
             </div>
         </div>
         
         <!-- ========================================
-             TAB 4: TÉCNICOS & SUCURSALES
+             TAB 5: TÉCNICOS & SUCURSALES
              ======================================== -->
         <div class="tab-pane fade" id="tecnicos" role="tabpanel">
             <div class="row">
@@ -969,7 +1051,7 @@
         </div>
         
         <!-- ========================================
-             TAB 5: MACHINE LEARNING
+             TAB 6: MACHINE LEARNING
              ======================================== -->
         <div class="tab-pane fade" id="ml" role="tabpanel">
             <div class="row">
