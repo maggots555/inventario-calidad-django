@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
  * @param {string} mensaje - Mensaje personalizado de confirmación
  * @returns {boolean} - true si el usuario confirma
  */
-function confirmarEliminacion(mensaje = '¿Estás seguro de que quieres eliminar este elemento?') {
+function confirmarEliminacion(mensaje: string = '¿Estás seguro de que quieres eliminar este elemento?'): boolean {
     return confirm(mensaje);
 }
 
@@ -45,7 +45,7 @@ function confirmarEliminacion(mensaje = '¿Estás seguro de que quieres eliminar
  * @param {string} mensaje - Mensaje a mostrar
  * @param {string} tipo - Tipo de notificación (success, error, warning, info)
  */
-function mostrarNotificacion(mensaje, tipo = 'info') {
+function mostrarNotificacion(mensaje: string, tipo: string = 'info'): void {
     // Crear elemento toast
     const toastHtml = `
         <div class="toast align-items-center text-white bg-${tipo === 'error' ? 'danger' : tipo}" role="alert" aria-live="assertive" aria-atomic="true">
@@ -69,8 +69,10 @@ function mostrarNotificacion(mensaje, tipo = 'info') {
     
     toastContainer.innerHTML = toastHtml;
     const toastElement = toastContainer.querySelector('.toast');
-    const toast = new bootstrap.Toast(toastElement);
-    toast.show();
+    if (toastElement) {
+        const toast = new bootstrap.Toast(toastElement);
+        toast.show();
+    }
 }
 
 /**
@@ -78,7 +80,7 @@ function mostrarNotificacion(mensaje, tipo = 'info') {
  * @param {number} numero - Número a formatear
  * @returns {string} - Número formateado
  */
-function formatearNumero(numero) {
+function formatearNumero(numero: number): string {
     return numero.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
@@ -87,17 +89,18 @@ function formatearNumero(numero) {
  * @param {HTMLFormElement} formulario - Formulario a validar
  * @returns {boolean} - true si es válido
  */
-function validarFormulario(formulario) {
+function validarFormulario(formulario: HTMLFormElement): boolean {
     let esValido = true;
     const camposRequeridos = formulario.querySelectorAll('[required]');
     
-    camposRequeridos.forEach(function(campo) {
-        if (!campo.value.trim()) {
-            campo.classList.add('is-invalid');
+    camposRequeridos.forEach(function(campo: Element) {
+        const inputElement = campo as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+        if (!inputElement.value.trim()) {
+            inputElement.classList.add('is-invalid');
             esValido = false;
         } else {
-            campo.classList.remove('is-invalid');
-            campo.classList.add('is-valid');
+            inputElement.classList.remove('is-invalid');
+            inputElement.classList.add('is-valid');
         }
     });
     
@@ -108,9 +111,9 @@ function validarFormulario(formulario) {
  * Función para limpiar validaciones de formulario
  * @param {HTMLFormElement} formulario - Formulario a limpiar
  */
-function limpiarValidaciones(formulario) {
+function limpiarValidaciones(formulario: HTMLFormElement): void {
     const campos = formulario.querySelectorAll('.form-control, .form-select');
-    campos.forEach(function(campo) {
+    campos.forEach(function(campo: Element) {
         campo.classList.remove('is-valid', 'is-invalid');
     });
 }
@@ -119,8 +122,8 @@ function limpiarValidaciones(formulario) {
 document.addEventListener('DOMContentLoaded', function() {
     // Agregar confirmación a botones de eliminar
     const botonesEliminar = document.querySelectorAll('.btn-eliminar, [data-action="delete"]');
-    botonesEliminar.forEach(function(boton) {
-        boton.addEventListener('click', function(e) {
+    botonesEliminar.forEach(function(boton: Element) {
+        boton.addEventListener('click', function(this: HTMLElement, e: Event) {
             const mensaje = this.getAttribute('data-confirm-message') || 
                            '¿Estás seguro de que quieres eliminar este elemento?';
             if (!confirmarEliminacion(mensaje)) {
@@ -133,8 +136,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const formularios = document.querySelectorAll('form');
     formularios.forEach(function(form) {
         const campos = form.querySelectorAll('.form-control, .form-select');
-        campos.forEach(function(campo) {
-            campo.addEventListener('blur', function() {
+        campos.forEach(function(campo: Element) {
+            campo.addEventListener('blur', function(this: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) {
                 if (this.hasAttribute('required')) {
                     if (!this.value.trim()) {
                         this.classList.add('is-invalid');
@@ -175,10 +178,12 @@ function inicializarScrollToTop() {
      * Función para mostrar/ocultar el botón según el scroll
      */
     function toggleScrollButton() {
-        if (window.pageYOffset > scrollThreshold) {
-            scrollButton.classList.add('visible');
-        } else {
-            scrollButton.classList.remove('visible');
+        if (scrollButton) {
+            if (window.pageYOffset > scrollThreshold) {
+                scrollButton.classList.add('visible');
+            } else {
+                scrollButton.classList.remove('visible');
+            }
         }
     }
     
@@ -207,7 +212,7 @@ function inicializarScrollToTop() {
     }
     
     // Event listener para el scroll (con throttle para mejor performance)
-    let scrollTimeout;
+    let scrollTimeout: number | undefined;
     window.addEventListener('scroll', function() {
         if (scrollTimeout) {
             window.cancelAnimationFrame(scrollTimeout);
@@ -250,21 +255,24 @@ function inicializarNavbarModerno() {
     // Dropdowns en desktop
     const dropdownLinks = document.querySelectorAll('.navbar-menu-link[data-dropdown]');
     
-    dropdownLinks.forEach(function(link) {
-        link.addEventListener('click', function(e) {
+    dropdownLinks.forEach(function(link: Element) {
+        link.addEventListener('click', function(this: HTMLElement, e: Event) {
             e.preventDefault();
             
             // En móvil, toggle el dropdown
             if (window.innerWidth <= 992) {
                 const parentItem = this.closest('.navbar-menu-item');
-                parentItem.classList.toggle('active');
+                if (parentItem) {
+                    parentItem.classList.toggle('active');
+                }
             }
         });
     });
     
     // Cerrar dropdowns al hacer click fuera
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.navbar-menu-item')) {
+    document.addEventListener('click', function(e: Event) {
+        const target = e.target as HTMLElement;
+        if (target && !target.closest('.navbar-menu-item')) {
             document.querySelectorAll('.navbar-menu-item').forEach(function(item) {
                 item.classList.remove('active');
             });
@@ -318,18 +326,20 @@ function inicializarSidebar() {
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
             sidebar.classList.toggle('collapsed');
-            mainWrapper.classList.toggle('sidebar-collapsed');
+            if (mainWrapper) {
+                mainWrapper.classList.toggle('sidebar-collapsed');
+            }
             
             // Guardar estado en localStorage
             const isCollapsed = sidebar.classList.contains('collapsed');
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
+            localStorage.setItem('sidebarCollapsed', String(isCollapsed));
             
             // Cerrar todos los submenús abiertos al cambiar de modo
             const openSubmenus = sidebar.querySelectorAll('.sidebar-item.has-submenu.open');
             openSubmenus.forEach(function(submenu) {
                 submenu.classList.remove('open');
                 // Limpiar estilos inline de posición
-                const submenuList = submenu.querySelector('.sidebar-submenu');
+                const submenuList = submenu.querySelector('.sidebar-submenu') as HTMLElement;
                 if (submenuList) {
                     submenuList.style.top = '';
                 }
@@ -339,7 +349,7 @@ function inicializarSidebar() {
     
     // Sincronizar mainWrapper con el estado inicial de la sidebar
     // (la sidebar ya tiene la clase 'collapsed' del script inline si corresponde)
-    if (sidebar.classList.contains('collapsed')) {
+    if (sidebar.classList.contains('collapsed') && mainWrapper) {
         mainWrapper.classList.add('sidebar-collapsed');
     }
     
@@ -359,12 +369,12 @@ function inicializarSidebar() {
     
     submenus.forEach(function(submenu) {
         const link = submenu.querySelector('.sidebar-link');
-        const submenuList = submenu.querySelector('.sidebar-submenu');
+        const submenuList = submenu.querySelector('.sidebar-submenu') as HTMLElement;
         
         if (!link || !submenuList) return;
         
         // Click en el link del menú principal (para abrir/cerrar)
-        link.addEventListener('click', function(e) {
+        link.addEventListener('click', function(e: Event) {
             e.preventDefault();
             e.stopPropagation(); // CRÍTICO: Evitar que el evento burbujee al document
             
@@ -374,7 +384,7 @@ function inicializarSidebar() {
             submenus.forEach(function(otherSubmenu) {
                 if (otherSubmenu !== submenu) {
                     otherSubmenu.classList.remove('open');
-                    const otherList = otherSubmenu.querySelector('.sidebar-submenu');
+                    const otherList = otherSubmenu.querySelector('.sidebar-submenu') as HTMLElement;
                     if (otherList) {
                         otherList.style.top = '';
                     }
@@ -418,9 +428,10 @@ function inicializarSidebar() {
         });
         
         // NUEVO: Event listener en el submenu para cerrar al hacer click en opciones
-        submenuList.addEventListener('click', function(e) {
+        submenuList.addEventListener('click', function(e: Event) {
             // Si el click es en un link de navegación (no en el contenedor)
-            const clickedLink = e.target.closest('a');
+            const target = e.target as HTMLElement;
+            const clickedLink = target ? target.closest('a') : null;
             if (clickedLink && clickedLink.href && clickedLink.href !== '#') {
                 console.log('🔗 Click detectado en link:', clickedLink.href);
                 console.log('🚪 Cerrando submenu...');
@@ -443,7 +454,7 @@ function inicializarSidebar() {
         // ADICIONAL: Capturar clicks específicamente en los links <a>
         const allLinks = submenuList.querySelectorAll('a[href]:not([href="#"])');
         allLinks.forEach(function(navLink) {
-            navLink.addEventListener('click', function(e) {
+            navLink.addEventListener('click', function(e: Event) {
                 console.log('🎯 Click directo en link detectado');
                 // Cerrar submenu inmediatamente
                 submenu.classList.remove('open');
@@ -461,12 +472,13 @@ function inicializarSidebar() {
     });
     
     // Cerrar tooltips al hacer click FUERA de la sidebar (solo modo colapsado)
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function(e: Event) {
         const isCollapsed = sidebar.classList.contains('collapsed');
         if (!isCollapsed) return;
         
+        const target = e.target as Node;
         // Si el click NO fue en la sidebar ni en sus elementos
-        if (!sidebar.contains(e.target)) {
+        if (target && !sidebar.contains(target)) {
             const openSubmenus = sidebar.querySelectorAll('.sidebar-item.has-submenu.open');
             openSubmenus.forEach(function(submenu) {
                 submenu.classList.remove('open');
@@ -475,14 +487,16 @@ function inicializarSidebar() {
     });
     
     // Ajustar sidebar en cambio de tamaño de ventana
-    let resizeTimer;
+    let resizeTimer: number | undefined;
     window.addEventListener('resize', function() {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(function() {
             if (window.innerWidth > 992) {
                 // Desktop: remover clases móviles
                 sidebar.classList.remove('mobile-open');
-                sidebarOverlay.classList.remove('active');
+                if (sidebarOverlay) {
+                    sidebarOverlay.classList.remove('active');
+                }
             }
             // No cerrar submenús automáticamente - dejar que el usuario los controle
         }, 250);
@@ -496,7 +510,7 @@ function inicializarSidebar() {
         const openSubmenus = sidebar.querySelectorAll('.sidebar-item.has-submenu.open');
         openSubmenus.forEach(function(submenu) {
             submenu.classList.remove('open');
-            const submenuList = submenu.querySelector('.sidebar-submenu');
+            const submenuList = submenu.querySelector('.sidebar-submenu') as HTMLElement;
             if (submenuList) {
                 submenuList.style.top = '';
             }
@@ -545,7 +559,7 @@ function marcarEnlaceActivo() {
  * @param {string} menuId - ID del menú a actualizar
  * @param {number} count - Número de notificaciones
  */
-function actualizarBadgeSidebar(menuId, count) {
+function actualizarBadgeSidebar(menuId: string, count: number): void {
     const menu = document.getElementById(menuId);
     if (!menu) return;
     
@@ -560,7 +574,7 @@ function actualizarBadgeSidebar(menuId, count) {
                 link.appendChild(badge);
             }
         }
-        badge.textContent = count > 99 ? '99+' : count;
+        badge.textContent = count > 99 ? '99+' : String(count);
     } else if (badge) {
         badge.remove();
     }

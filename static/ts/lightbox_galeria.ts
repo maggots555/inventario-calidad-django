@@ -2,24 +2,55 @@
 // LIGHTBOX PERSONALIZADO PARA GALERÍA DE SERVICIO TÉCNICO
 // Sin dependencias de Bootstrap Modal - Control total
 // ============================================================================
+
+// Declaración de tipo global para window
+declare global {
+    interface Window {
+        galeriaLightbox: GaleriaLightbox;
+    }
+}
+
+// EXPLICACIÓN PARA PRINCIPIANTES:
+// Esta interface define la estructura de datos de cada imagen en la galería
+interface GalleryImageData {
+    index: number;
+    src: string;
+    descripcion: string;
+    usuario: string;
+    fecha: string;
+    urlDescarga: string;
+}
+
 class GaleriaLightbox {
+    // EXPLICACIÓN: Estas son las propiedades de la clase con sus tipos
+    private lightboxContainer: HTMLElement | null;
+    private currentImageIndex: number;
+    private images: GalleryImageData[];
+    private isOpen: boolean;
+    
     constructor() {
         this.lightboxContainer = null;
         this.currentImageIndex = 0;
         this.images = [];
         this.isOpen = false;
+        
         this.init();
     }
-    init() {
+    
+    private init(): void {
         // Crear el lightbox en el DOM
         this.createLightbox();
+        
         // Buscar todas las imágenes de la galería
         this.collectImages();
+        
         // Agregar event listeners
         this.attachEventListeners();
+        
         console.log('✅ Lightbox inicializado con', this.images.length, 'imágenes');
     }
-    createLightbox() {
+    
+    private createLightbox(): void {
         // Crear el contenedor del lightbox
         const lightbox = document.createElement('div');
         lightbox.id = 'custom-lightbox';
@@ -73,21 +104,26 @@ class GaleriaLightbox {
                 </div>
             </div>
         `;
+        
         document.body.appendChild(lightbox);
         this.lightboxContainer = lightbox;
     }
-    collectImages() {
+    
+    private collectImages(): void {
         // Buscar todas las imágenes de la galería
         const galleryImages = document.querySelectorAll('.gallery-image');
-        galleryImages.forEach((item, index) => {
+        
+        galleryImages.forEach((item: Element, index: number) => {
             const img = item.querySelector('img');
-            const container = item.closest('.gallery-image-container');
+            const container = item.closest('.gallery-image-container') as HTMLElement;
+            
             if (img && container) {
                 // Obtener metadata
                 const descripcion = container.dataset.descripcion || '';
                 const usuario = container.dataset.usuario || 'Usuario';
                 const fecha = container.dataset.fecha || '';
                 const urlDescarga = container.dataset.urlDescarga || img.src;
+                
                 this.images.push({
                     index: index,
                     src: img.src,
@@ -96,44 +132,51 @@ class GaleriaLightbox {
                     fecha: fecha,
                     urlDescarga: urlDescarga
                 });
+                
                 // Agregar click listener a la imagen
-                item.addEventListener('click', (e) => {
+                item.addEventListener('click', (e: Event) => {
                     e.preventDefault();
                     e.stopPropagation();
                     this.open(index);
                 });
+                
                 // Cambiar cursor a pointer
-                item.style.cursor = 'pointer';
+                (item as HTMLElement).style.cursor = 'pointer';
             }
         });
     }
-    attachEventListeners() {
-        if (!this.lightboxContainer)
-            return;
+    
+    private attachEventListeners(): void {
+        if (!this.lightboxContainer) return;
+        
         // Botón cerrar
         const closeBtn = this.lightboxContainer.querySelector('.lightbox-close');
         if (closeBtn) {
             closeBtn.addEventListener('click', () => this.close());
         }
+        
         // Click en overlay para cerrar
         const overlay = this.lightboxContainer.querySelector('.lightbox-overlay');
         if (overlay) {
             overlay.addEventListener('click', () => this.close());
         }
+        
         // Navegación
         const prevBtn = this.lightboxContainer.querySelector('.lightbox-prev');
         const nextBtn = this.lightboxContainer.querySelector('.lightbox-next');
+        
         if (prevBtn) {
             prevBtn.addEventListener('click', () => this.prev());
         }
         if (nextBtn) {
             nextBtn.addEventListener('click', () => this.next());
         }
+        
         // Teclado
         document.addEventListener('keydown', (e) => {
-            if (!this.isOpen)
-                return;
-            switch (e.key) {
+            if (!this.isOpen) return;
+            
+            switch(e.key) {
                 case 'Escape':
                     this.close();
                     break;
@@ -146,84 +189,105 @@ class GaleriaLightbox {
             }
         });
     }
-    open(index) {
+    
+    public open(index: number): void {
         this.currentImageIndex = index;
         this.isOpen = true;
-        if (!this.lightboxContainer)
-            return;
+        
+        if (!this.lightboxContainer) return;
+        
         // Mostrar lightbox
         this.lightboxContainer.classList.add('active');
         document.body.style.overflow = 'hidden';
+        
         // Cargar imagen
         this.loadImage();
+        
         // Actualizar navegación
         this.updateNavigation();
+        
         console.log('🖼️ Lightbox abierto - Imagen', index + 1);
     }
-    close() {
+    
+    public close(): void {
         this.isOpen = false;
-        if (!this.lightboxContainer)
-            return;
+        
+        if (!this.lightboxContainer) return;
+        
         // Ocultar lightbox
         this.lightboxContainer.classList.remove('active');
         document.body.style.overflow = '';
+        
         console.log('❌ Lightbox cerrado');
     }
-    loadImage() {
-        if (!this.lightboxContainer)
-            return;
+    
+    private loadImage(): void {
+        if (!this.lightboxContainer) return;
+        
         const imageData = this.images[this.currentImageIndex];
-        const imgElement = this.lightboxContainer.querySelector('.lightbox-image');
-        const loader = this.lightboxContainer.querySelector('.lightbox-loader');
-        if (!imgElement || !loader)
-            return;
+        const imgElement = this.lightboxContainer.querySelector('.lightbox-image') as HTMLImageElement;
+        const loader = this.lightboxContainer.querySelector('.lightbox-loader') as HTMLElement;
+        
+        if (!imgElement || !loader) return;
+        
         // Mostrar loader
         loader.style.display = 'flex';
         imgElement.style.opacity = '0';
+        
         // Cargar nueva imagen
         const tempImg = new Image();
         tempImg.onload = () => {
             imgElement.src = imageData.src;
             imgElement.alt = imageData.descripcion;
+            
             // Ocultar loader, mostrar imagen
             setTimeout(() => {
                 loader.style.display = 'none';
                 imgElement.style.opacity = '1';
             }, 100);
         };
+        
         tempImg.onerror = () => {
             console.error('Error cargando imagen:', imageData.src);
             loader.style.display = 'none';
             imgElement.style.opacity = '1';
         };
+        
         tempImg.src = imageData.src;
+        
         // Actualizar info
         this.updateInfo();
     }
-    updateInfo() {
-        if (!this.lightboxContainer)
-            return;
+    
+    private updateInfo(): void {
+        if (!this.lightboxContainer) return;
+        
         const imageData = this.images[this.currentImageIndex];
+        
         // Descripción
         const descEl = this.lightboxContainer.querySelector('.lightbox-description');
         if (descEl) {
             descEl.textContent = imageData.descripcion || 'Sin descripción';
         }
+        
         // Usuario
         const userEl = this.lightboxContainer.querySelector('.user-name');
         if (userEl) {
             userEl.textContent = imageData.usuario;
         }
+        
         // Fecha
         const dateEl = this.lightboxContainer.querySelector('.date-text');
         if (dateEl) {
             dateEl.textContent = imageData.fecha;
         }
+        
         // Botón descarga
-        const downloadBtn = this.lightboxContainer.querySelector('.lightbox-download');
+        const downloadBtn = this.lightboxContainer.querySelector('.lightbox-download') as HTMLAnchorElement;
         if (downloadBtn) {
             downloadBtn.href = imageData.urlDescarga;
         }
+        
         // Contador
         const currentEl = this.lightboxContainer.querySelector('.current-index');
         const totalEl = this.lightboxContainer.querySelector('.total-images');
@@ -234,39 +298,42 @@ class GaleriaLightbox {
             totalEl.textContent = String(this.images.length);
         }
     }
-    updateNavigation() {
-        if (!this.lightboxContainer)
-            return;
-        const prevBtn = this.lightboxContainer.querySelector('.lightbox-prev');
-        const nextBtn = this.lightboxContainer.querySelector('.lightbox-next');
-        if (!prevBtn || !nextBtn)
-            return;
+    
+    private updateNavigation(): void {
+        if (!this.lightboxContainer) return;
+        
+        const prevBtn = this.lightboxContainer.querySelector('.lightbox-prev') as HTMLElement;
+        const nextBtn = this.lightboxContainer.querySelector('.lightbox-next') as HTMLElement;
+        
+        if (!prevBtn || !nextBtn) return;
+        
         // Mostrar/ocultar botones según posición
         if (this.currentImageIndex === 0) {
             prevBtn.style.opacity = '0.3';
             prevBtn.style.pointerEvents = 'none';
-        }
-        else {
+        } else {
             prevBtn.style.opacity = '1';
             prevBtn.style.pointerEvents = 'auto';
         }
+        
         if (this.currentImageIndex === this.images.length - 1) {
             nextBtn.style.opacity = '0.3';
             nextBtn.style.pointerEvents = 'none';
-        }
-        else {
+        } else {
             nextBtn.style.opacity = '1';
             nextBtn.style.pointerEvents = 'auto';
         }
     }
-    prev() {
+    
+    public prev(): void {
         if (this.currentImageIndex > 0) {
             this.currentImageIndex--;
             this.loadImage();
             this.updateNavigation();
         }
     }
-    next() {
+    
+    public next(): void {
         if (this.currentImageIndex < this.images.length - 1) {
             this.currentImageIndex++;
             this.loadImage();
@@ -274,6 +341,7 @@ class GaleriaLightbox {
         }
     }
 }
+
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
     // Solo inicializar si hay imágenes de galería
@@ -281,5 +349,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.galeriaLightbox = new GaleriaLightbox();
     }
 });
+
+// Exportar para hacer el archivo un módulo (necesario para declaración global)
 export {};
-//# sourceMappingURL=lightbox_galeria.js.map

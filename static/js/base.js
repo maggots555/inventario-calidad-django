@@ -62,8 +62,10 @@ function mostrarNotificacion(mensaje, tipo = 'info') {
     }
     toastContainer.innerHTML = toastHtml;
     const toastElement = toastContainer.querySelector('.toast');
-    const toast = new bootstrap.Toast(toastElement);
-    toast.show();
+    if (toastElement) {
+        const toast = new bootstrap.Toast(toastElement);
+        toast.show();
+    }
 }
 /**
  * Función para formatear números con separadores de miles
@@ -82,13 +84,14 @@ function validarFormulario(formulario) {
     let esValido = true;
     const camposRequeridos = formulario.querySelectorAll('[required]');
     camposRequeridos.forEach(function (campo) {
-        if (!campo.value.trim()) {
-            campo.classList.add('is-invalid');
+        const inputElement = campo;
+        if (!inputElement.value.trim()) {
+            inputElement.classList.add('is-invalid');
             esValido = false;
         }
         else {
-            campo.classList.remove('is-invalid');
-            campo.classList.add('is-valid');
+            inputElement.classList.remove('is-invalid');
+            inputElement.classList.add('is-valid');
         }
     });
     return esValido;
@@ -157,11 +160,13 @@ function inicializarScrollToTop() {
      * Función para mostrar/ocultar el botón según el scroll
      */
     function toggleScrollButton() {
-        if (window.pageYOffset > scrollThreshold) {
-            scrollButton.classList.add('visible');
-        }
-        else {
-            scrollButton.classList.remove('visible');
+        if (scrollButton) {
+            if (window.pageYOffset > scrollThreshold) {
+                scrollButton.classList.add('visible');
+            }
+            else {
+                scrollButton.classList.remove('visible');
+            }
         }
     }
     /**
@@ -228,13 +233,16 @@ function inicializarNavbarModerno() {
             // En móvil, toggle el dropdown
             if (window.innerWidth <= 992) {
                 const parentItem = this.closest('.navbar-menu-item');
-                parentItem.classList.toggle('active');
+                if (parentItem) {
+                    parentItem.classList.toggle('active');
+                }
             }
         });
     });
     // Cerrar dropdowns al hacer click fuera
     document.addEventListener('click', function (e) {
-        if (!e.target.closest('.navbar-menu-item')) {
+        const target = e.target;
+        if (target && !target.closest('.navbar-menu-item')) {
             document.querySelectorAll('.navbar-menu-item').forEach(function (item) {
                 item.classList.remove('active');
             });
@@ -286,10 +294,12 @@ function inicializarSidebar() {
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', function () {
             sidebar.classList.toggle('collapsed');
-            mainWrapper.classList.toggle('sidebar-collapsed');
+            if (mainWrapper) {
+                mainWrapper.classList.toggle('sidebar-collapsed');
+            }
             // Guardar estado en localStorage
             const isCollapsed = sidebar.classList.contains('collapsed');
-            localStorage.setItem('sidebarCollapsed', isCollapsed);
+            localStorage.setItem('sidebarCollapsed', String(isCollapsed));
             // Cerrar todos los submenús abiertos al cambiar de modo
             const openSubmenus = sidebar.querySelectorAll('.sidebar-item.has-submenu.open');
             openSubmenus.forEach(function (submenu) {
@@ -304,7 +314,7 @@ function inicializarSidebar() {
     }
     // Sincronizar mainWrapper con el estado inicial de la sidebar
     // (la sidebar ya tiene la clase 'collapsed' del script inline si corresponde)
-    if (sidebar.classList.contains('collapsed')) {
+    if (sidebar.classList.contains('collapsed') && mainWrapper) {
         mainWrapper.classList.add('sidebar-collapsed');
     }
     // NOTA: El botón flotante mobileSidebarToggle ha sido eliminado
@@ -371,7 +381,8 @@ function inicializarSidebar() {
         // NUEVO: Event listener en el submenu para cerrar al hacer click en opciones
         submenuList.addEventListener('click', function (e) {
             // Si el click es en un link de navegación (no en el contenedor)
-            const clickedLink = e.target.closest('a');
+            const target = e.target;
+            const clickedLink = target ? target.closest('a') : null;
             if (clickedLink && clickedLink.href && clickedLink.href !== '#') {
                 console.log('🔗 Click detectado en link:', clickedLink.href);
                 console.log('🚪 Cerrando submenu...');
@@ -411,8 +422,9 @@ function inicializarSidebar() {
         const isCollapsed = sidebar.classList.contains('collapsed');
         if (!isCollapsed)
             return;
+        const target = e.target;
         // Si el click NO fue en la sidebar ni en sus elementos
-        if (!sidebar.contains(e.target)) {
+        if (target && !sidebar.contains(target)) {
             const openSubmenus = sidebar.querySelectorAll('.sidebar-item.has-submenu.open');
             openSubmenus.forEach(function (submenu) {
                 submenu.classList.remove('open');
@@ -427,7 +439,9 @@ function inicializarSidebar() {
             if (window.innerWidth > 992) {
                 // Desktop: remover clases móviles
                 sidebar.classList.remove('mobile-open');
-                sidebarOverlay.classList.remove('active');
+                if (sidebarOverlay) {
+                    sidebarOverlay.classList.remove('active');
+                }
             }
             // No cerrar submenús automáticamente - dejar que el usuario los controle
         }, 250);
@@ -495,7 +509,7 @@ function actualizarBadgeSidebar(menuId, count) {
                 link.appendChild(badge);
             }
         }
-        badge.textContent = count > 99 ? '99+' : count;
+        badge.textContent = count > 99 ? '99+' : String(count);
     }
     else if (badge) {
         badge.remove();
