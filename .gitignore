@@ -59,6 +59,10 @@ ssl_certs/
 .pytest_cache/
 .tox/
 
+# Machine Learning models (specific to each database)
+# Only ignore .pkl files, keep README and .gitkeep
+ml_models/*.pkl
+
 # Other projects (not part of inventario-calidad-django)
 inventario_calidad_backup/
 mi_sitio_descontinuado/
