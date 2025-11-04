@@ -2545,6 +2545,50 @@ def agregar_pieza_cotizada(request, orden_id):
 
 
 @login_required
+@require_http_methods(["GET"])
+def obtener_pieza_cotizada(request, pieza_id):
+    """
+    Obtiene los datos de una pieza cotizada para edición.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista retorna los datos de una pieza en formato JSON para que
+    JavaScript pueda cargarlos en el formulario de edición.
+    
+    Returns:
+        JsonResponse: Datos de la pieza en formato JSON
+    """
+    from django.http import JsonResponse
+    from .models import PiezaCotizada
+    
+    try:
+        pieza = get_object_or_404(PiezaCotizada, id=pieza_id)
+        
+        # Construir diccionario con los datos de la pieza
+        datos_pieza = {
+            'id': pieza.id,
+            'componente_id': pieza.componente_id,
+            'componente_nombre': pieza.componente.nombre,
+            'descripcion_adicional': pieza.descripcion_adicional or '',
+            'cantidad': pieza.cantidad,
+            'costo_unitario': str(pieza.costo_unitario),
+            'orden_prioridad': pieza.orden_prioridad,
+            'es_necesaria': pieza.es_necesaria,
+            'sugerida_por_tecnico': pieza.sugerida_por_tecnico,
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'pieza': datos_pieza
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error al obtener pieza: {str(e)}'
+        }, status=500)
+
+
+@login_required
 @require_http_methods(["POST"])
 def editar_pieza_cotizada(request, pieza_id):
     """
@@ -7758,6 +7802,7 @@ def exportar_dashboard_cotizaciones(request):
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from openpyxl.utils.dataframe import dataframe_to_rows
+    from openpyxl.utils import get_column_letter
     from datetime import datetime
     import pandas as pd  # Necesario para pd.to_datetime()
     
@@ -7906,7 +7951,7 @@ def exportar_dashboard_cotizaciones(request):
     ws_cotiz = wb.create_sheet("Cotizaciones Detalle")
     
     # Título
-    ws_cotiz.merge_cells('A1:J1')
+    ws_cotiz.merge_cells('A1:L1')
     title_cell = ws_cotiz['A1']
     title_cell.value = f"DETALLE DE COTIZACIONES ({len(df_cotizaciones)} registros)"
     title_cell.font = title_font
@@ -7915,14 +7960,32 @@ def exportar_dashboard_cotizaciones(request):
     
     # Seleccionar columnas relevantes
     columnas_export = [
-        'numero_orden', 'fecha_envio', 'sucursal', 'tecnico', 'gama',
-        'tipo_equipo', 'marca', 'modelo', 'costo_total', 'aceptada'
+        'numero_orden', 'orden_cliente', 'numero_serie', 'fecha_envio', 
+        'sucursal', 'tecnico', 'gama', 'tipo_equipo', 'marca', 'modelo', 
+        'costo_total', 'aceptada'
     ]
     
     df_export = df_cotizaciones[columnas_export].copy()
-    df_export['fecha_envio'] = pd.to_datetime(df_export['fecha_envio']).dt.strftime('%d/%m/%Y')
-    df_export['costo_total'] = df_export['costo_total'].apply(lambda x: f'${x:,.2f}')
-    df_export['aceptada'] = df_export['aceptada'].map({
+    
+    # Renombrar columnas para el Excel
+    df_export.columns = [
+        'Número de Orden',
+        'Orden Cliente', 
+        'Número de Serie',
+        'Fecha Envío',
+        'Sucursal',
+        'Técnico',
+        'Gama',
+        'Tipo Equipo',
+        'Marca',
+        'Modelo',
+        'Costo Total',
+        'Estado'
+    ]
+    
+    df_export['Fecha Envío'] = pd.to_datetime(df_export['Fecha Envío']).dt.strftime('%d/%m/%Y')
+    df_export['Costo Total'] = df_export['Costo Total'].apply(lambda x: f'${x:,.2f}')
+    df_export['Estado'] = df_export['Estado'].map({
         True: '✅ Aceptada',
         False: '❌ Rechazada',
         None: '⏳ Pendiente'
@@ -7939,12 +8002,12 @@ def exportar_dashboard_cotizaciones(request):
                 cell.alignment = header_alignment
     
     # Auto-ajustar columnas
-    for column in ws_cotiz.columns:
+    for col_idx, column in enumerate(ws_cotiz.columns, 1):
         max_length = 0
-        column_letter = column[0].column_letter
+        column_letter = get_column_letter(col_idx)
         for cell in column:
             try:
-                if len(str(cell.value)) > max_length:
+                if cell.value and len(str(cell.value)) > max_length:
                     max_length = len(str(cell.value))
             except:
                 pass

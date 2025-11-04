@@ -3142,7 +3142,7 @@ document.addEventListener('DOMContentLoaded', function() {
 /**
  * Abre el modal para agregar una nueva pieza
  */
-function abrirModalPieza(piezaId = null) {
+async function abrirModalPieza(piezaId = null) {
     const modal = new bootstrap.Modal(document.getElementById('modalPieza'));
     const form = document.getElementById('formPieza');
     const titulo = document.getElementById('modalPiezaTitulo');
@@ -3159,8 +3159,32 @@ function abrirModalPieza(piezaId = null) {
         btnTexto.textContent = 'Actualizar Pieza';
         document.getElementById('piezaId').value = piezaId;
         
-        // Aquí cargaríamos los datos vía AJAX si fuera necesario
-        // Por ahora asumimos que los datos ya están en el form
+        // Cargar datos de la pieza vía AJAX
+        try {
+            const url = "{% url 'servicio_tecnico:obtener_pieza' 0 %}".replace('/0/', `/${piezaId}/`);
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.success) {
+                const pieza = data.pieza;
+                
+                // Poblar el formulario con los datos
+                document.getElementById('componente').value = pieza.componente_id;
+                document.getElementById('descripcion_adicional').value = pieza.descripcion_adicional;
+                document.getElementById('cantidad').value = pieza.cantidad;
+                document.getElementById('costo_unitario').value = pieza.costo_unitario;
+                document.getElementById('orden_prioridad').value = pieza.orden_prioridad;
+                document.getElementById('es_necesaria').checked = pieza.es_necesaria;
+                document.getElementById('sugerida_por_tecnico').checked = pieza.sugerida_por_tecnico;
+            } else {
+                mostrarToast(data.error || 'Error al cargar datos de la pieza', 'danger');
+                return;
+            }
+        } catch (error) {
+            console.error('Error al cargar pieza:', error);
+            mostrarToast('Error de conexión al cargar la pieza', 'danger');
+            return;
+        }
     } else {
         // Modo AGREGAR
         titulo.textContent = 'Agregar Pieza';
@@ -3237,7 +3261,6 @@ document.getElementById('formPieza')?.addEventListener('submit', async function(
  */
 function editarPieza(piezaId) {
     abrirModalPieza(piezaId);
-    // TODO: Cargar datos de la pieza vía AJAX y poblar el formulario
 }
 
 /**

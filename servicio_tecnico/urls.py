@@ -53,6 +53,7 @@ urlpatterns = [
     # GESTIÓN DE PIEZAS COTIZADAS (AJAX)
     # ========================================================================
     path('ordenes/<int:orden_id>/piezas/agregar/', views.agregar_pieza_cotizada, name='agregar_pieza'),
+    path('piezas/<int:pieza_id>/obtener/', views.obtener_pieza_cotizada, name='obtener_pieza'),
     path('piezas/<int:pieza_id>/editar/', views.editar_pieza_cotizada, name='editar_pieza'),
     path('piezas/<int:pieza_id>/eliminar/', views.eliminar_pieza_cotizada, name='eliminar_pieza'),
     

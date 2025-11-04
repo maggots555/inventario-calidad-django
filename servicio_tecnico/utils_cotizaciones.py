@@ -130,6 +130,8 @@ def obtener_dataframe_cotizaciones(fecha_inicio=None, fecha_fin=None,
             'cotizacion_id': cot.orden_id,
             'orden_id': orden.id,
             'numero_orden': orden.numero_orden_interno,
+            'orden_cliente': detalle.orden_cliente if detalle else '',
+            'numero_serie': detalle.numero_serie if detalle else '',
             
             # Fechas
             'fecha_envio': cot.fecha_envio,
@@ -191,8 +193,9 @@ def obtener_dataframe_cotizaciones(fecha_inicio=None, fecha_fin=None,
     # Si no hay datos, retornar DataFrame vacío con columnas
     if df.empty:
         return pd.DataFrame(columns=[
-            'cotizacion_id', 'orden_id', 'numero_orden', 'fecha_envio', 
-            'fecha_respuesta', 'aceptada', 'costo_total', 'sucursal', 'tecnico', 'gama'
+            'cotizacion_id', 'orden_id', 'numero_orden', 'orden_cliente', 'numero_serie',
+            'fecha_envio', 'fecha_respuesta', 'aceptada', 'costo_total', 
+            'sucursal', 'tecnico', 'gama'
         ])
     
     # Convertir fecha_envio a datetime si no lo es

@@ -175,6 +175,7 @@ MOTIVO_RECHAZO_COTIZACION = [
     ('tiempo_largo', 'Tiempo de reparación muy largo'),
     ('falta_justificacion', 'Falta de justificación en diagnóstico'),
     ('no_vale_pena', 'No vale la pena reparar'),
+    ('no_hay_partes', 'No hay partes en el mercado'),
     ('otro', 'Otro motivo'),
 ]
 
