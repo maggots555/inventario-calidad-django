@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     /* Opciones Base */
-    "target": "ES6", // Compila a JavaScript ES6 (compatible con navegadores modernos)
-    "module": "ES6", // Usa módulos modernos
+    "target": "ES2018", // Compila a JavaScript ES2018 (compatible con navegadores modernos)
+    "lib": ["ES2018", "DOM"], // Incluye librerías ES2018 y DOM
     "strict": true, // ¡La magia de TypeScript! Activa todos los chequeos estrictos.
     "esModuleInterop": true,
     "skipLibCheck": true,

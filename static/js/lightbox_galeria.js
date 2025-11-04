@@ -1,3 +1,4 @@
+"use strict";
 // ============================================================================
 // LIGHTBOX PERSONALIZADO PARA GALERÍA DE SERVICIO TÉCNICO
 // Sin dependencias de Bootstrap Modal - Control total
@@ -17,7 +18,30 @@ class GaleriaLightbox {
         this.collectImages();
         // Agregar event listeners
         this.attachEventListeners();
+        // NUEVO: Escuchar cambios de pestaña para recargar imágenes
+        this.attachTabListeners();
         console.log('✅ Lightbox inicializado con', this.images.length, 'imágenes');
+    }
+    // NUEVO: Método para escuchar cambios de pestaña
+    attachTabListeners() {
+        // Buscar todos los botones de pestañas de Bootstrap
+        const tabButtons = document.querySelectorAll('[data-bs-toggle="pill"]');
+        tabButtons.forEach((button) => {
+            button.addEventListener('shown.bs.tab', () => {
+                // EXPLICACIÓN: Cuando se muestra una nueva pestaña, recargamos las imágenes
+                console.log('📑 Pestaña cambiada, recargando galería...');
+                this.reloadGallery();
+            });
+        });
+    }
+    // NUEVO: Método público para recargar la galería
+    reloadGallery() {
+        // Cerrar el lightbox si está abierto
+        if (this.isOpen) {
+            this.close();
+        }
+        // Recolectar las imágenes de la nueva pestaña activa
+        this.collectImages();
     }
     createLightbox() {
         // Crear el contenedor del lightbox
@@ -77,8 +101,18 @@ class GaleriaLightbox {
         this.lightboxContainer = lightbox;
     }
     collectImages() {
-        // Buscar todas las imágenes de la galería
-        const galleryImages = document.querySelectorAll('.gallery-image');
+        // EXPLICACIÓN: Ahora solo recolectamos imágenes de la pestaña activa
+        // Buscar el contenedor de pestañas activo
+        const activeTabPane = document.querySelector('.tab-pane.active');
+        if (!activeTabPane) {
+            // Si no hay pestañas, buscar todas las imágenes (compatibilidad con páginas sin pestañas)
+            this.collectAllImages();
+            return;
+        }
+        // Limpiar el array de imágenes antes de recolectar
+        this.images = [];
+        // Buscar solo las imágenes dentro de la pestaña activa
+        const galleryImages = activeTabPane.querySelectorAll('.gallery-image');
         galleryImages.forEach((item, index) => {
             const img = item.querySelector('img');
             const container = item.closest('.gallery-image-container');
@@ -106,6 +140,37 @@ class GaleriaLightbox {
                 item.style.cursor = 'pointer';
             }
         });
+        console.log(`🖼️ Galería: ${this.images.length} imágenes cargadas desde la pestaña activa`);
+    }
+    // EXPLICACIÓN: Método auxiliar para cargar todas las imágenes (cuando no hay pestañas)
+    collectAllImages() {
+        this.images = [];
+        const galleryImages = document.querySelectorAll('.gallery-image');
+        galleryImages.forEach((item, index) => {
+            const img = item.querySelector('img');
+            const container = item.closest('.gallery-image-container');
+            if (img && container) {
+                const descripcion = container.dataset.descripcion || '';
+                const usuario = container.dataset.usuario || 'Usuario';
+                const fecha = container.dataset.fecha || '';
+                const urlDescarga = container.dataset.urlDescarga || img.src;
+                this.images.push({
+                    index: index,
+                    src: img.src,
+                    descripcion: descripcion,
+                    usuario: usuario,
+                    fecha: fecha,
+                    urlDescarga: urlDescarga
+                });
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.open(index);
+                });
+                item.style.cursor = 'pointer';
+            }
+        });
+        console.log(`🖼️ Galería: ${this.images.length} imágenes cargadas (sin pestañas)`);
     }
     attachEventListeners() {
         if (!this.lightboxContainer)
@@ -281,5 +346,4 @@ document.addEventListener('DOMContentLoaded', () => {
         window.galeriaLightbox = new GaleriaLightbox();
     }
 });
-export {};
 //# sourceMappingURL=lightbox_galeria.js.map

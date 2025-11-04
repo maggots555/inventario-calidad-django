@@ -3,13 +3,6 @@
 // Sin dependencias de Bootstrap Modal - Control total
 // ============================================================================
 
-// Declaración de tipo global para window
-declare global {
-    interface Window {
-        galeriaLightbox: GaleriaLightbox;
-    }
-}
-
 // EXPLICACIÓN PARA PRINCIPIANTES:
 // Esta interface define la estructura de datos de cada imagen en la galería
 interface GalleryImageData {
@@ -47,7 +40,35 @@ class GaleriaLightbox {
         // Agregar event listeners
         this.attachEventListeners();
         
+        // NUEVO: Escuchar cambios de pestaña para recargar imágenes
+        this.attachTabListeners();
+        
         console.log('✅ Lightbox inicializado con', this.images.length, 'imágenes');
+    }
+    
+    // NUEVO: Método para escuchar cambios de pestaña
+    private attachTabListeners(): void {
+        // Buscar todos los botones de pestañas de Bootstrap
+        const tabButtons = document.querySelectorAll('[data-bs-toggle="pill"]');
+        
+        tabButtons.forEach((button: Element) => {
+            button.addEventListener('shown.bs.tab', () => {
+                // EXPLICACIÓN: Cuando se muestra una nueva pestaña, recargamos las imágenes
+                console.log('📑 Pestaña cambiada, recargando galería...');
+                this.reloadGallery();
+            });
+        });
+    }
+    
+    // NUEVO: Método público para recargar la galería
+    public reloadGallery(): void {
+        // Cerrar el lightbox si está abierto
+        if (this.isOpen) {
+            this.close();
+        }
+        
+        // Recolectar las imágenes de la nueva pestaña activa
+        this.collectImages();
     }
     
     private createLightbox(): void {
@@ -110,8 +131,21 @@ class GaleriaLightbox {
     }
     
     private collectImages(): void {
-        // Buscar todas las imágenes de la galería
-        const galleryImages = document.querySelectorAll('.gallery-image');
+        // EXPLICACIÓN: Ahora solo recolectamos imágenes de la pestaña activa
+        // Buscar el contenedor de pestañas activo
+        const activeTabPane = document.querySelector('.tab-pane.active');
+        
+        if (!activeTabPane) {
+            // Si no hay pestañas, buscar todas las imágenes (compatibilidad con páginas sin pestañas)
+            this.collectAllImages();
+            return;
+        }
+        
+        // Limpiar el array de imágenes antes de recolectar
+        this.images = [];
+        
+        // Buscar solo las imágenes dentro de la pestaña activa
+        const galleryImages = activeTabPane.querySelectorAll('.gallery-image');
         
         galleryImages.forEach((item: Element, index: number) => {
             const img = item.querySelector('img');
@@ -144,6 +178,45 @@ class GaleriaLightbox {
                 (item as HTMLElement).style.cursor = 'pointer';
             }
         });
+        
+        console.log(`🖼️ Galería: ${this.images.length} imágenes cargadas desde la pestaña activa`);
+    }
+    
+    // EXPLICACIÓN: Método auxiliar para cargar todas las imágenes (cuando no hay pestañas)
+    private collectAllImages(): void {
+        this.images = [];
+        const galleryImages = document.querySelectorAll('.gallery-image');
+        
+        galleryImages.forEach((item: Element, index: number) => {
+            const img = item.querySelector('img');
+            const container = item.closest('.gallery-image-container') as HTMLElement;
+            
+            if (img && container) {
+                const descripcion = container.dataset.descripcion || '';
+                const usuario = container.dataset.usuario || 'Usuario';
+                const fecha = container.dataset.fecha || '';
+                const urlDescarga = container.dataset.urlDescarga || img.src;
+                
+                this.images.push({
+                    index: index,
+                    src: img.src,
+                    descripcion: descripcion,
+                    usuario: usuario,
+                    fecha: fecha,
+                    urlDescarga: urlDescarga
+                });
+                
+                item.addEventListener('click', (e: Event) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.open(index);
+                });
+                
+                (item as HTMLElement).style.cursor = 'pointer';
+            }
+        });
+        
+        console.log(`🖼️ Galería: ${this.images.length} imágenes cargadas (sin pestañas)`);
     }
     
     private attachEventListeners(): void {
@@ -346,9 +419,6 @@ class GaleriaLightbox {
 document.addEventListener('DOMContentLoaded', () => {
     // Solo inicializar si hay imágenes de galería
     if (document.querySelector('.gallery-image')) {
-        window.galeriaLightbox = new GaleriaLightbox();
+        (window as any).galeriaLightbox = new GaleriaLightbox();
     }
 });
-
-// Exportar para hacer el archivo un módulo (necesario para declaración global)
-export {};
