@@ -7405,3 +7405,612 @@ def exportar_excel_dashboard_oow_fl(request):
     return response
 
 
+# ============================================================================
+# 📊 DASHBOARD DE COTIZACIONES - ANALYTICS CON PLOTLY Y MACHINE LEARNING
+# ============================================================================
+
+@login_required
+def dashboard_cotizaciones(request):
+    """
+    Dashboard analítico completo de cotizaciones tipo Power BI.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista es el "cerebro" del dashboard. Hace lo siguiente:
+    
+    1. Recibe filtros del usuario (fechas, sucursal, técnico, etc.)
+    2. Obtiene datos de la base de datos y los convierte a Pandas DataFrame
+    3. Calcula KPIs (métricas clave como tasa de aceptación)
+    4. Genera 20+ gráficos interactivos con Plotly
+    5. Ejecuta predicciones con Machine Learning
+    6. Envía todo al template para mostrarlo visualmente
+    
+    Query Parameters (filtros en URL):
+        - fecha_inicio: Fecha inicio filtro (YYYY-MM-DD)
+        - fecha_fin: Fecha fin filtro (YYYY-MM-DD)
+        - sucursal: ID de sucursal
+        - tecnico: ID de técnico
+        - gama: Gama de equipo (alta/media/baja)
+        - periodo: Agrupación temporal (D/W/M/Q/Y)
+    
+    Returns:
+        HttpResponse: Página renderizada con el dashboard completo
+    
+    Ejemplo de URL:
+        /cotizaciones/dashboard/?fecha_inicio=2025-01-01&fecha_fin=2025-12-31&sucursal=1&periodo=M
+    """
+    
+    from datetime import datetime, timedelta
+    import pandas as pd  # Necesario para pd.DataFrame() en bloques except
+    from .utils_cotizaciones import (
+        obtener_dataframe_cotizaciones,
+        calcular_kpis_generales,
+        analizar_piezas_cotizadas,
+        analizar_proveedores,
+        calcular_metricas_por_tecnico,
+        calcular_metricas_por_sucursal
+    )
+    from .plotly_visualizations import DashboardCotizacionesVisualizer, convertir_figura_a_html
+    from .ml_predictor import PredictorAceptacionCotizacion
+    
+    # ========================================
+    # 1. OBTENER Y VALIDAR FILTROS DEL REQUEST
+    # ========================================
+    
+    # Fechas por defecto: últimos 3 meses
+    fecha_fin_default = datetime.now().date()
+    fecha_inicio_default = (datetime.now() - timedelta(days=90)).date()
+    
+    # Capturar parámetros GET
+    fecha_inicio_str = request.GET.get('fecha_inicio')
+    fecha_fin_str = request.GET.get('fecha_fin')
+    sucursal_id = request.GET.get('sucursal')
+    tecnico_id = request.GET.get('tecnico')
+    gama = request.GET.get('gama')
+    periodo = request.GET.get('periodo', 'M')  # Default: Mensual
+    
+    # Validar y parsear fechas
+    try:
+        fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date() if fecha_inicio_str else fecha_inicio_default
+    except ValueError:
+        fecha_inicio = fecha_inicio_default
+    
+    try:
+        fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date() if fecha_fin_str else fecha_fin_default
+    except ValueError:
+        fecha_fin = fecha_fin_default
+    
+    # Validar período
+    if periodo not in ['D', 'W', 'M', 'Q', 'Y']:
+        periodo = 'M'
+    
+    # Convertir IDs a enteros si existen
+    try:
+        sucursal_id = int(sucursal_id) if sucursal_id else None
+    except (ValueError, TypeError):
+        sucursal_id = None
+    
+    try:
+        tecnico_id = int(tecnico_id) if tecnico_id else None
+    except (ValueError, TypeError):
+        tecnico_id = None
+    
+    # ========================================
+    # 2. OBTENER DATOS CON FILTROS
+    # ========================================
+    
+    try:
+        # Obtener DataFrame principal de cotizaciones
+        df_cotizaciones = obtener_dataframe_cotizaciones(
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            sucursal_id=sucursal_id,
+            tecnico_id=tecnico_id,
+            gama=gama
+        )
+        
+        # Obtener IDs de cotizaciones para análisis relacionados
+        cotizacion_ids = df_cotizaciones['cotizacion_id'].tolist() if not df_cotizaciones.empty else []
+        
+        # Análisis de piezas
+        df_piezas = analizar_piezas_cotizadas(cotizacion_ids)
+        
+        # Análisis de proveedores
+        df_seguimientos = analizar_proveedores(cotizacion_ids)
+        
+    except Exception as e:
+        messages.error(request, f'Error al obtener datos: {str(e)}')
+        df_cotizaciones = pd.DataFrame()
+        df_piezas = pd.DataFrame()
+        df_seguimientos = pd.DataFrame()
+    
+    # ========================================
+    # 3. CALCULAR KPIs Y MÉTRICAS
+    # ========================================
+    
+    if not df_cotizaciones.empty:
+        # KPIs generales
+        kpis = calcular_kpis_generales(df_cotizaciones)
+        
+        # Métricas por técnico
+        df_metricas_tecnicos = calcular_metricas_por_tecnico(df_cotizaciones)
+        
+        # Métricas por sucursal
+        df_metricas_sucursales = calcular_metricas_por_sucursal(df_cotizaciones)
+    else:
+        kpis = {
+            'total_cotizaciones': 0,
+            'aceptadas': 0,
+            'rechazadas': 0,
+            'pendientes': 0,
+            'tasa_aceptacion': 0,
+            'tasa_rechazo': 0,
+            'valor_total_cotizado': 0,
+            'valor_total_cotizado_fmt': '$0',
+            'ticket_promedio': 0,
+            'ticket_promedio_fmt': '$0'
+        }
+        df_metricas_tecnicos = pd.DataFrame()
+        df_metricas_sucursales = pd.DataFrame()
+    
+    # ========================================
+    # 4. GENERAR VISUALIZACIONES
+    # ========================================
+    
+    visualizer = DashboardCotizacionesVisualizer()
+    graficos = {}
+    
+    if not df_cotizaciones.empty:
+        try:
+            # Usar función orquestadora para generar todos los gráficos
+            graficos = visualizer.crear_dashboard_completo(
+                df=df_cotizaciones,
+                df_piezas=df_piezas if not df_piezas.empty else None,
+                df_seguimientos=df_seguimientos if not df_seguimientos.empty else None,
+                df_metricas_tecnicos=df_metricas_tecnicos if not df_metricas_tecnicos.empty else None,
+                df_metricas_sucursales=df_metricas_sucursales if not df_metricas_sucursales.empty else None,
+                kpis=kpis,
+                ml_predictor=None,  # Lo agregamos después
+                periodo=periodo
+            )
+        except Exception as e:
+            messages.warning(request, f'Algunos gráficos no se pudieron generar: {str(e)}')
+            print(f"⚠️ Error generando gráficos: {str(e)}")
+    else:
+        # Sin datos, mostrar mensaje
+        messages.info(request, 'No hay datos de cotizaciones con los filtros aplicados.')
+    
+    # ========================================
+    # 5. MACHINE LEARNING (Si hay datos suficientes)
+    # ========================================
+    
+    ml_insights = {
+        'modelo_disponible': False,
+        'accuracy': 0,
+        'sugerencias': []
+    }
+    
+    if not df_cotizaciones.empty and len(df_cotizaciones) >= 20:
+        try:
+            # Inicializar predictor
+            predictor = PredictorAceptacionCotizacion()
+            
+            # Intentar cargar modelo existente
+            try:
+                predictor.cargar_modelo()
+                print("✅ Modelo ML cargado exitosamente")
+            except FileNotFoundError:
+                # Si no existe, entrenar con datos actuales
+                print("⚠️ No se encontró modelo pre-entrenado, entrenando nuevo modelo...")
+                predictor.entrenar_modelo(
+                    fecha_inicio=fecha_inicio.strftime('%Y-%m-%d'),
+                    fecha_fin=fecha_fin.strftime('%Y-%m-%d')
+                )
+            
+            # Obtener métricas del modelo
+            metricas_ml = predictor.obtener_metricas()
+            
+            # Generar gráfico de factores influyentes
+            feature_importance = predictor.obtener_factores_influyentes(top_n=10)
+            if feature_importance:
+                graficos['factores_influyentes'] = convertir_figura_a_html(
+                    visualizer.grafico_factores_influyentes(feature_importance)
+                )
+            
+            # Generar sugerencias
+            sugerencias = predictor.generar_sugerencias(df_cotizaciones)
+            
+            ml_insights = {
+                'modelo_disponible': True,
+                'accuracy': metricas_ml.get('accuracy', 0) * 100,  # Convertir a porcentaje
+                'precision': metricas_ml.get('precision', 0) * 100,
+                'recall': metricas_ml.get('recall', 0) * 100,
+                'f1_score': metricas_ml.get('f1_score', 0) * 100,
+                'total_muestras': metricas_ml.get('total_muestras', 0),
+                'fecha_entrenamiento': metricas_ml.get('fecha_entrenamiento', ''),
+                'sugerencias': sugerencias,
+                'feature_importance': feature_importance
+            }
+            
+            # Predicción de ejemplo (última cotización pendiente)
+            df_pendientes = df_cotizaciones[df_cotizaciones['aceptada'].isna()]
+            if not df_pendientes.empty:
+                ultima = df_pendientes.iloc[-1]
+                features_ejemplo = {
+                    'costo_total': ultima['costo_total'],
+                    'costo_mano_obra': ultima['costo_mano_obra'],
+                    'costo_total_piezas': ultima['costo_total_piezas'],
+                    'total_piezas': ultima['total_piezas'],
+                    'piezas_necesarias': ultima['piezas_necesarias'],
+                    'porcentaje_necesarias': ultima['porcentaje_necesarias'],
+                    'piezas_sugeridas_tecnico': ultima['piezas_sugeridas_tecnico'],
+                    'descontar_mano_obra': ultima['descontar_mano_obra'],
+                    'gama': ultima['gama'],
+                    'tipo_equipo': ultima['tipo_equipo'],
+                }
+                
+                prob_rechazo, prob_aceptacion = predictor.predecir_probabilidad(features_ejemplo)
+                
+                graficos['prediccion_ml_ejemplo'] = convertir_figura_a_html(
+                    visualizer.grafico_prediccion_ml(prob_aceptacion, prob_rechazo)
+                )
+                
+                ml_insights['ejemplo_prediccion'] = {
+                    'orden': ultima['numero_orden'],
+                    'prob_aceptacion': prob_aceptacion * 100,
+                    'prob_rechazo': prob_rechazo * 100
+                }
+        
+        except Exception as e:
+            print(f"⚠️ Error en Machine Learning: {str(e)}")
+            messages.warning(request, f'Machine Learning no disponible: {str(e)}')
+    
+    # ========================================
+    # 6. PREPARAR DATOS PARA FILTROS
+    # ========================================
+    
+    # Listas para desplegables
+    sucursales = Sucursal.objects.all().order_by('nombre')
+    tecnicos = Empleado.objects.filter(
+        ordenes_tecnico__isnull=False
+    ).distinct().order_by('nombre_completo')
+    
+    # Opciones de gama
+    gamas = [
+        ('alta', 'Alta'),
+        ('media', 'Media'),
+        ('baja', 'Baja')
+    ]
+    
+    # Opciones de período
+    periodos = [
+        ('D', 'Diario'),
+        ('W', 'Semanal'),
+        ('M', 'Mensual'),
+        ('Q', 'Trimestral'),
+        ('Y', 'Anual')
+    ]
+    
+    # ========================================
+    # 7. PREPARAR CONTEXTO COMPLETO
+    # ========================================
+    
+    context = {
+        # KPIs
+        'kpis': kpis,
+        
+        # Gráficos (diccionario completo)
+        'graficos': graficos,
+        
+        # Machine Learning
+        'ml_insights': ml_insights,
+        
+        # Filtros activos (para mantener estado en el form)
+        'filtros_activos': {
+            'fecha_inicio': fecha_inicio.strftime('%Y-%m-%d'),
+            'fecha_fin': fecha_fin.strftime('%Y-%m-%d'),
+            'sucursal': sucursal_id,
+            'tecnico': tecnico_id,
+            'gama': gama,
+            'periodo': periodo,
+        },
+        
+        # Datos para desplegables
+        'sucursales': sucursales,
+        'tecnicos': tecnicos,
+        'gamas': gamas,
+        'periodos': periodos,
+        
+        # Metadatos
+        'hay_datos': not df_cotizaciones.empty,
+        'total_registros': len(df_cotizaciones),
+        'fecha_generacion': datetime.now()
+    }
+    
+    # ========================================
+    # 8. RENDERIZAR TEMPLATE
+    # ========================================
+    
+    return render(request, 'servicio_tecnico/dashboard_cotizaciones.html', context)
+
+
+@login_required
+def exportar_dashboard_cotizaciones(request):
+    """
+    Exporta el dashboard de cotizaciones a Excel con múltiples hojas.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Genera un archivo Excel profesional con 6 hojas:
+    1. Resumen General (KPIs)
+    2. Cotizaciones Detalle
+    3. Análisis de Piezas
+    4. Proveedores
+    5. Ranking Técnicos
+    6. Predicciones ML
+    
+    Reutiliza los mismos filtros que el dashboard web.
+    
+    Returns:
+        HttpResponse: Archivo Excel para descargar
+    """
+    
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils.dataframe import dataframe_to_rows
+    from datetime import datetime
+    import pandas as pd  # Necesario para pd.to_datetime()
+    
+    from .utils_cotizaciones import (
+        obtener_dataframe_cotizaciones,
+        calcular_kpis_generales,
+        analizar_piezas_cotizadas,
+        analizar_proveedores,
+        calcular_metricas_por_tecnico,
+        calcular_metricas_por_sucursal
+    )
+    
+    # Obtener filtros (mismos que dashboard)
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    sucursal_id = request.GET.get('sucursal')
+    tecnico_id = request.GET.get('tecnico')
+    gama = request.GET.get('gama')
+    
+    # Obtener datos
+    df_cotizaciones = obtener_dataframe_cotizaciones(
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        sucursal_id=sucursal_id,
+        tecnico_id=tecnico_id,
+        gama=gama
+    )
+    
+    if df_cotizaciones.empty:
+        messages.error(request, 'No hay datos para exportar con los filtros aplicados.')
+        return redirect('servicio_tecnico:dashboard_cotizaciones')
+    
+    # Calcular KPIs y métricas
+    kpis = calcular_kpis_generales(df_cotizaciones)
+    df_metricas_tecnicos = calcular_metricas_por_tecnico(df_cotizaciones)
+    df_metricas_sucursales = calcular_metricas_por_sucursal(df_cotizaciones)
+    
+    # Obtener IDs para análisis relacionados
+    cotizacion_ids = df_cotizaciones['cotizacion_id'].tolist()
+    df_piezas = analizar_piezas_cotizadas(cotizacion_ids)
+    df_seguimientos = analizar_proveedores(cotizacion_ids)
+    
+    # ========================================
+    # CREAR WORKBOOK
+    # ========================================
+    
+    wb = Workbook()
+    wb.remove(wb.active)  # Remover hoja por defecto
+    
+    # Estilos
+    header_font = Font(bold=True, color='FFFFFF', size=12)
+    header_fill = PatternFill(start_color='0d6efd', end_color='0d6efd', fill_type='solid')
+    header_alignment = Alignment(horizontal='center', vertical='center')
+    
+    title_font = Font(bold=True, size=16, color='FFFFFF')
+    title_fill = PatternFill(start_color='212529', end_color='212529', fill_type='solid')
+    title_alignment = Alignment(horizontal='center', vertical='center')
+    
+    # ========================================
+    # HOJA 1: RESUMEN GENERAL (KPIs)
+    # ========================================
+    
+    ws_resumen = wb.create_sheet("Resumen General")
+    
+    # Título
+    ws_resumen.merge_cells('A1:D1')
+    title_cell = ws_resumen['A1']
+    title_cell.value = f"DASHBOARD DE COTIZACIONES - RESUMEN GENERAL"
+    title_cell.font = title_font
+    title_cell.fill = title_fill
+    title_cell.alignment = title_alignment
+    ws_resumen.row_dimensions[1].height = 30
+    
+    # Subtítulo con filtros
+    ws_resumen.merge_cells('A2:D2')
+    subtitle_cell = ws_resumen['A2']
+    filtros_texto = f"Período: {fecha_inicio or 'Inicio'} - {fecha_fin or 'Hoy'}"
+    if sucursal_id:
+        filtros_texto += f" | Sucursal ID: {sucursal_id}"
+    if tecnico_id:
+        filtros_texto += f" | Técnico ID: {tecnico_id}"
+    if gama:
+        filtros_texto += f" | Gama: {gama}"
+    subtitle_cell.value = filtros_texto
+    subtitle_cell.alignment = Alignment(horizontal='center')
+    
+    # Fecha de generación
+    ws_resumen.merge_cells('A3:D3')
+    ws_resumen['A3'].value = f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    ws_resumen['A3'].alignment = Alignment(horizontal='center')
+    ws_resumen['A3'].font = Font(italic=True, size=10)
+    
+    # Espacio
+    ws_resumen.row_dimensions[4].height = 5
+    
+    # Encabezados KPIs
+    ws_resumen['A5'].value = 'Métrica'
+    ws_resumen['B5'].value = 'Valor'
+    ws_resumen['C5'].value = 'Porcentaje'
+    ws_resumen['D5'].value = 'Observaciones'
+    
+    for col in ['A5', 'B5', 'C5', 'D5']:
+        ws_resumen[col].font = header_font
+        ws_resumen[col].fill = header_fill
+        ws_resumen[col].alignment = header_alignment
+    
+    # Datos de KPIs
+    kpis_data = [
+        ['Total Cotizaciones', kpis['total_cotizaciones'], '', ''],
+        ['Aceptadas', kpis['aceptadas'], f"{kpis['tasa_aceptacion']:.1f}%", 'Verde: > 60%'],
+        ['Rechazadas', kpis['rechazadas'], f"{kpis['tasa_rechazo']:.1f}%", 'Rojo: > 30%'],
+        ['Pendientes', kpis['pendientes'], f"{kpis['tasa_pendiente']:.1f}%", ''],
+        ['Valor Total Cotizado', f"${kpis['valor_total_cotizado']:,.2f}", '', ''],
+        ['Valor Aceptado', f"${kpis['valor_aceptado']:,.2f}", '', ''],
+        ['Valor Rechazado', f"${kpis['valor_rechazado']:,.2f}", '', ''],
+        ['Ticket Promedio', f"${kpis['ticket_promedio']:,.2f}", '', ''],
+        ['Tiempo Respuesta Promedio', f"{kpis['tiempo_respuesta_promedio']:.1f} días", '', 'Ideal: < 3 días'],
+        ['Piezas Promedio', f"{kpis['piezas_promedio']:.1f}", '', ''],
+    ]
+    
+    row = 6
+    for data in kpis_data:
+        ws_resumen[f'A{row}'].value = data[0]
+        ws_resumen[f'B{row}'].value = data[1]
+        ws_resumen[f'C{row}'].value = data[2]
+        ws_resumen[f'D{row}'].value = data[3]
+        
+        # Colorear según métrica
+        if 'Aceptadas' in data[0] and kpis['tasa_aceptacion'] > 60:
+            ws_resumen[f'B{row}'].fill = PatternFill(start_color='d4edda', end_color='d4edda', fill_type='solid')
+        elif 'Rechazadas' in data[0] and kpis['tasa_rechazo'] > 30:
+            ws_resumen[f'B{row}'].fill = PatternFill(start_color='f8d7da', end_color='f8d7da', fill_type='solid')
+        
+        row += 1
+    
+    # Ajustar anchos
+    ws_resumen.column_dimensions['A'].width = 30
+    ws_resumen.column_dimensions['B'].width = 20
+    ws_resumen.column_dimensions['C'].width = 15
+    ws_resumen.column_dimensions['D'].width = 25
+    
+    # ========================================
+    # HOJA 2: COTIZACIONES DETALLE
+    # ========================================
+    
+    ws_cotiz = wb.create_sheet("Cotizaciones Detalle")
+    
+    # Título
+    ws_cotiz.merge_cells('A1:J1')
+    title_cell = ws_cotiz['A1']
+    title_cell.value = f"DETALLE DE COTIZACIONES ({len(df_cotizaciones)} registros)"
+    title_cell.font = title_font
+    title_cell.fill = title_fill
+    title_cell.alignment = title_alignment
+    
+    # Seleccionar columnas relevantes
+    columnas_export = [
+        'numero_orden', 'fecha_envio', 'sucursal', 'tecnico', 'gama',
+        'tipo_equipo', 'marca', 'modelo', 'costo_total', 'aceptada'
+    ]
+    
+    df_export = df_cotizaciones[columnas_export].copy()
+    df_export['fecha_envio'] = pd.to_datetime(df_export['fecha_envio']).dt.strftime('%d/%m/%Y')
+    df_export['costo_total'] = df_export['costo_total'].apply(lambda x: f'${x:,.2f}')
+    df_export['aceptada'] = df_export['aceptada'].map({
+        True: '✅ Aceptada',
+        False: '❌ Rechazada',
+        None: '⏳ Pendiente'
+    })
+    
+    # Escribir con encabezados formateados
+    for r_idx, row in enumerate(dataframe_to_rows(df_export, index=False, header=True), 3):
+        for c_idx, value in enumerate(row, 1):
+            cell = ws_cotiz.cell(row=r_idx, column=c_idx, value=value)
+            
+            if r_idx == 3:  # Encabezados
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+    
+    # Auto-ajustar columnas
+    for column in ws_cotiz.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws_cotiz.column_dimensions[column_letter].width = adjusted_width
+    
+    # ========================================
+    # HOJA 3: MÉTRICAS POR TÉCNICO
+    # ========================================
+    
+    if not df_metricas_tecnicos.empty:
+        ws_tecnicos = wb.create_sheet("Ranking Técnicos")
+        
+        ws_tecnicos.merge_cells('A1:F1')
+        title_cell = ws_tecnicos['A1']
+        title_cell.value = f"RANKING DE TÉCNICOS"
+        title_cell.font = title_font
+        title_cell.fill = title_fill
+        title_cell.alignment = title_alignment
+        
+        for r_idx, row in enumerate(dataframe_to_rows(df_metricas_tecnicos, index=False, header=True), 3):
+            for c_idx, value in enumerate(row, 1):
+                cell = ws_tecnicos.cell(row=r_idx, column=c_idx, value=value)
+                if r_idx == 3:
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = header_alignment
+    
+    # ========================================
+    # HOJA 4: MÉTRICAS POR SUCURSAL
+    # ========================================
+    
+    if not df_metricas_sucursales.empty:
+        ws_sucursales = wb.create_sheet("Ranking Sucursales")
+        
+        ws_sucursales.merge_cells('A1:F1')
+        title_cell = ws_sucursales['A1']
+        title_cell.value = f"RANKING DE SUCURSALES"
+        title_cell.font = title_font
+        title_cell.fill = title_fill
+        title_cell.alignment = title_alignment
+        
+        for r_idx, row in enumerate(dataframe_to_rows(df_metricas_sucursales, index=False, header=True), 3):
+            for c_idx, value in enumerate(row, 1):
+                cell = ws_sucursales.cell(row=r_idx, column=c_idx, value=value)
+                if r_idx == 3:
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = header_alignment
+    
+    # ========================================
+    # GENERAR Y RETORNAR ARCHIVO
+    # ========================================
+    
+    # Nombre del archivo
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    nombre_archivo = f'Dashboard_Cotizaciones_{timestamp}.xlsx'
+    
+    # Preparar respuesta HTTP
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+    
+    # Guardar workbook
+    wb.save(response)
+    
+    return response
+

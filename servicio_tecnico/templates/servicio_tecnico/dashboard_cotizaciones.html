@@ -1,0 +1,1166 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard de Cotizaciones - Analytics{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ============================================
+       ESTILOS DEL DASHBOARD DE COTIZACIONES
+       Diseño moderno tipo Power BI
+       ============================================ */
+    
+    :root {
+        --dashboard-bg: #f8f9fa;
+        --card-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+        --card-hover-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+        --border-radius: 12px;
+        --transition: all 0.3s ease;
+    }
+    
+    body {
+        background-color: var(--dashboard-bg);
+    }
+    
+    /* Header del Dashboard */
+    .dashboard-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+    }
+    
+    .dashboard-header h1 {
+        font-weight: 700;
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .dashboard-header p {
+        opacity: 0.95;
+        font-size: 1.1rem;
+    }
+    
+    /* Formulario de Filtros */
+    .filtros-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        border: none;
+        margin-bottom: 2rem;
+        transition: var(--transition);
+    }
+    
+    .filtros-card:hover {
+        box-shadow: var(--card-hover-shadow);
+    }
+    
+    .filtros-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
+        padding: 1rem 1.5rem;
+        border: none;
+    }
+    
+    .filtros-card .card-body {
+        padding: 1.5rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 2px solid #e9ecef;
+        padding: 0.625rem 1rem;
+        transition: var(--transition);
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+    }
+    
+    /* Botones de Acción */
+    .btn-filtrar {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 0.625rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: var(--transition);
+    }
+    
+    .btn-filtrar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-limpiar {
+        background: #6c757d;
+        border: none;
+        padding: 0.625rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        color: white;
+        transition: var(--transition);
+    }
+    
+    .btn-limpiar:hover {
+        background: #5a6268;
+        transform: translateY(-2px);
+        color: white;
+    }
+    
+    .btn-exportar {
+        background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+        border: none;
+        padding: 0.625rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: var(--transition);
+    }
+    
+    .btn-exportar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
+    }
+    
+    /* Grid de KPIs */
+    .kpis-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .kpi-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        box-shadow: var(--card-shadow);
+        border-left: 4px solid;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .kpi-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, transparent 100%);
+        border-radius: 50%;
+        transform: translate(30%, -30%);
+    }
+    
+    .kpi-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--card-hover-shadow);
+    }
+    
+    .kpi-card.primary { border-left-color: #667eea; }
+    .kpi-card.success { border-left-color: #27ae60; }
+    .kpi-card.danger { border-left-color: #e74c3c; }
+    .kpi-card.warning { border-left-color: #f39c12; }
+    .kpi-card.info { border-left-color: #3498db; }
+    
+    .kpi-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.7;
+    }
+    
+    .kpi-label {
+        font-size: 0.875rem;
+        color: #6c757d;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+    }
+    
+    .kpi-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #212529;
+        margin-bottom: 0;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .kpi-subtext {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 0.5rem;
+    }
+    
+    /* Sistema de Tabs */
+    .nav-tabs {
+        border: none;
+        margin-bottom: 2rem;
+        background: white;
+        padding: 0.5rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+    }
+    
+    .nav-tabs .nav-item {
+        margin-bottom: 0;
+    }
+    
+    .nav-tabs .nav-link {
+        border: none;
+        color: #6c757d;
+        font-weight: 600;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        transition: var(--transition);
+        margin-right: 0.5rem;
+    }
+    
+    .nav-tabs .nav-link:hover {
+        color: #667eea;
+        background: rgba(102, 126, 234, 0.1);
+    }
+    
+    .nav-tabs .nav-link.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+    }
+    
+    /* Cards de Gráficos */
+    .grafico-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        margin-bottom: 2rem;
+        border: none;
+        transition: var(--transition);
+        overflow: hidden;
+    }
+    
+    .grafico-card:hover {
+        box-shadow: var(--card-hover-shadow);
+    }
+    
+    .grafico-card .card-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 2px solid #e9ecef;
+        padding: 1rem 1.5rem;
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
+    }
+    
+    .grafico-card .card-header h5 {
+        margin: 0;
+        font-weight: 700;
+        color: #212529;
+        font-size: 1.1rem;
+    }
+    
+    .grafico-card .card-body {
+        padding: 1.5rem;
+    }
+    
+    /* Plotly Graphs */
+    .plotly-graph-div {
+        border-radius: 8px;
+    }
+    
+    /* Alertas y Mensajes */
+    .alert-dashboard {
+        border-radius: var(--border-radius);
+        border: none;
+        box-shadow: var(--card-shadow);
+        padding: 1rem 1.5rem;
+    }
+    
+    .alert-dashboard .alert-heading {
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Loading State */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        opacity: 0;
+        visibility: hidden;
+        transition: var(--transition);
+    }
+    
+    .loading-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    .spinner-border-lg {
+        width: 4rem;
+        height: 4rem;
+        border-width: 0.4rem;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .dashboard-header h1 {
+            font-size: 1.75rem;
+        }
+        
+        .kpis-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .nav-tabs {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+        }
+        
+        .nav-tabs .nav-link {
+            white-space: nowrap;
+        }
+    }
+    
+    /* Animaciones */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .fade-in {
+        animation: fadeIn 0.6s ease;
+    }
+    
+    /* Badge personalizado */
+    .badge-custom {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    /* Sección ML especial */
+    .ml-insight-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: var(--border-radius);
+        padding: 2rem;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 2rem;
+    }
+    
+    .ml-insight-card h5 {
+        color: white;
+        margin-bottom: 1rem;
+        font-weight: 700;
+    }
+    
+    .ml-accuracy {
+        font-size: 4rem;
+        font-weight: 700;
+        text-align: center;
+        margin: 1rem 0;
+    }
+    
+    .ml-sugerencia {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        border-left: 3px solid white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    
+    <!-- ========================================
+         HEADER DEL DASHBOARD
+         ======================================== -->
+    <div class="dashboard-header fade-in">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1>📊 Dashboard de Cotizaciones</h1>
+                    <p class="mb-0">Análisis completo con Machine Learning y visualizaciones interactivas</p>
+                </div>
+                <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                    <a href="{% url 'servicio_tecnico:exportar_dashboard_cotizaciones' %}?{{ request.GET.urlencode }}" 
+                       class="btn btn-exportar">
+                        <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ========================================
+         FORMULARIO DE FILTROS
+         ======================================== -->
+    <div class="filtros-card card fade-in">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-funnel"></i> Filtros de Análisis</h5>
+        </div>
+        <div class="card-body">
+            <form id="filtros-form" method="get" class="row g-3">
+                
+                <!-- Rango de Fechas -->
+                <div class="col-md-3">
+                    <label for="fecha_inicio" class="form-label">
+                        <i class="bi bi-calendar-event"></i> Fecha Inicio
+                    </label>
+                    <input type="date" 
+                           class="form-control" 
+                           id="fecha_inicio"
+                           name="fecha_inicio" 
+                           value="{{ filtros_activos.fecha_inicio|default:'' }}">
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="fecha_fin" class="form-label">
+                        <i class="bi bi-calendar-check"></i> Fecha Fin
+                    </label>
+                    <input type="date" 
+                           class="form-control" 
+                           id="fecha_fin"
+                           name="fecha_fin" 
+                           value="{{ filtros_activos.fecha_fin|default:'' }}">
+                </div>
+                
+                <!-- Sucursal -->
+                <div class="col-md-2">
+                    <label for="sucursal" class="form-label">
+                        <i class="bi bi-building"></i> Sucursal
+                    </label>
+                    <select class="form-select" id="sucursal" name="sucursal">
+                        <option value="">Todas las sucursales</option>
+                        {% for sucursal in sucursales %}
+                        <option value="{{ sucursal.id }}" 
+                                {% if filtros_activos.sucursal == sucursal.id|stringformat:"s" %}selected{% endif %}>
+                            {{ sucursal.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Técnico -->
+                <div class="col-md-2">
+                    <label for="tecnico" class="form-label">
+                        <i class="bi bi-person-badge"></i> Técnico
+                    </label>
+                    <select class="form-select" id="tecnico" name="tecnico">
+                        <option value="">Todos los técnicos</option>
+                        {% for tecnico in tecnicos %}
+                        <option value="{{ tecnico.id }}"
+                                {% if filtros_activos.tecnico == tecnico.id|stringformat:"s" %}selected{% endif %}>
+                            {{ tecnico.nombre_completo }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Gama -->
+                <div class="col-md-2">
+                    <label for="gama" class="form-label">
+                        <i class="bi bi-star"></i> Gama
+                    </label>
+                    <select class="form-select" id="gama" name="gama">
+                        <option value="">Todas las gamas</option>
+                        <option value="alta" {% if filtros_activos.gama == 'alta' %}selected{% endif %}>Alta Gama</option>
+                        <option value="media" {% if filtros_activos.gama == 'media' %}selected{% endif %}>Media Gama</option>
+                        <option value="baja" {% if filtros_activos.gama == 'baja' %}selected{% endif %}>Baja Gama</option>
+                    </select>
+                </div>
+                
+                <!-- Botones de Acción -->
+                <div class="col-12">
+                    <button type="submit" class="btn btn-filtrar">
+                        <i class="bi bi-search"></i> Aplicar Filtros
+                    </button>
+                    <a href="{% url 'servicio_tecnico:dashboard_cotizaciones' %}" 
+                       class="btn btn-limpiar">
+                        <i class="bi bi-arrow-clockwise"></i> Limpiar Filtros
+                    </a>
+                    <span class="text-muted ms-3">
+                        <i class="bi bi-info-circle"></i> 
+                        Mostrando {{ total_cotizaciones }} cotización{{ total_cotizaciones|pluralize:"es" }}
+                    </span>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- ========================================
+         GRID DE KPIs PRINCIPALES
+         ======================================== -->
+    <div class="kpis-grid fade-in">
+        
+        <!-- KPI: Total Cotizaciones -->
+        <div class="kpi-card primary">
+            <div class="kpi-icon">📋</div>
+            <div class="kpi-label">Total Cotizaciones</div>
+            <div class="kpi-value">{{ kpis.total_cotizaciones|default:0 }}</div>
+            <div class="kpi-subtext">En el período seleccionado</div>
+        </div>
+        
+        <!-- KPI: Tasa de Aceptación -->
+        <div class="kpi-card success">
+            <div class="kpi-icon">✅</div>
+            <div class="kpi-label">Tasa de Aceptación</div>
+            <div class="kpi-value">{{ kpis.tasa_aceptacion|default:0|floatformat:1 }}%</div>
+            <div class="kpi-subtext">{{ kpis.aceptadas|default:0 }} cotizaciones aceptadas</div>
+        </div>
+        
+        <!-- KPI: Tasa de Rechazo -->
+        <div class="kpi-card danger">
+            <div class="kpi-icon">❌</div>
+            <div class="kpi-label">Tasa de Rechazo</div>
+            <div class="kpi-value">{{ kpis.tasa_rechazo|default:0|floatformat:1 }}%</div>
+            <div class="kpi-subtext">{{ kpis.rechazadas|default:0 }} cotizaciones rechazadas</div>
+        </div>
+        
+        <!-- KPI: Pendientes -->
+        <div class="kpi-card warning">
+            <div class="kpi-icon">⏳</div>
+            <div class="kpi-label">Pendientes</div>
+            <div class="kpi-value">{{ kpis.pendientes|default:0 }}</div>
+            <div class="kpi-subtext">En espera de respuesta</div>
+        </div>
+        
+        <!-- KPI: Valor Total -->
+        <div class="kpi-card info">
+            <div class="kpi-icon">💰</div>
+            <div class="kpi-label">Valor Total</div>
+            <div class="kpi-value">${{ kpis.valor_total_cotizado|default:0|floatformat:0 }}</div>
+            <div class="kpi-subtext">Suma de todas las cotizaciones</div>
+        </div>
+        
+        <!-- KPI: Ticket Promedio -->
+        <div class="kpi-card primary">
+            <div class="kpi-icon">💵</div>
+            <div class="kpi-label">Ticket Promedio</div>
+            <div class="kpi-value">${{ kpis.ticket_promedio|default:0|floatformat:0 }}</div>
+            <div class="kpi-subtext">Por cotización</div>
+        </div>
+        
+        <!-- KPI: Tiempo Promedio -->
+        <div class="kpi-card info">
+            <div class="kpi-icon">⏱️</div>
+            <div class="kpi-label">Tiempo Prom. Respuesta</div>
+            <div class="kpi-value">{{ kpis.tiempo_respuesta_promedio|default:0|floatformat:1 }}</div>
+            <div class="kpi-subtext">Días hasta respuesta</div>
+        </div>
+        
+        <!-- KPI: Total Piezas -->
+        <div class="kpi-card warning">
+            <div class="kpi-icon">🔧</div>
+            <div class="kpi-label">Total Piezas</div>
+            <div class="kpi-value">{{ kpis.total_piezas|default:0 }}</div>
+            <div class="kpi-subtext">Piezas cotizadas</div>
+        </div>
+        
+    </div>
+    
+    <!-- ========================================
+         SISTEMA DE TABS DE NAVEGACIÓN
+         ======================================== -->
+    <ul class="nav nav-tabs fade-in" id="dashboardTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" 
+                    id="overview-tab" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#overview" 
+                    type="button" 
+                    role="tab">
+                <i class="bi bi-graph-up"></i> Visión General
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" 
+                    id="piezas-tab" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#piezas" 
+                    type="button" 
+                    role="tab">
+                <i class="bi bi-gear"></i> Análisis de Piezas
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" 
+                    id="proveedores-tab" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#proveedores" 
+                    type="button" 
+                    role="tab">
+                <i class="bi bi-truck"></i> Proveedores
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" 
+                    id="tecnicos-tab" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#tecnicos" 
+                    type="button" 
+                    role="tab">
+                <i class="bi bi-people"></i> Técnicos & Sucursales
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" 
+                    id="ml-tab" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#ml" 
+                    type="button" 
+                    role="tab">
+                <i class="bi bi-robot"></i> Machine Learning
+            </button>
+        </li>
+    </ul>
+    
+    <!-- ========================================
+         CONTENIDO DE LOS TABS
+         ======================================== -->
+    <div class="tab-content fade-in" id="dashboardTabContent">
+        
+        <!-- ========================================
+             TAB 1: VISIÓN GENERAL
+             ======================================== -->
+        <div class="tab-pane fade show active" id="overview" role="tabpanel">
+            <div class="row">
+                
+                <!-- Evolución Temporal -->
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-graph-up-arrow"></i> Evolución Temporal de Cotizaciones</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.evolucion_temporal %}
+                                {{ graficos.evolucion_temporal|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos suficientes para mostrar la evolución temporal.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tasas de Aceptación y Distribución de Costos -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-bar-chart"></i> Tasas de Aceptación por Sucursal</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.tasas_aceptacion_sucursal %}
+                                {{ graficos.tasas_aceptacion_sucursal|safe }}
+                            {% else %}
+                                <div class="alert alert-warning alert-dashboard">
+                                    <i class="bi bi-exclamation-triangle"></i> No hay datos para mostrar tasas de aceptación.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-currency-dollar"></i> Distribución de Costos</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.distribucion_costos %}
+                                {{ graficos.distribucion_costos|safe }}
+                            {% else %}
+                                <div class="alert alert-warning alert-dashboard">
+                                    <i class="bi bi-exclamation-triangle"></i> No hay datos para mostrar distribución de costos.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Embudo de Conversión y Comparativo -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-funnel"></i> Embudo de Conversión</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.funnel_conversion %}
+                                {{ graficos.funnel_conversion|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos para mostrar el embudo de conversión.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-person-check"></i> Tasas de Aceptación por Técnico</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.tasas_aceptacion_tecnico %}
+                                {{ graficos.tasas_aceptacion_tecnico|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de técnicos disponibles.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gamas de Equipos -->
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-diagram-3"></i> Distribución por Gamas de Equipos</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.gamas_equipos %}
+                                {{ graficos.gamas_equipos|safe }}
+                            {% else %}
+                                <div class="alert alert-warning alert-dashboard">
+                                    <i class="bi bi-exclamation-triangle"></i> No hay datos de equipos disponibles.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+        <!-- ========================================
+             TAB 2: ANÁLISIS DE PIEZAS
+             ======================================== -->
+        <div class="tab-pane fade" id="piezas" role="tabpanel">
+            <div class="row">
+                
+                <!-- Top Piezas Rechazadas -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-x-circle"></i> Top Piezas Rechazadas</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.top_piezas_rechazadas %}
+                                {{ graficos.top_piezas_rechazadas|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay piezas rechazadas en el período.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Necesarias vs Opcionales -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-toggle-on"></i> Piezas Necesarias vs Opcionales</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.piezas_necesarias_vs_opcionales %}
+                                {{ graficos.piezas_necesarias_vs_opcionales|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de clasificación de piezas.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sugerencias del Técnico -->
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-lightbulb"></i> Flujo de Sugerencias del Técnico</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.sugerencias_tecnico %}
+                                {{ graficos.sugerencias_tecnico|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de sugerencias de técnicos.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+        <!-- ========================================
+             TAB 3: ANÁLISIS DE PROVEEDORES
+             ======================================== -->
+        <div class="tab-pane fade" id="proveedores" role="tabpanel">
+            <div class="row">
+                
+                <!-- Top Proveedores -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-trophy"></i> Top Proveedores</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.top_proveedores %}
+                                {{ graficos.top_proveedores|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de proveedores disponibles.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Performance de Proveedores -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-speedometer"></i> Performance de Proveedores</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.proveedores_performance %}
+                                {{ graficos.proveedores_performance|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay suficientes datos de seguimiento de proveedores.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tiempos de Respuesta -->
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-clock-history"></i> Tiempos de Respuesta</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.tiempos_respuesta %}
+                                {{ graficos.tiempos_respuesta|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos suficientes de tiempos de respuesta.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+        <!-- ========================================
+             TAB 4: TÉCNICOS & SUCURSALES
+             ======================================== -->
+        <div class="tab-pane fade" id="tecnicos" role="tabpanel">
+            <div class="row">
+                
+                <!-- Ranking de Técnicos -->
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-award"></i> Ranking de Técnicos</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.ranking_tecnicos %}
+                                {{ graficos.ranking_tecnicos|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos suficientes para generar ranking.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Rendimiento por Técnico -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-person-check"></i> Rendimiento por Técnico</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.rendimiento_tecnicos %}
+                                {{ graficos.rendimiento_tecnicos|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de rendimiento de técnicos.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Heatmap de Sucursales -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-grid"></i> Rendimiento de Sucursales</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.rendimiento_sucursales %}
+                                {{ graficos.rendimiento_sucursales|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de múltiples sucursales.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Distribución por Sucursales -->
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-buildings"></i> Distribución por Sucursales</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.distribucion_sucursales %}
+                                {{ graficos.distribucion_sucursales|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de distribución por sucursales.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+        <!-- ========================================
+             TAB 5: MACHINE LEARNING
+             ======================================== -->
+        <div class="tab-pane fade" id="ml" role="tabpanel">
+            <div class="row">
+                
+                {% if ml_insights.modelo_disponible %}
+                
+                <!-- Card de Precisión del Modelo -->
+                <div class="col-md-4">
+                    <div class="ml-insight-card">
+                        <h5><i class="bi bi-cpu"></i> Precisión del Modelo</h5>
+                        <div class="ml-accuracy">{{ ml_insights.accuracy|floatformat:1 }}%</div>
+                        <p class="mb-0">
+                            El modelo ha sido entrenado con {{ ml_insights.datos_entrenamiento }} cotizaciones 
+                            y puede predecir con esta precisión si una cotización será aceptada o rechazada.
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Card de Métricas Adicionales -->
+                <div class="col-md-4">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-graph-up"></i> Métricas del Modelo</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <strong>Precision:</strong> {{ ml_insights.precision|floatformat:2 }}
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-success" 
+                                         style="width: {{ ml_insights.precision|floatformat:0 }}%"></div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Recall:</strong> {{ ml_insights.recall|floatformat:2 }}
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-info" 
+                                         style="width: {{ ml_insights.recall|floatformat:0 }}%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <strong>F1-Score:</strong> {{ ml_insights.f1_score|floatformat:2 }}
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-warning" 
+                                         style="width: {{ ml_insights.f1_score|floatformat:0 }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Predicción de Ejemplo -->
+                <div class="col-md-4">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-bullseye"></i> Ejemplo de Predicción</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if ml_insights.prediccion_ejemplo %}
+                            <p class="text-muted mb-3">
+                                <strong>Cotización ID:</strong> {{ ml_insights.prediccion_ejemplo.cotizacion_id }}<br>
+                                <strong>Costo:</strong> ${{ ml_insights.prediccion_ejemplo.costo|floatformat:2 }}
+                            </p>
+                            <div class="mb-3">
+                                <strong>Probabilidad de Aceptación:</strong>
+                                <div class="progress mt-2" style="height: 25px;">
+                                    <div class="progress-bar bg-success" 
+                                         style="width: {{ ml_insights.prediccion_ejemplo.prob_aceptacion|floatformat:0 }}%">
+                                        {{ ml_insights.prediccion_ejemplo.prob_aceptacion|floatformat:1 }}%
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <strong>Probabilidad de Rechazo:</strong>
+                                <div class="progress mt-2" style="height: 25px;">
+                                    <div class="progress-bar bg-danger" 
+                                         style="width: {{ ml_insights.prediccion_ejemplo.prob_rechazo|floatformat:0 }}%">
+                                        {{ ml_insights.prediccion_ejemplo.prob_rechazo|floatformat:1 }}%
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> No hay cotizaciones pendientes para predecir.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Factores Más Influyentes -->
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-bar-chart-line"></i> Factores Más Influyentes en la Decisión</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.factores_influyentes %}
+                                {{ graficos.factores_influyentes|safe }}
+                                <div class="alert alert-info alert-dashboard mt-3">
+                                    <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
+                                    Los factores con mayor importancia son los que más influyen en la probabilidad 
+                                    de que una cotización sea aceptada o rechazada. Utiliza esta información para 
+                                    optimizar tus cotizaciones futuras.
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning alert-dashboard">
+                                    <i class="bi bi-exclamation-triangle"></i> No se pudo generar el gráfico de importancia de características.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sugerencias del Modelo -->
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-lightbulb"></i> Sugerencias Basadas en Machine Learning</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if ml_insights.sugerencias %}
+                            <div class="row">
+                                {% for sugerencia in ml_insights.sugerencias %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="alert alert-{{ sugerencia.color|default:'success' }} alert-dashboard">
+                                        <h6 class="alert-heading">
+                                            <span style="font-size: 1.2rem;">{{ sugerencia.icono|default:'💡' }}</span>
+                                            <strong>{{ sugerencia.titulo|default:'Sugerencia' }}</strong>
+                                        </h6>
+                                        <p class="mb-0">{{ sugerencia.mensaje }}</p>
+                                        {% if sugerencia.tipo %}
+                                        <small class="text-muted d-block mt-2">
+                                            <i class="bi bi-tag"></i> Tipo: {{ sugerencia.tipo|title }}
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info alert-dashboard">
+                                <i class="bi bi-info-circle"></i> No hay sugerencias disponibles en este momento.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                {% else %}
+                
+                <!-- Modelo No Disponible -->
+                <div class="col-12">
+                    <div class="alert alert-warning alert-dashboard">
+                        <h5 class="alert-heading">
+                            <i class="bi bi-exclamation-triangle"></i> Machine Learning No Disponible
+                        </h5>
+                        <p class="mb-0">
+                            El modelo de predicción requiere un mínimo de <strong>20 cotizaciones con respuesta</strong> 
+                            (aceptadas o rechazadas) para poder entrenarse. Actualmente hay 
+                            <strong>{{ ml_insights.datos_disponibles|default:0 }}</strong> cotizaciones con respuesta.
+                        </p>
+                        <hr>
+                        <p class="mb-0">
+                            <i class="bi bi-info-circle"></i> 
+                            A medida que se registren más cotizaciones, el modelo se entrenará automáticamente 
+                            y las predicciones estarán disponibles.
+                        </p>
+                    </div>
+                </div>
+                
+                {% endif %}
+                
+            </div>
+        </div>
+        
+    </div>
+    
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="text-center">
+        <div class="spinner-border spinner-border-lg text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+        <p class="mt-3 text-muted">Cargando datos del dashboard...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- TypeScript compilado del dashboard -->
+<script src="{% static 'js/dashboard_cotizaciones.js' %}" defer></script>
+{% endblock %}

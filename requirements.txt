@@ -1,6 +1,13 @@
 Django==5.2.5
-openpyxl==3.1.2
+openpyxl==3.1.5
 qrcode[pil]==7.4.2
 Pillow==11.3.0
 python-decouple==3.8
-reportlab==4.2.5
+reportlab==4.4.4
+
+# Dashboard de Cotizaciones - Analytics & ML
+plotly>=6.3.0
+pandas>=2.3.0
+scikit-learn>=1.5.0
+matplotlib>=3.9.0
+seaborn>=0.13.0

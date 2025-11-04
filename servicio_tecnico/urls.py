@@ -150,6 +150,23 @@ urlpatterns = [
          views.exportar_excel_dashboard_oow_fl, 
          name='exportar_excel_dashboard_oow_fl'),
     
+    # ========================================================================
+    # DASHBOARD DE COTIZACIONES - ANALYTICS CON PLOTLY Y ML (Enero 2025)
+    # ========================================================================
+    # Dashboard analítico tipo Power BI con 20+ visualizaciones interactivas
+    # Incluye: KPIs, gráficos temporales, análisis de piezas, proveedores,
+    # ranking de técnicos/sucursales, y predicciones con Machine Learning
+    path('cotizaciones/dashboard/', 
+         views.dashboard_cotizaciones, 
+         name='dashboard_cotizaciones'),
+    
+    # Exportación a Excel del dashboard de cotizaciones
+    # Genera archivo Excel con 6 hojas: resumen, cotizaciones, piezas, 
+    # proveedores, técnicos, sucursales
+    path('cotizaciones/dashboard/exportar/', 
+         views.exportar_dashboard_cotizaciones, 
+         name='exportar_dashboard_cotizaciones'),
+    
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]
