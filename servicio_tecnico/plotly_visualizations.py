@@ -2391,6 +2391,290 @@ class DashboardCotizacionesVisualizer:
         )
         
         return fig
+    
+    # ========================================================================
+    # VISUALIZACIONES ML AVANZADAS (Sistema Experto)
+    # ========================================================================
+    
+    def grafico_escenarios_precio(self, escenarios_dict):
+        """
+        Gráfico comparativo de escenarios de optimización de precio.
+        
+        Muestra los 4 escenarios (actual, óptimo, conservador, agresivo)
+        comparando precio vs probabilidad de aceptación vs ingreso esperado.
+        
+        Args:
+            escenarios_dict: Dict con 'escenario_actual', 'escenario_optimo', etc.
+        
+        Returns:
+            Figure: Gráfico de barras agrupadas
+        """
+        escenarios = ['Actual', 'Conservador', 'Óptimo', 'Agresivo']
+        
+        # Extraer datos de cada escenario
+        costos = [
+            escenarios_dict.get('costo_actual', 0),
+            escenarios_dict['escenario_conservador']['costo_final'],
+            escenarios_dict['escenario_optimo']['costo_final'],
+            escenarios_dict['escenario_agresivo']['costo_final']
+        ]
+        
+        probabilidades = [
+            escenarios_dict['escenario_actual']['prob_aceptacion'] * 100,
+            escenarios_dict['escenario_conservador']['prob_aceptacion'] * 100,
+            escenarios_dict['escenario_optimo']['prob_aceptacion'] * 100,
+            escenarios_dict['escenario_agresivo']['prob_aceptacion'] * 100
+        ]
+        
+        ingresos = [
+            escenarios_dict['escenario_actual']['ingreso_esperado'],
+            escenarios_dict['escenario_conservador']['ingreso_esperado'],
+            escenarios_dict['escenario_optimo']['ingreso_esperado'],
+            escenarios_dict['escenario_agresivo']['ingreso_esperado']
+        ]
+        
+        fig = go.Figure()
+        
+        # Barras de costo
+        fig.add_trace(go.Bar(
+            name='Costo Final',
+            x=escenarios,
+            y=costos,
+            text=[f'${c:,.0f}' for c in costos],
+            textposition='outside',
+            marker_color=self.colores['primary'],
+            yaxis='y'
+        ))
+        
+        # Línea de probabilidad
+        fig.add_trace(go.Scatter(
+            name='Prob. Aceptación',
+            x=escenarios,
+            y=probabilidades,
+            mode='lines+markers+text',
+            text=[f'{p:.1f}%' for p in probabilidades],
+            textposition='top center',
+            marker=dict(size=12, color=self.colores['success']),
+            line=dict(width=3, color=self.colores['success']),
+            yaxis='y2'
+        ))
+        
+        # Línea de ingreso esperado
+        fig.add_trace(go.Scatter(
+            name='Ingreso Esperado',
+            x=escenarios,
+            y=ingresos,
+            mode='lines+markers+text',
+            text=[f'${i:,.0f}' for i in ingresos],
+            textposition='bottom center',
+            marker=dict(size=10, color=self.colores['warning']),
+            line=dict(width=2, color=self.colores['warning'], dash='dash'),
+            yaxis='y'
+        ))
+        
+        fig.update_layout(
+            font=dict(family='Segoe UI, sans-serif', size=12),
+            paper_bgcolor='white',
+            plot_bgcolor='#f8f9fa',
+            margin=dict(l=50, r=50, t=80, b=50),
+            title='Comparación de Escenarios de Precio',
+            xaxis=dict(title='Escenario'),
+            yaxis=dict(
+                title='Costo / Ingreso ($)',
+                side='left'
+            ),
+            yaxis2=dict(
+                title='Probabilidad de Aceptación (%)',
+                overlaying='y',
+                side='right',
+                range=[0, 100]
+            ),
+            hovermode='x unified',
+            height=500
+        )
+        
+        return fig
+    
+    def grafico_matriz_riesgo_beneficio(self, analisis_completo):
+        """
+        Matriz de riesgo vs beneficio para decisiones sobre cotización.
+        
+        Muestra las recomendaciones en un espacio de 4 cuadrantes:
+        - Alto Riesgo / Alto Beneficio: Acciones audaces
+        - Bajo Riesgo / Alto Beneficio: Acciones prioritarias
+        - Alto Riesgo / Bajo Beneficio: Evitar
+        - Bajo Riesgo / Bajo Beneficio: Opcional
+        
+        Args:
+            analisis_completo: Dict con análisis del RecomendadorAcciones
+        
+        Returns:
+            Figure: Scatter plot de matriz 2x2
+        """
+        recomendaciones = analisis_completo.get('recomendaciones', [])
+        
+        if not recomendaciones:
+            return self._crear_grafico_vacio("No hay recomendaciones disponibles")
+        
+        # Asignar riesgo y beneficio a cada recomendación (heurística)
+        # Prioridad alta = bajo riesgo, media/baja = alto riesgo
+        # Nivel bajo (1-2) = alto beneficio, alto (3-4) = bajo beneficio
+        
+        x_riesgo = []
+        y_beneficio = []
+        textos = []
+        colores_puntos = []
+        tamaños = []
+        
+        for recom in recomendaciones:
+            # Riesgo: inverso a la prioridad (1-4 -> 4-1)
+            riesgo = 5 - recom['nivel']  # Nivel 1 = riesgo 4, Nivel 4 = riesgo 1
+            
+            # Beneficio: basado en tipo de recomendación
+            beneficio = 3  # Default medio
+            if recom['tipo'] == 'optimizacion_precio':
+                beneficio = 4  # Alto beneficio
+            elif recom['tipo'] == 'mitigar_motivo_rechazo':
+                beneficio = 4
+            elif recom['tipo'] == 'comunicacion_cliente':
+                beneficio = 3
+            elif recom['tipo'] == 'timing_envio':
+                beneficio = 2
+            
+            x_riesgo.append(riesgo)
+            y_beneficio.append(beneficio)
+            textos.append(f"{recom['id']}. {recom['titulo'][:30]}...")
+            
+            # Color según prioridad
+            if recom['color'] == 'danger':
+                colores_puntos.append(self.colores['danger'])
+            elif recom['color'] == 'warning':
+                colores_puntos.append(self.colores['warning'])
+            elif recom['color'] == 'info':
+                colores_puntos.append(self.colores['info'])
+            else:
+                colores_puntos.append(self.colores['success'])
+            
+            # Tamaño según nivel
+            tamaños.append(40 - (recom['nivel'] * 5))
+        
+        fig = go.Figure()
+        
+        # Puntos de recomendaciones
+        fig.add_trace(go.Scatter(
+            x=x_riesgo,
+            y=y_beneficio,
+            mode='markers+text',
+            marker=dict(
+                size=tamaños,
+                color=colores_puntos,
+                line=dict(width=2, color='white')
+            ),
+            text=[str(r['id']) for r in recomendaciones],
+            textposition='middle center',
+            textfont=dict(size=12, color='white', family='Arial Black'),
+            hovertext=textos,
+            hoverinfo='text',
+            showlegend=False
+        ))
+        
+        # Líneas de cuadrantes
+        fig.add_hline(y=2.5, line_dash="dash", line_color="gray", opacity=0.5)
+        fig.add_vline(x=2.5, line_dash="dash", line_color="gray", opacity=0.5)
+        
+        # Anotaciones de cuadrantes
+        fig.add_annotation(x=3.5, y=3.5, text="🎯 PRIORITARIO<br>Alto Beneficio<br>Bajo Riesgo",
+                          showarrow=False, font=dict(size=10, color='green'), bgcolor='lightgreen', opacity=0.7)
+        fig.add_annotation(x=1.5, y=3.5, text="⚡ AUDAZ<br>Alto Beneficio<br>Alto Riesgo",
+                          showarrow=False, font=dict(size=10, color='orange'), bgcolor='lightyellow', opacity=0.7)
+        fig.add_annotation(x=3.5, y=1.5, text="💤 OPCIONAL<br>Bajo Beneficio<br>Bajo Riesgo",
+                          showarrow=False, font=dict(size=10, color='gray'), bgcolor='lightgray', opacity=0.7)
+        fig.add_annotation(x=1.5, y=1.5, text="❌ EVITAR<br>Bajo Beneficio<br>Alto Riesgo",
+                          showarrow=False, font=dict(size=10, color='red'), bgcolor='lightcoral', opacity=0.7)
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title='Matriz Riesgo-Beneficio de Recomendaciones',
+            xaxis=dict(
+                title='Nivel de Riesgo',
+                range=[0.5, 4.5],
+                tickvals=[1, 2, 3, 4],
+                ticktext=['Muy Alto', 'Alto', 'Medio', 'Bajo']
+            ),
+            yaxis=dict(
+                title='Beneficio Esperado',
+                range=[0.5, 4.5],
+                tickvals=[1, 2, 3, 4],
+                ticktext=['Bajo', 'Medio', 'Alto', 'Muy Alto']
+            ),
+            height=600
+        )
+        
+        return fig
+    
+    def grafico_probabilidad_por_dia(self, analisis_temporal):
+        """
+        Timeline de probabilidad de aceptación por día de la semana.
+        
+        Muestra qué días tienen mejor/peor probabilidad de aceptación
+        basado en factores temporales históricos.
+        
+        Args:
+            analisis_temporal: Dict con datos de DIAS_OPTIMOS
+        
+        Returns:
+            Figure: Gráfico de barras horizontal con días de la semana
+        """
+        # Datos hardcodeados de DIAS_OPTIMOS del RecomendadorAcciones
+        dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+        factores = [1.15, 1.12, 1.0, 0.95, 0.82, 0.75, 0.70]
+        recomendados = [True, True, False, False, False, False, False]
+        
+        # Probabilidad base: 50% * factor
+        probabilidades = [50 * f for f in factores]
+        
+        # Colores según si es recomendado
+        colores_barras = [
+            self.colores['success'] if rec else self.colores['danger']
+            for rec in recomendados
+        ]
+        
+        # Marcar día actual
+        dia_actual = analisis_temporal.get('dia_hoy', 'Lunes')
+        marcadores = ['📍 HOY' if d == dia_actual else '' for d in dias]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            x=probabilidades,
+            y=dias,
+            orientation='h',
+            text=[f'{p:.0f}% {m}' for p, m in zip(probabilidades, marcadores)],
+            textposition='outside',
+            marker=dict(
+                color=colores_barras,
+                line=dict(color='white', width=2)
+            ),
+            hovertemplate='<b>%{y}</b><br>Probabilidad: %{x:.1f}%<extra></extra>'
+        ))
+        
+        # Línea de referencia (100% = base)
+        fig.add_vline(x=50, line_dash="dash", line_color="gray", 
+                     annotation_text="Base (50%)", annotation_position="top")
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title='Probabilidad de Aceptación por Día de la Semana',
+            xaxis=dict(
+                title='Probabilidad Relativa (%)',
+                range=[0, max(probabilidades) * 1.2]
+            ),
+            yaxis=dict(title='Día'),
+            height=400,
+            showlegend=False
+        )
+        
+        return fig
 
 
 # ============================================================================

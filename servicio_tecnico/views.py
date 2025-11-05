@@ -7498,6 +7498,13 @@ def dashboard_cotizaciones(request):
     from .plotly_visualizations import DashboardCotizacionesVisualizer, convertir_figura_a_html
     from .ml_predictor import PredictorAceptacionCotizacion
     
+    # NUEVO: Módulos ML Avanzados (Sistema Experto)
+    from .ml_advanced import (
+        PredictorMotivoRechazo,
+        OptimizadorPrecios,
+        RecomendadorAcciones
+    )
+    
     # ========================================
     # 1. OBTENER Y VALIDAR FILTROS DEL REQUEST
     # ========================================
@@ -7640,15 +7647,24 @@ def dashboard_cotizaciones(request):
         'sugerencias': []
     }
     
+    # NUEVO: Insights avanzados (sistema experto)
+    ml_insights_avanzados = {
+        'disponible': False,
+        'predictor_motivos_disponible': False,
+        'optimizador_disponible': False,
+        'recomendador_disponible': False,
+        'analisis_completo': None
+    }
+    
     if not df_cotizaciones.empty and len(df_cotizaciones) >= 20:
         try:
-            # Inicializar predictor
+            # Inicializar predictor base
             predictor = PredictorAceptacionCotizacion()
             
             # Intentar cargar modelo existente
             try:
                 predictor.cargar_modelo()
-                print("✅ Modelo ML cargado exitosamente")
+                print("✅ Modelo ML base cargado exitosamente")
             except FileNotFoundError:
                 # Si no existe, entrenar con datos actuales
                 print("⚠️ No se encontró modelo pre-entrenado, entrenando nuevo modelo...")
@@ -7714,6 +7730,144 @@ def dashboard_cotizaciones(request):
                     'prob_aceptacion': prob_aceptacion * 100,
                     'prob_rechazo': prob_rechazo * 100
                 }
+                
+                # ========================================
+                # 5.1. MÓDULOS ML AVANZADOS (Sistema Experto)
+                # ========================================
+                
+                print("\n🔬 Iniciando análisis con módulos ML avanzados...")
+                
+                try:
+                    # Inicializar el Recomendador (orquestador que carga todo)
+                    recomendador = RecomendadorAcciones(predictor_base=predictor)
+                    
+                    # Análisis completo de la cotización pendiente
+                    analisis_completo = recomendador.analizar_cotizacion_completa(
+                        cotizacion_features=features_ejemplo,
+                        incluir_optimizacion_precio=True,
+                        incluir_analisis_temporal=True
+                    )
+                    
+                    # Actualizar insights avanzados
+                    ml_insights_avanzados.update({
+                        'disponible': True,
+                        'predictor_motivos_disponible': recomendador.predictor_motivos is not None,
+                        'optimizador_disponible': recomendador.optimizador is not None,
+                        'recomendador_disponible': True,
+                        'analisis_completo': analisis_completo,
+                        
+                        # Extraer datos clave para fácil acceso en template
+                        'prob_aceptacion': analisis_completo['prediccion_base']['prob_aceptacion_pct'],
+                        'clasificacion': analisis_completo['prediccion_base']['clasificacion'],
+                        'total_recomendaciones': len(analisis_completo['recomendaciones']),
+                        'recomendaciones_criticas': len([
+                            r for r in analisis_completo['recomendaciones'] 
+                            if r['nivel'] <= 2
+                        ]),
+                        'total_alertas': len(analisis_completo['alertas_criticas']),
+                        'resumen_ejecutivo': analisis_completo['resumen_ejecutivo'],
+                        
+                        # Datos de cotización analizada (para mostrar en UI)
+                        'cotizacion_analizada': {
+                            'id': ultima['cotizacion_id'],
+                            'orden': ultima['numero_orden'],
+                            'costo_actual': ultima['costo_total'],
+                            'total_piezas': ultima['total_piezas'],
+                            'gama': ultima['gama'],
+                        }
+                    })
+                    
+                    # Si hay predicción de motivo, agregarlo
+                    if analisis_completo['prediccion_motivo']:
+                        ml_insights_avanzados['motivo_predicho'] = {
+                            'motivo': analisis_completo['prediccion_motivo']['motivo_principal'],
+                            'motivo_nombre': analisis_completo['prediccion_motivo']['motivo_nombre'],
+                            'probabilidad': analisis_completo['prediccion_motivo']['probabilidad_pct'],
+                            'confianza': analisis_completo['prediccion_motivo']['confianza'],
+                            'descripcion': analisis_completo['prediccion_motivo']['motivo_descripcion'],
+                            'acciones': analisis_completo['prediccion_motivo']['acciones_sugeridas']
+                        }
+                    
+                    # Si hay optimización de precio, agregarlo
+                    if analisis_completo['optimizacion_precio']:
+                        opt = analisis_completo['optimizacion_precio']
+                        ml_insights_avanzados['optimizacion'] = {
+                            'costo_actual': opt['costo_actual'],
+                            'costo_optimo': opt['escenario_optimo']['costo_final'],
+                            'mejora_ingreso': opt['mejora_ingreso'],
+                            'mejora_probabilidad': opt['mejora_probabilidad_pct'],
+                            'escenario_optimo': opt['escenario_optimo'],
+                            'escenario_conservador': opt['escenario_conservador'],
+                            'escenario_agresivo': opt['escenario_agresivo'],
+                            'total_escenarios': opt['total_escenarios_evaluados']
+                        }
+                    
+                    # Si hay análisis temporal, agregarlo
+                    if analisis_completo['analisis_temporal']:
+                        temp = analisis_completo['analisis_temporal']
+                        ml_insights_avanzados['temporal'] = {
+                            'dia_hoy': temp['dia_hoy'],
+                            'es_dia_optimo': temp['es_dia_optimo'],
+                            'mejor_dia': temp['mejor_dia'],
+                            'mejora_potencial': temp['mejora_potencial'],
+                            'recomendacion': temp['recomendacion'],
+                            'mensaje': temp['mensaje']
+                        }
+                    
+                    print(f"✅ Análisis ML avanzado completado:")
+                    print(f"   - {ml_insights_avanzados['total_recomendaciones']} recomendaciones generadas")
+                    print(f"   - {ml_insights_avanzados['total_alertas']} alertas críticas")
+                    print(f"   - Estado: {ml_insights_avanzados['resumen_ejecutivo']['estado_mensaje']}")
+                    
+                    # Mensaje informativo para el usuario
+                    if ml_insights_avanzados['total_alertas'] > 0:
+                        messages.warning(
+                            request,
+                            f"⚠️ {ml_insights_avanzados['total_alertas']} alertas críticas detectadas en ML avanzado"
+                        )
+                    
+                    # ========================================
+                    # 5.2. GENERAR VISUALIZACIONES ML AVANZADAS
+                    # ========================================
+                    
+                    print("📊 Generando visualizaciones ML avanzadas...")
+                    
+                    try:
+                        # Gráfico de escenarios de precio
+                        if analisis_completo['optimizacion_precio']:
+                            graficos['ml_escenarios_precio'] = convertir_figura_a_html(
+                                visualizer.grafico_escenarios_precio(
+                                    analisis_completo['optimizacion_precio']
+                                )
+                            )
+                            print("   ✅ Gráfico de escenarios de precio generado")
+                        
+                        # Matriz riesgo-beneficio
+                        graficos['ml_matriz_riesgo'] = convertir_figura_a_html(
+                            visualizer.grafico_matriz_riesgo_beneficio(analisis_completo)
+                        )
+                        print("   ✅ Matriz riesgo-beneficio generada")
+                        
+                        # Timeline de probabilidad por día
+                        if analisis_completo['analisis_temporal']:
+                            graficos['ml_probabilidad_dia'] = convertir_figura_a_html(
+                                visualizer.grafico_probabilidad_por_dia(
+                                    analisis_completo['analisis_temporal']
+                                )
+                            )
+                            print("   ✅ Timeline probabilidad por día generado")
+                        
+                        print("✅ Todas las visualizaciones ML avanzadas generadas exitosamente")
+                        
+                    except Exception as e_viz:
+                        print(f"⚠️ Error generando visualizaciones ML avanzadas: {str(e_viz)}")
+                        # No crítico, continuar
+                    
+                except Exception as e_avanzado:
+                    print(f"⚠️ Error en módulos ML avanzados: {str(e_avanzado)}")
+                    print(f"   Stack trace: {e_avanzado.__class__.__name__}")
+                    # No fallar todo el dashboard, solo deshabilitar módulos avanzados
+                    ml_insights_avanzados['error'] = str(e_avanzado)
         
         except Exception as e:
             print(f"⚠️ Error en Machine Learning: {str(e)}")
@@ -7756,8 +7910,11 @@ def dashboard_cotizaciones(request):
         # Gráficos (diccionario completo)
         'graficos': graficos,
         
-        # Machine Learning
+        # Machine Learning (básico)
         'ml_insights': ml_insights,
+        
+        # Machine Learning Avanzado (Sistema Experto) - NUEVO
+        'ml_insights_avanzados': ml_insights_avanzados,
         
         # Filtros activos (para mantener estado en el form)
         'filtros_activos': {

@@ -1331,6 +1331,378 @@
                     </div>
                 </div>
                 
+                <!-- ========================================
+                     SECCIÓN ML AVANZADO (Sistema Experto)
+                     ======================================== -->
+                
+                {% if ml_insights_avanzados.disponible %}
+                
+                <div class="col-12 mt-4">
+                    <hr class="my-4">
+                    <h4 class="mb-4">
+                        <i class="bi bi-stars"></i> Sistema Experto ML - Análisis Avanzado
+                        <span class="badge bg-success">NUEVO</span>
+                    </h4>
+                </div>
+                
+                <!-- Resumen Ejecutivo -->
+                <div class="col-12">
+                    {% if ml_insights_avanzados.resumen_ejecutivo.estado_general == 'favorable' %}
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                    {% elif ml_insights_avanzados.resumen_ejecutivo.estado_general == 'moderado' %}
+                    <div class="card border-warning">
+                        <div class="card-header bg-warning text-white">
+                    {% else %}
+                    <div class="card border-danger">
+                        <div class="card-header bg-danger text-white">
+                    {% endif %}
+                            <h5 class="mb-0">
+                                <span style="font-size: 1.5rem;">{{ ml_insights_avanzados.resumen_ejecutivo.estado_icono }}</span>
+                                Resumen Ejecutivo - {{ ml_insights_avanzados.resumen_ejecutivo.estado_mensaje }}
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h6 class="text-muted">Probabilidad</h6>
+                                        <div class="display-4">{{ ml_insights_avanzados.resumen_ejecutivo.prob_aceptacion|floatformat:0 }}%</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h6 class="text-muted">Recomendaciones</h6>
+                                        <div class="display-4">{{ ml_insights_avanzados.resumen_ejecutivo.total_recomendaciones }}</div>
+                                        <small class="text-danger">{{ ml_insights_avanzados.resumen_ejecutivo.recomendaciones_criticas }} críticas</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h6 class="text-muted">ROI Estimado</h6>
+                                        <div class="display-6">${{ ml_insights_avanzados.resumen_ejecutivo.roi_esperado|floatformat:0 }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <h6 class="text-muted">Motivo Principal</h6>
+                                        <div class="h5">{{ ml_insights_avanzados.resumen_ejecutivo.motivo_principal_rechazo }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="alert alert-info mb-0">
+                                <strong><i class="bi bi-info-circle"></i> Análisis:</strong>
+                                {{ ml_insights_avanzados.resumen_ejecutivo.resumen_1_linea }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Alertas Críticas -->
+                {% if ml_insights_avanzados.analisis_completo.alertas_criticas %}
+                <div class="col-12">
+                    <div class="card border-danger">
+                        <div class="card-header bg-danger text-white">
+                            <h5 class="mb-0">
+                                <i class="bi bi-exclamation-triangle-fill"></i> 
+                                Alertas Críticas ({{ ml_insights_avanzados.total_alertas }})
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for alerta in ml_insights_avanzados.analisis_completo.alertas_criticas %}
+                                <div class="col-md-6 mb-3">
+                                    {% if alerta.severidad == 'critica' %}
+                                    <div class="alert alert-danger mb-0">
+                                    {% else %}
+                                    <div class="alert alert-warning mb-0">
+                                    {% endif %}
+                                        <h6 class="alert-heading">
+                                            <span style="font-size: 1.5rem;">{{ alerta.icono }}</span>
+                                            <strong>{{ alerta.titulo }}</strong>
+                                        </h6>
+                                        <p class="mb-2">{{ alerta.mensaje }}</p>
+                                        <hr>
+                                        <p class="mb-0">
+                                            <strong>Acción Requerida:</strong> {{ alerta.accion_requerida }}
+                                        </p>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Plan de Acción Recomendado -->
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="bi bi-list-check"></i> 
+                                Plan de Acción Recomendado ({{ ml_insights_avanzados.total_recomendaciones }} acciones)
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% for recom in ml_insights_avanzados.analisis_completo.recomendaciones %}
+                            <div class="card mb-3 border-{{ recom.color }}">
+                                <div class="card-header bg-{{ recom.color }} bg-opacity-10">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span style="font-size: 1.2rem;">{{ recom.icono }}</span>
+                                            <strong>{{ recom.id }}. {{ recom.titulo }}</strong>
+                                        </div>
+                                        <span class="badge bg-{{ recom.color }}">{{ recom.etiqueta }}</span>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-3">{{ recom.descripcion }}</p>
+                                    
+                                    <h6><i class="bi bi-arrow-right-circle"></i> Acciones Específicas:</h6>
+                                    <ul class="mb-3">
+                                        {% for accion in recom.acciones %}
+                                        <li>{{ accion }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                    
+                                    <div class="alert alert-{{ recom.color }} alert-sm mb-0">
+                                        <strong>Impacto Esperado:</strong> {{ recom.impacto }}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Predicción de Motivo de Rechazo -->
+                {% if ml_insights_avanzados.motivo_predicho %}
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-search"></i> Motivo Probable de Rechazo</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center mb-3">
+                                <h3 class="text-danger">{{ ml_insights_avanzados.motivo_predicho.motivo_nombre }}</h3>
+                                <div class="progress" style="height: 30px;">
+                                    <div class="progress-bar bg-danger" 
+                                         style="width: {{ ml_insights_avanzados.motivo_predicho.probabilidad }}%">
+                                        {{ ml_insights_avanzados.motivo_predicho.probabilidad|floatformat:1 }}% probabilidad
+                                    </div>
+                                </div>
+                                <small class="text-muted">Confianza: {{ ml_insights_avanzados.motivo_predicho.confianza }}</small>
+                            </div>
+                            
+                            <p class="text-muted mb-3">{{ ml_insights_avanzados.motivo_predicho.descripcion }}</p>
+                            
+                            <h6>Acciones Sugeridas:</h6>
+                            <ul>
+                                {% for accion in ml_insights_avanzados.motivo_predicho.acciones|slice:":3" %}
+                                <li>{{ accion }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Optimización de Precio -->
+                {% if ml_insights_avanzados.optimizacion %}
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-graph-up-arrow"></i> Optimización de Precio</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center mb-3">
+                                <div class="col-6">
+                                    <h6 class="text-muted">Costo Actual</h6>
+                                    <h4 class="text-danger">${{ ml_insights_avanzados.optimizacion.costo_actual|floatformat:0 }}</h4>
+                                </div>
+                                <div class="col-6">
+                                    <h6 class="text-muted">Costo Óptimo</h6>
+                                    <h4 class="text-success">${{ ml_insights_avanzados.optimizacion.costo_optimo|floatformat:0 }}</h4>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-success mb-3">
+                                <strong><i class="bi bi-arrow-up-circle"></i> Mejora Esperada:</strong><br>
+                                +${{ ml_insights_avanzados.optimizacion.mejora_ingreso|floatformat:0 }} en ingreso esperado<br>
+                                +{{ ml_insights_avanzados.optimizacion.mejora_probabilidad|floatformat:1 }}% en probabilidad de aceptación
+                            </div>
+                            
+                            <h6>Escenario Óptimo:</h6>
+                            <ul class="mb-0">
+                                <li>Descuento Mano Obra: {{ ml_insights_avanzados.optimizacion.escenario_optimo.desc_mano_obra_pct|floatformat:0 }}%</li>
+                                <li>Descuento Piezas: {{ ml_insights_avanzados.optimizacion.escenario_optimo.desc_piezas_pct|floatformat:0 }}%</li>
+                                <li>{{ ml_insights_avanzados.optimizacion.total_escenarios }} escenarios evaluados</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Análisis Temporal -->
+                {% if ml_insights_avanzados.temporal %}
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-calendar-check"></i> Mejor Momento para Enviar</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if ml_insights_avanzados.temporal.es_dia_optimo %}
+                            <div class="alert alert-success">
+                            {% else %}
+                            <div class="alert alert-warning">
+                            {% endif %}
+                                <h6 class="alert-heading">
+                                    {% if ml_insights_avanzados.temporal.es_dia_optimo %}
+                                    <i class="bi bi-check-circle-fill"></i> HOY es un buen día
+                                    {% else %}
+                                    <i class="bi bi-clock-history"></i> Espera un mejor momento
+                                    {% endif %}
+                                </h6>
+                                <p class="mb-0">{{ ml_insights_avanzados.temporal.mensaje }}</p>
+                            </div>
+                            
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <h6 class="text-muted">Hoy ({{ ml_insights_avanzados.temporal.dia_hoy }})</h6>
+                                    <div class="progress mb-2" style="height: 25px;">
+                                        <div class="progress-bar" style="width: 100%">Base</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <h6 class="text-muted">{{ ml_insights_avanzados.temporal.mejor_dia }}</h6>
+                                    <div class="progress mb-2" style="height: 25px;">
+                                        <div class="progress-bar bg-success" style="width: 100%">
+                                            +{{ ml_insights_avanzados.temporal.mejora_potencial|floatformat:1 }}%
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Cotización Analizada (Info) -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-file-earmark-text"></i> Cotización Analizada</h5>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5">ID Cotización:</dt>
+                                <dd class="col-sm-7">{{ ml_insights_avanzados.cotizacion_analizada.id }}</dd>
+                                
+                                <dt class="col-sm-5">Orden de Servicio:</dt>
+                                <dd class="col-sm-7">{{ ml_insights_avanzados.cotizacion_analizada.orden }}</dd>
+                                
+                                <dt class="col-sm-5">Costo Total:</dt>
+                                <dd class="col-sm-7">${{ ml_insights_avanzados.cotizacion_analizada.costo_actual|floatformat:2 }}</dd>
+                                
+                                <dt class="col-sm-5">Total Piezas:</dt>
+                                <dd class="col-sm-7">{{ ml_insights_avanzados.cotizacion_analizada.total_piezas }}</dd>
+                                
+                                <dt class="col-sm-5">Gama Equipo:</dt>
+                                <dd class="col-sm-7">
+                                    {% if ml_insights_avanzados.cotizacion_analizada.gama == 'alta' %}
+                                    <span class="badge bg-success">
+                                    {% elif ml_insights_avanzados.cotizacion_analizada.gama == 'media' %}
+                                    <span class="badge bg-warning">
+                                    {% else %}
+                                    <span class="badge bg-secondary">
+                                    {% endif %}
+                                        {{ ml_insights_avanzados.cotizacion_analizada.gama|upper }}
+                                    </span>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Visualizaciones ML Avanzadas -->
+                <div class="col-12 mt-4">
+                    <h5 class="mb-3">
+                        <i class="bi bi-graph-up"></i> Visualizaciones Analíticas Avanzadas
+                    </h5>
+                </div>
+                
+                <!-- Gráfico: Comparación de Escenarios de Precio -->
+                {% if graficos.ml_escenarios_precio %}
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5>
+                                <i class="bi bi-currency-dollar"></i> 
+                                Comparación de Escenarios de Precio
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {{ graficos.ml_escenarios_precio|safe }}
+                            <div class="alert alert-info alert-sm mt-3">
+                                <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
+                                El gráfico muestra 4 escenarios diferentes comparando el costo final, probabilidad de aceptación
+                                e ingreso esperado. El escenario <strong>Óptimo</strong> maximiza el ingreso considerando ambos factores.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Gráfico: Matriz Riesgo-Beneficio -->
+                {% if graficos.ml_matriz_riesgo %}
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5>
+                                <i class="bi bi-grid-3x3"></i> 
+                                Matriz Riesgo-Beneficio de Recomendaciones
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {{ graficos.ml_matriz_riesgo|safe }}
+                            <div class="alert alert-info alert-sm mt-3">
+                                <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
+                                Las recomendaciones en el cuadrante <strong class="text-success">PRIORITARIO</strong> (arriba-derecha) 
+                                ofrecen alto beneficio con bajo riesgo. Las del cuadrante <strong class="text-danger">EVITAR</strong> 
+                                (abajo-izquierda) tienen bajo beneficio y alto riesgo.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Gráfico: Probabilidad por Día de la Semana -->
+                {% if graficos.ml_probabilidad_dia %}
+                <div class="col-md-12">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5>
+                                <i class="bi bi-calendar-week"></i> 
+                                Probabilidad de Aceptación por Día
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {{ graficos.ml_probabilidad_dia|safe }}
+                            <div class="alert alert-info alert-sm mt-3">
+                                <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
+                                Los días <strong class="text-success">Lunes y Martes</strong> tienen las mejores tasas de aceptación 
+                                históricas (+12-15%). Evita enviar cotizaciones los <strong class="text-danger">viernes y fines de semana</strong>.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% endif %}
+                <!-- FIN SECCIÓN ML AVANZADO -->
+                
                 {% else %}
                 
                 <!-- Modelo No Disponible -->
