@@ -4,423 +4,8 @@
 {% block title %}Dashboard de Cotizaciones - Analytics{% endblock %}
 
 {% block extra_css %}
-<style>
-    /* ============================================
-       ESTILOS DEL DASHBOARD DE COTIZACIONES
-       Diseño moderno tipo Power BI
-       ============================================ */
-    
-    :root {
-        --dashboard-bg: #f8f9fa;
-        --card-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
-        --card-hover-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
-        --border-radius: 12px;
-        --transition: all 0.3s ease;
-    }
-    
-    body {
-        background-color: var(--dashboard-bg);
-    }
-    
-    /* Header del Dashboard */
-    .dashboard-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 2rem 0;
-        margin-bottom: 2rem;
-        border-radius: var(--border-radius);
-        box-shadow: var(--card-shadow);
-    }
-    
-    .dashboard-header h1 {
-        font-weight: 700;
-        font-size: 2.5rem;
-        margin-bottom: 0.5rem;
-    }
-    
-    .dashboard-header p {
-        opacity: 0.95;
-        font-size: 1.1rem;
-    }
-    
-    /* Formulario de Filtros */
-    .filtros-card {
-        background: white;
-        border-radius: var(--border-radius);
-        box-shadow: var(--card-shadow);
-        border: none;
-        margin-bottom: 2rem;
-        transition: var(--transition);
-    }
-    
-    .filtros-card:hover {
-        box-shadow: var(--card-hover-shadow);
-    }
-    
-    .filtros-card .card-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: var(--border-radius) var(--border-radius) 0 0;
-        padding: 1rem 1.5rem;
-        border: none;
-    }
-    
-    .filtros-card .card-body {
-        padding: 1.5rem;
-    }
-    
-    .form-label {
-        font-weight: 600;
-        color: #495057;
-        margin-bottom: 0.5rem;
-    }
-    
-    .form-control, .form-select {
-        border-radius: 8px;
-        border: 2px solid #e9ecef;
-        padding: 0.625rem 1rem;
-        transition: var(--transition);
-    }
-    
-    .form-control:focus, .form-select:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
-    }
-    
-    /* Botones de Acción */
-    .btn-filtrar {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border: none;
-        padding: 0.625rem 1.5rem;
-        border-radius: 8px;
-        font-weight: 600;
-        transition: var(--transition);
-    }
-    
-    .btn-filtrar:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-    }
-    
-    .btn-limpiar {
-        background: #6c757d;
-        border: none;
-        padding: 0.625rem 1.5rem;
-        border-radius: 8px;
-        font-weight: 600;
-        color: white;
-        transition: var(--transition);
-    }
-    
-    .btn-limpiar:hover {
-        background: #5a6268;
-        transform: translateY(-2px);
-        color: white;
-    }
-    
-    .btn-exportar {
-        background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
-        border: none;
-        padding: 0.625rem 1.5rem;
-        border-radius: 8px;
-        font-weight: 600;
-        transition: var(--transition);
-    }
-    
-    .btn-exportar:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
-    }
-    
-    /* Grid de KPIs */
-    .kpis-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-    
-    .kpi-card {
-        background: white;
-        border-radius: var(--border-radius);
-        padding: 1.5rem;
-        box-shadow: var(--card-shadow);
-        border-left: 4px solid;
-        transition: var(--transition);
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .kpi-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        right: 0;
-        width: 100px;
-        height: 100px;
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, transparent 100%);
-        border-radius: 50%;
-        transform: translate(30%, -30%);
-    }
-    
-    .kpi-card:hover {
-        transform: translateY(-5px);
-        box-shadow: var(--card-hover-shadow);
-    }
-    
-    .kpi-card.primary { border-left-color: #667eea; }
-    .kpi-card.success { border-left-color: #27ae60; }
-    .kpi-card.danger { border-left-color: #e74c3c; }
-    .kpi-card.warning { border-left-color: #f39c12; }
-    .kpi-card.info { border-left-color: #3498db; }
-    
-    .kpi-icon {
-        font-size: 2.5rem;
-        margin-bottom: 0.5rem;
-        opacity: 0.7;
-    }
-    
-    .kpi-label {
-        font-size: 0.875rem;
-        color: #6c757d;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 0.5rem;
-    }
-    
-    .kpi-value {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #212529;
-        margin-bottom: 0;
-        position: relative;
-        z-index: 1;
-    }
-    
-    .kpi-subtext {
-        font-size: 0.875rem;
-        color: #6c757d;
-        margin-top: 0.5rem;
-    }
-    
-    /* Sistema de Tabs */
-    .nav-tabs {
-        border: none;
-        margin-bottom: 2rem;
-        background: white;
-        padding: 0.5rem;
-        border-radius: var(--border-radius);
-        box-shadow: var(--card-shadow);
-    }
-    
-    .nav-tabs .nav-item {
-        margin-bottom: 0;
-    }
-    
-    .nav-tabs .nav-link {
-        border: none;
-        color: #6c757d;
-        font-weight: 600;
-        padding: 0.75rem 1.5rem;
-        border-radius: 8px;
-        transition: var(--transition);
-        margin-right: 0.5rem;
-    }
-    
-    .nav-tabs .nav-link:hover {
-        color: #667eea;
-        background: rgba(102, 126, 234, 0.1);
-    }
-    
-    .nav-tabs .nav-link.active {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
-    }
-    
-    /* Cards de Gráficos */
-    .grafico-card {
-        background: white;
-        border-radius: var(--border-radius);
-        box-shadow: var(--card-shadow);
-        margin-bottom: 2rem;
-        border: none;
-        transition: var(--transition);
-        overflow: hidden;
-    }
-    
-    .grafico-card:hover {
-        box-shadow: var(--card-hover-shadow);
-    }
-    
-    .grafico-card .card-header {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-bottom: 2px solid #e9ecef;
-        padding: 1rem 1.5rem;
-        border-radius: var(--border-radius) var(--border-radius) 0 0;
-    }
-    
-    .grafico-card .card-header h5 {
-        margin: 0;
-        font-weight: 700;
-        color: #212529;
-        font-size: 1.1rem;
-    }
-    
-    .grafico-card .card-body {
-        padding: 1.5rem;
-    }
-    
-    /* Plotly Graphs */
-    .plotly-graph-div {
-        border-radius: 8px;
-    }
-    
-    /* Alertas y Mensajes */
-    .alert-dashboard {
-        border-radius: var(--border-radius);
-        border: none;
-        box-shadow: var(--card-shadow);
-        padding: 1rem 1.5rem;
-    }
-    
-    .alert-dashboard .alert-heading {
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-    }
-    
-    /* Loading State */
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.9);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-        opacity: 0;
-        visibility: hidden;
-        transition: var(--transition);
-    }
-    
-    .loading-overlay.active {
-        opacity: 1;
-        visibility: visible;
-    }
-    
-    .spinner-border-lg {
-        width: 4rem;
-        height: 4rem;
-        border-width: 0.4rem;
-    }
-    
-    /* Responsive */
-    @media (max-width: 768px) {
-        .dashboard-header h1 {
-            font-size: 1.75rem;
-        }
-        
-        .kpis-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .nav-tabs {
-            overflow-x: auto;
-            flex-wrap: nowrap;
-        }
-        
-        .nav-tabs .nav-link {
-            white-space: nowrap;
-        }
-    }
-    
-    /* Animaciones */
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    .fade-in {
-        animation: fadeIn 0.6s ease;
-    }
-    
-    /* Badge personalizado */
-    .badge-custom {
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        font-weight: 600;
-        font-size: 0.875rem;
-    }
-    
-    /* Sección ML especial */
-    .ml-insight-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: var(--border-radius);
-        padding: 2rem;
-        box-shadow: var(--card-shadow);
-        margin-bottom: 2rem;
-    }
-    
-    .ml-insight-card h5 {
-        color: white;
-        margin-bottom: 1rem;
-        font-weight: 700;
-    }
-    
-    .ml-accuracy {
-        font-size: 4rem;
-        font-weight: 700;
-        text-align: center;
-        margin: 1rem 0;
-    }
-    
-    .ml-sugerencia {
-        background: rgba(255, 255, 255, 0.1);
-        padding: 1rem;
-        border-radius: 8px;
-        margin-bottom: 0.5rem;
-        border-left: 3px solid white;
-    }
-    
-    /* Estilos adicionales para cards compactas */
-    .alert-sm {
-        padding: 0.5rem 0.75rem;
-        font-size: 0.875rem;
-    }
-    
-    .card h6 {
-        font-size: 0.95rem;
-        font-weight: 600;
-    }
-    
-    /* Asegurar altura uniforme en grid 2x2 */
-    .h-100 {
-        height: 100% !important;
-    }
-    
-    /* Mejor espaciado en cards pequeñas */
-    .card-body.compact {
-        padding: 1rem;
-    }
-    
-    /* Responsive para grid 2x2 */
-    @media (max-width: 991px) {
-        .col-lg-3 {
-            margin-bottom: 1rem;
-        }
-    }
-</style>
+<!-- Estilos específicos del Dashboard de Cotizaciones -->
+<link rel="stylesheet" href="{% static 'css/dashboard_cotizaciones.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -760,6 +345,15 @@
                         <div class="card-body">
                             {% if graficos.distribucion_costos %}
                                 {{ graficos.distribucion_costos|safe }}
+                                <div class="alert alert-success alert-dashboard mt-3">
+                                    <strong><i class="bi bi-cash-stack"></i> Análisis de Precios:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Distribución:</strong> Muestra cómo se dispersan los costos de las cotizaciones</li>
+                                        <li><strong>Picos altos:</strong> Rangos de precio más comunes</li>
+                                        <li><strong>Áreas amplias:</strong> Gran variabilidad en ese rango (analizar causas)</li>
+                                        <li><strong>Útil para:</strong> Identificar rangos de precio óptimos y detectar valores atípicos</li>
+                                    </ul>
+                                </div>
                             {% else %}
                                 <div class="alert alert-warning alert-dashboard">
                                     <i class="bi bi-exclamation-triangle"></i> No hay datos para mostrar distribución de costos.
@@ -778,6 +372,15 @@
                         <div class="card-body">
                             {% if graficos.funnel_conversion %}
                                 {{ graficos.funnel_conversion|safe }}
+                                <div class="alert alert-info alert-dashboard mt-3">
+                                    <strong><i class="bi bi-funnel-fill"></i> Interpretación del Embudo:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Total Cotizaciones:</strong> Volumen de oportunidades generadas</li>
+                                        <li><strong>Con Respuesta:</strong> Cotizaciones donde el cliente dio una respuesta</li>
+                                        <li><strong>Aceptadas:</strong> Conversión final exitosa (ingresos reales)</li>
+                                        <li><strong>% de caída:</strong> Indica oportunidades de mejora en cada etapa</li>
+                                    </ul>
+                                </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay datos para mostrar el embudo de conversión.
@@ -876,6 +479,15 @@
                         <div class="card-body">
                             {% if graficos.piezas_necesarias_vs_opcionales %}
                                 {{ graficos.piezas_necesarias_vs_opcionales|safe }}
+                                <div class="alert alert-warning alert-dashboard mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Insight Clave:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Piezas Necesarias:</strong> Críticas para el funcionamiento del equipo</li>
+                                        <li><strong>Piezas Opcionales:</strong> Mejoras o preventivas (mayor probabilidad de rechazo)</li>
+                                        <li><strong>Estrategia:</strong> Cotizar por separado puede mejorar tasa de aceptación</li>
+                                        <li><strong>Recomendación:</strong> Si hay muchas opcionales rechazadas, considerar presentarlas después</li>
+                                    </ul>
+                                </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay datos de clasificación de piezas.
@@ -894,6 +506,15 @@
                         <div class="card-body">
                             {% if graficos.sugerencias_tecnico %}
                                 {{ graficos.sugerencias_tecnico|safe }}
+                                <div class="alert alert-info alert-dashboard mt-3">
+                                    <strong><i class="bi bi-diagram-3"></i> Cómo Leer el Diagrama:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Flujo de decisiones:</strong> Desde la sugerencia del técnico hasta el resultado final</li>
+                                        <li><strong>Grosor de líneas:</strong> Proporcional al volumen de casos en cada ruta</li>
+                                        <li><strong>Rutas más gruesas:</strong> Patrones más comunes de comportamiento del cliente</li>
+                                        <li><strong>Analizar:</strong> ¿Las sugerencias del técnico influyen en la aceptación?</li>
+                                    </ul>
+                                </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay datos de sugerencias de técnicos.
@@ -921,6 +542,15 @@
                         <div class="card-body">
                             {% if graficos.tiempos_respuesta %}
                                 {{ graficos.tiempos_respuesta|safe }}
+                                <div class="alert alert-success alert-dashboard mt-3">
+                                    <strong><i class="bi bi-clock"></i> Rangos de Respuesta Óptimos:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>0-2 días:</strong> Respuesta rápida - Cliente muy interesado (alta prob. aceptación)</li>
+                                        <li><strong>3-5 días:</strong> Respuesta normal - Cliente evaluando opciones</li>
+                                        <li><strong>6-10 días:</strong> Respuesta lenta - Puede indicar dudas o comparando precios</li>
+                                        <li><strong>+10 días:</strong> Alto riesgo de rechazo - Considerar seguimiento proactivo</li>
+                                    </ul>
+                                </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay datos suficientes de tiempos de respuesta.
@@ -939,6 +569,15 @@
                         <div class="card-body">
                             {% if graficos.motivos_rechazo %}
                                 {{ graficos.motivos_rechazo|safe }}
+                                <div class="alert alert-danger alert-dashboard mt-3">
+                                    <strong><i class="bi bi-shield-exclamation"></i> Acciones Correctivas por Motivo:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Precio Alto:</strong> Revisar márgenes, buscar proveedores alternativos, ofrecer opciones</li>
+                                        <li><strong>No tiene presupuesto:</strong> Ofrecer financiamiento o reparaciones parciales</li>
+                                        <li><strong>Reparó en otro lugar:</strong> Mejorar seguimiento y tiempos de respuesta</li>
+                                        <li><strong>No vale la pena reparar:</strong> Educación sobre valor del equipo vs costo</li>
+                                    </ul>
+                                </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay datos de cotizaciones rechazadas.
@@ -949,7 +588,7 @@
                 </div>
                 
                 <!-- Motivos de Rechazo vs Costos -->
-                <div class="col-lg-6 offset-lg-3">
+                <div class="col-md-6">
                     <div class="grafico-card card">
                         <div class="card-header">
                             <h5><i class="bi bi-cash-coin"></i> Análisis de Costos por Motivo de Rechazo</h5>
@@ -975,8 +614,36 @@
                     </div>
                 </div>
                 
+                <!-- NUEVO: Correlación Tiempo de Respuesta vs Resultado -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-clock-history"></i> Correlación: Tiempo de Respuesta vs Resultado</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.correlacion_tiempo_resultado %}
+                                {{ graficos.correlacion_tiempo_resultado|safe }}
+                                <div class="alert alert-success alert-dashboard mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Insight Estratégico:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Puntos Verdes:</strong> Cotizaciones aceptadas - busca patrones de tiempo óptimo</li>
+                                        <li><strong>Puntos Rojos:</strong> Cotizaciones rechazadas - identifica "zonas peligrosas"</li>
+                                        <li><strong>Líneas de Tendencia:</strong> Muestran si hay correlación entre demora y resultado</li>
+                                        <li><strong>Tamaño del punto:</strong> Representa cantidad de piezas cotizadas</li>
+                                        <li><strong>Acción:</strong> Si la línea verde desciende, responder rápido mejora aceptación</li>
+                                    </ul>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos suficientes para análisis de correlación.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
             </div>
-        </div>>
+        </div>
         
         <!-- ========================================
              TAB 4: ANÁLISIS DE PROVEEDORES
@@ -1011,6 +678,15 @@
                         <div class="card-body">
                             {% if graficos.proveedores_performance %}
                                 {{ graficos.proveedores_performance|safe }}
+                                <div class="alert alert-primary alert-dashboard mt-3">
+                                    <strong><i class="bi bi-graph-up"></i> Métricas de Evaluación:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Volumen de Piezas:</strong> Cantidad de piezas suministradas (eje X o tamaño)</li>
+                                        <li><strong>Tasa de Aceptación:</strong> % de cotizaciones aceptadas con piezas de este proveedor</li>
+                                        <li><strong>Proveedor Ideal:</strong> Alto volumen + Alta tasa de aceptación (esquina superior derecha)</li>
+                                        <li><strong>Revisar:</strong> Proveedores con bajo rendimiento pero alto volumen (pueden afectar ventas)</li>
+                                    </ul>
+                                </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay suficientes datos de seguimiento de proveedores.
@@ -1074,6 +750,16 @@
                         <div class="card-body">
                             {% if graficos.rendimiento_tecnicos %}
                                 {{ graficos.rendimiento_tecnicos|safe }}
+                                <div class="alert alert-info alert-dashboard mt-3">
+                                    <strong><i class="bi bi-people"></i> Balance Volumen vs Calidad:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Eje X (Cotizaciones):</strong> Volumen de trabajo del técnico</li>
+                                        <li><strong>Eje Y (% Aceptación):</strong> Calidad/efectividad de las cotizaciones</li>
+                                        <li><strong>Ideal:</strong> Alto volumen + Alta aceptación (esquina superior derecha)</li>
+                                        <li><strong>Oportunidad:</strong> Alto volumen pero baja aceptación = necesita capacitación</li>
+                                        <li><strong>Potencial:</strong> Baja volumen pero alta aceptación = puede manejar más casos</li>
+                                    </ul>
+                                </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay datos de rendimiento de técnicos.
@@ -1092,6 +778,16 @@
                         <div class="card-body">
                             {% if graficos.rendimiento_sucursales %}
                                 {{ graficos.rendimiento_sucursales|safe }}
+                                <div class="alert alert-warning alert-dashboard mt-3">
+                                    <strong><i class="bi bi-thermometer-half"></i> Cómo Interpretar el Mapa de Calor:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Colores cálidos (rojo/naranja):</strong> Valores altos - Buen rendimiento</li>
+                                        <li><strong>Colores fríos (azul/verde):</strong> Valores bajos - Área de mejora</li>
+                                        <li><strong>Por columna:</strong> Compara métricas de una sucursal (volumen, aceptación, valor)</li>
+                                        <li><strong>Por fila:</strong> Compara una métrica entre todas las sucursales</li>
+                                        <li><strong>Patrones:</strong> Busca sucursales consistentemente altas o bajas en todas las métricas</li>
+                                    </ul>
+                                </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay datos de múltiples sucursales.

@@ -1539,6 +1539,239 @@ class DashboardCotizacionesVisualizer:
         
         return fig
     
+    def grafico_correlacion_tiempo_resultado(self, df):
+        """
+        Gráfico de dispersión: Correlación entre tiempo de respuesta y resultado.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Este gráfico revela patrones críticos para optimizar seguimiento:
+        
+        EJES:
+        - Eje X: Días transcurridos hasta que el cliente respondió
+        - Eje Y: Costo total de la cotización
+        
+        COLORES:
+        - Verde (🟢): Cotizaciones ACEPTADAS
+        - Rojo (🔴): Cotizaciones RECHAZADAS
+        
+        TAMAÑO DE PUNTOS:
+        - Más grande = Más piezas cotizadas (cotizaciones complejas)
+        - Más pequeño = Pocas piezas (cotizaciones simples)
+        
+        INSIGHTS CLAVE QUE REVELA:
+        ==========================
+        1. **Punto de Quiebre Temporal:**
+           - ¿A partir de cuántos días sin respuesta aumenta el rechazo?
+           - Ejemplo: "Después de 7 días, 80% son rechazadas"
+        
+        2. **Relación Precio-Urgencia:**
+           - ¿Los clientes responden más rápido a cotizaciones caras o baratas?
+           - ¿Cotizaciones caras respondidas rápido = cliente muy interesado?
+        
+        3. **Patrones de Comportamiento:**
+           - Verde concentrado abajo-izquierda = "Sweet Spot" (rápido + acepta)
+           - Rojo disperso derecha = Respuestas lentas correlacionan con rechazo
+           - Puntos grandes rojos = Cotizaciones complejas tienden a rechazarse
+        
+        4. **Estrategia de Seguimiento:**
+           - Define umbrales: "Cotizaciones >$5000 sin respuesta a 3 días → llamar"
+           - Prioriza según zona del gráfico donde está cada cotización pendiente
+        
+        5. **Indicador de Complejidad:**
+           - Si puntos grandes (muchas piezas) tardan más en decidir
+           - Ayuda a ajustar expectativas de tiempo de respuesta
+        
+        ACCIONABLE:
+        ===========
+        - Implementar alertas automáticas basadas en días transcurridos y costo
+        - Segmentar estrategia de seguimiento por zona del gráfico
+        - Identificar cotizaciones en "zona de riesgo" para acción proactiva
+        
+        Args:
+            df (DataFrame): DataFrame de cotizaciones con respuesta
+        
+        Returns:
+            Figure: Gráfico de dispersión interactivo de Plotly
+        """
+        
+        if df.empty:
+            return self._crear_grafico_vacio("No hay datos de cotizaciones")
+        
+        # Filtrar solo cotizaciones con respuesta (aceptadas o rechazadas)
+        # Usamos 'aceptada' en lugar de 'fecha_respuesta' porque es el campo que indica respuesta
+        df_con_respuesta = df[df['aceptada'].notna()].copy()
+        
+        if df_con_respuesta.empty:
+            return self._crear_grafico_vacio("No hay cotizaciones con respuesta del cliente")
+        
+        # Asegurar que dias_sin_respuesta esté calculado
+        if 'dias_sin_respuesta' not in df_con_respuesta.columns:
+            # Si existe fecha_respuesta, usarla; sino calcular desde fecha_envio
+            if 'fecha_respuesta' in df_con_respuesta.columns:
+                df_con_respuesta['dias_sin_respuesta'] = (
+                    df_con_respuesta['fecha_respuesta'] - df_con_respuesta['fecha_envio']
+                ).dt.days
+            else:
+                # Si no hay fecha_respuesta, usar fecha actual como referencia
+                from datetime import datetime
+                df_con_respuesta['dias_sin_respuesta'] = (
+                    pd.to_datetime('today') - df_con_respuesta['fecha_envio']
+                ).dt.days
+        
+        # Calcular total de piezas si no existe
+        if 'total_piezas' not in df_con_respuesta.columns:
+            df_con_respuesta['total_piezas'] = 1  # Default si no hay dato
+        
+        # Separar por resultado
+        df_aceptadas = df_con_respuesta[df_con_respuesta['aceptada'] == True].copy()
+        df_rechazadas = df_con_respuesta[df_con_respuesta['aceptada'] == False].copy()
+        
+        # Crear figura
+        fig = go.Figure()
+        
+        # Trace para ACEPTADAS (Verde)
+        if not df_aceptadas.empty:
+            fig.add_trace(go.Scatter(
+                x=df_aceptadas['dias_sin_respuesta'],
+                y=df_aceptadas['costo_total'],
+                mode='markers',
+                name='Aceptadas',
+                marker=dict(
+                    color=self.colores['success'],
+                    size=df_aceptadas['total_piezas'].clip(lower=5, upper=30),  # Tamaño basado en piezas
+                    sizemode='diameter',
+                    line=dict(width=1, color='white'),
+                    opacity=0.7
+                ),
+                hovertemplate=(
+                    '<b>✅ ACEPTADA</b><br>'
+                    'Días de respuesta: %{x}<br>'
+                    'Costo: $%{y:,.0f}<br>'
+                    'Piezas: %{marker.size:.0f}<br>'
+                    '<extra></extra>'
+                )
+            ))
+        
+        # Trace para RECHAZADAS (Rojo)
+        if not df_rechazadas.empty:
+            fig.add_trace(go.Scatter(
+                x=df_rechazadas['dias_sin_respuesta'],
+                y=df_rechazadas['costo_total'],
+                mode='markers',
+                name='Rechazadas',
+                marker=dict(
+                    color=self.colores['danger'],
+                    size=df_rechazadas['total_piezas'].clip(lower=5, upper=30),
+                    sizemode='diameter',
+                    line=dict(width=1, color='white'),
+                    opacity=0.7
+                ),
+                hovertemplate=(
+                    '<b>❌ RECHAZADA</b><br>'
+                    'Días de respuesta: %{x}<br>'
+                    'Costo: $%{y:,.0f}<br>'
+                    'Piezas: %{marker.size:.0f}<br>'
+                    '<extra></extra>'
+                )
+            ))
+        
+        # Calcular líneas de tendencia si hay suficientes datos
+        # IMPORTANTE: Solo calcular si hay variabilidad en los datos
+        import numpy as np
+        
+        if len(df_aceptadas) >= 3:  # Mínimo 3 puntos para una tendencia confiable
+            try:
+                # Verificar que hay variabilidad en ambos ejes
+                x_aceptadas = df_aceptadas['dias_sin_respuesta'].values
+                y_aceptadas = df_aceptadas['costo_total'].values
+                
+                # Solo calcular si hay variación (no todos los valores son iguales)
+                if (x_aceptadas.std() > 0) and (y_aceptadas.std() > 0):
+                    z = np.polyfit(x_aceptadas, y_aceptadas, 1)
+                    p = np.poly1d(z)
+                    x_tend = np.linspace(x_aceptadas.min(), x_aceptadas.max(), 50)
+                    fig.add_trace(go.Scatter(
+                        x=x_tend,
+                        y=p(x_tend),
+                        mode='lines',
+                        name='Tendencia Aceptadas',
+                        line=dict(color=self.colores['success'], width=2, dash='dash'),
+                        hoverinfo='skip',
+                        showlegend=True
+                    ))
+            except Exception as e:
+                # Si falla el cálculo de tendencia, continuar sin ella
+                print(f"⚠️ No se pudo calcular tendencia para aceptadas: {str(e)}")
+        
+        if len(df_rechazadas) >= 3:
+            try:
+                x_rechazadas = df_rechazadas['dias_sin_respuesta'].values
+                y_rechazadas = df_rechazadas['costo_total'].values
+                
+                if (x_rechazadas.std() > 0) and (y_rechazadas.std() > 0):
+                    z = np.polyfit(x_rechazadas, y_rechazadas, 1)
+                    p = np.poly1d(z)
+                    x_tend = np.linspace(x_rechazadas.min(), x_rechazadas.max(), 50)
+                    fig.add_trace(go.Scatter(
+                        x=x_tend,
+                        y=p(x_tend),
+                        mode='lines',
+                        name='Tendencia Rechazadas',
+                        line=dict(color=self.colores['danger'], width=2, dash='dash'),
+                        hoverinfo='skip',
+                        showlegend=True
+                    ))
+            except Exception as e:
+                print(f"⚠️ No se pudo calcular tendencia para rechazadas: {str(e)}")
+        
+        # Calcular estadísticas para anotaciones
+        tiempo_promedio_aceptadas = df_aceptadas['dias_sin_respuesta'].mean() if not df_aceptadas.empty else 0
+        tiempo_promedio_rechazadas = df_rechazadas['dias_sin_respuesta'].mean() if not df_rechazadas.empty else 0
+        
+        # Línea vertical de referencia: tiempo promedio global
+        tiempo_promedio_global = df_con_respuesta['dias_sin_respuesta'].mean()
+        fig.add_vline(
+            x=tiempo_promedio_global,
+            line_dash="dot",
+            line_color="gray",
+            annotation_text=f"⏱️ Promedio: {tiempo_promedio_global:.1f} días",
+            annotation_position="top"
+        )
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='⏱️💰 Correlación: Tiempo de Respuesta vs Costo y Resultado',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=18, color=self.colores['dark'])
+            ),
+            xaxis=dict(
+                title='Días Transcurridos hasta Respuesta del Cliente',
+                showgrid=True,
+                gridcolor='lightgray',
+                gridwidth=0.5
+            ),
+            yaxis=dict(
+                title='Costo Total de la Cotización ($)',
+                tickformat='$,.0f',
+                showgrid=True,
+                gridcolor='lightgray',
+                gridwidth=0.5
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            ),
+            height=600
+        )
+        
+        return fig
+    
     def grafico_funnel_conversion(self, df):
         """
         Embudo de conversión: Etapas del proceso de cotización.
@@ -2311,6 +2544,10 @@ class DashboardCotizacionesVisualizer:
             )
             graficos['motivos_rechazo_vs_costos'] = convertir_figura_a_html(
                 self.grafico_motivos_rechazo_vs_costos(df)
+            )
+            # NUEVO: Correlación tiempo de respuesta vs resultado
+            graficos['correlacion_tiempo_resultado'] = convertir_figura_a_html(
+                self.grafico_correlacion_tiempo_resultado(df)
             )
             graficos['funnel_conversion'] = convertir_figura_a_html(
                 self.grafico_funnel_conversion(df)
