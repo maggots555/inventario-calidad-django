@@ -392,6 +392,34 @@
         margin-bottom: 0.5rem;
         border-left: 3px solid white;
     }
+    
+    /* Estilos adicionales para cards compactas */
+    .alert-sm {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+    }
+    
+    .card h6 {
+        font-size: 0.95rem;
+        font-weight: 600;
+    }
+    
+    /* Asegurar altura uniforme en grid 2x2 */
+    .h-100 {
+        height: 100% !important;
+    }
+    
+    /* Mejor espaciado en cards pequeñas */
+    .card-body.compact {
+        padding: 1rem;
+    }
+    
+    /* Responsive para grid 2x2 */
+    @media (max-width: 991px) {
+        .col-lg-3 {
+            margin-bottom: 1rem;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -1272,30 +1300,6 @@
                     </div>
                 </div>
                 
-                <!-- Factores Más Influyentes -->
-                <div class="col-12">
-                    <div class="grafico-card card">
-                        <div class="card-header">
-                            <h5><i class="bi bi-bar-chart-line"></i> Factores Más Influyentes en la Decisión</h5>
-                        </div>
-                        <div class="card-body">
-                            {% if graficos.factores_influyentes %}
-                                {{ graficos.factores_influyentes|safe }}
-                                <div class="alert alert-info alert-dashboard mt-3">
-                                    <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
-                                    Los factores con mayor importancia son los que más influyen en la probabilidad 
-                                    de que una cotización sea aceptada o rechazada. Utiliza esta información para 
-                                    optimizar tus cotizaciones futuras.
-                                </div>
-                            {% else %}
-                                <div class="alert alert-warning alert-dashboard">
-                                    <i class="bi bi-exclamation-triangle"></i> No se pudo generar el gráfico de importancia de características.
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                
                 <!-- Sugerencias del Modelo -->
                 <div class="col-12">
                     <div class="grafico-card card">
@@ -1477,228 +1481,321 @@
                     </div>
                 </div>
                 
-                <!-- Predicción de Motivo de Rechazo -->
-                {% if ml_insights_avanzados.motivo_predicho %}
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="bi bi-search"></i> Motivo Probable de Rechazo</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="text-center mb-3">
-                                <h3 class="text-danger">{{ ml_insights_avanzados.motivo_predicho.motivo_nombre }}</h3>
-                                <div class="progress" style="height: 30px;">
-                                    <div class="progress-bar bg-danger" 
-                                         style="width: {{ ml_insights_avanzados.motivo_predicho.probabilidad }}%">
-                                        {{ ml_insights_avanzados.motivo_predicho.probabilidad|floatformat:1 }}% probabilidad
-                                    </div>
-                                </div>
-                                <small class="text-muted">Confianza: {{ ml_insights_avanzados.motivo_predicho.confianza }}</small>
-                            </div>
-                            
-                            <p class="text-muted mb-3">{{ ml_insights_avanzados.motivo_predicho.descripcion }}</p>
-                            
-                            <h6>Acciones Sugeridas:</h6>
-                            <ul>
-                                {% for accion in ml_insights_avanzados.motivo_predicho.acciones|slice:":3" %}
-                                <li>{{ accion }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    </div>
+                <!-- ========================================
+                     ANÁLISIS DETALLADO (4 CARDS)
+                     ======================================== -->
+                <div class="col-12 mt-4 mb-3">
+                    <h5>
+                        <i class="bi bi-clipboard-data"></i> Análisis Detallado de la Cotización
+                    </h5>
                 </div>
-                {% endif %}
                 
-                <!-- Optimización de Precio -->
-                {% if ml_insights_avanzados.optimizacion %}
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="bi bi-graph-up-arrow"></i> Optimización de Precio</h5>
+                <div class="col-md-6 col-lg-3">
+                    <!-- Card 1: Cotización Analizada -->
+                    <div class="card h-100 border-primary">
+                        <div class="card-header bg-primary bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-file-earmark-text"></i> Información General</h6>
                         </div>
                         <div class="card-body">
-                            <div class="row text-center mb-3">
-                                <div class="col-6">
-                                    <h6 class="text-muted">Costo Actual</h6>
-                                    <h4 class="text-danger">${{ ml_insights_avanzados.optimizacion.costo_actual|floatformat:0 }}</h4>
-                                </div>
-                                <div class="col-6">
-                                    <h6 class="text-muted">Costo Óptimo</h6>
-                                    <h4 class="text-success">${{ ml_insights_avanzados.optimizacion.costo_optimo|floatformat:0 }}</h4>
-                                </div>
-                            </div>
-                            
-                            <div class="alert alert-success mb-3">
-                                <strong><i class="bi bi-arrow-up-circle"></i> Mejora Esperada:</strong><br>
-                                +${{ ml_insights_avanzados.optimizacion.mejora_ingreso|floatformat:0 }} en ingreso esperado<br>
-                                +{{ ml_insights_avanzados.optimizacion.mejora_probabilidad|floatformat:1 }}% en probabilidad de aceptación
-                            </div>
-                            
-                            <h6>Escenario Óptimo:</h6>
-                            <ul class="mb-0">
-                                <li>Descuento Mano Obra: {{ ml_insights_avanzados.optimizacion.escenario_optimo.desc_mano_obra_pct|floatformat:0 }}%</li>
-                                <li>Descuento Piezas: {{ ml_insights_avanzados.optimizacion.escenario_optimo.desc_piezas_pct|floatformat:0 }}%</li>
-                                <li>{{ ml_insights_avanzados.optimizacion.total_escenarios }} escenarios evaluados</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                <!-- Análisis Temporal -->
-                {% if ml_insights_avanzados.temporal %}
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="bi bi-calendar-check"></i> Mejor Momento para Enviar</h5>
-                        </div>
-                        <div class="card-body">
-                            {% if ml_insights_avanzados.temporal.es_dia_optimo %}
-                            <div class="alert alert-success">
-                            {% else %}
-                            <div class="alert alert-warning">
-                            {% endif %}
-                                <h6 class="alert-heading">
-                                    {% if ml_insights_avanzados.temporal.es_dia_optimo %}
-                                    <i class="bi bi-check-circle-fill"></i> HOY es un buen día
-                                    {% else %}
-                                    <i class="bi bi-clock-history"></i> Espera un mejor momento
-                                    {% endif %}
-                                </h6>
-                                <p class="mb-0">{{ ml_insights_avanzados.temporal.mensaje }}</p>
-                            </div>
-                            
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <h6 class="text-muted">Hoy ({{ ml_insights_avanzados.temporal.dia_hoy }})</h6>
-                                    <div class="progress mb-2" style="height: 25px;">
-                                        <div class="progress-bar" style="width: 100%">Base</div>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <h6 class="text-muted">{{ ml_insights_avanzados.temporal.mejor_dia }}</h6>
-                                    <div class="progress mb-2" style="height: 25px;">
-                                        <div class="progress-bar bg-success" style="width: 100%">
-                                            +{{ ml_insights_avanzados.temporal.mejora_potencial|floatformat:1 }}%
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                <!-- Cotización Analizada (Info) -->
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="bi bi-file-earmark-text"></i> Cotización Analizada</h5>
-                        </div>
-                        <div class="card-body">
-                            <dl class="row mb-0">
-                                <dt class="col-sm-5">ID Cotización:</dt>
-                                <dd class="col-sm-7">{{ ml_insights_avanzados.cotizacion_analizada.id }}</dd>
+                            <dl class="row mb-0 small">
+                                <dt class="col-5">ID:</dt>
+                                <dd class="col-7">{{ ml_insights_avanzados.cotizacion_analizada.id }}</dd>
                                 
-                                <dt class="col-sm-5">Orden de Servicio:</dt>
-                                <dd class="col-sm-7">{{ ml_insights_avanzados.cotizacion_analizada.orden }}</dd>
+                                <dt class="col-5">Orden:</dt>
+                                <dd class="col-7">{{ ml_insights_avanzados.cotizacion_analizada.orden }}</dd>
                                 
-                                <dt class="col-sm-5">Costo Total:</dt>
-                                <dd class="col-sm-7">${{ ml_insights_avanzados.cotizacion_analizada.costo_actual|floatformat:2 }}</dd>
+                                <dt class="col-5">Costo:</dt>
+                                <dd class="col-7"><strong>${{ ml_insights_avanzados.cotizacion_analizada.costo_actual|floatformat:0 }}</strong></dd>
                                 
-                                <dt class="col-sm-5">Total Piezas:</dt>
-                                <dd class="col-sm-7">{{ ml_insights_avanzados.cotizacion_analizada.total_piezas }}</dd>
+                                <dt class="col-5">Piezas:</dt>
+                                <dd class="col-7">{{ ml_insights_avanzados.cotizacion_analizada.total_piezas }}</dd>
                                 
-                                <dt class="col-sm-5">Gama Equipo:</dt>
-                                <dd class="col-sm-7">
+                                <dt class="col-5">Gama:</dt>
+                                <dd class="col-7">
                                     {% if ml_insights_avanzados.cotizacion_analizada.gama == 'alta' %}
-                                    <span class="badge bg-success">
+                                    <span class="badge bg-success">ALTA</span>
                                     {% elif ml_insights_avanzados.cotizacion_analizada.gama == 'media' %}
-                                    <span class="badge bg-warning">
+                                    <span class="badge bg-warning">MEDIA</span>
                                     {% else %}
-                                    <span class="badge bg-secondary">
+                                    <span class="badge bg-secondary">BAJA</span>
                                     {% endif %}
-                                        {{ ml_insights_avanzados.cotizacion_analizada.gama|upper }}
-                                    </span>
                                 </dd>
                             </dl>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Visualizaciones ML Avanzadas -->
+                {% if ml_insights_avanzados.motivo_predicho %}
+                <div class="col-md-6 col-lg-3">
+                    <!-- Card 2: Motivo Probable de Rechazo -->
+                    <div class="card h-100 border-danger">
+                        <div class="card-header bg-danger bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-search"></i> Motivo Probable</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center mb-2">
+                                <h6 class="text-danger mb-2">{{ ml_insights_avanzados.motivo_predicho.motivo_nombre }}</h6>
+                                <div class="progress mb-2" style="height: 20px;">
+                                    <div class="progress-bar bg-danger" 
+                                         style="width: {{ ml_insights_avanzados.motivo_predicho.probabilidad }}%">
+                                        {{ ml_insights_avanzados.motivo_predicho.probabilidad|floatformat:0 }}%
+                                    </div>
+                                </div>
+                                <small class="text-muted">{{ ml_insights_avanzados.motivo_predicho.confianza }}</small>
+                            </div>
+                            
+                            <p class="small text-muted mb-2">{{ ml_insights_avanzados.motivo_predicho.descripcion|truncatewords:15 }}</p>
+                            
+                            <div class="small">
+                                <strong>Acciones:</strong>
+                                <ul class="mb-0 ps-3">
+                                    {% for accion in ml_insights_avanzados.motivo_predicho.acciones|slice:":2" %}
+                                    <li>{{ accion|truncatewords:8 }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if ml_insights_avanzados.optimizacion %}
+                <div class="col-md-6 col-lg-3">
+                    <!-- Card 3: Optimización de Precio -->
+                    <div class="card h-100 border-success">
+                        <div class="card-header bg-success bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Optimización</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Actual</small>
+                                    <h6 class="text-danger mb-0">${{ ml_insights_avanzados.optimizacion.costo_actual|floatformat:0 }}</h6>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Óptimo</small>
+                                    <h6 class="text-success mb-0">${{ ml_insights_avanzados.optimizacion.costo_optimo|floatformat:0 }}</h6>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-success alert-sm mb-2 py-2 px-2">
+                                <small>
+                                    <strong>Mejora:</strong><br>
+                                    +${{ ml_insights_avanzados.optimizacion.mejora_ingreso|floatformat:0 }} ingreso<br>
+                                    +{{ ml_insights_avanzados.optimizacion.mejora_probabilidad|floatformat:1 }}% probabilidad
+                                </small>
+                            </div>
+                            
+                            <div class="small">
+                                <strong>Escenario:</strong>
+                                <ul class="mb-0 ps-3">
+                                    <li>M.O.: {{ ml_insights_avanzados.optimizacion.escenario_optimo.desc_mano_obra_pct|floatformat:0 }}% desc.</li>
+                                    <li>Piezas: {{ ml_insights_avanzados.optimizacion.escenario_optimo.desc_piezas_pct|floatformat:0 }}% desc.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if ml_insights_avanzados.temporal %}
+                <div class="col-md-6 col-lg-3">
+                    <!-- Card 4: Análisis Temporal -->
+                    <div class="card h-100 border-info">
+                        <div class="card-header bg-info bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-calendar-check"></i> Timing Óptimo</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if ml_insights_avanzados.temporal.es_dia_optimo %}
+                            <div class="alert alert-success alert-sm py-2 px-2 mb-2">
+                                <small>
+                                    <i class="bi bi-check-circle-fill"></i> <strong>HOY es buen día</strong>
+                                </small>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-warning alert-sm py-2 px-2 mb-2">
+                                <small>
+                                    <i class="bi bi-clock-history"></i> <strong>Espera mejor momento</strong>
+                                </small>
+                            </div>
+                            {% endif %}
+                            
+                            <p class="small mb-3">{{ ml_insights_avanzados.temporal.mensaje|truncatewords:12 }}</p>
+                            
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Hoy</small>
+                                    <h6 class="mb-1">{{ ml_insights_avanzados.temporal.dia_hoy }}</h6>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar" style="width: 100%"></div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Mejor</small>
+                                    <h6 class="mb-1">{{ ml_insights_avanzados.temporal.mejor_dia }}</h6>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar bg-success" style="width: 100%"></div>
+                                    </div>
+                                    <small class="text-success">+{{ ml_insights_avanzados.temporal.mejora_potencial|floatformat:0 }}%</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- ========================================
+                     VISUALIZACIONES ML AVANZADAS (GRID 2x2)
+                     ======================================== -->
                 <div class="col-12 mt-4">
                     <h5 class="mb-3">
                         <i class="bi bi-graph-up"></i> Visualizaciones Analíticas Avanzadas
                     </h5>
                 </div>
                 
-                <!-- Gráfico: Comparación de Escenarios de Precio -->
-                {% if graficos.ml_escenarios_precio %}
-                <div class="col-12">
-                    <div class="grafico-card card">
+                <!-- Grid 2x2 de Gráficos Principales -->
+                <div class="col-md-6">
+                    <!-- Gráfico 1: Comparación de Escenarios de Precio -->
+                    {% if graficos.ml_escenarios_precio %}
+                    <div class="grafico-card card h-100">
                         <div class="card-header">
-                            <h5>
+                            <h6 class="mb-0">
                                 <i class="bi bi-currency-dollar"></i> 
-                                Comparación de Escenarios de Precio
-                            </h5>
+                                Escenarios de Precio
+                            </h6>
                         </div>
                         <div class="card-body">
                             {{ graficos.ml_escenarios_precio|safe }}
-                            <div class="alert alert-info alert-sm mt-3">
-                                <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
-                                El gráfico muestra 4 escenarios diferentes comparando el costo final, probabilidad de aceptación
-                                e ingreso esperado. El escenario <strong>Óptimo</strong> maximiza el ingreso considerando ambos factores.
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="grafico-card card h-100">
+                        <div class="card-body">
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-info-circle"></i> Gráfico no disponible
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
-                {% endif %}
                 
-                <!-- Gráfico: Matriz Riesgo-Beneficio -->
-                {% if graficos.ml_matriz_riesgo %}
-                <div class="col-12">
-                    <div class="grafico-card card">
+                <div class="col-md-6">
+                    <!-- Gráfico 2: Matriz Riesgo-Beneficio -->
+                    {% if graficos.ml_matriz_riesgo %}
+                    <div class="grafico-card card h-100">
                         <div class="card-header">
-                            <h5>
+                            <h6 class="mb-0">
                                 <i class="bi bi-grid-3x3"></i> 
-                                Matriz Riesgo-Beneficio de Recomendaciones
-                            </h5>
+                                Matriz Riesgo-Beneficio
+                            </h6>
                         </div>
                         <div class="card-body">
                             {{ graficos.ml_matriz_riesgo|safe }}
-                            <div class="alert alert-info alert-sm mt-3">
-                                <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
-                                Las recomendaciones en el cuadrante <strong class="text-success">PRIORITARIO</strong> (arriba-derecha) 
-                                ofrecen alto beneficio con bajo riesgo. Las del cuadrante <strong class="text-danger">EVITAR</strong> 
-                                (abajo-izquierda) tienen bajo beneficio y alto riesgo.
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="grafico-card card h-100">
+                        <div class="card-body">
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-info-circle"></i> Gráfico no disponible
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
-                {% endif %}
                 
-                <!-- Gráfico: Probabilidad por Día de la Semana -->
-                {% if graficos.ml_probabilidad_dia %}
-                <div class="col-md-12">
-                    <div class="grafico-card card">
+                <div class="col-md-6 mt-3">
+                    <!-- Gráfico 3: Probabilidad por Día -->
+                    {% if graficos.ml_probabilidad_dia %}
+                    <div class="grafico-card card h-100">
                         <div class="card-header">
-                            <h5>
+                            <h6 class="mb-0">
                                 <i class="bi bi-calendar-week"></i> 
-                                Probabilidad de Aceptación por Día
-                            </h5>
+                                Probabilidad por Día
+                            </h6>
                         </div>
                         <div class="card-body">
                             {{ graficos.ml_probabilidad_dia|safe }}
-                            <div class="alert alert-info alert-sm mt-3">
-                                <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
-                                Los días <strong class="text-success">Lunes y Martes</strong> tienen las mejores tasas de aceptación 
-                                históricas (+12-15%). Evita enviar cotizaciones los <strong class="text-danger">viernes y fines de semana</strong>.
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="grafico-card card h-100">
+                        <div class="card-body">
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-info-circle"></i> Gráfico no disponible
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6 mt-3">
+                    <!-- Gráfico 4: Factores Influyentes (movido aquí) -->
+                    {% if graficos.factores_influyentes %}
+                    <div class="grafico-card card h-100">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="bi bi-bar-chart-line"></i> 
+                                Factores Influyentes
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            {{ graficos.factores_influyentes|safe }}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="grafico-card card h-100">
+                        <div class="card-body">
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-info-circle"></i> Gráfico no disponible
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Interpretaciones de los Gráficos -->
+                <div class="col-12 mt-3">
+                    <div class="card border-info">
+                        <div class="card-header bg-info bg-opacity-10">
+                            <h6 class="mb-0">
+                                <i class="bi bi-lightbulb"></i> Interpretación de Visualizaciones
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <strong><i class="bi bi-currency-dollar text-primary"></i> Escenarios de Precio:</strong>
+                                    <p class="mb-0 text-muted small">
+                                        Compara 4 escenarios de precios. El <strong>Óptimo</strong> maximiza 
+                                        el ingreso esperado balanceando costo y probabilidad de aceptación.
+                                    </p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong><i class="bi bi-grid-3x3 text-success"></i> Matriz Riesgo-Beneficio:</strong>
+                                    <p class="mb-0 text-muted small">
+                                        Cuadrante <strong class="text-success">superior-derecho</strong>: alto beneficio, bajo riesgo (PRIORITARIO). 
+                                        <strong class="text-danger">Inferior-izquierdo</strong>: evitar.
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong><i class="bi bi-calendar-week text-warning"></i> Probabilidad por Día:</strong>
+                                    <p class="mb-0 text-muted small">
+                                        <strong class="text-success">Lunes-Martes</strong> son los mejores días (+12-15%). 
+                                        Evita <strong class="text-danger">viernes y fin de semana</strong>.
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong><i class="bi bi-bar-chart-line text-danger"></i> Factores Influyentes:</strong>
+                                    <p class="mb-0 text-muted small">
+                                        Los factores con mayor importancia influyen más en la decisión. 
+                                        Usa esta info para optimizar futuras cotizaciones.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                {% endif %}
                 
                 {% endif %}
                 <!-- FIN SECCIÓN ML AVANZADO -->
