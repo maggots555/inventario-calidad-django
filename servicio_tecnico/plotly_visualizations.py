@@ -1887,11 +1887,307 @@ class DashboardCotizacionesVisualizer:
         return fig
     
     # ========================================================================
+    # ANÁLISIS POR RESPONSABLE DE SEGUIMIENTO (4 funciones)
+    # ========================================================================
+    
+    def grafico_ranking_responsables(self, df_metricas):
+        """
+        Barras horizontales: Ranking de responsables por total de cotizaciones.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Muestra quiénes son los responsables más activos en enviar cotizaciones,
+        con barras coloreadas según su tasa de aceptación.
+        
+        Args:
+            df_metricas (DataFrame): DataFrame con métricas por responsable
+                                    (generado por calcular_metricas_por_responsable)
+        
+        Returns:
+            Figure: Gráfico de Plotly
+        """
+        
+        if df_metricas.empty:
+            return self._crear_grafico_vacio("No hay métricas de responsables")
+        
+        # Tomar top 10
+        top_10 = df_metricas.head(10).copy()
+        
+        # Crear gráfico de barras horizontales
+        fig = go.Figure(go.Bar(
+            y=top_10['responsable'][::-1],  # Invertir para que el top esté arriba
+            x=top_10['total'][::-1],
+            orientation='h',
+            marker=dict(
+                color=top_10['tasa_aceptacion'][::-1],
+                colorscale=[
+                    [0, self.colores['danger']],
+                    [0.5, self.colores['warning']],
+                    [1, self.colores['success']]
+                ],
+                showscale=True,
+                colorbar=dict(title="Tasa %")
+            ),
+            text=top_10['total'][::-1].apply(lambda x: f'{x}'),
+            textposition='auto',
+            hovertemplate=(
+                '<b>%{y}</b><br>'
+                'Total: %{x} cotizaciones<br>'
+                'Aceptadas: %{customdata[0]}<br>'
+                'Rechazadas: %{customdata[1]}<br>'
+                'Pendientes: %{customdata[2]}<br>'
+                'Tasa aceptación: %{customdata[3]:.1f}%'
+                '<extra></extra>'
+            ),
+            customdata=top_10[['aceptadas', 'rechazadas', 'pendientes', 'tasa_aceptacion']][::-1].values
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='🏆 Top 10 Responsables por Volumen de Cotizaciones',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=18, color=self.colores['dark'])
+            ),
+            xaxis=dict(title='Total de Cotizaciones'),
+            yaxis=dict(title=''),
+            height=500
+        )
+        
+        return fig
+    
+    def grafico_tasas_aceptacion_responsables(self, df_metricas):
+        """
+        Barras agrupadas: Aceptadas vs Rechazadas por responsable.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Muestra la distribución de resultados (aceptadas/rechazadas/pendientes)
+        para cada responsable, permitiendo comparar su efectividad.
+        
+        Args:
+            df_metricas (DataFrame): DataFrame con métricas por responsable
+        
+        Returns:
+            Figure: Gráfico de Plotly
+        """
+        
+        if df_metricas.empty:
+            return self._crear_grafico_vacio("No hay métricas de responsables")
+        
+        # Tomar top 8 para mejor visualización
+        top_8 = df_metricas.head(8).copy()
+        
+        # Crear gráfico de barras agrupadas
+        fig = go.Figure()
+        
+        # Barras de aceptadas
+        fig.add_trace(go.Bar(
+            name='Aceptadas',
+            x=top_8['responsable'],
+            y=top_8['aceptadas'],
+            marker_color=self.colores['success'],
+            text=top_8['aceptadas'],
+            textposition='auto',
+            hovertemplate='<b>Aceptadas</b><br>%{x}<br>Cantidad: %{y}<extra></extra>'
+        ))
+        
+        # Barras de rechazadas
+        fig.add_trace(go.Bar(
+            name='Rechazadas',
+            x=top_8['responsable'],
+            y=top_8['rechazadas'],
+            marker_color=self.colores['danger'],
+            text=top_8['rechazadas'],
+            textposition='auto',
+            hovertemplate='<b>Rechazadas</b><br>%{x}<br>Cantidad: %{y}<extra></extra>'
+        ))
+        
+        # Barras de pendientes
+        fig.add_trace(go.Bar(
+            name='Pendientes',
+            x=top_8['responsable'],
+            y=top_8['pendientes'],
+            marker_color=self.colores['warning'],
+            text=top_8['pendientes'],
+            textposition='auto',
+            hovertemplate='<b>Pendientes</b><br>%{x}<br>Cantidad: %{y}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='📊 Distribución de Resultados por Responsable',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=18, color=self.colores['dark'])
+            ),
+            barmode='group',
+            xaxis=dict(title='Responsable', tickangle=-45),
+            yaxis=dict(title='Cantidad de Cotizaciones'),
+            height=500,
+            showlegend=True,
+            legend=dict(
+                orientation='h',
+                yanchor='bottom',
+                y=1.02,
+                xanchor='right',
+                x=1
+            )
+        )
+        
+        return fig
+    
+    def grafico_valor_generado_responsables(self, df_metricas):
+        """
+        Barras comparativas: Valor cotizado vs Valor real generado.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Compara el valor TOTAL cotizado (potencial) con el valor REAL aceptado
+        (ingresos confirmados) para cada responsable.
+        
+        Args:
+            df_metricas (DataFrame): DataFrame con métricas por responsable
+        
+        Returns:
+            Figure: Gráfico de Plotly
+        """
+        
+        if df_metricas.empty:
+            return self._crear_grafico_vacio("No hay métricas de responsables")
+        
+        # Tomar top 8 por valor aceptado
+        top_8 = df_metricas.nlargest(8, 'valor_aceptado').copy()
+        
+        # Crear gráfico de barras agrupadas
+        fig = go.Figure()
+        
+        # Barras de valor cotizado (potencial)
+        fig.add_trace(go.Bar(
+            name='Valor Cotizado',
+            x=top_8['responsable'],
+            y=top_8['valor_cotizado'],
+            marker_color=self.colores['info'],
+            text=top_8['valor_cotizado'].apply(lambda x: f'${x:,.0f}'),
+            textposition='auto',
+            hovertemplate='<b>Valor Cotizado</b><br>%{x}<br>$%{y:,.2f}<extra></extra>'
+        ))
+        
+        # Barras de valor aceptado (real)
+        fig.add_trace(go.Bar(
+            name='Ingresos Reales',
+            x=top_8['responsable'],
+            y=top_8['valor_aceptado'],
+            marker_color=self.colores['success'],
+            text=top_8['valor_aceptado'].apply(lambda x: f'${x:,.0f}'),
+            textposition='auto',
+            hovertemplate='<b>Ingresos Reales</b><br>%{x}<br>$%{y:,.2f}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='💰 Valor Generado por Responsable',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=18, color=self.colores['dark'])
+            ),
+            barmode='group',
+            xaxis=dict(title='Responsable', tickangle=-45),
+            yaxis=dict(title='Valor ($)', tickformat='$,.0f'),
+            height=500,
+            showlegend=True,
+            legend=dict(
+                orientation='h',
+                yanchor='bottom',
+                y=1.02,
+                xanchor='right',
+                x=1
+            )
+        )
+        
+        return fig
+    
+    def grafico_piezas_promedio_responsables(self, df_metricas):
+        """
+        Gráfico de dispersión: Piezas promedio vs Tasa de aceptación.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Analiza la relación entre cantidad de piezas ofrecidas y tasa de aceptación.
+        ¿Ofrecer más piezas aumenta o disminuye la tasa de aceptación?
+        
+        Args:
+            df_metricas (DataFrame): DataFrame con métricas por responsable
+        
+        Returns:
+            Figure: Gráfico de Plotly
+        """
+        
+        if df_metricas.empty:
+            return self._crear_grafico_vacio("No hay métricas de responsables")
+        
+        # Crear scatter plot
+        fig = go.Figure(go.Scatter(
+            x=df_metricas['piezas_promedio'],
+            y=df_metricas['tasa_aceptacion'],
+            mode='markers+text',
+            marker=dict(
+                size=df_metricas['total'],  # Tamaño según total cotizaciones
+                sizemode='diameter',
+                sizeref=df_metricas['total'].max() / 40,
+                color=df_metricas['valor_aceptado'],
+                colorscale='Viridis',
+                showscale=True,
+                colorbar=dict(title="Valor<br>Generado"),
+                line=dict(width=2, color='white')
+            ),
+            text=df_metricas['responsable'],
+            textposition='top center',
+            textfont=dict(size=10),
+            hovertemplate=(
+                '<b>%{text}</b><br>'
+                'Piezas promedio: %{x:.1f}<br>'
+                'Tasa aceptación: %{y:.1f}%<br>'
+                'Total cotizaciones: %{marker.size}<br>'
+                'Valor generado: $%{marker.color:,.0f}'
+                '<extra></extra>'
+            )
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='🔧 Relación: Piezas Promedio vs Tasa de Aceptación',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=18, color=self.colores['dark'])
+            ),
+            xaxis=dict(title='Piezas Promedio por Cotización'),
+            yaxis=dict(title='Tasa de Aceptación (%)', range=[0, 100]),
+            height=600,
+            annotations=[
+                dict(
+                    text='<i>Tamaño de la burbuja = Total de cotizaciones</i>',
+                    xref='paper',
+                    yref='paper',
+                    x=0.5,
+                    y=-0.15,
+                    xanchor='center',
+                    yanchor='top',
+                    showarrow=False,
+                    font=dict(size=12, color='gray')
+                )
+            ]
+        )
+        
+        return fig
+    
+    # ========================================================================
     # FUNCIÓN ORQUESTADORA PRINCIPAL
     # ========================================================================
     
     def crear_dashboard_completo(self, df, df_piezas=None, df_seguimientos=None,
                                  df_metricas_tecnicos=None, df_metricas_sucursales=None,
+                                 df_metricas_responsables=None,
                                  kpis=None, ml_predictor=None, periodo='M'):
         """
         Genera TODOS los gráficos del dashboard en un solo llamado.
@@ -1980,6 +2276,21 @@ class DashboardCotizacionesVisualizer:
                 )
                 graficos['distribucion_sucursales'] = convertir_figura_a_html(
                     self.grafico_distribucion_sucursales(df_metricas_sucursales)
+                )
+            
+            # ANÁLISIS POR RESPONSABLE DE SEGUIMIENTO
+            if df_metricas_responsables is not None and not df_metricas_responsables.empty:
+                graficos['ranking_responsables'] = convertir_figura_a_html(
+                    self.grafico_ranking_responsables(df_metricas_responsables)
+                )
+                graficos['tasas_aceptacion_responsables'] = convertir_figura_a_html(
+                    self.grafico_tasas_aceptacion_responsables(df_metricas_responsables)
+                )
+                graficos['valor_generado_responsables'] = convertir_figura_a_html(
+                    self.grafico_valor_generado_responsables(df_metricas_responsables)
+                )
+                graficos['piezas_promedio_responsables'] = convertir_figura_a_html(
+                    self.grafico_piezas_promedio_responsables(df_metricas_responsables)
                 )
             
             # PROVEEDORES

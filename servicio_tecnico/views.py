@@ -7492,7 +7492,8 @@ def dashboard_cotizaciones(request):
         analizar_piezas_cotizadas,
         analizar_proveedores,
         calcular_metricas_por_tecnico,
-        calcular_metricas_por_sucursal
+        calcular_metricas_por_sucursal,
+        calcular_metricas_por_responsable
     )
     from .plotly_visualizations import DashboardCotizacionesVisualizer, convertir_figura_a_html
     from .ml_predictor import PredictorAceptacionCotizacion
@@ -7581,6 +7582,9 @@ def dashboard_cotizaciones(request):
         
         # Métricas por sucursal
         df_metricas_sucursales = calcular_metricas_por_sucursal(df_cotizaciones)
+        
+        # Métricas por responsable de seguimiento
+        df_metricas_responsables = calcular_metricas_por_responsable(df_cotizaciones)
     else:
         kpis = {
             'total_cotizaciones': 0,
@@ -7596,6 +7600,7 @@ def dashboard_cotizaciones(request):
         }
         df_metricas_tecnicos = pd.DataFrame()
         df_metricas_sucursales = pd.DataFrame()
+        df_metricas_responsables = pd.DataFrame()
     
     # ========================================
     # 4. GENERAR VISUALIZACIONES
@@ -7613,6 +7618,7 @@ def dashboard_cotizaciones(request):
                 df_seguimientos=df_seguimientos if not df_seguimientos.empty else None,
                 df_metricas_tecnicos=df_metricas_tecnicos if not df_metricas_tecnicos.empty else None,
                 df_metricas_sucursales=df_metricas_sucursales if not df_metricas_sucursales.empty else None,
+                df_metricas_responsables=df_metricas_responsables if not df_metricas_responsables.empty else None,
                 kpis=kpis,
                 ml_predictor=None,  # Lo agregamos después
                 periodo=periodo

@@ -161,6 +161,8 @@ def obtener_dataframe_cotizaciones(fecha_inicio=None, fecha_fin=None,
             'sucursal_id': orden.sucursal_id,
             'tecnico': orden.tecnico_asignado_actual.nombre_completo if orden.tecnico_asignado_actual else 'Sin técnico',
             'tecnico_id': orden.tecnico_asignado_actual_id,
+            'responsable': orden.responsable_seguimiento.nombre_completo if orden.responsable_seguimiento else 'Sin responsable',
+            'responsable_id': orden.responsable_seguimiento_id,
             'estado_orden': orden.estado,
             'estado_orden_display': orden.get_estado_display(),
             
@@ -509,5 +511,98 @@ def calcular_metricas_por_sucursal(df):
     
     # Ordenar por tasa de aceptación descendente
     metricas = metricas.sort_values('tasa_aceptacion', ascending=False)
+    
+    return metricas
+
+
+# ============================================================================
+# FUNCIÓN 7: CALCULAR MÉTRICAS POR RESPONSABLE DE SEGUIMIENTO
+# ============================================================================
+
+def calcular_metricas_por_responsable(df):
+    """
+    Calcula métricas de rendimiento por responsable de seguimiento.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Los responsables de seguimiento son los empleados encargados de dar seguimiento
+    a las órdenes y cotizaciones. Esta función analiza su desempeño:
+    - ¿Cuántas cotizaciones envían?
+    - ¿Qué tasa de aceptación tienen?
+    - ¿Cuánto valor generan?
+    - ¿Cuántas piezas ofrecen en promedio?
+    
+    Args:
+        df (DataFrame): DataFrame de cotizaciones
+    
+    Returns:
+        DataFrame: DataFrame con métricas por responsable
+        
+    Columnas retornadas:
+        - responsable: Nombre del responsable
+        - total: Total de cotizaciones enviadas
+        - aceptadas: Cotizaciones aceptadas
+        - rechazadas: Cotizaciones rechazadas
+        - pendientes: Cotizaciones sin respuesta
+        - tasa_aceptacion: Porcentaje de aceptación
+        - valor_cotizado: Valor total cotizado
+        - valor_aceptado: Valor real generado (ingresos)
+        - piezas_promedio: Promedio de piezas por cotización
+        - tiempo_respuesta_promedio: Días promedio hasta respuesta
+    """
+    
+    if df.empty:
+        return pd.DataFrame(columns=[
+            'responsable', 'total', 'aceptadas', 'rechazadas', 'pendientes',
+            'tasa_aceptacion', 'valor_cotizado', 'valor_aceptado', 'piezas_promedio'
+        ])
+    
+    # Filtrar responsables válidos (no nulos)
+    df_valido = df[df['responsable'] != 'Sin responsable'].copy()
+    
+    if df_valido.empty:
+        return pd.DataFrame(columns=[
+            'responsable', 'total', 'aceptadas', 'rechazadas', 'pendientes',
+            'tasa_aceptacion', 'valor_cotizado', 'valor_aceptado', 'piezas_promedio'
+        ])
+    
+    # Agrupar por responsable
+    metricas = df_valido.groupby('responsable').agg({
+        'cotizacion_id': 'count',  # Total cotizaciones
+        'aceptada': [
+            lambda x: (x == True).sum(),  # Aceptadas
+            lambda x: (x == False).sum(),  # Rechazadas
+            lambda x: x.isna().sum()  # Pendientes
+        ],
+        'costo_total': 'sum',  # Valor total cotizado
+        'total_piezas': 'mean',  # Promedio de piezas
+        'dias_sin_respuesta': 'mean'  # Tiempo respuesta promedio
+    }).reset_index()
+    
+    # Aplanar nombres de columnas multinivel
+    metricas.columns = [
+        'responsable', 'total', 'aceptadas', 'rechazadas', 'pendientes',
+        'valor_cotizado', 'piezas_promedio', 'tiempo_respuesta_promedio'
+    ]
+    
+    # Calcular valor aceptado de forma separada para evitar warning
+    valor_aceptado = df_valido[df_valido['aceptada'] == True].groupby('responsable')['costo_total_final'].sum()
+    metricas['valor_aceptado'] = metricas['responsable'].map(valor_aceptado).fillna(0)
+    
+    # Calcular tasa de aceptación
+    metricas['tasa_aceptacion'] = (metricas['aceptadas'] / metricas['total'] * 100).round(2)
+    
+    # Redondear promedios
+    metricas['piezas_promedio'] = metricas['piezas_promedio'].round(1)
+    metricas['tiempo_respuesta_promedio'] = metricas['tiempo_respuesta_promedio'].round(1)
+    
+    # Reordenar columnas
+    metricas = metricas[[
+        'responsable', 'total', 'aceptadas', 'rechazadas', 'pendientes',
+        'tasa_aceptacion', 'valor_cotizado', 'valor_aceptado', 
+        'piezas_promedio', 'tiempo_respuesta_promedio'
+    ]]
+    
+    # Ordenar por total de cotizaciones descendente
+    metricas = metricas.sort_values('total', ascending=False)
     
     return metricas
