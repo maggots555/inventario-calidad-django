@@ -176,6 +176,8 @@ MOTIVO_RECHAZO_COTIZACION = [
     ('falta_justificacion', 'Falta de justificación en diagnóstico'),
     ('no_vale_pena', 'No vale la pena reparar'),
     ('no_hay_partes', 'No hay partes en el mercado'),
+    ('solo_venta_mostrador', 'Solo está interesado en la propuesta de venta mostrador'),
+    ('falta_de_respuesta', 'Se cierra cotización por vigencia y falta de respuesta del cliente'),
     ('otro', 'Otro motivo'),
 ]
 
