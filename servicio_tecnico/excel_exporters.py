@@ -102,6 +102,9 @@ def get_estado_color(estado):
     EXPLICACIÓN: Cada estado de servicio tiene un color asociado para identificarlo
     rápidamente en el Excel (verde = entregado, amarillo = en proceso, etc.)
     
+    ACTUALIZACIÓN (Nov 2025): Se agregaron colores para todos los estados nuevos
+    para evitar que aparezcan en blanco en el Excel.
+    
     Args:
         estado (str): Estado de la orden (entregado, finalizado, reparacion, etc.)
         
@@ -109,16 +112,32 @@ def get_estado_color(estado):
         str: Código hexadecimal del color (sin #)
     """
     colores = {
-        'entregado': '28a745',      # Verde - completado exitosamente
-        'finalizado': '17a2b8',     # Azul claro - terminado pero no entregado
-        'reparacion': 'ffc107',     # Amarillo - en proceso
-        'cancelado': 'dc3545',      # Rojo - cancelado
-        'diagnostico': 'fd7e14',    # Naranja - en diagnóstico
-        'espera': '6c757d',         # Gris - en espera
-        'cotizacion': 'e83e8c',     # Rosa - esperando cotización
-        'control_calidad': '20c997'  # Verde agua - en control de calidad
+        # === ESTADOS BÁSICOS (Ya existentes) ===
+        'entregado': '28a745',              # Verde - completado exitosamente
+        'finalizado': '17a2b8',             # Azul claro - terminado pero no entregado
+        'reparacion': 'ffc107',             # Amarillo - en proceso
+        'cancelado': 'dc3545',              # Rojo - cancelado
+        'diagnostico': 'fd7e14',            # Naranja - en diagnóstico
+        'espera': '6c757d',                 # Gris - en espera
+        'cotizacion': 'e83e8c',             # Rosa - esperando cotización
+        'control_calidad': '20c997',        # Verde agua - en control de calidad
+        'recepcion': 'a0c4ff',              # Azul claro suave - recepción
+        
+        # === ESTADOS NUEVOS AGREGADOS (Oct 2025) ===
+        'equipo_diagnosticado': '6f42c1',   # Púrpura - diagnóstico completado
+        'diagnostico_enviado_cliente': '9b59b6',  # Morado claro - diagnóstico enviado
+        'cotizacion_enviada_proveedor': 'e74c3c', # Rojo ladrillo - cotización enviada a proveedor
+        'cotizacion_recibida_proveedor': 'f39c12', # Naranja - cotización recibida de proveedor
+        'cliente_acepta_cotizacion': '2ecc71',    # Verde esmeralda - cliente aceptó
+        'rechazada': 'c0392b',              # Rojo oscuro - cotización rechazada
+        'partes_solicitadas_proveedor': '3498db', # Azul - partes solicitadas
+        'esperando_piezas': 'f1c40f',       # Amarillo dorado - esperando llegada
+        'piezas_recibidas': '27ae60',       # Verde medio - piezas recibidas
+        'wpb_pieza_incorrecta': 'e67e22',   # Naranja fuerte - WPB pieza incorrecta
+        'doa_pieza_danada': 'c0392b',       # Rojo granate - DOA pieza dañada
+        'pnc_parte_no_disponible': '95a5a6', # Gris medio - PNC parte no disponible
     }
-    return colores.get(estado.lower(), 'ffffff')  # Blanco por defecto
+    return colores.get(estado.lower(), 'cccccc')  # Gris claro por defecto (en vez de blanco)
 
 
 def apply_cell_style(cell, style_dict):

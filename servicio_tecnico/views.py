@@ -1609,14 +1609,39 @@ def detalle_orden(request, orden_id):
                     es_sistema=False
                 )
                 
-                # MODIFICACIÓN: Se eliminó el cambio automático de estado
-                # Ahora el usuario debe cambiar manualmente el estado usando
-                # el formulario de "Asignación de Estado" en la sección 2
-                # 
-                # CÓDIGO ANTERIOR (ELIMINADO):
-                # - Cambiaba automáticamente orden.estado = 'cotizacion'
-                # - Mostraba mensaje: "Estado actualizado automáticamente"
-                # - Registraba en historial como "Cambio automático de estado"
+                # ================================================================
+                # CAMBIO AUTOMÁTICO DE ESTADO: Esperando Aprobación Cliente
+                # ================================================================
+                # Al crear una nueva cotización, cambiar automáticamente el estado
+                # de la orden a "Esperando Aprobación Cliente" (estado: 'cotizacion')
+                # para reflejar que está pendiente de respuesta del cliente.
+                estado_anterior = orden.estado
+                
+                # Solo cambiar si NO está ya en ese estado
+                if estado_anterior != 'cotizacion':
+                    orden.estado = 'cotizacion'
+                    orden.save()
+                    
+                    # Mensaje informativo al usuario
+                    messages.info(
+                        request,
+                        '📋 Estado actualizado automáticamente a: "Esperando Aprobación Cliente"'
+                    )
+                    
+                    # Registrar el cambio automático en el historial
+                    HistorialOrden.objects.create(
+                        orden=orden,
+                        tipo_evento='cambio_estado',
+                        estado_anterior=estado_anterior,
+                        estado_nuevo='cotizacion',
+                        comentario=(
+                            f'Cambio automático de estado: '
+                            f'{dict(ESTADO_ORDEN_CHOICES).get(estado_anterior, estado_anterior)} → '
+                            f'Esperando Aprobación Cliente (cotización creada)'
+                        ),
+                        usuario=empleado_actual,
+                        es_sistema=True  # Marcar como evento del sistema
+                    )
                 
                 return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
             else:

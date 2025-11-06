@@ -183,6 +183,7 @@ MOTIVO_RECHAZO_COTIZACION = [
     ('no_hay_partes', 'No hay partes en el mercado'),
     ('solo_venta_mostrador', 'Solo está interesado en la propuesta de venta mostrador'),
     ('falta_de_respuesta', 'Se cierra cotización por vigencia y falta de respuesta del cliente'),
+    ('rechazo_sin_decision', 'Cliente desea evaluar las opciones sin tomar decisión inmediata'),
     ('otro', 'Otro motivo'),
 ]
 
