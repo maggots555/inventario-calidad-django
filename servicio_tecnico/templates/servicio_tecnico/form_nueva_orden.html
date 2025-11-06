@@ -119,7 +119,7 @@
                                         {% for error in form.orden_cliente.errors %}{{ error }}{% endfor %}
                                     </div>
                                 {% endif %}
-                                <div class="form-text">{{ form.orden_cliente.help_text }}</div>
+                                <div class="form-text">{{ form.orden_cliente.help_text|safe }}</div>
                             </div>
                         </div>
 
@@ -351,6 +351,41 @@ document.addEventListener('DOMContentLoaded', function() {
     if (numeroSerieCargadorInput) {
         numeroSerieCargadorInput.addEventListener('input', function() {
             this.value = this.value.toUpperCase();
+        });
+    }
+    
+    // ============================================================================
+    // FUNCIÓN: Manejar campo de Orden del Cliente con prefijo
+    // EXPLICACIÓN: Mejora la experiencia al trabajar con el prefijo OOW-
+    // ============================================================================
+    const ordenClienteInput = document.getElementById('id_orden_cliente');
+    if (ordenClienteInput) {
+        // Convertir a mayúsculas mientras el usuario escribe
+        ordenClienteInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+        
+        // Cuando el usuario hace clic en el campo, posicionar el cursor después del prefijo
+        ordenClienteInput.addEventListener('click', function() {
+            // Si el campo solo contiene "OOW-", posicionar el cursor al final
+            if (this.value === 'OOW-' || this.value === 'FL-') {
+                this.setSelectionRange(this.value.length, this.value.length);
+            }
+        });
+        
+        // Cuando el usuario presiona una tecla, verificar si intenta borrar el prefijo
+        ordenClienteInput.addEventListener('keydown', function(e) {
+            const cursorPos = this.selectionStart;
+            const value = this.value;
+            
+            // Si está al inicio y presiona Backspace o Delete, prevenir borrar el prefijo
+            if ((e.key === 'Backspace' && cursorPos <= 4 && value.startsWith('OOW-')) ||
+                (e.key === 'Backspace' && cursorPos <= 3 && value.startsWith('FL-')) ||
+                (e.key === 'Delete' && cursorPos < 4 && value.startsWith('OOW-')) ||
+                (e.key === 'Delete' && cursorPos < 3 && value.startsWith('FL-'))) {
+                // No prevenir, permitir borrar para que el usuario pueda escribir otro prefijo
+                // Este es el comportamiento que solicitaste
+            }
         });
     }
 });

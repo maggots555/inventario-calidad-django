@@ -124,7 +124,7 @@
                                         {% for error in form.orden_cliente.errors %}{{ error }}{% endfor %}
                                     </div>
                                 {% endif %}
-                                <div class="form-text">{{ form.orden_cliente.help_text }}</div>
+                                <div class="form-text">{{ form.orden_cliente.help_text|safe }}</div>
                             </div>
                         </div>
 
@@ -146,7 +146,48 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN 2: DESCRIPCIÓN DEL SERVICIO -->
+                <!-- SECCIÓN 2: ACCESORIOS -->
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-plug"></i> Accesorios
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    {{ form.tiene_cargador }}
+                                    <label class="form-check-label" for="{{ form.tiene_cargador.id_for_label }}">
+                                        <i class="bi bi-battery-charging"></i> ¿Incluye cargador?
+                                    </label>
+                                </div>
+                                <div class="form-text">{{ form.tiene_cargador.help_text }}</div>
+                            </div>
+                            
+                            <!-- 
+                                CAMPO CONDICIONAL - NÚMERO DE SERIE DEL CARGADOR
+                                EXPLICACIÓN: Este div se muestra/oculta con JavaScript
+                                             cuando el usuario marca/desmarca "tiene_cargador"
+                            -->
+                            <div class="col-md-6 mb-3" id="div_numero_serie_cargador" style="display: none;">
+                                <label for="{{ form.numero_serie_cargador.id_for_label }}" class="form-label">
+                                    <i class="bi bi-upc"></i> Número de Serie del Cargador
+                                    <span class="badge bg-secondary">Opcional</span>
+                                </label>
+                                {{ form.numero_serie_cargador }}
+                                {% if form.numero_serie_cargador.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.numero_serie_cargador.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{{ form.numero_serie_cargador.help_text }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 3: DESCRIPCIÓN DEL SERVICIO -->
                 <div class="card mb-4">
                     <div class="card-header bg-success text-white">
                         <h5 class="mb-0">
@@ -168,7 +209,7 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN 3: UBICACIÓN -->
+                <!-- SECCIÓN 4: UBICACIÓN -->
                 <div class="card mb-4">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
@@ -224,4 +265,96 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ============================================================================
+// JAVASCRIPT PARA FORMULARIO DE VENTA MOSTRADOR
+// EXPLICACIÓN: Mejora la experiencia del usuario con validaciones y UX
+// ============================================================================
+
+// ============================================================================
+// FUNCIÓN: toggleCargadorFields
+// EXPLICACIÓN: Muestra u oculta el campo de número de serie del cargador
+//              dependiendo de si el checkbox "tiene_cargador" está marcado
+// ============================================================================
+function toggleCargadorFields() {
+    // Obtener el checkbox (elemento HTML)
+    const tieneCargador = document.getElementById('id_tiene_cargador');
+    
+    // Obtener el div que contiene el campo de número de serie del cargador
+    const divNumeroSerie = document.getElementById('div_numero_serie_cargador');
+    
+    // Verificar si el checkbox existe (por seguridad)
+    if (tieneCargador && divNumeroSerie) {
+        // Si el checkbox ESTÁ marcado (checked = true)
+        if (tieneCargador.checked) {
+            // MOSTRAR el campo de número de serie
+            divNumeroSerie.style.display = 'block';
+        } else {
+            // OCULTAR el campo de número de serie
+            divNumeroSerie.style.display = 'none';
+            
+            // Limpiar el campo (por si había algo escrito)
+            const inputNumeroSerie = document.getElementById('id_numero_serie_cargador');
+            if (inputNumeroSerie) {
+                inputNumeroSerie.value = '';
+            }
+        }
+    }
+}
+
+// ============================================================================
+// EVENTO: DOMContentLoaded
+// EXPLICACIÓN: Este código se ejecuta cuando la página termina de cargar
+// ============================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // Ejecutar la función al cargar la página para establecer el estado inicial
+    toggleCargadorFields();
+    
+    // Agregar evento al checkbox para que se ejecute cada vez que cambie
+    const tieneCargador = document.getElementById('id_tiene_cargador');
+    if (tieneCargador) {
+        tieneCargador.addEventListener('change', toggleCargadorFields);
+    }
+    
+    // ========================================================================
+    // Convertir número de serie a mayúsculas mientras escribes
+    // ========================================================================
+    const numeroSerieInput = document.getElementById('id_numero_serie');
+    if (numeroSerieInput) {
+        numeroSerieInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+    }
+    
+    // Número de serie del cargador también en mayúsculas
+    const numeroSerieCargadorInput = document.getElementById('id_numero_serie_cargador');
+    if (numeroSerieCargadorInput) {
+        numeroSerieCargadorInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+    }
+    
+    // ========================================================================
+    // Manejar campo de Orden del Cliente con prefijo FL-
+    // ========================================================================
+    const ordenClienteInput = document.getElementById('id_orden_cliente');
+    if (ordenClienteInput) {
+        // Convertir a mayúsculas mientras el usuario escribe
+        ordenClienteInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+        });
+        
+        // Cuando el usuario hace clic en el campo, posicionar el cursor después del prefijo
+        ordenClienteInput.addEventListener('click', function() {
+            if (this.value === 'FL-' || this.value === 'OOW-') {
+                this.setSelectionRange(this.value.length, this.value.length);
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

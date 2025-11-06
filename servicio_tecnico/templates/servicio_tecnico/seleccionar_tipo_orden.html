@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<!-- Font Awesome 6 - Iconos profesionales -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- CSS personalizado para la página de selección -->
+<link rel="stylesheet" href="{% static 'css/seleccion_orden.css' %}">
+{% endblock %}
+
+{% block content %}
+<!--
+================================================================================
+PÁGINA DE SELECCIÓN DE TIPO DE ORDEN
+================================================================================
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+Esta página le muestra al usuario dos opciones para crear una orden de servicio:
+
+1. SERVICIO CON DIAGNÓSTICO (OOW-):
+   - Equipos que necesitan ser analizados
+   - Requiere cotización
+   - Cliente espera diagnóstico y autorización
+
+2. VENTA MOSTRADOR (FL-):
+   - Servicio inmediato sin diagnóstico previo
+   - Cliente presente en el momento
+   - Pago y entrega rápidos
+
+El usuario DEBE elegir una opción antes de proceder al formulario correspondiente.
+================================================================================
+-->
+
+<div class="seleccion-orden-wrapper">
+    <div class="container">
+        
+        <!-- ================================================================ -->
+        <!-- SECCIÓN HERO: Título y Subtítulo                                 -->
+        <!-- ================================================================ -->
+        <div class="hero-section">
+            <div class="hero-icon">
+                <i class="fas fa-tools"></i>
+            </div>
+            <h1 class="hero-title">Crear Nueva Orden de Servicio</h1>
+            <p class="hero-subtitle">
+                Selecciona el tipo de servicio que deseas registrar para continuar
+            </p>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- CONTENEDOR DE CARDS: Dos opciones lado a lado                    -->
+        <!-- ================================================================ -->
+        <div class="cards-container">
+            
+            <!-- ============================================================ -->
+            <!-- CARD 1: SERVICIO CON DIAGNÓSTICO (OOW-)                     -->
+            <!-- ============================================================ -->
+            <div class="service-card diagnostico">
+                <div class="service-card-content">
+                    <!-- Ícono representativo -->
+                    <div class="service-icon">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    
+                    <!-- Título del tipo de servicio -->
+                    <h2 class="service-title">Servicio con Diagnóstico</h2>
+                    <h5 class="service-subtitle">- Dentro y fuera de garantía</h5>
+                    
+                    <!-- Badge con el prefijo -->
+                    <div class="service-prefix">
+                        <i class="fas fa-tag"></i> Prefijo: OOW-
+                    </div>
+                    
+                    <!-- Lista de características -->
+                    <ul class="service-features">
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            Requiere análisis técnico
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            Cotización previa
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            Cliente espera autorización
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            Tiempo de diagnóstico estimado
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            Seguimiento completo
+                        </li>
+                    </ul>
+                    
+                    <!-- Botón de acción -->
+                    <a href="{% url 'servicio_tecnico:crear_orden' %}" class="service-button">
+                        <span>Crear Orden OOW-</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- CARD 2: VENTA MOSTRADOR (FL-)                                -->
+            <!-- ============================================================ -->
+            <div class="service-card venta-mostrador">
+                <div class="service-card-content">
+                    <!-- Ícono representativo -->
+                    <div class="service-icon">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    
+                    <!-- Título del tipo de servicio -->
+                    <h2 class="service-title">Venta Mostrador</h2>
+                    <h5 class="service-subtitle">- Solo fuera de garantía</h5>
+                    
+                    <!-- Badge con el prefijo -->
+                    <div class="service-prefix">
+                        <i class="fas fa-tag"></i> Prefijo: FL-
+                    </div>
+                    
+                    <!-- Lista de características -->
+                    <ul class="service-features">
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            Servicio inmediato
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            Sin diagnóstico previo
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            Cliente presente
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            Cobro directo
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            Entrega rápida
+                        </li>
+                    </ul>
+                    
+                    <!-- Botón de acción -->
+                    <a href="{% url 'servicio_tecnico:crear_orden_venta_mostrador' %}" class="service-button">
+                        <span>Crear Orden FL-</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- SECCIÓN DE INFORMACIÓN: Ayuda adicional                          -->
+        <!-- ================================================================ -->
+        <div class="info-section">
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <p>
+                    <strong>¿No estás seguro cuál elegir?</strong><br>
+                    Usa <strong>Diagnóstico dentro y fuera de garantía (OOW-)</strong> cuando el equipo requiera análisis 
+                    y cotización previa. Usa <strong>Venta Mostrador (FL-)</strong> para servicios 
+                    rápidos con el cliente presente.
+                </p>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!--
+================================================================================
+JAVASCRIPT PARA INTERACTIVIDAD ADICIONAL
+================================================================================
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+Este script agrega pequeñas mejoras de experiencia de usuario:
+- Efectos de sonido al hacer hover (opcional)
+- Confirmación antes de proceder (opcional)
+- Atajos de teclado para selección rápida
+================================================================================
+-->
+<script>
+// ============================================================================
+// Esperar a que el DOM esté completamente cargado
+// ============================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // ========================================================================
+    // ATAJOS DE TECLADO - Acceso rápido para usuarios avanzados
+    // ========================================================================
+    document.addEventListener('keydown', function(e) {
+        // Tecla "1" = Servicio con Diagnóstico (OOW-)
+        if (e.key === '1') {
+            e.preventDefault();
+            window.location.href = "{% url 'servicio_tecnico:crear_orden' %}";
+        }
+        
+        // Tecla "2" = Venta Mostrador (FL-)
+        if (e.key === '2') {
+            e.preventDefault();
+            window.location.href = "{% url 'servicio_tecnico:crear_orden_venta_mostrador' %}";
+        }
+    });
+    
+    // ========================================================================
+    // EFECTO DE CLICK EN CARD COMPLETO
+    // Al hacer clic en cualquier parte del card, redirigir
+    // ========================================================================
+    const diagnosticoCard = document.querySelector('.service-card.diagnostico');
+    const ventaMostradorCard = document.querySelector('.service-card.venta-mostrador');
+    
+    if (diagnosticoCard) {
+        diagnosticoCard.addEventListener('click', function(e) {
+            // Si NO se hizo clic en el botón (para evitar doble navegación)
+            if (!e.target.closest('.service-button')) {
+                window.location.href = "{% url 'servicio_tecnico:crear_orden' %}";
+            }
+        });
+    }
+    
+    if (ventaMostradorCard) {
+        ventaMostradorCard.addEventListener('click', function(e) {
+            if (!e.target.closest('.service-button')) {
+                window.location.href = "{% url 'servicio_tecnico:crear_orden_venta_mostrador' %}";
+            }
+        });
+    }
+    
+    // ========================================================================
+    // MENSAJE DE CONSOLA PARA DESARROLLADORES
+    // ========================================================================
+    console.log('%c🔧 Página de Selección de Tipo de Orden', 'color: #4F46E5; font-size: 16px; font-weight: bold;');
+    console.log('%cAtajos de teclado disponibles:', 'color: #6B7280; font-size: 12px;');
+    console.log('%c  • Presiona "1" para Diagnóstico (OOW-)', 'color: #4F46E5; font-size: 12px;');
+    console.log('%c  • Presiona "2" para Venta Mostrador (FL-)', 'color: #F59E0B; font-size: 12px;');
+});
+</script>
+{% endblock %}

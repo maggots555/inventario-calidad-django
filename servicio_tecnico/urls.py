@@ -17,6 +17,9 @@ urlpatterns = [
     # Página de inicio del módulo de servicio técnico
     path('', views.inicio, name='inicio'),
     
+    # Seleccionar tipo de orden (Diagnóstico vs Venta Mostrador)
+    path('ordenes/nueva/', views.seleccionar_tipo_orden, name='seleccionar_tipo_orden'),
+    
     # Crear nueva orden de servicio
     path('ordenes/crear/', views.crear_orden, name='crear_orden'),
     

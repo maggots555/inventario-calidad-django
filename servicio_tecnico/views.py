@@ -222,6 +222,40 @@ def obtener_top_productos_vendidos(ordenes, limite=5):
     return piezas_lista[:limite]
 
 
+# ============================================================================
+# VISTA: Seleccionar Tipo de Orden
+# EXPLICACIÓN: Página intermedia donde el usuario elige entre:
+#              - Servicio con Diagnóstico (OOW-)
+#              - Venta Mostrador (FL-)
+# ============================================================================
+@login_required
+def seleccionar_tipo_orden(request):
+    """
+    Vista de selección de tipo de orden de servicio.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta es una vista simple que solo muestra un template. No procesa datos,
+    solo presenta dos opciones al usuario para que elija el tipo de servicio
+    que desea crear.
+    
+    PROPÓSITO:
+    - Clarificar al usuario qué tipo de orden va a crear
+    - Mostrar los prefijos correspondientes (OOW- o FL-)
+    - Mejorar la experiencia de usuario con una interfaz visual atractiva
+    - Prevenir confusiones entre tipos de servicio
+    
+    Args:
+        request: Objeto HttpRequest de Django
+        
+    Returns:
+        HttpResponse con el template de selección renderizado
+    """
+    context = {
+        'titulo': 'Seleccionar Tipo de Servicio',
+    }
+    return render(request, 'servicio_tecnico/seleccionar_tipo_orden.html', context)
+
+
 @login_required
 def inicio(request):
     """

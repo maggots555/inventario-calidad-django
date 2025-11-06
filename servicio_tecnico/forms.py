@@ -108,13 +108,14 @@ class NuevaOrdenForm(forms.ModelForm):
     
     orden_cliente = forms.CharField(
         max_length=50,
+        initial='OOW-',  # Valor inicial con el prefijo
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Ej: OC-2025-001, 12345',
+            'placeholder': 'OOW-',
             'required': True,
         }),
         label="Número de Orden del Cliente",
-        help_text="Número de orden interno del cliente (obligatorio)"
+        help_text="<strong>Campo obligatorio.</strong> El prefijo 'OOW-' aparece por defecto. Puede borrar el texto para escribir otro número de orden, pero <strong>en las órdenes que son OOW- o FL-, siempre es necesario poner el prefijo.</strong>"
     )
     
     equipo_enciende = forms.BooleanField(
@@ -299,6 +300,11 @@ class NuevaOrdenForm(forms.ModelForm):
         # Crear la instancia de OrdenServicio pero NO guardarla aún
         orden = super().save(commit=False)
         
+        # ESTABLECER TIPO DE SERVICIO COMO DIAGNÓSTICO
+        # EXPLICACIÓN: Marcamos explícitamente que esta orden requiere diagnóstico técnico
+        # Esto es importante para métricas, reportes y análisis del negocio
+        orden.tipo_servicio = 'diagnostico'
+        
         # IMPORTANTE: OrdenServicio requiere responsable_seguimiento y tecnico_asignado_actual
         # Como este es un formulario simplificado, usamos el usuario actual o el primero disponible
         
@@ -420,13 +426,14 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
     
     orden_cliente = forms.CharField(
         max_length=50,
+        initial='FL-',  # Valor inicial con el prefijo para Venta Mostrador
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Ej: VM-001, CLIENTE-123',
+            'placeholder': 'FL-',
             'required': True,
         }),
         label="Número de Orden del Cliente",
-        help_text="Identificador de la orden del cliente"
+        help_text="<strong>Campo obligatorio.</strong> El prefijo 'FL-' aparece por defecto para Venta Mostrador. Puede borrar el texto para escribir otro número de orden, pero <strong>en las órdenes que son OOW- o FL-, siempre es necesario poner el prefijo.</strong>"
     )
     
     equipo_enciende = forms.BooleanField(
@@ -437,6 +444,33 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
         }),
         label="¿El equipo enciende?",
         help_text="Estado del equipo al momento del ingreso"
+    )
+    
+    # ========================================================================
+    # CAMPOS DE ACCESORIOS (igual que en diagnóstico)
+    # ========================================================================
+    
+    tiene_cargador = forms.BooleanField(
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'id': 'id_tiene_cargador',
+        }),
+        label="¿Incluye cargador?",
+        help_text="Marca si el equipo trae cargador"
+    )
+    
+    numero_serie_cargador = forms.CharField(
+        max_length=100,
+        required=False,  # OPCIONAL, solo si tiene cargador
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Número de serie del cargador (opcional)',
+            'id': 'id_numero_serie_cargador',
+        }),
+        label="Número de Serie del Cargador",
+        help_text="Solo si el cargador tiene número de serie identificable"
     )
     
     # ========================================================================
@@ -506,10 +540,14 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
         Guarda la orden de Venta Mostrador.
         
         IMPORTANTE: Marca automáticamente tipo_servicio='venta_mostrador'
+        Esto diferencia estas órdenes de las que requieren diagnóstico técnico,
+        lo cual es crítico para métricas, reportes y análisis del negocio.
         """
         orden = super().save(commit=False)
         
         # ESTABLECER TIPO DE SERVICIO COMO VENTA MOSTRADOR
+        # EXPLICACIÓN: Estas órdenes NO requieren diagnóstico técnico previo
+        # Son servicios directos donde el cliente puede esperar o regresar el mismo día
         orden.tipo_servicio = 'venta_mostrador'
         
         # Establecer estado inicial como 'recepcion' (pueden empezar servicio de inmediato)
@@ -541,7 +579,8 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
                 equipo_enciende=self.cleaned_data.get('equipo_enciende', True),
                 falla_principal=self.cleaned_data.get('descripcion_servicio', 'Venta Mostrador - Servicio Directo'),
                 gama='media',  # Valor por defecto
-                tiene_cargador=False,  # No relevante para venta mostrador
+                tiene_cargador=self.cleaned_data.get('tiene_cargador', False),
+                numero_serie_cargador=self.cleaned_data.get('numero_serie_cargador', '') if self.cleaned_data.get('tiene_cargador', False) else '',
             )
             
             # Intentar calcular gama automáticamente
