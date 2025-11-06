@@ -76,16 +76,6 @@
                                     <i class="bi bi-award"></i> Marca
                                 </label>
                                 {{ form.marca }}
-                                <datalist id="marcas-list-vm">
-                                    <option value="Dell">
-                                    <option value="HP">
-                                    <option value="Lenovo">
-                                    <option value="Asus">
-                                    <option value="Acer">
-                                    <option value="Apple">
-                                    <option value="Samsung">
-                                    <option value="Toshiba">
-                                </datalist>
                                 {% if form.marca.errors %}
                                     <div class="invalid-feedback d-block">
                                         {% for error in form.marca.errors %}{{ error }}{% endfor %}

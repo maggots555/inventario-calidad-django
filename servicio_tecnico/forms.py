@@ -29,7 +29,8 @@ from inventario.models import Sucursal, Empleado
 from scorecard.models import ComponenteEquipo
 from config.constants import (
     TIPO_EQUIPO_CHOICES, 
-    MARCAS_EQUIPOS, 
+    MARCAS_EQUIPOS_CHOICES,  # Nueva constante para dropdown
+    MARCAS_EQUIPOS,  # Lista simple (compatibilidad)
     TIPO_IMAGEN_CHOICES, 
     MOTIVO_RECHAZO_COTIZACION,
     ESTADO_PIEZA_CHOICES,
@@ -72,16 +73,14 @@ class NuevaOrdenForm(forms.ModelForm):
         help_text="Selecciona el tipo de equipo que ingresa"
     )
     
-    marca = forms.CharField(
-        max_length=50,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Ej: Dell, HP, Lenovo',
+    marca = forms.ChoiceField(
+        choices=MARCAS_EQUIPOS_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-control form-select',
             'required': True,
-            'list': 'marcas-list',  # Para autocompletar
         }),
         label="Marca del Equipo",
-        help_text="Marca del equipo (campo obligatorio)"
+        help_text="Selecciona la marca del equipo (campo obligatorio)"
     )
     
     modelo = forms.CharField(
@@ -336,24 +335,21 @@ class NuevaOrdenForm(forms.ModelForm):
             )
             
             # Intentar calcular la gama automáticamente
-            gama_calculada = ReferenciaGamaEquipo.obtener_gama(
+            # EXPLICACIÓN: ReferenciaGamaEquipo.obtener_gama() retorna un objeto ReferenciaGamaEquipo
+            # pero el campo detalle.gama espera un STRING ('alta', 'media', 'baja')
+            # Por eso usamos .gama para extraer solo el valor del campo
+            referencia_gama = ReferenciaGamaEquipo.obtener_gama(
                 self.cleaned_data['marca'],
                 self.cleaned_data.get('modelo', '')
             )
-            if gama_calculada:
-                detalle.gama = gama_calculada
+            if referencia_gama:
+                # ✅ CORRECTO: Extraer el valor del campo gama del objeto
+                detalle.gama = referencia_gama.gama
             
             detalle.save()
         
         return orden
     
-    def get_marcas_list(self):
-        """
-        EXPLICACIÓN:
-        Método auxiliar para obtener la lista de marcas predefinidas
-        desde las constantes. Se usa en el template para el autocompletar.
-        """
-        return MARCAS_EQUIPOS
 
 
 # ============================================================================
@@ -389,16 +385,14 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
         help_text="Tipo de equipo que ingresa para el servicio"
     )
     
-    marca = forms.CharField(
-        max_length=50,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Ej: Dell, HP, Lenovo',
+    marca = forms.ChoiceField(
+        choices=MARCAS_EQUIPOS_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-control form-select',
             'required': True,
-            'list': 'marcas-list-vm',
         }),
         label="Marca del Equipo",
-        help_text="Marca del equipo"
+        help_text="Selecciona la marca del equipo"
     )
     
     modelo = forms.CharField(
@@ -551,12 +545,14 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
             )
             
             # Intentar calcular gama automáticamente
-            gama_calculada = ReferenciaGamaEquipo.obtener_gama(
+            # EXPLICACIÓN: Extraer el valor del campo gama del objeto ReferenciaGamaEquipo
+            referencia_gama = ReferenciaGamaEquipo.obtener_gama(
                 self.cleaned_data['marca'],
                 self.cleaned_data.get('modelo', '')
             )
-            if gama_calculada:
-                detalle.gama = gama_calculada
+            if referencia_gama:
+                # ✅ CORRECTO: Usar .gama para obtener el string ('alta', 'media', 'baja')
+                detalle.gama = referencia_gama.gama
             
             detalle.save()
             
@@ -1122,11 +1118,9 @@ class EditarInformacionEquipoForm(forms.ModelForm):
                 'class': 'form-control form-select',
                 'required': True,
             }),
-            'marca': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Ej: Dell, HP, Lenovo',
+            'marca': forms.Select(attrs={
+                'class': 'form-control form-select',
                 'required': True,
-                'list': 'marcas-list-modal',
             }),
             'modelo': forms.TextInput(attrs={
                 'class': 'form-control',

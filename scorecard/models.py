@@ -6,6 +6,7 @@ from django.db import models
 from django.utils import timezone
 from django.core.validators import FileExtensionValidator
 from inventario.models import Sucursal, Empleado
+from config.constants import MARCAS_EQUIPOS_CHOICES  # Importar constante compartida
 import os
 
 
@@ -190,7 +191,8 @@ class Incidencia(models.Model):
     )
     marca = models.CharField(
         max_length=50,
-        help_text="Marca del equipo (HP, Dell, Lenovo, etc.)"
+        choices=MARCAS_EQUIPOS_CHOICES,
+        help_text="Marca del equipo (selecciona de la lista)"
     )
     modelo = models.CharField(
         max_length=100,

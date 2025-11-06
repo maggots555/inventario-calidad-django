@@ -71,11 +71,6 @@
                         {{ form.marca.label }}
                     </label>
                     {{ form.marca }}
-                    <datalist id="marcas-list">
-                        {% for marca in marcas_comunes %}
-                            <option value="{{ marca }}">
-                        {% endfor %}
-                    </datalist>
                     {% if form.marca.errors %}
                         <div class="invalid-feedback d-block">{{ form.marca.errors }}</div>
                     {% endif %}

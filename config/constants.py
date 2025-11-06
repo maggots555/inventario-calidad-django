@@ -13,23 +13,28 @@ TIPO_EQUIPO_CHOICES = [
 ]
 
 # ============================================================================
-# MARCAS COMUNES DE EQUIPOS - Para autocompletado y estandarización
+# MARCAS COMUNES DE EQUIPOS - Para dropdown obligatorio
 # ============================================================================
-MARCAS_EQUIPOS = [
-    'HP',
-    'Dell',
-    'Lenovo',
-    'Acer',
-    'Asus',
-    'MSI',
-    'Apple',
-    'Samsung',
-    'Toshiba',
-    'Sony',
-    'Compaq',
-    'Gateway',
-    'Alienware',
+MARCAS_EQUIPOS_CHOICES = [
+    ('', '-- Seleccione una marca --'),  # Opción vacía para validación
+    ('acer', 'Acer'),
+    ('apple', 'Apple'),
+    ('asus', 'Asus'),
+    ('compaq', 'Compaq'),
+    ('dell', 'Dell'),
+    ('gateway', 'Gateway'),
+    ('hp', 'HP'),
+    ('huawei', 'Huawei'),
+    ('lenovo', 'Lenovo'),
+    ('msi', 'MSI'),
+    ('samsung', 'Samsung'),
+    ('sony', 'Sony'),
+    ('toshiba', 'Toshiba'),
+    ('otra', 'Otra Marca'),
 ]
+
+# Lista simple de marcas (para compatibilidad con código existente)
+MARCAS_EQUIPOS = [marca[1] for marca in MARCAS_EQUIPOS_CHOICES if marca[0]]
 
 # ============================================================================
 # GAMAS DE EQUIPOS - Clasificación por calidad/precio

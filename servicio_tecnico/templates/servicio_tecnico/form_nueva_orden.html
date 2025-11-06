@@ -71,15 +71,6 @@
                                     <i class="bi bi-award"></i> Marca
                                 </label>
                                 {{ form.marca }}
-                                <!-- 
-                                    LISTA DE AUTOCOMPLETADO
-                                    EXPLICACIÓN: datalist permite autocompletar marcas comunes
-                                -->
-                                <datalist id="marcas-list">
-                                    {% for marca in form.get_marcas_list %}
-                                        <option value="{{ marca }}">
-                                    {% endfor %}
-                                </datalist>
                                 {% if form.marca.errors %}
                                     <div class="invalid-feedback d-block">
                                         {% for error in form.marca.errors %}{{ error }}{% endfor %}

@@ -10,6 +10,7 @@ from inventario.models import Sucursal, Empleado
 from scorecard.models import ComponenteEquipo, Incidencia
 from config.constants import (
     TIPO_EQUIPO_CHOICES,
+    MARCAS_EQUIPOS_CHOICES,  # Agregar constante de marcas
     GAMA_EQUIPO_CHOICES,
     ESTADO_ORDEN_CHOICES,
     PAQUETES_CHOICES,
@@ -781,7 +782,8 @@ class DetalleEquipo(models.Model):
     )
     marca = models.CharField(
         max_length=50,
-        help_text="Marca del equipo"
+        choices=MARCAS_EQUIPOS_CHOICES,
+        help_text="Marca del equipo (selecciona de la lista)"
     )
     modelo = models.CharField(
         max_length=100,

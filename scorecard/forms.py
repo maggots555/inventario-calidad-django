@@ -60,11 +60,10 @@ class IncidenciaForm(forms.ModelForm):
                     'id': 'id_tipo_equipo'
                 }
             ),
-            'marca': forms.TextInput(
+            'marca': forms.Select(
                 attrs={
-                    'class': 'form-control',
-                    'placeholder': 'HP, Dell, Lenovo, etc.',
-                    'list': 'marcas-list'
+                    'class': 'form-select',
+                    'id': 'id_marca'
                 }
             ),
             'modelo': forms.TextInput(
