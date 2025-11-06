@@ -180,12 +180,12 @@
             <div class="kpi-subtext">Solo cotizaciones aceptadas</div>
         </div>
         
-        <!-- KPI: Valor Perdido -->
+        <!-- KPI: Cotizaciones no concretadas -->
         <div class="kpi-card danger">
             <div class="kpi-icon">📉</div>
-            <div class="kpi-label">Valor Perdido</div>
+            <div class="kpi-label">Cotizaciones no concretadas</div>
             <div class="kpi-value">${{ kpis.valor_rechazado|default:0|floatformat:0 }}</div>
-            <div class="kpi-subtext">Cotizaciones rechazadas</div>
+            <div class="kpi-subtext">Oportunidades de recuperación</div>
         </div>
         
         <!-- KPI: Ticket Promedio -->
@@ -209,7 +209,7 @@
             <div class="kpi-icon">🔧</div>
             <div class="kpi-label">Total Piezas</div>
             <div class="kpi-value">{{ kpis.total_piezas|default:0 }}</div>
-            <div class="kpi-subtext">Piezas cotizadas</div>
+            <div class="kpi-subtext">Piezas cotizadas (Esto incluye piezas pendientes)</div>
         </div>
         
     </div>
