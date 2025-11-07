@@ -1043,21 +1043,21 @@ form:has(#btnSubirImagenes:disabled) textarea {
 /* ===== ESTILO ESPECIAL PARA ÓRDENES OOW- ===== */
 .orden-oow {
     background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
-    border-color: #e91e63;
-    box-shadow: 0 2px 8px rgba(233, 30, 99, 0.15);
+    border-color: #d86f92;
+    box-shadow: 0 3px 12px rgba(167, 73, 151, 0.815);
 }
 
 .orden-oow:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 25px rgba(233, 30, 99, 0.25);
-    border-color: #c2185b;
+    border-color: #c55582;
 }
 
 /* ===== ESTILO ESPECIAL PARA ÓRDENES FL- (ROSITA MÁS FUERTE) ===== */
 .orden-fl {
-    background: linear-gradient(135deg, #f48fb1 0%, #e91e63 100%);
-    border-color: #c2185b;
-    box-shadow: 0 3px 12px rgba(194, 24, 91, 0.2);
+    background: linear-gradient(135deg, #f48fb1 0%, #eba6bd8e 100%);
+    border-color: #c75f89;
+    box-shadow: 0 3px 12px rgba(167, 73, 151, 0.815);
 }
 
 .orden-fl:hover {
@@ -1761,4 +1761,217 @@ form:has(#btnSubirImagenes:disabled) textarea {
         margin-bottom: 0.5rem;
     }
 }
+
+/* =============================================================================
+   BOTONES DE COLAPSO/EXPANDIR PARA TABLAS DE ESTADÍSTICAS
+   ============================================================================= */
+
+/* Header clickeable completo */
+.clickable-header {
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    user-select: none;
+}
+
+.clickable-header:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15) !important;
+}
+
+.clickable-header:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Contenedor del icono de toggle */
+.toggle-collapse-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    transition: all 0.3s ease;
+}
+
+.clickable-header:hover .toggle-collapse-icon {
+    transform: scale(1.15);
+}
+
+/* Icono del chevron con animación suave */
+.collapse-icon {
+    font-size: 1.3rem;
+    transition: transform 0.3s ease;
+    display: inline-block;
+}
+
+/* Animación de rotación cuando cambia el estado */
+.clickable-header[aria-expanded="false"] .collapse-icon {
+    transform: rotate(0deg);
+}
+
+.clickable-header[aria-expanded="true"] .collapse-icon {
+    transform: rotate(180deg);
+}
+
+/* Mejora visual del collapse con animación suave */
+.collapse {
+    transition: height 0.35s ease;
+}
+
+/* Prevenir FOUC (Flash of Unstyled Content) - iniciar oculto */
+.collapse:not(.show) {
+    display: none;
+    visibility: hidden;
+}
+
+.collapse.show {
+    display: block;
+    visibility: visible;
+}
+
+/* Animación de entrada para el contenido del collapse */
+@media (max-width: 768px) {
+    .toggle-collapse-icon {
+        padding: 0.15rem;
+    }
+    
+    .collapse-icon {
+        font-size: 1.1rem;
+    }
+    
+    .clickable-header h6 {
+        font-size: 0.9rem;
+    }
+    
+    /* Ajustar headers con degradado en móviles */
+    .card-header[style*="linear-gradient"] {
+        padding: 0.75rem 1rem !important;
+    }
+    
+    .card-header[style*="linear-gradient"] h6 {
+        font-size: 0.85rem !important;
+    }
+    
+    .card-header[style*="linear-gradient"] i {
+        font-size: 1rem !important;
+    }
+}
+
+/* Animación de entrada para el contenido del collapse */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.collapse.show .card-body {
+    animation: fadeInDown 0.2s ease;
+}
+
+/* =============================================================================
+   GRID DE CARGA DE TRABAJO POR TÉCNICO (desde dashboard inicio)
+   ============================================================================= */
+
+/* Variables CSS para consistencia visual */
+:root {
+    --primary-color: #0d6efd;
+    --primary-light: #cfe2ff;
+    --gray-50: #f8f9fa;
+    --gray-600: #6c757d;
+    --gray-900: #212529;
+    --border-radius-md: 8px;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.st-tecnicos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.25rem;
+}
+
+.st-tecnico-card {
+    background: var(--gray-50);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.st-tecnico-card:hover {
+    background: white;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow);
+    transform: translateY(-3px);
+}
+
+.st-tecnico-avatar {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    margin: 0 auto 1rem;
+    border: 3px solid var(--primary-color);
+    overflow: hidden;
+}
+
+.st-tecnico-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.st-tecnico-avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--primary-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.st-tecnico-nombre {
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.st-tecnico-ordenes {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.25rem;
+}
+
+.st-tecnico-label {
+    font-size: 0.85rem;
+    color: var(--gray-600);
+}
+
+/* Responsive para grid de técnicos */
+@media (max-width: 768px) {
+    .st-tecnicos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+    
+    .st-tecnico-card {
+        padding: 1rem;
+    }
+    
+    .st-tecnico-avatar {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .st-tecnico-ordenes {
+        font-size: 1.5rem;
+    }
+}
+
 

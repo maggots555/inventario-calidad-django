@@ -105,16 +105,66 @@
         </div>
 
         <div class="row mt-4 g-4 estadisticas-tecnico-row">
+        
+        <!-- ========================================================================
+             CARGA DE TRABAJO POR TÉCNICO (Grid siempre visible)
+             ======================================================================== -->
+        {% if ordenes_por_tecnico %}
+        <div class="col-lg-12">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header text-white d-flex justify-content-between align-items-center" 
+                     style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 1rem 1.5rem;">
+                    <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
+                        <i class="bi bi-people-fill" style="font-size: 1.3rem;"></i> Carga de Trabajo por Técnico
+                    </h6>
+                    <span class="badge bg-white text-dark" style="padding: 0.5rem 1rem; font-weight: 600;">
+                        {{ ordenes_por_tecnico|length }} técnico{{ ordenes_por_tecnico|length|pluralize }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="st-tecnicos-grid">
+                        {% for tecnico in ordenes_por_tecnico %}
+                        <div class="st-tecnico-card">
+                            <div class="st-tecnico-avatar">
+                                {% if tecnico.foto_url %}
+                                    <img src="{{ tecnico.foto_url }}" alt="{{ tecnico.tecnico_nombre }}">
+                                {% else %}
+                                    <div class="st-tecnico-avatar-placeholder">
+                                        {{ tecnico.iniciales }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="st-tecnico-nombre">{{ tecnico.tecnico_nombre }}</div>
+                            <div class="st-tecnico-ordenes">{{ tecnico.total_ordenes }}</div>
+                            <div class="st-tecnico-label">Órdenes Activas</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
         <!-- Equipos "No enciende" por técnico (ACTIVOS + HISTÓRICO) -->
         {% if equipos_no_enciende_por_tecnico %}
             <div class="col-lg-12">
-                <div class="card border-warning h-100">
-                    <div class="card-header bg-warning text-dark">
-                        <h6 class="card-title mb-0">
-                            <i class="bi bi-exclamation-triangle"></i> Equipos "No Enciende" por Técnico - Activos vs Histórico
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header text-white d-flex justify-content-between align-items-center clickable-header" 
+                         data-bs-toggle="collapse" 
+                         data-bs-target="#collapseNoEnciende" 
+                         aria-expanded="false" 
+                         aria-controls="collapseNoEnciende"
+                         role="button"
+                         style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border: none; padding: 1rem 1.5rem; cursor: pointer;">
+                        <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
+                            <i class="bi bi-exclamation-triangle" style="font-size: 1.3rem;"></i> Equipos "No Enciende" por Técnico - Activos vs Histórico
                         </h6>
+                        <div class="toggle-collapse-icon">
+                            <i class="bi bi-chevron-down collapse-icon" style="font-size: 1.3rem;"></i>
+                        </div>
                     </div>
-                    <div class="card-body">
+                    <div class="collapse" id="collapseNoEnciende">
+                        <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover table-sm align-middle">
                                 <thead class="table-light">
@@ -214,6 +264,7 @@
                             </small>
                         </div>
                     </div>
+                    </div>
                 </div>
             </div>
         {% endif %}
@@ -221,13 +272,23 @@
         <!-- Equipos por gama por técnico (HISTÓRICO COMPLETO) -->
         {% if equipos_por_gama_por_tecnico %}
             <div class="col-lg-12">
-                <div class="card border-info h-100">
-                    <div class="card-header bg-info text-white">
-                        <h6 class="card-title mb-0">
-                            <i class="bi bi-bar-chart-line"></i> Equipos por Gama por Técnico - Activos vs Histórico
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header text-white d-flex justify-content-between align-items-center clickable-header" 
+                         data-bs-toggle="collapse" 
+                         data-bs-target="#collapseGama" 
+                         aria-expanded="false" 
+                         aria-controls="collapseGama"
+                         role="button"
+                         style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border: none; padding: 1rem 1.5rem; cursor: pointer;">
+                        <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
+                            <i class="bi bi-bar-chart-line" style="font-size: 1.3rem;"></i> Equipos por Gama por Técnico - Activos vs Histórico
                         </h6>
+                        <div class="toggle-collapse-icon">
+                            <i class="bi bi-chevron-down collapse-icon" style="font-size: 1.3rem;"></i>
+                        </div>
                     </div>
-                    <div class="card-body">
+                    <div class="collapse" id="collapseGama">
+                        <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover table-sm align-middle">
                                 <thead class="table-light">
@@ -346,6 +407,7 @@
                                 </ul>
                             </small>
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -623,6 +685,81 @@ document.addEventListener('DOMContentLoaded', function() {
         // Auto-focus en el campo de búsqueda
         busquedaInput.focus();
     }
+
+    // ============================================
+    // MANEJO DE COLLAPSE/EXPAND DE TABLAS
+    // ============================================
+    
+    const collapseNoEnciende = document.getElementById('collapseNoEnciende');
+    const collapseGama = document.getElementById('collapseGama');
+    
+    // Verificar el estado guardado en localStorage
+    // Si el usuario expandió manualmente, mantener expandido
+    if (collapseNoEnciende) {
+        const savedStateNoEnciende = localStorage.getItem('collapseNoEnciende');
+        if (savedStateNoEnciende === 'visible') {
+            const bsCollapse = new bootstrap.Collapse(collapseNoEnciende, { toggle: false });
+            bsCollapse.show();
+        }
+        // Por defecto permanece colapsado (no se hace nada)
+    }
+    
+    if (collapseGama) {
+        const savedStateGama = localStorage.getItem('collapseGama');
+        if (savedStateGama === 'visible') {
+            const bsCollapse = new bootstrap.Collapse(collapseGama, { toggle: false });
+            bsCollapse.show();
+        }
+        // Por defecto permanece colapsado (no se hace nada)
+    }
+    
+    // Manejar cambio de iconos y guardar estado
+    function setupCollapseToggle(collapseElement, storageKey) {
+        if (!collapseElement) return;
+        
+        const header = document.querySelector(`[data-bs-target="#${collapseElement.id}"]`);
+        if (!header) return;
+        
+        const icon = header.querySelector('.collapse-icon');
+        
+        collapseElement.addEventListener('show.bs.collapse', function() {
+            if (icon) {
+                icon.classList.remove('bi-chevron-down');
+                icon.classList.add('bi-chevron-up');
+            }
+            // Actualizar aria-expanded en el header
+            header.setAttribute('aria-expanded', 'true');
+            localStorage.setItem(storageKey, 'visible');
+        });
+        
+        collapseElement.addEventListener('hide.bs.collapse', function() {
+            if (icon) {
+                icon.classList.remove('bi-chevron-up');
+                icon.classList.add('bi-chevron-down');
+            }
+            // Actualizar aria-expanded en el header
+            header.setAttribute('aria-expanded', 'false');
+            localStorage.setItem(storageKey, 'hidden');
+        });
+        
+        // Sincronizar icono con estado actual al cargar
+        if (collapseElement.classList.contains('show')) {
+            if (icon) {
+                icon.classList.remove('bi-chevron-down');
+                icon.classList.add('bi-chevron-up');
+            }
+            header.setAttribute('aria-expanded', 'true');
+        } else {
+            if (icon) {
+                icon.classList.remove('bi-chevron-up');
+                icon.classList.add('bi-chevron-down');
+            }
+            header.setAttribute('aria-expanded', 'false');
+        }
+    }
+    
+    setupCollapseToggle(collapseNoEnciende, 'collapseNoEnciende');
+    setupCollapseToggle(collapseGama, 'collapseGama');
 });
 </script>
 {% endblock %}

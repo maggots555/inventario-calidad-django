@@ -1644,11 +1644,12 @@ class DashboardCotizacionesVisualizer:
                     line=dict(width=1, color='white'),
                     opacity=0.7
                 ),
+                customdata=df_aceptadas['total_piezas'],  # Pasar valor real de piezas
                 hovertemplate=(
                     '<b>✅ ACEPTADA</b><br>'
                     'Días de respuesta: %{x}<br>'
                     'Costo: $%{y:,.0f}<br>'
-                    'Piezas: %{marker.size:.0f}<br>'
+                    'Piezas: %{customdata}<br>'
                     '<extra></extra>'
                 )
             ))
@@ -1667,11 +1668,12 @@ class DashboardCotizacionesVisualizer:
                     line=dict(width=1, color='white'),
                     opacity=0.7
                 ),
+                customdata=df_rechazadas['total_piezas'],  # Pasar valor real de piezas
                 hovertemplate=(
                     '<b>❌ RECHAZADA</b><br>'
                     'Días de respuesta: %{x}<br>'
                     'Costo: $%{y:,.0f}<br>'
-                    'Piezas: %{marker.size:.0f}<br>'
+                    'Piezas: %{customdata}<br>'
                     '<extra></extra>'
                 )
             ))

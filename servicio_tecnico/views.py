@@ -924,6 +924,35 @@ def lista_ordenes_activas(request):
         reverse=True
     )
     
+    # ========================================================================
+    # CARGA DE TRABAJO POR TÉCNICO (Solo técnicos de laboratorio activos)
+    # ========================================================================
+    ordenes_por_tecnico = OrdenServicio.objects.filter(
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
+        tecnico_asignado_actual__activo=True
+    ).exclude(
+        estado__in=['entregado', 'cancelado']
+    ).values(
+        'tecnico_asignado_actual__nombre_completo',
+        'tecnico_asignado_actual__id'
+    ).annotate(
+        total_ordenes=Count('numero_orden_interno')
+    ).order_by('-total_ordenes')
+    
+    # Enriquecer con información adicional del técnico
+    ordenes_por_tecnico_enriquecido = []
+    for item in ordenes_por_tecnico:
+        try:
+            tecnico = Empleado.objects.get(id=item['tecnico_asignado_actual__id'])
+            ordenes_por_tecnico_enriquecido.append({
+                'tecnico_nombre': item['tecnico_asignado_actual__nombre_completo'],
+                'total_ordenes': item['total_ordenes'],
+                'foto_url': tecnico.get_foto_perfil_url(),
+                'iniciales': tecnico.get_iniciales(),
+            })
+        except Empleado.DoesNotExist:
+            pass
+    
     # Calcular total de órdenes activas (sin filtro de búsqueda) para las estadísticas
     total_ordenes_activas = OrdenServicio.objects.exclude(
         estado__in=['entregado', 'cancelado']
@@ -937,6 +966,7 @@ def lista_ordenes_activas(request):
         'busqueda': busqueda,
         'equipos_no_enciende_por_tecnico': equipos_no_enciende_por_tecnico,
         'equipos_por_gama_por_tecnico': equipos_por_gama_por_tecnico,
+        'ordenes_por_tecnico': ordenes_por_tecnico_enriquecido,  # Grid de carga de trabajo
         'total_ordenes_activas': total_ordenes_activas,  # Para mostrar en estadísticas
         'mostrar_estadisticas': True,  # Siempre mostrar en vista activas
     }
