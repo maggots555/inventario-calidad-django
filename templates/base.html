@@ -46,7 +46,7 @@
                     </div>
                     <div class="navbar-brand-text">
                         <h1>Sistema Integral de Gestión</h1>
-                        <span>Inventario y Scorecard</span>
+                        <span>Inventario • Scorecard • Servicio Técnico</span>
                     </div>
                 </a>
             </div>
@@ -386,6 +386,51 @@
                 </div>
             </li>
             
+            <!-- Servicio Técnico -->
+            <li class="sidebar-section">
+                <div class="sidebar-section-title">Servicio Técnico</div>
+                <div class="sidebar-item has-submenu" id="servicio-menu">
+                    <a href="#" class="sidebar-link">
+                        <i class="sidebar-icon bi bi-tools"></i>
+                        <span class="sidebar-text">Servicio Técnico</span>
+                        <i class="sidebar-arrow bi bi-chevron-right"></i>
+                        <span class="sidebar-tooltip">Módulo Servicio Técnico</span>
+                    </a>
+                    <ul class="sidebar-submenu">
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'servicio_tecnico:inicio' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-house"></i>
+                                <span class="sidebar-text">Inicio</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'servicio_tecnico:dashboard_cotizaciones' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-bar-chart-line-fill"></i>
+                                <span class="sidebar-text">Cotizaciones</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'servicio_tecnico:dashboard_rhitso' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-speedometer"></i>
+                                <span class="sidebar-text">RHITSO</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'servicio_tecnico:seleccionar_tipo_orden' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-plus-circle-fill"></i>
+                                <span class="sidebar-text">Nueva Orden</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'servicio_tecnico:lista_activas' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-hourglass-split"></i>
+                                <span class="sidebar-text">Órdenes Activas</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+            
             <!-- Configuración -->
             <li class="sidebar-section">
                 <div class="sidebar-section-title">Configuración</div>
@@ -484,8 +529,8 @@
                             <i class="bi bi-grid-3x3-gap-fill"></i>
                         </div>
                         <div class="footer-brand-text">
-                            <h5>Sistema integral de Gestión</h5>
-                            <p>Inventario y Scorecard</p>
+                            <h5>Sistema Integral de Gestión</h5>
+                            <p>Inventario • Scorecard • Servicio Técnico</p>
                         </div>
                     </div>
                 </div>
@@ -497,22 +542,32 @@
                         <ul class="footer-links">
                             <li>
                                 <a href="{% url 'home' %}">
-                                    <i class="bi bi-speedometer2"></i> Dashboard
+                                    <i class="bi bi-speedometer2"></i> Dashboard Principal
                                 </a>
                             </li>
                             <li>
-                                <a href="{% url 'lista_productos' %}">
-                                    <i class="bi bi-box-seam"></i> Inventario
+                                <a href="{% url 'dashboard_inventario' %}">
+                                    <i class="bi bi-box-seam"></i> Dashboard Inventario
                                 </a>
                             </li>
                             <li>
                                 <a href="{% url 'scorecard:dashboard' %}">
-                                    <i class="bi bi-bar-chart-line"></i> Scorecard
+                                    <i class="bi bi-shield-check"></i> Dashboard Scorecard
                                 </a>
                             </li>
                             <li>
-                                <a href="{% url 'lista_movimientos' %}">
-                                    <i class="bi bi-arrow-left-right"></i> Movimientos
+                                <a href="{% url 'servicio_tecnico:inicio' %}">
+                                    <i class="bi bi-tools"></i> Servicio Técnico
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'servicio_tecnico:dashboard_cotizaciones' %}">
+                                    <i class="bi bi-bar-chart-line"></i> Dashboard Cotizaciones
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'movimiento_rapido' %}">
+                                    <i class="bi bi-qr-code-scan"></i> Scanner QR
                                 </a>
                             </li>
                         </ul>
@@ -544,10 +599,10 @@
             <!-- Copyright y Bottom -->
             <div class="footer-bottom">
                 <p class="footer-copyright">
-                    © 2025 Sistema Inventario • Todos los derechos reservados
+                    © {% now "Y" %} Sistema Integral de Gestión • Todos los derechos reservados
                 </p>
                 <p class="footer-made-with">
-                    Hecho con <span class="footer-heart">❤️</span> <span class="footer-tech">Python & Django</span>
+                    Hecho con <span class="footer-heart">❤️</span> usando <span class="footer-tech">Python • Django • TypeScript</span>
                 </p>
             </div>
         </div>

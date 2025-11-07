@@ -95,12 +95,13 @@ input[type="checkbox"]:checked,
 /* 3. LÍNEA DE TIEMPO (TIMELINE) */
 /* ========================================================================== */
 
-.timeline {
+/* IMPORTANTE: Solo aplicar dentro del contexto de RHITSO */
+.rhitso-timeline {
     position: relative;
     padding: 20px 0;
 }
 
-.timeline::before {
+.rhitso-timeline::before {
     content: '';
     position: absolute;
     left: 30px;
@@ -110,13 +111,13 @@ input[type="checkbox"]:checked,
     background: #dee2e6;
 }
 
-.timeline-item {
+.rhitso-timeline .timeline-item {
     position: relative;
     padding-left: 70px;
     padding-bottom: 30px;
 }
 
-.timeline-icon {
+.rhitso-timeline .timeline-icon {
     position: absolute;
     left: 17px;
     width: 28px;
@@ -128,7 +129,7 @@ input[type="checkbox"]:checked,
     font-size: 14px;
 }
 
-.timeline-icon.sistema {
+.rhitso-timeline .timeline-icon.sistema {
     background: #007bff;
     color: white;
 }

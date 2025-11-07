@@ -26,78 +26,38 @@
         </div>
     </div>
 
-    <!-- Tarjetas de Estadísticas Principales -->
-    <div class="row mb-4">
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                Total de Productos
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_productos }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="bi bi-box-seam card-icon text-primary"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Tarjetas de Estadísticas Principales - Rediseño KPI Moderno -->
+    <div class="kpis-grid fade-in mb-4">
+        <!-- KPI: Total de Productos -->
+        <div class="kpi-card primary">
+            <div class="kpi-icon">📦</div>
+            <div class="kpi-label">Total de Productos</div>
+            <div class="kpi-value">{{ total_productos }}</div>
+            <div class="kpi-subtext">En inventario activo</div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Productos con Stock Bajo
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ productos_stock_bajo }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="bi bi-exclamation-triangle card-icon text-warning"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <!-- KPI: Productos con Stock Bajo -->
+        <div class="kpi-card warning">
+            <div class="kpi-icon">⚠️</div>
+            <div class="kpi-label">Stock Bajo</div>
+            <div class="kpi-value">{{ productos_stock_bajo }}</div>
+            <div class="kpi-subtext">Requieren atención inmediata</div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                Valor Total del Inventario
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">${{ valor_total_inventario|floatformat:2 }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="bi bi-currency-dollar card-icon text-success"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <!-- KPI: Valor Total del Inventario -->
+        <div class="kpi-card success">
+            <div class="kpi-icon">💰</div>
+            <div class="kpi-label">Valor Total Inventario</div>
+            <div class="kpi-value">${{ valor_total_inventario|floatformat:0 }}</div>
+            <div class="kpi-subtext">Inversión total en productos</div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Movimientos del Mes
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ movimientos_recientes|length }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="bi bi-arrow-left-right card-icon text-info"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <!-- KPI: Movimientos del Mes -->
+        <div class="kpi-card info">
+            <div class="kpi-icon">📊</div>
+            <div class="kpi-label">Movimientos del Mes</div>
+            <div class="kpi-value">{{ movimientos_recientes|length }}</div>
+            <div class="kpi-subtext">Actividad registrada</div>
         </div>
     </div>
 
@@ -238,11 +198,11 @@
                         <span class="badge bg-light text-primary">{{ movimientos_recientes|length }}</span>
                     </h6>
                 </div>
-                <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+                <div class="card-body p-0">
                     {% if movimientos_recientes %}
-                        <div class="timeline-container">
+                        <div class="timeline-container" style="max-height: 400px; overflow-y: auto;">
                             {% for movimiento in movimientos_recientes %}
-                            <div class="timeline-item border-bottom py-3 px-3">
+                            <div class="timeline-item py-3 px-3">
                                 <div class="d-flex align-items-start">
                                     <div class="timeline-icon me-3 mt-1">
                                         {% if movimiento.tipo == 'entrada' %}
@@ -268,7 +228,7 @@
                                         </div>
                                         {% if movimiento.empleado_destinatario %}
                                         <div class="text-muted small">
-                                            → {{ movimiento.empleado_destinatario.nombre_completo|truncatechars:20 }}
+                                            <i class="bi bi-person me-1"></i>{{ movimiento.empleado_destinatario.nombre_completo|truncatechars:20 }}
                                         </div>
                                         {% endif %}
                                         <div class="text-muted small">
@@ -278,6 +238,9 @@
                                     </div>
                                 </div>
                             </div>
+                            {% if not forloop.last %}
+                            <div style="border-bottom: 1px solid #e9ecef;"></div>
+                            {% endif %}
                             {% endfor %}
                         </div>
                         <div class="card-footer bg-light text-center py-2">

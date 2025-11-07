@@ -752,6 +752,145 @@
     margin-bottom: var(--space-6);
 }
 
+/* ===== KPIs MODERNOS - ESTILO POWER BI ===== */
+.kpis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background: white;
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+    border-left: 4px solid;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Efecto decorativo en la esquina superior derecha */
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, transparent 100%);
+    border-radius: 50%;
+    transform: translate(30%, -30%);
+    transition: all 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+}
+
+.kpi-card:hover::before {
+    transform: translate(30%, -30%) scale(1.2);
+}
+
+/* Colores de borde según el tipo */
+.kpi-card.primary { border-left-color: var(--primary-color); }
+.kpi-card.success { border-left-color: var(--success-color); }
+.kpi-card.danger { border-left-color: var(--danger-color); }
+.kpi-card.warning { border-left-color: var(--warning-color); }
+.kpi-card.info { border-left-color: var(--info-color); }
+
+/* Elementos del KPI */
+.kpi-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+.kpi-card:hover .kpi-icon {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.kpi-label {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 0;
+    position: relative;
+    z-index: 1;
+    line-height: 1.2;
+}
+
+.kpi-subtext {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    margin-top: 0.5rem;
+    line-height: 1.4;
+}
+
+/* Animación de entrada */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.6s ease-out;
+}
+
+/* Responsive para KPIs */
+@media (max-width: 768px) {
+    .kpis-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .kpi-card {
+        padding: 1.25rem;
+    }
+    
+    .kpi-icon {
+        font-size: 2rem;
+    }
+    
+    .kpi-value {
+        font-size: 1.75rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .kpis-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== ELIMINACIÓN DE ESTILOS ANTIGUOS DE KPI ===== */
+/* Ocultar tarjetas antiguas si existen */
+.border-left-primary,
+.border-left-warning,
+.border-left-success,
+.border-left-info {
+    display: none !important; /* Ocultar cards antiguas de Bootstrap */
+}
+
 /* Tarjetas del dashboard con altura uniforme */
 .card-dashboard {
     transition: all var(--transition-normal);
@@ -782,27 +921,56 @@
     background: linear-gradient(135deg, #374151, #1f2937) !important;
 }
 
-/* Timeline para movimientos recientes */
-.timeline-container {
+/* ===== TIMELINE PARA DASHBOARD - ESTILOS ESPECÍFICOS Y AISLADOS ===== */
+.card-dashboard .timeline-container {
     position: relative;
 }
 
-.timeline-item {
-    position: relative;
-    border-left: 3px solid transparent;
-    transition: all var(--transition-normal);
+/* CRÍTICO: Anular cualquier ::before o ::after de otros módulos */
+.card-dashboard .timeline-item::before,
+.card-dashboard .timeline-item::after {
+    display: none !important;
+    content: none !important;
 }
 
-.timeline-item:hover {
-    border-left-color: var(--primary-color);
+.card-dashboard .timeline-item {
+    position: relative;
+    transition: background-color 0.3s ease;
+    border-left: none !important;
+    padding-left: 0 !important; /* Resetear padding-left de otros estilos */
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.card-dashboard .timeline-item:hover {
     background-color: #f8fafc;
+    border-radius: 8px;
 }
 
-.timeline-icon {
+.card-dashboard .timeline-icon {
     min-width: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative !important; /* No absolute */
+    left: auto !important; /* Resetear left de otros estilos */
+}
+
+/* Scrollbar personalizado para timeline del dashboard */
+.card-dashboard .timeline-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.card-dashboard .timeline-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.card-dashboard .timeline-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.card-dashboard .timeline-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 /* Barra de progreso personalizada para fraccionables */
@@ -1985,10 +2153,7 @@
     background: #0b5ed7;
 }
 
-.timeline-item {
-    position: relative;
-    animation: fadeInUp 0.5s ease-out;
-}
+/* Definiciones de timeline-item movidas a la sección Dashboard (línea 788-820) */
 
 .timeline-item .badge.rounded-circle {
     width: 32px;
@@ -1999,18 +2164,12 @@
     font-size: 14px;
 }
 
-.timeline-item:hover {
-    background-color: #f9fafb;
-    border-radius: 8px;
-    transition: background-color 0.3s ease;
-}
-
 .alert-sm {
     font-size: 0.875rem;
     padding: 0.5rem 0.75rem;
 }
 
-/* Animaci�n para nuevos items del timeline */
+/* Animación para nuevos items del timeline */
 @keyframes fadeInUp {
     from {
         opacity: 0;

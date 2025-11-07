@@ -1198,11 +1198,12 @@
     border-left: 2px solid var(--gray-300);
 }
 
-.timeline-item:last-child {
+/* IMPORTANTE: Solo aplicar estos estilos dentro del contexto de scorecard */
+.scorecard-timeline .timeline-item:last-child {
     border-left: none;
 }
 
-.timeline-item::before {
+.scorecard-timeline .timeline-item::before {
     content: '';
     position: absolute;
     left: -6px;
