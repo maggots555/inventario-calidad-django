@@ -94,7 +94,7 @@ PAQUETES_CHOICES = [
 # Precios fijos de paquetes (en pesos mexicanos, IVA incluido)
 PRECIOS_PAQUETES = {
     'premium': 5500.00,  # RAM 16GB DDR5 + SSD 1TB + Kit Limpieza
-    'oro': 3850.00,      # RAM 8GB DDR5 + SSD 1TB
+    'oro': 3250.00,      # RAM 8GB DDR5 + SSD 1TB
     'plata': 2900.00,    # SSD 1TB
     'ninguno': 0.00,
 }
@@ -110,7 +110,7 @@ DESCRIPCION_PAQUETES = {
 
 *Ideal para gaming, diseño gráfico y edición de video''',
     
-    'oro': '''🥇 SOLUCIÓN ORO - $3,850 IVA incluido
+    'oro': '''🥇 SOLUCIÓN ORO - $3,250 IVA incluido
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ RAM 8GB DDR5 Samsung (3200 MHz)
 ✅ SSD 1TB de alta velocidad
@@ -183,12 +183,14 @@ MOTIVO_RECHAZO_COTIZACION = [
     ('no_hay_partes', 'No hay partes en el mercado'),
     ('solo_venta_mostrador', 'Solo está interesado en la propuesta de venta mostrador'),
     ('falta_de_respuesta', 'Se cierra cotización por vigencia y falta de respuesta del cliente'),
+    ('no_apto', 'Equipo no apto para diagnóstico o reparación'),
     ('rechazo_sin_decision', 'Cliente desea evaluar las opciones sin tomar decisión inmediata'),
     ('otro', 'Otro motivo'),
 ]
 
 # ============================================================================
 # ESTADOS DE SEGUIMIENTO DE PIEZAS
+# Actualizado: Noviembre 2025 - Agregados estados para piezas problemáticas
 # ============================================================================
 ESTADO_PIEZA_CHOICES = [
     ('pedido', 'Pedido Realizado'),
@@ -196,6 +198,8 @@ ESTADO_PIEZA_CHOICES = [
     ('transito', 'En Tránsito'),
     ('retrasado', 'Retrasado'),
     ('recibido', 'Recibido en Sucursal'),
+    ('incorrecto', 'WPB - Pieza Incorrecta'),  # Wrong Part Boxed
+    ('danado', 'DOA - Pieza Dañada/No Funcional'),  # Dead On Arrival
 ]
 
 # ============================================================================

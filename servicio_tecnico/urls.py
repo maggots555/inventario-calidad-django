@@ -70,6 +70,10 @@ urlpatterns = [
     path('seguimientos/<int:seguimiento_id>/reenviar-notificacion/', views.reenviar_notificacion_pieza, name='reenviar_notificacion'),
     path('seguimientos/<int:seguimiento_id>/cambiar-estado/', views.cambiar_estado_seguimiento, name='cambiar_estado_seguimiento'),
     
+    # NUEVOS: Marcar piezas con problemas (Noviembre 2025)
+    path('seguimientos/<int:seguimiento_id>/marcar-incorrecta/', views.marcar_pieza_incorrecta, name='marcar_incorrecta'),
+    path('seguimientos/<int:seguimiento_id>/marcar-danada/', views.marcar_pieza_danada, name='marcar_danada'),
+    
     # ========================================================================
     # GESTIÓN DE VENTA MOSTRADOR (AJAX) - FASE 3
     # ========================================================================

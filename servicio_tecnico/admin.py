@@ -626,13 +626,15 @@ class SeguimientoPiezaAdmin(admin.ModelAdmin):
     date_hierarchy = 'fecha_pedido'
     
     def estado_badge(self, obj):
-        """Muestra el estado con color"""
+        """Muestra el estado con color (Actualizado Nov 2025)"""
         colores = {
             'pedido': '#6c757d',
             'confirmado': '#17a2b8',
             'transito': '#ffc107',
             'retrasado': '#dc3545',
             'recibido': '#28a745',
+            'incorrecto': '#dc3545',  # NUEVO: Pieza incorrecta (WPB) - Rojo
+            'danado': '#ffc107',      # NUEVO: Pieza dañada (DOA) - Amarillo
         }
         color = colores.get(obj.estado, '#6c757d')
         return format_html(

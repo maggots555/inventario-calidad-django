@@ -1941,7 +1941,8 @@ def detalle_orden(request, orden_id):
         from django.utils import timezone
         hoy = timezone.now().date()
         for seguimiento in seguimientos_piezas:
-            if seguimiento.estado != 'recibido' and seguimiento.fecha_entrega_estimada:
+            # Solo contar como retrasado si NO está en estado final (recibido, incorrecto, danado)
+            if seguimiento.estado not in ['recibido', 'incorrecto', 'danado'] and seguimiento.fecha_entrega_estimada:
                 if hoy > seguimiento.fecha_entrega_estimada:
                     seguimientos_retrasados_count += 1
     
@@ -3173,6 +3174,185 @@ def reenviar_notificacion_pieza(request, seguimiento_id):
 
 
 @login_required
+@require_http_methods(["POST"])
+def marcar_pieza_incorrecta(request, seguimiento_id):
+    """
+    Marca una pieza como incorrecta (WPB - Wrong Part Boxed).
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista se usa cuando una pieza llega INCORRECTA:
+    - Es la pieza equivocada (proveedor envió otra cosa)
+    - No es compatible con el equipo
+    - No cumple las especificaciones solicitadas
+    
+    FLUJO DE USO:
+    1. La pieza se marca como "recibido" (llega físicamente)
+    2. Al instalarla/probarla, se detecta que es incorrecta
+    3. Se usa el botón "❌ Pieza Incorrecta" 
+    4. Esta vista cambia el estado a 'incorrecto'
+    5. Se registra en el historial
+    6. Se debe hacer un NUEVO pedido de la pieza correcta
+    
+    IMPORTANTE:
+    - Solo se puede marcar como incorrecta si está en estado 'recibido'
+    - El seguimiento queda cerrado con estado 'incorrecto'
+    - Se debe crear un NUEVO seguimiento para el reemplazo
+    
+    Args:
+        request: HttpRequest con el usuario autenticado
+        seguimiento_id: ID del seguimiento de la pieza
+    
+    Returns:
+        JsonResponse con el resultado de la operación
+    """
+    from django.http import JsonResponse
+    from django.utils import timezone
+    from .models import SeguimientoPieza
+    
+    try:
+        seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        cotizacion = seguimiento.cotizacion
+        orden = cotizacion.orden
+        
+        # =================================================================
+        # VALIDACIÓN: Solo se puede marcar si está recibido
+        # =================================================================
+        if seguimiento.estado != 'recibido':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Solo se pueden marcar como incorrectas las piezas que ya fueron recibidas'
+            }, status=400)
+        
+        # =================================================================
+        # ACTUALIZAR ESTADO A INCORRECTO
+        # =================================================================
+        seguimiento.estado = 'incorrecto'
+        seguimiento.save()
+        
+        # =================================================================
+        # REGISTRAR EN HISTORIAL
+        # =================================================================
+        mensaje_historial = f"❌ PIEZA INCORRECTA (WPB) - {seguimiento.proveedor}\n"
+        mensaje_historial += f"Descripción: {seguimiento.descripcion_piezas}\n"
+        mensaje_historial += f"⚠️ La pieza recibida NO es la correcta o NO es compatible\n"
+        mensaje_historial += f"📝 Acción requerida: Crear nuevo pedido de la pieza correcta"
+        
+        registrar_historial(
+            orden=orden,
+            tipo_evento='pieza',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=mensaje_historial,
+            es_sistema=False
+        )
+        
+        # =================================================================
+        # RESPUESTA JSON
+        # =================================================================
+        return JsonResponse({
+            'success': True,
+            'message': '❌ Pieza marcada como INCORRECTA. Crea un nuevo pedido para la pieza correcta.',
+            'seguimiento_html': _render_seguimiento_card(seguimiento)
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def marcar_pieza_danada(request, seguimiento_id):
+    """
+    Marca una pieza como dañada o no funcional (DOA - Dead On Arrival).
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista se usa cuando una pieza llega DAÑADA o NO FUNCIONA:
+    - Llega físicamente dañada (rota, golpeada, etc.)
+    - No funciona al probarla (defecto de fábrica)
+    - Problemas técnicos que la hacen inservible
+    
+    FLUJO DE USO:
+    1. La pieza se marca como "recibido" (llega físicamente)
+    2. Al instalarla/probarla, se detecta que está dañada o no funciona
+    3. Se usa el botón "⚠️ Pieza Dañada"
+    4. Esta vista cambia el estado a 'danado'
+    5. Se registra en el historial
+    6. Se debe hacer un NUEVO pedido de reemplazo
+    
+    IMPORTANTE:
+    - Solo se puede marcar como dañada si está en estado 'recibido'
+    - El seguimiento queda cerrado con estado 'danado'
+    - Se debe crear un NUEVO seguimiento para el reemplazo
+    - Considerar reclamación al proveedor/garantía
+    
+    Args:
+        request: HttpRequest con el usuario autenticado
+        seguimiento_id: ID del seguimiento de la pieza
+    
+    Returns:
+        JsonResponse con el resultado de la operación
+    """
+    from django.http import JsonResponse
+    from django.utils import timezone
+    from .models import SeguimientoPieza
+    
+    try:
+        seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        cotizacion = seguimiento.cotizacion
+        orden = cotizacion.orden
+        
+        # =================================================================
+        # VALIDACIÓN: Solo se puede marcar si está recibido
+        # =================================================================
+        if seguimiento.estado != 'recibido':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Solo se pueden marcar como dañadas las piezas que ya fueron recibidas'
+            }, status=400)
+        
+        # =================================================================
+        # ACTUALIZAR ESTADO A DAÑADO
+        # =================================================================
+        seguimiento.estado = 'danado'
+        seguimiento.save()
+        
+        # =================================================================
+        # REGISTRAR EN HISTORIAL
+        # =================================================================
+        mensaje_historial = f"⚠️ PIEZA DAÑADA/NO FUNCIONAL (DOA) - {seguimiento.proveedor}\n"
+        mensaje_historial += f"Descripción: {seguimiento.descripcion_piezas}\n"
+        mensaje_historial += f"❌ La pieza llegó dañada o no funciona correctamente\n"
+        mensaje_historial += f"📝 Acción requerida: Solicitar reemplazo al proveedor/garantía"
+        
+        registrar_historial(
+            orden=orden,
+            tipo_evento='pieza',
+            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+            comentario=mensaje_historial,
+            es_sistema=False
+        )
+        
+        # =================================================================
+        # RESPUESTA JSON
+        # =================================================================
+        return JsonResponse({
+            'success': True,
+            'message': '⚠️ Pieza marcada como DAÑADA/NO FUNCIONAL. Solicita reemplazo al proveedor.',
+            'seguimiento_html': _render_seguimiento_card(seguimiento)
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error inesperado: {str(e)}'
+        }, status=500)
+
+
+@login_required
 def cambiar_estado_seguimiento(request, seguimiento_id):
     """
     Cambia el estado de un seguimiento de pieza de forma rápida.
@@ -3334,13 +3514,15 @@ def _render_seguimiento_card(seguimiento):
             retraso_dias = (hoy - seguimiento.fecha_entrega_estimada).days
             hay_retraso = True
     
-    # Definir estilos según estado (ACTUALIZADOS según ESTADO_PIEZA_CHOICES)
+    # Definir estilos según estado (ACTUALIZADOS según ESTADO_PIEZA_CHOICES - Nov 2025)
     estado_badges = {
         'pedido': 'bg-primary',
         'confirmado': 'bg-info',
         'transito': 'bg-warning text-dark',
         'retrasado': 'bg-danger',
         'recibido': 'bg-success',
+        'incorrecto': 'bg-danger',      # NUEVO: Pieza incorrecta (WPB)
+        'danado': 'bg-warning text-dark',  # NUEVO: Pieza dañada (DOA)
     }
     
     estado_nombres = {
@@ -3349,11 +3531,15 @@ def _render_seguimiento_card(seguimiento):
         'transito': '🚚 En Tránsito',
         'retrasado': '⚠️ Retrasado',
         'recibido': '📬 Recibido',
+        'incorrecto': '❌ Pieza Incorrecta (WPB)',  # NUEVO
+        'danado': '⚠️ Pieza Dañada (DOA)',          # NUEVO
     }
     
     border_class = ''
     if seguimiento.estado == 'recibido':
         border_class = 'border-success'
+    elif seguimiento.estado in ['incorrecto', 'danado']:  # NUEVO: Borde rojo para problemas
+        border_class = 'border-danger'
     elif hay_retraso or seguimiento.estado == 'retrasado':
         border_class = 'border-danger'
     
@@ -3391,9 +3577,21 @@ def _render_seguimiento_card(seguimiento):
                     {f'<button type="button" class="btn btn-danger" onclick="cambiarEstadoSeguimiento({seguimiento.id}, \'retrasado\')" title="Marcar como retrasado">⚠️ Retrasado</button>' if seguimiento.estado in ['pedido', 'confirmado', 'transito'] else ''}
                     <button type="button" class="btn btn-success" onclick="marcarRecibido({seguimiento.id})" title="Marcar como recibido">📬 Recibido</button>
                 </div>
-                ''' if seguimiento.estado != 'recibido' else ''}
+                ''' if seguimiento.estado not in ['recibido', 'incorrecto', 'danado'] else ''}
                 
-                <!-- Fila 2: Editar y Eliminar -->
+                <!-- Fila 2: Reportar problemas con pieza recibida (NUEVO Nov 2025) -->
+                {f'''
+                <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+                    <button type="button" class="btn btn-outline-danger" onclick="marcarIncorrecto({seguimiento.id})" title="La pieza recibida es incorrecta">
+                        ❌ Pieza Incorrecta
+                    </button>
+                    <button type="button" class="btn btn-outline-warning" onclick="marcarDanado({seguimiento.id})" title="La pieza recibida está dañada o no funciona">
+                        ⚠️ Pieza Dañada
+                    </button>
+                </div>
+                ''' if seguimiento.estado == 'recibido' else ''}
+                
+                <!-- Fila 3: Editar, Eliminar y Reenviar -->
                 <div class="btn-group btn-group-sm w-100" role="group">
                     <button type="button" class="btn btn-outline-primary" onclick="editarSeguimiento({seguimiento.id})" title="Editar">
                         📝 Editar
@@ -3401,6 +3599,7 @@ def _render_seguimiento_card(seguimiento):
                     <button type="button" class="btn btn-outline-danger" onclick="eliminarSeguimiento({seguimiento.id})" title="Eliminar">
                         🗑️ Eliminar
                     </button>
+                    {f'<button type="button" class="btn btn-outline-info" onclick="reenviarNotificacion({seguimiento.id})" title="Reenviar notificación al técnico">📧 Reenviar</button>' if seguimiento.estado == 'recibido' else ''}
                 </div>
             </div>
         </div>
