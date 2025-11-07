@@ -4,273 +4,276 @@
 {% block title %}Dashboard Principal - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<!-- Estilos específicos del Dashboard Principal -->
-<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+<!-- Font Awesome 6 - Iconos profesionales -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- Estilos específicos del Dashboard Principal - Diseño moderno y minimalista -->
+<link rel="stylesheet" href="{% static 'css/dashboard_principal.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- Hero Section -->
-    <div class="hero-section">
-        <div class="container text-center">
-            <h1 class="hero-title">
-                <i class="bi bi-grid-3x3-gap-fill"></i> Sistema Integral de Gestión
-            </h1>
+<!--
+================================================================================
+DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
+================================================================================
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+Este es el dashboard principal del sistema que muestra las tres herramientas
+disponibles para gestionar tu negocio:
+
+1. INVENTARIO: Control de productos, stock y movimientos
+2. SCORECARD: Control de calidad e incidencias
+3. SERVICIO TÉCNICO: Gestión de órdenes de servicio y reparaciones
+
+El usuario selecciona el módulo que desea utilizar haciendo clic en cualquiera
+de las tarjetas (cards) que se muestran a continuación.
+================================================================================
+-->
+
+<div class="dashboard-principal-wrapper">
+    <div class="container">
+        
+        <!-- ================================================================ -->
+        <!-- SECCIÓN HERO: Encabezado principal con ícono animado             -->
+        <!-- ================================================================ -->
+        <div class="hero-section">
+            <div class="hero-icon">
+                <i class="fas fa-th-large"></i>
+            </div>
+            <h1 class="hero-title">Sistema Integral de Gestión</h1>
             <p class="hero-subtitle">
-                Gestión completa de Inventario y Control de Calidad en un solo lugar
+                Selecciona la herramienta que deseas utilizar para comenzar a trabajar
             </p>
         </div>
-    </div>
 
-    <!-- Module Cards -->
-    <div class="row g-4 mb-4">
-        <!-- Módulo Inventario -->
-        <div class="col-lg-6">
-            <div class="module-card">
-                <div class="text-center">
-                    <div class="module-icon text-primary">
-                        <i class="bi bi-box-seam"></i>
+        <!-- ================================================================ -->
+        <!-- CONTENEDOR DE MÓDULOS: Grid de 3 tarjetas principales            -->
+        <!-- ================================================================ -->
+        <div class="modules-container">
+            
+            <!-- ============================================================ -->
+            <!-- MÓDULO 1: INVENTARIO                                         -->
+            <!-- ============================================================ -->
+            <div class="module-card inventario" onclick="window.location.href='{% url 'dashboard_inventario' %}'">
+                <div class="module-content">
+                    <!-- Ícono representativo del módulo -->
+                    <div class="module-icon">
+                        <i class="fas fa-boxes-stacked"></i>
                     </div>
-                    <h2 class="module-title">Módulo de Inventario</h2>
+                    
+                    <!-- Título del módulo -->
+                    <h2 class="module-title">Inventario</h2>
+                    
+                    <!-- Descripción breve -->
                     <p class="module-description">
                         Gestiona productos, movimientos y stock en tiempo real con control total sobre tu inventario
                     </p>
-                </div>
-                
-                <div class="module-stats">
-                    <div class="stat-item">
-                        <span class="stat-number">{{ total_productos }}</span>
-                        <span class="stat-label">Productos Totales</span>
+                    
+                    <!-- Estadísticas clave del módulo -->
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">{{ total_productos }}</span>
+                            <span class="stat-label">Productos</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ productos_stock_bajo }}</span>
+                            <span class="stat-label">Stock Bajo</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ movimientos_hoy }}</span>
+                            <span class="stat-label">Movimientos Hoy</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">${{ valor_inventario|floatformat:0 }}</span>
+                            <span class="stat-label">Valor Total</span>
+                        </div>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-number text-warning">{{ productos_stock_bajo }}</span>
-                        <span class="stat-label">Stock Bajo</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">{{ movimientos_hoy }}</span>
-                        <span class="stat-label">Movimientos Hoy</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">${{ valor_inventario|floatformat:0 }}</span>
-                        <span class="stat-label">Valor Inventario</span>
-                    </div>
-                </div>
-                
-                <div class="text-center">
-                    <a href="{% url 'dashboard_inventario' %}" class="btn btn-primary btn-lg">
-                        <i class="bi bi-arrow-right-circle"></i> Ir al Dashboard de Inventario
+                    
+                    <!-- Botón de acción -->
+                    <a href="{% url 'dashboard_inventario' %}" class="module-button">
+                        <span>Abrir Inventario</span>
+                        <i class="fas fa-arrow-right"></i>
                     </a>
                 </div>
             </div>
-        </div>
 
-        <!-- Módulo Control de Calidad -->
-        <div class="col-lg-6">
-            <div class="module-card calidad-card">
-                <div class="text-center">
-                    <div class="module-icon text-success">
-                        <i class="bi bi-shield-check"></i>
+            <!-- ============================================================ -->
+            <!-- MÓDULO 2: SCORECARD (CONTROL DE CALIDAD)                    -->
+            <!-- ============================================================ -->
+            <div class="module-card scorecard" onclick="window.location.href='{% url 'scorecard:dashboard' %}'">
+                <div class="module-content">
+                    <!-- Ícono representativo del módulo -->
+                    <div class="module-icon">
+                        <i class="fas fa-shield-halved"></i>
                     </div>
+                    
+                    <!-- Título del módulo -->
                     <h2 class="module-title">Control de Calidad</h2>
+                    
+                    <!-- Descripción breve -->
                     <p class="module-description">
                         Supervisa y registra incidencias de calidad con análisis detallado y reportes completos
                     </p>
-                </div>
-                
-                <div class="module-stats">
-                    <div class="stat-item">
-                        <span class="stat-number">{{ incidencias_totales }}</span>
-                        <span class="stat-label">Incidencias Totales</span>
+                    
+                    <!-- Estadísticas clave del módulo -->
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">{{ incidencias_totales }}</span>
+                            <span class="stat-label">Incidencias</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ incidencias_abiertas }}</span>
+                            <span class="stat-label">Abiertas</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ incidencias_criticas }}</span>
+                            <span class="stat-label">Críticas</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ tasa_exito }}%</span>
+                            <span class="stat-label">Tasa Éxito</span>
+                        </div>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-number text-primary">{{ incidencias_abiertas }}</span>
-                        <span class="stat-label">Abiertas</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number text-danger">{{ incidencias_criticas }}</span>
-                        <span class="stat-label">Críticas</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">{{ tasa_exito }}%</span>
-                        <span class="stat-label">Tasa de Éxito</span>
-                    </div>
-                </div>
-                
-                <div class="text-center">
-                    <a href="{% url 'scorecard:dashboard' %}" class="btn btn-success btn-lg">
-                        <i class="bi bi-arrow-right-circle"></i> Ir al Dashboard de Calidad
+                    
+                    <!-- Botón de acción -->
+                    <a href="{% url 'scorecard:dashboard' %}" class="module-button">
+                        <span>Abrir Scorecard</span>
+                        <i class="fas fa-arrow-right"></i>
                     </a>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Quick Actions -->
-    <div class="quick-actions">
-        <h3 class="mb-4">
-            <i class="bi bi-lightning-charge text-warning"></i> Acciones Rápidas
-        </h3>
-        <div class="row g-3">
-            <div class="col-md-3">
-                <a href="{% url 'movimiento_rapido' %}" class="action-btn">
-                    <i class="bi bi-qr-code-scan"></i>
-                    <strong>Scanner QR</strong>
-                    <small class="text-muted">Movimiento rápido</small>
-                </a>
-            </div>
-            <div class="col-md-3">
-                <a href="{% url 'crear_producto' %}" class="action-btn">
-                    <i class="bi bi-plus-circle"></i>
-                    <strong>Nuevo Producto</strong>
-                    <small class="text-muted">Agregar al inventario</small>
-                </a>
-            </div>
-            <div class="col-md-3">
-                <a href="{% url 'scorecard:crear_incidencia' %}" class="action-btn">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <strong>Nueva Incidencia</strong>
-                    <small class="text-muted">Registrar problema</small>
-                </a>
-            </div>
-            <div class="col-md-3">
-                <a href="{% url 'movimiento_fraccionario' %}" class="action-btn">
-                    <i class="bi bi-droplet-half"></i>
-                    <strong>Fraccionario</strong>
-                    <small class="text-muted">Mov. fraccionario</small>
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Statistics Overview -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-card-icon text-primary">
-                <i class="bi bi-building"></i>
-            </div>
-            <div class="stat-card-value">{{ total_sucursales }}</div>
-            <div class="stat-card-label">Sucursales Activas</div>
-        </div>
-        
-        <div class="stat-card">
-            <div class="stat-card-icon text-info">
-                <i class="bi bi-people"></i>
-            </div>
-            <div class="stat-card-value">{{ total_empleados }}</div>
-            <div class="stat-card-label">Empleados Registrados</div>
-        </div>
-        
-        <div class="stat-card">
-            <div class="stat-card-icon text-warning">
-                <i class="bi bi-exclamation-triangle"></i>
-            </div>
-            <div class="stat-card-value">{{ productos_stock_bajo }}</div>
-            <div class="stat-card-label">Alertas de Stock</div>
-        </div>
-        
-        <div class="stat-card">
-            <div class="stat-card-icon text-success">
-                <i class="bi bi-check-circle"></i>
-            </div>
-            <div class="stat-card-value">{{ tasa_exito }}%</div>
-            <div class="stat-card-label">Tasa de Éxito</div>
-        </div>
-    </div>
-
-    <!-- Recent Activity -->
-    <div class="row">
-        <div class="col-lg-6 mb-4">
-            <div class="activity-feed">
-                <h3 class="mb-4">
-                    <i class="bi bi-clock-history text-primary"></i> Movimientos Recientes
-                </h3>
-                {% if movimientos_recientes %}
-                    {% for movimiento in movimientos_recientes %}
-                    <div class="activity-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong>
-                                    {% if movimiento.tipo == 'entrada' %}
-                                        <i class="bi bi-arrow-down-circle text-success"></i>
-                                    {% else %}
-                                        <i class="bi bi-arrow-up-circle text-danger"></i>
-                                    {% endif %}
-                                    {{ movimiento.producto.nombre }}
-                                </strong>
-                                <p class="mb-1 text-muted">
-                                    {{ movimiento.tipo|title }} - 
-                                    {% if movimiento.cantidad_fraccionaria %}
-                                        {{ movimiento.cantidad_fraccionaria|floatformat:2 }} {{ movimiento.producto.unidad_medida_fraccionaria }}
-                                    {% else %}
-                                        {{ movimiento.cantidad }} unidades
-                                    {% endif %}
-                                </p>
-                                <small class="activity-time">
-                                    <i class="bi bi-building"></i> {{ movimiento.sucursal_destino.nombre }} |
-                                    <i class="bi bi-person"></i> {{ movimiento.empleado.nombre_completo }}
-                                </small>
-                            </div>
-                            <span class="badge bg-secondary">
-                                {{ movimiento.fecha_movimiento|date:"d/m H:i" }}
-                            </span>
+            <!-- ============================================================ -->
+            <!-- MÓDULO 3: SERVICIO TÉCNICO                                   -->
+            <!-- ============================================================ -->
+            <div class="module-card servicio" onclick="window.location.href='{% url 'servicio_tecnico:inicio' %}'">
+                <div class="module-content">
+                    <!-- Ícono representativo del módulo -->
+                    <div class="module-icon">
+                        <i class="fas fa-screwdriver-wrench"></i>
+                    </div>
+                    
+                    <!-- Título del módulo -->
+                    <h2 class="module-title">Servicio Técnico</h2>
+                    
+                    <!-- Descripción breve -->
+                    <p class="module-description">
+                        Gestiona órdenes de servicio, diagnósticos, reparaciones y entregas de equipos
+                    </p>
+                    
+                    <!-- Estadísticas clave del módulo -->
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">{{ ordenes_activas }}</span>
+                            <span class="stat-label">Órdenes Activas</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ ordenes_pendientes }}</span>
+                            <span class="stat-label">Pendientes</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ ordenes_hoy }}</span>
+                            <span class="stat-label">Hoy</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ ordenes_completadas }}</span>
+                            <span class="stat-label">Completadas</span>
                         </div>
                     </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-muted text-center py-4">No hay movimientos registrados</p>
-                {% endif %}
+                    
+                    <!-- Botón de acción -->
+                    <a href="{% url 'servicio_tecnico:inicio' %}" class="module-button">
+                        <span>Abrir Servicio Técnico</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- SECCIÓN DE INFORMACIÓN: Ayuda y configuración                    -->
+        <!-- ================================================================ -->
+        <div class="info-section">
+            <div class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <p>
+                    <strong>¿Necesitas ayuda?</strong><br>
+                    Cada módulo cuenta con su propio dashboard especializado. Puedes acceder a la 
+                    configuración del sistema desde 
+                    <a href="{% url 'lista_sucursales' %}">Sucursales</a>, 
+                    <a href="{% url 'lista_empleados' %}">Empleados</a> o 
+                    <a href="/admin/">Administración</a>.
+                </p>
             </div>
         </div>
 
-        <div class="col-lg-6 mb-4">
-            <div class="activity-feed">
-                <h3 class="mb-4">
-                    <i class="bi bi-exclamation-triangle text-warning"></i> Incidencias Recientes
-                </h3>
-                {% if scorecard_disponible and incidencias_recientes %}
-                    {% for incidencia in incidencias_recientes %}
-                    <div class="activity-item calidad">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong>{{ incidencia.folio }}</strong>
-                                <p class="mb-1 text-muted">
-                                    {{ incidencia.tipo_incidencia.nombre }} - 
-                                    {{ incidencia.marca }} {{ incidencia.modelo }}
-                                </p>
-                                <small class="activity-time">
-                                    <i class="bi bi-person"></i> {{ incidencia.tecnico_responsable.nombre_completo }}
-                                </small>
-                            </div>
-                            <span class="badge 
-                                {% if incidencia.grado_severidad == 'critico' %}bg-danger
-                                {% elif incidencia.grado_severidad == 'alto' %}bg-warning
-                                {% else %}bg-info{% endif %}">
-                                {{ incidencia.get_grado_severidad_display }}
-                            </span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-muted text-center py-4">No hay incidencias registradas</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Configuration Links -->
-    <div class="text-center mt-4 mb-4">
-        <p class="text-muted mb-2">Configuración del Sistema</p>
-        <div class="btn-group" role="group">
-            <a href="{% url 'lista_sucursales' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-building"></i> Sucursales
-            </a>
-            <a href="{% url 'lista_empleados' %}" class="btn btn-outline-secondary">
-                <i class="bi bi-people"></i> Empleados
-            </a>
-            <a href="/admin/" class="btn btn-outline-secondary">
-                <i class="bi bi-gear"></i> Administración
-            </a>
-        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<!--
+================================================================================
+JAVASCRIPT PARA INTERACTIVIDAD MEJORADA
+================================================================================
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+Este script agrega funcionalidades adicionales:
+- Atajos de teclado (1, 2, 3) para acceso rápido a cada módulo
+- Confirmación de navegación (opcional)
+- Efectos de sonido al hacer hover (opcional)
+================================================================================
+-->
+<script>
+// ============================================================================
+// Esperar a que el DOM esté completamente cargado antes de ejecutar
+// ============================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // ========================================================================
+    // ATAJOS DE TECLADO - Navegación rápida para usuarios avanzados
+    // ========================================================================
+    document.addEventListener('keydown', function(e) {
+        // Tecla "1" = Inventario
+        if (e.key === '1') {
+            e.preventDefault();
+            window.location.href = "{% url 'dashboard_inventario' %}";
+        }
+        
+        // Tecla "2" = Scorecard (Control de Calidad)
+        if (e.key === '2') {
+            e.preventDefault();
+            window.location.href = "{% url 'scorecard:dashboard' %}";
+        }
+        
+        // Tecla "3" = Servicio Técnico
+        if (e.key === '3') {
+            e.preventDefault();
+            window.location.href = "{% url 'servicio_tecnico:inicio' %}";
+        }
+    });
+    
+    // ========================================================================
+    // PREVENIR DOBLE CLICK EN CARDS
+    // Evita que el click en el botón y en el card navegue dos veces
+    // ========================================================================
+    const moduleButtons = document.querySelectorAll('.module-button');
+    
+    moduleButtons.forEach(function(button) {
+        button.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+    });
+    
+    // ========================================================================
+    // MENSAJE DE CONSOLA PARA DESARROLLADORES
+    // ========================================================================
+    console.log('%c🚀 Dashboard Principal Cargado', 'color: #4F46E5; font-size: 16px; font-weight: bold;');
+    console.log('%cAtajos de teclado disponibles:', 'color: #6B7280; font-size: 12px;');
+    console.log('%c  • Presiona "1" para Inventario', 'color: #4F46E5; font-size: 12px;');
+    console.log('%c  • Presiona "2" para Scorecard', 'color: #10B981; font-size: 12px;');
+    console.log('%c  • Presiona "3" para Servicio Técnico', 'color: #F59E0B; font-size: 12px;');
+});
+</script>
 {% endblock %}

@@ -5,424 +5,301 @@
 {% block title %}Servicio Técnico - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/servicio_tecnico_dashboard.css' %}">
+<!-- Font Awesome 6 - Iconos profesionales -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- CSS personalizado para Servicio Técnico - Diseño moderno y minimalista -->
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico_inicio.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4 py-3">
-    
-    {# ======================================================================== #}
-    {# SECCIÓN HERO - ENCABEZADO PRINCIPAL #}
-    {# ======================================================================== #}
-    <div class="st-hero">
-        <div class="st-hero-content text-center">
-            <h1 class="st-hero-title">
-                <i class="bi bi-tools"></i> Servicio Técnico
-            </h1>
+<!--
+================================================================================
+SERVICIO TÉCNICO - DASHBOARD PRINCIPAL
+================================================================================
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+Este es el dashboard principal del módulo de Servicio Técnico.
+Muestra información clave sobre las órdenes de servicio:
+- Distribución por estado
+- Equipos por gama
+- Carga de trabajo por técnico
+- Órdenes sin actualización reciente
+
+El diseño es moderno, minimalista y fácil de navegar.
+================================================================================
+-->
+
+
+<div class="st-dashboard-wrapper">
+    <div class="container">
+        
+        <!-- ================================================================ -->
+        <!-- SECCIÓN HERO: Encabezado principal con ícono animado             -->
+        <!-- ================================================================ -->
+        <div class="st-hero-section">
+            <div class="st-hero-icon">
+                <i class="fas fa-screwdriver-wrench"></i>
+            </div>
+            <h1 class="st-hero-title">Dashboard de Servicio Técnico</h1>
             <p class="st-hero-subtitle">
-                Centro de Gestión de Reparaciones · Dashboard en Tiempo Real
+                Gestión y seguimiento de órdenes de reparación en tiempo real
             </p>
         </div>
-    </div>
-    
-    {# ======================================================================== #}
-    {# BOTONES DE ACCIÓN RÁPIDA #}
-    {# ======================================================================== #}
-    <div class="st-action-buttons mb-4">
-        <a href="{% url 'servicio_tecnico:crear_orden' %}" class="st-action-btn btn btn-primary">
-            <i class="bi bi-plus-circle-fill"></i>
-            <span>Nueva Orden de Servicio</span>
-        </a>
-        <a href="{% url 'servicio_tecnico:crear_orden_venta_mostrador' %}" class="st-action-btn btn btn-warning">
-            <i class="bi bi-shop"></i>
-            <span>Venta Mostrador</span>
-        </a>
-        <a href="{% url 'servicio_tecnico:lista_activas' %}" class="st-action-btn btn btn-info">
-            <i class="bi bi-eye-fill"></i>
-            <span>Ver Órdenes Activas</span>
-        </a>
-    </div>
-    
-    {# ======================================================================== #}
-    {# ALERTAS CRÍTICAS (Si existen) #}
-    {# ======================================================================== #}
-    {% if total_alertas > 0 %}
-    <div class="st-section">
-        <div class="st-section-header">
-            <h2 class="st-section-title">
-                <i class="bi bi-exclamation-triangle-fill text-warning"></i>
-                Alertas y Situaciones que Requieren Atención
-            </h2>
-            <span class="badge bg-warning text-dark" style="font-size: 1.1rem;">
-                {{ total_alertas }} alerta{{ total_alertas|pluralize }}
-            </span>
-        </div>
-        
-        <div class="st-alertas-grid">
-            {% if ordenes_retrasadas > 0 %}
-            <div class="st-alerta-card danger">
-                <i class="bi bi-clock-history st-alerta-icon"></i>
-                <div class="st-alerta-content">
-                    <div class="st-alerta-numero">{{ ordenes_retrasadas }}</div>
-                    <div class="st-alerta-texto">Órdenes Retrasadas (+15 días)</div>
-                </div>
-            </div>
-            {% endif %}
-            
-            {% if ordenes_esperando_cotizacion > 0 %}
-            <div class="st-alerta-card">
-                <i class="bi bi-hourglass-split st-alerta-icon"></i>
-                <div class="st-alerta-content">
-                    <div class="st-alerta-numero">{{ ordenes_esperando_cotizacion }}</div>
-                    <div class="st-alerta-texto">Esperando Cotización (+3 días)</div>
-                </div>
-            </div>
-            {% endif %}
-            
-            {% if ordenes_esperando_piezas > 0 %}
-            <div class="st-alerta-card">
-                <i class="bi bi-box-seam st-alerta-icon"></i>
-                <div class="st-alerta-content">
-                    <div class="st-alerta-numero">{{ ordenes_esperando_piezas }}</div>
-                    <div class="st-alerta-texto">Esperando Piezas (+7 días)</div>
-                </div>
-            </div>
-            {% endif %}
-            
-            {% if ordenes_finalizadas_pendientes > 0 %}
-            <div class="st-alerta-card">
-                <i class="bi bi-truck st-alerta-icon"></i>
-                <div class="st-alerta-content">
-                    <div class="st-alerta-numero">{{ ordenes_finalizadas_pendientes }}</div>
-                    <div class="st-alerta-texto">Finalizadas sin Entregar (+5 días)</div>
-                </div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-    
-    {# ======================================================================== #}
-    {# MÉTRICAS PRINCIPALES #}
-    {# ======================================================================== #}
-    <div class="st-metrics-grid">
-        <!-- Total de Órdenes -->
-        <div class="st-metric-card primary">
-            <i class="bi bi-file-earmark-text st-metric-icon"></i>
-            <div class="st-metric-value">{{ total_ordenes }}</div>
-            <div class="st-metric-label">Total de Órdenes</div>
-            <div class="st-metric-sublabel">Todas las órdenes registradas</div>
-        </div>
-        
-        <!-- Órdenes Activas -->
-        <div class="st-metric-card info">
-            <i class="bi bi-hourglass-split st-metric-icon"></i>
-            <div class="st-metric-value">{{ ordenes_activas }}</div>
-            <div class="st-metric-label">Órdenes Activas</div>
-            <div class="st-metric-sublabel">En proceso de reparación</div>
-        </div>
-        
-        <!-- Finalizadas Este Mes -->
-        <div class="st-metric-card success">
-            <i class="bi bi-check-circle st-metric-icon"></i>
-            <div class="st-metric-value">{{ ordenes_finalizadas_mes }}</div>
-            <div class="st-metric-label">Finalizadas Este Mes</div>
-            <div class="st-metric-sublabel">Órdenes entregadas en {{ "now"|date:"F" }}</div>
-        </div>
-        
-        <!-- Órdenes Retrasadas -->
-        <div class="st-metric-card danger">
-            <i class="bi bi-exclamation-triangle st-metric-icon"></i>
-            <div class="st-metric-value">{{ ordenes_retrasadas }}</div>
-            <div class="st-metric-label">Órdenes Retrasadas</div>
-            <div class="st-metric-sublabel">Más de 15 días sin entregar</div>
-        </div>
-        
-        <!-- Tiempo Promedio de Servicio -->
-        <div class="st-metric-card warning">
-            <i class="bi bi-speedometer2 st-metric-icon"></i>
-            <div class="st-metric-value">{{ tiempo_promedio_servicio }}</div>
-            <div class="st-metric-label">Días Promedio de Servicio</div>
-            <div class="st-metric-sublabel">Tiempo promedio de reparación (hábiles)</div>
-        </div>
-        
-        <!-- Órdenes RHITSO -->
-        <div class="st-metric-card primary">
-            <i class="bi bi-cpu st-metric-icon"></i>
-            <div class="st-metric-value">{{ ordenes_rhitso_activas }}</div>
-            <div class="st-metric-label">Órdenes RHITSO Activas</div>
-            <div class="st-metric-sublabel">Reparación especializada</div>
-        </div>
-    </div>
-    
-    {# ======================================================================== #}
-    {# COTIZACIONES #}
-    {# ======================================================================== #}
-    <div class="st-section">
-        <div class="st-section-header">
-            <h2 class="st-section-title">
-                <i class="bi bi-receipt"></i>
-                Estado de Cotizaciones
-            </h2>
-        </div>
-        
-        <div class="row g-3">
-            <div class="col-md-4">
-                <div class="st-metric-card warning" style="margin: 0;">
-                    <i class="bi bi-clock-history st-metric-icon"></i>
-                    <div class="st-metric-value">{{ cotizaciones_pendientes }}</div>
-                    <div class="st-metric-label">Pendientes de Respuesta</div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="st-metric-card success" style="margin: 0;">
-                    <i class="bi bi-check-circle st-metric-icon"></i>
-                    <div class="st-metric-value">{{ cotizaciones_aceptadas }}</div>
-                    <div class="st-metric-label">Cotizaciones Aceptadas</div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="st-metric-card danger" style="margin: 0;">
-                    <i class="bi bi-x-circle st-metric-icon"></i>
-                    <div class="st-metric-value">{{ cotizaciones_rechazadas }}</div>
-                    <div class="st-metric-label">Cotizaciones Rechazadas</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="row g-4">
-        {# ======================================================================== #}
-        {# ÓRDENES POR ESTADO #}
-        {# ======================================================================== #}
-        <div class="col-lg-6">
-            <div class="st-section">
-                <div class="st-section-header">
-                    <h2 class="st-section-title">
-                        <i class="bi bi-bar-chart-fill"></i>
-                        Distribución por Estado
-                    </h2>
-                </div>
-                
-                {% if ordenes_por_estado %}
-                <div class="st-estado-table">
-                    {% for item in ordenes_por_estado %}
-                    <div class="st-estado-row">
-                        <div class="st-estado-badge">
-                            <span class="badge bg-{{ item.estado|color_estado_orden }}">
-                                {{ item.estado_display }}
-                            </span>
-                        </div>
-                        
-                        <div class="st-estado-bar">
-                            {% widthratio item.total total_ordenes 100 as porcentaje %}
-                            <div class="st-estado-bar-fill" style="width: {{ porcentaje }}%;"></div>
-                        </div>
-                        
-                        <div class="st-estado-number">{{ item.total }}</div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <p class="text-center text-muted py-4">
-                    <i class="bi bi-inbox" style="font-size: 3rem;"></i><br>
-                    No hay órdenes registradas aún
-                </p>
-                {% endif %}
-            </div>
-        </div>
-        
-        {# ======================================================================== #}
-        {# ÓRDENES POR GAMA #}
-        {# ======================================================================== #}
-        <div class="col-lg-6">
-            <div class="st-section">
-                <div class="st-section-header">
-                    <h2 class="st-section-title">
-                        <i class="bi bi-laptop"></i>
-                        Equipos por Gama (Activos)
-                    </h2>
-                </div>
-                
-                <div class="st-gama-grid">
-                    <div class="st-gama-card alta">
-                        <i class="bi bi-star-fill st-gama-icon"></i>
-                        <div class="st-gama-numero">{{ ordenes_gama_alta }}</div>
-                        <div class="st-gama-label">Gama Alta</div>
-                    </div>
-                    
-                    <div class="st-gama-card media">
-                        <i class="bi bi-star-half st-gama-icon"></i>
-                        <div class="st-gama-numero">{{ ordenes_gama_media }}</div>
-                        <div class="st-gama-label">Gama Media</div>
-                    </div>
-                    
-                    <div class="st-gama-card baja">
-                        <i class="bi bi-star st-gama-icon"></i>
-                        <div class="st-gama-numero">{{ ordenes_gama_baja }}</div>
-                        <div class="st-gama-label">Gama Baja</div>
-                    </div>
-                </div>
-            </div>
-            
-            {# ======================================================================== #}
-            {# ÓRDENES POR SUCURSAL #}
-            {# ======================================================================== #}
-            <div class="st-section mt-4">
-                <div class="st-section-header">
-                    <h2 class="st-section-title">
-                        <i class="bi bi-building"></i>
-                        Distribución por Sucursal
-                    </h2>
-                </div>
-                
-                {% if ordenes_por_sucursal %}
-                <div class="st-estado-table">
-                    {% for item in ordenes_por_sucursal %}
-                    <div class="st-estado-row">
-                        <div style="flex: 1;">
-                            <strong>{{ item.sucursal__nombre }}</strong>
-                        </div>
-                        <div class="st-estado-number">{{ item.total }}</div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <p class="text-center text-muted py-3">Sin órdenes por sucursal</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    
-    {# ======================================================================== #}
-    {# TÉCNICOS ACTIVOS #}
-    {# ======================================================================== #}
-    {% if ordenes_por_tecnico %}
-    <div class="st-section">
-        <div class="st-section-header">
-            <h2 class="st-section-title">
-                <i class="bi bi-people-fill"></i>
-                Carga de Trabajo por Técnico
-            </h2>
-            <span class="badge bg-primary">{{ ordenes_por_tecnico|length }} técnico{{ ordenes_por_tecnico|length|pluralize }}</span>
-        </div>
-        
-        <div class="st-tecnicos-grid">
-            {% for tecnico in ordenes_por_tecnico %}
-            <div class="st-tecnico-card">
-                <div class="st-tecnico-avatar">
-                    {% if tecnico.foto_url %}
-                        <img src="{{ tecnico.foto_url }}" alt="{{ tecnico.tecnico_nombre }}">
-                    {% else %}
-                        <div class="st-tecnico-avatar-placeholder">
-                            {{ tecnico.iniciales }}
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="st-tecnico-nombre">{{ tecnico.tecnico_nombre }}</div>
-                <div class="st-tecnico-ordenes">{{ tecnico.total_ordenes }}</div>
-                <div class="st-tecnico-label">Órdenes Activas</div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-    
-    {# ======================================================================== #}
-    {# ÓRDENES RECIENTES #}
-    {# ======================================================================== #}
-    <div class="st-section">
-        <div class="st-section-header">
-            <h2 class="st-section-title">
-                <i class="bi bi-clock-history"></i>
-                Órdenes sin actualización de estado (Top 10)
-            </h2>
-            <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-outline-primary btn-sm">
-                Ver Todas <i class="bi bi-arrow-right"></i>
+
+        <!-- ================================================================ -->
+        <!-- BOTÓN DE ACCIÓN: Ver Órdenes Activas                             -->
+        <!-- ================================================================ -->
+        <div class="st-action-section">
+            <a href="{% url 'servicio_tecnico:lista_activas' %}" class="st-btn-main">
+                <i class="fas fa-eye"></i>
+                <span>Ver Órdenes Activas</span>
+                <i class="fas fa-arrow-right"></i>
             </a>
         </div>
-        
-        {% if ordenes_sin_actualizacion %}
-        <div class="st-ordenes-recientes">
-            {% for orden in ordenes_sin_actualizacion %}
-            <div class="st-orden-item">
-                <div class="st-orden-header">
-                    {# Mostrar la orden interna del cliente si existe, si no mostrar el número interno del sistema #}
-                    <a href="{% url 'servicio_tecnico:detalle_orden' orden.pk %}" 
-                       class="st-orden-numero text-decoration-none">
-                        {% if orden.orden_cliente %}
-                            {{ orden.orden_cliente }}
-                        {% else %}
-                            {{ orden.numero_orden_interno }}
-                        {% endif %}
-                    </a>
-                    <span class="st-orden-fecha">
-                        <i class="bi bi-calendar3"></i>
-                        Última actualización: {{ orden.fecha_ultimo_estado|date:"d/m/Y H:i" }}
-                    </span>
-                </div>
 
-                <div class="st-orden-equipo">
-                    <i class="bi bi-laptop"></i>
-                    <strong>{{ orden.marca }} {{ orden.modelo }}</strong>
-                    {% if orden.numero_serie %}
-                    <br><small class="text-muted">S/N: {{ orden.numero_serie }}</small>
+        <!-- ================================================================ -->
+        <!-- ROW 1: Distribución por Estado y Equipos por Gama                -->
+        <!-- ================================================================ -->
+        <div class="row g-4 mb-4">
+            
+            <!-- DISTRIBUCIÓN POR ESTADO -->
+            <div class="col-lg-6">
+                <div class="st-content-section">
+                    <div class="st-section-header">
+                        <h2 class="st-section-title">
+                            <i class="fas fa-chart-bar"></i>
+                            Distribución por Estado
+                        </h2>
+                    </div>
+                    
+                    {% if ordenes_por_estado %}
+                    <div class="st-estado-list">
+                        {% for item in ordenes_por_estado %}
+                        <div class="st-estado-item">
+                            <div class="st-estado-badge">
+                                <span class="badge bg-{{ item.estado|color_estado_orden }}">
+                                    {{ item.estado_display }}
+                                </span>
+                            </div>
+                            
+                            <div class="st-estado-progress">
+                                {% widthratio item.total total_ordenes 100 as porcentaje %}
+                                <div class="st-estado-progress-fill" style="width: {{ porcentaje }}%;"></div>
+                            </div>
+                            
+                            <div class="st-estado-count">{{ item.total }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="st-empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No hay órdenes registradas aún</p>
+                    </div>
                     {% endif %}
                 </div>
+            </div>
 
-                <div class="st-orden-footer">
-                    <div class="st-orden-tecnico">
-                        <i class="bi bi-person-badge"></i>
-                        {{ orden.tecnico_nombre }}
+            <!-- EQUIPOS POR GAMA -->
+            <div class="col-lg-6">
+                <div class="st-content-section">
+                    <div class="st-section-header">
+                        <h2 class="st-section-title">
+                            <i class="fas fa-laptop"></i>
+                            Equipos por Gama (Activos)
+                        </h2>
                     </div>
-                    <div>
-                        <span class="badge bg-secondary">{{ orden.estado_display }}</span>
-                    </div>
-                    <div class="st-orden-dias text-muted">
-                        {{ orden.dias_sin_actualizacion }} día{{ orden.dias_sin_actualizacion|pluralize }} sin cambios
+                    
+                    <div class="st-gama-grid">
+                        <div class="st-gama-item alta">
+                            <i class="fas fa-star st-gama-icon"></i>
+                            <div class="st-gama-number">{{ ordenes_gama_alta }}</div>
+                            <div class="st-gama-label">Gama Alta</div>
+                        </div>
+                        
+                        <div class="st-gama-item media">
+                            <i class="fas fa-star-half-stroke st-gama-icon"></i>
+                            <div class="st-gama-number">{{ ordenes_gama_media }}</div>
+                            <div class="st-gama-label">Gama Media</div>
+                        </div>
+                        
+                        <div class="st-gama-item baja">
+                            <i class="far fa-star st-gama-icon"></i>
+                            <div class="st-gama-number">{{ ordenes_gama_baja }}</div>
+                            <div class="st-gama-label">Gama Baja</div>
+                        </div>
                     </div>
                 </div>
+                
+                <!-- DISTRIBUCIÓN POR SUCURSAL -->
+                <div class="st-content-section mt-4">
+                    <div class="st-section-header">
+                        <h2 class="st-section-title">
+                            <i class="fas fa-building"></i>
+                            Distribución por Sucursal
+                        </h2>
+                    </div>
+                    
+                    {% if ordenes_por_sucursal %}
+                    <div class="st-sucursal-list">
+                        {% for item in ordenes_por_sucursal %}
+                        <div class="st-sucursal-item">
+                            <div class="st-sucursal-name">{{ item.sucursal__nombre }}</div>
+                            <div class="st-sucursal-count">{{ item.total }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="st-empty-state">
+                        <p>Sin órdenes por sucursal</p>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
-            {% endfor %}
         </div>
-        {% else %}
-        <p class="text-center text-muted py-4">
-            <i class="bi bi-inbox" style="font-size: 3rem;"></i><br>
-            No hay órdenes sin actualización recientes
-        </p>
+
+        <!-- ================================================================ -->
+        <!-- CARGA DE TRABAJO POR TÉCNICO                                     -->
+        <!-- ================================================================ -->
+        {% if ordenes_por_tecnico %}
+        <div class="st-content-section">
+            <div class="st-section-header">
+                <h2 class="st-section-title">
+                    <i class="fas fa-users"></i>
+                    Carga de Trabajo por Técnico
+                </h2>
+                <span class="badge bg-primary" style="font-size: 1rem; padding: 0.5rem 1rem;">
+                    {{ ordenes_por_tecnico|length }} técnico{{ ordenes_por_tecnico|length|pluralize }}
+                </span>
+            </div>
+            
+            <div class="st-tecnicos-grid">
+                {% for tecnico in ordenes_por_tecnico %}
+                <div class="st-tecnico-card">
+                    <div class="st-tecnico-avatar">
+                        {% if tecnico.foto_url %}
+                            <img src="{{ tecnico.foto_url }}" alt="{{ tecnico.tecnico_nombre }}">
+                        {% else %}
+                            <div class="st-tecnico-avatar-placeholder">
+                                {{ tecnico.iniciales }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="st-tecnico-name">{{ tecnico.tecnico_nombre }}</div>
+                    <div class="st-tecnico-orders">{{ tecnico.total_ordenes }}</div>
+                    <div class="st-tecnico-label">Órdenes Activas</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
         {% endif %}
-    </div>
-    
-    {# ======================================================================== #}
-    {# INDICADORES RÁPIDOS - Reemplaza accesos al admin con métricas útiles #}
-    {# ======================================================================== #}
-    <div class="st-section">
-        <div class="st-section-header">
-            <h2 class="st-section-title">
-                <i class="bi bi-speedometer2"></i>
-                Indicadores Rápidos
-            </h2>
+
+        <!-- ================================================================ -->
+        <!-- ÓRDENES SIN ACTUALIZACIÓN (Top 10)                               -->
+        <!-- ================================================================ -->
+        <div class="st-content-section">
+            <div class="st-section-header">
+                <h2 class="st-section-title">
+                    <i class="fas fa-clock-rotate-left"></i>
+                    Órdenes sin Actualización de Estado (Top 10)
+                </h2>
+                <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-outline-primary btn-sm">
+                    Ver Todas <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            
+            {% if ordenes_sin_actualizacion %}
+            <div class="st-ordenes-list">
+                {% for orden in ordenes_sin_actualizacion %}
+                <div class="st-orden-card">
+                    <div class="st-orden-header">
+                        <a href="{% url 'servicio_tecnico:detalle_orden' orden.pk %}" 
+                           class="st-orden-numero">
+                            {% if orden.orden_cliente %}
+                                {{ orden.orden_cliente }}
+                            {% else %}
+                                {{ orden.numero_orden_interno }}
+                            {% endif %}
+                        </a>
+                        <span class="st-orden-fecha">
+                            <i class="far fa-calendar"></i>
+                            Última actualización: {{ orden.fecha_ultimo_estado|date:"d/m/Y H:i" }}
+                        </span>
+                    </div>
+
+                    <div class="st-orden-equipo">
+                        <i class="fas fa-laptop"></i>
+                        <strong>{{ orden.marca }} {{ orden.modelo }}</strong>
+                        {% if orden.numero_serie %}
+                        <br><small class="text-muted">S/N: {{ orden.numero_serie }}</small>
+                        {% endif %}
+                    </div>
+
+                    <div class="st-orden-footer">
+                        <div class="st-orden-tecnico">
+                            <i class="fas fa-user-gear"></i>
+                            {{ orden.tecnico_nombre }}
+                        </div>
+                        <div>
+                            <span class="badge bg-secondary">{{ orden.estado_display }}</span>
+                        </div>
+                        <div class="st-orden-dias">
+                            {{ orden.dias_sin_actualizacion }} día{{ orden.dias_sin_actualizacion|pluralize }} sin cambios
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="st-empty-state">
+                <i class="fas fa-check-circle"></i>
+                <p>No hay órdenes sin actualización recientes</p>
+            </div>
+            {% endif %}
         </div>
 
-        <div class="row g-3">
-            <div class="col-md-6">
-                <div class="st-metric-card danger" style="margin:0;">
-                    <i class="bi bi-exclamation-octagon st-metric-icon"></i>
-                    <div class="st-metric-value">{{ incidencias_abiertas }}</div>
-                    <div class="st-metric-label">Incidencias Abiertas</div>
-                    <div class="st-metric-sublabel">Problemas reportados sin resolver</div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="st-metric-card warning" style="margin:0;">
-                    <i class="bi bi-box-seam st-metric-icon"></i>
-                    <div class="st-metric-value">{{ piezas_retrasadas }}</div>
-                    <div class="st-metric-label">Pedidos de Piezas Retrasados</div>
-                    <div class="st-metric-sublabel">Piezas con fecha estimada vencida</div>
-                </div>
-            </div>
-        </div>
     </div>
-    
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<!--
+================================================================================
+JAVASCRIPT PARA INTERACTIVIDAD MEJORADA
+================================================================================
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+Este script agrega funcionalidades adicionales:
+- Atajos de teclado para navegación rápida
+- Efectos de hover mejorados
+- Mensajes de consola para desarrolladores
+================================================================================
+-->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // ========================================================================
+    // ATAJO DE TECLADO - Tecla "A" para Ver Órdenes Activas
+    // ========================================================================
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'a' || e.key === 'A') {
+            if (!e.ctrlKey && !e.altKey && !e.metaKey) {
+                const activeElement = document.activeElement;
+                if (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    window.location.href = "{% url 'servicio_tecnico:lista_activas' %}";
+                }
+            }
+        }
+    });
+    
+    // ========================================================================
+    // MENSAJE DE CONSOLA PARA DESARROLLADORES
+    // ========================================================================
+    console.log('%c🔧 Dashboard de Servicio Técnico Cargado', 'color: #F59E0B; font-size: 16px; font-weight: bold;');
+    console.log('%cAtajo de teclado disponible:', 'color: #6B7280; font-size: 12px;');
+    console.log('%c  • Presiona "A" para Ver Órdenes Activas', 'color: #F59E0B; font-size: 12px;');
+});
+</script>
 {% endblock %}

@@ -69,7 +69,7 @@ def fecha_local(fecha_utc):
 def dashboard_principal(request):
     """
     Dashboard principal del sistema - Punto de entrada unificado
-    Muestra resumen de ambos módulos: Inventario y Control de Calidad
+    Muestra resumen de los tres módulos: Inventario, Control de Calidad y Servicio Técnico
     """
     # ========== ESTADÍSTICAS DE INVENTARIO ==========
     total_productos = Producto.objects.count()
@@ -95,6 +95,48 @@ def dashboard_principal(request):
         incidencias_recientes = Incidencia.objects.select_related(
             'tecnico_responsable', 'tipo_incidencia'
         ).order_by('-fecha_registro')[:5]
+    
+    # ========== ESTADÍSTICAS DE SERVICIO TÉCNICO ==========
+    ordenes_activas = 0
+    ordenes_pendientes = 0
+    ordenes_hoy = 0
+    ordenes_completadas = 0
+    
+    # Verificar si el módulo de servicio técnico está disponible
+    try:
+        from servicio_tecnico.models import OrdenServicio
+        SERVICIO_TECNICO_AVAILABLE = True
+    except ImportError:
+        SERVICIO_TECNICO_AVAILABLE = False
+    
+    if SERVICIO_TECNICO_AVAILABLE:
+        # Estados considerados como "activas" (en proceso)
+        estados_activos = [
+            'espera', 'recepcion', 'diagnostico', 'equipo_diagnosticado',
+            'diagnostico_enviado_cliente', 'cotizacion', 'cliente_acepta_cotizacion',
+            'partes_solicitadas_proveedor', 'esperando_piezas', 'piezas_recibidas',
+            'reparacion', 'control_calidad'
+        ]
+        
+        # Estados considerados como "pendientes" (esperando acción)
+        estados_pendientes = [
+            'espera', 'diagnostico_enviado_cliente', 'cotizacion',
+            'cotizacion_enviada_proveedor', 'esperando_piezas'
+        ]
+        
+        # Órdenes activas (todas las que no están finalizadas, entregadas o canceladas)
+        ordenes_activas = OrdenServicio.objects.filter(estado__in=estados_activos).count()
+        
+        # Órdenes pendientes (esperando alguna acción o respuesta)
+        ordenes_pendientes = OrdenServicio.objects.filter(estado__in=estados_pendientes).count()
+        
+        # Órdenes creadas hoy
+        ordenes_hoy = OrdenServicio.objects.filter(fecha_ingreso__date=date.today()).count()
+        
+        # Órdenes completadas (finalizadas + entregadas)
+        ordenes_completadas = OrdenServicio.objects.filter(
+            estado__in=['finalizado', 'entregado']
+        ).count()
     
     # ========== ACTIVIDADES RECIENTES ==========
     # Últimos 5 movimientos
@@ -125,6 +167,13 @@ def dashboard_principal(request):
         'incidencias_abiertas': incidencias_abiertas,
         'incidencias_criticas': incidencias_criticas,
         'incidencias_recientes': incidencias_recientes,
+        
+        # Servicio Técnico
+        'ordenes_activas': ordenes_activas,
+        'ordenes_pendientes': ordenes_pendientes,
+        'ordenes_hoy': ordenes_hoy,
+        'ordenes_completadas': ordenes_completadas,
+        'servicio_tecnico_disponible': SERVICIO_TECNICO_AVAILABLE,
         
         # General
         'total_sucursales': total_sucursales,
