@@ -6017,7 +6017,6 @@ def enviar_imagenes_cliente(request, orden_id):
             'mensaje_personalizado': mensaje_personalizado,
             'fecha_envio': ahora,
             'cantidad_imagenes': len(imagenes_comprimidas),
-            'usuario_remitente': request.user.empleado if hasattr(request.user, 'empleado') else None,
         }
         
         # Renderizar plantilla HTML
@@ -6031,14 +6030,26 @@ def enviar_imagenes_cliente(request, orden_id):
         # =======================================================================
         print(f"✉️ Enviando correo electrónico...")
         
-        # Asunto del correo
-        asunto = f'📸 Fotografías de ingreso - Orden {orden.numero_orden_interno}'
+        # Asunto del correo usando orden_cliente si existe, sino número interno
+        numero_orden_display = orden.detalle_equipo.orden_cliente if orden.detalle_equipo.orden_cliente else orden.numero_orden_interno
+        asunto = f'📸 Fotografías de ingreso - Orden {numero_orden_display}'
+        
+        # Configurar remitente como "Servicio Técnico System"
+        # Extraer solo el email de DEFAULT_FROM_EMAIL (que puede incluir nombre)
+        import re
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        if email_match:
+            email_solo = email_match.group(1)  # Extraer email entre < >
+        else:
+            email_solo = settings.DEFAULT_FROM_EMAIL  # Si no tiene < >, usar directo
+        
+        remitente = f"Servicio Técnico System <{email_solo}>"
         
         # Crear mensaje de correo
         email = EmailMessage(
             subject=asunto,
             body=html_content,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=remitente,
             to=[email_cliente],
             cc=destinatarios_copia if destinatarios_copia else None,
         )
@@ -6087,17 +6098,34 @@ def enviar_imagenes_cliente(request, orden_id):
         # =======================================================================
         # PASO 9: RETORNAR RESPUESTA EXITOSA
         # =======================================================================
-        return JsonResponse({
-            'success': True,
-            'message': f'✅ Correo enviado exitosamente a {email_cliente}',
-            'data': {
-                'destinatario': email_cliente,
-                'imagenes_enviadas': len(imagenes_comprimidas),
-                'tamaño_mb': round(tamaño_total_comprimido/1024/1024, 2),
-                'reduccion_porcentaje': round(reduccion_total, 1),
-                'copia_count': len(destinatarios_copia)
-            }
-        })
+        # Detectar si es petición AJAX (fetch desde JavaScript)
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
+                  request.content_type == 'application/json' or \
+                  'application/json' in request.headers.get('Accept', '')
+        
+        if is_ajax:
+            # Respuesta JSON para AJAX (JavaScript fetch)
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Correo enviado exitosamente a {email_cliente}',
+                'data': {
+                    'destinatario': email_cliente,
+                    'imagenes_enviadas': len(imagenes_comprimidas),
+                    'tamaño_mb': round(tamaño_total_comprimido/1024/1024, 2),
+                    'reduccion_porcentaje': round(reduccion_total, 1),
+                    'copia_count': len(destinatarios_copia)
+                }
+            })
+        else:
+            # Respuesta con redirect y mensaje de Django (fallback si JavaScript falla)
+            from django.contrib import messages
+            messages.success(
+                request,
+                f'✅ Correo enviado exitosamente a {email_cliente}. '
+                f'Se enviaron {len(imagenes_comprimidas)} imagen(es) '
+                f'({round(tamaño_total_comprimido/1024/1024, 2)} MB total).'
+            )
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
         
     except Exception as e:
         # Registrar error en consola
@@ -6105,10 +6133,22 @@ def enviar_imagenes_cliente(request, orden_id):
         import traceback
         traceback.print_exc()
         
-        return JsonResponse({
-            'success': False,
-            'error': f'❌ Error al enviar el correo: {str(e)}'
-        }, status=500)
+        # Detectar si es petición AJAX
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
+                  request.content_type == 'application/json' or \
+                  'application/json' in request.headers.get('Accept', '')
+        
+        if is_ajax:
+            # Respuesta JSON para AJAX
+            return JsonResponse({
+                'success': False,
+                'error': f'❌ Error al enviar el correo: {str(e)}'
+            }, status=500)
+        else:
+            # Respuesta con redirect y mensaje de error (fallback)
+            from django.contrib import messages
+            messages.error(request, f'❌ Error al enviar el correo: {str(e)}')
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
 
 
 # ============================================================================

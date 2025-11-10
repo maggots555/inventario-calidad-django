@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fotografías de Ingreso - {{ orden.numero_orden_interno }}</title>
+    <title>Fotografías de Ingreso - {{ detalle.orden_cliente }}</title>
     <style>
         * {
             margin: 0;
@@ -289,7 +289,13 @@
                 
                 <div class="info-row">
                     <div class="info-label">🎯 Número de Orden:</div>
-                    <div class="info-value highlight">{{ orden.numero_orden_interno }}</div>
+                    <div class="info-value highlight">
+                        {% if detalle.orden_cliente %}
+                            {{ detalle.orden_cliente }}
+                        {% else %}
+                            {{ orden.numero_orden_interno }}
+                        {% endif %}
+                    </div>
                 </div>
                 
                 <div class="info-row">
@@ -307,7 +313,7 @@
                 
                 <div class="info-row">
                     <div class="info-label">📅 Fecha de Ingreso:</div>
-                    <div class="info-value">{{ orden.fecha_creacion|date:"d/m/Y H:i" }}</div>
+                    <div class="info-value">{{ orden.fecha_ingreso|date:"d/m/Y H:i" }}</div>
                 </div>
                 
                 {% if detalle.tiene_cargador %}
@@ -372,23 +378,15 @@
         <div class="footer">
             <div class="signature">
                 <div class="signature-name">
-                    {% if usuario_remitente %}
-                        {{ usuario_remitente.nombre_completo }}
-                    {% else %}
-                        Sistema Integral SIC
-                    {% endif %}
+                    Sistema de Servicio Técnico
                 </div>
-                {% if usuario_remitente %}
-                    {% if usuario_remitente.cargo %}
-                        <div class="signature-role">{{ usuario_remitente.cargo }}</div>
-                    {% endif %}
-                    {% if usuario_remitente.area %}
-                        <div class="signature-area">{{ usuario_remitente.area }}</div>
-                    {% endif %}
-                    {% if usuario_remitente.email %}
-                        <div class="signature-email">✉️ {{ usuario_remitente.email }}</div>
-                    {% endif %}
-                {% endif %}
+                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2);">
+                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                </div>
+                <div class="signature-area" style="margin-top: 10px; font-size: 13px; line-height: 1.5;">
+                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                    Para seguimiento de su orden, contacte directamente a su responsable de seguimiento.
+                </div>
             </div>
             
             <div class="company">SIC Comercialización y Servicios</div>

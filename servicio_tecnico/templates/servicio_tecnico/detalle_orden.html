@@ -2766,8 +2766,8 @@
                             <h6 class="mb-0 text-primary fw-bold">Para: (Destinatario principal)</h6>
                         </div>
                         
-                        {% if orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}
-                        <!-- ADVERTENCIA: Email no configurado -->
+                        {% if not orden.detalle_equipo.email_cliente|es_email_valido %}
+                        <!-- ADVERTENCIA: Email no configurado o inválido -->
                         <div class="alert alert-warning border-warning border-2">
                             <div class="d-flex align-items-start">
                                 <i class="bi bi-exclamation-triangle-fill fs-3 me-3 flex-shrink-0"></i>
@@ -2776,9 +2776,20 @@
                                         <strong>⚠️ Email del cliente no configurado</strong>
                                     </h6>
                                     <p class="mb-2">
-                                        El email del cliente está configurado con el valor por defecto. 
+                                        {% if orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}
+                                            El email del cliente está configurado con el <strong>valor por defecto</strong>. 
+                                        {% else %}
+                                            El email del cliente <strong>no está configurado correctamente</strong>.
+                                        {% endif %}
                                         <strong>Debes actualizarlo antes de poder enviar las imágenes.</strong>
                                     </p>
+                                    <div class="alert alert-light border-start border-4 border-info mb-2">
+                                        <small>
+                                            <i class="bi bi-info-circle-fill text-info"></i>
+                                            <strong>Email actual:</strong> 
+                                            <code class="bg-white px-2 py-1 rounded">{{ orden.detalle_equipo.email_cliente }}</code>
+                                        </small>
+                                    </div>
                                     <hr class="my-2">
                                     <button type="button" 
                                             class="btn btn-warning btn-sm"
@@ -2795,7 +2806,7 @@
                         </div>
                         {% else %}
                         <!-- Cliente con email válido -->
-                        <div class="destinatario-card p-3 border rounded bg-light shadow-sm">
+                        <div class="destinatario-card p-3 border rounded shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); border: 2px solid #4caf50 !important;">
                             <div class="d-flex align-items-center">
                                 <input 
                                     class="form-check-input me-3 flex-shrink-0" 
@@ -2805,13 +2816,16 @@
                                     value="1"
                                     checked
                                     disabled>
-                                <i class="bi bi-person-circle text-primary fs-2 me-3 flex-shrink-0"></i>
+                                <i class="bi bi-person-check-fill text-success fs-2 me-3 flex-shrink-0"></i>
                                 <div class="flex-grow-1">
-                                    <div class="fw-bold">
+                                    <div class="fw-bold text-success">
                                         <i class="bi bi-laptop"></i> Cliente del Equipo
+                                        <span class="badge bg-success ms-2">
+                                            <i class="bi bi-check-circle-fill"></i> VÁLIDO
+                                        </span>
                                     </div>
-                                    <small class="text-muted d-block">
-                                        <i class="bi bi-envelope"></i> {{ orden.detalle_equipo.email_cliente }}
+                                    <small class="text-dark d-block mt-1">
+                                        <i class="bi bi-envelope-fill"></i> <strong>{{ orden.detalle_equipo.email_cliente }}</strong>
                                     </small>
                                     <small class="text-success d-block mt-1">
                                         <i class="bi bi-check-circle-fill"></i> Destinatario principal (siempre incluido)
@@ -2838,19 +2852,19 @@
                                     <i class="bi bi-tools text-success"></i> Técnico Asignado
                                 </h6>
                                 
-                                {% if orden.tecnico_asignado and orden.tecnico_asignado.empleado and orden.tecnico_asignado.empleado.email %}
+                                {% if orden.tecnico_asignado_actual and orden.tecnico_asignado_actual.email %}
                                 <label class="destinatario-card p-3 border rounded bg-light hover-shadow d-block mb-0 cursor-pointer" for="tecnico_asignado">
                                     <div class="d-flex align-items-center">
                                         <input 
                                             class="form-check-input me-3 flex-shrink-0" 
                                             type="checkbox" 
                                             name="copia_tecnico" 
-                                            value="{{ orden.tecnico_asignado.empleado.email }}" 
+                                            value="{{ orden.tecnico_asignado_actual.email }}" 
                                             id="tecnico_asignado">
                                         
-                                        {% if orden.tecnico_asignado.empleado.foto_perfil %}
-                                            <img src="{{ orden.tecnico_asignado.empleado.foto_perfil.url }}" 
-                                                 alt="{{ orden.tecnico_asignado.empleado.nombre_completo }}" 
+                                        {% if orden.tecnico_asignado_actual.foto_perfil %}
+                                            <img src="{{ orden.tecnico_asignado_actual.foto_perfil.url }}" 
+                                                 alt="{{ orden.tecnico_asignado_actual.nombre_completo }}" 
                                                  class="rounded-circle me-2 flex-shrink-0"
                                                  style="width: 48px; height: 48px; object-fit: cover; border: 2px solid #28a745;">
                                         {% else %}
@@ -2859,12 +2873,12 @@
                                         
                                         <div class="flex-grow-1" style="min-width: 0;">
                                             <div class="fw-bold text-truncate">
-                                                <i class="bi bi-wrench"></i> {{ orden.tecnico_asignado.empleado.nombre_completo }}
+                                                <i class="bi bi-wrench"></i> {{ orden.tecnico_asignado_actual.nombre_completo }}
                                             </div>
                                             <small class="text-muted d-block">
                                                 <span class="badge bg-success me-1">TÉCNICO ASIGNADO</span>
                                                 <span class="text-truncate d-inline-block" style="max-width: 200px; vertical-align: middle;">
-                                                    {{ orden.tecnico_asignado.empleado.email }}
+                                                    {{ orden.tecnico_asignado_actual.email }}
                                                 </span>
                                             </small>
                                         </div>
@@ -2873,10 +2887,8 @@
                                 {% else %}
                                 <div class="alert alert-info mb-0">
                                     <i class="bi bi-info-circle"></i>
-                                    {% if not orden.tecnico_asignado %}
+                                    {% if not orden.tecnico_asignado_actual %}
                                         <strong>Sin técnico asignado:</strong> Esta orden aún no tiene técnico asignado.
-                                    {% elif not orden.tecnico_asignado.empleado %}
-                                        <strong>Sin empleado vinculado:</strong> El técnico no tiene empleado asociado.
                                     {% else %}
                                         <strong>Sin email configurado:</strong> El técnico asignado no tiene email configurado en su perfil.
                                     {% endif %}
@@ -3079,7 +3091,7 @@
                                     <div class="col-12">
                                         <small class="text-muted"><strong>Asunto:</strong></small>
                                         <div class="p-2 bg-white border rounded">
-                                            <strong>📸 Fotografías de ingreso - Orden {{ orden.numero_orden_interno }}</strong>
+                                            <strong>📸 Fotografías de ingreso - Orden {{ detalle.orden_cliente }}</strong>
                                         </div>
                                     </div>
                                     <div class="col-12">
@@ -3103,8 +3115,14 @@
                                 <p>
                                     Adjuntamos las fotografías del estado en el que ingresó su equipo para su conocimiento y registro.
                                 </p>
-                                <p><strong>Número de orden:</strong> {{ orden.numero_orden_interno }}</p>
-                                <p><strong>Fecha de ingreso:</strong> {{ orden.fecha_creacion|date:"d/m/Y H:i" }}</p>
+                                <p><strong>Número de orden:</strong> 
+                                    {% if orden.detalle_equipo.orden_cliente %}
+                                        {{ orden.detalle_equipo.orden_cliente }}
+                                    {% else %}
+                                        {{ orden.numero_orden_interno }}
+                                    {% endif %}
+                                </p>
+                                <p><strong>Fecha de ingreso:</strong> {{ orden.fecha_ingreso|date:"d/m/Y H:i" }}</p>
                                 
                                 <hr>
                                 
@@ -3146,8 +3164,20 @@
                         form="formEnviarImagenesCliente" 
                         class="btn btn-primary btn-lg"
                         id="btnEnviarImagenes"
-                        {% if orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}disabled{% endif %}>
-                    <i class="bi bi-send-fill"></i> Enviar Correo
+                        {% if not orden.detalle_equipo.email_cliente|es_email_valido %}
+                            disabled 
+                            data-email-invalido="true"
+                            title="⚠️ Debes configurar un email válido antes de enviar"
+                        {% else %}
+                            title="Enviar imágenes al cliente por correo electrónico"
+                        {% endif %}>
+                    <i class="bi bi-send-fill"></i> 
+                    {% if not orden.detalle_equipo.email_cliente|es_email_valido %}
+                        <span class="text-decoration-line-through">Enviar Correo</span>
+                        <i class="bi bi-exclamation-triangle-fill ms-1"></i>
+                    {% else %}
+                        Enviar Correo
+                    {% endif %}
                 </button>
             </div>
         </div>
@@ -4735,14 +4765,32 @@ document.addEventListener('DOMContentLoaded', function() {
             previsualizacionArchivos.innerHTML = `<i class="bi bi-images"></i> ${seleccionadas} imagen${seleccionadas !== 1 ? 'es' : ''}`;
         }
         
-        // Habilitar/deshabilitar botón de envío
-        if (btnEnviarImagenes && !btnEnviarImagenes.hasAttribute('data-email-invalido')) {
-            btnEnviarImagenes.disabled = seleccionadas === 0;
+        // =====================================================================
+        // CRÍTICO: Validación de email antes de habilitar botón de envío
+        // =====================================================================
+        // Solo habilitar/deshabilitar el botón si el email es VÁLIDO
+        // Si tiene el atributo data-email-invalido, el botón SIEMPRE está disabled
+        // (este atributo se establece en el template cuando el email es inválido)
+        if (btnEnviarImagenes) {
+            const emailInvalido = btnEnviarImagenes.hasAttribute('data-email-invalido');
             
-            if (seleccionadas === 0) {
-                btnEnviarImagenes.title = 'Debes seleccionar al menos una imagen';
+            if (emailInvalido) {
+                // Email inválido: botón SIEMPRE deshabilitado (no importa cuántas imágenes)
+                btnEnviarImagenes.disabled = true;
+                btnEnviarImagenes.title = '⚠️ Debes configurar un email válido antes de enviar';
+                btnEnviarImagenes.classList.add('btn-outline-secondary');
+                btnEnviarImagenes.classList.remove('btn-primary');
             } else {
-                btnEnviarImagenes.title = 'Enviar ' + seleccionadas + ' imagen' + (seleccionadas !== 1 ? 'es' : '') + ' al cliente';
+                // Email válido: habilitar/deshabilitar según imágenes seleccionadas
+                btnEnviarImagenes.disabled = seleccionadas === 0;
+                btnEnviarImagenes.classList.remove('btn-outline-secondary');
+                btnEnviarImagenes.classList.add('btn-primary');
+                
+                if (seleccionadas === 0) {
+                    btnEnviarImagenes.title = 'Debes seleccionar al menos una imagen';
+                } else {
+                    btnEnviarImagenes.title = 'Enviar ' + seleccionadas + ' imagen' + (seleccionadas !== 1 ? 'es' : '') + ' al cliente';
+                }
             }
         }
     }
@@ -4814,7 +4862,23 @@ document.addEventListener('DOMContentLoaded', function() {
         formEnviarImagenes.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            // Validar que se hayan seleccionado imágenes
+            // =====================================================================
+            // VALIDACIÓN 1: Verificar que el email del cliente sea válido
+            // =====================================================================
+            const btnSubmit = document.getElementById('btnEnviarImagenes');
+            if (btnSubmit && btnSubmit.hasAttribute('data-email-invalido')) {
+                alert(
+                    '❌ No se puede enviar el correo\n\n' +
+                    'El email del cliente no está configurado o es inválido.\n' +
+                    'Por favor, actualiza el email del cliente antes de intentar enviar las imágenes.\n\n' +
+                    'Usa el botón "Editar Email del Cliente Ahora" para configurarlo.'
+                );
+                return;
+            }
+            
+            // =====================================================================
+            // VALIDACIÓN 2: Verificar que se hayan seleccionado imágenes
+            // =====================================================================
             const imagenesSeleccionadas = document.querySelectorAll('.checkbox-imagen:checked').length;
             
             if (imagenesSeleccionadas === 0) {
@@ -4822,7 +4886,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Confirmación final
+            // =====================================================================
+            // CONFIRMACIÓN FINAL: Confirmar envío con el usuario
+            // =====================================================================
             const confirmacion = confirm(
                 `📧 ¿Confirmas el envío de ${imagenesSeleccionadas} imagen${imagenesSeleccionadas !== 1 ? 'es' : ''} al cliente?\n\n` +
                 'El correo se enviará inmediatamente.'
@@ -4830,8 +4896,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!confirmacion) return;
             
-            // Deshabilitar botón y mostrar loader (botón está fuera del form, buscar por ID)
-            const btnSubmit = document.getElementById('btnEnviarImagenes');
+            // Deshabilitar botón y mostrar loader (reusar variable btnSubmit ya declarada arriba)
             let textoOriginal = '';
             
             if (btnSubmit) {
@@ -4844,14 +4909,26 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData(this);
             
             try {
-                // Enviar petición AJAX
+                // Enviar petición AJAX con headers correctos
                 const response = await fetch(this.action, {
                     method: 'POST',
                     headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Accept': 'application/json',  // Indicar que esperamos JSON
+                        'X-Requested-With': 'XMLHttpRequest'  // Indicar que es AJAX
                     },
                     body: formData
                 });
+                
+                // Verificar si la respuesta es JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    // Si no es JSON, probablemente es un redirect (HTML)
+                    // El correo se envió correctamente, pero el servidor devolvió HTML
+                    console.warn('Respuesta no es JSON, recargando página...');
+                    location.reload();
+                    return;
+                }
                 
                 const data = await response.json();
                 

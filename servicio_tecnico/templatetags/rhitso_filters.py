@@ -645,3 +645,80 @@ def text_color_for_bg(hex_color):
     except (ValueError, TypeError):
         # Si hay algún error al procesar el color, retornar blanco por seguridad
         return '#ffffff'
+
+
+# =============================================================================
+# FILTRO 9: VALIDAR SI EL EMAIL ES VÁLIDO Y NO ES EL VALOR POR DEFECTO
+# =============================================================================
+
+@register.filter(name='es_email_valido')
+def es_email_valido(email):
+    """
+    Valida si un email es válido y no es el valor por defecto del sistema.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Este filtro verifica dos cosas:
+    1. Que el email NO sea el valor por defecto ('cliente@ejemplo.com')
+    2. Que el email NO esté vacío o None
+    
+    ¿Por qué es necesario?
+    ----------------------
+    En el sistema, cuando se crea una orden sin email del cliente,
+    se asigna automáticamente 'cliente@ejemplo.com' como valor por defecto.
+    Este NO es un email real y NO se puede usar para enviar correos.
+    
+    Este filtro ayuda a:
+    - Mostrar advertencias en la UI cuando el email no es válido
+    - Deshabilitar botones de envío de correo si el email no está configurado
+    - Destacar visualmente qué órdenes necesitan actualizar el email
+    
+    Uso en templates:
+    -----------------
+    Para validación condicional:
+        {% if orden.detalle_equipo.email_cliente|es_email_valido %}
+            <span class="text-success">✓ Email válido</span>
+        {% else %}
+            <span class="text-danger">✗ Email no configurado</span>
+        {% endif %}
+    
+    Para deshabilitar botones:
+        <button {% if not orden.detalle_equipo.email_cliente|es_email_valido %}disabled{% endif %}>
+            Enviar correo
+        </button>
+    
+    Args:
+        email (str): Dirección de email a validar
+    
+    Returns:
+        bool: True si el email es válido y diferente al valor por defecto
+              False si el email es None, vacío, o es 'cliente@ejemplo.com'
+    
+    Ejemplos:
+        >>> es_email_valido('juan.perez@gmail.com')
+        True
+        
+        >>> es_email_valido('cliente@ejemplo.com')
+        False
+        
+        >>> es_email_valido(None)
+        False
+        
+        >>> es_email_valido('')
+        False
+    """
+    # Si el email es None o está vacío, no es válido
+    if not email:
+        return False
+    
+    # Convertir a string y limpiar espacios
+    email_str = str(email).strip().lower()
+    
+    # Validar que NO sea el valor por defecto
+    if email_str == 'cliente@ejemplo.com':
+        return False
+    
+    # Si llegó aquí, el email tiene algún valor diferente al por defecto
+    # Django ya validó el formato de email en el modelo (EmailField)
+    # así que podemos confiar en que es un formato válido
+    return True
