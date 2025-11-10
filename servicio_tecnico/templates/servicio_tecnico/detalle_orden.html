@@ -3334,7 +3334,8 @@ function abrirModalSeguimiento(seguimientoId = null) {
         btnTexto.textContent = 'Actualizar Seguimiento';
         document.getElementById('seguimientoId').value = seguimientoId;
         
-        // TODO: Cargar datos del seguimiento vía AJAX
+        // Cargar datos del seguimiento vía AJAX
+        cargarDatosSeguimiento(seguimientoId);
     } else {
         // Modo AGREGAR
         titulo.textContent = 'Agregar Seguimiento';
@@ -3347,6 +3348,68 @@ function abrirModalSeguimiento(seguimientoId = null) {
     }
     
     modal.show();
+}
+
+/**
+ * Carga los datos de un seguimiento existente en el formulario.
+ * 
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Esta función es la que soluciona el problema de edición.
+ * Cuando haces clic en "Editar", esta función:
+ * 1. Hace una petición al servidor (fetch) pidiendo los datos del seguimiento
+ * 2. El servidor responde con un JSON que contiene toda la información
+ * 3. La función toma cada campo del JSON y lo coloca en el formulario
+ * 
+ * Es como copiar datos de una hoja a otra: lee de la base de datos
+ * y los pega en los campos del formulario para que puedas editarlos.
+ * 
+ * @param {number} seguimientoId - ID del seguimiento a cargar
+ */
+async function cargarDatosSeguimiento(seguimientoId) {
+    try {
+        // Construir la URL para obtener los datos
+        const url = "{% url 'servicio_tecnico:obtener_seguimiento' 0 %}".replace('/0/', `/${seguimientoId}/`);
+        
+        // Hacer la petición al servidor
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success) {
+            const seg = data.seguimiento;
+            
+            // Poblar los campos del formulario con los datos recibidos
+            // IMPORTANTE: Los IDs son sin el prefijo 'id_'
+            document.getElementById('proveedor').value = seg.proveedor;
+            document.getElementById('descripcion_piezas').value = seg.descripcion_piezas;
+            document.getElementById('numero_pedido').value = seg.numero_pedido;
+            document.getElementById('fecha_pedido').value = seg.fecha_pedido;
+            document.getElementById('fecha_entrega_estimada').value = seg.fecha_entrega_estimada;
+            document.getElementById('fecha_entrega_real').value = seg.fecha_entrega_real;
+            document.getElementById('estado').value = seg.estado;
+            document.getElementById('notas_seguimiento').value = seg.notas_seguimiento;
+            
+            // Cargar piezas seleccionadas (checkboxes)
+            // Primero, desmarcar todas las piezas
+            document.querySelectorAll('input[name="piezas"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            // Luego, marcar solo las piezas que pertenecen a este seguimiento
+            seg.piezas.forEach(piezaId => {
+                const checkbox = document.querySelector(`input[name="piezas"][value="${piezaId}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+            });
+            
+        } else {
+            mostrarToast(data.error || 'Error al cargar datos del seguimiento', 'danger');
+        }
+        
+    } catch (error) {
+        console.error('Error al cargar seguimiento:', error);
+        mostrarToast('Error de conexión al cargar datos', 'danger');
+    }
 }
 
 /**

@@ -1177,13 +1177,50 @@ def detalle_orden(request, orden_id):
         # FORMULARIO 1: Configuración Adicional
         # ------------------------------------------------------------------------
         if form_type == 'configuracion':
+            # Obtener el valor ANTES de crear el formulario
+            # Hacemos una consulta directa a la BD para tener el valor real
+            from .models import DetalleEquipo
+            detalle_bd = DetalleEquipo.objects.get(pk=orden.detalle_equipo.pk)
+            fecha_fin_anterior = detalle_bd.fecha_fin_diagnostico
+            
             form_config = ConfiguracionAdicionalForm(
                 request.POST,
                 instance=orden.detalle_equipo
             )
             
             if form_config.is_valid():
-                form_config.save()
+                # Guardar el formulario
+                detalle_actualizado = form_config.save()
+                
+                # ===================================================================
+                # NUEVA FUNCIONALIDAD: Cambiar estado al finalizar diagnóstico
+                # ===================================================================
+                # Verificar si se acaba de agregar la fecha de fin de diagnóstico
+                fecha_fin_nueva = detalle_actualizado.fecha_fin_diagnostico
+                
+                if not fecha_fin_anterior and fecha_fin_nueva:
+                    # Se agregó la fecha de fin de diagnóstico por primera vez
+                    # → Cambiar estado a "equipo_diagnosticado"
+                    estado_anterior = orden.estado
+                    orden.estado = 'equipo_diagnosticado'
+                    orden.save()
+                    
+                    # Registrar el cambio de estado en el historial
+                    registrar_historial(
+                        orden=orden,
+                        tipo_evento='estado',
+                        usuario=empleado_actual,
+                        comentario=f"🔄 Estado cambiado automáticamente: '{dict(orden._meta.get_field('estado').choices).get(estado_anterior)}' → 'Equipo Diagnosticado' (Diagnóstico finalizado)",
+                        es_sistema=True
+                    )
+                    
+                    # Mensaje informativo al usuario
+                    messages.info(
+                        request,
+                        '🔍 Estado actualizado automáticamente a: "Equipo Diagnosticado"'
+                    )
+                # ===================================================================
+                
                 messages.success(request, '✅ Configuración actualizada correctamente.')
                 
                 # Registrar en historial
@@ -2792,6 +2829,61 @@ def eliminar_pieza_cotizada(request, pieza_id):
 # ============================================================================
 
 @login_required
+@require_http_methods(["GET"])
+def obtener_seguimiento_pieza(request, seguimiento_id):
+    """
+    Obtiene los datos de un seguimiento en formato JSON.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista devuelve toda la información de un seguimiento específico
+    en formato JSON para que JavaScript pueda cargarla en el formulario
+    de edición. Es como pedirle a Django "dame todos los datos de este
+    seguimiento" y Django responde con un JSON que JavaScript entiende.
+    
+    FLUJO:
+    1. Busca el seguimiento por ID
+    2. Extrae todos sus campos (proveedor, fechas, estado, etc.)
+    3. Convierte las fechas a formato ISO (YYYY-MM-DD) para los inputs type="date"
+    4. Devuelve todo en formato JSON
+    
+    USO:
+    Se llama desde JavaScript cuando el usuario hace clic en "Editar"
+    para poblar el formulario con los datos existentes.
+    """
+    from django.http import JsonResponse
+    from .models import SeguimientoPieza
+    
+    try:
+        seguimiento = get_object_or_404(SeguimientoPieza, id=seguimiento_id)
+        
+        # Preparar datos en formato JSON
+        data = {
+            'success': True,
+            'seguimiento': {
+                'id': seguimiento.id,
+                'proveedor': seguimiento.proveedor,
+                'descripcion_piezas': seguimiento.descripcion_piezas,
+                'numero_pedido': seguimiento.numero_pedido or '',
+                'fecha_pedido': seguimiento.fecha_pedido.isoformat(),  # Formato: YYYY-MM-DD
+                'fecha_entrega_estimada': seguimiento.fecha_entrega_estimada.isoformat(),
+                'fecha_entrega_real': seguimiento.fecha_entrega_real.isoformat() if seguimiento.fecha_entrega_real else '',
+                'estado': seguimiento.estado,
+                'notas_seguimiento': seguimiento.notas_seguimiento or '',
+                # Piezas relacionadas (IDs)
+                'piezas': list(seguimiento.piezas.values_list('id', flat=True))
+            }
+        }
+        
+        return JsonResponse(data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error al obtener seguimiento: {str(e)}'
+        }, status=500)
+
+
+@login_required
 @require_http_methods(["POST"])
 def agregar_seguimiento_pieza(request, orden_id):
     """
@@ -2825,6 +2917,28 @@ def agregar_seguimiento_pieza(request, orden_id):
             seguimiento.cotizacion = cotizacion
             seguimiento.save()
             form.save_m2m()  # Guardar relaciones ManyToMany (piezas)
+            
+            # ===================================================================
+            # NUEVA FUNCIONALIDAD: Cambiar estado automáticamente si es el primer seguimiento
+            # ===================================================================
+            # Contar cuántos seguimientos tiene esta cotización (incluyendo el recién agregado)
+            total_seguimientos = cotizacion.seguimientos_piezas.count()
+            
+            if total_seguimientos == 1:
+                # Es el PRIMER seguimiento → Cambiar estado a "esperando_piezas"
+                estado_anterior = orden.estado
+                orden.estado = 'esperando_piezas'
+                orden.save()
+                
+                # Registrar el cambio de estado en el historial
+                registrar_historial(
+                    orden=orden,
+                    tipo_evento='estado',
+                    usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
+                    comentario=f"🔄 Estado cambiado automáticamente: '{dict(orden._meta.get_field('estado').choices).get(estado_anterior)}' → 'Esperando Llegada de Piezas' (Primer seguimiento agregado)",
+                    es_sistema=True
+                )
+            # ===================================================================
             
             # Registrar en historial
             registrar_historial(

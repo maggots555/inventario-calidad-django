@@ -63,6 +63,7 @@ urlpatterns = [
     # ========================================================================
     # GESTIÓN DE SEGUIMIENTOS DE PIEZAS (AJAX)
     # ========================================================================
+    path('seguimientos/<int:seguimiento_id>/obtener/', views.obtener_seguimiento_pieza, name='obtener_seguimiento'),
     path('ordenes/<int:orden_id>/seguimientos/agregar/', views.agregar_seguimiento_pieza, name='agregar_seguimiento'),
     path('seguimientos/<int:seguimiento_id>/editar/', views.editar_seguimiento_pieza, name='editar_seguimiento'),
     path('seguimientos/<int:seguimiento_id>/eliminar/', views.eliminar_seguimiento_pieza, name='eliminar_seguimiento'),
