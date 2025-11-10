@@ -156,6 +156,25 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # ============================================================================
+# CONFIGURACIÓN DE ALMACENAMIENTO DINÁMICO (DISCO ALTERNO)
+# ============================================================================
+# Usar el storage dinámico que cambia automáticamente entre disco C: y D:
+# según el espacio disponible
+#
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Django 5.x usa el dict STORAGES para configurar almacenamiento
+# 'default' = storage para archivos subidos por usuarios (ImageField, FileField)
+# 'staticfiles' = storage para archivos estáticos (CSS, JS)
+STORAGES = {
+    "default": {
+        "BACKEND": "config.storage_utils.DynamicFileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+# ============================================================================
 # CONFIGURACIÓN DE LÍMITES DE CARGA DE ARCHIVOS
 # ============================================================================
 # Aumentado a 50MB para permitir imágenes de alta resolución desde celulares

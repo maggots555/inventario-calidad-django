@@ -16,10 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from inventario import views as inventario_views
+from config.media_views import serve_media_from_multiple_locations
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -41,6 +42,24 @@ urlpatterns = [
     path('servicio-tecnico/', include('servicio_tecnico.urls')),  # URLs del módulo de servicio técnico
 ]
 
-# Servir archivos media en desarrollo
+# ============================================================================
+# SERVIR ARCHIVOS MEDIA EN DESARROLLO (CON SOPORTE PARA MÚLTIPLES UBICACIONES)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# En desarrollo (DEBUG=True), Django necesita servir los archivos media.
+# Usamos una vista personalizada que busca archivos en DOS ubicaciones:
+# 1. Disco alterno (D:\Media_Django\...) - Archivos nuevos
+# 2. Disco principal (C:\...\media\) - Archivos antiguos
+#
+# IMPORTANTE: En producción (DEBUG=False), el servidor web (nginx/apache)
+# debe configurarse para servir ambas ubicaciones.
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Usar vista personalizada para servir archivos media desde múltiples ubicaciones
+    # re_path permite usar regex para capturar cualquier ruta después de /media/
+    urlpatterns += [
+        re_path(
+            r'^media/(?P<path>.*)$',  # Captura cualquier ruta después de /media/
+            serve_media_from_multiple_locations,
+            name='serve_media_multi_location'
+        ),
+    ]

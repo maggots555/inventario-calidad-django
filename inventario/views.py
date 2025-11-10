@@ -1763,3 +1763,38 @@ def cambiar_contraseña_inicial(request):
     }
     
     return render(request, 'inventario/cambiar_contraseña_inicial.html', context)
+
+
+# ============================================================================
+# VISTAS DE ADMINISTRACIÓN - MONITOR DE ALMACENAMIENTO
+# ============================================================================
+
+@login_required
+@staff_required
+def admin_storage_monitor(request):
+    """
+    Vista para monitorear el espacio de almacenamiento en los discos.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista muestra información sobre el espacio disponible en el disco principal
+    y el disco alterno. Solo los administradores (staff) pueden acceder.
+    
+    Muestra:
+    - Espacio total, usado y libre en cada disco
+    - Qué disco está activo actualmente
+    - Alertas si el espacio es bajo
+    - Configuración del umbral mínimo
+    
+    Returns:
+        HttpResponse con el template renderizado
+    """
+    from config.storage_utils import get_storage_info
+    
+    # Obtener información de almacenamiento de ambos discos
+    storage_info = get_storage_info()
+    
+    context = {
+        'storage_info': storage_info,
+    }
+    
+    return render(request, 'admin_storage_monitor.html', context)

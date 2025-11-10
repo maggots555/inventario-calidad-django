@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Monitor de Almacenamiento - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .storage-card {
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+    
+    .storage-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .storage-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .progress-bar-animated-custom {
+        animation: progress-bar-stripes 1s linear infinite;
+    }
+    
+    .badge-active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        font-size: 0.75rem;
+        padding: 0.35rem 0.75rem;
+    }
+    
+    .badge-inactive {
+        background-color: #6c757d;
+        font-size: 0.75rem;
+        padding: 0.35rem 0.75rem;
+    }
+    
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    
+    .alert-storage {
+        border-left: 4px solid;
+        padding-left: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-hdd-stack"></i> Monitor de Almacenamiento</h2>
+            <p class="text-muted">Visualiza el espacio disponible en los discos de almacenamiento</p>
+        </div>
+        <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver al Dashboard
+        </a>
+    </div>
+
+    <!-- Alertas de Estado -->
+    {% if storage_info.primary.is_active and storage_info.primary.free_gb < storage_info.min_free_space_gb %}
+    <div class="alert alert-warning alert-storage" style="border-left-color: #ffc107;">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <strong>¡Atención!</strong> El disco principal tiene poco espacio disponible ({{ storage_info.primary.free_gb|floatformat:2 }} GB).
+        El sistema cambiará automáticamente al disco alterno cuando sea necesario.
+    </div>
+    {% endif %}
+    
+    {% if storage_info.alternate.is_active %}
+    <div class="alert alert-info alert-storage" style="border-left-color: #0dcaf0;">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        <strong>Disco Alterno Activo:</strong> El sistema está usando el disco alterno porque el disco principal no tiene suficiente espacio.
+    </div>
+    {% endif %}
+
+    <!-- Cards de Almacenamiento -->
+    <div class="row g-4 mb-4">
+        <!-- Disco Principal -->
+        <div class="col-md-6">
+            <div class="card storage-card h-100">
+                <div class="card-body text-center">
+                    <div class="storage-icon text-primary">
+                        <i class="bi bi-hdd"></i>
+                    </div>
+                    <h4 class="card-title mb-3">
+                        Disco Principal
+                        {% if storage_info.primary.is_active %}
+                        <span class="badge badge-active">
+                            <i class="bi bi-check-circle-fill"></i> Activo
+                        </span>
+                        {% else %}
+                        <span class="badge badge-inactive">Inactivo</span>
+                        {% endif %}
+                    </h4>
+                    
+                    <div class="text-start">
+                        <div class="info-row">
+                            <span class="text-muted">Ruta:</span>
+                            <code>{{ storage_info.primary.path }}</code>
+                        </div>
+                        <div class="info-row">
+                            <span class="text-muted">Espacio Total:</span>
+                            <strong>{{ storage_info.primary.total_gb|floatformat:2 }} GB</strong>
+                        </div>
+                        <div class="info-row">
+                            <span class="text-muted">Espacio Usado:</span>
+                            <strong>{{ storage_info.primary.used_gb|floatformat:2 }} GB</strong>
+                        </div>
+                        <div class="info-row">
+                            <span class="text-muted">Espacio Libre:</span>
+                            <strong class="{% if storage_info.primary.free_gb < storage_info.min_free_space_gb %}text-danger{% else %}text-success{% endif %}">
+                                {{ storage_info.primary.free_gb|floatformat:2 }} GB
+                            </strong>
+                        </div>
+                    </div>
+                    
+                    <!-- Barra de Progreso -->
+                    <div class="mt-4">
+                        {% widthratio storage_info.primary.used_gb storage_info.primary.total_gb 100 as used_percent %}
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar {% if used_percent > 90 %}bg-danger{% elif used_percent > 75 %}bg-warning{% else %}bg-success{% endif %}" 
+                                 role="progressbar" 
+                                 style="width: {{ used_percent }}%;" 
+                                 aria-valuenow="{{ used_percent }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                {{ used_percent }}% usado
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disco Alterno -->
+        <div class="col-md-6">
+            <div class="card storage-card h-100">
+                <div class="card-body text-center">
+                    <div class="storage-icon text-info">
+                        <i class="bi bi-hdd-rack"></i>
+                    </div>
+                    <h4 class="card-title mb-3">
+                        Disco Alterno
+                        {% if storage_info.alternate.is_active %}
+                        <span class="badge badge-active">
+                            <i class="bi bi-check-circle-fill"></i> Activo
+                        </span>
+                        {% else %}
+                        <span class="badge badge-inactive">Inactivo</span>
+                        {% endif %}
+                    </h4>
+                    
+                    <div class="text-start">
+                        <div class="info-row">
+                            <span class="text-muted">Ruta:</span>
+                            <code>{{ storage_info.alternate.path }}</code>
+                        </div>
+                        <div class="info-row">
+                            <span class="text-muted">Espacio Total:</span>
+                            <strong>{{ storage_info.alternate.total_gb|floatformat:2 }} GB</strong>
+                        </div>
+                        <div class="info-row">
+                            <span class="text-muted">Espacio Usado:</span>
+                            <strong>{{ storage_info.alternate.used_gb|floatformat:2 }} GB</strong>
+                        </div>
+                        <div class="info-row">
+                            <span class="text-muted">Espacio Libre:</span>
+                            <strong class="text-success">{{ storage_info.alternate.free_gb|floatformat:2 }} GB</strong>
+                        </div>
+                    </div>
+                    
+                    <!-- Barra de Progreso -->
+                    <div class="mt-4">
+                        {% widthratio storage_info.alternate.used_gb storage_info.alternate.total_gb 100 as used_percent_alt %}
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar {% if used_percent_alt > 90 %}bg-danger{% elif used_percent_alt > 75 %}bg-warning{% else %}bg-info{% endif %}" 
+                                 role="progressbar" 
+                                 style="width: {{ used_percent_alt }}%;" 
+                                 aria-valuenow="{{ used_percent_alt }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                {{ used_percent_alt }}% usado
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuración Actual -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-gear-fill"></i> Configuración Actual</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="info-row">
+                        <span class="text-muted">Umbral Mínimo de Espacio:</span>
+                        <strong>{{ storage_info.min_free_space_gb }} GB</strong>
+                    </div>
+                    <div class="info-row">
+                        <span class="text-muted">Disco Activo Actualmente:</span>
+                        <strong>
+                            {% if storage_info.primary.is_active %}
+                                Principal (C:)
+                            {% else %}
+                                Alterno (D:)
+                            {% endif %}
+                        </strong>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="alert alert-light mb-0">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Nota:</strong> El sistema cambia automáticamente al disco alterno cuando el espacio libre
+                            del disco principal es menor a {{ storage_info.min_free_space_gb }} GB.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instrucciones -->
+    <div class="card mt-4 shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="bi bi-book"></i> ¿Cómo Funciona?</h5>
+        </div>
+        <div class="card-body">
+            <ol class="mb-0">
+                <li class="mb-2">
+                    <strong>Verificación Automática:</strong> Cada vez que se sube una imagen, el sistema verifica el espacio disponible.
+                </li>
+                <li class="mb-2">
+                    <strong>Cambio Dinámico:</strong> Si el disco principal tiene menos de {{ storage_info.min_free_space_gb }} GB libres, 
+                    las nuevas imágenes se guardan automáticamente en el disco alterno.
+                </li>
+                <li class="mb-2">
+                    <strong>Archivos Existentes:</strong> Los archivos que ya están guardados permanecen en su ubicación original.
+                </li>
+                <li class="mb-2">
+                    <strong>Configuración:</strong> Puedes cambiar el umbral y la ruta del disco alterno en el archivo <code>.env</code>.
+                </li>
+            </ol>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-refresh cada 30 segundos
+    setTimeout(function() {
+        location.reload();
+    }, 30000);
+    
+    console.log('Monitor de almacenamiento cargado. Auto-refresh en 30s.');
+</script>
+{% endblock %}

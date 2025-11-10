@@ -45,4 +45,7 @@ urlpatterns = [
     
     # Reportes
     path('reportes/excel/', views.descargar_reporte_excel, name='descargar_reporte_excel'),
+    
+    # Administración
+    path('admin/storage-monitor/', views.admin_storage_monitor, name='admin_storage_monitor'),
 ]
