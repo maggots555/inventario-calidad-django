@@ -123,7 +123,24 @@
                             </div>
                         </div>
 
-                        <!-- Fila 3: Estado al Ingreso -->
+                        <!-- Fila 3: Email del Cliente -->
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.email_cliente.id_for_label }}" class="form-label">
+                                    <i class="bi bi-envelope"></i> Email del Cliente
+                                    <span class="badge bg-secondary">Opcional</span>
+                                </label>
+                                {{ form.email_cliente }}
+                                {% if form.email_cliente.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.email_cliente.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{{ form.email_cliente.help_text }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Fila 4: Estado al Ingreso -->
                         <div class="row">
                             <div class="col-md-12 mb-3">
                                 <label for="{{ form.equipo_enciende.id_for_label }}" class="form-label">

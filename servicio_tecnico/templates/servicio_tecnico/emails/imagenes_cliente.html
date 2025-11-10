@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fotografías de Ingreso - {{ orden.numero_orden_interno }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .header::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .intro-text {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 25px;
+            line-height: 1.7;
+        }
+        
+        .equipment-info {
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .info-title {
+            font-size: 20px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-align: center;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .info-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #667eea;
+            min-width: 150px;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            color: #333;
+            font-size: 15px;
+            flex: 1;
+        }
+        
+        .info-value.highlight {
+            font-weight: 700;
+            color: #764ba2;
+        }
+        
+        .message-box {
+            background: linear-gradient(135deg, #e8f4fd 0%, #d4edda 100%);
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .message-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .message-content {
+            font-size: 15px;
+            color: #555;
+            line-height: 1.7;
+            font-style: italic;
+        }
+        
+        .attachments-box {
+            background: #fff3cd;
+            border: 2px dashed #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: center;
+        }
+        
+        .attachments-title {
+            font-weight: 700;
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        .attachments-count {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffc107;
+            margin: 10px 0;
+        }
+        
+        .attachments-text {
+            color: #856404;
+            font-size: 14px;
+        }
+        
+        .help-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        .help-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #17a2b8;
+            margin-bottom: 10px;
+        }
+        
+        .help-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .signature {
+            margin-bottom: 15px;
+        }
+        
+        .signature-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .signature-role {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .signature-area {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+        
+        .signature-email {
+            font-size: 13px;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+        
+        .company {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 0;
+            }
+            
+            .content {
+                padding: 20px 15px;
+            }
+            
+            .info-row {
+                flex-direction: column;
+            }
+            
+            .info-label {
+                min-width: auto;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">📸 FOTOGRAFÍAS DE INGRESO</div>
+            <div class="subtitle">Registro de Estado del Equipo</div>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Estimado/a cliente,
+            </div>
+            
+            <div class="intro-text">
+                Le informamos que su equipo ha sido recibido en nuestras instalaciones 
+                y hemos registrado su estado de ingreso mediante las fotografías que 
+                adjuntamos a este correo.
+            </div>
+            
+            <div class="equipment-info">
+                <div class="info-title">📋 INFORMACIÓN DE SU EQUIPO</div>
+                
+                <div class="info-row">
+                    <div class="info-label">🎯 Número de Orden:</div>
+                    <div class="info-value highlight">{{ orden.numero_orden_interno }}</div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">💻 Equipo:</div>
+                    <div class="info-value">
+                        {{ detalle.tipo_equipo }} {{ detalle.marca }} 
+                        {% if detalle.modelo %}{{ detalle.modelo }}{% endif %}
+                    </div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">🔢 Número de Serie:</div>
+                    <div class="info-value">{{ detalle.numero_serie }}</div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">📅 Fecha de Ingreso:</div>
+                    <div class="info-value">{{ orden.fecha_creacion|date:"d/m/Y H:i" }}</div>
+                </div>
+                
+                {% if detalle.tiene_cargador %}
+                <div class="info-row">
+                    <div class="info-label">🔌 Cargador:</div>
+                    <div class="info-value">
+                        Incluido
+                        {% if detalle.numero_serie_cargador %}
+                            (S/N: {{ detalle.numero_serie_cargador }})
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if detalle.equipo_enciende %}
+                <div class="info-row">
+                    <div class="info-label">⚡ Estado al Ingreso:</div>
+                    <div class="info-value" style="color: #28a745;">Equipo enciende ✓</div>
+                </div>
+                {% else %}
+                <div class="info-row">
+                    <div class="info-label">⚡ Estado al Ingreso:</div>
+                    <div class="info-value" style="color: #dc3545;">Equipo no enciende ✗</div>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if mensaje_personalizado %}
+            <div class="message-box">
+                <div class="message-title">💬 Mensaje Adicional</div>
+                <div class="message-content">
+                    {{ mensaje_personalizado|linebreaks }}
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="attachments-box">
+                <div class="attachments-title">📎 IMÁGENES ADJUNTAS</div>
+                <div class="attachments-count">{{ cantidad_imagenes }}</div>
+                <div class="attachments-text">
+                    fotografía{{ cantidad_imagenes|pluralize }} adjunta{{ cantidad_imagenes|pluralize }} a este correo
+                </div>
+            </div>
+            
+            <div class="help-section">
+                <div class="help-title">ℹ️ Información Importante</div>
+                <div class="help-text">
+                    <strong>•</strong> Las fotografías adjuntas muestran el estado en el que recibimos su equipo.<br>
+                    <strong>•</strong> Estas imágenes forman parte del registro de ingreso para su tranquilidad.<br>
+                    <strong>•</strong> Si tiene alguna pregunta o requiere información adicional, no dude en contactarnos.<br>
+                    <strong>•</strong> Le mantendremos informado sobre el progreso de su equipo.
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
+                <p style="margin: 0; font-size: 14px;">
+                    Gracias por confiar en nuestros servicios.
+                </p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-name">
+                    {% if usuario_remitente %}
+                        {{ usuario_remitente.nombre_completo }}
+                    {% else %}
+                        Sistema Integral SIC
+                    {% endif %}
+                </div>
+                {% if usuario_remitente %}
+                    {% if usuario_remitente.cargo %}
+                        <div class="signature-role">{{ usuario_remitente.cargo }}</div>
+                    {% endif %}
+                    {% if usuario_remitente.area %}
+                        <div class="signature-area">{{ usuario_remitente.area }}</div>
+                    {% endif %}
+                    {% if usuario_remitente.email %}
+                        <div class="signature-email">✉️ {{ usuario_remitente.email }}</div>
+                    {% endif %}
+                {% endif %}
+            </div>
+            
+            <div class="company">SIC Comercialización y Servicios</div>
+            <div style="font-size: 14px; opacity: 0.9;">México</div>
+            
+            <div class="timestamp">
+                📅 Enviado el {{ fecha_envio|date:"d/m/Y" }} a las {{ fecha_envio|date:"H:i" }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

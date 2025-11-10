@@ -118,6 +118,19 @@ class NuevaOrdenForm(forms.ModelForm):
         help_text="<strong>Campo obligatorio.</strong> El prefijo 'OOW-' aparece por defecto. Puede borrar el texto para escribir otro número de orden, pero <strong>en las órdenes que son OOW- o FL-, siempre es necesario poner el prefijo.</strong>"
     )
     
+    # ✅ NUEVO: Email del Cliente (Noviembre 2025)
+    email_cliente = forms.EmailField(
+        required=False,  # OPCIONAL al crear, obligatorio al editar
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'cliente@ejemplo.com (opcional)',
+            'type': 'email',
+            'autocomplete': 'email',
+        }),
+        label='📧 Email del Cliente',
+        help_text='Email para enviar fotos del ingreso y notificaciones (opcional, se puede agregar después)'
+    )
+    
     equipo_enciende = forms.BooleanField(
         required=False,  # BooleanField por defecto es False si no se marca
         initial=True,  # Por defecto marcado como True
@@ -262,6 +275,23 @@ class NuevaOrdenForm(forms.ModelForm):
             return orden_cliente.strip().upper()
         return orden_cliente
     
+    def clean_email_cliente(self):
+        """
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Normaliza el email del cliente a minúsculas para evitar duplicados.
+        
+        Por ejemplo:
+        - Usuario escribe: Cliente@EJEMPLO.com
+        - Se guarda como: cliente@ejemplo.com
+        
+        Esto asegura que "cliente@ejemplo.com" y "CLIENTE@ejemplo.com" 
+        se reconozcan como el mismo email.
+        """
+        email = self.cleaned_data.get('email_cliente')
+        if email:
+            return email.strip().lower()
+        return email
+    
     def clean(self):
         """
         EXPLICACIÓN DE clean():
@@ -333,6 +363,7 @@ class NuevaOrdenForm(forms.ModelForm):
                 modelo=self.cleaned_data.get('modelo', ''),  # Opcional
                 numero_serie=self.cleaned_data['numero_serie'],
                 orden_cliente=self.cleaned_data['orden_cliente'],  # Nuevo campo obligatorio
+                email_cliente=self.cleaned_data.get('email_cliente', 'cliente@ejemplo.com'),  # ✅ NUEVO: Email opcional
                 tiene_cargador=self.cleaned_data.get('tiene_cargador', False),
                 numero_serie_cargador=self.cleaned_data.get('numero_serie_cargador', ''),
                 equipo_enciende=self.cleaned_data.get('equipo_enciende', True),
@@ -436,6 +467,19 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
         help_text="<strong>Campo obligatorio.</strong> El prefijo 'FL-' aparece por defecto para Venta Mostrador. Puede borrar el texto para escribir otro número de orden, pero <strong>en las órdenes que son OOW- o FL-, siempre es necesario poner el prefijo.</strong>"
     )
     
+    # ✅ NUEVO: Email del Cliente (Noviembre 2025)
+    email_cliente = forms.EmailField(
+        required=False,  # OPCIONAL al crear, obligatorio al editar
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'cliente@ejemplo.com (opcional)',
+            'type': 'email',
+            'autocomplete': 'email',
+        }),
+        label='📧 Email del Cliente',
+        help_text='Email para enviar fotos del ingreso y notificaciones (opcional, se puede agregar después)'
+    )
+    
     equipo_enciende = forms.BooleanField(
         required=False,
         initial=True,
@@ -535,6 +579,16 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
             return orden_cliente.strip().upper()
         return orden_cliente
     
+    def clean_email_cliente(self):
+        """
+        Normaliza el email del cliente a minúsculas para evitar duplicados.
+        Mismo comportamiento que en NuevaOrdenForm para consistencia.
+        """
+        email = self.cleaned_data.get('email_cliente')
+        if email:
+            return email.strip().lower()
+        return email
+    
     def save(self, commit=True):
         """
         Guarda la orden de Venta Mostrador.
@@ -576,6 +630,7 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
                 modelo=self.cleaned_data.get('modelo', ''),
                 numero_serie=self.cleaned_data['numero_serie'],
                 orden_cliente=self.cleaned_data['orden_cliente'],
+                email_cliente=self.cleaned_data.get('email_cliente', 'cliente@ejemplo.com'),  # ✅ NUEVO: Email opcional
                 equipo_enciende=self.cleaned_data.get('equipo_enciende', True),
                 falla_principal=self.cleaned_data.get('descripcion_servicio', 'Venta Mostrador - Servicio Directo'),
                 gama='media',  # Valor por defecto
@@ -1146,6 +1201,7 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'modelo',
             'numero_serie',
             'orden_cliente',
+            'email_cliente',  # ✅ NUEVO CAMPO (Noviembre 2025)
             'equipo_enciende',
             'tiene_cargador',
             'numero_serie_cargador',
@@ -1176,6 +1232,14 @@ class EditarInformacionEquipoForm(forms.ModelForm):
                 'placeholder': 'Número de orden del cliente',
                 'required': True,
             }),
+            # ✅ NUEVO WIDGET: Email del Cliente
+            'email_cliente': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'cliente@ejemplo.com',
+                'required': True,
+                'type': 'email',  # HTML5 email validation
+                'autocomplete': 'email',
+            }),
             'equipo_enciende': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
             }),
@@ -1200,6 +1264,7 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'modelo': 'Modelo',
             'numero_serie': 'Número de Serie',
             'orden_cliente': 'Orden del Cliente',
+            'email_cliente': '📧 Email del Cliente',  # ✅ NUEVO
             'equipo_enciende': '¿El equipo enciende?',
             'tiene_cargador': '¿Incluye cargador?',
             'numero_serie_cargador': 'Número de Serie del Cargador',
@@ -1212,6 +1277,7 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'modelo': 'Modelo específico (opcional)',
             'numero_serie': 'Número de serie o Service Tag del equipo',
             'orden_cliente': 'Número de orden del cliente',
+            'email_cliente': 'Email para enviar fotos del ingreso y notificaciones (obligatorio)',  # ✅ NUEVO
             'equipo_enciende': 'Marca si el equipo enciende al momento del ingreso',
             'tiene_cargador': 'Marca si el equipo incluye cargador',
             'numero_serie_cargador': 'Solo si el cargador tiene número de serie identificable',

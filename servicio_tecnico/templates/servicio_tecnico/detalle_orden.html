@@ -247,6 +247,33 @@
                             <p class="mb-0"><code>{{ detalle.orden_cliente|default:"N/A" }}</code></p>
                         </div>
                         
+                        <!-- ✅ NUEVO: Email del Cliente (Noviembre 2025) -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">
+                                <i class="bi bi-envelope-fill text-primary"></i> Email del Cliente
+                            </label>
+                            <p class="mb-0">
+                                {% if detalle.email_cliente %}
+                                    {% if detalle.email_cliente != 'cliente@ejemplo.com' %}
+                                        <a href="mailto:{{ detalle.email_cliente }}" class="text-decoration-none" title="Enviar email">
+                                            <i class="bi bi-envelope"></i> {{ detalle.email_cliente }}
+                                        </a>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark" title="Email pendiente de actualizar">
+                                            <i class="bi bi-exclamation-triangle"></i> {{ detalle.email_cliente }}
+                                        </span>
+                                        <small class="text-muted d-block mt-1">
+                                            <i class="bi bi-info-circle"></i> Email por defecto - Actualizar con email real
+                                        </small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> Sin email registrado
+                                    </span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        
                         <!-- Gama y Accesorios -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small">Gama del Equipo</label>
@@ -1839,6 +1866,28 @@
                                 </div>
                             </div>
                             
+                            <!-- Botón para enviar imágenes al cliente -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <button type="button" 
+                                            class="btn btn-primary w-100" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#modalEnviarImagenesCliente"
+                                            {% if not imagenes_por_tipo.ingreso %}disabled{% endif %}
+                                            title="{% if not imagenes_por_tipo.ingreso %}Debe subir al menos una imagen de ingreso{% else %}Enviar fotografías del equipo al cliente por correo{% endif %}">
+                                        <i class="bi bi-envelope-paper"></i> Envío de imágenes al cliente
+                                        {% if imagenes_por_tipo.ingreso %}
+                                            <span class="badge bg-light text-primary ms-2">{{ imagenes_por_tipo.ingreso.count }} disponible{{ imagenes_por_tipo.ingreso.count|pluralize:"s" }}</span>
+                                        {% endif %}
+                                    </button>
+                                    {% if not imagenes_por_tipo.ingreso %}
+                                    <small class="text-muted d-block mt-2 text-center">
+                                        <i class="bi bi-info-circle"></i> Sube al menos una imagen de ingreso para habilitar el envío
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
                             <!-- Barra de progreso (oculta por defecto) -->
                             <div class="row mb-3" id="progresoUpload" style="display: none;">
                                 <div class="col-12">
@@ -2066,6 +2115,23 @@
                             {{ form_editar_info.orden_cliente }}
                             {% if form_editar_info.orden_cliente.help_text %}
                                 <small class="form-text text-muted">{{ form_editar_info.orden_cliente.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- ✅ NUEVO: Email del Cliente (Noviembre 2025) -->
+                        <div class="col-md-12 mb-3">
+                            {{ form_editar_info.email_cliente.errors }}
+                            <label for="{{ form_editar_info.email_cliente.id_for_label }}" class="form-label">
+                                <i class="bi bi-envelope-fill text-primary"></i>
+                                {{ form_editar_info.email_cliente.label }}
+                                <span class="badge bg-danger ms-2">Obligatorio</span>
+                            </label>
+                            {{ form_editar_info.email_cliente }}
+                            {% if form_editar_info.email_cliente.help_text %}
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    {{ form_editar_info.email_cliente.help_text|safe }}
+                                </small>
                             {% endif %}
                         </div>
                         
@@ -2673,6 +2739,420 @@
 <!-- ⛔ MODAL DE CONVERSIÓN A DIAGNÓSTICO ELIMINADO (Oct 2025) -->
 <!-- Funcionalidad eliminada: Venta mostrador ahora es complemento opcional -->
 <!-- ============================================================================ -->
+
+<!-- ============================================================================ -->
+<!-- MODAL: ENVIAR IMÁGENES AL CLIENTE -->
+<!-- ============================================================================ -->
+<div class="modal fade" id="modalEnviarImagenesCliente" tabindex="-1" aria-labelledby="modalEnviarImagenesClienteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <!-- Encabezado del Modal -->
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <h5 class="modal-title" id="modalEnviarImagenesClienteLabel">
+                    <i class="bi bi-envelope-paper"></i> 📸 Enviar imágenes del equipo al cliente
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <!-- Cuerpo del Modal -->
+            <div class="modal-body" style="padding: 1.5rem;">
+                <form id="formEnviarImagenesCliente" method="post" action="{% url 'servicio_tecnico:enviar_imagenes_cliente' orden.id %}">
+                    {% csrf_token %}
+                    
+                    <!-- SECCIÓN 1: DESTINATARIO PRINCIPAL (CLIENTE) -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-person-fill text-primary fs-5 me-2"></i>
+                            <h6 class="mb-0 text-primary fw-bold">Para: (Destinatario principal)</h6>
+                        </div>
+                        
+                        {% if orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}
+                        <!-- ADVERTENCIA: Email no configurado -->
+                        <div class="alert alert-warning border-warning border-2">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-exclamation-triangle-fill fs-3 me-3 flex-shrink-0"></i>
+                                <div class="flex-grow-1">
+                                    <h6 class="alert-heading mb-2">
+                                        <strong>⚠️ Email del cliente no configurado</strong>
+                                    </h6>
+                                    <p class="mb-2">
+                                        El email del cliente está configurado con el valor por defecto. 
+                                        <strong>Debes actualizarlo antes de poder enviar las imágenes.</strong>
+                                    </p>
+                                    <hr class="my-2">
+                                    <button type="button" 
+                                            class="btn btn-warning btn-sm"
+                                            data-bs-dismiss="modal"
+                                            onclick="document.querySelector('[data-bs-target=\'#modalEditarInfoEquipo\']').click()">
+                                        <i class="bi bi-pencil-square"></i> Editar Email del Cliente Ahora
+                                    </button>
+                                    <small class="text-muted d-block mt-2">
+                                        <i class="bi bi-info-circle"></i> 
+                                        Cierra este modal y haz clic en el botón "Editar Información" en la sección de información del equipo.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <!-- Cliente con email válido -->
+                        <div class="destinatario-card p-3 border rounded bg-light shadow-sm">
+                            <div class="d-flex align-items-center">
+                                <input 
+                                    class="form-check-input me-3 flex-shrink-0" 
+                                    type="checkbox" 
+                                    name="enviar_a_cliente" 
+                                    id="enviar_a_cliente"
+                                    value="1"
+                                    checked
+                                    disabled>
+                                <i class="bi bi-person-circle text-primary fs-2 me-3 flex-shrink-0"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold">
+                                        <i class="bi bi-laptop"></i> Cliente del Equipo
+                                    </div>
+                                    <small class="text-muted d-block">
+                                        <i class="bi bi-envelope"></i> {{ orden.detalle_equipo.email_cliente }}
+                                    </small>
+                                    <small class="text-success d-block mt-1">
+                                        <i class="bi bi-check-circle-fill"></i> Destinatario principal (siempre incluido)
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- SECCIÓN 2: CON COPIA A (EMPLEADOS + TÉCNICO ASIGNADO) -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-file-earmark-text-fill text-info fs-5 me-2"></i>
+                            <h6 class="mb-0 text-info fw-bold">Con copia a: (Opcional)</h6>
+                        </div>
+                        
+                        <div class="row g-3">
+                            <!-- TÉCNICO ASIGNADO -->
+                            <div class="col-12">
+                                <h6 class="mb-2">
+                                    <i class="bi bi-tools text-success"></i> Técnico Asignado
+                                </h6>
+                                
+                                {% if orden.tecnico_asignado and orden.tecnico_asignado.empleado and orden.tecnico_asignado.empleado.email %}
+                                <label class="destinatario-card p-3 border rounded bg-light hover-shadow d-block mb-0 cursor-pointer" for="tecnico_asignado">
+                                    <div class="d-flex align-items-center">
+                                        <input 
+                                            class="form-check-input me-3 flex-shrink-0" 
+                                            type="checkbox" 
+                                            name="copia_tecnico" 
+                                            value="{{ orden.tecnico_asignado.empleado.email }}" 
+                                            id="tecnico_asignado">
+                                        
+                                        {% if orden.tecnico_asignado.empleado.foto_perfil %}
+                                            <img src="{{ orden.tecnico_asignado.empleado.foto_perfil.url }}" 
+                                                 alt="{{ orden.tecnico_asignado.empleado.nombre_completo }}" 
+                                                 class="rounded-circle me-2 flex-shrink-0"
+                                                 style="width: 48px; height: 48px; object-fit: cover; border: 2px solid #28a745;">
+                                        {% else %}
+                                            <i class="bi bi-person-badge-fill text-success fs-3 me-2 flex-shrink-0"></i>
+                                        {% endif %}
+                                        
+                                        <div class="flex-grow-1" style="min-width: 0;">
+                                            <div class="fw-bold text-truncate">
+                                                <i class="bi bi-wrench"></i> {{ orden.tecnico_asignado.empleado.nombre_completo }}
+                                            </div>
+                                            <small class="text-muted d-block">
+                                                <span class="badge bg-success me-1">TÉCNICO ASIGNADO</span>
+                                                <span class="text-truncate d-inline-block" style="max-width: 200px; vertical-align: middle;">
+                                                    {{ orden.tecnico_asignado.empleado.email }}
+                                                </span>
+                                            </small>
+                                        </div>
+                                    </div>
+                                </label>
+                                {% else %}
+                                <div class="alert alert-info mb-0">
+                                    <i class="bi bi-info-circle"></i>
+                                    {% if not orden.tecnico_asignado %}
+                                        <strong>Sin técnico asignado:</strong> Esta orden aún no tiene técnico asignado.
+                                    {% elif not orden.tecnico_asignado.empleado %}
+                                        <strong>Sin empleado vinculado:</strong> El técnico no tiene empleado asociado.
+                                    {% else %}
+                                        <strong>Sin email configurado:</strong> El técnico asignado no tiene email configurado en su perfil.
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-12">
+                                <hr class="my-2">
+                            </div>
+                            
+                            <!-- EMPLEADOS INTERNOS -->
+                            <div class="col-12">
+                                <h6 class="mb-2">
+                                    <i class="bi bi-people-fill text-info"></i> Empleados Internos
+                                </h6>
+                                
+                                {% if empleados_copia_imagenes %}
+                                <div class="row g-2">
+                                    {% for empleado in empleados_copia_imagenes %}
+                                    <div class="col-lg-6 col-md-12">
+                                        <label class="destinatario-card p-3 border rounded bg-light hover-shadow d-block mb-0 cursor-pointer" for="emp_img_{{ empleado.id }}">
+                                            <div class="d-flex align-items-center">
+                                                <input 
+                                                    class="form-check-input me-3 flex-shrink-0" 
+                                                    type="checkbox" 
+                                                    name="copia_empleados" 
+                                                    value="{{ empleado.email }}" 
+                                                    id="emp_img_{{ empleado.id }}">
+                                                
+                                                {% if empleado.foto_perfil %}
+                                                    <img src="{{ empleado.foto_perfil.url }}" 
+                                                         alt="{{ empleado.nombre_completo }}" 
+                                                         class="rounded-circle me-2 flex-shrink-0"
+                                                         style="width: 48px; height: 48px; object-fit: cover; border: 2px solid #17a2b8;">
+                                                {% else %}
+                                                    <i class="bi bi-person-badge text-info fs-3 me-2 flex-shrink-0"></i>
+                                                {% endif %}
+                                                
+                                                <div class="flex-grow-1" style="min-width: 0;">
+                                                    <div class="fw-bold text-truncate">{{ empleado.nombre_completo }}</div>
+                                                    <small class="text-muted d-block">
+                                                        <span class="badge bg-secondary me-1">{{ empleado.area }}</span>
+                                                        <span class="text-truncate d-inline-block" style="max-width: 180px; vertical-align: middle;">
+                                                            {{ empleado.email }}
+                                                        </span>
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info mb-0">
+                                    <i class="bi bi-info-circle"></i>
+                                    <strong>Sin empleados disponibles:</strong> No hay empleados de las áreas CALIDAD o FRONTDESK con email configurado.
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- SECCIÓN 3: SELECCIONAR IMÁGENES -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-images text-primary fs-5 me-2"></i>
+                            <h6 class="mb-0 text-primary fw-bold">
+                                Imágenes a enviar 
+                                <span class="badge bg-primary ms-2" id="contadorImagenesSeleccionadas">0 seleccionadas</span>
+                            </h6>
+                        </div>
+                        
+                        {% if imagenes_por_tipo.ingreso %}
+                        <div class="mb-3">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="seleccionarTodasImagenes">
+                                <label class="form-check-label fw-bold" for="seleccionarTodasImagenes">
+                                    <i class="bi bi-check-all"></i> Seleccionar todas las imágenes
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="row g-3" id="galeriaImagenesModal">
+                            {% for imagen in imagenes_por_tipo.ingreso %}
+                            <div class="col-lg-3 col-md-4 col-sm-6">
+                                <label class="card h-100 hover-shadow cursor-pointer imagen-selectable" for="img_{{ imagen.id }}">
+                                    <div class="position-relative">
+                                        <img src="{{ imagen.imagen.url }}" 
+                                             class="card-img-top" 
+                                             alt="Imagen {{ forloop.counter }}"
+                                             style="height: 200px; object-fit: cover;">
+                                        <div class="position-absolute top-0 start-0 m-2">
+                                            <input 
+                                                class="form-check-input checkbox-imagen" 
+                                                type="checkbox" 
+                                                name="imagenes_seleccionadas" 
+                                                value="{{ imagen.id }}" 
+                                                id="img_{{ imagen.id }}"
+                                                style="width: 1.5rem; height: 1.5rem;">
+                                        </div>
+                                        <div class="position-absolute bottom-0 end-0 m-2">
+                                            <span class="badge bg-dark bg-opacity-75">
+                                                <i class="bi bi-calendar3"></i> {{ imagen.fecha_subida|date:"d/m/Y" }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <small class="text-muted d-block text-truncate">
+                                            {% if imagen.descripcion %}
+                                                {{ imagen.descripcion }}
+                                            {% else %}
+                                                Imagen de ingreso
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle"></i>
+                            <small>
+                                <strong>Nota:</strong> Las imágenes se enviarán comprimidas automáticamente para optimizar el tamaño del correo. 
+                                Selecciona solo las imágenes relevantes para el cliente.
+                            </small>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Sin imágenes disponibles:</strong> No hay imágenes de tipo "Ingreso" para enviar.
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- SECCIÓN 4: MENSAJE PERSONALIZADO -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-chat-left-text text-success fs-5 me-2"></i>
+                            <h6 class="mb-0 text-success fw-bold">Mensaje personalizado (Opcional)</h6>
+                        </div>
+                        
+                        <div class="form-floating">
+                            <textarea 
+                                class="form-control" 
+                                placeholder="Mensaje adicional para el cliente" 
+                                id="mensaje_personalizado"
+                                name="mensaje_personalizado"
+                                style="height: 120px;"></textarea>
+                            <label for="mensaje_personalizado">
+                                <i class="bi bi-pencil"></i> Mensaje adicional para el cliente
+                            </label>
+                        </div>
+                        <small class="text-muted d-block mt-2">
+                            <i class="bi bi-lightbulb"></i> 
+                            <strong>Sugerencia:</strong> Puedes agregar información adicional como el estado del equipo, 
+                            próximos pasos, o cualquier detalle relevante para el cliente.
+                        </small>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- SECCIÓN 5: PREVISUALIZACIÓN -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-eye-fill text-info fs-5 me-2"></i>
+                            <h6 class="mb-0 text-info fw-bold">Vista previa del correo</h6>
+                        </div>
+                        
+                        <div class="alert alert-light border-info border-2 mb-3">
+                            <i class="bi bi-info-circle"></i>
+                            <small><strong>Información:</strong> Así se verá el correo que recibirá el cliente.</small>
+                        </div>
+                        
+                        <div class="border rounded overflow-hidden shadow-sm">
+                            <!-- Encabezado del correo -->
+                            <div class="bg-light border-bottom p-3">
+                                <div class="row g-2">
+                                    <div class="col-12">
+                                        <small class="text-muted"><strong>De:</strong></small>
+                                        <div>
+                                            <i class="bi bi-building text-primary me-1"></i>
+                                            {{ request.user.empleado.nombre_completo|default:"Sistema SIC" }}
+                                            <small class="text-muted">&lt;{{ request.user.email }}&gt;</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <small class="text-muted"><strong>Para:</strong></small>
+                                        <div>
+                                            <span class="badge bg-primary">
+                                                <i class="bi bi-person"></i> Cliente - {{ orden.detalle_equipo.email_cliente }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <small class="text-muted"><strong>Asunto:</strong></small>
+                                        <div class="p-2 bg-white border rounded">
+                                            <strong>📸 Fotografías de ingreso - Orden {{ orden.numero_orden_interno }}</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <small class="text-muted"><strong>Archivos adjuntos:</strong></small>
+                                        <div>
+                                            <span class="badge bg-info" id="previsualizacionArchivos">
+                                                <i class="bi bi-images"></i> 0 imagen(es)
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Cuerpo del correo -->
+                            <div class="p-4 bg-white">
+                                <p>Estimado/a cliente,</p>
+                                <p>
+                                    Le informamos que su equipo <strong>{{ orden.detalle_equipo.tipo_equipo }} {{ orden.detalle_equipo.marca }}</strong> 
+                                    (S/N: <strong>{{ orden.detalle_equipo.numero_serie }}</strong>) ha sido recibido en nuestras instalaciones.
+                                </p>
+                                <p>
+                                    Adjuntamos las fotografías del estado en el que ingresó su equipo para su conocimiento y registro.
+                                </p>
+                                <p><strong>Número de orden:</strong> {{ orden.numero_orden_interno }}</p>
+                                <p><strong>Fecha de ingreso:</strong> {{ orden.fecha_creacion|date:"d/m/Y H:i" }}</p>
+                                
+                                <hr>
+                                
+                                <div id="previsualizacionMensajePersonalizado" style="display: none;">
+                                    <p><strong>Mensaje adicional:</strong></p>
+                                    <div class="bg-light p-3 rounded border-start border-primary border-4">
+                                        <em id="textoMensajePersonalizado"></em>
+                                    </div>
+                                    <hr>
+                                </div>
+                                
+                                <p>
+                                    Si tiene alguna pregunta o necesita información adicional, no dude en contactarnos.
+                                </p>
+                                <p>Atentamente,</p>
+                                
+                                <!-- Firma -->
+                                <div class="mt-3 pt-3 border-top">
+                                    <strong>{{ request.user.empleado.nombre_completo|default:"Sistema Integral SIC" }}</strong><br>
+                                    {% if request.user.empleado %}
+                                        {{ request.user.empleado.cargo }}<br>
+                                        {{ request.user.empleado.area }}<br>
+                                    {% endif %}
+                                    <a href="mailto:{{ request.user.email }}">{{ request.user.email }}</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </form>
+            </div>
+            
+            <!-- Footer del Modal -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="submit" 
+                        form="formEnviarImagenesCliente" 
+                        class="btn btn-primary btn-lg"
+                        id="btnEnviarImagenes"
+                        {% if orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}disabled{% endif %}>
+                    <i class="bi bi-send-fill"></i> Enviar Correo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
 
@@ -4212,5 +4692,290 @@ document.addEventListener('DOMContentLoaded', function() {
      Panel VM ahora visible en todas las órdenes como complemento opcional
      ============================================================================ -->
 <script src="{% static 'js/venta_mostrador.js' %}?v=2.2"></script>
+
+<!-- ============================================================================
+     MODAL ENVIAR IMÁGENES AL CLIENTE - JavaScript
+     ============================================================================ -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // =========================================================================
+    // ELEMENTOS DEL DOM
+    // =========================================================================
+    const checkboxesImagenes = document.querySelectorAll('.checkbox-imagen');
+    const contadorImagenes = document.getElementById('contadorImagenesSeleccionadas');
+    const previsualizacionArchivos = document.getElementById('previsualizacionArchivos');
+    const selectTodas = document.getElementById('seleccionarTodasImagenes');
+    const mensajePersonalizado = document.getElementById('mensaje_personalizado');
+    const previsualizacionMensaje = document.getElementById('previsualizacionMensajePersonalizado');
+    const textoMensajePersonalizado = document.getElementById('textoMensajePersonalizado');
+    const btnEnviarImagenes = document.getElementById('btnEnviarImagenes');
+    const formEnviarImagenes = document.getElementById('formEnviarImagenesCliente');
+    
+    // =========================================================================
+    // FUNCIÓN: Actualizar contador de imágenes seleccionadas
+    // =========================================================================
+    function actualizarContador() {
+        const seleccionadas = document.querySelectorAll('.checkbox-imagen:checked').length;
+        
+        if (contadorImagenes) {
+            contadorImagenes.textContent = seleccionadas + ' seleccionada' + (seleccionadas !== 1 ? 's' : '');
+            
+            // Cambiar color del badge según cantidad
+            contadorImagenes.className = 'badge ms-2';
+            if (seleccionadas === 0) {
+                contadorImagenes.classList.add('bg-secondary');
+            } else if (seleccionadas < 3) {
+                contadorImagenes.classList.add('bg-warning', 'text-dark');
+            } else {
+                contadorImagenes.classList.add('bg-primary');
+            }
+        }
+        
+        if (previsualizacionArchivos) {
+            previsualizacionArchivos.innerHTML = `<i class="bi bi-images"></i> ${seleccionadas} imagen${seleccionadas !== 1 ? 'es' : ''}`;
+        }
+        
+        // Habilitar/deshabilitar botón de envío
+        if (btnEnviarImagenes && !btnEnviarImagenes.hasAttribute('data-email-invalido')) {
+            btnEnviarImagenes.disabled = seleccionadas === 0;
+            
+            if (seleccionadas === 0) {
+                btnEnviarImagenes.title = 'Debes seleccionar al menos una imagen';
+            } else {
+                btnEnviarImagenes.title = 'Enviar ' + seleccionadas + ' imagen' + (seleccionadas !== 1 ? 'es' : '') + ' al cliente';
+            }
+        }
+    }
+    
+    // =========================================================================
+    // EVENTO: Cambio en checkboxes individuales de imágenes
+    // =========================================================================
+    checkboxesImagenes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            actualizarContador();
+            
+            // Agregar efecto visual al card
+            const card = this.closest('.card');
+            if (card) {
+                if (this.checked) {
+                    card.classList.add('border-primary', 'border-3', 'shadow');
+                } else {
+                    card.classList.remove('border-primary', 'border-3', 'shadow');
+                }
+            }
+        });
+    });
+    
+    // =========================================================================
+    // EVENTO: Seleccionar/deseleccionar todas las imágenes
+    // =========================================================================
+    if (selectTodas) {
+        selectTodas.addEventListener('change', function() {
+            checkboxesImagenes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+                
+                // Aplicar efecto visual
+                const card = checkbox.closest('.card');
+                if (card) {
+                    if (this.checked) {
+                        card.classList.add('border-primary', 'border-3', 'shadow');
+                    } else {
+                        card.classList.remove('border-primary', 'border-3', 'shadow');
+                    }
+                }
+            });
+            
+            actualizarContador();
+        });
+    }
+    
+    // =========================================================================
+    // EVENTO: Actualizar previsualización del mensaje personalizado
+    // =========================================================================
+    if (mensajePersonalizado) {
+        mensajePersonalizado.addEventListener('input', function() {
+            const texto = this.value.trim();
+            
+            if (previsualizacionMensaje && textoMensajePersonalizado) {
+                if (texto) {
+                    previsualizacionMensaje.style.display = 'block';
+                    textoMensajePersonalizado.textContent = texto;
+                } else {
+                    previsualizacionMensaje.style.display = 'none';
+                }
+            }
+        });
+    }
+    
+    // =========================================================================
+    // EVENTO: Envío del formulario con validación
+    // =========================================================================
+    if (formEnviarImagenes) {
+        formEnviarImagenes.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Validar que se hayan seleccionado imágenes
+            const imagenesSeleccionadas = document.querySelectorAll('.checkbox-imagen:checked').length;
+            
+            if (imagenesSeleccionadas === 0) {
+                alert('⚠️ Debes seleccionar al menos una imagen para enviar.');
+                return;
+            }
+            
+            // Confirmación final
+            const confirmacion = confirm(
+                `📧 ¿Confirmas el envío de ${imagenesSeleccionadas} imagen${imagenesSeleccionadas !== 1 ? 'es' : ''} al cliente?\n\n` +
+                'El correo se enviará inmediatamente.'
+            );
+            
+            if (!confirmacion) return;
+            
+            // Deshabilitar botón y mostrar loader (botón está fuera del form, buscar por ID)
+            const btnSubmit = document.getElementById('btnEnviarImagenes');
+            let textoOriginal = '';
+            
+            if (btnSubmit) {
+                textoOriginal = btnSubmit.innerHTML;
+                btnSubmit.disabled = true;
+                btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+            }
+            
+            // Preparar datos del formulario
+            const formData = new FormData(this);
+            
+            try {
+                // Enviar petición AJAX
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Construir mensaje HTML detallado con la información del correo
+                    let mensajeHTML = `
+                        <div class="text-center mb-3">
+                            <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                        </div>
+                        <h5 class="text-center mb-3">${data.message}</h5>
+                    `;
+                    
+                    if (data.data) {
+                        mensajeHTML += `
+                            <div class="alert alert-info mb-0">
+                                <h6 class="mb-3"><i class="bi bi-info-circle"></i> 📊 Detalles del envío:</h6>
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <strong>📧 Destinatario:</strong> ${data.data.destinatario}
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <strong>📸 Imágenes:</strong> ${data.data.imagenes_enviadas}
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <strong>📦 Tamaño total:</strong> ${data.data.tamaño_mb} MB
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <strong>💾 Ahorro:</strong> <span class="text-success">${data.data.reduccion_porcentaje}%</span>
+                                    </div>
+                        `;
+                        
+                        if (data.data.copia_count > 0) {
+                            mensajeHTML += `
+                                    <div class="col-12 mb-2">
+                                        <strong>👥 Copias enviadas:</strong> ${data.data.copia_count} persona(s)
+                                    </div>
+                            `;
+                        }
+                        
+                        mensajeHTML += `
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    // Cerrar modal de envío
+                    const modalEnviar = bootstrap.Modal.getInstance(document.getElementById('modalEnviarImagenesCliente'));
+                    if (modalEnviar) {
+                        modalEnviar.hide();
+                    }
+                    
+                    // Crear modal de confirmación
+                    const modalConfirmacionHTML = `
+                        <div class="modal fade" id="modalConfirmacionEnvioImagenes" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-success text-white">
+                                        <h5 class="modal-title">
+                                            <i class="bi bi-envelope-check"></i> Correo Enviado al Cliente
+                                        </h5>
+                                    </div>
+                                    <div class="modal-body">
+                                        ${mensajeHTML}
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-primary" onclick="location.reload()">
+                                            <i class="bi bi-check-lg"></i> Aceptar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Agregar modal al DOM si no existe
+                    let modalConfirmacion = document.getElementById('modalConfirmacionEnvioImagenes');
+                    if (modalConfirmacion) {
+                        modalConfirmacion.remove();
+                    }
+                    document.body.insertAdjacentHTML('beforeend', modalConfirmacionHTML);
+                    
+                    // Mostrar modal de confirmación
+                    modalConfirmacion = new bootstrap.Modal(document.getElementById('modalConfirmacionEnvioImagenes'));
+                    modalConfirmacion.show();
+                    
+                } else {
+                    // Error del servidor
+                    alert('❌ Error al enviar el correo:\n\n' + (data.error || 'Error desconocido'));
+                }
+                
+            } catch (error) {
+                console.error('Error al enviar correo:', error);
+                alert('❌ Error de conexión al enviar el correo.\n\nPor favor, verifica tu conexión a internet e intenta nuevamente.');
+            } finally {
+                // Restaurar botón solo si existe
+                if (btnSubmit) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = textoOriginal;
+                }
+            }
+        });
+    }
+    
+    // =========================================================================
+    // INICIALIZACIÓN: Actualizar contador al cargar
+    // =========================================================================
+    actualizarContador();
+    
+    // =========================================================================
+    // HOVER EFFECT: Resaltar cards al pasar el mouse
+    // =========================================================================
+    document.querySelectorAll('.imagen-selectable').forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            if (!this.querySelector('.checkbox-imagen').checked) {
+                this.style.transform = 'scale(1.05)';
+                this.style.transition = 'transform 0.2s ease';
+            }
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+});
+</script>
 
 {% endblock %}

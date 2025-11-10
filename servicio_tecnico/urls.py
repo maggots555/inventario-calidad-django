@@ -136,6 +136,11 @@ urlpatterns = [
          views.enviar_correo_rhitso, 
          name='enviar_correo_rhitso'),
     
+    # Enviar imágenes de ingreso al cliente por correo
+    path('orden/<int:orden_id>/enviar-imagenes-cliente/', 
+         views.enviar_imagenes_cliente, 
+         name='enviar_imagenes_cliente'),
+    
     # Vista de prueba: GENERACIÓN DE PDF RHITSO (FASE 10.2)
     # ========================================================================
     # Esta vista es temporal para probar la generación de PDF

@@ -2000,6 +2000,20 @@ def detalle_orden(request, orden_id):
         estadisticas_tecnicos[tecnico.pk] = tecnico.obtener_estadisticas_ordenes_activas()
     
     # ========================================================================
+    # EMPLEADOS PARA COPIA EN ENVÍO DE IMÁGENES AL CLIENTE
+    # ========================================================================
+    # Obtener empleados de áreas CALIDAD y FRONTDESK que tengan email configurado
+    # Estos empleados estarán disponibles para recibir copia del correo al cliente
+    
+    empleados_copia_imagenes = Empleado.objects.filter(
+        Q(area='CALIDAD') | Q(area='FRONTDESK'),
+        activo=True,
+        email__isnull=False
+    ).exclude(
+        email=''
+    ).order_by('area', 'nombre_completo')
+    
+    # ========================================================================
     # CONTEXT PARA EL TEMPLATE
     # ========================================================================
     
@@ -2071,6 +2085,9 @@ def detalle_orden(request, orden_id):
         # Imágenes
         'imagenes_por_tipo': imagenes_por_tipo,
         'total_imagenes': total_imagenes,
+        
+        # Empleados para copia en envío de imágenes
+        'empleados_copia_imagenes': empleados_copia_imagenes,
         
         # Información adicional
         'dias_en_servicio': orden.dias_en_servicio,  # Días naturales (mantener por compatibilidad)
@@ -5798,6 +5815,300 @@ def generar_pdf_rhitso_prueba(request, orden_id):
         traceback.print_exc()
         
         return redirect('servicio_tecnico:lista_ordenes')
+
+
+# ============================================================================
+# ENVIAR IMÁGENES AL CLIENTE POR CORREO ELECTRÓNICO
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def enviar_imagenes_cliente(request, orden_id):
+    """
+    Vista para enviar imágenes de ingreso del equipo al cliente por correo electrónico.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta vista procesa el formulario del modal de envío de imágenes al cliente.
+    Realiza las siguientes acciones:
+    
+    1. Valida que el cliente tenga un email configurado
+    2. Valida que se hayan seleccionado imágenes para enviar
+    3. Recopila empleados en copia (CALIDAD, FRONTDESK, TÉCNICO)
+    4. Comprime las imágenes seleccionadas para optimizar tamaño
+    5. Genera correo HTML profesional con los datos de la orden
+    6. Envía el correo con las imágenes adjuntas
+    7. Registra el envío en el historial de la orden
+    8. Limpia archivos temporales
+    
+    FLUJO DEL CORREO:
+    - Para: Cliente (email configurado en la orden)
+    - CC: Empleados seleccionados (CALIDAD, FRONTDESK, Técnico asignado)
+    - Asunto: 📸 Fotografías de ingreso - Orden #[NUMERO]
+    - Adjuntos: Imágenes de ingreso seleccionadas (comprimidas)
+    
+    Args:
+        request: HttpRequest object con datos POST del formulario
+        orden_id: ID de la orden de servicio
+    
+    Returns:
+        JsonResponse con resultado del envío
+    """
+    import os
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from PIL import Image
+    import io
+    
+    try:
+        # =======================================================================
+        # PASO 1: OBTENER Y VALIDAR LA ORDEN
+        # =======================================================================
+        orden = get_object_or_404(OrdenServicio.objects.select_related('detalle_equipo'), pk=orden_id)
+        
+        # Validar que el cliente tenga email configurado
+        email_cliente = orden.detalle_equipo.email_cliente
+        if not email_cliente or email_cliente == 'cliente@ejemplo.com':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ El email del cliente no está configurado o es el valor por defecto. '
+                        'Por favor, actualiza el email del cliente antes de enviar.'
+            }, status=400)
+        
+        # =======================================================================
+        # PASO 2: OBTENER IMÁGENES SELECCIONADAS
+        # =======================================================================
+        imagenes_ids = request.POST.getlist('imagenes_seleccionadas')
+        
+        if not imagenes_ids:
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Debes seleccionar al menos una imagen para enviar.'
+            }, status=400)
+        
+        # Obtener las imágenes seleccionadas
+        imagenes = ImagenOrden.objects.filter(
+            id__in=imagenes_ids,
+            orden=orden,
+            tipo='ingreso'
+        )
+        
+        if not imagenes.exists():
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Las imágenes seleccionadas no son válidas.'
+            }, status=400)
+        
+        print(f"📸 Preparando envío de {imagenes.count()} imagen(es) al cliente...")
+        
+        # =======================================================================
+        # PASO 3: OBTENER DESTINATARIOS EN COPIA
+        # =======================================================================
+        copia_empleados = request.POST.getlist('copia_empleados', [])
+        copia_tecnico = request.POST.getlist('copia_tecnico', [])
+        
+        # Combinar todas las copias (evitando duplicados)
+        destinatarios_copia = list(set(copia_empleados + copia_tecnico))
+        
+        print(f"📧 Destinatarios:")
+        print(f"   Para: {email_cliente}")
+        if destinatarios_copia:
+            print(f"   CC: {', '.join(destinatarios_copia)}")
+        
+        # =======================================================================
+        # PASO 4: OBTENER MENSAJE PERSONALIZADO (OPCIONAL)
+        # =======================================================================
+        mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
+        
+        # =======================================================================
+        # PASO 5: COMPRIMIR IMÁGENES PARA OPTIMIZAR TAMAÑO
+        # =======================================================================
+        print(f"🔄 Comprimiendo imágenes...")
+        
+        imagenes_comprimidas = []
+        tamaño_total_original = 0
+        tamaño_total_comprimido = 0
+        
+        for imagen in imagenes:
+            try:
+                # Abrir imagen con PIL
+                img_path = imagen.imagen.path
+                img = Image.open(img_path)
+                
+                # Calcular tamaño original
+                tamaño_original = os.path.getsize(img_path)
+                tamaño_total_original += tamaño_original
+                
+                # Convertir RGBA a RGB si es necesario
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                    img = background
+                
+                # Redimensionar si es muy grande (máx 1920px en el lado más largo)
+                max_dimension = 1920
+                if max(img.size) > max_dimension:
+                    ratio = max_dimension / max(img.size)
+                    new_size = tuple([int(dim * ratio) for dim in img.size])
+                    img = img.resize(new_size, Image.Resampling.LANCZOS)
+                
+                # Comprimir a JPEG con calidad 85
+                output = io.BytesIO()
+                img.save(output, format='JPEG', quality=85, optimize=True)
+                output.seek(0)
+                
+                tamaño_comprimido = len(output.getvalue())
+                tamaño_total_comprimido += tamaño_comprimido
+                
+                # Generar nombre de archivo único
+                nombre_archivo = f"ingreso_{imagen.id}_{os.path.basename(imagen.imagen.name)}"
+                if not nombre_archivo.lower().endswith('.jpg'):
+                    nombre_archivo = os.path.splitext(nombre_archivo)[0] + '.jpg'
+                
+                imagenes_comprimidas.append({
+                    'nombre': nombre_archivo,
+                    'contenido': output.getvalue(),
+                    'tamaño_original': tamaño_original,
+                    'tamaño_comprimido': tamaño_comprimido
+                })
+                
+                reduccion = ((tamaño_original - tamaño_comprimido) / tamaño_original) * 100
+                print(f"   ✅ {nombre_archivo}: {tamaño_original/1024:.1f}KB → {tamaño_comprimido/1024:.1f}KB (-{reduccion:.1f}%)")
+                
+            except Exception as e:
+                print(f"   ⚠️ Error procesando imagen {imagen.id}: {str(e)}")
+                continue
+        
+        if not imagenes_comprimidas:
+            return JsonResponse({
+                'success': False,
+                'error': '❌ No se pudo procesar ninguna imagen. Intenta nuevamente.'
+            }, status=500)
+        
+        # Mostrar resumen de compresión
+        reduccion_total = ((tamaño_total_original - tamaño_total_comprimido) / tamaño_total_original) * 100
+        print(f"\n📊 Resumen de compresión:")
+        print(f"   Original: {tamaño_total_original/1024/1024:.2f} MB")
+        print(f"   Comprimido: {tamaño_total_comprimido/1024/1024:.2f} MB")
+        print(f"   Reducción: {reduccion_total:.1f}%")
+        
+        # Verificar límite de 25MB
+        if tamaño_total_comprimido > 25 * 1024 * 1024:
+            return JsonResponse({
+                'success': False,
+                'error': f'❌ El tamaño total de las imágenes ({tamaño_total_comprimido/1024/1024:.1f} MB) '
+                        f'excede el límite de Gmail (25 MB). Selecciona menos imágenes.'
+            }, status=400)
+        
+        # =======================================================================
+        # PASO 6: PREPARAR CONTENIDO HTML DEL CORREO
+        # =======================================================================
+        print(f"📧 Preparando contenido del correo...")
+        
+        ahora = timezone.now()
+        
+        context = {
+            'orden': orden,
+            'detalle': orden.detalle_equipo,
+            'mensaje_personalizado': mensaje_personalizado,
+            'fecha_envio': ahora,
+            'cantidad_imagenes': len(imagenes_comprimidas),
+            'usuario_remitente': request.user.empleado if hasattr(request.user, 'empleado') else None,
+        }
+        
+        # Renderizar plantilla HTML
+        html_content = render_to_string(
+            'servicio_tecnico/emails/imagenes_cliente.html',
+            context
+        )
+        
+        # =======================================================================
+        # PASO 7: CREAR Y ENVIAR EL CORREO ELECTRÓNICO
+        # =======================================================================
+        print(f"✉️ Enviando correo electrónico...")
+        
+        # Asunto del correo
+        asunto = f'📸 Fotografías de ingreso - Orden {orden.numero_orden_interno}'
+        
+        # Crear mensaje de correo
+        email = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[email_cliente],
+            cc=destinatarios_copia if destinatarios_copia else None,
+        )
+        
+        # Configurar como HTML
+        email.content_subtype = 'html'
+        
+        # Adjuntar imágenes comprimidas
+        for img_data in imagenes_comprimidas:
+            email.attach(
+                img_data['nombre'],
+                img_data['contenido'],
+                'image/jpeg'
+            )
+        
+        # Enviar correo
+        email.send(fail_silently=False)
+        
+        print(f"✅ Correo enviado exitosamente a {email_cliente}")
+        
+        # =======================================================================
+        # PASO 8: REGISTRAR EN HISTORIAL
+        # =======================================================================
+        empleado_actual = request.user.empleado if hasattr(request.user, 'empleado') else None
+        
+        comentario_historial = (
+            f"📧 Imágenes de ingreso enviadas al cliente ({email_cliente})\n"
+            f"📸 Cantidad de imágenes: {len(imagenes_comprimidas)}\n"
+            f"📦 Tamaño total: {tamaño_total_comprimido/1024/1024:.2f} MB"
+        )
+        
+        if destinatarios_copia:
+            comentario_historial += f"\n👥 Copia a: {', '.join(destinatarios_copia)}"
+        
+        if mensaje_personalizado:
+            comentario_historial += f"\n💬 Mensaje: {mensaje_personalizado[:100]}..."
+        
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='email',
+            comentario=comentario_historial,
+            usuario=empleado_actual,
+            es_sistema=False
+        )
+        
+        # =======================================================================
+        # PASO 9: RETORNAR RESPUESTA EXITOSA
+        # =======================================================================
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Correo enviado exitosamente a {email_cliente}',
+            'data': {
+                'destinatario': email_cliente,
+                'imagenes_enviadas': len(imagenes_comprimidas),
+                'tamaño_mb': round(tamaño_total_comprimido/1024/1024, 2),
+                'reduccion_porcentaje': round(reduccion_total, 1),
+                'copia_count': len(destinatarios_copia)
+            }
+        })
+        
+    except Exception as e:
+        # Registrar error en consola
+        print(f"❌ Error al enviar imágenes al cliente: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error al enviar el correo: {str(e)}'
+        }, status=500)
 
 
 # ============================================================================

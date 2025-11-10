@@ -801,6 +801,15 @@ class DetalleEquipo(models.Model):
         help_text="Número de orden del cliente (identificador interno del cliente)"
     )
     
+    # ✅ NUEVO CAMPO: Email del Cliente (Noviembre 2025)
+    # Agregado para facilitar el envío de fotos de ingreso y notificaciones
+    email_cliente = models.EmailField(
+        max_length=254,
+        blank=False,  # Campo OBLIGATORIO
+        default='cliente@ejemplo.com',  # Valor temporal para registros existentes
+        help_text="Email del cliente para envío de fotos y notificaciones"
+    )
+    
     # GAMA DEL EQUIPO
     gama = models.CharField(
         max_length=10,
@@ -927,9 +936,23 @@ class DetalleEquipo(models.Model):
             self.gama = 'media'
     
     def save(self, *args, **kwargs):
-        """Calcular gama antes de guardar"""
+        """
+        Calcular gama y normalizar email antes de guardar.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Este método se ejecuta ANTES de guardar en la base de datos.
+        - Calcula la gama del equipo si no está definida
+        - Normaliza el email a minúsculas para evitar duplicados (email@example.com == EMAIL@example.com)
+        - Elimina espacios en blanco del email
+        """
+        # Calcular gama si no está definida
         if not self.gama:
             self.calcular_gama()
+        
+        # Normalizar email (lowercase y sin espacios)
+        if self.email_cliente:
+            self.email_cliente = self.email_cliente.strip().lower()
+        
         super().save(*args, **kwargs)
     
     def __str__(self):
