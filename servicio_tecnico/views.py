@@ -6057,6 +6057,32 @@ def enviar_imagenes_cliente(request, orden_id):
         # Configurar como HTML
         email.content_subtype = 'html'
         
+        # =======================================================================
+        # ADJUNTAR LOGO DE SIC COMO IMAGEN EMBEBIDA (CID) - FORMATO PNG
+        # =======================================================================
+        # PNG es más compatible con clientes de correo (Gmail, Outlook, etc.)
+        # SVG no es soportado por la mayoría de clientes de email
+        try:
+            from django.contrib.staticfiles import finders
+            from email.mime.image import MIMEImage
+            
+            logo_path = finders.find('images/logos/logo_sic.png')
+            
+            if logo_path:
+                with open(logo_path, 'rb') as logo_file:
+                    logo_data = logo_file.read()
+                    # Crear MIMEImage para PNG
+                    logo_mime = MIMEImage(logo_data, _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email.attach(logo_mime)
+                    print(f"🖼️ Logo SIC (PNG) adjuntado correctamente")
+            else:
+                print(f"⚠️ Advertencia: No se encontró el logo en static/images/logos/logo_sic.png")
+        except Exception as e:
+            print(f"⚠️ Error al adjuntar logo: {e}")
+            # Continuar sin el logo, no es crítico
+        
         # Adjuntar imágenes comprimidas
         for img_data in imagenes_comprimidas:
             email.attach(
