@@ -1253,6 +1253,230 @@ class DashboardCotizacionesVisualizer:
         
         return fig
     
+    def grafico_proveedores_impacto_conversion(self, df_proveedores_conversion):
+        """
+        Heatmap: Impacto de proveedores en conversión de ventas.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Este heatmap (mapa de calor) muestra 3 métricas clave por proveedor:
+        1. Tasa de Aceptación (%) - ¿Las cotizaciones con este proveedor se aceptan?
+        2. Tiempo de Entrega (días) - ¿Qué tan rápido entrega?
+        3. Valor Generado ($) - ¿Cuántos ingresos reales genera?
+        
+        Colores:
+        - Verde: Buen desempeño
+        - Amarillo: Desempeño medio
+        - Rojo: Desempeño bajo
+        
+        INSIGHT CLAVE:
+        Permite identificar proveedores "estrella" (alto en las 3 métricas) vs
+        proveedores "problemáticos" (alto volumen pero baja conversión).
+        
+        Args:
+            df_proveedores_conversion (DataFrame): DataFrame de métricas de proveedores
+        
+        Returns:
+            Figure: Gráfico de Plotly
+        """
+        
+        if df_proveedores_conversion.empty:
+            return self._crear_grafico_vacio("No hay datos de impacto de proveedores")
+        
+        # Filtrar top 15 proveedores por valor generado
+        df_top = df_proveedores_conversion.nlargest(15, 'valor_generado').copy()
+        
+        if df_top.empty:
+            return self._crear_grafico_vacio("No hay suficientes datos de proveedores")
+        
+        # Preparar datos para el heatmap
+        # Normalizar métricas para comparación visual (0-100 scale)
+        
+        # 1. Tasa de aceptación (ya está en 0-100)
+        tasa_aceptacion = df_top['tasa_aceptacion'].values
+        
+        # 2. Tiempo de entrega (invertir: menos días = mejor)
+        # Normalizar a escala 0-100 donde 100 = más rápido
+        tiempos = df_top['tiempo_entrega_promedio'].fillna(df_top['tiempo_entrega_promedio'].max())
+        max_tiempo = tiempos.max() if tiempos.max() > 0 else 1
+        tiempo_normalizado = 100 - (tiempos / max_tiempo * 100)
+        
+        # 3. Valor generado (normalizar a 0-100)
+        valores = df_top['valor_generado'].values
+        max_valor = valores.max() if valores.max() > 0 else 1
+        valor_normalizado = (valores / max_valor * 100)
+        
+        # Crear matriz de datos (proveedores x métricas)
+        z_data = [
+            tasa_aceptacion.tolist(),
+            tiempo_normalizado.tolist(),
+            valor_normalizado.tolist()
+        ]
+        
+        # Etiquetas de texto para mostrar valores reales
+        text_data = [
+            [f"{val:.1f}%" for val in tasa_aceptacion],
+            [f"{val:.0f} días" for val in tiempos],
+            [f"${val:,.0f}" for val in valores]
+        ]
+        
+        # Crear heatmap
+        fig = go.Figure(data=go.Heatmap(
+            z=z_data,
+            x=df_top['proveedor'].tolist(),
+            y=['Tasa de Aceptación', 'Velocidad de Entrega', 'Valor Generado'],
+            text=text_data,
+            texttemplate='%{text}',
+            textfont={"size": 11, "color": "white"},
+            colorscale='RdYlGn',  # Rojo-Amarillo-Verde
+            showscale=True,
+            colorbar=dict(
+                title="Desempeño<br>(0-100)",
+                titleside="right",
+                tickmode="linear",
+                tick0=0,
+                dtick=25
+            ),
+            hovertemplate='<b>%{y}</b><br>Proveedor: %{x}<br>Valor: %{text}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='🎯 Impacto de Proveedores en Conversión de Ventas (Top 15)',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=18, color=self.colores['dark'])
+            ),
+            xaxis=dict(
+                title='',
+                tickangle=-45,
+                tickfont=dict(size=10)
+            ),
+            yaxis=dict(
+                title='',
+                tickfont=dict(size=12)
+            ),
+            height=500,
+            margin=dict(b=120, l=150, r=100, t=80)
+        )
+        
+        return fig
+    
+    def grafico_componentes_por_proveedor(self, df_componentes):
+        """
+        Sunburst: Análisis jerárquico de componentes por proveedor.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Un "sunburst chart" es un gráfico de anillos concéntricos que muestra
+        jerarquías de datos. Cada anillo representa un nivel de detalle.
+        
+        ESTRUCTURA:
+        - Centro: Todas las piezas
+        - Anillo 1: Tipo de componente (RAM, Disco, Pantalla, etc.)
+        - Anillo 2: Proveedor que suministra ese componente
+        - Anillo 3: Resultado (Aceptado/Rechazado/Sin Respuesta)
+        
+        CÓMO USAR:
+        - Click en cualquier segmento para hacer zoom
+        - El tamaño representa cantidad de piezas o valor
+        - Colores diferenciados por nivel jerárquico
+        
+        INSIGHTS QUE REVELA:
+        - ¿Qué proveedor domina cada categoría de componente?
+        - ¿Hay diversificación o dependencia de un solo proveedor?
+        - ¿Ciertos proveedores tienen mejor aceptación en componentes específicos?
+        - ¿Qué categorías generan más rechazo?
+        
+        Args:
+            df_componentes (DataFrame): DataFrame de componentes por proveedor
+        
+        Returns:
+            Figure: Gráfico de Plotly
+        """
+        
+        if df_componentes.empty:
+            return self._crear_grafico_vacio("No hay datos de componentes por proveedor")
+        
+        # Preparar datos jerárquicos para Sunburst
+        # Estructura: Raíz -> Componente -> Proveedor -> Resultado
+        
+        labels = ['Todos los Componentes']
+        parents = ['']
+        values = [df_componentes['cantidad'].sum()]
+        colors = [self.colores['primary']]
+        
+        # Nivel 1: Componentes
+        componentes = df_componentes.groupby('componente_nombre').agg({
+            'cantidad': 'sum',
+            'valor_total': 'sum'
+        }).reset_index()
+        
+        for _, comp in componentes.iterrows():
+            labels.append(comp['componente_nombre'])
+            parents.append('Todos los Componentes')
+            values.append(comp['cantidad'])
+            colors.append(self.colores['info'])
+        
+        # Nivel 2: Proveedores por componente
+        proveedores_por_comp = df_componentes.groupby(['componente_nombre', 'proveedor']).agg({
+            'cantidad': 'sum',
+            'valor_total': 'sum'
+        }).reset_index()
+        
+        for _, prov_comp in proveedores_por_comp.iterrows():
+            label = f"{prov_comp['proveedor']}"
+            parent = prov_comp['componente_nombre']
+            labels.append(label)
+            parents.append(parent)
+            values.append(prov_comp['cantidad'])
+            colors.append(self.colores['warning'])
+        
+        # Nivel 3: Resultados por proveedor-componente
+        for _, row in df_componentes.iterrows():
+            label = f"{row['resultado']}"
+            parent = f"{row['proveedor']}"
+            
+            # Colores según resultado
+            if row['resultado'] == 'Aceptado':
+                color = self.colores['success']
+            elif row['resultado'] == 'Rechazado':
+                color = self.colores['danger']
+            else:
+                color = self.colores['secondary']
+            
+            labels.append(label)
+            parents.append(parent)
+            values.append(row['cantidad'])
+            colors.append(color)
+        
+        # Crear figura Sunburst
+        fig = go.Figure(go.Sunburst(
+            labels=labels,
+            parents=parents,
+            values=values,
+            branchvalues='total',
+            marker=dict(
+                colors=colors,
+                line=dict(color='white', width=2)
+            ),
+            hovertemplate='<b>%{label}</b><br>Cantidad: %{value}<br>%{percentParent}<extra></extra>',
+            textfont=dict(size=11, color='white', family='Arial')
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='🔧 Análisis de Componentes por Proveedor y Resultado',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=18, color=self.colores['dark'])
+            ),
+            height=700,
+            margin=dict(t=80, l=0, r=0, b=0)
+        )
+        
+        return fig
+    
     # ========================================================================
     # TIEMPOS Y EFICIENCIA (2 funciones)
     # ========================================================================
@@ -2536,6 +2760,47 @@ class DashboardCotizacionesVisualizer:
                 graficos['top_proveedores'] = convertir_figura_a_html(
                     self.grafico_top_proveedores(df_seguimientos)
                 )
+                
+                # NUEVOS GRÁFICOS DE PROVEEDORES (Noviembre 2025)
+                try:
+                    # Importar funciones de análisis avanzado
+                    from servicio_tecnico.utils_cotizaciones import (
+                        analizar_proveedores_con_conversion,
+                        analizar_componentes_por_proveedor
+                    )
+                    
+                    # Obtener IDs de cotizaciones del DataFrame actual
+                    if 'cotizacion_id' in df.columns:
+                        cotizacion_ids = df['cotizacion_id'].dropna().unique().tolist()
+                    else:
+                        cotizacion_ids = None
+                    
+                    # Gráfico 1: Impacto de proveedores en conversión
+                    try:
+                        df_prov_conversion = analizar_proveedores_con_conversion(cotizacion_ids)
+                        if not df_prov_conversion.empty:
+                            graficos['proveedores_impacto_conversion'] = convertir_figura_a_html(
+                                self.grafico_proveedores_impacto_conversion(df_prov_conversion)
+                            )
+                    except Exception as e:
+                        print(f"Error generando gráfico de impacto de proveedores: {e}")
+                        graficos['proveedores_impacto_conversion'] = None
+                    
+                    # Gráfico 2: Componentes por proveedor (Sunburst)
+                    try:
+                        df_componentes = analizar_componentes_por_proveedor(cotizacion_ids)
+                        if not df_componentes.empty:
+                            graficos['componentes_por_proveedor'] = convertir_figura_a_html(
+                                self.grafico_componentes_por_proveedor(df_componentes)
+                            )
+                    except Exception as e:
+                        print(f"Error generando gráfico de componentes por proveedor: {e}")
+                        graficos['componentes_por_proveedor'] = None
+                        
+                except Exception as e:
+                    print(f"Error en importación de funciones de análisis avanzado: {e}")
+                    graficos['proveedores_impacto_conversion'] = None
+                    graficos['componentes_por_proveedor'] = None
             
             # TIEMPOS Y EFICIENCIA
             graficos['tiempos_respuesta'] = convertir_figura_a_html(

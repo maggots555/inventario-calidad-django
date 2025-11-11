@@ -651,15 +651,19 @@
         <div class="tab-pane fade" id="proveedores" role="tabpanel">
             <div class="row">
                 
-                <!-- Top Proveedores -->
+                <!-- Top Proveedores (Superior Izquierda) -->
                 <div class="col-md-6">
                     <div class="grafico-card card">
                         <div class="card-header">
-                            <h5><i class="bi bi-trophy"></i> Top Proveedores</h5>
+                            <h5><i class="bi bi-trophy"></i> Top Proveedores por Volumen</h5>
                         </div>
                         <div class="card-body">
                             {% if graficos.top_proveedores %}
                                 {{ graficos.top_proveedores|safe }}
+                                <div class="alert alert-info alert-dashboard mt-3">
+                                    <strong><i class="bi bi-info-circle"></i> Métrica:</strong>
+                                    Proveedores ordenados por cantidad de pedidos realizados (volumen).
+                                </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay datos de proveedores disponibles.
@@ -669,27 +673,87 @@
                     </div>
                 </div>
                 
-                <!-- Performance de Proveedores -->
+                <!-- Performance de Proveedores (Superior Derecha) -->
                 <div class="col-md-6">
                     <div class="grafico-card card">
                         <div class="card-header">
-                            <h5><i class="bi bi-speedometer"></i> Performance de Proveedores</h5>
+                            <h5><i class="bi bi-speedometer"></i> Velocidad de Entrega vs Volumen</h5>
                         </div>
                         <div class="card-body">
                             {% if graficos.proveedores_performance %}
                                 {{ graficos.proveedores_performance|safe }}
                                 <div class="alert alert-primary alert-dashboard mt-3">
-                                    <strong><i class="bi bi-graph-up"></i> Métricas de Evaluación:</strong>
+                                    <strong><i class="bi bi-graph-up"></i> Cómo Leer:</strong>
                                     <ul class="mb-0 mt-2">
-                                        <li><strong>Volumen de Piezas:</strong> Cantidad de piezas suministradas (eje X o tamaño)</li>
-                                        <li><strong>Tasa de Aceptación:</strong> % de cotizaciones aceptadas con piezas de este proveedor</li>
-                                        <li><strong>Proveedor Ideal:</strong> Alto volumen + Alta tasa de aceptación (esquina superior derecha)</li>
-                                        <li><strong>Revisar:</strong> Proveedores con bajo rendimiento pero alto volumen (pueden afectar ventas)</li>
+                                        <li><strong>Eje X:</strong> Tiempo promedio de entrega (días)</li>
+                                        <li><strong>Eje Y:</strong> Cantidad de pedidos</li>
+                                        <li><strong>Color:</strong> Verde = rápido, Rojo = lento</li>
+                                        <li><strong>Ideal:</strong> Muchos pedidos + entregas rápidas</li>
                                     </ul>
                                 </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay suficientes datos de seguimiento de proveedores.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- NUEVO: Impacto en Conversión (Inferior Izquierda) -->
+                <div class="col-md-6 mt-3">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-bullseye"></i> Impacto en Conversión de Ventas</h5>
+                            <span class="badge bg-success">NUEVO</span>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.proveedores_impacto_conversion %}
+                                {{ graficos.proveedores_impacto_conversion|safe }}
+                                <div class="alert alert-success alert-dashboard mt-3">
+                                    <strong><i class="bi bi-lightbulb-fill"></i> Insight Estratégico:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Tasa de Aceptación:</strong> % de cotizaciones aceptadas con piezas de este proveedor</li>
+                                        <li><strong>Velocidad de Entrega:</strong> Rapidez normalizada (100 = más rápido)</li>
+                                        <li><strong>Valor Generado:</strong> Ingresos reales en cotizaciones aceptadas</li>
+                                        <li><strong>Verde:</strong> Excelente desempeño | <strong>Amarillo:</strong> Regular | <strong>Rojo:</strong> Mejorar</li>
+                                        <li><strong>Acción:</strong> Priorizar proveedores con las 3 métricas en verde</li>
+                                    </ul>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay suficientes datos para análisis de conversión.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- NUEVO: Componentes por Proveedor (Inferior Derecha) -->
+                <div class="col-md-6 mt-3">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-diagram-3"></i> Especialización por Componente</h5>
+                            <span class="badge bg-success">NUEVO</span>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.componentes_por_proveedor %}
+                                {{ graficos.componentes_por_proveedor|safe }}
+                                <div class="alert alert-warning alert-dashboard mt-3">
+                                    <strong><i class="bi bi-stars"></i> Cómo Usar Este Gráfico:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Click en segmentos:</strong> Navega por la jerarquía (Componente → Proveedor → Resultado)</li>
+                                        <li><strong>Centro:</strong> Todas las piezas suministradas</li>
+                                        <li><strong>Anillo 1:</strong> Tipo de componente (RAM, Disco, Pantalla, etc.)</li>
+                                        <li><strong>Anillo 2:</strong> Proveedores que suministran cada componente</li>
+                                        <li><strong>Anillo 3:</strong> Resultado (Aceptado/Rechazado/Sin Respuesta)</li>
+                                        <li><strong>Tamaño:</strong> Proporcional a cantidad de piezas</li>
+                                        <li><strong>Insight:</strong> Identifica especialización y diversificación de proveedores</li>
+                                    </ul>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay suficientes datos de componentes por proveedor.
                                 </div>
                             {% endif %}
                         </div>
