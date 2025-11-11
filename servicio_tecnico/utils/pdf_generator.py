@@ -872,14 +872,34 @@ class PDFGeneratorRhitso:
         if self.imagenes_autorizacion:
             imagen = self.imagenes_autorizacion[0]
             
-            # Obtener ruta de la imagen
+            # BUSCAR IMAGEN EN MÚLTIPLES UBICACIONES (disco alterno y principal)
+            from pathlib import Path
+            from config.storage_utils import ALTERNATE_STORAGE_PATH, PRIMARY_STORAGE_PATH
+            
             ruta_imagen = None
             if hasattr(imagen, 'imagen') and imagen.imagen:
-                ruta_imagen = os.path.join(settings.MEDIA_ROOT, str(imagen.imagen))
+                nombre_relativo = str(imagen.imagen)
+                
+                # Lista de ubicaciones donde buscar
+                search_locations = [
+                    ALTERNATE_STORAGE_PATH,  # Disco alterno (D:)
+                    PRIMARY_STORAGE_PATH,    # Disco principal (C:)
+                ]
+                
+                # Buscar el archivo en cada ubicación
+                for location in search_locations:
+                    full_path = Path(location) / nombre_relativo
+                    if full_path.exists() and full_path.is_file():
+                        ruta_imagen = str(full_path)
+                        print(f"[PDF RHITSO] ✅ Imagen de autorización encontrada: {ruta_imagen}")
+                        break
+                
+                if not ruta_imagen:
+                    print(f"[PDF RHITSO] ❌ Imagen de autorización NO encontrada: {nombre_relativo}")
             
             y_imagen = y_header - alto_imagen
             
-            if ruta_imagen and os.path.exists(ruta_imagen):
+            if ruta_imagen:
                 exito = self._agregar_imagen_al_pdf(
                     c,
                     ruta_imagen,
