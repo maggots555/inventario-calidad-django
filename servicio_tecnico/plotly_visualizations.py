@@ -1330,8 +1330,10 @@ class DashboardCotizacionesVisualizer:
             colorscale='RdYlGn',  # Rojo-Amarillo-Verde
             showscale=True,
             colorbar=dict(
-                title="Desempeño<br>(0-100)",
-                titleside="right",
+                title=dict(
+                    text="Desempeño<br>(0-100)",
+                    side="right"
+                ),
                 tickmode="linear",
                 tick0=0,
                 dtick=25
@@ -1356,9 +1358,11 @@ class DashboardCotizacionesVisualizer:
                 title='',
                 tickfont=dict(size=12)
             ),
-            height=500,
-            margin=dict(b=120, l=150, r=100, t=80)
+            height=500
         )
+        
+        # Actualizar margen por separado para evitar conflicto con LAYOUT_BASE
+        fig.update_layout(margin=dict(b=120, l=150, r=100, t=80))
         
         return fig
     
@@ -1424,17 +1428,19 @@ class DashboardCotizacionesVisualizer:
         }).reset_index()
         
         for _, prov_comp in proveedores_por_comp.iterrows():
-            label = f"{prov_comp['proveedor']}"
+            # Crear ID único para evitar conflictos (mismo proveedor en diferentes componentes)
+            label_id = f"{prov_comp['componente_nombre']} - {prov_comp['proveedor']}"
             parent = prov_comp['componente_nombre']
-            labels.append(label)
+            labels.append(label_id)
             parents.append(parent)
             values.append(prov_comp['cantidad'])
             colors.append(self.colores['warning'])
         
         # Nivel 3: Resultados por proveedor-componente
         for _, row in df_componentes.iterrows():
+            # Usar el mismo formato de ID único para el padre
             label = f"{row['resultado']}"
-            parent = f"{row['proveedor']}"
+            parent = f"{row['componente_nombre']} - {row['proveedor']}"
             
             # Colores según resultado
             if row['resultado'] == 'Aceptado':
@@ -1471,9 +1477,11 @@ class DashboardCotizacionesVisualizer:
                 xanchor='center',
                 font=dict(size=18, color=self.colores['dark'])
             ),
-            height=700,
-            margin=dict(t=80, l=0, r=0, b=0)
+            height=700
         )
+        
+        # Actualizar margen por separado para evitar conflicto con LAYOUT_BASE
+        fig.update_layout(margin=dict(t=80, l=0, r=0, b=0))
         
         return fig
     
