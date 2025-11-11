@@ -200,10 +200,26 @@ def enviar_notificacion_incidencia(incidencia, destinatarios_seleccionados, mens
         imagenes_adjuntadas = 0
         for idx, evidencia in enumerate(evidencias, start=1):
             try:
-                # Obtener la ruta completa de la imagen
-                ruta_imagen = evidencia.imagen.path
+                # BUSCAR IMAGEN EN MÚLTIPLES UBICACIONES (disco alterno y principal)
+                from pathlib import Path
+                from config.storage_utils import ALTERNATE_STORAGE_PATH, PRIMARY_STORAGE_PATH
                 
-                if os.path.exists(ruta_imagen):
+                nombre_relativo = evidencia.imagen.name
+                search_locations = [
+                    ALTERNATE_STORAGE_PATH,  # Disco alterno (D:)
+                    PRIMARY_STORAGE_PATH,    # Disco principal (C:)
+                ]
+                
+                # Buscar el archivo en cada ubicación
+                ruta_imagen = None
+                for location in search_locations:
+                    full_path = Path(location) / nombre_relativo
+                    if full_path.exists() and full_path.is_file():
+                        ruta_imagen = str(full_path)
+                        break
+                
+                # Si se encontró el archivo
+                if ruta_imagen:
                     # Comprimir la imagen inteligentemente (solo si > 1MB)
                     # Calidad 85 (alta), max 1920px ancho, umbral 1MB
                     imagen_comprimida = comprimir_imagen(

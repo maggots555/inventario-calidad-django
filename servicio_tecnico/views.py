@@ -5560,12 +5560,35 @@ def enviar_correo_rhitso(request, orden_id):
         compressor = ImageCompressor()
         
         # Preparar lista de imágenes para calcular tamaño
+        # BUSCAR IMÁGENES EN MÚLTIPLES UBICACIONES (disco alterno y principal)
+        from pathlib import Path
+        from config.storage_utils import ALTERNATE_STORAGE_PATH, PRIMARY_STORAGE_PATH
+        
+        search_locations = [
+            ALTERNATE_STORAGE_PATH,  # Disco alterno (D:)
+            PRIMARY_STORAGE_PATH,    # Disco principal (C:)
+        ]
+        
         imagenes_para_correo = []
         for imagen in imagenes_ingreso:
-            imagenes_para_correo.append({
-                'ruta': imagen.imagen.path,
-                'nombre': os.path.basename(imagen.imagen.path)
-            })
+            nombre_relativo = imagen.imagen.name
+            
+            # Buscar el archivo en cada ubicación
+            img_path = None
+            for location in search_locations:
+                full_path = Path(location) / nombre_relativo
+                if full_path.exists() and full_path.is_file():
+                    img_path = str(full_path)
+                    break
+            
+            # Si se encontró el archivo, agregarlo
+            if img_path:
+                imagenes_para_correo.append({
+                    'ruta': img_path,
+                    'nombre': os.path.basename(img_path)
+                })
+            else:
+                print(f"   ⚠️ Imagen de ingreso no encontrada: {nombre_relativo}")
         
         # Calcular tamaño total del correo con análisis completo
         print(f"📊 Analizando tamaño del correo...")
@@ -6003,8 +6026,31 @@ def enviar_imagenes_cliente(request, orden_id):
         
         for imagen in imagenes:
             try:
+                # BUSCAR IMAGEN EN MÚLTIPLES UBICACIONES (disco alterno y principal)
+                from pathlib import Path
+                from config.storage_utils import ALTERNATE_STORAGE_PATH, PRIMARY_STORAGE_PATH
+                
+                nombre_relativo = imagen.imagen.name
+                search_locations = [
+                    ALTERNATE_STORAGE_PATH,  # Disco alterno (D:)
+                    PRIMARY_STORAGE_PATH,    # Disco principal (C:)
+                ]
+                
+                # Buscar el archivo en cada ubicación
+                img_path = None
+                for location in search_locations:
+                    full_path = Path(location) / nombre_relativo
+                    if full_path.exists() and full_path.is_file():
+                        img_path = str(full_path)
+                        print(f"   📂 Imagen encontrada en: {img_path}")
+                        break
+                
+                # Si no se encontró el archivo
+                if not img_path:
+                    print(f"   ⚠️ Imagen no encontrada: {nombre_relativo}")
+                    continue
+                
                 # Abrir imagen con PIL
-                img_path = imagen.imagen.path
                 img = Image.open(img_path)
                 
                 # Calcular tamaño original
