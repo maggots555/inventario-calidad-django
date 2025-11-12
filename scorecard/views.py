@@ -132,6 +132,12 @@ def crear_incidencia(request):
             if tecnico and tecnico.area:
                 incidencia.area_tecnico = tecnico.area
             
+            # GUARDAR RELACIÓN CON ORDEN DE SERVICIO (si viene del autocompletado)
+            orden_servicio = form.cleaned_data.get('orden_servicio')
+            if orden_servicio:
+                print(f"[ScorecardForm] ✓ Vinculando incidencia con orden: {orden_servicio.numero_orden_interno}")
+                incidencia.orden_servicio = orden_servicio
+            
             incidencia.save()
             
             # Manejar las imágenes subidas

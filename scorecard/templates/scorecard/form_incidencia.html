@@ -91,7 +91,9 @@
                         {{ form.numero_serie.label }}
                     </label>
                     {{ form.numero_serie }}
-                    <small class="form-text text-muted">Service Tag - Se verificará automáticamente si hay reincidencias</small>
+                    <small class="form-text text-muted">
+                        <i class="bi bi-search"></i> Busca automáticamente (excepto si es "NO VISIBLE", "NO IDENTIFICADO", etc.)
+                    </small>
                     {% if form.numero_serie.errors %}
                         <div class="invalid-feedback d-block">{{ form.numero_serie.errors }}</div>
                     {% endif %}
@@ -102,10 +104,19 @@
                         {{ form.numero_orden.label }}
                     </label>
                     {{ form.numero_orden }}
-                    <small class="form-text text-muted">Número de orden interno del servicio</small>
+                    <small class="form-text text-muted">
+                        <i class="bi bi-search"></i> Busca automáticamente. <strong>Use este campo si el service tag no es legible.</strong>
+                    </small>
                     {% if form.numero_orden.errors %}
                         <div class="invalid-feedback d-block">{{ form.numero_orden.errors }}</div>
                     {% endif %}
+                </div>
+                
+                <!-- Contenedor para información de la orden encontrada (Autocompletado Inteligente) -->
+                <div class="col-12">
+                    <div id="orden-info-container"></div>
+                    <!-- Campo oculto para almacenar el ID de la orden de servicio -->
+                    {{ form.orden_servicio }}
                 </div>
                 
                 <div class="col-12">
@@ -760,4 +771,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<!-- ==========================================
+     AUTOCOMPLETADO INTELIGENTE DE ÓRDENES
+     ========================================== -->
+<script src="{% static 'js/scorecard_form.js' %}"></script>
 {% endblock %}

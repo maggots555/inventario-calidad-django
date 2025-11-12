@@ -181,6 +181,16 @@ urlpatterns = [
          views.exportar_dashboard_cotizaciones, 
          name='exportar_dashboard_cotizaciones'),
     
+    # ========================================================================
+    # API: BÚSQUEDA DE ÓRDENES (Noviembre 2025)
+    # ========================================================================
+    # API endpoint para buscar órdenes por número de serie o orden del cliente
+    # Usado por el formulario de ScoreCard para autocompletar datos
+    # Soporta búsqueda inteligente: si serie es "NO VISIBLE", busca por orden_cliente
+    path('api/buscar-orden-por-serie/', 
+         views.api_buscar_orden_por_serie, 
+         name='api_buscar_orden_por_serie'),
+    
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]

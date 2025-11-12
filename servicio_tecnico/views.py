@@ -9139,3 +9139,182 @@ def exportar_dashboard_cotizaciones(request):
     
     return response
 
+
+# ============================================================================
+# API ENDPOINT: BUSCAR ORDEN POR NÚMERO DE SERIE
+# ============================================================================
+
+@login_required
+@require_http_methods(["GET"])
+def api_buscar_orden_por_serie(request):
+    """
+    API para buscar órdenes de servicio por número de serie o orden del cliente.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Este endpoint busca órdenes de servicio de manera inteligente:
+    
+    LÓGICA DE BÚSQUEDA:
+    1. Si el número de serie contiene palabras como "NO VISIBLE", "NO IDENTIFICADO", etc.
+       → Busca por orden_cliente (campo alternativo)
+    2. Si el número de serie es normal → Busca por numero_serie
+    3. Si no encuentra nada → Retorna mensaje indicando que no existe
+    
+    ¿Por qué esta lógica?
+    Algunos equipos no tienen número de serie visible o legible,
+    por lo que se identifican por la orden del cliente.
+    
+    PARÁMETROS GET:
+    - numero_serie: Número de serie del equipo (obligatorio)
+    - orden_cliente: Orden del cliente (opcional, para búsqueda alternativa)
+    
+    RETORNA JSON:
+    {
+        'success': True/False,
+        'encontrado': True/False,
+        'orden': {datos de la orden...} o None,
+        'mensaje': 'Mensaje informativo'
+    }
+    
+    USO:
+    /servicio-tecnico/api/buscar-orden-por-serie/?numero_serie=ABC123
+    /servicio-tecnico/api/buscar-orden-por-serie/?orden_cliente=OOW-12345
+    """
+    from django.db.models import Q
+    
+    # Obtener parámetros de búsqueda
+    numero_serie = request.GET.get('numero_serie', '').strip().upper()
+    orden_cliente = request.GET.get('orden_cliente', '').strip().upper()
+    
+    # Validar que al menos uno de los parámetros venga
+    if not numero_serie and not orden_cliente:
+        return JsonResponse({
+            'success': False,
+            'error': 'Debe proporcionar al menos número de serie o orden del cliente'
+        })
+    
+    # ========================================================================
+    # LÓGICA DE BÚSQUEDA INTELIGENTE
+    # ========================================================================
+    
+    # Lista de palabras que indican que el número de serie no es válido
+    SERIES_INVALIDAS = [
+        'NO VISIBLE',
+        'NO IDENTIFICADO',
+        'NO LEGIBLE',
+        'SIN SERIE',
+        'N/A',
+        'NA',
+        'NO APLICA',
+        'DESCONOCIDO',
+        'NO SE VE',
+    ]
+    
+    # Determinar si el número de serie es inválido
+    serie_invalida = any(keyword in numero_serie for keyword in SERIES_INVALIDAS) if numero_serie else True
+    
+    try:
+        # CASO 1: Si la serie es inválida o no existe, buscar por orden_cliente
+        if serie_invalida and orden_cliente:
+            detalle = DetalleEquipo.objects.select_related('orden').get(
+                orden_cliente__iexact=orden_cliente
+            )
+        
+        # CASO 2: Si hay orden_cliente explícita, buscar por ella (prioridad)
+        elif orden_cliente and not numero_serie:
+            detalle = DetalleEquipo.objects.select_related('orden').get(
+                orden_cliente__iexact=orden_cliente
+            )
+        
+        # CASO 3: Buscar por número de serie normal
+        elif numero_serie and not serie_invalida:
+            detalle = DetalleEquipo.objects.select_related('orden').get(
+                numero_serie__iexact=numero_serie
+            )
+        
+        # CASO 4: Última opción - buscar por cualquiera de los dos
+        else:
+            detalle = DetalleEquipo.objects.select_related('orden').filter(
+                Q(numero_serie__iexact=numero_serie) | Q(orden_cliente__iexact=orden_cliente)
+            ).first()
+            
+            if not detalle:
+                raise DetalleEquipo.DoesNotExist
+        
+        # Si encontramos el detalle, extraer información de la orden
+        orden = detalle.orden
+        
+        # Preparar respuesta con todos los datos relevantes
+        return JsonResponse({
+            'success': True,
+            'encontrado': True,
+            'orden': {
+                # Identificadores
+                'id': orden.id,
+                'numero_orden_interno': orden.numero_orden_interno,
+                'orden_cliente': detalle.orden_cliente,
+                
+                # Información del equipo
+                'tipo_equipo': detalle.tipo_equipo,
+                'tipo_equipo_display': detalle.get_tipo_equipo_display(),
+                'marca': detalle.marca,
+                'modelo': detalle.modelo,
+                'numero_serie': detalle.numero_serie,
+                'gama': detalle.gama,
+                'gama_display': detalle.get_gama_display(),
+                
+                # Información de la orden
+                'fecha_ingreso': orden.fecha_ingreso.strftime('%d/%m/%Y %H:%M'),
+                'fecha_ingreso_corta': orden.fecha_ingreso.strftime('%d/%m/%Y'),
+                'estado': orden.estado,
+                'estado_display': orden.get_estado_display(),
+                'dias_en_servicio': orden.dias_en_servicio,
+                
+                # Responsables
+                'tecnico_responsable': orden.tecnico_asignado_actual.nombre_completo,
+                'tecnico_id': orden.tecnico_asignado_actual.id,
+                'responsable_seguimiento': orden.responsable_seguimiento.nombre_completo,
+                'responsable_id': orden.responsable_seguimiento.id,
+                
+                # Ubicación
+                'sucursal': orden.sucursal.nombre,
+                'sucursal_id': orden.sucursal.id,
+                
+                # Información adicional
+                'falla_principal': detalle.falla_principal,
+                'equipo_enciende': detalle.equipo_enciende,
+                'es_reingreso': orden.es_reingreso,
+                'es_candidato_rhitso': orden.es_candidato_rhitso,
+            },
+            'mensaje': f'Orden {orden.numero_orden_interno} encontrada exitosamente'
+        })
+        
+    except DetalleEquipo.DoesNotExist:
+        # No se encontró ninguna orden con los criterios proporcionados
+        criterio_busqueda = f"número de serie '{numero_serie}'" if numero_serie and not serie_invalida else f"orden del cliente '{orden_cliente}'"
+        
+        return JsonResponse({
+            'success': True,
+            'encontrado': False,
+            'orden': None,
+            'mensaje': f'No se encontró ninguna orden con {criterio_busqueda} en el sistema'
+        })
+        
+    except DetalleEquipo.MultipleObjectsReturned:
+        # Se encontraron múltiples órdenes (no debería pasar, pero por si acaso)
+        return JsonResponse({
+            'success': False,
+            'encontrado': False,
+            'orden': None,
+            'error': f'Se encontraron múltiples órdenes con los criterios proporcionados. Por favor, sea más específico.'
+        })
+        
+    except Exception as e:
+        # Error inesperado
+        return JsonResponse({
+            'success': False,
+            'encontrado': False,
+            'orden': None,
+            'error': f'Error al buscar la orden: {str(e)}'
+        })
+

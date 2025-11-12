@@ -27,6 +27,7 @@ class IncidenciaForm(forms.ModelForm):
             'modelo',
             'numero_serie',
             'numero_orden',
+            'orden_servicio',  # NUEVO CAMPO (Noviembre 2025): Vincula con orden de servicio técnico
             'servicio_realizado',
             'sucursal',
             'area_detectora',
@@ -83,8 +84,15 @@ class IncidenciaForm(forms.ModelForm):
             'numero_orden': forms.TextInput(
                 attrs={
                     'class': 'form-control',
-                    'placeholder': 'Número de orden interno (opcional)',
-                    'autocomplete': 'off'
+                    'placeholder': 'Orden del Cliente',
+                    'autocomplete': 'off',
+                    'id': 'id_numero_orden',
+                    # NO readonly: Se puede usar para buscar órdenes
+                }
+            ),
+            'orden_servicio': forms.HiddenInput(
+                attrs={
+                    'id': 'id_orden_servicio'  # Campo oculto que guarda el ID de la orden
                 }
             ),
             'servicio_realizado': forms.Select(
@@ -187,7 +195,9 @@ class IncidenciaForm(forms.ModelForm):
             'tipo_equipo': 'Tipo de Equipo',
             'marca': 'Marca',
             'modelo': 'Modelo',
-            'numero_serie': 'Número de Serie',
+            'numero_serie': 'Número de Serie (Service Tag)',
+            'numero_orden': 'Número de Orden Cliente',
+            'orden_servicio': '',  # Campo oculto, sin label
             'servicio_realizado': 'Servicio Realizado',
             'sucursal': 'Sucursal',
             'area_detectora': 'Área que Detectó',
@@ -241,6 +251,11 @@ class IncidenciaForm(forms.ModelForm):
         self.fields['causa_raiz'].required = False
         self.fields['acciones_tomadas'].required = False
         self.fields['modelo'].required = False
+        
+        # Campo orden_servicio: Opcional pero recomendado
+        # El campo se llenará automáticamente vía JavaScript si encuentra coincidencia
+        self.fields['orden_servicio'].required = False
+        self.fields['numero_orden'].required = False
     
     def clean_numero_serie(self):
         """

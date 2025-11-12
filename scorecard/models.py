@@ -217,6 +217,28 @@ class Incidencia(models.Model):
         help_text="Servicio que se realizó al equipo"
     )
     
+    # RELACIÓN CON ORDEN DE SERVICIO TÉCNICO
+    # ========================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Este campo vincula la incidencia con la orden de servicio técnico original.
+    # Permite rastrear qué orden generó esta incidencia de calidad.
+    # 
+    # ¿Por qué es importante?
+    # - Trazabilidad completa: Sabemos exactamente qué orden causó el problema
+    # - Evita duplicación de datos: No necesitamos copiar número de serie, marca, etc.
+    # - Integridad referencial: Django garantiza que la orden existe
+    # - Consultas eficientes: Podemos acceder a todos los datos de la orden fácilmente
+    #
+    # null=True, blank=True: Permite que órdenes antiguas sigan funcionando sin este campo
+    orden_servicio = models.ForeignKey(
+        'servicio_tecnico.OrdenServicio',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='incidencias_generadas',
+        help_text="Orden de servicio técnico que generó esta incidencia (si aplica)"
+    )
+    
     # UBICACIÓN Y RESPONSABLES
     sucursal = models.ForeignKey(
         Sucursal,
