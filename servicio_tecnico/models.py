@@ -1656,6 +1656,89 @@ class PiezaVentaMostrador(models.Model):
 
 
 # ============================================================================
+# FUNCIONES UPLOAD_TO PARA IMÁGENES (Estructura por Orden)
+# ============================================================================
+
+def imagen_upload_path(instance, filename):
+    """
+    Genera la ruta de almacenamiento para imágenes comprimidas.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta función determina dónde se guardará la imagen cuando se suba.
+    En lugar de organizarlas por mes (2025/11/), las organiza por orden_cliente.
+    
+    Estructura resultante:
+    - servicio_tecnico/imagenes/OS-001-2025/ingreso_123456.jpg
+    - servicio_tecnico/imagenes/OS-002-2025/diagnostico_789012.jpg
+    
+    Ventajas:
+    - Todas las imágenes de un equipo en una carpeta
+    - Fácil localizar evidencias por orden
+    - Simplifica respaldos por equipo
+    
+    Args:
+        instance: Instancia de ImagenOrden que se está guardando
+        filename: Nombre del archivo original
+        
+    Returns:
+        str: Ruta completa donde se guardará el archivo
+        
+    Ejemplo:
+        Para orden con orden_cliente='OS-001-2025' y filename='foto.jpg'
+        Retorna: 'servicio_tecnico/imagenes/OS-001-2025/foto.jpg'
+    
+    NOTA IMPORTANTE:
+    orden_cliente está en DetalleEquipo, no en OrdenServicio.
+    La relación es: ImagenOrden.orden (OrdenServicio) → detalle_equipo → orden_cliente
+    """
+    # Acceder a orden_cliente a través de la relación OneToOne con DetalleEquipo
+    orden_cliente = instance.orden.detalle_equipo.orden_cliente
+    
+    # Si orden_cliente está vacío, usar numero_orden_interno como fallback
+    if not orden_cliente or orden_cliente.strip() == '':
+        orden_cliente = instance.orden.numero_orden_interno
+    
+    return f'servicio_tecnico/imagenes/{orden_cliente}/{filename}'
+
+
+def imagen_original_upload_path(instance, filename):
+    """
+    Genera la ruta de almacenamiento para imágenes originales (sin comprimir).
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Similar a imagen_upload_path, pero para las versiones originales de alta calidad.
+    Las imágenes originales se usan para descargas y archivos de alta resolución.
+    
+    Estructura resultante:
+    - servicio_tecnico/imagenes_originales/OS-001-2025/ingreso_123456_original.jpg
+    - servicio_tecnico/imagenes_originales/OS-002-2025/diagnostico_789012_original.jpg
+    
+    Args:
+        instance: Instancia de ImagenOrden que se está guardando
+        filename: Nombre del archivo original
+        
+    Returns:
+        str: Ruta completa donde se guardará el archivo original
+        
+    Ejemplo:
+        Para orden con orden_cliente='OS-001-2025' y filename='foto_original.jpg'
+        Retorna: 'servicio_tecnico/imagenes_originales/OS-001-2025/foto_original.jpg'
+    
+    NOTA IMPORTANTE:
+    orden_cliente está en DetalleEquipo, no en OrdenServicio.
+    La relación es: ImagenOrden.orden (OrdenServicio) → detalle_equipo → orden_cliente
+    """
+    # Acceder a orden_cliente a través de la relación OneToOne con DetalleEquipo
+    orden_cliente = instance.orden.detalle_equipo.orden_cliente
+    
+    # Si orden_cliente está vacío, usar numero_orden_interno como fallback
+    if not orden_cliente or orden_cliente.strip() == '':
+        orden_cliente = instance.orden.numero_orden_interno
+    
+    return f'servicio_tecnico/imagenes_originales/{orden_cliente}/{filename}'
+
+
+# ============================================================================
 # MODELO 8: IMAGEN DE ORDEN
 # ============================================================================
 
@@ -1681,13 +1764,16 @@ class ImagenOrden(models.Model):
     )
     
     # IMAGEN Y DESCRIPCIÓN
+    # NOTA: Cambiado de estructura por mes (%Y/%m/) a estructura por orden_cliente
+    # Imágenes nuevas se guardarán en: servicio_tecnico/imagenes/{orden_cliente}/
+    # Imágenes antiguas permanecen en su ubicación original y siguen funcionando
     imagen = models.ImageField(
-        upload_to='servicio_tecnico/imagenes/%Y/%m/',
+        upload_to=imagen_upload_path,  # ← Función que genera ruta por orden
         validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif'])],
         help_text="Archivo de imagen comprimida para galería (JPG, PNG, GIF)"
     )
     imagen_original = models.ImageField(
-        upload_to='servicio_tecnico/imagenes_originales/%Y/%m/',
+        upload_to=imagen_original_upload_path,  # ← Función que genera ruta por orden
         validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif'])],
         null=True,
         blank=True,
