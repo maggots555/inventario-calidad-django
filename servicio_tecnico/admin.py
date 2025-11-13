@@ -675,6 +675,7 @@ class VentaMostradorAdmin(admin.ModelAdmin):
         'incluye_cambio_pieza',
         'incluye_limpieza',
         'incluye_reinstalacion_so',
+        'incluye_respaldo',
     )
     search_fields = ('folio_venta', 'orden__numero_orden_interno')
     date_hierarchy = 'fecha_venta'
@@ -698,6 +699,7 @@ class VentaMostradorAdmin(admin.ModelAdmin):
                 ('incluye_limpieza', 'costo_limpieza'),
                 ('incluye_kit_limpieza', 'costo_kit'),
                 ('incluye_reinstalacion_so', 'costo_reinstalacion'),
+                ('incluye_respaldo', 'costo_respaldo'),
             )
         }),
         ('Notas', {
@@ -745,6 +747,8 @@ class VentaMostradorAdmin(admin.ModelAdmin):
             servicios.append('Kit Limpieza')
         if obj.incluye_reinstalacion_so:
             servicios.append('Reinstalación SO')
+        if obj.incluye_respaldo:
+            servicios.append('Respaldo Info')
         return ', '.join(servicios) if servicios else '-'
     servicios_incluidos.short_description = 'Servicios'
     

@@ -1951,6 +1951,8 @@ class VentaMostradorForm(forms.ModelForm):
             'costo_kit',
             'incluye_reinstalacion_so',
             'costo_reinstalacion',
+            'incluye_respaldo',
+            'costo_respaldo',
             'notas_adicionales',
         ]
         
@@ -1999,6 +2001,16 @@ class VentaMostradorForm(forms.ModelForm):
                 'step': '0.01',
                 'min': '0',
             }),
+            'incluye_respaldo': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'onchange': 'toggleRespaldoCosto()',
+            }),
+            'costo_respaldo': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0.00',
+                'step': '0.01',
+                'min': '0',
+            }),
             'notas_adicionales': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 3,
@@ -2016,6 +2028,8 @@ class VentaMostradorForm(forms.ModelForm):
             'costo_kit': 'Costo del kit',
             'incluye_reinstalacion_so': 'Reinstalación de sistema operativo',
             'costo_reinstalacion': 'Costo de reinstalación',
+            'incluye_respaldo': 'Respaldo de información',
+            'costo_respaldo': 'Costo del respaldo',
             'notas_adicionales': 'Notas adicionales',
         }
         
@@ -2029,6 +2043,8 @@ class VentaMostradorForm(forms.ModelForm):
             'costo_kit': 'Precio de venta del kit',
             'incluye_reinstalacion_so': 'Reinstalación de Windows u otro SO',
             'costo_reinstalacion': 'Costo del servicio de reinstalación',
+            'incluye_respaldo': 'Respaldo de archivos, fotos, documentos del cliente',
+            'costo_respaldo': 'Costo del servicio de respaldo',
             'notas_adicionales': 'Cualquier observación o detalle importante',
         }
     
@@ -2068,6 +2084,13 @@ class VentaMostradorForm(forms.ModelForm):
             if not cleaned_data.get('costo_reinstalacion') or cleaned_data.get('costo_reinstalacion') <= 0:
                 raise ValidationError({
                     'costo_reinstalacion': '❌ Si incluye reinstalación, el costo debe ser mayor a 0'
+                })
+        
+        # Validar respaldo de información
+        if cleaned_data.get('incluye_respaldo'):
+            if not cleaned_data.get('costo_respaldo') or cleaned_data.get('costo_respaldo') <= 0:
+                raise ValidationError({
+                    'costo_respaldo': '❌ Si incluye respaldo de información, el costo debe ser mayor a 0'
                 })
         
         return cleaned_data

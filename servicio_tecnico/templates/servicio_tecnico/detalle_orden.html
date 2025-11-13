@@ -1431,7 +1431,13 @@
                                                         Reinstalación SO - <strong>${{ venta_mostrador.costo_reinstalacion|floatformat:2 }}</strong>
                                                     </li>
                                                 {% endif %}
-                                                {% if not venta_mostrador.incluye_cambio_pieza and not venta_mostrador.incluye_limpieza and not venta_mostrador.incluye_kit_limpieza and not venta_mostrador.incluye_reinstalacion_so %}
+                                                {% if venta_mostrador.incluye_respaldo %}
+                                                    <li class="mb-1">
+                                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                                        Respaldo de Información - <strong>${{ venta_mostrador.costo_respaldo|floatformat:2 }}</strong>
+                                                    </li>
+                                                {% endif %}
+                                                {% if not venta_mostrador.incluye_cambio_pieza and not venta_mostrador.incluye_limpieza and not venta_mostrador.incluye_kit_limpieza and not venta_mostrador.incluye_reinstalacion_so and not venta_mostrador.incluye_respaldo %}
                                                     <li class="text-muted"><em>Sin servicios adicionales</em></li>
                                                 {% endif %}
                                             </ul>
@@ -1483,6 +1489,12 @@
                                                 <tr>
                                                     <td class="text-muted">+ Reinstalación SO:</td>
                                                     <td class="text-end"><strong>${{ venta_mostrador.costo_reinstalacion|floatformat:2 }}</strong></td>
+                                                </tr>
+                                            {% endif %}
+                                            {% if venta_mostrador.incluye_respaldo %}
+                                                <tr>
+                                                    <td class="text-muted">+ Respaldo de Información:</td>
+                                                    <td class="text-end"><strong>${{ venta_mostrador.costo_respaldo|floatformat:2 }}</strong></td>
                                                 </tr>
                                             {% endif %}
                                             {% if piezas_venta_mostrador %}
@@ -2605,7 +2617,7 @@
                             <div class="form-check mb-2">
                                 {{ form_venta_mostrador.incluye_reinstalacion_so }}
                                 <label class="form-check-label fw-bold" for="{{ form_venta_mostrador.incluye_reinstalacion_so.id_for_label }}">
-                                    Reinstalación de Sistema Operativo
+                                    🖥️ Reinstalación de Sistema Operativo
                                 </label>
                             </div>
                             <div id="divCostoReinstalacion" style="display: none;">
@@ -2613,6 +2625,22 @@
                                     Costo de Reinstalación
                                 </label>
                                 {{ form_venta_mostrador.costo_reinstalacion }}
+                            </div>
+                        </div>
+                        
+                        <!-- Respaldo de Información -->
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mb-2">
+                                {{ form_venta_mostrador.incluye_respaldo }}
+                                <label class="form-check-label fw-bold" for="{{ form_venta_mostrador.incluye_respaldo.id_for_label }}">
+                                    💾 Respaldo de Información
+                                </label>
+                            </div>
+                            <div id="divCostoRespaldo" style="display: none;">
+                                <label for="{{ form_venta_mostrador.costo_respaldo.id_for_label }}" class="form-label small">
+                                    Costo del Respaldo
+                                </label>
+                                {{ form_venta_mostrador.costo_respaldo }}
                             </div>
                         </div>
                     </div>

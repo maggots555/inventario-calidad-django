@@ -1486,6 +1486,18 @@ class VentaMostrador(models.Model):
         help_text="Costo de reinstalación de SO"
     )
     
+    incluye_respaldo = models.BooleanField(
+        default=False,
+        help_text="¿Incluye respaldo de información del cliente?"
+    )
+    costo_respaldo = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Costo del servicio de respaldo de información"
+    )
+    
     # NOTAS
     notas_adicionales = models.TextField(
         blank=True,
@@ -1511,7 +1523,7 @@ class VentaMostrador(models.Model):
         """
         Calcula el total de la venta sumando todos los conceptos:
         - Paquete (premium/oro/plata)
-        - Servicios adicionales (cambio pieza, limpieza, kit, reinstalación)
+        - Servicios adicionales (cambio pieza, limpieza, kit, reinstalación, respaldo)
         - Piezas vendidas individualmente
         """
         total = self.costo_paquete
@@ -1519,6 +1531,7 @@ class VentaMostrador(models.Model):
         total += self.costo_limpieza
         total += self.costo_kit
         total += self.costo_reinstalacion
+        total += self.costo_respaldo
         
         # NUEVO: Sumar todas las piezas vendidas individualmente
         if hasattr(self, 'piezas_vendidas'):

@@ -72,7 +72,8 @@ function inicializarEventListeners() {
         { checkbox: 'id_incluye_cambio_pieza', div: 'divCostoCambioPieza' },
         { checkbox: 'id_incluye_limpieza', div: 'divCostoLimpieza' },
         { checkbox: 'id_incluye_kit_limpieza', div: 'divCostoKit' },
-        { checkbox: 'id_incluye_reinstalacion_so', div: 'divCostoReinstalacion' }
+        { checkbox: 'id_incluye_reinstalacion_so', div: 'divCostoReinstalacion' },
+        { checkbox: 'id_incluye_respaldo', div: 'divCostoRespaldo' }
     ];
     
     checkboxes.forEach(item => {
@@ -205,6 +206,13 @@ function toggleReinstalacionCosto() {
     toggleCampoCosto('id_incluye_reinstalacion_so', 'divCostoReinstalacion');
 }
 
+/**
+ * Toggle para campo de respaldo de información
+ */
+function toggleRespaldoCosto() {
+    toggleCampoCosto('id_incluye_respaldo', 'divCostoRespaldo');
+}
+
 // ============================================================================
 // CÁLCULOS
 // ============================================================================
@@ -267,7 +275,8 @@ function guardarVentaMostrador() {
         { checkbox: 'id_incluye_cambio_pieza', input: 'id_costo_cambio_pieza', nombre: 'Cambio de Pieza' },
         { checkbox: 'id_incluye_limpieza', input: 'id_costo_limpieza', nombre: 'Limpieza' },
         { checkbox: 'id_incluye_kit_limpieza', input: 'id_costo_kit', nombre: 'Kit de Limpieza' },
-        { checkbox: 'id_incluye_reinstalacion_so', input: 'id_costo_reinstalacion', nombre: 'Reinstalación SO' }
+        { checkbox: 'id_incluye_reinstalacion_so', input: 'id_costo_reinstalacion', nombre: 'Reinstalación SO' },
+        { checkbox: 'id_incluye_respaldo', input: 'id_costo_respaldo', nombre: 'Respaldo de Información' }
     ];
     
     for (const servicio of servicios) {
