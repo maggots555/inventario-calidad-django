@@ -348,3 +348,26 @@ TIPO_CONFIG_CHOICES = [
     ('BOOLEAN', 'Booleano (Sí/No)'),
     ('JSON', 'JSON - Datos estructurados'),
 ]
+
+# ============================================================================
+# PROVEEDORES DE PIEZAS - Lista predefinida para cotizaciones (Noviembre 2025)
+# ============================================================================
+# Lista de proveedores comunes para selección en cotizaciones de piezas
+# Esta lista aparece como dropdown en el formulario de PiezaCotizada
+# permitiendo al técnico indicar con qué proveedor se cotizó cada pieza
+PROVEEDORES_CHOICES = [
+    ('', '-- Seleccionar proveedor (opcional) --'),  # Opción vacía
+    ('AMAZON', 'AMAZON'),
+    ('AMERICANSTOCK', 'AMERICANSTOCK'),
+    ('FRANCISCO RUIZ', 'FRANCISCO RUIZ'),
+    ('GJJ TECNOLOGIA', 'GJJ TECNOLOGIA'),
+    ('MERCADO LIBRE', 'MERCADO LIBRE'),
+    ('RHITSO', 'RHITSO'),
+    ('SIC STOCK', 'SIC STOCK'),
+    ('SOL SATA', 'SOL SATA'),
+    ('SUREM', 'SUREM'),
+    ('TECNOCITY', 'TECNOCITY'),
+    ('TIENDA LENOVO', 'TIENDA LENOVO'),
+    ('ULTRA', 'ULTRA'),
+    ('OTRO', 'Otro proveedor'),  # Opción para proveedor no listado
+]

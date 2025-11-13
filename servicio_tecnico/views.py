@@ -1755,6 +1755,72 @@ def detalle_orden(request, orden_id):
                                 pieza.motivo_rechazo_pieza = 'Cliente decidió no incluir esta pieza'
                                 piezas_rechazadas_count += 1
                             pieza.save()
+                        
+                        # ============================================================
+                        # ✨ NUEVO: CREACIÓN AUTOMÁTICA DE SEGUIMIENTOS (Nov 2025)
+                        # ============================================================
+                        # Después de marcar las piezas como aceptadas, crear automáticamente
+                        # los registros de SeguimientoPieza agrupados por proveedor
+                        # para facilitar el tracking de pedidos.
+                        
+                        from .models import SeguimientoPieza
+                        from collections import defaultdict
+                        from datetime import date, timedelta
+                        
+                        # Obtener solo las piezas aceptadas que tienen proveedor
+                        piezas_aceptadas_con_proveedor = todas_las_piezas.filter(
+                            aceptada_por_cliente=True
+                        ).exclude(proveedor='').exclude(proveedor__isnull=True)
+                        
+                        if piezas_aceptadas_con_proveedor.exists():
+                            # Agrupar piezas por proveedor
+                            piezas_por_proveedor = defaultdict(list)
+                            for pieza in piezas_aceptadas_con_proveedor:
+                                piezas_por_proveedor[pieza.proveedor].append(pieza)
+                            
+                            # Crear un SeguimientoPieza por cada proveedor
+                            seguimientos_creados = 0
+                            for proveedor, piezas_grupo in piezas_por_proveedor.items():
+                                # Construir descripción de las piezas
+                                descripcion_piezas = '\n'.join([
+                                    f"• {pieza.componente.nombre} × {pieza.cantidad} (${pieza.costo_total})"
+                                    for pieza in piezas_grupo
+                                ])
+                                
+                                # Crear el seguimiento
+                                seguimiento = SeguimientoPieza.objects.create(
+                                    cotizacion=cotizacion_actualizada,
+                                    proveedor=proveedor,
+                                    descripcion_piezas=descripcion_piezas,
+                                    fecha_pedido=date.today(),
+                                    fecha_entrega_estimada=date.today() + timedelta(days=7),  # 7 días por defecto
+                                    estado='pedido',
+                                    notas_seguimiento=f'Seguimiento creado automáticamente al aceptar cotización'
+                                )
+                                
+                                # Asociar las piezas al seguimiento
+                                seguimiento.piezas.set(piezas_grupo)
+                                seguimientos_creados += 1
+                            
+                            # Notificar al usuario que se crearon seguimientos
+                            if seguimientos_creados > 0:
+                                messages.info(
+                                    request,
+                                    f'📦 Se crearon automáticamente {seguimientos_creados} registro(s) de seguimiento '
+                                    f'de piezas agrupados por proveedor. Puedes editarlos para agregar número de pedido '
+                                    f'y ajustar fechas.'
+                                )
+                                
+                                # Registrar en historial
+                                HistorialOrden.objects.create(
+                                    orden=orden,
+                                    tipo_evento='cotizacion',
+                                    comentario=f'📦 Sistema creó automáticamente {seguimientos_creados} seguimiento(s) de piezas agrupados por proveedor',
+                                    usuario=empleado_actual,
+                                    es_sistema=True
+                                )
+                        # Fin de creación automática de seguimientos
+                        # ============================================================
                 elif accion == 'rechazar':
                     # Si rechaza toda la cotización, todas las piezas se rechazan
                     for pieza in todas_las_piezas:
@@ -2783,6 +2849,7 @@ def obtener_pieza_cotizada(request, pieza_id):
             'componente_id': pieza.componente_id,
             'componente_nombre': pieza.componente.nombre,
             'descripcion_adicional': pieza.descripcion_adicional or '',
+            'proveedor': pieza.proveedor or '',  # ← NUEVO CAMPO (Noviembre 2025)
             'cantidad': pieza.cantidad,
             'costo_unitario': str(pieza.costo_unitario),
             'orden_prioridad': pieza.orden_prioridad,
@@ -3677,6 +3744,9 @@ def _render_pieza_row(pieza, cotizacion):
         <td class="text-center">{pieza.cantidad}</td>
         <td class="text-end">${pieza.costo_unitario:.2f}</td>
         <td class="text-end"><strong>${pieza.costo_total:.2f}</strong></td>
+        <td class="text-center">
+            {f'<span class="badge bg-secondary" style="font-size: 0.75rem;">🏪 {pieza.proveedor}</span>' if pieza.proveedor else '<span class="text-muted">-</span>'}
+        </td>
         <td class="text-center">
             {'<span class="badge bg-success">Sí</span>' if pieza.es_necesaria else '<span class="badge bg-info">Opcional</span>'}
         </td>

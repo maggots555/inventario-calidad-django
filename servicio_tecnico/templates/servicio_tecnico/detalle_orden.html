@@ -999,6 +999,7 @@
                                                     <th class="text-center">Cantidad</th>
                                                     <th class="text-end">Precio Unit.</th>
                                                     <th class="text-end">Total</th>
+                                                    <th class="text-center">Proveedor</th>
                                                     <th class="text-center">Necesaria</th>
                                                     <th class="text-center">Cliente</th>
                                                     <th class="text-center">Acciones</th>
@@ -1033,6 +1034,13 @@
                                                         <td class="text-center">{{ pieza.cantidad }}</td>
                                                         <td class="text-end">${{ pieza.costo_unitario|floatformat:2 }}</td>
                                                         <td class="text-end"><strong>${{ pieza.costo_total|floatformat:2 }}</strong></td>
+                                                        <td class="text-center">
+                                                            {% if pieza.proveedor %}
+                                                                <span class="badge bg-secondary" style="font-size: 0.75rem;">🏪 {{ pieza.proveedor }}</span>
+                                                            {% else %}
+                                                                <span class="text-muted">—</span>
+                                                            {% endif %}
+                                                        </td>
                                                         <td class="text-center">
                                                             {% if pieza.es_necesaria %}
                                                                 <span class="badge bg-danger">Sí</span>
@@ -2263,6 +2271,17 @@
                                     <small class="form-text text-muted">{{ form_pieza.costo_unitario.help_text }}</small>
                                 {% endif %}
                             </div>
+                            
+                            <!-- ✨ NUEVO: Proveedor (Noviembre 2025) -->
+                            <div class="mb-3">
+                                <label for="{{ form_pieza.proveedor.id_for_label }}" class="form-label">
+                                    {{ form_pieza.proveedor.label }}
+                                </label>
+                                {{ form_pieza.proveedor }}
+                                {% if form_pieza.proveedor.help_text %}
+                                    <small class="form-text text-muted">{{ form_pieza.proveedor.help_text }}</small>
+                                {% endif %}
+                            </div>
                         </div>
                         
                         <!-- Columna derecha -->
@@ -2411,19 +2430,13 @@
                         <div class="col-md-6">
                             <!-- Proveedor -->
                             <div class="mb-3">
-                                <label for="proveedor" class="form-label">
-                                    Proveedor <span class="text-danger">*</span>
+                                <label for="{{ form_seguimiento.proveedor.id_for_label }}" class="form-label">
+                                    🏪 Proveedor <span class="text-danger">*</span>
                                 </label>
-                                <input type="text" class="form-control" id="proveedor" name="proveedor" 
-                                       placeholder="Ej: STEREN, CompuMarket, Amazon" required 
-                                       list="proveedores-list">
-                                <datalist id="proveedores-list">
-                                    <option value="STEREN">
-                                    <option value="CompuMarket">
-                                    <option value="Amazon">
-                                    <option value="MercadoLibre">
-                                </datalist>
-                                <small class="form-text text-muted">Nombre del proveedor donde se pidió</small>
+                                {{ form_seguimiento.proveedor }}
+                                {% if form_seguimiento.proveedor.help_text %}
+                                    <small class="form-text text-muted">{{ form_seguimiento.proveedor.help_text }}</small>
+                                {% endif %}
                             </div>
                             
                             <!-- Descripción de Piezas -->
@@ -3716,6 +3729,7 @@ async function abrirModalPieza(piezaId = null) {
                 // Poblar el formulario con los datos
                 document.getElementById('componente').value = pieza.componente_id;
                 document.getElementById('descripcion_adicional').value = pieza.descripcion_adicional;
+                document.getElementById('proveedor').value = pieza.proveedor || '';  // ← NUEVO CAMPO (Noviembre 2025)
                 document.getElementById('cantidad').value = pieza.cantidad;
                 document.getElementById('costo_unitario').value = pieza.costo_unitario;
                 document.getElementById('orden_prioridad').value = pieza.orden_prioridad;
@@ -3916,8 +3930,8 @@ async function cargarDatosSeguimiento(seguimientoId) {
             const seg = data.seguimiento;
             
             // Poblar los campos del formulario con los datos recibidos
-            // IMPORTANTE: Los IDs son sin el prefijo 'id_'
-            document.getElementById('proveedor').value = seg.proveedor;
+            // IMPORTANTE: Django agrega el prefijo 'id_' a los campos del formulario
+            document.getElementById('id_proveedor').value = seg.proveedor;
             document.getElementById('descripcion_piezas').value = seg.descripcion_piezas;
             document.getElementById('numero_pedido').value = seg.numero_pedido;
             document.getElementById('fecha_pedido').value = seg.fecha_pedido;

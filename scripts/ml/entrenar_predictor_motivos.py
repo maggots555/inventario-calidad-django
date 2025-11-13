@@ -115,16 +115,35 @@ def entrenar_modelo_motivos():
         print("✅ ENTRENAMIENTO COMPLETADO EXITOSAMENTE")
         print("="*80)
         print(f"Accuracy (Precisión General): {metricas['accuracy']*100:.2f}%")
-        print(f"Precision (Macro): {metricas['precision']*100:.2f}%")
-        print(f"Recall (Macro): {metricas['recall']*100:.2f}%")
-        print(f"F1-Score (Macro): {metricas['f1_score']*100:.2f}%")
-        print(f"\nTotal de muestras: {metricas['total_muestras']}")
-        print(f"Muestras entrenamiento: {metricas['muestras_entrenamiento']}")
-        print(f"Muestras prueba: {metricas['muestras_prueba']}")
+        print(f"Precision (Weighted): {metricas['precision']*100:.2f}%")
+        print(f"Recall (Weighted): {metricas['recall']*100:.2f}%")
+        print(f"F1-Score (Weighted): {metricas['f1_score']*100:.2f}%")
         
-        print("\n📊 Distribución por motivo:")
-        for motivo, count in metricas['distribucion_motivos'].items():
-            print(f"   - {motivo}: {count} casos")
+        # Información de muestras
+        print(f"\n📊 DATOS DE ENTRENAMIENTO:")
+        print(f"   Total de muestras: {metricas.get('total_muestras', 'N/A')}")
+        print(f"   Muestras entrenamiento: {metricas.get('muestras_entrenamiento', 'N/A')}")
+        print(f"   Muestras prueba: {metricas.get('muestras_prueba', 'N/A')}")
+        
+        # Mostrar motivos detectados
+        if 'motivos_detectados' in metricas:
+            print(f"\n🎯 Motivos Detectados: {len(metricas['motivos_detectados'])}")
+            for motivo in metricas['motivos_detectados']:
+                print(f"   - {motivo}")
+        
+        # Distribución por motivo
+        if 'distribucion_motivos' in metricas:
+            print("\n📈 Distribución de Motivos en Dataset:")
+            for motivo, count in sorted(metricas['distribucion_motivos'].items(), 
+                                       key=lambda x: x[1], reverse=True):
+                porcentaje = (count / metricas['total_muestras']) * 100
+                print(f"   - {motivo}: {count} casos ({porcentaje:.1f}%)")
+        
+        # Mostrar top features importantes
+        if 'feature_importance' in metricas and len(metricas['feature_importance']) > 0:
+            print("\n🔝 Top 5 Features Más Importantes:")
+            for i, feat in enumerate(metricas['feature_importance'][:5], 1):
+                print(f"   {i}. {feat['feature']}: {feat['importance']:.4f}")
         
         print(f"\n💾 Modelo guardado en: ml_models/motivos_predictor.pkl")
         print("="*80)

@@ -392,6 +392,15 @@ class PredictorMotivoRechazo(MLModelBase):
         # Calcular métricas
         metricas = self.calcular_metricas_clasificacion(y_test, y_pred, y_pred_proba)
         
+        # Agregar información adicional de entrenamiento
+        metricas['muestras_entrenamiento'] = len(X_train)
+        metricas['muestras_prueba'] = len(X_test)
+        metricas['total_muestras'] = len(df_rechazadas)
+        
+        # Distribución de motivos en el dataset completo (y ya contiene nombres, no códigos)
+        distribucion_motivos = pd.Series(y).value_counts().to_dict()
+        metricas['distribucion_motivos'] = distribucion_motivos
+        
         # Feature importance
         feature_importance = pd.DataFrame({
             'feature': self.feature_names,

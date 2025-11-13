@@ -39,6 +39,8 @@ from config.constants import (
     COMPLEJIDAD_CHOICES,
     IMPACTO_CLIENTE_CHOICES,
     PRIORIDAD_CHOICES,
+    # Proveedores - Noviembre 2025
+    PROVEEDORES_CHOICES,
 )
 
 
@@ -1639,6 +1641,7 @@ class PiezaCotizadaForm(forms.ModelForm):
         fields = [
             'componente',
             'descripcion_adicional',
+            'proveedor',  # ← NUEVO CAMPO (Noviembre 2025)
             'cantidad',
             'costo_unitario',
             'orden_prioridad',
@@ -1657,6 +1660,10 @@ class PiezaCotizadaForm(forms.ModelForm):
                 'id': 'descripcion_adicional',
                 'rows': 2,
                 'placeholder': 'Descripción específica de la pieza (opcional)',
+            }),
+            'proveedor': forms.Select(attrs={
+                'class': 'form-control form-select',
+                'id': 'proveedor',
             }),
             'cantidad': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -1693,6 +1700,7 @@ class PiezaCotizadaForm(forms.ModelForm):
         labels = {
             'componente': 'Componente',
             'descripcion_adicional': 'Descripción Adicional',
+            'proveedor': '🏪 Proveedor',  # ← NUEVO CAMPO
             'cantidad': 'Cantidad',
             'costo_unitario': 'Costo Unitario ($)',
             'orden_prioridad': 'Prioridad',
@@ -1702,6 +1710,7 @@ class PiezaCotizadaForm(forms.ModelForm):
         
         help_texts = {
             'componente': 'Selecciona el componente del catálogo',
+            'proveedor': 'Selecciona con qué proveedor se cotizó esta pieza (opcional)',  # ← NUEVO
             'cantidad': 'Número de unidades a cambiar',
             'costo_unitario': 'Precio por unidad',
             'orden_prioridad': '1 = más importante',
@@ -1713,6 +1722,8 @@ class PiezaCotizadaForm(forms.ModelForm):
         EXPLICACIÓN:
         Personalización del formulario al inicializarse.
         Filtramos solo componentes activos del catálogo.
+        
+        NOVIEMBRE 2025: Agregado configuración de proveedores predefinidos.
         """
         super().__init__(*args, **kwargs)
         
@@ -1723,6 +1734,17 @@ class PiezaCotizadaForm(forms.ModelForm):
         
         # Agregar opción vacía al dropdown
         self.fields['componente'].empty_label = "-- Selecciona un componente --"
+        
+        # ✨ NUEVO: Configurar campo proveedor con lista predefinida
+        # El campo proveedor usa las constantes de config/constants.py
+        # esto permite mantener la lista centralizada y fácil de actualizar
+        self.fields['proveedor'].widget = forms.Select(
+            choices=PROVEEDORES_CHOICES,
+            attrs={
+                'class': 'form-control form-select',
+                'id': 'proveedor',
+            }
+        )
     
     def clean(self):
         """
@@ -1792,11 +1814,9 @@ class SeguimientoPiezaForm(forms.ModelForm):
             'piezas': forms.CheckboxSelectMultiple(attrs={
                 'class': 'form-check-input',
             }),
-            'proveedor': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Ej: STEREN, CompuMarket, Amazon',
+            'proveedor': forms.Select(attrs={
+                'class': 'form-control form-select',
                 'required': True,
-                'list': 'proveedores-list',  # Para autocompletar
             }),
             'descripcion_piezas': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -1860,9 +1880,21 @@ class SeguimientoPiezaForm(forms.ModelForm):
         EXPLICACIÓN:
         Personalización del formulario.
         Filtra las piezas para mostrar SOLO las que fueron aceptadas por el cliente.
+        
+        ACTUALIZACIÓN NOVIEMBRE 2025:
+        Configurar dropdown de proveedores predefinidos con lista de PROVEEDORES_CHOICES.
         """
         cotizacion = kwargs.pop('cotizacion', None)
         super().__init__(*args, **kwargs)
+        
+        # ✨ NUEVO: Configurar campo proveedor con lista predefinida (Noviembre 2025)
+        self.fields['proveedor'].widget = forms.Select(
+            choices=PROVEEDORES_CHOICES,
+            attrs={
+                'class': 'form-control form-select',
+                'required': True,
+            }
+        )
         
         # NUEVO: Filtrar solo piezas aceptadas por el cliente
         if cotizacion:

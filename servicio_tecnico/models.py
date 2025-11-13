@@ -1258,6 +1258,24 @@ class PiezaCotizada(models.Model):
         help_text="Costo unitario de la pieza"
     )
     
+    # PROVEEDOR SELECCIONADO (Noviembre 2025)
+    # ========================================================================
+    # Campo agregado para permitir seleccionar el proveedor al momento de
+    # cotizar cada pieza. Esto facilita la creación automática de seguimientos
+    # cuando el cliente acepta la cotización.
+    # 
+    # BENEFICIOS:
+    # - El técnico elige el proveedor mientras cotiza (no después)
+    # - Al aceptar, se crea SeguimientoPieza automáticamente
+    # - Reduce pasos manuales y errores
+    # - Permite comparar precios entre proveedores en cotizaciones
+    proveedor = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="Proveedor con el cual se cotizó esta pieza (opcional)"
+    )
+    
     # RESPUESTA DEL CLIENTE
     aceptada_por_cliente = models.BooleanField(
         null=True,
@@ -1285,7 +1303,14 @@ class PiezaCotizada(models.Model):
         return self.cantidad * self.costo_unitario
     
     def __str__(self):
-        return f"{self.componente.nombre} × {self.cantidad} - ${self.costo_total}"
+        """
+        Representación en texto de la pieza cotizada.
+        Incluye el proveedor si está especificado.
+        """
+        base = f"{self.componente.nombre} × {self.cantidad} - ${self.costo_total}"
+        if self.proveedor:
+            return f"{base} ({self.proveedor})"
+        return base
     
     class Meta:
         ordering = ['orden_prioridad', 'fecha_creacion']

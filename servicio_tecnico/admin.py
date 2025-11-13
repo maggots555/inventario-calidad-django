@@ -48,12 +48,19 @@ class DetalleEquipoInline(admin.StackedInline):
 
 
 class PiezaCotizadaInline(admin.TabularInline):
-    """Inline para mostrar piezas en la cotización"""
+    """
+    Inline para mostrar piezas en la cotización.
+    
+    ACTUALIZACIÓN NOVIEMBRE 2025:
+    - Agregado campo 'proveedor' para especificar con quién se cotiza cada pieza
+    - Al aceptar la cotización, se usa este proveedor para crear el seguimiento automático
+    """
     model = PiezaCotizada
     extra = 1
     fields = (
         'componente',
         'descripcion_adicional',
+        'proveedor',  # ← NUEVO CAMPO (Noviembre 2025)
         'cantidad',
         'costo_unitario',
         'sugerida_por_tecnico',
@@ -566,9 +573,18 @@ class CotizacionAdmin(admin.ModelAdmin):
 
 @admin.register(PiezaCotizada)
 class PiezaCotizadaAdmin(admin.ModelAdmin):
+    """
+    Admin para PiezaCotizada.
+    
+    ACTUALIZACIÓN NOVIEMBRE 2025:
+    - Agregado 'proveedor' en list_display para ver con quién se cotizó
+    - Agregado 'proveedor' en list_filter para filtrar por proveedor
+    - Agregado 'proveedor' en search_fields para buscar por nombre de proveedor
+    """
     list_display = (
         'componente',
         'cotizacion',
+        'proveedor',  # ← NUEVO (Noviembre 2025)
         'cantidad',
         'costo_unitario',
         'costo_total_display',
@@ -576,11 +592,17 @@ class PiezaCotizadaAdmin(admin.ModelAdmin):
         'aceptada_por_cliente',
         'orden_prioridad',
     )
-    list_filter = ('sugerida_por_tecnico', 'es_necesaria', 'aceptada_por_cliente')
+    list_filter = (
+        'sugerida_por_tecnico', 
+        'es_necesaria', 
+        'aceptada_por_cliente',
+        'proveedor',  # ← NUEVO FILTRO (Noviembre 2025)
+    )
     search_fields = (
         'componente__nombre',
         'cotizacion__orden__numero_orden_interno',
         'descripcion_adicional',
+        'proveedor',  # ← NUEVO CAMPO DE BÚSQUEDA (Noviembre 2025)
     )
     
     def costo_total_display(self, obj):
