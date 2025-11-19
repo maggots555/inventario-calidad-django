@@ -17,20 +17,20 @@ TIPO_EQUIPO_CHOICES = [
 # ============================================================================
 MARCAS_EQUIPOS_CHOICES = [
     ('', '-- Seleccione una marca --'),  # Opción vacía para validación
-    ('acer', 'Acer'),
-    ('apple', 'Apple'),
-    ('asus', 'Asus'),
-    ('compaq', 'Compaq'),
-    ('dell', 'Dell'),
-    ('gateway', 'Gateway'),
-    ('hp', 'HP'),
-    ('huawei', 'Huawei'),
-    ('lenovo', 'Lenovo'),
-    ('msi', 'MSI'),
-    ('samsung', 'Samsung'),
-    ('sony', 'Sony'),
-    ('toshiba', 'Toshiba'),
-    ('otra', 'Otra Marca'),
+    ('Acer', 'Acer'),
+    ('Apple', 'Apple'),
+    ('Asus', 'Asus'),
+    ('Compaq', 'Compaq'),
+    ('Dell', 'Dell'),
+    ('Gateway', 'Gateway'),
+    ('HP', 'HP'),
+    ('Huawei', 'Huawei'),
+    ('Lenovo', 'Lenovo'),
+    ('MSI', 'MSI'),
+    ('Samsung', 'Samsung'),
+    ('Sony', 'Sony'),
+    ('Toshiba', 'Toshiba'),
+    ('Otra', 'Otra Marca'),
 ]
 
 # Lista simple de marcas (para compatibilidad con código existente)
@@ -363,6 +363,7 @@ PROVEEDORES_CHOICES = [
     ('GJJ TECNOLOGIA', 'GJJ TECNOLOGIA'),
     ('MERCADO LIBRE', 'MERCADO LIBRE'),
     ('RHITSO', 'RHITSO'),
+    ('DAVID CASTAÑEDA', 'DAVID CASTAÑEDA'),
     ('SIC STOCK', 'SIC STOCK'),
     ('SOL SATA', 'SOL SATA'),
     ('SUREM', 'SUREM'),
