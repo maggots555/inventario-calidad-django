@@ -24,8 +24,12 @@ media/
 staticfiles/
 
 # Database dumps (backups y migraciones)
+# Excluir SOLO los dumps de modelos, NO los de configuración
 *dump*.json
 backup_*.json
+*_dump.json
+*_backup.json
+*_fixture.json
 users.json
 inventario.json
 scorecard.json
