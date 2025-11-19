@@ -1,0 +1,699 @@
+/*
+================================================================================
+SERVICIO TÉCNICO - INICIO - CSS MODERNO Y MINIMALISTA
+================================================================================
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+Este archivo define los estilos visuales del dashboard de Servicio Técnico.
+Mantiene consistencia con el diseño del dashboard principal pero con colores
+específicos para el módulo de Servicio Técnico (ámbar/naranja).
+
+CARACTERÍSTICAS:
+- Diseño moderno y minimalista
+- Animaciones suaves y profesionales
+- Paleta de colores ámbar/naranja
+- Cards interactivos con efectos hover
+- Responsive para dispositivos móviles
+================================================================================
+*/
+
+/* ============================================================================
+   VARIABLES CSS - Colores del módulo Servicio Técnico
+   ============================================================================ */
+:root {
+    /* Colores principales del módulo */
+    --st-primary: #F59E0B;          /* Ámbar principal */
+    --st-primary-light: #FBBF24;    /* Ámbar claro */
+    --st-primary-dark: #D97706;     /* Ámbar oscuro */
+    
+    /* Colores secundarios */
+    --st-info: #3B82F6;             /* Azul información */
+    --st-success: #10B981;          /* Verde éxito */
+    --st-danger: #EF4444;           /* Rojo peligro */
+    --st-warning: #F59E0B;          /* Ámbar advertencia */
+    
+    /* Colores neutrales */
+    --st-bg-light: #F9FAFB;
+    --st-bg-white: #FFFFFF;
+    --st-text-dark: #111827;
+    --st-text-gray: #6B7280;
+    --st-text-light: #9CA3AF;
+    
+    /* Sombras */
+    --st-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --st-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --st-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --st-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    
+    /* Transiciones */
+    --st-transition-fast: 150ms ease-in-out;
+    --st-transition-normal: 300ms ease-in-out;
+    --st-transition-slow: 500ms ease-in-out;
+}
+
+/* ============================================================================
+   CONTENEDOR PRINCIPAL
+   ============================================================================ */
+.st-dashboard-wrapper {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+    padding: 3rem 0;
+}
+
+/* ============================================================================
+   SECCIÓN HERO - Encabezado principal
+   ============================================================================ */
+.st-hero-section {
+    text-align: center;
+    margin-bottom: 3rem;
+    animation: fadeInDown 0.6s ease-out;
+}
+
+.st-hero-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--st-primary) 0%, var(--st-primary-dark) 100%);
+    border-radius: 20px;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--st-shadow-xl);
+    animation: float 3s ease-in-out infinite;
+}
+
+.st-hero-icon i {
+    font-size: 2.5rem;
+    color: white;
+}
+
+.st-hero-title {
+    font-size: 3rem;
+    font-weight: 800;
+    color: var(--st-text-dark);
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
+}
+
+.st-hero-subtitle {
+    font-size: 1.25rem;
+    color: var(--st-text-gray);
+    font-weight: 400;
+}
+
+/* ============================================================================
+   BOTÓN DE ACCIÓN - Ver Órdenes Activas
+   ============================================================================ */
+.st-action-section {
+    text-align: center;
+    margin-bottom: 3rem;
+    animation: fadeInUp 0.6s ease-out 0.1s backwards;
+}
+
+.st-btn-main {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1rem 2.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, var(--st-primary) 0%, var(--st-primary-dark) 100%);
+    border: none;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: all var(--st-transition-normal);
+    box-shadow: var(--st-shadow-lg);
+}
+
+.st-btn-main:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--st-shadow-xl);
+    color: white;
+}
+
+.st-btn-main i {
+    transition: transform var(--st-transition-fast);
+}
+
+.st-btn-main:hover i {
+    transform: translateX(4px);
+}
+
+/* ============================================================================
+   SECCIONES DE CONTENIDO
+   ============================================================================ */
+.st-content-section {
+    background: white;
+    border-radius: 20px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--st-shadow-lg);
+    animation: fadeInUp 0.8s ease-out 0.2s backwards;
+}
+
+.st-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--st-bg-light);
+}
+
+.st-section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--st-text-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+}
+
+.st-section-title i {
+    color: var(--st-primary);
+}
+
+/* ============================================================================
+   DISTRIBUCIÓN POR ESTADO - Tabla con barras de progreso
+   ============================================================================ */
+.st-estado-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.st-estado-item {
+    display: grid;
+    grid-template-columns: 180px 1fr 70px;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.875rem 1rem;
+    background: var(--st-bg-light);
+    border-radius: 12px;
+    transition: all var(--st-transition-fast);
+}
+
+.st-estado-item:hover {
+    background: var(--st-bg-white);
+    box-shadow: var(--st-shadow-sm);
+    transform: translateX(5px);
+}
+
+.st-estado-badge {
+    display: flex;
+    align-items: center;
+}
+
+.st-estado-badge .badge {
+    font-size: 0.8125rem;
+    padding: 0.375rem 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.st-estado-progress {
+    background: #E5E7EB;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+}
+
+.st-estado-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--st-primary-light), var(--st-primary));
+    border-radius: 5px;
+    transition: width 1s ease-out;
+    animation: progressSlide 1.5s ease-out;
+}
+
+.st-estado-count {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--st-primary);
+    text-align: right;
+}
+
+/* ============================================================================
+   EQUIPOS POR GAMA - Grid de 3 columnas
+   ============================================================================ */
+.st-gama-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.st-gama-item {
+    background: var(--st-bg-light);
+    padding: 2rem;
+    border-radius: 16px;
+    text-align: center;
+    transition: all var(--st-transition-normal);
+    border: 2px solid transparent;
+}
+
+.st-gama-item:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--st-shadow-md);
+}
+
+.st-gama-item.alta {
+    border-color: #EF4444;
+}
+
+.st-gama-item.alta:hover {
+    background: #FEE2E2;
+}
+
+.st-gama-item.media {
+    border-color: #3B82F6;
+}
+
+.st-gama-item.media:hover {
+    background: #DBEAFE;
+}
+
+.st-gama-item.baja {
+    border-color: #10B981;
+}
+
+.st-gama-item.baja:hover {
+    background: #D1FAE5;
+}
+
+.st-gama-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.st-gama-item.alta .st-gama-icon {
+    color: #EF4444;
+}
+
+.st-gama-item.media .st-gama-icon {
+    color: #3B82F6;
+}
+
+.st-gama-item.baja .st-gama-icon {
+    color: #10B981;
+}
+
+.st-gama-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.st-gama-item.alta .st-gama-number {
+    color: #EF4444;
+}
+
+.st-gama-item.media .st-gama-number {
+    color: #3B82F6;
+}
+
+.st-gama-item.baja .st-gama-number {
+    color: #10B981;
+}
+
+.st-gama-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--st-text-gray);
+}
+
+/* ============================================================================
+   DISTRIBUCIÓN POR SUCURSAL - Lista simple
+   ============================================================================ */
+.st-sucursal-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.st-sucursal-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--st-bg-light);
+    border-radius: 12px;
+    transition: all var(--st-transition-fast);
+}
+
+.st-sucursal-item:hover {
+    background: var(--st-bg-white);
+    box-shadow: var(--st-shadow-sm);
+    transform: translateX(5px);
+}
+
+.st-sucursal-name {
+    font-weight: 600;
+    color: var(--st-text-dark);
+}
+
+.st-sucursal-count {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--st-primary);
+}
+
+/* ============================================================================
+   TÉCNICOS - Grid de tarjetas con avatares
+   ============================================================================ */
+.st-tecnicos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1.5rem;
+}
+
+.st-tecnico-card {
+    background: var(--st-bg-light);
+    padding: 1.5rem;
+    border-radius: 16px;
+    text-align: center;
+    transition: all var(--st-transition-normal);
+    border: 2px solid transparent;
+}
+
+.st-tecnico-card:hover {
+    background: white;
+    border-color: var(--st-primary-light);
+    transform: translateY(-5px);
+    box-shadow: var(--st-shadow-md);
+}
+
+.st-tecnico-avatar {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: var(--st-shadow-md);
+    border: 3px solid var(--st-primary-light);
+}
+
+.st-tecnico-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.st-tecnico-avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--st-primary) 0%, var(--st-primary-dark) 100%);
+    color: white;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.st-tecnico-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--st-text-dark);
+    margin-bottom: 0.5rem;
+}
+
+.st-tecnico-orders {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--st-primary);
+    margin-bottom: 0.25rem;
+}
+
+.st-tecnico-label {
+    font-size: 0.875rem;
+    color: var(--st-text-gray);
+}
+
+/* ============================================================================
+   ÓRDENES SIN ACTUALIZACIÓN - Lista de items
+   ============================================================================ */
+.st-ordenes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.st-orden-card {
+    background: var(--st-bg-light);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border-left: 4px solid var(--st-primary);
+    transition: all var(--st-transition-fast);
+}
+
+.st-orden-card:hover {
+    background: white;
+    box-shadow: var(--st-shadow-md);
+    transform: translateX(5px);
+}
+
+.st-orden-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.st-orden-numero {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--st-primary);
+    text-decoration: none;
+    transition: color var(--st-transition-fast);
+}
+
+.st-orden-numero:hover {
+    color: var(--st-primary-dark);
+    text-decoration: underline;
+}
+
+.st-orden-fecha {
+    font-size: 0.875rem;
+    color: var(--st-text-gray);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.st-orden-equipo {
+    margin-bottom: 1rem;
+    color: var(--st-text-dark);
+}
+
+.st-orden-equipo i {
+    color: var(--st-primary);
+    margin-right: 0.5rem;
+}
+
+.st-orden-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.st-orden-tecnico {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--st-text-gray);
+    font-size: 0.875rem;
+}
+
+.st-orden-dias {
+    font-size: 0.875rem;
+    font-style: italic;
+}
+
+/* ============================================================================
+   ESTADO VACÍO - Cuando no hay datos
+   ============================================================================ */
+.st-empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--st-text-gray);
+}
+
+.st-empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.3;
+}
+
+.st-empty-state p {
+    font-size: 1.125rem;
+    margin: 0;
+}
+
+/* ============================================================================
+   ANIMACIONES - Keyframes personalizados
+   ============================================================================ */
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes progressSlide {
+    from {
+        width: 0;
+    }
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN - Diseño adaptable
+   ============================================================================ */
+
+/* Tablets */
+@media (max-width: 992px) {
+    .st-hero-title {
+        font-size: 2.5rem;
+    }
+    
+    .st-gama-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .st-estado-item {
+        grid-template-columns: 150px 1fr 60px;
+        padding: 0.75rem;
+    }
+    
+    .st-estado-badge .badge {
+        font-size: 0.75rem;
+        padding: 0.3rem 0.6rem;
+    }
+    
+    .st-estado-count {
+        font-size: 1.125rem;
+    }
+}
+
+/* Móviles */
+@media (max-width: 768px) {
+    .st-dashboard-wrapper {
+        padding: 2rem 0;
+    }
+    
+    .st-hero-icon {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .st-hero-icon i {
+        font-size: 2rem;
+    }
+    
+    .st-hero-title {
+        font-size: 2rem;
+    }
+    
+    .st-hero-subtitle {
+        font-size: 1rem;
+    }
+    
+    .st-content-section {
+        padding: 1.5rem;
+    }
+    
+    .st-section-title {
+        font-size: 1.25rem;
+    }
+    
+    .st-gama-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .st-estado-item {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        padding: 1rem;
+    }
+    
+    .st-estado-badge {
+        margin-bottom: 0.25rem;
+    }
+    
+    .st-estado-count {
+        text-align: left;
+        font-size: 1.5rem;
+        margin-top: 0.25rem;
+    }
+    
+    .st-tecnicos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+    
+    .st-orden-footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* Pantallas muy pequeñas */
+@media (max-width: 480px) {
+    .st-hero-title {
+        font-size: 1.75rem;
+    }
+    
+    .st-btn-main {
+        padding: 0.875rem 2rem;
+        font-size: 1rem;
+    }
+    
+    .st-tecnicos-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================================
+   MEJORAS DE ACCESIBILIDAD
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

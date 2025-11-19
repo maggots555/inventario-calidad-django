@@ -26,26 +26,22 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-c^$$m7)o4(**%esnl3ao&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-# Permitir conexiones desde cualquier host para desarrollo (celular, otros dispositivos)
-# IMPORTANTE: Cambiar esto en producción por seguridad
-ALLOWED_HOSTS = [
-    'localhost', 
-    '127.0.0.1',
-    '192.168.10.244',    # Tu IP actual principal
-    '192.168.137.1',     # Tu IP de punto de acceso móvil
-    '192.168.10.*',      # Cualquier IP en tu red local principal
-    '192.168.137.*',     # Cualquier IP en tu red de punto de acceso
-    '192.168.*.*',       # Cualquier IP en redes locales 192.168.x.x
-    '10.*.*.*',          # Redes privadas clase A
-    '*'                  # Permitir cualquier host (solo para desarrollo)
-]
+# EXPLICACIÓN: ALLOWED_HOSTS especifica qué dominios/IPs pueden acceder a tu aplicación
+# En producción, solo incluye dominios e IPs específicas por seguridad
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1,192.168.1.235',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 
 # CSRF: Configuración para permitir solicitudes desde dominios externos
-# Necesario para ngrok y otras herramientas de túnel
-CSRF_TRUSTED_ORIGINS = [
-    'https://*.ngrok-free.app',  # Dominios de ngrok
-    'https://*.ngrok.io',         # Dominios alternativos de ngrok
-]
+# EXPLICACIÓN: Lista de orígenes confiables para solicitudes CSRF (formularios, AJAX)
+# Agregar aquí tu dominio cuando tengas HTTPS configurado
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost,http://127.0.0.1,http://192.168.1.235',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 
 # Application definition
 
@@ -97,10 +93,22 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# EXPLICACIÓN: Configuración de la base de datos PostgreSQL
+# - ENGINE: Motor de base de datos (PostgreSQL en este caso)
+# - NAME: Nombre de la base de datos
+# - USER: Usuario de PostgreSQL con permisos sobre la base de datos
+# - PASSWORD: Contraseña del usuario (almacenada en .env por seguridad)
+# - HOST: Servidor donde está PostgreSQL ('localhost' = mismo servidor)
+# - PORT: Puerto de PostgreSQL (5432 es el puerto por defecto)
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': config('DB_ENGINE', default='django.db.backends.postgresql'),
+        'NAME': config('DB_NAME', default='inventario_django'),
+        'USER': config('DB_USER', default='django_user'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='5432'),
     }
 }
 
@@ -142,13 +150,15 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 # Directorios donde Django buscará archivos estáticos adicionales
+# EXPLICACIÓN: STATICFILES_DIRS contiene las carpetas con tus archivos originales (CSS, JS, imágenes)
 STATICFILES_DIRS = [
     BASE_DIR / "static",  # Archivos estáticos globales del proyecto
 ]
 
 # Directorio donde se recopilarán todos los archivos estáticos en producción
-# Descomenta esto para producción:
-# STATIC_ROOT = BASE_DIR / "staticfiles"
+# EXPLICACIÓN: STATIC_ROOT es donde Django copia TODOS los archivos estáticos
+# para que el servidor web (Nginx) los pueda servir eficientemente
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Media files (User uploaded content - imágenes de evidencias)
 # https://docs.djangoproject.com/en/5.2/topics/files/

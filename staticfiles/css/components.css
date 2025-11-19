@@ -1,0 +1,2475 @@
+/* =============================================================================
+   COMPONENTES DE INVENTARIO MODERNOS
+   Descripción: Estilos específicos para componentes del sistema de inventario
+   con diseño moderno y minimalista
+   ============================================================================= */
+
+/* ===== ALERTAS Y NOTIFICACIONES MODERNAS ===== */
+.alert-stock-bajo {
+    background: linear-gradient(135deg, var(--warning-light) 0%, #fef3c7 100%);
+    border: 1px solid var(--warning-color);
+    color: #92400e;
+    border-left: 4px solid var(--warning-color);
+    border-radius: var(--border-radius-md);
+    padding: var(--space-4) var(--space-5);
+    position: relative;
+    overflow: hidden;
+}
+
+.alert-stock-bajo::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, var(--warning-color), #f59e0b, var(--warning-color));
+    animation: alertGlow 2s infinite;
+}
+
+@keyframes alertGlow {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+.alert {
+    border-radius: var(--border-radius-md);
+    border: none;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+    position: relative;
+}
+
+/* ===== INDICADORES DE STOCK MODERNOS ===== */
+.stock-bajo {
+    color: var(--danger-color);
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--danger-light), #fecaca);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--danger-color);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    animation: pulse 2s infinite;
+}
+
+.stock-bajo::before {
+    content: '⚠';
+    font-size: var(--text-sm);
+}
+
+.stock-normal {
+    color: var(--success-color);
+    font-weight: 500;
+    background: linear-gradient(135deg, var(--success-light), #bbf7d0);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--success-color);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stock-normal::before {
+    content: '✓';
+    font-size: var(--text-sm);
+}
+
+.stock-critico {
+    color: #dc2626;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--border-radius);
+    border: 2px solid #dc2626;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    animation: blink 1.5s infinite;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.3);
+}
+
+.stock-critico::before {
+    content: '🚨';
+    font-size: var(--text-base);
+}
+
+/* ===== CÓDIGOS QR MODERNOS ===== */
+.qr-code {
+    max-width: 200px;
+    height: auto;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-4);
+    background: linear-gradient(135deg, white 0%, var(--gray-50) 100%);
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.qr-code::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+}
+
+.qr-code:hover {
+    transform: scale(1.05);
+    box-shadow: var(--shadow-xl);
+    border-color: var(--primary-color);
+}
+
+.qr-container {
+    text-align: center;
+    padding: var(--space-6);
+    background: linear-gradient(135deg, var(--gray-50) 0%, white 100%);
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow);
+}
+
+/* ===== SCANNER QR MODERNO ===== */
+.scanner-container {
+    background: #000;
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    position: relative;
+    box-shadow: var(--shadow-xl);
+    border: 2px solid var(--primary-color);
+    width: 100%;
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+}
+
+.scanner-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #000;
+    border: none;
+    outline: none;
+    margin: 0;
+    padding: 0;
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.scanner-frame {
+    width: 250px;
+    height: 250px;
+    border: 3px solid var(--primary-color);
+    border-radius: var(--border-radius-xl);
+    position: relative;
+    background: transparent;
+    animation: scanner-glow 2s infinite ease-in-out;
+}
+
+.scanner-frame::before,
+.scanner-frame::after {
+    content: '';
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--accent-color);
+}
+
+.scanner-frame::before {
+    top: -3px;
+    left: -3px;
+    border-right: none;
+    border-bottom: none;
+    border-radius: var(--border-radius) 0 0 0;
+}
+
+.scanner-frame::after {
+    bottom: -3px;
+    right: -3px;
+    border-left: none;
+    border-top: none;
+    border-radius: 0 0 var(--border-radius) 0;
+}
+
+@keyframes scanner-glow {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(37, 99, 235, 0.5);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 40px rgba(37, 99, 235, 0.8);
+        transform: scale(1.02);
+    }
+}
+
+/* ===== BOTONES ESPECIALES MODERNOS ===== */
+.btn-scanner {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border: none;
+    color: white;
+    padding: var(--space-4) var(--space-6);
+    border-radius: var(--border-radius-xl);
+    font-weight: 600;
+    font-size: var(--text-base);
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+    text-transform: none;
+    letter-spacing: 0.025em;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-scanner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left var(--transition-normal);
+}
+
+.btn-scanner:hover::before {
+    left: 100%;
+}
+
+.btn-scanner:hover {
+    background: linear-gradient(135deg, var(--primary-dark), var(--accent-color));
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+    color: white;
+}
+
+.btn-scanner:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow);
+}
+
+/* ===== ICONOS MEJORADOS ===== */
+.icon-dashboard {
+    color: var(--primary-color);
+    font-size: 2.5rem;
+    margin-bottom: var(--space-4);
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.icon-small {
+    font-size: var(--text-lg);
+    margin-right: var(--space-2);
+    opacity: 0.8;
+}
+
+/* ===== ESTADÍSTICAS Y MÉTRICAS ===== */
+.metric-card {
+    background: linear-gradient(135deg, white 0%, var(--gray-50) 100%);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-6);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-normal);
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+}
+
+.metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
+}
+
+.metric-number {
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: var(--space-2);
+    display: block;
+}
+
+.metric-label {
+    font-size: var(--text-sm);
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+}
+
+/* ===== ANIMACIONES ===== */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.02);
+    }
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.5; }
+}
+
+@keyframes scanner-glow {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(37, 99, 235, 0.5);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 40px rgba(37, 99, 235, 0.8);
+        transform: scale(1.02);
+    }
+}
+
+@keyframes scanner-pulse {
+    0%, 100% { 
+        opacity: 0.6;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    50% { 
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.05);
+    }
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ===== COMPONENTES DE NAVEGACIÓN ===== */
+.breadcrumb {
+    background-color: transparent;
+    padding: var(--space-4) 0;
+    margin-bottom: var(--space-6);
+}
+
+.breadcrumb-item {
+    font-size: var(--text-sm);
+    color: var(--gray-500);
+}
+
+.breadcrumb-item.active {
+    color: var(--gray-800);
+    font-weight: 500;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    content: "→";
+    color: var(--gray-400);
+}
+
+/* ===== ESTADOS DE CARGA ===== */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--gray-300);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===== RESPONSIVE COMPONENTS ===== */
+@media (max-width: 768px) {
+    .scanner-frame {
+        width: 200px;
+        height: 200px;
+    }
+    
+    .btn-scanner {
+        padding: var(--space-3) var(--space-5);
+        font-size: var(--text-sm);
+    }
+    
+    .metric-card {
+        padding: var(--space-4);
+    }
+    
+    .metric-number {
+        font-size: var(--text-2xl);
+    }
+}
+
+@media (max-width: 576px) {
+    .qr-code {
+        max-width: 150px;
+        padding: var(--space-3);
+    }
+    
+    .scanner-frame {
+        width: 180px;
+        height: 180px;
+    }
+    
+    .metric-number {
+        font-size: var(--text-xl);
+    }
+}
+
+/* ===== TABLAS DE INVENTARIO ===== */
+.table-inventario {
+    background-color: white;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--box-shadow);
+}
+
+.table-inventario th {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: 500;
+    border: none;
+    padding: 15px 12px;
+}
+
+.table-inventario td {
+    padding: 12px;
+    vertical-align: middle;
+    border-color: #e9ecef;
+}
+
+.table-inventario tbody tr:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.2s ease;
+}
+
+/* ===== ANIMACIONES ===== */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.3; }
+}
+
+@keyframes scanner-glow {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(0,123,255,0.5);
+        border-color: var(--primary-color);
+    }
+    50% { 
+        box-shadow: 0 0 30px rgba(0,123,255,0.8);
+        border-color: #80bdff;
+    }
+}
+
+/* ===== BADGES Y ETIQUETAS ===== */
+.badge-stock {
+    font-size: 0.8rem;
+    padding: 6px 12px;
+    border-radius: 20px;
+}
+
+.badge-disponible {
+    background-color: var(--success-color);
+}
+
+.badge-agotado {
+    background-color: var(--danger-color);
+}
+
+.badge-bajo-stock {
+    background-color: #ffc107;
+    color: #000;
+}
+
+/* ===== RESPONSIVE PARA COMPONENTES ===== */
+@media (max-width: 768px) {
+    .qr-code {
+        max-width: 150px;
+    }
+    
+    .scanner-frame {
+        width: 200px;
+        height: 200px;
+    }
+    
+    .table-inventario {
+        font-size: 0.9rem;
+    }
+    
+    .btn-scanner {
+        padding: 10px 20px;
+        font-size: 0.9rem;
+    }
+}
+
+/* =============================================================================
+   COMPONENTES PARA PRODUCTOS FRACCIONABLES
+   Descripción: Barras de progreso, alertas y elementos visuales para
+   productos que se pueden consumir en porciones (líquidos, granulados)
+   ============================================================================= */
+
+/* ===== BARRA DE PROGRESO FRACCIONARIO ===== */
+.progress-fraccionario {
+    height: 24px;
+    background-color: #e5e7eb;
+    border-radius: var(--border-radius-lg);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-2);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.progress-bar-fraccionario {
+    height: 100%;
+    border-radius: var(--border-radius-lg);
+    transition: all 0.3s ease;
+    position: relative;
+    background: linear-gradient(135deg, var(--success-color), #34d399);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* Estados de la barra según porcentaje */
+.progress-bar-fraccionario.nivel-alto {
+    background: linear-gradient(135deg, var(--success-color), #34d399);
+}
+
+.progress-bar-fraccionario.nivel-medio {
+    background: linear-gradient(135deg, var(--warning-color), #fbbf24);
+}
+
+.progress-bar-fraccionario.nivel-bajo {
+    background: linear-gradient(135deg, var(--danger-color), #f87171);
+    animation: pulseWarning 2s infinite;
+}
+
+/* ===== INFORMACIÓN DEL PRODUCTO FRACCIONABLE - DISEÑO PROFESIONAL ===== */
+.info-fraccionario {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: var(--border-radius-xl);
+    padding: var(--space-6);
+    margin-bottom: var(--space-6);
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    overflow: hidden;
+    animation: slideInUp 0.6s ease-out;
+}
+
+.info-fraccionario::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, var(--info-color), var(--primary-color), var(--info-color));
+    animation: shimmer 3s infinite;
+}
+
+.info-fraccionario .titulo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: clamp(1rem, 3vw, 1.25rem); /* Responsivo: min 16px, max 20px */
+    font-weight: 700;
+    color: var(--gray-800);
+    margin-bottom: var(--space-5);
+    padding-bottom: var(--space-3);
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.info-fraccionario .titulo::before {
+    content: '💧';
+    font-size: var(--text-2xl);
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+/* Grid de detalles del producto */
+.info-fraccionario .detalle,
+.detalle {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+}
+
+.info-fraccionario .item,
+.detalle .item {
+    background: linear-gradient(135deg, #ffffff, #f1f5f9);
+    border: 1px solid #cbd5e1;
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.info-fraccionario .item:hover,
+.detalle .item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-color);
+}
+
+.info-fraccionario .item::after,
+.detalle .item::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--info-color);
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.info-fraccionario .item:hover::after,
+.detalle .item:hover::after {
+    opacity: 1;
+}
+
+/* FORZAR tamaños más pequeños con selectores específicos */
+#info-producto-content .detalle .label,
+.detalle .label,
+.info-fraccionario .detalle .label {
+    font-weight: 600;
+    color: var(--gray-700);
+    font-size: 0.7rem !important; /* 20% más pequeño que el original (0.875rem) */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+#info-producto-content .detalle .valor,
+.detalle .valor,
+.info-fraccionario .detalle .valor {
+    font-weight: 700;
+    color: var(--primary-color);
+    font-size: 0.88rem !important; /* 20% más pequeño que el original (1.1rem) */
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Selectores MUY específicos para el contenido generado dinámicamente */
+#info-producto-content span.label,
+#info-producto-content .item span.label {
+    font-size: 0.7rem !important;
+}
+
+#info-producto-content span.valor,
+#info-producto-content .item span.valor {
+    font-size: 0.88rem !important;
+}
+
+/* Aún más específico - por si acaso hay conflictos de Bootstrap */
+.info-fraccionario #info-producto-content .detalle .item span {
+    line-height: 1.4;
+}
+
+.info-fraccionario #info-producto-content .detalle .item span.label {
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+}
+
+.info-fraccionario #info-producto-content .detalle .item span.valor {
+    font-size: 0.88rem !important;
+    font-weight: 700 !important;
+}
+
+/* Estilos finales optimizados */
+#info-producto-content .detalle .item span {
+    font-size: 0.7rem !important; /* Tamaño reducido para mejor balance visual */
+}
+
+/* ===== ESTILOS ESPECÍFICOS PARA DASHBOARD ===== */
+
+/* Layout principal del dashboard */
+.dashboard-main-content {
+    margin-bottom: var(--space-6);
+}
+
+/* ===== KPIs MODERNOS - ESTILO POWER BI ===== */
+.kpis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background: white;
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+    border-left: 4px solid;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Efecto decorativo en la esquina superior derecha */
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, transparent 100%);
+    border-radius: 50%;
+    transform: translate(30%, -30%);
+    transition: all 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+}
+
+.kpi-card:hover::before {
+    transform: translate(30%, -30%) scale(1.2);
+}
+
+/* Colores de borde según el tipo */
+.kpi-card.primary { border-left-color: var(--primary-color); }
+.kpi-card.success { border-left-color: var(--success-color); }
+.kpi-card.danger { border-left-color: var(--danger-color); }
+.kpi-card.warning { border-left-color: var(--warning-color); }
+.kpi-card.info { border-left-color: var(--info-color); }
+
+/* Elementos del KPI */
+.kpi-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+.kpi-card:hover .kpi-icon {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.kpi-label {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 0;
+    position: relative;
+    z-index: 1;
+    line-height: 1.2;
+}
+
+.kpi-subtext {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    margin-top: 0.5rem;
+    line-height: 1.4;
+}
+
+/* Animación de entrada */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.6s ease-out;
+}
+
+/* Responsive para KPIs */
+@media (max-width: 768px) {
+    .kpis-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .kpi-card {
+        padding: 1.25rem;
+    }
+    
+    .kpi-icon {
+        font-size: 2rem;
+    }
+    
+    .kpi-value {
+        font-size: 1.75rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .kpis-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== ELIMINACIÓN DE ESTILOS ANTIGUOS DE KPI ===== */
+/* Ocultar tarjetas antiguas si existen */
+.border-left-primary,
+.border-left-warning,
+.border-left-success,
+.border-left-info {
+    display: none !important; /* Ocultar cards antiguas de Bootstrap */
+}
+
+/* Tarjetas del dashboard con altura uniforme */
+.card-dashboard {
+    transition: all var(--transition-normal);
+    border: none;
+    border-radius: var(--border-radius-xl);
+    overflow: hidden;
+}
+
+.card-dashboard:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-xl);
+}
+
+/* Headers con gradientes */
+.bg-gradient-warning {
+    background: linear-gradient(135deg, var(--warning-color), #f59e0b) !important;
+}
+
+.bg-gradient-info {
+    background: linear-gradient(135deg, var(--info-color), #0891b2) !important;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, var(--primary-color), #1d4ed8) !important;
+}
+
+.bg-gradient-dark {
+    background: linear-gradient(135deg, #374151, #1f2937) !important;
+}
+
+/* ===== TIMELINE PARA DASHBOARD - ESTILOS ESPECÍFICOS Y AISLADOS ===== */
+.card-dashboard .timeline-container {
+    position: relative;
+}
+
+/* CRÍTICO: Anular cualquier ::before o ::after de otros módulos */
+.card-dashboard .timeline-item::before,
+.card-dashboard .timeline-item::after {
+    display: none !important;
+    content: none !important;
+}
+
+.card-dashboard .timeline-item {
+    position: relative;
+    transition: background-color 0.3s ease;
+    border-left: none !important;
+    padding-left: 0 !important; /* Resetear padding-left de otros estilos */
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.card-dashboard .timeline-item:hover {
+    background-color: #f8fafc;
+    border-radius: 8px;
+}
+
+.card-dashboard .timeline-icon {
+    min-width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative !important; /* No absolute */
+    left: auto !important; /* Resetear left de otros estilos */
+}
+
+/* Scrollbar personalizado para timeline del dashboard */
+.card-dashboard .timeline-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.card-dashboard .timeline-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.card-dashboard .timeline-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.card-dashboard .timeline-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Barra de progreso personalizada para fraccionables */
+.progress {
+    background-color: #e5e7eb;
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+}
+
+.progress .progress-bar {
+    transition: width 0.6s ease;
+    border-radius: var(--border-radius-md);
+}
+
+/* Botones de acceso rápido */
+.action-card {
+    min-height: 120px;
+    border-radius: var(--border-radius-xl) !important;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none !important;
+    padding: var(--space-4) !important;
+}
+
+.action-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1), transparent);
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.action-card:hover::before {
+    opacity: 1;
+}
+
+.action-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: var(--shadow-xl);
+}
+
+/* Badges especiales - definición eliminada (duplicado) */
+
+/* Estados de nivel para productos fraccionables */
+.indicador-nivel {
+    padding: 0.25em 0.75em;
+    border-radius: var(--border-radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.indicador-nivel.alto {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.indicador-nivel.medio {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.indicador-nivel.bajo {
+    background-color: #fee2e2;
+    color: #991b1b;
+    animation: pulseWarning 2s infinite;
+}
+
+/* Lista de productos fraccionables */
+.list-group-flush .list-group-item {
+    border-left: none !important;
+    border-right: none !important;
+    border-radius: 0 !important;
+    transition: background-color var(--transition-normal);
+}
+
+.list-group-flush .list-group-item:hover {
+    background-color: #f8fafc;
+}
+
+/* Tarjetas de estadísticas mejoradas */
+.border-left-primary {
+    border-left: 4px solid var(--primary-color) !important;
+}
+
+.border-left-warning {
+    border-left: 4px solid var(--warning-color) !important;
+}
+
+.border-left-success {
+    border-left: 4px solid var(--success-color) !important;
+}
+
+.border-left-info {
+    border-left: 4px solid var(--info-color) !important;
+}
+
+/* Iconos de tarjetas de estadísticas */
+.card-icon {
+    font-size: 2rem;
+    opacity: 0.7;
+}
+
+/* Mejoras responsivas para el dashboard */
+@media (max-width: 768px) {
+    .card-dashboard {
+        margin-bottom: var(--space-4);
+    }
+    
+    .action-card {
+        min-height: 100px;
+        padding: var(--space-3) !important;
+    }
+    
+    .action-card i {
+        font-size: 2rem !important;
+    }
+    
+    .timeline-item {
+        padding: var(--space-2) var(--space-3);
+    }
+}
+
+@media (max-width: 576px) {
+    .dashboard-main-content .col-lg-4 {
+        margin-bottom: var(--space-3);
+    }
+    
+    .action-card {
+        min-height: 80px;
+    }
+    
+    .card-header h6 {
+        font-size: 0.9rem;
+    }
+}
+
+/* ===== ESTILOS ESPECÍFICOS PARA ALERTAS DE STOCK ===== */
+.alert-stock-container {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.alert-stock-item {
+    transition: all var(--transition-normal);
+    background-color: white;
+}
+
+.alert-stock-item:hover {
+    background-color: #fef2f2;
+    border-left-color: #dc2626 !important;
+    border-left-width: 5px !important;
+}
+
+.alert-stock-item:last-child {
+    border-bottom: none !important;
+}
+
+/* Asegurar que el texto del título sea blanco en headers oscuros */
+.bg-gradient-dark h6,
+.bg-gradient-dark .font-weight-bold {
+    color: white !important;
+}
+
+.bg-gradient-dark i {
+    color: white !important;
+}
+
+/* Mantener también las clases originales para otros usos */
+.info-fraccionario .label {
+    font-weight: 600;
+    color: var(--gray-700);
+    font-size: clamp(0.7rem, 1.8vw, 0.875rem); /* Etiquetas más pequeñas y responsivas */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.info-fraccionario .valor {
+    font-weight: 700;
+    color: var(--primary-color);
+    font-size: clamp(0.9rem, 2.2vw, 1.1rem); /* Valores más equilibrados */
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Iconos específicos para cada tipo de información */
+.info-fraccionario .item:nth-child(1) .label::before,
+.detalle .item:nth-child(1) .label::before {
+    content: '📦';
+    font-size: var(--text-base);
+}
+
+.info-fraccionario .item:nth-child(2) .label::before,
+.detalle .item:nth-child(2) .label::before {
+    content: '📏';
+    font-size: var(--text-base);
+}
+
+.info-fraccionario .item:nth-child(3) .label::before,
+.detalle .item:nth-child(3) .label::before {
+    content: '🧪';
+    font-size: var(--text-base);
+}
+
+.info-fraccionario .item:nth-child(4) .label::before,
+.detalle .item:nth-child(4) .label::before {
+    content: '📊';
+    font-size: var(--text-base);
+}
+
+/* Sección de nivel actual mejorada */
+.nivel-actual-section {
+    background: linear-gradient(135deg, #f0f9ff, #ecfeff);
+    border: 1px solid #0891b2;
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-5);
+    margin-top: var(--space-4);
+}
+
+.nivel-actual-section .form-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: clamp(0.875rem, 2vw, 1rem); /* Tamaño responsivo para etiqueta */
+    font-weight: 700;
+    color: var(--info-dark);
+    margin-bottom: var(--space-3);
+}
+
+.nivel-actual-section .form-label::before {
+    content: '📈';
+    font-size: var(--text-lg);
+}
+
+/* Barra de progreso mejorada */
+.progress-fraccionario {
+    height: 32px;
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    border: 1px solid #cbd5e1;
+    border-radius: var(--border-radius-xl);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-3);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.progress-bar-fraccionario {
+    height: 100%;
+    border-radius: var(--border-radius-xl);
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: clamp(0.75rem, 1.5vw, 0.875rem); /* Texto de progreso responsivo */
+    color: white;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    overflow: hidden;
+}
+
+.progress-bar-fraccionario::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: progressShine 3s infinite;
+}
+
+/* Información de cantidad mejorada */
+#info-cantidad {
+    background: linear-gradient(135deg, #fefefe, #f8fafc);
+    border: 1px solid #e2e8f0;
+    border-radius: var(--border-radius-md);
+    padding: var(--space-3) var(--space-4);
+    font-size: clamp(0.75rem, 1.8vw, 0.875rem); /* Info más compacta */
+    color: var(--gray-600);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+#info-cantidad::before {
+    content: 'ℹ️';
+    font-size: var(--text-base);
+    opacity: 0.8;
+}
+
+/* Estados específicos según el nivel */
+.progress-bar-fraccionario.nivel-alto {
+    background: linear-gradient(135deg, var(--success-color), #34d399, #10b981);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+.progress-bar-fraccionario.nivel-medio {
+    background: linear-gradient(135deg, var(--warning-color), #fbbf24, #f59e0b);
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+.progress-bar-fraccionario.nivel-bajo {
+    background: linear-gradient(135deg, var(--danger-color), #f87171, #ef4444);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    animation: pulseWarning 2s infinite;
+}
+
+/* Animaciones específicas */
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+@keyframes progressShine {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+@keyframes pulseWarning {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+        opacity: 1;
+    }
+    50% { 
+        box-shadow: 0 0 30px rgba(239, 68, 68, 0.6);
+        opacity: 0.8;
+    }
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ===== RESPONSIVE PARA INFORMACIÓN FRACCIONABLE ===== */
+@media (max-width: 768px) {
+    .info-fraccionario {
+        padding: var(--space-4);
+    }
+    
+    .info-fraccionario .detalle,
+    .detalle {
+        grid-template-columns: 1fr;
+        gap: var(--space-3);
+    }
+    
+    .progress-fraccionario {
+        height: 28px;
+    }
+}
+
+@media (max-width: 576px) {
+    .info-fraccionario .item,
+    .detalle .item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-2);
+        text-align: left;
+    }
+    
+    .info-fraccionario .valor,
+    .detalle .valor {
+        align-self: flex-end;
+    }
+    
+    /* En móviles, reducir un poco más el espaciado */
+    .info-fraccionario {
+        padding: var(--space-3);
+        margin-bottom: var(--space-4);
+    }
+}
+
+@keyframes pulseWarning {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+
+/* ===== INFORMACIÓN DEL PRODUCTO FRACCIONABLE ===== */
+.info-fraccionario {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.info-fraccionario .titulo {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.info-fraccionario .titulo::before {
+    content: '💧';
+    font-size: 1.2rem;
+}
+
+.info-fraccionario .detalle {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
+.info-fraccionario .item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2);
+    background: white;
+    border-radius: var(--border-radius);
+    border: 1px solid #e5e7eb;
+}
+
+.info-fraccionario .label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.info-fraccionario .valor {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* ===== ALERTAS ESPECÍFICAS PARA FRACCIONABLES ===== */
+.alerta-fraccionario {
+    background: linear-gradient(135deg, #fef2f2 0%, #fed7d7 100%);
+    border: 1px solid var(--danger-color);
+    border-left: 4px solid var(--danger-color);
+    border-radius: var(--border-radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+    position: relative;
+}
+
+.alerta-fraccionario::before {
+    content: '⚠️';
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-3);
+    font-size: 1.2rem;
+    animation: bounce 2s infinite;
+}
+
+.alerta-fraccionario .titulo {
+    font-weight: 600;
+    color: #dc2626;
+    margin-bottom: var(--space-2);
+}
+
+.alerta-fraccionario .mensaje {
+    color: #7f1d1d;
+    font-size: 0.875rem;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+}
+
+/* ===== BADGE PARA TIPO DE PRODUCTO - definición eliminada (duplicado) ===== */
+
+/* Definición eliminada - duplicado */
+
+/* ===== FORMULARIO FRACCIONARIO ===== */
+.form-fraccionario {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #0ea5e9;
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-4);
+}
+
+.form-fraccionario .titulo-seccion {
+    color: #0c4a6e;
+    font-weight: 600;
+    margin-bottom: var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.form-fraccionario .titulo-seccion::before {
+    content: '🧪';
+    font-size: 1.2rem;
+}
+
+/* Campos específicos para cantidad fraccionaria */
+.input-fraccionario {
+    border: 2px solid #0ea5e9 !important;
+    background: rgba(240, 249, 255, 0.5);
+    transition: all 0.3s ease;
+}
+
+.input-fraccionario:focus {
+    border-color: #0284c7 !important;
+    box-shadow: 0 0 0 0.2rem rgba(14, 165, 233, 0.15) !important;
+    background: white;
+}
+
+/* ===== INDICADORES VISUALES ===== */
+.indicador-nivel {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--border-radius-full);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.indicador-nivel.alto {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #34d399;
+}
+
+.indicador-nivel.medio {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fbbf24;
+}
+
+.indicador-nivel.bajo {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #f87171;
+}
+
+/* ===== SCANNER UNIVERSAL - ESTILOS PARA QR Y CÓDIGOS DE BARRAS ===== */
+.scanner-container {
+    position: relative;
+    max-width: 500px;
+    margin: 0 auto;
+    background: #000;
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.scanner-frame {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60%;
+    height: 40%;
+    border: 3px solid var(--primary-color);
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    animation: scannerPulse 2s infinite;
+}
+
+@keyframes scannerPulse {
+    0%, 100% {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(13, 110, 253, 0.3);
+    }
+    50% {
+        border-color: var(--success-color);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(40, 167, 69, 0.3);
+    }
+}
+
+#qr-video video {
+    width: 100%;
+    height: 300px;
+    object-fit: cover;
+    background: #000;
+    border-radius: var(--border-radius-lg);
+}
+
+/* Estados visuales del campo código QR - Validación robusta */
+.field-searching {
+    border-color: var(--primary-color) !important;
+    background-color: var(--primary-light) !important;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15) !important;
+    transition: all 0.3s ease;
+}
+
+.field-success {
+    border-color: var(--success-color) !important;
+    background-color: var(--success-light) !important;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.15) !important;
+    transition: all 0.3s ease;
+}
+
+.field-error {
+    border-color: var(--danger-color) !important;
+    background-color: var(--danger-light) !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.15) !important;
+    transition: all 0.3s ease;
+}
+
+.field-info {
+    border-color: var(--info-color) !important;
+    background-color: var(--info-light) !important;
+    box-shadow: 0 0 0 0.2rem rgba(23, 162, 184, 0.15) !important;
+    transition: all 0.3s ease;
+}
+
+/* Área de destino empleado - Auto-relleno visual */
+.area-destino-container {
+    margin-top: var(--space-4);
+}
+
+.area-destino-success {
+    border-color: var(--success-color) !important;
+    background-color: var(--success-light) !important;
+    color: var(--success-dark) !important;
+    font-weight: 600;
+}
+
+.area-destino-warning {
+    border-color: var(--warning-color) !important;
+    background-color: var(--warning-light) !important;
+    color: var(--warning-dark) !important;
+}
+
+/* Botón scanner mejorado */
+.btn-scanner {
+    background: linear-gradient(135deg, var(--success-color), #20c997);
+    border: none;
+    color: white;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-scanner:hover {
+    background: linear-gradient(135deg, #218838, #1e7e34);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.btn-scanner:focus {
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+.btn-scanner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-scanner:hover::before {
+    left: 100%;
+}
+
+/* ===== RESPONSIVE PARA COMPONENTES FRACCIONABLES ===== */
+@media (max-width: 768px) {
+    .info-fraccionario .detalle {
+        grid-template-columns: 1fr;
+    }
+    
+    .progress-fraccionario {
+        height: 20px;
+    }
+    
+    .progress-bar-fraccionario {
+        font-size: 0.7rem;
+    }
+    
+    .form-fraccionario {
+        padding: var(--space-4);
+    }
+    
+    /* Scanner responsivo */
+    .scanner-container {
+        max-width: 100%;
+        margin: 0;
+    }
+    
+    #qr-video video {
+        height: 250px;
+    }
+    
+    .scanner-frame {
+        width: 70%;
+        height: 50%;
+    }
+}
+
+/* ===== ESTILOS PARA BADGES DE PRODUCTOS ===== */
+
+/* ===== BADGES DE CATEGORÍAS ===== */
+.badge-categoria-limpieza {
+    background: linear-gradient(135deg, #3b82f6, #60a5fa) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-seguridad {
+    background: linear-gradient(135deg, #8b5cf6, #a78bfa) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-oficina {
+    background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-etiquetas {
+    background: linear-gradient(135deg, #ec4899, #f472b6) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(236, 72, 153, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-envases {
+    background: linear-gradient(135deg, #14b8a6, #2dd4bf) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(20, 184, 166, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-herramientas {
+    background: linear-gradient(135deg, #f97316, #fb923c) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(249, 115, 22, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-categoria-otros {
+    background: linear-gradient(135deg, #6b7280, #9ca3af) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(107, 114, 128, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Efectos hover para badges de categoría */
+.badge-categoria-limpieza:hover { background: linear-gradient(135deg, #2563eb, #3b82f6) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4) !important; }
+.badge-categoria-seguridad:hover { background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4) !important; }
+.badge-categoria-oficina:hover { background: linear-gradient(135deg, #3730a3, #4f46e5) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(79, 70, 229, 0.4) !important; }
+.badge-categoria-etiquetas:hover { background: linear-gradient(135deg, #db2777, #ec4899) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(236, 72, 153, 0.4) !important; }
+.badge-categoria-envases:hover { background: linear-gradient(135deg, #0f766e, #14b8a6) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(20, 184, 166, 0.4) !important; }
+.badge-categoria-herramientas:hover { background: linear-gradient(135deg, #ea580c, #f97316) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(249, 115, 22, 0.4) !important; }
+.badge-categoria-otros:hover { background: linear-gradient(135deg, #4b5563, #6b7280) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(107, 114, 128, 0.4) !important; }
+
+/* ===== BADGES DE TIPO DE PRODUCTO ===== */
+
+/* Badge para objetos únicos (morado) */
+.badge-unico {
+    background: linear-gradient(135deg, #8b5cf6, #a855f7);
+    color: white;
+    font-weight: 600;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: none;
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+    transition: all 0.2s ease;
+}
+
+.badge-unico:hover {
+    background: linear-gradient(135deg, #7c3aed, #9333ea);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
+}
+
+/* Badge para productos normales (gris) */
+.badge-normal {
+    background: linear-gradient(135deg, #9ca3af, #6b7280) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(156, 163, 175, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-normal:hover {
+    background: linear-gradient(135deg, #6b7280, #4b5563) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(107, 114, 128, 0.4) !important;
+}
+
+/* Badge para productos fraccionables (azul) */
+.badge-fraccionable {
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.375rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
+    transition: all 0.2s ease !important;
+}
+
+.badge-fraccionable:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+}
+
+.icono-objeto-unico {
+    font-size: 0.8rem;
+    margin-right: 0.1rem;
+}
+
+@keyframes rotateIcon {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Estilos para filas de tabla de objetos únicos */
+.tabla-producto-unico {
+    background-color: #faf5ff;
+    border-left: 3px solid #8b5cf6;
+}
+
+.tabla-producto-no-disponible {
+    background-color: #fef2f2;
+    border-left: 3px solid #ef4444;
+    animation: pulseAlert 2s infinite;
+}
+
+@keyframes pulseAlert {
+    0%, 100% { 
+        background-color: #fef2f2; 
+        border-left-color: #ef4444;
+    }
+    50% { 
+        background-color: #fee2e2; 
+        border-left-color: #dc2626;
+    }
+}
+
+/* Mejoras para formularios de objetos únicos */
+.objeto-unico-check {
+    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+    padding: var(--space-4);
+    border-radius: var(--border-radius-md);
+    border: 2px solid #e5e7eb;
+    transition: all 0.3s ease;
+}
+
+.objeto-unico-check:hover {
+    border-color: #8b5cf6;
+    background: linear-gradient(135deg, #faf5ff, #f3e8ff);
+}
+
+.objeto-unico-label {
+    font-weight: 600;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.objeto-unico-help {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: var(--border-radius-sm);
+    padding: var(--space-3);
+    margin-top: var(--space-2);
+    font-size: 0.875rem;
+    color: #1e40af;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.stock-minimo-help-unico {
+    background: #f0f9ff;
+    border: 1px solid #7dd3fc;
+    border-radius: var(--border-radius-sm);
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.875rem;
+    color: #0369a1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* =============================================================================
+   OBJETOS ÚNICOS - NUEVOS ESTILOS
+   Descripción: Estilos específicos para productos únicos (que se prestan)
+   ============================================================================= */
+
+/* ===== BADGES PARA OBJETOS ÚNICOS ===== */
+.badge-unico {
+    background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #9333ea 100%);
+    color: white;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Definición eliminada - duplicado que sobreescribía el gris */
+
+/* ===== ESTADOS DE DISPONIBILIDAD ÚNICOS ===== */
+.estado-disponible {
+    color: #047857;
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    border: 1px solid #10b981;
+}
+
+.estado-no-disponible {
+    color: #dc2626;
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    border: 1px solid #ef4444;
+    animation: pulse-warning 1.5s infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); 
+    }
+    50% { 
+        box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); 
+    }
+}
+
+/* ===== FILAS DE TABLA PARA OBJETOS ÚNICOS ===== */
+.tabla-producto-unico {
+    border-left: 4px solid #8b5cf6;
+}
+
+.tabla-producto-no-disponible {
+    background-color: rgba(220, 38, 38, 0.05) !important;
+    border-left: 4px solid #dc2626;
+}
+
+.tabla-producto-no-disponible td {
+    position: relative;
+}
+
+.tabla-producto-no-disponible td::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #dc2626, transparent);
+    animation: scanLine 2s infinite;
+}
+
+@keyframes scanLine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* ===== FORMULARIO - OBJETO ÚNICO ===== */
+.objeto-unico-container {
+    background: linear-gradient(135deg, #faf5ff, #f3e8ff);
+    border: 2px solid #c4b5fd;
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-5);
+    margin: var(--space-4) 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.objeto-unico-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #8b5cf6, #a855f7, #9333ea);
+}
+
+.objeto-unico-check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.objeto-unico-check input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #8b5cf6;
+    cursor: pointer;
+}
+
+.objeto-unico-label {
+    font-weight: 600;
+    color: #6d28d9;
+    cursor: pointer;
+}
+
+.objeto-unico-help {
+    color: #7c3aed;
+    font-size: 0.9rem;
+    margin-top: var(--space-2);
+    font-style: italic;
+}
+
+/* ===== STOCK MÍNIMO CONDICIONAL ===== */
+.stock-minimo-help-normal {
+    color: #065f46;
+    font-size: 0.85rem;
+}
+
+.stock-minimo-help-unico {
+    color: #7c3aed;
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+/* ===== ICONOS PARA OBJETOS ÚNICOS ===== */
+.icono-objeto-unico {
+    color: #8b5cf6;
+    margin-right: var(--space-2);
+}
+
+.icono-prestado {
+    color: #f59e0b;
+    animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ===== CARDS ESPECIALES PARA OBJETOS ÚNICOS ===== */
+.card-objeto-unico {
+    border: 2px solid #c4b5fd;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(168, 85, 247, 0.05));
+    position: relative;
+}
+
+.card-objeto-unico::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #8b5cf6, #a855f7, #9333ea);
+}
+
+/* ===== TIMELINE PARA HISTORIAL DE NOTIFICACIONES ===== */
+.timeline {
+    position: relative;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+/* Scrollbar personalizado para el timeline */
+.timeline::-webkit-scrollbar {
+    width: 6px;
+}
+
+.timeline::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 10px;
+}
+
+.timeline::-webkit-scrollbar-thumb {
+    background: #0d6efd;
+    border-radius: 10px;
+}
+
+.timeline::-webkit-scrollbar-thumb:hover {
+    background: #0b5ed7;
+}
+
+/* Definiciones de timeline-item movidas a la sección Dashboard (línea 788-820) */
+
+.timeline-item .badge.rounded-circle {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.alert-sm {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+}
+
+/* Animación para nuevos items del timeline */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+/* ===== EFECTO DE AUTO-COMPLETADO ===== */
+/* Efecto visual para campos que se auto-completan dinámicamente */
+.auto-filled {
+    animation: autoFillPulse 0.6s ease-in-out;
+    background-color: #d1fae5 !important;
+    border-color: #10b981 !important;
+    transition: all 0.3s ease;
+}
+
+@keyframes autoFillPulse {
+    0% {
+        background-color: #ffffff;
+        border-color: #dee2e6;
+    }
+    50% {
+        background-color: #d1fae5;
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+    100% {
+        background-color: #d1fae5;
+        border-color: #10b981;
+    }
+}
+
+/* Campos de solo lectura con estilo informativo */
+input[readonly].form-control {
+    background-color: #f8f9fa;
+    cursor: not-allowed;
+    border-style: dashed;
+}
+
+input[readonly].form-control:focus {
+    background-color: #f8f9fa;
+    border-color: #6c757d;
+    box-shadow: none;
+}
+
+/* =============================================================================
+   BADGES DE ATRIBUIBILIDAD - SCORECARD
+   Descripción: Estilos para indicadores visuales de atribuibilidad de incidencias
+   ============================================================================= */
+
+/* Badge para incidencias ATRIBUIBLES al técnico */
+.badge.bg-danger[title*="atribuible"] {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+    padding: 0.35rem 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    transition: all 0.3s ease;
+}
+
+.badge.bg-danger[title*="atribuible"]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+/* Badge para incidencias NO ATRIBUIBLES */
+.badge.bg-secondary[title*="atribuible"] {
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.25);
+    padding: 0.35rem 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    transition: all 0.3s ease;
+    cursor: help; /* Indica que hay información adicional en el tooltip */
+}
+
+.badge.bg-secondary[title*="atribuible"]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.35);
+    background: linear-gradient(135deg, #5a6268 0%, #545b62 100%) !important;
+}
+
+/* Iconos dentro de los badges de atribuibilidad */
+.badge i.bi {
+    margin-right: 0.25rem;
+    font-size: 0.9em;
+    vertical-align: middle;
+}
+
+/* Tooltip mejorado para justificación */
+.badge[title] {
+    position: relative;
+}
+
+/* =============================================================================
+   BADGES DE CATEGORÍA DINÁMICOS - SCORECARD
+   Descripción: Estilos para badges de categoría con colores personalizados
+   ============================================================================= */
+
+/* Badge base para categorías con color dinámico */
+.badge-categoria {
+    padding: 0.35rem 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    border-radius: 0.375rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Efecto hover para badges de categoría */
+.badge-categoria:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    filter: brightness(1.1);
+}
+
+/* Asegurar contraste de texto en badges dinámicos */
+.badge-categoria {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+
+/* =============================================================================
+   DROPDOWN MENUS DE GESTIÓN DE ACCESO
+   Descripción: Estilos visuales para dropdowns en lista de empleados
+   NOTA: El posicionamiento lo maneja Bootstrap/Popper.js automáticamente
+   ============================================================================= */
+
+/* Ancho mínimo para que el contenido sea legible */
+.btn-group .dropdown-menu {
+    min-width: 260px;
+}
+
+/* Estilizar headers del dropdown (estados: Activo, Revocado, Pendiente) */
+.dropdown-header {
+    font-weight: 600;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+}
+
+/* Mejorar hover de items del menú */
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.2s ease;
+}
+
+/* Items informativos (no clickeables) con texto pequeño */
+.dropdown-item.text-muted.small {
+    font-size: 0.75rem;
+    padding: 0.25rem 1rem;
+    cursor: default;
+}
+
+.dropdown-item.text-muted.small:hover {
+    background-color: transparent;
+}
+
+/* Iconos en items del dropdown */
+.dropdown-item i.bi {
+    margin-right: 0.5rem;
+    font-size: 1rem;
+}
+
+/* Dividers en dropdown */
+.dropdown-divider {
+    margin: 0.5rem 0;
+}
+
+/* =============================================================================
+   AVATARES DE EMPLEADOS
+   Descripción: Estilos para mostrar fotos de perfil o iniciales de empleados
+   ============================================================================= */
+
+/* Avatar pequeño para tablas/listas (48px - 20% más grande que antes) */
+.empleado-avatar-small {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.empleado-avatar-small:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* Imagen dentro del avatar */
+.empleado-avatar-small img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* Iniciales cuando no hay foto */
+.empleado-avatar-small .avatar-iniciales {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Variación de colores de fondo para iniciales */
+.empleado-avatar-small:nth-child(3n+1) {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.empleado-avatar-small:nth-child(3n+2) {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.empleado-avatar-small:nth-child(3n) {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+/* Avatar mediano para detalles (60px) */
+.empleado-avatar-medium {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 3px solid #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.empleado-avatar-medium img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.empleado-avatar-medium .avatar-iniciales {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.25rem;
+    text-transform: uppercase;
+}
+
+/* Avatar grande para perfiles (120px) */
+.empleado-avatar-large {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 4px solid #ffffff;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.empleado-avatar-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.empleado-avatar-large .avatar-iniciales {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 2rem;
+    text-transform: uppercase;
+}
+
+/* Indicador de foto presente */
+.has-foto-indicator {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    background-color: #10b981;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+

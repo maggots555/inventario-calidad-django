@@ -1,0 +1,558 @@
+/*
+================================================================================
+ESTILOS PERSONALIZADOS - PÁGINA DE SELECCIÓN DE TIPO DE ORDEN
+================================================================================
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+Este archivo CSS define el aspecto visual de la página de selección de tipo
+de orden de servicio. Usa una paleta de colores profesional y efectos modernos.
+
+PALETA DE COLORES PROFESIONAL:
+- Diagnóstico (OOW-): Azules/Índigo (#4F46E5, #6366F1)
+- Venta Mostrador (FL-): Naranjas/Ámbar (#F59E0B, #F97316)
+- Fondos: Grises suaves (#F9FAFB, #F3F4F6)
+- Texto: Grises oscuros (#111827, #374151)
+
+TÉCNICAS CSS UTILIZADAS:
+- CSS Variables (Custom Properties) para reutilización
+- Flexbox para layouts responsivos
+- Transiciones suaves para interactividad
+- Box-shadows para profundidad
+- Transform para animaciones
+- Media queries para responsividad
+================================================================================
+*/
+
+/* ========================================================================== */
+/* VARIABLES CSS - Colores y Valores Reutilizables                           */
+/* ========================================================================== */
+:root {
+    /* Colores Primarios */
+    --color-diagnostico: #4F46E5;        /* Índigo para diagnóstico */
+    --color-diagnostico-light: #6366F1;  /* Índigo claro */
+    --color-diagnostico-dark: #4338CA;   /* Índigo oscuro */
+    
+    --color-venta: #F59E0B;              /* Ámbar para venta mostrador */
+    --color-venta-light: #FBBF24;        /* Ámbar claro */
+    --color-venta-dark: #D97706;         /* Ámbar oscuro */
+    
+    /* Colores de Fondo */
+    --bg-page: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --bg-card: #FFFFFF;
+    --bg-hover: #F9FAFB;
+    
+    /* Colores de Texto */
+    --text-dark: #111827;
+    --text-medium: #374151;
+    --text-light: #6B7280;
+    
+    /* Sombras */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    
+    /* Espaciados */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 3rem;
+    
+    /* Bordes */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+    
+    /* Transiciones */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================================================== */
+/* CONTENEDOR PRINCIPAL DE LA PÁGINA                                         */
+/* ========================================================================== */
+.seleccion-orden-wrapper {
+    min-height: calc(100vh - 200px);
+    background: var(--bg-page);
+    padding: var(--spacing-xl) 0;
+    animation: fadeIn 0.6s ease-out;
+}
+
+/* ========================================================================== */
+/* SECCIÓN DE HÉROE (Hero Section)                                           */
+/* ========================================================================== */
+.hero-section {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+    animation: slideDown 0.8s ease-out;
+}
+
+.hero-icon {
+    font-size: 4rem;
+    margin-bottom: var(--spacing-md);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.hero-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: var(--spacing-sm);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.hero-subtitle {
+    font-size: 1.25rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 400;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* ========================================================================== */
+/* CONTENEDOR DE CARDS                                                       */
+/* ========================================================================== */
+.cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-lg);
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+}
+
+/* ========================================================================== */
+/* CARD INDIVIDUAL DE TIPO DE SERVICIO                                       */
+/* ========================================================================== */
+.service-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    box-shadow: var(--shadow-lg);
+    transition: all var(--transition-base);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    animation: fadeInUp 0.8s ease-out;
+    animation-fill-mode: both;
+}
+
+.service-card:nth-child(1) {
+    animation-delay: 0.1s;
+}
+
+.service-card:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+/* Efecto de fondo animado en hover */
+.service-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, transparent 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity var(--transition-base);
+    z-index: 0;
+}
+
+.service-card:hover::before {
+    opacity: 1;
+}
+
+.service-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: var(--shadow-xl);
+}
+
+/* Card de Diagnóstico */
+.service-card.diagnostico::before {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%);
+}
+
+.service-card.diagnostico:hover {
+    border: 2px solid var(--color-diagnostico-light);
+}
+
+/* Card de Venta Mostrador */
+.service-card.venta-mostrador::before {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(249, 115, 22, 0.05) 100%);
+}
+
+.service-card.venta-mostrador:hover {
+    border: 2px solid var(--color-venta-light);
+}
+
+/* ========================================================================== */
+/* CONTENIDO INTERNO DEL CARD                                                */
+/* ========================================================================== */
+.service-card-content {
+    position: relative;
+    z-index: 1;
+}
+
+/* Ícono del Tipo de Servicio */
+.service-icon {
+    font-size: 3.5rem;
+    margin-bottom: var(--spacing-md);
+    transition: transform var(--transition-base);
+}
+
+.service-card:hover .service-icon {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.service-card.diagnostico .service-icon {
+    color: var(--color-diagnostico);
+}
+
+.service-card.venta-mostrador .service-icon {
+    color: var(--color-venta);
+}
+
+/* Título del Tipo de Servicio */
+.service-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Badge del Prefijo */
+.service-prefix {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--spacing-md);
+    animation: breathing 2s ease-in-out infinite;
+}
+
+.service-card.diagnostico .service-prefix {
+    background: linear-gradient(135deg, var(--color-diagnostico) 0%, var(--color-diagnostico-light) 100%);
+    color: white;
+    box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3);
+}
+
+.service-card.venta-mostrador .service-prefix {
+    background: linear-gradient(135deg, var(--color-venta) 0%, var(--color-venta-light) 100%);
+    color: white;
+    box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);
+}
+
+/* Lista de Características */
+.service-features {
+    list-style: none;
+    padding: 0;
+    margin: var(--spacing-md) 0;
+    text-align: left;
+}
+
+.service-features li {
+    padding: var(--spacing-xs) 0;
+    color: var(--text-medium);
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    transition: transform var(--transition-fast);
+}
+
+.service-features li:hover {
+    transform: translateX(5px);
+}
+
+.service-features li i {
+    margin-right: var(--spacing-sm);
+    font-size: 1.1rem;
+}
+
+.service-card.diagnostico .service-features li i {
+    color: var(--color-diagnostico);
+}
+
+.service-card.venta-mostrador .service-features li i {
+    color: var(--color-venta);
+}
+
+/* Botón de Acción */
+.service-button {
+    width: 100%;
+    padding: var(--spacing-md);
+    border: none;
+    border-radius: var(--radius-lg);
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    margin-top: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    position: relative;
+    overflow: hidden;
+}
+
+.service-button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width var(--transition-slow), height var(--transition-slow);
+}
+
+.service-button:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+.service-card.diagnostico .service-button {
+    background: linear-gradient(135deg, var(--color-diagnostico) 0%, var(--color-diagnostico-light) 100%);
+    box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3);
+}
+
+.service-card.diagnostico .service-button:hover {
+    background: linear-gradient(135deg, var(--color-diagnostico-dark) 0%, var(--color-diagnostico) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(79, 70, 229, 0.4);
+}
+
+.service-card.venta-mostrador .service-button {
+    background: linear-gradient(135deg, var(--color-venta) 0%, var(--color-venta-light) 100%);
+    box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);
+}
+
+.service-card.venta-mostrador .service-button:hover {
+    background: linear-gradient(135deg, var(--color-venta-dark) 0%, var(--color-venta) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(245, 158, 11, 0.4);
+}
+
+.service-button i {
+    transition: transform var(--transition-base);
+    position: relative;
+    z-index: 1;
+}
+
+.service-button:hover i {
+    transform: translateX(5px);
+}
+
+/* ========================================================================== */
+/* SECCIÓN DE INFORMACIÓN ADICIONAL                                          */
+/* ========================================================================== */
+.info-section {
+    text-align: center;
+    margin-top: var(--spacing-xl);
+    padding: var(--spacing-lg);
+    animation: fadeIn 1s ease-out 0.5s both;
+}
+
+.info-box {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-md);
+    max-width: 700px;
+    margin: 0 auto;
+    backdrop-filter: blur(10px);
+}
+
+.info-box i {
+    font-size: 2rem;
+    color: var(--color-diagnostico);
+    margin-bottom: var(--spacing-sm);
+}
+
+.info-box p {
+    color: var(--text-medium);
+    font-size: 1rem;
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* ========================================================================== */
+/* ANIMACIONES                                                                */
+/* ========================================================================== */
+
+/* Fade In - Aparición gradual */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Slide Down - Deslizar desde arriba */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Fade In Up - Aparición desde abajo */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Pulse - Efecto de pulso */
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+/* Breathing - Efecto de respiración para badges */
+@keyframes breathing {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.9;
+    }
+}
+
+/* ========================================================================== */
+/* RESPONSIVIDAD - MOBILE FIRST                                              */
+/* ========================================================================== */
+
+/* Tablets y dispositivos medianos (768px - 991px) */
+@media (max-width: 991px) {
+    .hero-title {
+        font-size: 2rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.125rem;
+    }
+    
+    .cards-container {
+        gap: var(--spacing-md);
+    }
+}
+
+/* Móviles (menor a 768px) */
+@media (max-width: 767px) {
+    .seleccion-orden-wrapper {
+        padding: var(--spacing-lg) 0;
+    }
+    
+    .hero-icon {
+        font-size: 3rem;
+    }
+    
+    .hero-title {
+        font-size: 1.75rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1rem;
+    }
+    
+    .cards-container {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+    
+    .service-card {
+        padding: var(--spacing-lg);
+    }
+    
+    .service-icon {
+        font-size: 3rem;
+    }
+    
+    .service-title {
+        font-size: 1.5rem;
+    }
+    
+    /* Reducir animaciones en móvil para mejor rendimiento */
+    .service-card:hover {
+        transform: translateY(-4px) scale(1.01);
+    }
+    
+    .service-button {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+}
+
+/* Móviles pequeños (menor a 480px) */
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: 1.5rem;
+    }
+    
+    .service-title {
+        font-size: 1.25rem;
+    }
+    
+    .service-features li {
+        font-size: 0.875rem;
+    }
+}
+
+/* ========================================================================== */
+/* ACCESIBILIDAD                                                              */
+/* ========================================================================== */
+
+/* Modo de alto contraste */
+@media (prefers-contrast: high) {
+    .service-card {
+        border: 2px solid var(--text-dark);
+    }
+}
+
+/* Reducción de movimiento para usuarios sensibles */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Focus visible para navegación por teclado */
+.service-card:focus-within,
+.service-button:focus {
+    outline: 3px solid var(--color-diagnostico);
+    outline-offset: 4px;
+}

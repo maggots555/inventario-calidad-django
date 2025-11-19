@@ -1,0 +1,336 @@
+/* ====================================================================
+   ESTILOS PERSONALIZADOS PARA DASHBOARD OOW-/FL-
+   Archivo: static/css/dashboard_oow_fl.css
+   
+   Este archivo contiene todos los estilos específicos para el dashboard
+   de seguimiento de órdenes con prefijo OOW- y FL-
+   ==================================================================== */
+
+/* ====================================================================
+   VARIABLES CSS - Colores y valores reutilizables
+   ==================================================================== */
+:root {
+    --primary-gradient-start: #667eea;
+    --primary-gradient-end: #764ba2;
+    --filter-gradient-start: #f5f7fa;
+    --filter-gradient-end: #c3cfe2;
+    --shadow-light: 0 3px 10px rgba(0,0,0,0.1);
+    --shadow-medium: 0 5px 15px rgba(0,0,0,0.2);
+    --border-radius: 8px;
+    --transition-speed: 0.2s;
+}
+
+/* ====================================================================
+   TARJETAS DE MÉTRICAS
+   ==================================================================== */
+.metric-card {
+    border-left: 4px solid;
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-medium);
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 0;
+}
+
+.metric-label {
+    color: #6c757d;
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+/* ====================================================================
+   CARD MEJORADO DE COTIZACIONES CON DESGLOSE CLARO
+   ==================================================================== */
+.cotizaciones-desglose {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+}
+
+.cotizaciones-desglose .estado-item {
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cotizaciones-desglose .estado-item strong {
+    font-size: 1.25rem;
+    min-width: 2rem;
+    text-align: center;
+}
+
+.cotizaciones-desglose .estado-item small {
+    color: #6c757d;
+    font-size: 0.8rem;
+    flex: 1;
+}
+
+/* Colores específicos para cada estado */
+.estado-aceptadas {
+    background-color: rgba(40, 167, 69, 0.1);
+    border-left: 3px solid #28a745;
+}
+
+.estado-pendientes {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-left: 3px solid #ffc107;
+}
+
+.estado-rechazadas {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-left: 3px solid #dc3545;
+}
+
+/* ====================================================================
+   VERSIÓN COMPACTA DE COTIZACIONES (Para cards de responsables)
+   ==================================================================== */
+.cotizaciones-desglose-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.estado-item-compact {
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.estado-item-compact .estado-numero {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.estado-aceptadas-compact {
+    background-color: rgba(40, 167, 69, 0.15);
+    border-left: 2px solid #28a745;
+}
+
+.estado-pendientes-compact {
+    background-color: rgba(255, 193, 7, 0.15);
+    border-left: 2px solid #ffc107;
+}
+
+.estado-rechazadas-compact {
+    background-color: rgba(220, 53, 69, 0.15);
+    border-left: 2px solid #dc3545;
+}
+
+/* ====================================================================
+   SECCIÓN COLAPSABLE DE RESPONSABLE
+   ==================================================================== */
+.responsable-section {
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+    transition: box-shadow var(--transition-speed);
+}
+
+.responsable-section:hover {
+    box-shadow: var(--shadow-light);
+}
+
+.responsable-header {
+    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+    color: white;
+    padding: 1rem;
+    cursor: pointer;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.responsable-body {
+    padding: 1rem;
+    background: #f8f9fa;
+}
+
+/* ====================================================================
+   ALERTAS
+   ==================================================================== */
+.alert-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* ====================================================================
+   TABLAS
+   ==================================================================== */
+.table-dashboard {
+    font-size: 0.875rem;
+}
+
+.table-dashboard th {
+    background-color: #495057;
+    color: white;
+    font-weight: 600;
+    border: none;
+}
+
+.table-dashboard td {
+    vertical-align: middle;
+}
+
+/* ====================================================================
+   GRÁFICOS
+   ==================================================================== */
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin-bottom: 2rem;
+}
+
+/* Contenedor para gráficos horizontales (Ventas por Responsable) */
+.chart-container.chart-horizontal {
+    height: 400px;
+}
+
+/* Contenedor para gráficos verticales (TOP Productos) */
+.chart-container.chart-vertical {
+    height: 350px;
+}
+
+/* Estilos específicos para card de gráficos */
+.card.chart-card {
+    border: 1px solid #e9ecef;
+    box-shadow: var(--shadow-light);
+}
+
+.card.chart-card .card-header {
+    background: linear-gradient(135deg, rgba(240, 147, 251, 0.1) 0%, rgba(240, 147, 251, 0.05) 100%);
+    border-bottom: 2px solid rgba(240, 147, 251, 0.3);
+}
+
+.card.chart-card .card-header.top-productos {
+    background: linear-gradient(135deg, rgba(67, 233, 123, 0.1) 0%, rgba(67, 233, 123, 0.05) 100%);
+    border-bottom: 2px solid rgba(67, 233, 123, 0.3);
+}
+
+/* ====================================================================
+   SECCIÓN DE FILTROS
+   ==================================================================== */
+.filter-section {
+    background: linear-gradient(135deg, var(--filter-gradient-start) 0%, var(--filter-gradient-end) 100%);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 2rem;
+}
+
+/* ====================================================================
+   BADGES PERSONALIZADOS
+   ==================================================================== */
+.badge-custom-primary {
+    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+}
+
+/* ====================================================================
+   CARD HEADERS CON FONDO OSCURO - TEXTO BLANCO
+   ==================================================================== */
+.card-header.bg-dark,
+.card-header.bg-primary,
+.card-header.bg-secondary {
+    color: white !important;
+}
+
+.card-header.bg-dark h5,
+.card-header.bg-dark h6,
+.card-header.bg-primary h5,
+.card-header.bg-primary h6,
+.card-header.bg-secondary h5,
+.card-header.bg-secondary h6 {
+    color: white !important;
+    margin: 0;
+}
+
+.card-header.bg-dark i,
+.card-header.bg-primary i,
+.card-header.bg-secondary i {
+    color: white !important;
+}
+
+/* Asegurar que los badges dentro de headers oscuros sean visibles */
+.card-header.bg-dark .badge,
+.card-header.bg-primary .badge,
+.card-header.bg-secondary .badge {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+/* ====================================================================
+   LOADING OVERLAY (Para futuras implementaciones AJAX)
+   ==================================================================== */
+.loading-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+
+/* ====================================================================
+   ANIMACIONES Y TRANSICIONES
+   ==================================================================== */
+.card {
+    transition: box-shadow var(--transition-speed);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-light);
+}
+
+/* ====================================================================
+   RESPONSIVE - AJUSTES PARA MÓVILES Y TABLETS
+   ==================================================================== */
+@media (max-width: 768px) {
+    .metric-value {
+        font-size: 1.5rem;
+    }
+    
+    .chart-container {
+        height: 250px;
+    }
+    
+    .responsable-header {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .filter-section {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .metric-value {
+        font-size: 1.25rem;
+    }
+    
+    .chart-container {
+        height: 200px;
+    }
+    
+    .table-dashboard {
+        font-size: 0.75rem;
+    }
+}

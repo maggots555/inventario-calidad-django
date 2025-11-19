@@ -1,0 +1,415 @@
+/* ============================================
+   ESTILOS DEL DASHBOARD DE COTIZACIONES
+   Diseño moderno tipo Power BI
+   ============================================ */
+
+:root {
+    --dashboard-bg: #f8f9fa;
+    --card-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+    --card-hover-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+    --border-radius: 12px;
+    --transition: all 0.3s ease;
+}
+
+body {
+    background-color: var(--dashboard-bg);
+}
+
+/* Header del Dashboard */
+.dashboard-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+}
+
+.dashboard-header h1 {
+    font-weight: 700;
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.dashboard-header p {
+    opacity: 0.95;
+    font-size: 1.1rem;
+}
+
+/* Formulario de Filtros */
+.filtros-card {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    border: none;
+    margin-bottom: 2rem;
+    transition: var(--transition);
+}
+
+.filtros-card:hover {
+    box-shadow: var(--card-hover-shadow);
+}
+
+.filtros-card .card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    padding: 1rem 1.5rem;
+    border: none;
+}
+
+.filtros-card .card-body {
+    padding: 1.5rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    padding: 0.625rem 1rem;
+    transition: var(--transition);
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+}
+
+/* Botones de Acción */
+.btn-filtrar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    padding: 0.625rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.btn-filtrar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+.btn-limpiar {
+    background: #6c757d;
+    border: none;
+    padding: 0.625rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    color: white;
+    transition: var(--transition);
+}
+
+.btn-limpiar:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    color: white;
+}
+
+.btn-exportar {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+    border: none;
+    padding: 0.625rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.btn-exportar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
+}
+
+/* Grid de KPIs */
+.kpis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--card-shadow);
+    border-left: 4px solid;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, transparent 100%);
+    border-radius: 50%;
+    transform: translate(30%, -30%);
+}
+
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--card-hover-shadow);
+}
+
+.kpi-card.primary { border-left-color: #667eea; }
+.kpi-card.success { border-left-color: #27ae60; }
+.kpi-card.danger { border-left-color: #e74c3c; }
+.kpi-card.warning { border-left-color: #f39c12; }
+.kpi-card.info { border-left-color: #3498db; }
+
+.kpi-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.7;
+}
+
+.kpi-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #212529;
+    margin-bottom: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.kpi-subtext {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-top: 0.5rem;
+}
+
+/* Sistema de Tabs */
+.nav-tabs {
+    border: none;
+    margin-bottom: 2rem;
+    background: white;
+    padding: 0.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+}
+
+.nav-tabs .nav-item {
+    margin-bottom: 0;
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    color: #6c757d;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    transition: var(--transition);
+    margin-right: 0.5rem;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.nav-tabs .nav-link.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+}
+
+/* Cards de Gráficos */
+.grafico-card {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    margin-bottom: 2rem;
+    border: none;
+    transition: var(--transition);
+    overflow: hidden;
+}
+
+.grafico-card:hover {
+    box-shadow: var(--card-hover-shadow);
+}
+
+.grafico-card .card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 2px solid #e9ecef;
+    padding: 1rem 1.5rem;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.grafico-card .card-header h5 {
+    margin: 0;
+    font-weight: 700;
+    color: #212529;
+    font-size: 1.1rem;
+}
+
+.grafico-card .card-body {
+    padding: 1.5rem;
+}
+
+/* Plotly Graphs */
+.plotly-graph-div {
+    border-radius: 8px;
+}
+
+/* Alertas y Mensajes */
+.alert-dashboard {
+    border-radius: var(--border-radius);
+    border: none;
+    box-shadow: var(--card-shadow);
+    padding: 1rem 1.5rem;
+}
+
+.alert-dashboard .alert-heading {
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+/* Loading State */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: var(--transition);
+}
+
+.loading-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.spinner-border-lg {
+    width: 4rem;
+    height: 4rem;
+    border-width: 0.4rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .dashboard-header h1 {
+        font-size: 1.75rem;
+    }
+    
+    .kpis-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .nav-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+    
+    .nav-tabs .nav-link {
+        white-space: nowrap;
+    }
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.6s ease;
+}
+
+/* Badge personalizado */
+.badge-custom {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* Sección ML especial */
+.ml-insight-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    box-shadow: var(--card-shadow);
+    margin-bottom: 2rem;
+}
+
+.ml-insight-card h5 {
+    color: white;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.ml-accuracy {
+    font-size: 4rem;
+    font-weight: 700;
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.ml-sugerencia {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    border-left: 3px solid white;
+}
+
+/* Estilos adicionales para cards compactas */
+.alert-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+.card h6 {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+/* Asegurar altura uniforme en grid 2x2 */
+.h-100 {
+    height: 100% !important;
+}
+
+/* Mejor espaciado en cards pequeñas */
+.card-body.compact {
+    padding: 1rem;
+}
+
+/* Responsive para grid 2x2 */
+@media (max-width: 991px) {
+    .col-lg-3 {
+        margin-bottom: 1rem;
+    }
+}
