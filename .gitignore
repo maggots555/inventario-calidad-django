@@ -24,12 +24,14 @@ media/
 staticfiles/
 
 # Archivos de migración de datos (JSON dumps)
+# Excluir SOLO los dumps de modelos, NO los de configuración
 users.json
 inventario.json
 scorecard.json
 servicio_tecnico.json
 *_dump.json
 *_backup.json
+*_fixture.json
 
 # IDEs
 .vscode/
