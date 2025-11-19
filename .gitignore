@@ -21,6 +21,7 @@ db.sqlite3.backup*
 *.sqlite
 *.sqlite3
 media/
+staticfiles/
 
 # IDEs
 .vscode/
