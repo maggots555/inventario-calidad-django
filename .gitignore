@@ -23,6 +23,14 @@ db.sqlite3.backup*
 media/
 staticfiles/
 
+# Archivos de migración de datos (JSON dumps)
+users.json
+inventario.json
+scorecard.json
+servicio_tecnico.json
+*_dump.json
+*_backup.json
+
 # IDEs
 .vscode/
 .idea/

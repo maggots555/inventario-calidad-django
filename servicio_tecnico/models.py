@@ -1895,12 +1895,12 @@ class HistorialOrden(models.Model):
     
     # CAMBIOS DE ESTADO
     estado_anterior = models.CharField(
-        max_length=20,
+        max_length=30,
         blank=True,
         help_text="Estado anterior (si aplica)"
     )
     estado_nuevo = models.CharField(
-        max_length=20,
+        max_length=30,
         blank=True,
         help_text="Estado nuevo (si aplica)"
     )
