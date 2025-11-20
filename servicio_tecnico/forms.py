@@ -1910,8 +1910,10 @@ class SeguimientoPiezaForm(forms.ModelForm):
         self.fields['fecha_pedido'].widget.attrs['max'] = date.today().isoformat()
         self.fields['fecha_entrega_estimada'].widget.attrs['min'] = date.today().isoformat()
         
-        # Si es edición y el estado es "recibido", hacer obligatoria la fecha real
-        if self.instance and self.instance.pk and self.instance.estado == 'recibido':
+        # Si es edición y el estado es "recibido" (incluye recibido, incorrecto, danado),
+        # hacer obligatoria la fecha real ya que la pieza llegó físicamente
+        from config.constants import ESTADOS_PIEZA_RECIBIDOS
+        if self.instance and self.instance.pk and self.instance.estado in ESTADOS_PIEZA_RECIBIDOS:
             self.fields['fecha_entrega_real'].required = True
     
     def clean(self):
@@ -1932,10 +1934,11 @@ class SeguimientoPiezaForm(forms.ModelForm):
                     'fecha_entrega_estimada': '❌ La fecha estimada no puede ser anterior a la fecha de pedido'
                 })
         
-        # Si el estado es "recibido", la fecha real es obligatoria
-        if estado == 'recibido' and not fecha_real:
+        # Si el estado es "recibido" (incluye recibido, incorrecto, danado), la fecha real es obligatoria
+        from config.constants import ESTADOS_PIEZA_RECIBIDOS
+        if estado in ESTADOS_PIEZA_RECIBIDOS and not fecha_real:
             raise ValidationError({
-                'fecha_entrega_real': '❌ Debes indicar la fecha real de entrega si el estado es "Recibido"'
+                'fecha_entrega_real': '❌ Debes indicar la fecha real de entrega si la pieza fue recibida (correcta, incorrecta o dañada)'
             })
         
         # Si hay fecha real, validar que sea posterior al pedido

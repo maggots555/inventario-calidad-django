@@ -132,7 +132,7 @@ class FilterFormValidator implements FormValidator {
     private fechaInicioInput: HTMLInputElement | null;
     private fechaFinInput: HTMLInputElement | null;
 
-    constructor(formId: string) {
+    constructor(formId: string = 'filtros-form') {
         this.form = document.getElementById(formId) as HTMLFormElement;
         this.fechaInicioInput = document.getElementById('fecha_inicio') as HTMLInputElement;
         this.fechaFinInput = document.getElementById('fecha_fin') as HTMLInputElement;
@@ -309,6 +309,189 @@ class SmoothScrollManager {
 }
 
 // ============================================
+// CLASE PARA VISTA AGRUPADA (NUEVO)
+// ============================================
+
+class VistaAgrupadaManager {
+    /**
+     * Maneja las funcionalidades interactivas de la vista agrupada:
+     * - Expandir/colapsar proveedores adicionales
+     * - Expandir/colapsar detalles completos de seguimiento
+     * - Animaciones suaves
+     */
+
+    public init(): void {
+        this.setupToggleProveedores();
+        this.setupToggleDetalles();
+        this.setupRowClickExpand();
+    }
+
+    /**
+     * Configura botones para expandir/colapsar proveedores adicionales
+     */
+    private setupToggleProveedores(): void {
+        const toggleButtons = document.querySelectorAll<HTMLButtonElement>('.toggle-proveedores');
+
+        toggleButtons.forEach((button: HTMLButtonElement) => {
+            button.addEventListener('click', (event: MouseEvent) => {
+                event.stopPropagation(); // Evitar que dispare el click de la fila
+                const ordenId = button.getAttribute('data-orden-id');
+                if (ordenId) {
+                    this.toggleProveedores(ordenId, button);
+                }
+            });
+        });
+    }
+
+    /**
+     * Expande o colapsa la lista de proveedores adicionales
+     */
+    private toggleProveedores(ordenId: string, button: HTMLButtonElement): void {
+        const proveedoresExtra = document.getElementById(`proveedores-${ordenId}`);
+        const icon = button.querySelector<HTMLElement>('i');
+
+        if (proveedoresExtra) {
+            if (proveedoresExtra.classList.contains('d-none')) {
+                // Expandir
+                proveedoresExtra.classList.remove('d-none');
+                proveedoresExtra.classList.add('expanded');
+                if (icon) {
+                    icon.classList.remove('bi-chevron-down');
+                    icon.classList.add('bi-chevron-up');
+                }
+                button.innerHTML = button.innerHTML.replace('Ver', 'Ocultar');
+            } else {
+                // Colapsar
+                proveedoresExtra.classList.add('d-none');
+                proveedoresExtra.classList.remove('expanded');
+                if (icon) {
+                    icon.classList.remove('bi-chevron-up');
+                    icon.classList.add('bi-chevron-down');
+                }
+                button.innerHTML = button.innerHTML.replace('Ocultar', 'Ver');
+            }
+        }
+    }
+
+    /**
+     * Configura botones para expandir/colapsar detalles completos
+     */
+    private setupToggleDetalles(): void {
+        const toggleButtons = document.querySelectorAll<HTMLButtonElement>('.toggle-detalles');
+
+        toggleButtons.forEach((button: HTMLButtonElement) => {
+            button.addEventListener('click', (event: MouseEvent) => {
+                event.stopPropagation(); // Evitar que dispare el click de la fila
+                const ordenId = button.getAttribute('data-orden-id');
+                if (ordenId) {
+                    this.toggleDetalles(ordenId, button);
+                }
+            });
+        });
+    }
+
+    /**
+     * Expande o colapsa la fila de detalles completos
+     */
+    private toggleDetalles(ordenId: string, button: HTMLButtonElement): void {
+        const detallesRow = document.getElementById(`detalles-${ordenId}`);
+        const icon = button.querySelector<HTMLElement>('i');
+
+        if (detallesRow) {
+            if (detallesRow.classList.contains('d-none')) {
+                // Expandir
+                detallesRow.classList.remove('d-none');
+                detallesRow.classList.add('show');
+                button.classList.add('expanded');
+                if (icon) {
+                    icon.classList.remove('bi-chevron-down');
+                    icon.classList.add('bi-chevron-up');
+                }
+                // Cambiar estilo del botón
+                button.classList.remove('btn-outline-info');
+                button.classList.add('btn-info');
+                button.innerHTML = '<i class="bi bi-chevron-up"></i> Ocultar';
+            } else {
+                // Colapsar
+                detallesRow.classList.add('d-none');
+                detallesRow.classList.remove('show');
+                button.classList.remove('expanded');
+                if (icon) {
+                    icon.classList.remove('bi-chevron-up');
+                    icon.classList.add('bi-chevron-down');
+                }
+                // Restaurar estilo del botón
+                button.classList.remove('btn-info');
+                button.classList.add('btn-outline-info');
+                button.innerHTML = '<i class="bi bi-chevron-down"></i> Detalles';
+            }
+        }
+    }
+
+    /**
+     * Permite hacer clic en toda la fila para expandir detalles
+     * (excepto en botones y enlaces)
+     */
+    private setupRowClickExpand(): void {
+        const ordenRows = document.querySelectorAll<HTMLTableRowElement>('.orden-row');
+
+        ordenRows.forEach((row: HTMLTableRowElement) => {
+            row.addEventListener('click', (event: MouseEvent) => {
+                const target = event.target as HTMLElement;
+
+                // Verificar que no se hizo clic en un botón, enlace o input
+                if (
+                    !target.closest('button') &&
+                    !target.closest('a') &&
+                    !target.closest('input') &&
+                    !target.closest('select')
+                ) {
+                    const ordenId = row.getAttribute('data-orden-id');
+                    if (ordenId) {
+                        const toggleButton = row.nextElementSibling?.querySelector<HTMLButtonElement>('.toggle-detalles');
+                        if (toggleButton) {
+                            // Simular click en el botón de detalles
+                            const toggleButtonInRow = row.querySelector<HTMLButtonElement>('.toggle-detalles');
+                            if (toggleButtonInRow) {
+                                toggleButtonInRow.click();
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Agregar cursor pointer para indicar que la fila es clickeable
+            row.style.cursor = 'pointer';
+        });
+    }
+
+    /**
+     * Expande automáticamente órdenes con prioridad crítica al cargar
+     */
+    public autoExpandCriticas(): void {
+        const ordenesRows = document.querySelectorAll<HTMLTableRowElement>('.orden-row');
+
+        ordenesRows.forEach((row: HTMLTableRowElement) => {
+            // Buscar badge de prioridad crítica
+            const badgeCritico = row.querySelector<HTMLElement>('.badge.bg-danger.badge-lg');
+
+            if (badgeCritico && badgeCritico.textContent?.includes('CRÍTICO')) {
+                const ordenId = row.getAttribute('data-orden-id');
+                if (ordenId) {
+                    const toggleButton = row.querySelector<HTMLButtonElement>('.toggle-detalles');
+                    if (toggleButton) {
+                        // Expandir automáticamente después de 500ms
+                        setTimeout(() => {
+                            this.toggleDetalles(ordenId, toggleButton);
+                        }, 500);
+                    }
+                }
+            }
+        });
+    }
+}
+
+// ============================================
 // CLASE PRINCIPAL - DASHBOARD MANAGER
 // ============================================
 
@@ -320,6 +503,7 @@ class DashboardSeguimientoPiezas {
     private exportManager: ExportManager;
     private tooltipManager: TooltipManager;
     private smoothScrollManager: SmoothScrollManager;
+    private vistaAgrupadaManager: VistaAgrupadaManager;
 
     constructor() {
         this.loadingOverlay = new LoadingOverlayManager();
@@ -329,6 +513,7 @@ class DashboardSeguimientoPiezas {
         this.exportManager = new ExportManager(this.loadingOverlay);
         this.tooltipManager = new TooltipManager();
         this.smoothScrollManager = new SmoothScrollManager();
+        this.vistaAgrupadaManager = new VistaAgrupadaManager();
     }
 
     public init(): void {
@@ -340,6 +525,9 @@ class DashboardSeguimientoPiezas {
         this.exportManager.init();
         this.tooltipManager.init();
         this.smoothScrollManager.init();
+        
+        // Inicializar vista agrupada (NUEVO)
+        this.vistaAgrupadaManager.init();
 
         // Setup validación de formulario
         if (this.formValidator instanceof FilterFormValidator) {
@@ -351,6 +539,11 @@ class DashboardSeguimientoPiezas {
 
         // Mostrar loading overlay al enviar formulario de filtros
         this.setupFormSubmitLoading();
+        
+        // Auto-expandir órdenes críticas (NUEVO)
+        setTimeout(() => {
+            this.vistaAgrupadaManager.autoExpandCriticas();
+        }, 1000);
 
         console.log('Dashboard inicializado correctamente.');
     }
@@ -364,7 +557,7 @@ class DashboardSeguimientoPiezas {
     }
 
     private setupFormSubmitLoading(): void {
-        const form = document.getElementById('form-filtros') as HTMLFormElement;
+        const form = document.getElementById('filtros-form') as HTMLFormElement;
         if (form) {
             form.addEventListener('submit', () => {
                 this.loadingOverlay.show();

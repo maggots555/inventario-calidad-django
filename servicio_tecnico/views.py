@@ -35,7 +35,13 @@ from .models import (
     ConfiguracionRHITSO,
 )
 from inventario.models import Empleado, Sucursal
-from config.constants import ESTADO_ORDEN_CHOICES
+from config.constants import (
+    ESTADO_ORDEN_CHOICES,
+    ESTADO_PIEZA_CHOICES,
+    ESTADOS_PIEZA_RECIBIDOS,
+    ESTADOS_PIEZA_PENDIENTES,
+    ESTADOS_PIEZA_PROBLEMATICOS
+)
 from .utils_rhitso import (
     calcular_dias_habiles,
     calcular_dias_en_estatus,
@@ -9587,8 +9593,9 @@ def dashboard_seguimiento_piezas(request):
     if not df_seguimientos.empty:
         try:
             # Filtrar solo activos con fecha estimada futura
+            # ACTUALIZADO: Usar constantes para estados pendientes
             df_activos = df_seguimientos[
-                (df_seguimientos['estado'].isin(['pedido', 'transito'])) &
+                (df_seguimientos['estado'].isin(ESTADOS_PIEZA_PENDIENTES)) &
                 (df_seguimientos['dias_hasta_entrega'] >= -30)  # Incluir hasta 30 días de retraso
             ].copy()
             
@@ -9684,50 +9691,76 @@ def dashboard_seguimiento_piezas(request):
             graficos['timeline_entregas'] = None
     
     # ========================================
-    # 4. PREPARAR DATOS PARA LA TABLA
+    # 4. PREPARAR DATOS PARA ALERTAS
     # ========================================
     
-    # Separar seguimientos en activos y recibidos
+    # ========================================
+    # 4.5 PREPARAR VISTA AGRUPADA POR ORDEN
+    # ========================================
+    
+    # Importar función de agrupación
+    from .utils_cotizaciones import agrupar_seguimientos_por_orden
+    
+    # Generar vista agrupada
     if not df_seguimientos.empty:
-        # Seguimientos activos (pedido, tránsito)
-        df_activos_tabla = df_seguimientos[
-            df_seguimientos['estado'].isin(['pedido', 'transito'])
-        ].copy()
-        seguimientos_activos = df_activos_tabla.to_dict('records')
+        ordenes_agrupadas = agrupar_seguimientos_por_orden(df_seguimientos)
         
-        # Seguimientos recibidos
-        df_recibidos = df_seguimientos[
-            df_seguimientos['estado'] == 'recibido'
-        ].copy()
-        seguimientos_recibidos = df_recibidos.to_dict('records')
+        # Separar agrupadas en activas y recibidas
+        ordenes_activas = [o for o in ordenes_agrupadas if o['estado_general'] != 'todos_recibidos']
+        ordenes_recibidas = [o for o in ordenes_agrupadas if o['estado_general'] == 'todos_recibidos']
         
-        # Todos los seguimientos (para compatibilidad)
-        seguimientos_lista = df_seguimientos.to_dict('records')
+        # KPIs específicos de la vista agrupada
+        kpis_agrupados = {
+            'total_ordenes': len(ordenes_agrupadas),
+            'ordenes_activas': len(ordenes_activas),
+            'ordenes_completadas': len(ordenes_recibidas),
+            'ordenes_con_retrasos': len([o for o in ordenes_agrupadas if o['tiene_retrasados']]),
+            'ordenes_criticas': len([o for o in ordenes_agrupadas if o['prioridad_maxima'] == 'critico']),
+        }
     else:
-        seguimientos_activos = []
-        seguimientos_recibidos = []
-        seguimientos_lista = []
+        ordenes_agrupadas = []
+        ordenes_activas = []
+        ordenes_recibidas = []
+        kpis_agrupados = {
+            'total_ordenes': 0,
+            'ordenes_activas': 0,
+            'ordenes_completadas': 0,
+            'ordenes_con_retrasos': 0,
+            'ordenes_criticas': 0,
+        }
     
     # Filtrar piezas retrasadas para alertas (solo las que NO han llegado)
+    # ACTUALIZADO: Usar constantes para estados pendientes
     if not df_seguimientos.empty:
         df_retrasados = df_seguimientos[
             (df_seguimientos['esta_retrasado'] == True) &
-            (df_seguimientos['estado'].isin(['pedido', 'transito']))  # Solo activas, no recibidas
+            (df_seguimientos['estado'].isin(ESTADOS_PIEZA_PENDIENTES))  # Solo activas, no recibidas
         ]
         piezas_retrasadas = df_retrasados.to_dict('records')
     else:
         piezas_retrasadas = []
     
     # Filtrar piezas próximas a llegar (siguientes 3 días)
+    # ACTUALIZADO: Usar constantes para estados pendientes
     if not df_seguimientos.empty:
         df_proximos = df_seguimientos[
             (df_seguimientos['dias_hasta_entrega'] >= 0) &
             (df_seguimientos['dias_hasta_entrega'] <= 3) &
-            (df_seguimientos['estado'].isin(['pedido', 'transito']))
+            (df_seguimientos['estado'].isin(ESTADOS_PIEZA_PENDIENTES))
         ]
         piezas_proximas = df_proximos.to_dict('records')
     else:
         piezas_proximas = []
+    
+    # NUEVO: Filtrar piezas con problemas de calidad (WPB/DOA)
+    # Estas piezas llegaron físicamente pero con incidencias de calidad
+    if not df_seguimientos.empty:
+        df_problematicos = df_seguimientos[
+            df_seguimientos['estado'].isin(ESTADOS_PIEZA_PROBLEMATICOS)
+        ]
+        piezas_problematicas = df_problematicos.to_dict('records')
+    else:
+        piezas_problematicas = []
     
     # ========================================
     # 5. PREPARAR DATOS PARA FILTROS
@@ -9742,14 +9775,8 @@ def dashboard_seguimiento_piezas(request):
     else:
         proveedores_lista = []
     
-    # Estados disponibles
-    estados_choices = [
-        ('pedido', 'Pedido'),
-        ('transito', 'En Tránsito'),
-        ('recibido', 'Recibido'),
-        ('instalado', 'Instalado'),
-        ('cancelado', 'Cancelado'),
-    ]
+    # Estados disponibles - Ya importados al inicio del archivo
+    estados_choices = ESTADO_PIEZA_CHOICES
     
     # ========================================
     # 6. PREPARAR CONTEXTO PARA EL TEMPLATE
@@ -9758,13 +9785,17 @@ def dashboard_seguimiento_piezas(request):
     context = {
         # KPIs
         'kpis': kpis,
+        'kpis_agrupados': kpis_agrupados,
         
-        # Datos para la tabla
-        'seguimientos': seguimientos_lista,
-        'seguimientos_activos': seguimientos_activos,
-        'seguimientos_recibidos': seguimientos_recibidos,
+        # Alertas
         'piezas_retrasadas': piezas_retrasadas,
         'piezas_proximas': piezas_proximas,
+        'piezas_problematicas': piezas_problematicas,  # NUEVO: WPB/DOA
+        
+        # Datos para la tabla (vista agrupada)
+        'ordenes_agrupadas': ordenes_agrupadas,
+        'ordenes_activas': ordenes_activas,
+        'ordenes_recibidas': ordenes_recibidas,
         
         # Gráficos
         'graficos': graficos,
@@ -9785,7 +9816,7 @@ def dashboard_seguimiento_piezas(request):
         },
         
         # Totales
-        'total_seguimientos': len(seguimientos_lista),
+        'total_ordenes': len(ordenes_agrupadas),
     }
     
     return render(request, 'servicio_tecnico/dashboard_seguimiento_piezas.html', context)
@@ -9871,6 +9902,10 @@ def exportar_dashboard_seguimiento_piezas(request):
             ]
         
         kpis = calcular_kpis_seguimientos_piezas(df_seguimientos)
+        
+        # Generar vista agrupada (NUEVO)
+        from .utils_cotizaciones import agrupar_seguimientos_por_orden
+        ordenes_agrupadas = agrupar_seguimientos_por_orden(df_seguimientos) if not df_seguimientos.empty else []
         
     except Exception as e:
         messages.error(request, f'Error al obtener datos para exportación: {str(e)}')
@@ -10023,6 +10058,76 @@ def exportar_dashboard_seguimiento_piezas(request):
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = center_align
+    
+    # HOJA 6: Vista Agrupada por Orden (NUEVO)
+    if ordenes_agrupadas:
+        ws_agrupada = wb.create_sheet("Vista Agrupada")
+        
+        # Encabezados
+        headers = [
+            'Orden Cliente', 'Service Tag', 'Sucursal', 'Total Proveedores',
+            'Seguimientos Recibidos', 'Seguimientos Pendientes', 'Estado General',
+            'Tiene Retrasos', 'Días Máx Retraso', 'Prioridad Máxima',
+            'Fecha Pedido Más Antigua', 'Fecha Entrega Más Próxima', 'Proveedores Detalle'
+        ]
+        ws_agrupada.append(headers)
+        
+        # Datos
+        for orden in ordenes_agrupadas:
+            # Construir cadena de proveedores
+            proveedores_str = ' | '.join([
+                f"{p['proveedor']}: {p['estado_display']} ({p['descripcion'][:30]}...)"
+                for p in orden['proveedores_activos']
+            ])
+            
+            row_data = [
+                orden['orden_cliente'],
+                orden['service_tag'],
+                orden['sucursal'],
+                orden['total_proveedores'],
+                orden['seguimientos_recibidos'],
+                orden['seguimientos_pendientes'],
+                orden['estado_general'].upper(),
+                'SÍ' if orden['tiene_retrasados'] else 'NO',
+                orden['dias_maximo_retraso'] if orden['tiene_retrasados'] else 0,
+                orden['prioridad_maxima'].upper(),
+                orden['fecha_pedido_mas_antigua'].strftime('%Y-%m-%d') if orden['fecha_pedido_mas_antigua'] else '',
+                orden['fecha_entrega_mas_proxima'].strftime('%Y-%m-%d') if orden['fecha_entrega_mas_proxima'] else '',
+                proveedores_str
+            ]
+            ws_agrupada.append(row_data)
+        
+        # Aplicar estilos
+        for cell in ws_agrupada[1]:
+            cell.font = header_font
+            cell.fill = PatternFill(start_color="27ae60", end_color="27ae60", fill_type="solid")
+            cell.alignment = center_align
+        
+        # Ajustar ancho de columnas
+        ws_agrupada.column_dimensions['A'].width = 15
+        ws_agrupada.column_dimensions['B'].width = 15
+        ws_agrupada.column_dimensions['C'].width = 15
+        ws_agrupada.column_dimensions['D'].width = 12
+        ws_agrupada.column_dimensions['E'].width = 12
+        ws_agrupada.column_dimensions['F'].width = 12
+        ws_agrupada.column_dimensions['G'].width = 15
+        ws_agrupada.column_dimensions['H'].width = 12
+        ws_agrupada.column_dimensions['I'].width = 12
+        ws_agrupada.column_dimensions['J'].width = 15
+        ws_agrupada.column_dimensions['K'].width = 18
+        ws_agrupada.column_dimensions['L'].width = 18
+        ws_agrupada.column_dimensions['M'].width = 50
+        
+        # Colorear filas según prioridad
+        for row_idx, orden in enumerate(ordenes_agrupadas, start=2):
+            if orden['prioridad_maxima'] == 'critico':
+                fill_color = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+                for cell in ws_agrupada[row_idx]:
+                    cell.fill = fill_color
+            elif orden['prioridad_maxima'] == 'alto':
+                fill_color = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+                for cell in ws_agrupada[row_idx]:
+                    cell.fill = fill_color
     
     # ========================================
     # 4. PREPARAR RESPUESTA HTTP

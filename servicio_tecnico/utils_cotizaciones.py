@@ -23,6 +23,11 @@ from .models import (
     DetalleEquipo
 )
 from inventario.models import Empleado, Sucursal
+from config.constants import (
+    ESTADOS_PIEZA_RECIBIDOS,
+    ESTADOS_PIEZA_PENDIENTES,
+    ESTADOS_PIEZA_PROBLEMATICOS
+)
 
 
 # ============================================================================
@@ -932,15 +937,21 @@ def obtener_dataframe_seguimientos_piezas(fecha_inicio=None, fecha_fin=None,
         detalle = orden.detalle_equipo
         
         # Calcular métricas
-        dias_desde_pedido = (hoy - seg.fecha_pedido).days if isinstance(seg.fecha_pedido, date) else (hoy - seg.fecha_pedido.date()).days
+        # CORREGIDO: dias_desde_pedido debe considerar fecha_entrega_real si existe
+        if seg.fecha_entrega_real:
+            # Si ya llegó, calcular desde pedido hasta entrega real
+            dias_desde_pedido = (seg.fecha_entrega_real - seg.fecha_pedido).days if isinstance(seg.fecha_pedido, date) else (seg.fecha_entrega_real - seg.fecha_pedido.date()).days
+        else:
+            # Si no ha llegado, calcular desde pedido hasta hoy
+            dias_desde_pedido = (hoy - seg.fecha_pedido).days if isinstance(seg.fecha_pedido, date) else (hoy - seg.fecha_pedido.date()).days
         
         # Calcular días de retraso y días totales de espera
         if seg.fecha_entrega_real:
             # Si ya llegó, calcular retraso respecto a fecha estimada
             dias_retraso = max(0, (seg.fecha_entrega_real - seg.fecha_entrega_estimada).days)
             esta_retrasado = dias_retraso > 0
-            # Días totales: desde pedido hasta recepción real
-            dias_totales_espera = (seg.fecha_entrega_real - seg.fecha_pedido).days if isinstance(seg.fecha_pedido, date) else (seg.fecha_entrega_real - seg.fecha_pedido.date()).days
+            # Días totales: mismo que dias_desde_pedido (ya llegó)
+            dias_totales_espera = dias_desde_pedido
         else:
             # Si no ha llegado, calcular retraso respecto a hoy
             if hoy > seg.fecha_entrega_estimada:
@@ -949,7 +960,7 @@ def obtener_dataframe_seguimientos_piezas(fecha_inicio=None, fecha_fin=None,
             else:
                 dias_retraso = 0
                 esta_retrasado = False
-            # Días totales: hasta hoy (aún no ha llegado)
+            # Días totales: mismo que dias_desde_pedido (hasta hoy)
             dias_totales_espera = dias_desde_pedido
         
         # Calcular días hasta entrega estimada (negativo si ya pasó)
@@ -1064,10 +1075,11 @@ def calcular_kpis_seguimientos_piezas(df):
         }
     
     # Filtros para diferentes categorías
-    activos = df[df['estado'].isin(['pedido', 'transito'])]
+    # ACTUALIZADO: Usar constantes globales para estados
+    activos = df[df['estado'].isin(ESTADOS_PIEZA_PENDIENTES)]
     retrasados = df[df['esta_retrasado'] == True]
-    proximos = df[(df['dias_hasta_entrega'] >= 0) & (df['dias_hasta_entrega'] <= 3) & (df['estado'].isin(['pedido', 'transito']))]
-    recibidos = df[df['estado'] == 'recibido']
+    proximos = df[(df['dias_hasta_entrega'] >= 0) & (df['dias_hasta_entrega'] <= 3) & (df['estado'].isin(ESTADOS_PIEZA_PENDIENTES))]
+    recibidos = df[df['estado'].isin(ESTADOS_PIEZA_RECIBIDOS)]  # Incluye recibido, incorrecto, danado
     
     # Calcular promedios
     if not recibidos.empty:
@@ -1111,3 +1123,186 @@ def calcular_kpis_seguimientos_piezas(df):
         'por_proveedor': por_proveedor,
         'por_estado': por_estado,
     }
+
+
+# ============================================================================
+# FUNCIÓN 14: AGRUPAR SEGUIMIENTOS POR ORDEN
+# ============================================================================
+
+def agrupar_seguimientos_por_orden(df):
+    """
+    Agrupa múltiples seguimientos de piezas por orden, consolidando
+    información de proveedores en una sola fila por orden.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Cuando una orden tiene piezas de múltiples proveedores, en lugar de mostrar
+    3 filas separadas (una por proveedor), esta función las agrupa en 1 sola fila
+    que muestra todos los proveedores juntos.
+    
+    Ejemplo:
+        Antes:
+            Orden #123 | Proveedor A | Estado: En tránsito
+            Orden #123 | Proveedor B | Estado: Recibido
+            Orden #123 | Proveedor C | Estado: Pedido
+        
+        Después:
+            Orden #123 | 3 proveedores | 1 recibida, 2 pendientes | Tiene retrasos
+    
+    Args:
+        df (DataFrame): DataFrame original con seguimientos individuales
+    
+    Returns:
+        list[dict]: Lista de diccionarios con órdenes agrupadas
+    
+    Estructura de retorno:
+        [
+            {
+                'orden_id': 123,
+                'orden_cliente': 'ORD-2024-001',
+                'service_tag': 'ABC123',
+                'sucursal': 'Matriz',
+                'responsable': 'Juan Pérez',
+                'total_proveedores': 3,
+                'proveedores_activos': [
+                    {
+                        'id': 1,
+                        'proveedor': 'Proveedor A',
+                        'estado': 'transito',
+                        'estado_display': 'En Tránsito',
+                        'descripcion': 'RAM 16GB DDR4',
+                        'fecha_pedido': date(2024, 11, 15),
+                        'fecha_estimada': date(2024, 11, 25),
+                        'dias_desde_pedido': 5,
+                        'dias_hasta_entrega': 3,
+                        'esta_retrasado': False,
+                        'dias_retraso': 0,
+                        'numero_pedido': 'TRK-12345'
+                    },
+                    {...}
+                ],
+                'total_piezas': 3,
+                'piezas_recibidas': 1,
+                'piezas_pendientes': 2,
+                'tiene_retrasados': True,
+                'dias_maximo_retraso': 5,
+                'prioridad_maxima': 'alto',
+                'estado_general': 'parcial',  # 'todos_recibidos', 'parcial', 'todos_pendientes'
+                'fecha_pedido_mas_antigua': date(2024, 11, 10),
+                'fecha_entrega_mas_proxima': date(2024, 11, 22),
+            }
+        ]
+    """
+    from datetime import date
+    
+    if df.empty:
+        return []
+    
+    # Agrupar por orden_id
+    ordenes_agrupadas = []
+    
+    for orden_id, grupo in df.groupby('orden_id'):
+        # Información general de la orden (igual en todos los seguimientos)
+        primer_registro = grupo.iloc[0]
+        
+        # Construir lista de proveedores con sus detalles
+        proveedores_activos = []
+        for _, seg in grupo.iterrows():
+            proveedores_activos.append({
+                'id': seg['id'],
+                'proveedor': seg['proveedor'],
+                'estado': seg['estado'],
+                'estado_display': seg['estado_display'],
+                'descripcion': seg['descripcion_piezas'],
+                'fecha_pedido': seg['fecha_pedido'],
+                'fecha_estimada': seg['fecha_entrega_estimada'],
+                'fecha_real': seg.get('fecha_entrega_real'),
+                'dias_desde_pedido': seg['dias_desde_pedido'],
+                'dias_hasta_entrega': seg['dias_hasta_entrega'],
+                'dias_totales_espera': seg.get('dias_totales_espera', 0),
+                'esta_retrasado': seg['esta_retrasado'],
+                'dias_retraso': seg['dias_retraso'],
+                'numero_pedido': seg['numero_pedido'],
+                'prioridad': seg['prioridad'],
+            })
+        
+        # Calcular métricas agregadas
+        # IMPORTANTE: total_piezas son los seguimientos (1 seguimiento puede tener múltiples piezas del mismo proveedor)
+        # pero para el usuario es más claro ver "cuántos pedidos/seguimientos" hay activos
+        total_seguimientos = len(proveedores_activos)
+        
+        # ACTUALIZADO: Usar constantes globales para clasificar estados
+        # Estados recibidos incluyen: recibido, incorrecto (WPB), danado (DOA)
+        seguimientos_recibidos = len([p for p in proveedores_activos if p['estado'] in ESTADOS_PIEZA_RECIBIDOS])
+        seguimientos_pendientes = len([p for p in proveedores_activos if p['estado'] in ESTADOS_PIEZA_PENDIENTES])
+        
+        # Identificar seguimientos con problemas de calidad (WPB/DOA)
+        seguimientos_problematicos = len([p for p in proveedores_activos if p['estado'] in ESTADOS_PIEZA_PROBLEMATICOS])
+        
+        tiene_retrasados = any(p['esta_retrasado'] for p in proveedores_activos)
+        dias_maximo_retraso = max([p['dias_retraso'] for p in proveedores_activos], default=0)
+        
+        # Determinar estado general
+        if seguimientos_recibidos == total_seguimientos:
+            estado_general = 'todos_recibidos'
+        elif seguimientos_recibidos == 0:
+            estado_general = 'todos_pendientes'
+        else:
+            estado_general = 'parcial'
+        
+        # Prioridad máxima
+        prioridades_orden = ['critico', 'alto', 'medio', 'normal']
+        prioridad_maxima = 'normal'
+        for prioridad in prioridades_orden:
+            if any(p['prioridad'] == prioridad for p in proveedores_activos):
+                prioridad_maxima = prioridad
+                break
+        
+        # Fechas relevantes
+        fecha_pedido_mas_antigua = min([p['fecha_pedido'] for p in proveedores_activos])
+        fechas_proximas = [p['fecha_estimada'] for p in proveedores_activos if p['estado'] in ESTADOS_PIEZA_PENDIENTES]
+        fecha_entrega_mas_proxima = min(fechas_proximas) if fechas_proximas else None
+        
+        # Construir diccionario de orden agrupada
+        orden_agrupada = {
+            'orden_id': orden_id,
+            'orden_numero': primer_registro['orden_numero'],
+            'orden_cliente': primer_registro['orden_cliente'],
+            'service_tag': primer_registro['service_tag'],
+            'sucursal': primer_registro['sucursal'],
+            'sucursal_id': primer_registro['sucursal_id'],
+            'responsable': primer_registro['responsable'],
+            'tipo_equipo': primer_registro['tipo_equipo'],
+            'marca_equipo': primer_registro['marca_equipo'],
+            
+            # Proveedores
+            'total_proveedores': total_seguimientos,
+            'proveedores_activos': proveedores_activos,
+            
+            # Métricas (seguimientos, no piezas individuales)
+            'total_seguimientos': total_seguimientos,
+            'seguimientos_recibidos': seguimientos_recibidos,
+            'seguimientos_pendientes': seguimientos_pendientes,
+            'seguimientos_problematicos': seguimientos_problematicos,  # NUEVO: WPB/DOA
+            'tiene_retrasados': tiene_retrasados,
+            'dias_maximo_retraso': dias_maximo_retraso,
+            'prioridad_maxima': prioridad_maxima,
+            'estado_general': estado_general,
+            
+            # Fechas
+            'fecha_pedido_mas_antigua': fecha_pedido_mas_antigua,
+            'fecha_entrega_mas_proxima': fecha_entrega_mas_proxima,
+        }
+        
+        ordenes_agrupadas.append(orden_agrupada)
+    
+    # Ordenar por prioridad y fecha más próxima
+    prioridades_orden = {'critico': 0, 'alto': 1, 'medio': 2, 'normal': 3}
+    ordenes_agrupadas.sort(
+        key=lambda x: (
+            prioridades_orden.get(x['prioridad_maxima'], 3),
+            x['fecha_entrega_mas_proxima'] if x['fecha_entrega_mas_proxima'] else date.max
+        )
+    )
+    
+    return ordenes_agrupadas

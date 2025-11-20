@@ -202,6 +202,16 @@ ESTADO_PIEZA_CHOICES = [
     ('danado', 'DOA - Pieza Dañada/No Funcional'),  # Dead On Arrival
 ]
 
+# Clasificación de estados de piezas para lógica de seguimiento
+# ESTADOS RECIBIDOS: Piezas que ya llegaron físicamente al centro (correctas o con problemas)
+ESTADOS_PIEZA_RECIBIDOS = ['recibido', 'incorrecto', 'danado']
+
+# ESTADOS PENDIENTES: Piezas que aún no han llegado físicamente
+ESTADOS_PIEZA_PENDIENTES = ['pedido', 'confirmado', 'transito', 'retrasado']
+
+# ESTADOS PROBLEMÁTICOS: Piezas recibidas pero con incidencias de calidad
+ESTADOS_PIEZA_PROBLEMATICOS = ['incorrecto', 'danado']
+
 # ============================================================================
 # MOTIVOS PARA RHITSO (Reparación Especializada)
 # ============================================================================

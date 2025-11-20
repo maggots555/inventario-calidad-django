@@ -84,7 +84,7 @@ class TabNavigationManager {
 // CLASE PARA VALIDACIÓN DE FORMULARIO
 // ============================================
 class FilterFormValidator {
-    constructor(formId) {
+    constructor(formId = 'filtros-form') {
         this.form = document.getElementById(formId);
         this.fechaInicioInput = document.getElementById('fecha_inicio');
         this.fechaFinInput = document.getElementById('fecha_fin');
@@ -224,6 +224,173 @@ class SmoothScrollManager {
     }
 }
 // ============================================
+// CLASE PARA VISTA AGRUPADA (NUEVO)
+// ============================================
+class VistaAgrupadaManager {
+    /**
+     * Maneja las funcionalidades interactivas de la vista agrupada:
+     * - Expandir/colapsar proveedores adicionales
+     * - Expandir/colapsar detalles completos de seguimiento
+     * - Animaciones suaves
+     */
+    init() {
+        this.setupToggleProveedores();
+        this.setupToggleDetalles();
+        this.setupRowClickExpand();
+    }
+    /**
+     * Configura botones para expandir/colapsar proveedores adicionales
+     */
+    setupToggleProveedores() {
+        const toggleButtons = document.querySelectorAll('.toggle-proveedores');
+        toggleButtons.forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.stopPropagation(); // Evitar que dispare el click de la fila
+                const ordenId = button.getAttribute('data-orden-id');
+                if (ordenId) {
+                    this.toggleProveedores(ordenId, button);
+                }
+            });
+        });
+    }
+    /**
+     * Expande o colapsa la lista de proveedores adicionales
+     */
+    toggleProveedores(ordenId, button) {
+        const proveedoresExtra = document.getElementById(`proveedores-${ordenId}`);
+        const icon = button.querySelector('i');
+        if (proveedoresExtra) {
+            if (proveedoresExtra.classList.contains('d-none')) {
+                // Expandir
+                proveedoresExtra.classList.remove('d-none');
+                proveedoresExtra.classList.add('expanded');
+                if (icon) {
+                    icon.classList.remove('bi-chevron-down');
+                    icon.classList.add('bi-chevron-up');
+                }
+                button.innerHTML = button.innerHTML.replace('Ver', 'Ocultar');
+            }
+            else {
+                // Colapsar
+                proveedoresExtra.classList.add('d-none');
+                proveedoresExtra.classList.remove('expanded');
+                if (icon) {
+                    icon.classList.remove('bi-chevron-up');
+                    icon.classList.add('bi-chevron-down');
+                }
+                button.innerHTML = button.innerHTML.replace('Ocultar', 'Ver');
+            }
+        }
+    }
+    /**
+     * Configura botones para expandir/colapsar detalles completos
+     */
+    setupToggleDetalles() {
+        const toggleButtons = document.querySelectorAll('.toggle-detalles');
+        toggleButtons.forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.stopPropagation(); // Evitar que dispare el click de la fila
+                const ordenId = button.getAttribute('data-orden-id');
+                if (ordenId) {
+                    this.toggleDetalles(ordenId, button);
+                }
+            });
+        });
+    }
+    /**
+     * Expande o colapsa la fila de detalles completos
+     */
+    toggleDetalles(ordenId, button) {
+        const detallesRow = document.getElementById(`detalles-${ordenId}`);
+        const icon = button.querySelector('i');
+        if (detallesRow) {
+            if (detallesRow.classList.contains('d-none')) {
+                // Expandir
+                detallesRow.classList.remove('d-none');
+                detallesRow.classList.add('show');
+                button.classList.add('expanded');
+                if (icon) {
+                    icon.classList.remove('bi-chevron-down');
+                    icon.classList.add('bi-chevron-up');
+                }
+                // Cambiar estilo del botón
+                button.classList.remove('btn-outline-info');
+                button.classList.add('btn-info');
+                button.innerHTML = '<i class="bi bi-chevron-up"></i> Ocultar';
+            }
+            else {
+                // Colapsar
+                detallesRow.classList.add('d-none');
+                detallesRow.classList.remove('show');
+                button.classList.remove('expanded');
+                if (icon) {
+                    icon.classList.remove('bi-chevron-up');
+                    icon.classList.add('bi-chevron-down');
+                }
+                // Restaurar estilo del botón
+                button.classList.remove('btn-info');
+                button.classList.add('btn-outline-info');
+                button.innerHTML = '<i class="bi bi-chevron-down"></i> Detalles';
+            }
+        }
+    }
+    /**
+     * Permite hacer clic en toda la fila para expandir detalles
+     * (excepto en botones y enlaces)
+     */
+    setupRowClickExpand() {
+        const ordenRows = document.querySelectorAll('.orden-row');
+        ordenRows.forEach((row) => {
+            row.addEventListener('click', (event) => {
+                var _a;
+                const target = event.target;
+                // Verificar que no se hizo clic en un botón, enlace o input
+                if (!target.closest('button') &&
+                    !target.closest('a') &&
+                    !target.closest('input') &&
+                    !target.closest('select')) {
+                    const ordenId = row.getAttribute('data-orden-id');
+                    if (ordenId) {
+                        const toggleButton = (_a = row.nextElementSibling) === null || _a === void 0 ? void 0 : _a.querySelector('.toggle-detalles');
+                        if (toggleButton) {
+                            // Simular click en el botón de detalles
+                            const toggleButtonInRow = row.querySelector('.toggle-detalles');
+                            if (toggleButtonInRow) {
+                                toggleButtonInRow.click();
+                            }
+                        }
+                    }
+                }
+            });
+            // Agregar cursor pointer para indicar que la fila es clickeable
+            row.style.cursor = 'pointer';
+        });
+    }
+    /**
+     * Expande automáticamente órdenes con prioridad crítica al cargar
+     */
+    autoExpandCriticas() {
+        const ordenesRows = document.querySelectorAll('.orden-row');
+        ordenesRows.forEach((row) => {
+            var _a;
+            // Buscar badge de prioridad crítica
+            const badgeCritico = row.querySelector('.badge.bg-danger.badge-lg');
+            if (badgeCritico && ((_a = badgeCritico.textContent) === null || _a === void 0 ? void 0 : _a.includes('CRÍTICO'))) {
+                const ordenId = row.getAttribute('data-orden-id');
+                if (ordenId) {
+                    const toggleButton = row.querySelector('.toggle-detalles');
+                    if (toggleButton) {
+                        // Expandir automáticamente después de 500ms
+                        setTimeout(() => {
+                            this.toggleDetalles(ordenId, toggleButton);
+                        }, 500);
+                    }
+                }
+            }
+        });
+    }
+}
+// ============================================
 // CLASE PRINCIPAL - DASHBOARD MANAGER
 // ============================================
 class DashboardSeguimientoPiezas {
@@ -235,6 +402,7 @@ class DashboardSeguimientoPiezas {
         this.exportManager = new ExportManager(this.loadingOverlay);
         this.tooltipManager = new TooltipManager();
         this.smoothScrollManager = new SmoothScrollManager();
+        this.vistaAgrupadaManager = new VistaAgrupadaManager();
     }
     init() {
         console.log('Inicializando Dashboard de Seguimiento de Piezas...');
@@ -244,6 +412,8 @@ class DashboardSeguimientoPiezas {
         this.exportManager.init();
         this.tooltipManager.init();
         this.smoothScrollManager.init();
+        // Inicializar vista agrupada (NUEVO)
+        this.vistaAgrupadaManager.init();
         // Setup validación de formulario
         if (this.formValidator instanceof FilterFormValidator) {
             this.formValidator.setupValidation();
@@ -252,6 +422,10 @@ class DashboardSeguimientoPiezas {
         this.addFadeInAnimations();
         // Mostrar loading overlay al enviar formulario de filtros
         this.setupFormSubmitLoading();
+        // Auto-expandir órdenes críticas (NUEVO)
+        setTimeout(() => {
+            this.vistaAgrupadaManager.autoExpandCriticas();
+        }, 1000);
         console.log('Dashboard inicializado correctamente.');
     }
     addFadeInAnimations() {
@@ -262,7 +436,7 @@ class DashboardSeguimientoPiezas {
         });
     }
     setupFormSubmitLoading() {
-        const form = document.getElementById('form-filtros');
+        const form = document.getElementById('filtros-form');
         if (form) {
             form.addEventListener('submit', () => {
                 this.loadingOverlay.show();
