@@ -14,7 +14,7 @@ import pandas as pd
 from django.db.models import Count, Sum, Avg, Q, F, Prefetch
 from django.utils import timezone
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from .models import (
     Cotizacion, 
     PiezaCotizada, 
@@ -849,3 +849,265 @@ def analizar_componentes_por_proveedor(cotizacion_ids=None):
     df_agrupado = df_agrupado.sort_values(['componente_nombre', 'valor_total'], ascending=[True, False])
     
     return df_agrupado
+
+
+# ============================================================================
+# FUNCIÓN 12: OBTENER DATAFRAME DE SEGUIMIENTOS DE PIEZAS
+# ============================================================================
+
+def obtener_dataframe_seguimientos_piezas(fecha_inicio=None, fecha_fin=None,
+                                          sucursal_id=None, proveedor=None,
+                                          estado=None):
+    """
+    Convierte QuerySet de seguimientos de piezas a DataFrame de Pandas.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Similar a obtener_dataframe_cotizaciones pero enfocado en seguimientos de piezas.
+    Extrae información relevante de pedidos de piezas incluyendo:
+    - Estado actual del pedido
+    - Fechas y tiempos de entrega
+    - Información de la orden relacionada
+    - Cálculo de días de retraso
+    
+    Args:
+        fecha_inicio (date): Fecha inicio de pedidos
+        fecha_fin (date): Fecha fin de pedidos
+        sucursal_id (int): Filtrar por sucursal
+        proveedor (str): Filtrar por proveedor específico
+        estado (str): Filtrar por estado (pedido, transito, recibido, etc.)
+    
+    Returns:
+        DataFrame: DataFrame con todos los seguimientos y métricas calculadas
+    
+    Columnas del DataFrame:
+        - id: ID del seguimiento
+        - orden_numero: Número de orden relacionada
+        - proveedor: Nombre del proveedor
+        - estado: Estado actual
+        - fecha_pedido: Cuándo se pidió
+        - fecha_entrega_estimada: Cuándo debería llegar
+        - fecha_entrega_real: Cuándo llegó (si aplica)
+        - dias_desde_pedido: Días transcurridos
+        - dias_retraso: Días de retraso (0 si no hay)
+        - esta_retrasado: Boolean
+        - sucursal: Nombre de la sucursal
+        - descripcion_piezas: Qué se pidió
+        - numero_pedido: Tracking del proveedor
+    """
+    from django.db.models import Q, F
+    from django.utils import timezone
+    
+    # Construir QuerySet base con relaciones optimizadas
+    queryset = SeguimientoPieza.objects.select_related(
+        'cotizacion__orden__sucursal',
+        'cotizacion__orden__detalle_equipo',
+        'cotizacion__orden__responsable_seguimiento'
+    ).prefetch_related(
+        'piezas'
+    )
+    
+    # Aplicar filtros
+    if fecha_inicio:
+        queryset = queryset.filter(fecha_pedido__gte=fecha_inicio)
+    
+    if fecha_fin:
+        queryset = queryset.filter(fecha_pedido__lte=fecha_fin)
+    
+    if sucursal_id:
+        queryset = queryset.filter(cotizacion__orden__sucursal_id=sucursal_id)
+    
+    if proveedor:
+        queryset = queryset.filter(proveedor__icontains=proveedor)
+    
+    if estado:
+        queryset = queryset.filter(estado=estado)
+    
+    # Convertir a lista de diccionarios
+    data = []
+    hoy = timezone.now().date()
+    
+    for seg in queryset:
+        orden = seg.cotizacion.orden
+        detalle = orden.detalle_equipo
+        
+        # Calcular métricas
+        dias_desde_pedido = (hoy - seg.fecha_pedido).days if isinstance(seg.fecha_pedido, date) else (hoy - seg.fecha_pedido.date()).days
+        
+        # Calcular días de retraso y días totales de espera
+        if seg.fecha_entrega_real:
+            # Si ya llegó, calcular retraso respecto a fecha estimada
+            dias_retraso = max(0, (seg.fecha_entrega_real - seg.fecha_entrega_estimada).days)
+            esta_retrasado = dias_retraso > 0
+            # Días totales: desde pedido hasta recepción real
+            dias_totales_espera = (seg.fecha_entrega_real - seg.fecha_pedido).days if isinstance(seg.fecha_pedido, date) else (seg.fecha_entrega_real - seg.fecha_pedido.date()).days
+        else:
+            # Si no ha llegado, calcular retraso respecto a hoy
+            if hoy > seg.fecha_entrega_estimada:
+                dias_retraso = (hoy - seg.fecha_entrega_estimada).days
+                esta_retrasado = True
+            else:
+                dias_retraso = 0
+                esta_retrasado = False
+            # Días totales: hasta hoy (aún no ha llegado)
+            dias_totales_espera = dias_desde_pedido
+        
+        # Calcular días hasta entrega estimada (negativo si ya pasó)
+        dias_hasta_entrega = (seg.fecha_entrega_estimada - hoy).days
+        
+        # Determinar prioridad visual
+        if esta_retrasado and dias_retraso > 5:
+            prioridad = 'critico'
+        elif esta_retrasado:
+            prioridad = 'alto'
+        elif dias_hasta_entrega <= 3:
+            prioridad = 'medio'
+        else:
+            prioridad = 'normal'
+        
+        # Obtener lista de piezas vinculadas
+        piezas_vinculadas = list(seg.piezas.all().values_list('componente__nombre', flat=True))
+        piezas_str = ', '.join(piezas_vinculadas) if piezas_vinculadas else seg.descripcion_piezas
+        
+        data.append({
+            'id': seg.id,
+            'orden_numero': orden.numero_orden_interno,
+            'orden_id': orden.id,
+            'orden_cliente': detalle.orden_cliente,
+            'service_tag': detalle.numero_serie,
+            'proveedor': seg.proveedor,
+            'estado': seg.estado,
+            'estado_display': seg.get_estado_display(),
+            'fecha_pedido': seg.fecha_pedido,
+            'fecha_entrega_estimada': seg.fecha_entrega_estimada,
+            'fecha_entrega_real': seg.fecha_entrega_real,
+            'dias_desde_pedido': dias_desde_pedido,
+            'dias_totales_espera': dias_totales_espera,
+            'dias_retraso': dias_retraso,
+            'dias_hasta_entrega': dias_hasta_entrega,
+            'esta_retrasado': esta_retrasado,
+            'prioridad': prioridad,
+            'sucursal': orden.sucursal.nombre,
+            'sucursal_id': orden.sucursal.id,
+            'responsable': orden.responsable_seguimiento.nombre_completo,
+            'descripcion_piezas': piezas_str,
+            'numero_pedido': seg.numero_pedido,
+            'notas': seg.notas_seguimiento,
+            'tipo_equipo': detalle.tipo_equipo,
+            'marca_equipo': detalle.marca,
+        })
+    
+    df = pd.DataFrame(data)
+    
+    # Si está vacío, retornar DataFrame vacío con columnas esperadas
+    if df.empty:
+        return pd.DataFrame(columns=[
+            'id', 'orden_numero', 'orden_id', 'orden_cliente', 'service_tag', 'proveedor', 'estado',
+            'estado_display', 'fecha_pedido', 'fecha_entrega_estimada', 'fecha_entrega_real',
+            'dias_desde_pedido', 'dias_totales_espera', 'dias_retraso', 'dias_hasta_entrega', 'esta_retrasado',
+            'prioridad', 'sucursal', 'sucursal_id', 'responsable', 'descripcion_piezas',
+            'numero_pedido', 'notas', 'tipo_equipo', 'marca_equipo'
+        ])
+    
+    return df
+
+
+# ============================================================================
+# FUNCIÓN 13: CALCULAR KPIs DE SEGUIMIENTOS DE PIEZAS
+# ============================================================================
+
+def calcular_kpis_seguimientos_piezas(df):
+    """
+    Calcula métricas clave (KPIs) para el dashboard de seguimiento de piezas.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Los KPIs (Key Performance Indicators) son números importantes que resumen
+    el estado general del negocio. Esta función calcula métricas como:
+    - Cuántas piezas están en tránsito
+    - Cuántas están retrasadas
+    - Promedio de días de entrega
+    - etc.
+    
+    Args:
+        df (DataFrame): DataFrame de seguimientos obtenido con obtener_dataframe_seguimientos_piezas()
+    
+    Returns:
+        dict: Diccionario con todos los KPIs calculados
+    
+    Ejemplo de retorno:
+        {
+            'total_seguimientos': 45,
+            'en_transito': 12,
+            'retrasados': 5,
+            'promedio_dias_entrega': 7.5,
+            'proximos_llegar': 3,
+            ...
+        }
+    """
+    from datetime import date
+    
+    if df.empty:
+        return {
+            'total_seguimientos': 0,
+            'total_activos': 0,
+            'en_transito': 0,
+            'pedidos': 0,
+            'recibidos': 0,
+            'retrasados': 0,
+            'proximos_llegar': 0,
+            'promedio_dias_entrega': 0,
+            'promedio_dias_retraso': 0,
+            'por_sucursal': {},
+            'por_proveedor': {},
+            'por_estado': {},
+        }
+    
+    # Filtros para diferentes categorías
+    activos = df[df['estado'].isin(['pedido', 'transito'])]
+    retrasados = df[df['esta_retrasado'] == True]
+    proximos = df[(df['dias_hasta_entrega'] >= 0) & (df['dias_hasta_entrega'] <= 3) & (df['estado'].isin(['pedido', 'transito']))]
+    recibidos = df[df['estado'] == 'recibido']
+    
+    # Calcular promedios
+    if not recibidos.empty:
+        # Para piezas recibidas, calcular días reales de entrega
+        promedio_dias_entrega = recibidos['dias_desde_pedido'].mean()
+    else:
+        promedio_dias_entrega = 0
+    
+    if not retrasados.empty:
+        promedio_dias_retraso = retrasados['dias_retraso'].mean()
+    else:
+        promedio_dias_retraso = 0
+    
+    # Agrupar por sucursal
+    por_sucursal = df.groupby('sucursal').agg({
+        'id': 'count',
+        'esta_retrasado': 'sum'
+    }).to_dict('index')
+    
+    # Agrupar por proveedor
+    por_proveedor = df.groupby('proveedor').agg({
+        'id': 'count',
+        'esta_retrasado': 'sum',
+        'dias_desde_pedido': 'mean'
+    }).sort_values('id', ascending=False).to_dict('index')
+    
+    # Agrupar por estado
+    por_estado = df['estado'].value_counts().to_dict()
+    
+    return {
+        'total_seguimientos': len(df),
+        'total_activos': len(activos),
+        'en_transito': len(df[df['estado'] == 'transito']),
+        'pedidos': len(df[df['estado'] == 'pedido']),
+        'recibidos': len(recibidos),
+        'retrasados': len(retrasados),
+        'proximos_llegar': len(proximos),
+        'promedio_dias_entrega': round(promedio_dias_entrega, 1),
+        'promedio_dias_retraso': round(promedio_dias_retraso, 1),
+        'por_sucursal': por_sucursal,
+        'por_proveedor': por_proveedor,
+        'por_estado': por_estado,
+    }

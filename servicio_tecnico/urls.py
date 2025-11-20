@@ -191,6 +191,23 @@ urlpatterns = [
          views.api_buscar_orden_por_serie, 
          name='api_buscar_orden_por_serie'),
     
+    # ========================================================================
+    # DASHBOARD DE SEGUIMIENTO DE PIEZAS EN TRÁNSITO (Noviembre 2025)
+    # ========================================================================
+    # Dashboard dedicado para seguimiento de piezas pedidas a proveedores
+    # Incluye: KPIs (activos, retrasados, próximos), gráficos interactivos con Plotly,
+    # tabla filtrable, alertas visuales, y análisis por proveedor/sucursal
+    path('dashboard/seguimiento-piezas/', 
+         views.dashboard_seguimiento_piezas, 
+         name='dashboard_seguimiento_piezas'),
+    
+    # Exportación a Excel del dashboard de seguimiento de piezas
+    # Genera archivo Excel con 5 hojas: resumen, seguimientos completos,
+    # solo retrasados, agrupado por proveedor, agrupado por sucursal
+    path('dashboard/seguimiento-piezas/exportar/', 
+         views.exportar_dashboard_seguimiento_piezas, 
+         name='exportar_dashboard_seguimiento_piezas'),
+    
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]

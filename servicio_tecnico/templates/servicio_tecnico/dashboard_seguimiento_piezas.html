@@ -1,0 +1,693 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard de Seguimiento de Piezas - Tránsito{% endblock %}
+
+{% block extra_css %}
+<!-- Estilos específicos del Dashboard de Seguimiento de Piezas -->
+<link rel="stylesheet" href="{% static 'css/dashboard_seguimiento_piezas.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    
+    <!-- ========================================
+         HEADER DEL DASHBOARD
+         ======================================== -->
+    <div class="dashboard-header fade-in">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1>🚚 Dashboard de Seguimiento de Piezas</h1>
+                    <p class="mb-0">Monitoreo en tiempo real de piezas en tránsito desde proveedores</p>
+                </div>
+                <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                    <a href="{% url 'servicio_tecnico:exportar_dashboard_seguimiento_piezas' %}?{{ request.GET.urlencode }}" 
+                       class="btn btn-exportar">
+                        <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ========================================
+         FORMULARIO DE FILTROS
+         ======================================== -->
+    <div class="filtros-card card fade-in">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-funnel"></i> Filtros de Búsqueda</h5>
+        </div>
+        <div class="card-body">
+            <form id="filtros-form" method="get" class="row g-3">
+                
+                <!-- Rango de Fechas -->
+                <div class="col-md-3">
+                    <label for="fecha_inicio" class="form-label">
+                        <i class="bi bi-calendar-event"></i> Fecha Inicio
+                    </label>
+                    <input type="date" 
+                           class="form-control" 
+                           id="fecha_inicio"
+                           name="fecha_inicio" 
+                           value="{{ filtros_activos.fecha_inicio }}">
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="fecha_fin" class="form-label">
+                        <i class="bi bi-calendar-check"></i> Fecha Fin
+                    </label>
+                    <input type="date" 
+                           class="form-control" 
+                           id="fecha_fin"
+                           name="fecha_fin" 
+                           value="{{ filtros_activos.fecha_fin }}">
+                </div>
+                
+                <!-- Sucursal -->
+                <div class="col-md-2">
+                    <label for="sucursal" class="form-label">
+                        <i class="bi bi-building"></i> Sucursal
+                    </label>
+                    <select class="form-select" id="sucursal" name="sucursal">
+                        <option value="">Todas las sucursales</option>
+                        {% for sucursal in sucursales %}
+                        <option value="{{ sucursal.id }}" 
+                                {% if filtros_activos.sucursal == sucursal.id %}selected{% endif %}>
+                            {{ sucursal.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Proveedor -->
+                <div class="col-md-2">
+                    <label for="proveedor" class="form-label">
+                        <i class="bi bi-truck"></i> Proveedor
+                    </label>
+                    <select class="form-select" id="proveedor" name="proveedor">
+                        <option value="">Todos los proveedores</option>
+                        {% for prov in proveedores %}
+                        <option value="{{ prov }}"
+                                {% if filtros_activos.proveedor == prov %}selected{% endif %}>
+                            {{ prov }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Estado -->
+                <div class="col-md-2">
+                    <label for="estado" class="form-label">
+                        <i class="bi bi-clipboard-check"></i> Estado
+                    </label>
+                    <select class="form-select" id="estado" name="estado">
+                        <option value="">Todos los estados</option>
+                        {% for estado_val, estado_label in estados %}
+                        <option value="{{ estado_val }}"
+                                {% if filtros_activos.estado == estado_val %}selected{% endif %}>
+                            {{ estado_label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Búsqueda Libre -->
+                <div class="col-md-12">
+                    <label for="busqueda" class="form-label">
+                        <i class="bi bi-search"></i> Búsqueda Libre
+                    </label>
+                    <input type="text" 
+                           class="form-control" 
+                           id="busqueda"
+                           name="busqueda" 
+                           placeholder="Buscar por orden, proveedor, descripción o número de pedido..."
+                           value="{{ filtros_activos.busqueda }}">
+                </div>
+                
+                <!-- Botones de Acción -->
+                <div class="col-12">
+                    <button type="submit" class="btn btn-filtrar">
+                        <i class="bi bi-search"></i> Aplicar Filtros
+                    </button>
+                    <a href="{% url 'servicio_tecnico:dashboard_seguimiento_piezas' %}" 
+                       class="btn btn-limpiar">
+                        <i class="bi bi-arrow-clockwise"></i> Limpiar Filtros
+                    </a>
+                    <span class="text-muted ms-3">
+                        <i class="bi bi-info-circle"></i> 
+                        Mostrando {{ total_seguimientos }} seguimiento{{ total_seguimientos|pluralize:"s" }}
+                    </span>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- ========================================
+         GRID DE KPIs PRINCIPALES
+         ======================================== -->
+    <div class="kpis-grid fade-in">
+        
+        <!-- KPI: Total Seguimientos -->
+        <div class="kpi-card primary">
+            <div class="kpi-icon">📦</div>
+            <div class="kpi-label">Total Seguimientos</div>
+            <div class="kpi-value">{{ kpis.total_seguimientos }}</div>
+            <div class="kpi-subtext">En el período seleccionado</div>
+        </div>
+        
+        <!-- KPI: Activos -->
+        <div class="kpi-card info">
+            <div class="kpi-icon">🔄</div>
+            <div class="kpi-label">Activos</div>
+            <div class="kpi-value">{{ kpis.total_activos }}</div>
+            <div class="kpi-subtext">En pedido o tránsito</div>
+        </div>
+        
+        <!-- KPI: Retrasados -->
+        <div class="kpi-card danger">
+            <div class="kpi-icon">⚠️</div>
+            <div class="kpi-label">Retrasados</div>
+            <div class="kpi-value">{{ kpis.retrasados }}</div>
+            <div class="kpi-subtext">Requieren atención urgente</div>
+        </div>
+        
+        <!-- KPI: Próximos a Llegar -->
+        <div class="kpi-card warning">
+            <div class="kpi-icon">📅</div>
+            <div class="kpi-label">Próximos a Llegar</div>
+            <div class="kpi-value">{{ kpis.proximos_llegar }}</div>
+            <div class="kpi-subtext">En los siguientes 3 días</div>
+        </div>
+        
+        <!-- KPI: En Tránsito -->
+        <div class="kpi-card success">
+            <div class="kpi-icon">🚛</div>
+            <div class="kpi-label">En Tránsito</div>
+            <div class="kpi-value">{{ kpis.en_transito }}</div>
+            <div class="kpi-subtext">Camino a su destino</div>
+        </div>
+        
+        <!-- KPI: Pedidos -->
+        <div class="kpi-card info">
+            <div class="kpi-icon">🛒</div>
+            <div class="kpi-label">Pedidos</div>
+            <div class="kpi-value">{{ kpis.pedidos }}</div>
+            <div class="kpi-subtext">Recién solicitados</div>
+        </div>
+        
+        <!-- KPI: Recibidos -->
+        <div class="kpi-card success">
+            <div class="kpi-icon">✅</div>
+            <div class="kpi-label">Recibidos</div>
+            <div class="kpi-value">{{ kpis.recibidos }}</div>
+            <div class="kpi-subtext">Ya en inventario</div>
+        </div>
+        
+        <!-- KPI: Promedio Días Entrega -->
+        <div class="kpi-card primary">
+            <div class="kpi-icon">⏱️</div>
+            <div class="kpi-label">Promedio Días Entrega</div>
+            <div class="kpi-value">{{ kpis.promedio_dias_entrega }}</div>
+            <div class="kpi-subtext">Días desde pedido hasta recepción</div>
+        </div>
+        
+    </div>
+    
+    <!-- ========================================
+         ALERTAS CRÍTICAS
+         ======================================== -->
+    {% if piezas_retrasadas %}
+    <div class="row fade-in mb-4">
+        <div class="col-12">
+            <div class="alert alert-danger alert-dashboard alert-permanent">
+                <h5 class="alert-heading">
+                    <i class="bi bi-exclamation-triangle-fill"></i> 
+                    ⚠️ Atención: {{ piezas_retrasadas|length }} Pieza(s) Retrasada(s)
+                </h5>
+                <p class="mb-3">
+                    Las siguientes piezas han superado su fecha de entrega estimada y requieren seguimiento inmediato:
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Orden</th>
+                                <th>Proveedor</th>
+                                <th>Descripción</th>
+                                <th>Fecha Estimada</th>
+                                <th>Días Retraso</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pieza in piezas_retrasadas|slice:":10" %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'servicio_tecnico:detalle_orden' pieza.orden_id %}" 
+                                       class="text-primary fw-bold" target="_blank"
+                                       title="Sistema: {{ pieza.orden_numero }}">
+                                        {{ pieza.orden_cliente }}<br>
+                                        <small class="text-muted">{{ pieza.service_tag }}</small>
+                                    </a>
+                                </td>
+                                <td>{{ pieza.proveedor }}</td>
+                                <td>{{ pieza.descripcion_piezas|truncatewords:8 }}</td>
+                                <td>{{ pieza.fecha_entrega_estimada|date:"d/m/Y" }}</td>
+                                <td>
+                                    <span class="badge bg-danger">
+                                        {{ pieza.dias_retraso }} día{{ pieza.dias_retraso|pluralize:"s" }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{% url 'servicio_tecnico:detalle_orden' pieza.orden_id %}" 
+                                       class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if piezas_retrasadas|length > 10 %}
+                <p class="mb-0 mt-3 text-center">
+                    <small class="text-muted">
+                        Mostrando las primeras 10 de {{ piezas_retrasadas|length }} piezas retrasadas.
+                        Usa los filtros para ver todas.
+                    </small>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- ========================================
+         PIEZAS PRÓXIMAS A LLEGAR
+         ======================================== -->
+    {% if piezas_proximas %}
+    <div class="row fade-in mb-4">
+        <div class="col-12">
+            <div class="alert alert-warning alert-dashboard alert-permanent">
+                <h5 class="alert-heading">
+                    <i class="bi bi-clock-history"></i> 
+                    📦 Próximas a Llegar: {{ piezas_proximas|length }} Pieza(s)
+                </h5>
+                <p class="mb-2">
+                    Estas piezas deberían llegar en los próximos 3 días. Prepara el espacio de recepción:
+                </p>
+                <ul class="mb-0">
+                    {% for pieza in piezas_proximas|slice:":5" %}
+                    <li>
+                        <strong>{{ pieza.orden_cliente }}</strong> ({{ pieza.service_tag }}) - {{ pieza.proveedor }}: 
+                        {{ pieza.descripcion_piezas|truncatewords:6 }} 
+                        <span class="badge bg-info">{{ pieza.fecha_entrega_estimada|date:"d/m/Y" }}</span>
+                        <span class="badge bg-secondary">{{ pieza.dias_hasta_entrega }} día{{ pieza.dias_hasta_entrega|pluralize:"s" }}</span>
+                    </li>
+                    {% endfor %}
+                    {% if piezas_proximas|length > 5 %}
+                    <li class="text-muted">
+                        <small>Y {{ piezas_proximas|length|add:"-5" }} más...</small>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- ========================================
+         SISTEMA DE TABS DE NAVEGACIÓN
+         ======================================== -->
+    <ul class="nav nav-tabs fade-in" id="dashboardTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" 
+                    id="tabla-tab" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#tabla" 
+                    type="button" 
+                    role="tab">
+                <i class="bi bi-table"></i> Tabla de Seguimientos
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" 
+                    id="graficos-tab" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#graficos" 
+                    type="button" 
+                    role="tab">
+                <i class="bi bi-graph-up"></i> Visualizaciones
+            </button>
+        </li>
+    </ul>
+    
+    <!-- ========================================
+         CONTENIDO DE LOS TABS
+         ======================================== -->
+    <div class="tab-content fade-in" id="dashboardTabContent">
+        
+        <!-- ========================================
+             TAB 1: TABLA DE SEGUIMIENTOS
+             ======================================== -->
+        <div class="tab-pane fade show active" id="tabla" role="tabpanel">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-list-ul"></i> Lista de Seguimientos
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Sub-pestañas para activos y recibidos -->
+                            <ul class="nav nav-pills mb-3" id="seguimientosTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" 
+                                            id="activos-tab" 
+                                            data-bs-toggle="pill" 
+                                            data-bs-target="#activos" 
+                                            type="button" 
+                                            role="tab">
+                                        <i class="bi bi-truck"></i> En Tránsito / Pedido
+                                        <span class="badge bg-primary ms-2">{{ seguimientos_activos|length }}</span>
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" 
+                                            id="recibidos-tab" 
+                                            data-bs-toggle="pill" 
+                                            data-bs-target="#recibidos" 
+                                            type="button" 
+                                            role="tab">
+                                        <i class="bi bi-check-circle"></i> Recibidos
+                                        <span class="badge bg-success ms-2">{{ seguimientos_recibidos|length }}</span>
+                                    </button>
+                                </li>
+                            </ul>
+
+                            <div class="tab-content" id="seguimientosTabContent">
+                                <!-- Pestaña de activos -->
+                                <div class="tab-pane fade show active" id="activos" role="tabpanel">
+                                    {% if seguimientos_activos %}
+                                    <div class="table-responsive">
+                                <table class="table table-hover table-striped" id="tabla-seguimientos">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Orden</th>
+                                            <th>Proveedor</th>
+                                            <th>Estado</th>
+                                            <th>Descripción</th>
+                                            <th>Pedido</th>
+                                            <th>Estimada</th>
+                                            <th>Real</th>
+                                            <th>Días</th>
+                                            <th>Retraso</th>
+                                            <th>Sucursal</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for seg in seguimientos_activos %}
+                                        <tr class="{% if seg.esta_retrasado %}table-danger{% elif seg.dias_hasta_entrega <= 3 and seg.estado != 'recibido' %}table-warning{% endif %}">
+                                            <td>
+                                                <a href="{% url 'servicio_tecnico:detalle_orden' seg.orden_id %}" 
+                                                   class="fw-bold text-primary" target="_blank"
+                                                   title="Sistema: {{ seg.orden_numero }}">
+                                                    {{ seg.orden_cliente }}<br>
+                                                    <small class="text-muted">{{ seg.service_tag }}</small>
+                                                </a>
+                                            </td>
+                                            <td>{{ seg.proveedor }}</td>
+                                            <td>
+                                                {% if seg.estado == 'pedido' %}
+                                                <span class="badge bg-info">{{ seg.estado_display }}</span>
+                                                {% elif seg.estado == 'transito' %}
+                                                <span class="badge bg-warning">{{ seg.estado_display }}</span>
+                                                {% elif seg.estado == 'recibido' %}
+                                                <span class="badge bg-success">{{ seg.estado_display }}</span>
+                                                {% elif seg.estado == 'cancelado' %}
+                                                <span class="badge bg-secondary">{{ seg.estado_display }}</span>
+                                                {% else %}
+                                                <span class="badge bg-primary">{{ seg.estado_display }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ seg.descripcion_piezas|truncatewords:5 }}</td>
+                                            <td>{{ seg.fecha_pedido|date:"d/m/Y" }}</td>
+                                            <td>{{ seg.fecha_entrega_estimada|date:"d/m/Y" }}</td>
+                                            <td>
+                                                {% if seg.fecha_entrega_real %}
+                                                {{ seg.fecha_entrega_real|date:"d/m/Y" }}
+                                                {% else %}
+                                                <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary">
+                                                    {{ seg.dias_desde_pedido }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if seg.esta_retrasado %}
+                                                <span class="badge bg-danger">
+                                                    <i class="bi bi-exclamation-triangle"></i> {{ seg.dias_retraso }}
+                                                </span>
+                                                {% elif seg.dias_hasta_entrega <= 3 and seg.estado != 'recibido' %}
+                                                <span class="badge bg-warning">
+                                                    <i class="bi bi-clock"></i> {{ seg.dias_hasta_entrega }}
+                                                </span>
+                                                {% else %}
+                                                <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ seg.sucursal }}</td>
+                                            <td>
+                                                <a href="{% url 'servicio_tecnico:detalle_orden' seg.orden_id %}" 
+                                                   class="btn btn-sm btn-outline-primary" 
+                                                   title="Ver detalle de orden"
+                                                   target="_blank">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info alert-dashboard">
+                                <i class="bi bi-info-circle"></i> 
+                                No hay seguimientos activos con los filtros aplicados.
+                            </div>
+                            {% endif %}
+                                </div>
+                                
+                                <!-- Pestaña de recibidos -->
+                                <div class="tab-pane fade" id="recibidos" role="tabpanel">
+                                    {% if seguimientos_recibidos %}
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-striped" id="tabla-recibidos">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>Orden</th>
+                                                    <th>Proveedor</th>
+                                                    <th>Estado</th>
+                                                    <th>Descripción</th>
+                                                    <th>Pedido</th>
+                                                    <th>Estimada</th>
+                                                    <th>Recibido</th>
+                                                    <th title="Días transcurridos desde el pedido hasta la recepción">Días Espera</th>
+                                                    <th>Retraso</th>
+                                                    <th>Sucursal</th>
+                                                    <th>Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for seg in seguimientos_recibidos %}
+                                                <tr>
+                                                    <td>
+                                                        <a href="{% url 'servicio_tecnico:detalle_orden' seg.orden_id %}" 
+                                                           class="fw-bold text-primary" target="_blank"
+                                                           title="Sistema: {{ seg.orden_numero }}">
+                                                            {{ seg.orden_cliente }}<br>
+                                                            <small class="text-muted">{{ seg.service_tag }}</small>
+                                                        </a>
+                                                    </td>
+                                                    <td>{{ seg.proveedor }}</td>
+                                                    <td>
+                                                        <span class="badge bg-success">{{ seg.estado_display }}</span>
+                                                    </td>
+                                                    <td>{{ seg.descripcion_piezas|truncatewords:5 }}</td>
+                                                    <td>{{ seg.fecha_pedido|date:"d/m/Y" }}</td>
+                                                    <td>{{ seg.fecha_entrega_estimada|date:"d/m/Y" }}</td>
+                                                    <td>
+                                                        {% if seg.fecha_entrega_real %}
+                                                        {{ seg.fecha_entrega_real|date:"d/m/Y" }}
+                                                        {% else %}
+                                                        <span class="text-muted">-</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">
+                                                            {{ seg.dias_totales_espera }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        {% if seg.dias_retraso > 0 %}
+                                                        <span class="badge bg-danger">
+                                                            <i class="bi bi-exclamation-triangle"></i> {{ seg.dias_retraso }}
+                                                        </span>
+                                                        {% else %}
+                                                        <span class="badge bg-success">
+                                                            <i class="bi bi-check"></i> A tiempo
+                                                        </span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>{{ seg.sucursal }}</td>
+                                                    <td>
+                                                        <a href="{% url 'servicio_tecnico:detalle_orden' seg.orden_id %}" 
+                                                           class="btn btn-sm btn-outline-primary" 
+                                                           title="Ver detalle de orden"
+                                                           target="_blank">
+                                                            <i class="bi bi-eye"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% else %}
+                                    <div class="alert alert-info alert-dashboard">
+                                        <i class="bi bi-info-circle"></i> 
+                                        No hay seguimientos recibidos con los filtros aplicados.
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ========================================
+             TAB 2: GRÁFICOS Y VISUALIZACIONES
+             ======================================== -->
+        <div class="tab-pane fade" id="graficos" role="tabpanel">
+            <div class="row">
+                
+                <!-- Distribución por Estado -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-pie-chart"></i> Distribución por Estado</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.distribucion_estados %}
+                                {{ graficos.distribucion_estados|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos para mostrar la distribución.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Top Proveedores -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-trophy"></i> Top Proveedores</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.top_proveedores %}
+                                {{ graficos.top_proveedores|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de proveedores disponibles.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tiempos de Entrega -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-speedometer"></i> Tiempos de Entrega por Proveedor</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.tiempos_entrega_proveedor %}
+                                {{ graficos.tiempos_entrega_proveedor|safe }}
+                                <div class="alert alert-success alert-dashboard mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Interpretación:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Caja:</strong> Rango típico de días de entrega (50% central)</li>
+                                        <li><strong>Línea:</strong> Mediana (tiempo más común)</li>
+                                        <li><strong>Puntos:</strong> Valores atípicos (muy rápidos o muy lentos)</li>
+                                        <li><strong>Usa esto para:</strong> Seleccionar proveedores más confiables</li>
+                                    </ul>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay suficientes datos de entregas completadas.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Timeline de Entregas -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-calendar3"></i> Timeline de Entregas Esperadas</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.timeline_entregas %}
+                                {{ graficos.timeline_entregas|safe }}
+                                <div class="alert alert-warning alert-dashboard mt-3">
+                                    <strong><i class="bi bi-info-circle"></i> Cómo Leer:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Línea Azul Vertical:</strong> Hoy</li>
+                                        <li><strong>Verde:</strong> Llegada normal, dentro del plazo</li>
+                                        <li><strong>Amarillo:</strong> Próximo a llegar (< 3 días)</li>
+                                        <li><strong>Naranja:</strong> Retrasado (< 5 días)</li>
+                                        <li><strong>Rojo:</strong> Críticamente retrasado (> 5 días)</li>
+                                    </ul>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay entregas pendientes para mostrar en timeline.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+    </div>
+    
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="text-center">
+        <div class="spinner-border spinner-border-lg text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+        <p class="mt-3 text-muted">Cargando datos del dashboard...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- TypeScript compilado del dashboard -->
+<script src="{% static 'js/dashboard_seguimiento_piezas.js' %}" defer></script>
+{% endblock %}
