@@ -1306,3 +1306,231 @@ def agrupar_seguimientos_por_orden(df):
     )
     
     return ordenes_agrupadas
+
+
+# ============================================================================
+# FUNCIÓN: ANÁLISIS DE COMENTARIOS DE RECHAZO (TEXT MINING)
+# ============================================================================
+
+def analizar_comentarios_rechazo(df_cotizaciones):
+    """
+    Realiza análisis de texto sobre los comentarios de rechazo.
+    
+    Extrae:
+    - Palabras más frecuentes
+    - Frases comunes (n-gramas)
+    - Correlación palabra → resultado
+    - Insights automáticos
+    
+    Args:
+        df_cotizaciones: DataFrame con cotizaciones
+    
+    Returns:
+        dict: Diccionario con análisis completo de texto
+    """
+    import re
+    from collections import Counter, defaultdict
+    
+    # Filtrar solo cotizaciones rechazadas con comentarios
+    df_rechazadas = df_cotizaciones[
+        (df_cotizaciones['aceptada'] == False) & 
+        (df_cotizaciones['detalle_rechazo'].notna()) &
+        (df_cotizaciones['detalle_rechazo'] != '')
+    ].copy()
+    
+    if df_rechazadas.empty:
+        return {
+            'total_comentarios': 0,
+            'palabras_clave': [],
+            'frases_comunes': [],
+            'correlaciones': [],
+            'insights': [],
+            'tiene_datos': False
+        }
+    
+    # Combinar todos los comentarios
+    todos_comentarios = ' '.join(df_rechazadas['detalle_rechazo'].astype(str).tolist())
+    
+    # Limpiar texto
+    texto_limpio = todos_comentarios.lower()
+    texto_limpio = re.sub(r'[^\w\sáéíóúñü]', ' ', texto_limpio)
+    
+    # Palabras a ignorar (stopwords en español + contexto servicio técnico)
+    stopwords = {
+        # Stopwords básicas en español
+        'el', 'la', 'de', 'que', 'y', 'a', 'en', 'un', 'ser', 'se', 'no', 'haber',
+        'por', 'con', 'su', 'para', 'como', 'estar', 'tener', 'le', 'lo', 'todo',
+        'pero', 'más', 'hacer', 'o', 'poder', 'decir', 'este', 'ir', 'otro', 'ese',
+        'si', 'me', 'ya', 'ver', 'porque', 'dar', 'cuando', 'él', 'muy', 'sin',
+        'vez', 'mucho', 'saber', 'qué', 'sobre', 'mi', 'alguno', 'mismo', 'yo',
+        'también', 'hasta', 'año', 'dos', 'querer', 'entre', 'así', 'primero',
+        'desde', 'grande', 'eso', 'ni', 'nos', 'llegar', 'pasar', 'tiempo', 'ella',
+        'sí', 'día', 'uno', 'bien', 'poco', 'deber', 'entonces', 'poner', 'cosa',
+        'tanto', 'hombre', 'parecer', 'nuestro', 'tan', 'donde', 'ahora', 'parte',
+        'después', 'vida', 'quedar', 'siempre', 'creer', 'hablar', 'llevar', 'dejar',
+        'nada', 'cada', 'seguir', 'menos', 'nuevo', 'encontrar', 'algo', 'solo',
+        'decir', 'salir', 'volver', 'tomar', 'conocer', 'vivir', 'sentir', 'tratar',
+        'mirar', 'contar', 'empezar', 'esperar', 'buscar', 'existir', 'entrar',
+        'trabajar', 'escribir', 'perder', 'producir', 'ocurrir', 'entender', 'pedir',
+        'recibir', 'recordar', 'terminar', 'permitir', 'aparecer', 'conseguir',
+        'comenzar', 'servir', 'sacar', 'necesitar', 'mantener', 'resultar', 'leer',
+        'caer', 'cambiar', 'presentar', 'crear', 'abrir', 'considerar', 'oír',
+        'acabar', 'mil', 'nadie', 'realizar', 'suponer', 'comprender', 'lograr',
+        
+        # Stopwords específicas del contexto de servicio técnico
+        # (palabras genéricas que aparecen en todos los comentarios pero no añaden valor)
+        'usuario', 'usuarios', 'cliente', 'clientes', 'equipo', 'equipos',
+        'cotizacion', 'cotizaciones', 'servicio', 'servicios', 'tecnico', 'tecnicos',
+        'reparacion', 'reparaciones', 'pieza', 'piezas', 'repuesto', 'repuestos',
+        'acepta', 'aceptar', 'acepto', 'aceptado', 'aceptara', 'aceptacion',
+        'rechaza', 'rechazar', 'rechazo', 'rechazado', 'rechazara',
+        'disponible', 'disponibles', 'disponibilidad',
+        'motivo', 'motivos', 'razon', 'razones', 'causa', 'causas',
+        'nivel', 'componente', 'componentes',
+        'correo', 'correos', 'email', 'telefono', 'llamada', 'whatsapp',
+        'recoleccion', 'entrega', 'retiro', 'retira', 'retiro', 'retirara',
+        'ante', 'contra', 'mediante', 'hacia', 'bajo', 'sobre',
+        'dice', 'dijo', 'indica', 'informo', 'comento', 'comenta', 'menciono', 'menciona',
+        'informa', 'notifica', 'confirma', 'confirmado', 'reporta', 'reporto',
+        'solicita', 'solicito', 'requiere', 'requirio', 'pregunta', 'pregunto',
+        'realizara', 'realizar', 'realizo', 'hace', 'hizo', 'hara', 'hecho',
+        'toma', 'tomo', 'tomara', 'tomado', 'pone', 'puso', 'pondra', 'puesto',
+        'alista', 'alisto', 'alistara', 'alistado',
+        'tiene', 'tuvo', 'tengo', 'tendra', 'habia', 'hubo', 'habra',
+        'sera', 'seria', 'fue', 'fueron', 'seran', 'esta', 'estuvo', 'estara',
+        'puede', 'pudo', 'podra', 'podria', 'debe', 'debio', 'debera', 'deberia',
+        'quiere', 'quiso', 'querra', 'querria', 'sabe', 'supo', 'sabra',
+        'llama', 'llamo', 'llamara', 'avisa', 'aviso', 'avisara',
+        'atencion', 'favor', 'gracias', 'saludos', 'nota', 'observacion',
+        'todos', 'todas', 'todo', 'toda', 'algunos', 'algunas', 'varios', 'varias',
+        'mas', 'menos', 'mucho', 'mucha', 'muchos', 'muchas', 'poco', 'poca', 'pocos', 'pocas',
+        'ahi', 'alla', 'aqui', 'alla', 'dentro', 'fuera', 'cerca', 'lejos',
+        'antes', 'despues', 'durante', 'mientras', 'luego', 'pronto', 'tarde', 'temprano',
+        'siempre', 'nunca', 'jamas', 'todavia', 'aun', 'recien',
+        'tambien', 'tampoco', 'incluso', 'ademas', 'aparte', 'excepto', 'salvo',
+        'segun', 'mediante', 'conforme', 'acerca', 'respecto', 'referente'
+    }
+    
+    # Extraer palabras individuales
+    palabras = [p for p in texto_limpio.split() if len(p) > 3 and p not in stopwords]
+    contador_palabras = Counter(palabras)
+    
+    # Top 15 palabras más frecuentes
+    palabras_clave = [
+        {'palabra': palabra, 'frecuencia': freq}
+        for palabra, freq in contador_palabras.most_common(15)
+    ]
+    
+    # Extraer bigramas (frases de 2 palabras)
+    palabras_lista = texto_limpio.split()
+    bigramas = []
+    for i in range(len(palabras_lista) - 1):
+        palabra1 = palabras_lista[i]
+        palabra2 = palabras_lista[i + 1]
+        if (len(palabra1) > 3 and len(palabra2) > 3 and 
+            palabra1 not in stopwords and palabra2 not in stopwords):
+            bigramas.append(f"{palabra1} {palabra2}")
+    
+    contador_bigramas = Counter(bigramas)
+    frases_comunes = [
+        {'frase': frase, 'frecuencia': freq}
+        for frase, freq in contador_bigramas.most_common(10)
+    ]
+    
+    # Calcular correlación palabra → resultado
+    # Para cada palabra clave, ver tasa de rechazo cuando aparece
+    correlaciones = []
+    
+    for palabra_data in palabras_clave[:10]:  # Top 10 palabras
+        palabra = palabra_data['palabra']
+        
+        # Cotizaciones que mencionan esta palabra
+        menciona_palabra = df_cotizaciones[
+            df_cotizaciones['detalle_rechazo'].str.contains(
+                palabra, case=False, na=False
+            )
+        ]
+        
+        if len(menciona_palabra) > 0:
+            rechazos_con_palabra = menciona_palabra[menciona_palabra['aceptada'] == False]
+            tasa_rechazo = (len(rechazos_con_palabra) / len(menciona_palabra)) * 100
+            
+            correlaciones.append({
+                'palabra': palabra,
+                'menciones': len(menciona_palabra),
+                'tasa_rechazo': tasa_rechazo,
+                'tasa_aceptacion': 100 - tasa_rechazo
+            })
+    
+    # Ordenar por tasa de rechazo
+    correlaciones.sort(key=lambda x: x['tasa_rechazo'], reverse=True)
+    
+    # Generar insights automáticos
+    insights = []
+    
+    # Insight 1: Palabra más peligrosa
+    if correlaciones:
+        palabra_peligrosa = correlaciones[0]
+        if palabra_peligrosa['tasa_rechazo'] > 70:
+            insights.append({
+                'tipo': 'alerta',
+                'icono': '🔴',
+                'titulo': f'Alerta: "{palabra_peligrosa["palabra"].title()}"',
+                'mensaje': f'La palabra "{palabra_peligrosa["palabra"]}" aparece en {palabra_peligrosa["menciones"]} cotizaciones y está asociada con {palabra_peligrosa["tasa_rechazo"]:.0f}% de rechazos.',
+                'accion': f'Cuando el cliente mencione "{palabra_peligrosa["palabra"]}", actúa proactivamente para mitigar el riesgo.'
+            })
+    
+    # Insight 2: Palabra más segura
+    palabras_seguras = [p for p in correlaciones if p['tasa_aceptacion'] > 60]
+    if palabras_seguras:
+        palabra_segura = palabras_seguras[0]
+        insights.append({
+            'tipo': 'positivo',
+            'icono': '🟢',
+            'titulo': f'Oportunidad: "{palabra_segura["palabra"].title()}"',
+            'mensaje': f'Cuando los clientes mencionan "{palabra_segura["palabra"]}", hay {palabra_segura["tasa_aceptacion"]:.0f}% de probabilidad de aceptación.',
+            'accion': f'Enfatiza aspectos relacionados con "{palabra_segura["palabra"]}" en tus cotizaciones.'
+        })
+    
+    # Insight 3: Frase más común
+    if frases_comunes:
+        frase_top = frases_comunes[0]
+        insights.append({
+            'tipo': 'info',
+            'icono': '💬',
+            'titulo': 'Frase Más Mencionada',
+            'mensaje': f'La frase "{frase_top["frase"]}" aparece {frase_top["frecuencia"]} veces en los rechazos.',
+            'accion': 'Analiza el contexto de esta frase para identificar patrones de insatisfacción.'
+        })
+    
+    # Insight 4: Volumen de feedback
+    total_palabras = sum(contador_palabras.values())
+    promedio_palabras = total_palabras / len(df_rechazadas) if len(df_rechazadas) > 0 else 0
+    
+    if promedio_palabras > 20:
+        insights.append({
+            'tipo': 'info',
+            'icono': '📝',
+            'titulo': 'Feedback Detallado',
+            'mensaje': f'Los clientes escriben en promedio {promedio_palabras:.0f} palabras al rechazar.',
+            'accion': 'Alto nivel de detalle indica que los clientes están evaluando cuidadosamente. Aprovecha este feedback.'
+        })
+    elif promedio_palabras < 5:
+        insights.append({
+            'tipo': 'advertencia',
+            'icono': '⚠️',
+            'titulo': 'Feedback Limitado',
+            'mensaje': f'Los comentarios de rechazo son muy breves (promedio: {promedio_palabras:.0f} palabras).',
+            'accion': 'Considera solicitar más detalles al cliente para mejorar futuras cotizaciones.'
+        })
+    
+    return {
+        'total_comentarios': len(df_rechazadas),
+        'total_palabras_unicas': len(contador_palabras),
+        'promedio_palabras_por_comentario': promedio_palabras,
+        'palabras_clave': palabras_clave,
+        'frases_comunes': frases_comunes,
+        'correlaciones': correlaciones,
+        'insights': insights,
+        'tiene_datos': True
+    }

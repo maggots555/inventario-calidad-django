@@ -8750,11 +8750,16 @@ def dashboard_cotizaciones(request):
                     
                     # Si hay predicción de motivo, agregarlo
                     if analisis_completo['prediccion_motivo']:
+                        # Convertir probabilidad de decimal a porcentaje (0.255 -> 25.5)
+                        prob_numerica = analisis_completo['prediccion_motivo']['probabilidad'] * 100
+                        
                         ml_insights_avanzados['motivo_predicho'] = {
                             'motivo': analisis_completo['prediccion_motivo']['motivo_principal'],
                             'motivo_nombre': analisis_completo['prediccion_motivo']['motivo_nombre'],
-                            'probabilidad': analisis_completo['prediccion_motivo']['probabilidad_pct'],
+                            'probabilidad': prob_numerica,  # Valor numérico para el progress bar
+                            'probabilidad_texto': analisis_completo['prediccion_motivo']['probabilidad_pct'],  # Texto formateado
                             'confianza': analisis_completo['prediccion_motivo']['confianza'],
+                            'confianza_icono': analisis_completo['prediccion_motivo']['confianza_icono'],
                             'descripcion': analisis_completo['prediccion_motivo']['motivo_descripcion'],
                             'acciones': analisis_completo['prediccion_motivo']['acciones_sugeridas']
                         }
@@ -8871,6 +8876,80 @@ def dashboard_cotizaciones(request):
     ]
     
     # ========================================
+    # 6.5. ANÁLISIS DE TEXTO (TEXT MINING)
+    # ========================================
+    
+    print("\n" + "="*50)
+    print("📝 ANÁLISIS DE COMENTARIOS DE RECHAZO (TEXT MINING)")
+    print("="*50)
+    
+    analisis_texto = {}
+    
+    try:
+        from .utils_cotizaciones import analizar_comentarios_rechazo
+        
+        print("🔍 Analizando comentarios de rechazo...")
+        
+        # Llamar función de análisis de texto
+        analisis_texto = analizar_comentarios_rechazo(df_cotizaciones)
+        
+        if analisis_texto['tiene_datos']:
+            print(f"✅ Análisis de texto completado:")
+            print(f"   - {analisis_texto['total_comentarios']} comentarios analizados")
+            print(f"   - {analisis_texto['total_palabras_unicas']} palabras únicas encontradas")
+            print(f"   - {len(analisis_texto['palabras_clave'])} palabras clave extraídas")
+            print(f"   - {len(analisis_texto['frases_comunes'])} frases comunes identificadas")
+            print(f"   - {len(analisis_texto['insights'])} insights generados")
+            
+            # Generar visualizaciones de text mining
+            try:
+                print("📊 Generando visualizaciones de text mining...")
+                
+                # Gráfico de palabras más frecuentes
+                graficos['texto_palabras_frecuentes'] = convertir_figura_a_html(
+                    visualizer.grafico_palabras_frecuentes(analisis_texto['palabras_clave'])
+                )
+                print("   ✅ Gráfico de palabras frecuentes generado")
+                
+                # Gráfico de frases comunes
+                if analisis_texto['frases_comunes']:
+                    graficos['texto_frases_comunes'] = convertir_figura_a_html(
+                        visualizer.grafico_frases_comunes(analisis_texto['frases_comunes'])
+                    )
+                    print("   ✅ Gráfico de frases comunes generado")
+                
+                # Gráfico de correlación palabras → resultado
+                if analisis_texto['correlaciones']:
+                    graficos['texto_correlaciones'] = convertir_figura_a_html(
+                        visualizer.grafico_correlacion_palabras(analisis_texto['correlaciones'])
+                    )
+                    print("   ✅ Gráfico de correlaciones generado")
+                
+                # Nube de palabras tipo burbujas
+                graficos['texto_nube_palabras'] = convertir_figura_a_html(
+                    visualizer.grafico_nube_palabras_simple(analisis_texto['palabras_clave'])
+                )
+                print("   ✅ Nube de palabras generada")
+                
+                print("✅ Todas las visualizaciones de text mining generadas exitosamente")
+                
+            except Exception as e_viz_texto:
+                print(f"⚠️ Error generando visualizaciones de text mining: {str(e_viz_texto)}")
+                # No crítico, continuar
+        
+        else:
+            print("ℹ️ No hay suficientes comentarios de rechazo para análisis de texto")
+            analisis_texto['mensaje'] = "No hay comentarios de rechazo suficientes para análisis"
+    
+    except Exception as e_texto:
+        print(f"⚠️ Error en análisis de texto: {str(e_texto)}")
+        analisis_texto = {
+            'tiene_datos': False,
+            'error': str(e_texto),
+            'mensaje': 'Error al analizar comentarios'
+        }
+    
+    # ========================================
     # 7. PREPARAR CONTEXTO COMPLETO
     # ========================================
     
@@ -8886,6 +8965,9 @@ def dashboard_cotizaciones(request):
         
         # Machine Learning Avanzado (Sistema Experto) - NUEVO
         'ml_insights_avanzados': ml_insights_avanzados,
+        
+        # Análisis de Texto (Text Mining) - NUEVO
+        'analisis_texto': analisis_texto,
         
         # Filtros activos (para mantener estado en el form)
         'filtros_activos': {

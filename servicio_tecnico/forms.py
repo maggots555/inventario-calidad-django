@@ -1520,11 +1520,13 @@ class GestionarCotizacionForm(forms.ModelForm):
         widgets = {
             'motivo_rechazo': forms.Select(attrs={
                 'class': 'form-control form-select',
+                'id': 'id_motivo_rechazo',
             }),
             'detalle_rechazo': forms.Textarea(attrs={
                 'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Describe con más detalle el motivo del rechazo...',
+                'rows': 5,
+                'id': 'id_detalle_rechazo',
+                'placeholder': 'Selecciona un motivo de rechazo y se cargará automáticamente una plantilla. Edita los campos entre [ ] con los datos específicos del caso.',
             }),
         }
         

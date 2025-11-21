@@ -41,6 +41,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import logging
+import joblib
 
 from .base import MLModelBase
 from ..models import Cotizacion
@@ -439,10 +440,54 @@ class PredictorMotivoRechazo(MLModelBase):
             print(f"   {i}. {row.feature}: {row.importance:.4f}")
         print("="*70)
         
-        # Guardar modelo
+        # Guardar modelo (incluyendo encoders)
         self.guardar_modelo()
         
         return metricas
+    
+    def guardar_modelo(self) -> None:
+        """
+        Sobrescribe guardar_modelo para incluir los encoders.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Además del modelo principal (RandomForest), necesitamos guardar
+        los LabelEncoders que convierten texto a números. Si no los guardamos,
+        el modelo no puede hacer predicciones después.
+        """
+        # Llamar al método padre para guardar el modelo principal
+        super().guardar_modelo()
+        
+        # Guardar encoders adicionales
+        encoders_path = self.model_dir / f'{self.model_name}_encoders.pkl'
+        encoders_data = {
+            'label_encoder': self.label_encoder,
+            'feature_encoders': self.feature_encoders
+        }
+        joblib.dump(encoders_data, encoders_path)
+        logger.info(f"💾 Encoders guardados en: {encoders_path}")
+    
+    def cargar_modelo(self) -> bool:
+        """
+        Sobrescribe cargar_modelo para incluir los encoders.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Cuando cargamos el modelo, también debemos cargar los encoders
+        para que las predicciones funcionen correctamente.
+        """
+        # Llamar al método padre para cargar el modelo principal
+        resultado = super().cargar_modelo()
+        
+        # Cargar encoders
+        encoders_path = self.model_dir / f'{self.model_name}_encoders.pkl'
+        if encoders_path.exists():
+            encoders_data = joblib.load(encoders_path)
+            self.label_encoder = encoders_data['label_encoder']
+            self.feature_encoders = encoders_data['feature_encoders']
+            logger.info(f"✅ Encoders cargados desde: {encoders_path}")
+        else:
+            logger.warning(f"⚠️ No se encontraron encoders en: {encoders_path}")
+        
+        return resultado
     
     def predecir_motivo(
         self, 

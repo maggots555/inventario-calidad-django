@@ -2905,6 +2905,306 @@ class DashboardCotizacionesVisualizer:
         return fig
     
     # ========================================================================
+    # VISUALIZACIONES DE TEXT MINING (ANÁLISIS DE COMENTARIOS)
+    # ========================================================================
+    
+    def grafico_palabras_frecuentes(self, palabras_clave):
+        """
+        Gráfico de barras horizontales con las palabras más frecuentes.
+        
+        Muestra las palabras que más aparecen en los comentarios de rechazo,
+        ordenadas de mayor a menor frecuencia.
+        
+        Args:
+            palabras_clave: Lista de dicts [{'palabra': str, 'frecuencia': int}]
+        
+        Returns:
+            Figure: Gráfico de barras horizontales de Plotly
+        """
+        if not palabras_clave:
+            return self._crear_grafico_vacio("No hay palabras para analizar")
+        
+        # Ordenar por frecuencia descendente
+        palabras_ordenadas = sorted(palabras_clave, key=lambda x: x['frecuencia'], reverse=True)
+        
+        palabras = [p['palabra'].title() for p in palabras_ordenadas]
+        frecuencias = [p['frecuencia'] for p in palabras_ordenadas]
+        
+        # Crear degradado de colores (más frecuente = más oscuro)
+        max_freq = max(frecuencias)
+        colores = [
+            f'rgba(13, 110, 253, {0.3 + (freq / max_freq) * 0.7})'  # Azul con opacidad variable
+            for freq in frecuencias
+        ]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            y=palabras,
+            x=frecuencias,
+            orientation='h',
+            text=frecuencias,
+            textposition='outside',
+            marker=dict(
+                color=colores,
+                line=dict(color=self.colores['primary'], width=1)
+            ),
+            hovertemplate='<b>%{y}</b><br>Aparece: %{x} veces<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='🔤 Palabras Más Mencionadas en Rechazos',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=16, color=self.colores['dark'])
+            ),
+            xaxis=dict(
+                title='Frecuencia (veces mencionada)',
+                showgrid=True,
+                gridcolor='rgba(0,0,0,0.1)'
+            ),
+            yaxis=dict(title='', autorange="reversed"),
+            height=500,
+            showlegend=False
+        )
+        
+        # Ajustar margen después del update_layout
+        fig.update_layout(margin=dict(l=150, r=50, t=80, b=50))
+        
+        return fig
+    
+    def grafico_frases_comunes(self, frases_comunes):
+        """
+        Gráfico de barras con las frases más comunes (bigramas).
+        
+        Muestra las combinaciones de 2 palabras que aparecen juntas
+        frecuentemente en los comentarios de rechazo.
+        
+        Args:
+            frases_comunes: Lista de dicts [{'frase': str, 'frecuencia': int}]
+        
+        Returns:
+            Figure: Gráfico de barras de Plotly
+        """
+        if not frases_comunes:
+            return self._crear_grafico_vacio("No hay frases para analizar")
+        
+        # Ordenar por frecuencia
+        frases_ordenadas = sorted(frases_comunes, key=lambda x: x['frecuencia'], reverse=True)
+        
+        frases = [f['frase'].title() for f in frases_ordenadas]
+        frecuencias = [f['frecuencia'] for f in frases_ordenadas]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            y=frases,
+            x=frecuencias,
+            orientation='h',
+            text=frecuencias,
+            textposition='outside',
+            marker=dict(
+                color=self.colores['info'],
+                line=dict(color='white', width=2)
+            ),
+            hovertemplate='<b>"%{y}"</b><br>Aparece: %{x} veces<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='💬 Frases Más Comunes (Bigramas)',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=16, color=self.colores['dark'])
+            ),
+            xaxis=dict(
+                title='Frecuencia',
+                showgrid=True,
+                gridcolor='rgba(0,0,0,0.1)'
+            ),
+            yaxis=dict(title='', autorange="reversed"),
+            height=450,
+            showlegend=False
+        )
+        
+        # Ajustar margen después del update_layout
+        fig.update_layout(margin=dict(l=180, r=50, t=80, b=50))
+        
+        return fig
+    
+    def grafico_correlacion_palabras(self, correlaciones):
+        """
+        Heatmap: Correlación entre palabras y tasa de rechazo/aceptación.
+        
+        Muestra qué palabras están más asociadas con aceptación vs rechazo.
+        Verde = Alta aceptación cuando aparece
+        Rojo = Alto rechazo cuando aparece
+        
+        Args:
+            correlaciones: Lista de dicts [{'palabra': str, 'tasa_rechazo': float, 
+                          'tasa_aceptacion': float, 'menciones': int}]
+        
+        Returns:
+            Figure: Gráfico de barras apiladas de Plotly
+        """
+        if not correlaciones:
+            return self._crear_grafico_vacio("No hay correlaciones para analizar")
+        
+        # Ordenar por tasa de rechazo (más peligrosas primero)
+        correlaciones_ordenadas = sorted(correlaciones, key=lambda x: x['tasa_rechazo'], reverse=True)
+        
+        palabras = [c['palabra'].title() for c in correlaciones_ordenadas]
+        tasas_rechazo = [c['tasa_rechazo'] for c in correlaciones_ordenadas]
+        tasas_aceptacion = [c['tasa_aceptacion'] for c in correlaciones_ordenadas]
+        menciones = [c['menciones'] for c in correlaciones_ordenadas]
+        
+        fig = go.Figure()
+        
+        # Barra de rechazo (rojo)
+        fig.add_trace(go.Bar(
+            y=palabras,
+            x=tasas_rechazo,
+            name='% Rechazo',
+            orientation='h',
+            marker=dict(color=self.colores['danger']),
+            text=[f'{t:.0f}%' for t in tasas_rechazo],
+            textposition='inside',
+            hovertemplate='<b>%{y}</b><br>Rechazo: %{x:.1f}%<br>Menciones: %{customdata}<extra></extra>',
+            customdata=menciones
+        ))
+        
+        # Barra de aceptación (verde)
+        fig.add_trace(go.Bar(
+            y=palabras,
+            x=tasas_aceptacion,
+            name='% Aceptación',
+            orientation='h',
+            marker=dict(color=self.colores['success']),
+            text=[f'{t:.0f}%' for t in tasas_aceptacion],
+            textposition='inside',
+            hovertemplate='<b>%{y}</b><br>Aceptación: %{x:.1f}%<br>Menciones: %{customdata}<extra></extra>',
+            customdata=menciones
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='🎯 Correlación Palabra → Resultado',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=16, color=self.colores['dark'])
+            ),
+            xaxis=dict(
+                title='Porcentaje (%)',
+                range=[0, 100],
+                showgrid=True,
+                gridcolor='rgba(0,0,0,0.1)'
+            ),
+            yaxis=dict(title='', autorange="reversed"),
+            barmode='stack',
+            height=500,
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5
+            )
+        )
+        
+        # Ajustar margen después del update_layout
+        fig.update_layout(margin=dict(l=150, r=50, t=100, b=50))
+        
+        return fig
+    
+    def grafico_nube_palabras_simple(self, palabras_clave):
+        """
+        Visualización alternativa tipo "nube de palabras" usando burbujas.
+        
+        Dado que Python no tiene word cloud nativo fácil para web,
+        esta función crea un gráfico de burbujas donde:
+        - Tamaño de burbuja = frecuencia de palabra
+        - Posición aleatoria pero organizada
+        
+        Args:
+            palabras_clave: Lista de dicts [{'palabra': str, 'frecuencia': int}]
+        
+        Returns:
+            Figure: Gráfico de burbujas de Plotly
+        """
+        if not palabras_clave:
+            return self._crear_grafico_vacio("No hay palabras para visualizar")
+        
+        # Tomar top 25 palabras
+        palabras_top = sorted(palabras_clave, key=lambda x: x['frecuencia'], reverse=True)[:25]
+        
+        palabras = [p['palabra'].title() for p in palabras_top]
+        frecuencias = [p['frecuencia'] for p in palabras_top]
+        
+        # Generar posiciones en espiral
+        import math
+        n = len(palabras)
+        theta = [2 * math.pi * i / n for i in range(n)]
+        radio = [math.sqrt(freq) for freq in frecuencias]
+        x = [r * math.cos(t) for r, t in zip(radio, theta)]
+        y = [r * math.sin(t) for r, t in zip(radio, theta)]
+        
+        # Normalizar tamaños de burbuja
+        max_freq = max(frecuencias)
+        sizes = [(freq / max_freq) * 100 + 20 for freq in frecuencias]
+        
+        # Colores degradados
+        colores_burbujas = [
+            f'rgba(13, 110, 253, {0.3 + (freq / max_freq) * 0.7})'
+            for freq in frecuencias
+        ]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=y,
+            mode='markers+text',
+            text=palabras,
+            textposition="middle center",
+            textfont=dict(
+                size=[10 + (freq / max_freq) * 20 for freq in frecuencias],
+                color='white',
+                family='Arial Black'
+            ),
+            marker=dict(
+                size=sizes,
+                color=colores_burbujas,
+                line=dict(color=self.colores['primary'], width=2)
+            ),
+            hovertemplate='<b>%{text}</b><br>Frecuencia: %{customdata}<extra></extra>',
+            customdata=frecuencias
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='☁️ Nube de Palabras Interactiva',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=16, color=self.colores['dark'])
+            ),
+            xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            height=600,
+            showlegend=False
+        )
+        
+        # Ajustar hovermode después del update_layout
+        fig.update_layout(hovermode='closest')
+        
+        return fig
+
+    # ========================================================================
     # VISUALIZACIONES ML AVANZADAS (Sistema Experto)
     # ========================================================================
     
