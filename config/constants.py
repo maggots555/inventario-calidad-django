@@ -379,6 +379,6 @@ PROVEEDORES_CHOICES = [
     ('SUREM', 'SUREM'),
     ('TECNOCITY', 'TECNOCITY'),
     ('TIENDA LENOVO', 'TIENDA LENOVO'),
-    ('ULTRA', 'ULTRA'),
+    ('ULRA', 'ULTRA'),
     ('OTRO', 'Otro proveedor'),  # Opción para proveedor no listado
 ]

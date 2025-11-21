@@ -8113,7 +8113,7 @@ def exportar_excel_dashboard_oow_fl(request):
         
         # Encabezados de la tabla de órdenes activas
         headers_orden = [
-            'N° Orden Cliente', 'N° Orden Interno', 'Tipo Equipo', 'Marca',
+            'N° Orden Cliente', 'N° de Serie', 'Tipo Equipo', 'Marca',
             'Modelo', 'Estado', 'Días Hábiles', 'Días Sin Actualizar',
             'Tipo de Orden', 'Monto', 'Sucursal', 'Fecha Ingreso',
             'Última Actualización', 'Cotización', 'Observaciones'
@@ -8128,7 +8128,7 @@ def exportar_excel_dashboard_oow_fl(request):
         # Datos de órdenes activas
         for orden in ordenes_activas_resp.order_by('-fecha_ingreso'):
             ws_resp.cell(row=row, column=1).value = orden.detalle_equipo.orden_cliente
-            ws_resp.cell(row=row, column=2).value = orden.numero_orden_interno if orden.numero_orden_interno else 'N/A'
+            ws_resp.cell(row=row, column=2).value = orden.detalle_equipo.numero_serie if orden.detalle_equipo.numero_serie else 'N/A'
             ws_resp.cell(row=row, column=3).value = orden.detalle_equipo.get_tipo_equipo_display()
             ws_resp.cell(row=row, column=4).value = orden.detalle_equipo.marca
             ws_resp.cell(row=row, column=5).value = orden.detalle_equipo.modelo[:30] if orden.detalle_equipo.modelo else 'N/A'
@@ -8214,7 +8214,7 @@ def exportar_excel_dashboard_oow_fl(request):
         # Datos de órdenes cerradas
         for orden in ordenes_cerradas_resp.order_by('-fecha_ingreso'):
             ws_resp.cell(row=row, column=1).value = orden.detalle_equipo.orden_cliente
-            ws_resp.cell(row=row, column=2).value = orden.numero_orden_interno if orden.numero_orden_interno else 'N/A'
+            ws_resp.cell(row=row, column=2).value = orden.detalle_equipo.numero_serie if orden.detalle_equipo.numero_serie else 'N/A'
             ws_resp.cell(row=row, column=3).value = orden.detalle_equipo.get_tipo_equipo_display()
             ws_resp.cell(row=row, column=4).value = orden.detalle_equipo.marca
             ws_resp.cell(row=row, column=5).value = orden.detalle_equipo.modelo[:30] if orden.detalle_equipo.modelo else 'N/A'
@@ -8282,7 +8282,7 @@ def exportar_excel_dashboard_oow_fl(request):
     
     # Encabezados completos
     headers_all = [
-        'N° Orden Cliente', 'N° Orden Interno', 'Tipo Equipo', 'Marca',
+        'N° Orden Cliente', 'N° de Serie', 'Tipo Equipo', 'Marca',
         'Modelo', 'Estado', 'Responsable Seguimiento', 'Técnico Asignado',
         'Días Hábiles', 'Días Sin Actualizar', 'Tipo de Orden', 'Monto',
         'Sucursal', 'Fecha Ingreso', 'Última Actualización', 'Cotización',
@@ -8298,7 +8298,7 @@ def exportar_excel_dashboard_oow_fl(request):
     row = 4
     for orden in ordenes:
         ws_all.cell(row=row, column=1).value = orden.detalle_equipo.orden_cliente
-        ws_all.cell(row=row, column=2).value = orden.numero_orden_interno if orden.numero_orden_interno else 'N/A'
+        ws_all.cell(row=row, column=2).value = orden.detalle_equipo.numero_serie if orden.detalle_equipo.numero_serie else 'N/A'
         ws_all.cell(row=row, column=3).value = orden.detalle_equipo.get_tipo_equipo_display()
         ws_all.cell(row=row, column=4).value = orden.detalle_equipo.marca
         ws_all.cell(row=row, column=5).value = orden.detalle_equipo.modelo[:30] if orden.detalle_equipo.modelo else 'N/A'

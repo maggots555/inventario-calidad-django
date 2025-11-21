@@ -244,12 +244,10 @@
                             {% for pieza in piezas_retrasadas|slice:":10" %}
                             <tr>
                                 <td>
-                                    <a href="{% url 'servicio_tecnico:detalle_orden' pieza.orden_id %}" 
-                                       class="text-primary fw-bold" target="_blank"
-                                       title="Sistema: {{ pieza.orden_numero }}">
+                                    <span class="fw-bold" title="Sistema: {{ pieza.orden_numero }}">
                                         {{ pieza.orden_cliente }}<br>
                                         <small class="text-muted">{{ pieza.service_tag }}</small>
-                                    </a>
+                                    </span>
                                 </td>
                                 <td>{{ pieza.proveedor }}</td>
                                 <td>{{ pieza.descripcion_piezas|truncatewords:8 }}</td>
@@ -313,12 +311,10 @@
                             {% for pieza in piezas_problematicas|slice:":10" %}
                             <tr>
                                 <td>
-                                    <a href="{% url 'servicio_tecnico:detalle_orden' pieza.orden_id %}" 
-                                       class="text-primary fw-bold" target="_blank"
-                                       title="Sistema: {{ pieza.orden_numero }}">
+                                    <span class="fw-bold" title="Sistema: {{ pieza.orden_numero }}">
                                         {{ pieza.orden_cliente }}<br>
                                         <small class="text-muted">{{ pieza.service_tag }}</small>
-                                    </a>
+                                    </span>
                                 </td>
                                 <td>{{ pieza.proveedor }}</td>
                                 <td>{{ pieza.descripcion_piezas|truncatewords:8 }}</td>
@@ -495,12 +491,10 @@
                                             
                                             <!-- COLUMNA 1: ORDEN -->
                                             <td>
-                                                <a href="{% url 'servicio_tecnico:detalle_orden' orden.orden_id %}" 
-                                                   class="fw-bold text-primary" target="_blank"
-                                                   title="Sistema: {{ orden.orden_numero }}">
+                                                <span class="fw-bold" title="Sistema: {{ orden.orden_numero }}">
                                                     {{ orden.orden_cliente }}<br>
                                                     <small class="text-muted">{{ orden.service_tag }}</small>
-                                                </a>
+                                                </span>
                                                 <br>
                                                 <small class="text-muted">
                                                     {{ orden.tipo_equipo }} {{ orden.marca_equipo }}
@@ -765,12 +759,10 @@
                                                 {% for orden in ordenes_recibidas %}
                                                 <tr>
                                                     <td>
-                                                        <a href="{% url 'servicio_tecnico:detalle_orden' orden.orden_id %}" 
-                                                           class="fw-bold text-primary" target="_blank"
-                                                           title="Sistema: {{ orden.orden_numero }}">
+                                                        <span class="fw-bold" title="Sistema: {{ orden.orden_numero }}">
                                                             {{ orden.orden_cliente }}<br>
                                                             <small class="text-muted">{{ orden.service_tag }}</small>
-                                                        </a>
+                                                        </span>
                                                     </td>
                                                     <td>
                                                         {% for prov in orden.proveedores_activos %}
