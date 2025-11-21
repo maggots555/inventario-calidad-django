@@ -1534,3 +1534,415 @@ def analizar_comentarios_rechazo(df_cotizaciones):
         'insights': insights,
         'tiene_datos': True
     }
+
+
+def analizar_diagnosticos_tecnicos(df_ordenes):
+    """
+    Realiza análisis de texto sobre los diagnósticos técnicos realizados por cada técnico.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Esta función analiza los diagnósticos escritos por los técnicos para identificar:
+    - Nivel de detalle en sus diagnósticos (cuántas palabras escriben)
+    - Terminología técnica vs lenguaje coloquial
+    - Fallas más diagnosticadas por cada técnico
+    - Comparación entre técnicos (quién es más detallado, técnico, etc.)
+    - Áreas de mejora en la calidad de los diagnósticos
+    
+    Args:
+        df_ordenes: DataFrame con órdenes de servicio (debe incluir columnas:
+                   'tecnico_nombre', 'diagnostico_sic', 'falla_principal')
+    
+    Returns:
+        dict: Diccionario con análisis completo por técnico con la estructura:
+            - tiene_datos: bool (si hay datos suficientes para analizar)
+            - total_diagnosticos: int (cantidad total de diagnósticos analizados)
+            - total_tecnicos: int (cantidad de técnicos únicos)
+            - analisis_por_tecnico: list (análisis individual de cada técnico)
+            - ranking_detalle: list (técnicos ordenados por nivel de detalle)
+            - ranking_tecnicidad: list (técnicos ordenados por uso de términos técnicos)
+            - comparativa: dict (métricas comparativas entre técnicos)
+            - insights: list (recomendaciones automáticas)
+            - palabras_tecnicas_globales: list (términos técnicos más usados)
+    """
+    import re
+    from collections import Counter, defaultdict
+    
+    # Filtrar solo órdenes con diagnóstico técnico completado
+    df_con_diagnostico = df_ordenes[
+        (df_ordenes['diagnostico_sic'].notna()) & 
+        (df_ordenes['diagnostico_sic'] != '') &
+        (df_ordenes['tecnico_nombre'].notna())
+    ].copy()
+    
+    if df_con_diagnostico.empty or len(df_con_diagnostico) < 5:
+        return {
+            'tiene_datos': False,
+            'total_diagnosticos': len(df_con_diagnostico),
+            'mensaje': 'No hay suficientes diagnósticos técnicos para análisis (mínimo 5 requeridos)'
+        }
+    
+    # ========================================
+    # DICCIONARIO DE TERMINOLOGÍA TÉCNICA
+    # ========================================
+    # Palabras que indican conocimiento técnico especializado
+    terminologia_tecnica = {
+        # Componentes de hardware
+        'placa', 'motherboard', 'tarjeta', 'procesador', 'cpu', 'gpu', 'ram', 'memoria',
+        'disco', 'ssd', 'hdd', 'fuente', 'power', 'bateria', 'pantalla', 'display',
+        'teclado', 'touchpad', 'trackpad', 'bisagra', 'hinge', 'conector', 'puerto',
+        'usb', 'hdmi', 'vga', 'ethernet', 'wifi', 'bluetooth', 'webcam', 'camara',
+        'ventilador', 'cooler', 'disipador', 'heatsink', 'flex', 'cable', 'ribbon',
+        
+        # Componentes electrónicos especializados
+        'capacitor', 'condensador', 'resistencia', 'transistor', 'mosfet', 'diodo',
+        'bobina', 'inductor', 'chip', 'ic', 'bga', 'smd', 'circuito', 'pcb',
+        'soldadura', 'reballing', 'reflow', 'flux', 'estano', 'pasta', 'termica',
+        
+        # Diagnósticos técnicos
+        'cortocircuito', 'corto', 'sobrecalentamiento', 'temperatura', 'voltaje',
+        'amperaje', 'continuidad', 'medicion', 'multimetro', 'osciloscopio',
+        'resistencia', 'capacitancia', 'inductancia', 'señal', 'clock', 'bus',
+        'reset', 'power', 'enable', 'standby', 'suspend', 'boot', 'post',
+        
+        # Software y firmware
+        'bios', 'uefi', 'firmware', 'driver', 'controlador', 'sistema', 'operativo',
+        'windows', 'linux', 'macos', 'android', 'ios', 'arranque', 'booteo',
+        'particion', 'formato', 'instalacion', 'actualizacion', 'recovery',
+        
+        # Fallas comunes técnicas
+        'oxidacion', 'humedad', 'golpe', 'caida', 'impacto', 'derrame', 'liquido',
+        'polvo', 'suciedad', 'desgaste', 'fisura', 'fractura', 'rotura',
+        'desconexion', 'falso', 'contacto', 'intermitente', 'intermitencia',
+        
+        # Procesos técnicos
+        'diagnostico', 'inspeccion', 'revision', 'prueba', 'testeo', 'verificacion',
+        'medicion', 'analisis', 'evaluacion', 'limpieza', 'mantenimiento',
+        'reparacion', 'reemplazo', 'sustitucion', 'instalacion', 'configuracion',
+        
+        # Herramientas y equipos
+        'multimetro', 'tester', 'osciloscopio', 'estacion', 'soldadura', 'cautín',
+        'desarmador', 'destornillador', 'pinzas', 'lupa', 'microscopio',
+        'pistola', 'calor', 'aire', 'compresor', 'pasta', 'termica', 'alcohol',
+        'isopropilico', 'flux', 'malha', 'BGA',
+        
+        # Términos de calidad/precisión
+        'exacto', 'preciso', 'especifico', 'detallado', 'completo', 'exhaustivo',
+        'minucioso', 'cuidadoso', 'correcto', 'adecuado', 'apropiado', 'optimo',
+    }
+    
+    # Palabras genéricas que NO indican conocimiento técnico (lenguaje coloquial)
+    palabras_genericas = {
+        'no', 'si', 'funciona', 'sirve', 'esta', 'esta', 'tiene', 'tengo', 'hay',
+        'puede', 'debe', 'quiere', 'necesita', 'requiere', 'hace', 'dice', 'da',
+        'sale', 'aparece', 'muestra', 'indica', 'marca', 'presenta', 'esta',
+        'bien', 'mal', 'bueno', 'malo', 'regular', 'excelente', 'pesimo',
+        'cosa', 'parte', 'pedazo', 'trozo', 'pieza', 'componente', 'elemento',
+        'problema', 'falla', 'error', 'daño', 'averia', 'desperfecto', 'defecto',
+        'cliente', 'usuario', 'persona', 'dueño', 'propietario', 'equipo',
+        'computadora', 'laptop', 'notebook', 'pc', 'desktop', 'maquina',
+        'algo', 'nada', 'todo', 'poco', 'mucho', 'bastante', 'demasiado',
+        'despues', 'antes', 'ahora', 'luego', 'pronto', 'tarde', 'temprano',
+        'cuando', 'donde', 'como', 'porque', 'para', 'desde', 'hasta', 'segun',
+    }
+    
+    # Stopwords completas (incluyen las básicas del español)
+    stopwords = {
+        'el', 'la', 'de', 'que', 'y', 'a', 'en', 'un', 'ser', 'se', 'no', 'haber',
+        'por', 'con', 'su', 'para', 'como', 'estar', 'tener', 'le', 'lo', 'todo',
+        'pero', 'más', 'hacer', 'o', 'poder', 'decir', 'este', 'ir', 'otro', 'ese',
+        'la', 'si', 'me', 'ya', 'ver', 'porque', 'dar', 'cuando', 'él', 'muy', 'sin',
+        'vez', 'mucho', 'saber', 'qué', 'sobre', 'mi', 'alguno', 'mismo', 'yo',
+        'también', 'hasta', 'año', 'dos', 'querer', 'entre', 'así', 'primero',
+        'desde', 'grande', 'eso', 'ni', 'nos', 'llegar', 'pasar', 'tiempo', 'ella',
+        'sí', 'día', 'uno', 'bien', 'poco', 'deber', 'entonces', 'poner', 'cosa',
+        'tanto', 'hombre', 'parecer', 'nuestro', 'tan', 'donde', 'ahora', 'parte',
+        'después', 'vida', 'quedar', 'siempre', 'creer', 'hablar', 'llevar', 'dejar',
+        'nada', 'cada', 'seguir', 'menos', 'nuevo', 'encontrar', 'algo', 'solo',
+        'los', 'las', 'del', 'una', 'unos', 'unas', 'al', 'del', 'esto', 'esta',
+        'estos', 'estas', 'ese', 'esa', 'esos', 'esas', 'aquel', 'aquella',
+        'aquellos', 'aquellas', 'quien', 'cual', 'cuales', 'cuanto', 'cuanta',
+        'cuantos', 'cuantas', 'fue', 'han', 'has', 'sido', 'son', 'soy', 'eres',
+        'somos', 'sois', 'era', 'eras', 'eramos', 'erais', 'eran', 'fui', 'fuiste',
+        'fue', 'fuimos', 'fuisteis', 'fueron', 'sea', 'seas', 'seamos', 'seais',
+        'sean', 'seria', 'serias', 'seriamos', 'seriais', 'serian',
+    }
+    
+    # ========================================
+    # ANÁLISIS POR TÉCNICO
+    # ========================================
+    
+    analisis_por_tecnico = []
+    tecnicos_unicos = df_con_diagnostico['tecnico_nombre'].unique()
+    
+    for tecnico in tecnicos_unicos:
+        # Filtrar diagnósticos de este técnico
+        diagnosticos_tecnico = df_con_diagnostico[
+            df_con_diagnostico['tecnico_nombre'] == tecnico
+        ]
+        
+        # Combinar todos los diagnósticos del técnico
+        texto_completo = ' '.join(diagnosticos_tecnico['diagnostico_sic'].astype(str).tolist())
+        
+        # Limpiar texto
+        texto_limpio = texto_completo.lower()
+        texto_limpio = re.sub(r'[^\w\sáéíóúñü]', ' ', texto_limpio)
+        
+        # Extraer todas las palabras (sin filtrar stopwords aún)
+        todas_palabras = texto_limpio.split()
+        total_palabras = len(todas_palabras)
+        
+        # Filtrar palabras válidas (más de 3 caracteres, no stopwords)
+        palabras_validas = [
+            p for p in todas_palabras 
+            if len(p) > 3 and p not in stopwords
+        ]
+        
+        # Contar palabras técnicas usadas
+        palabras_tecnicas_usadas = [
+            p for p in palabras_validas 
+            if p in terminologia_tecnica
+        ]
+        contador_tecnicas = Counter(palabras_tecnicas_usadas)
+        
+        # Contar palabras genéricas
+        palabras_genericas_usadas = [
+            p for p in palabras_validas 
+            if p in palabras_genericas
+        ]
+        
+        # Calcular métricas
+        num_diagnosticos = len(diagnosticos_tecnico)
+        promedio_palabras = total_palabras / num_diagnosticos if num_diagnosticos > 0 else 0
+        
+        # Índice de tecnicidad: % de palabras técnicas sobre palabras válidas
+        if len(palabras_validas) > 0:
+            indice_tecnicidad = (len(palabras_tecnicas_usadas) / len(palabras_validas)) * 100
+        else:
+            indice_tecnicidad = 0
+        
+        # Top 5 palabras técnicas más usadas por este técnico
+        top_tecnicas = [
+            {'palabra': palabra, 'frecuencia': freq}
+            for palabra, freq in contador_tecnicas.most_common(5)
+        ]
+        
+        # Análisis de fallas diagnosticadas (si existe la columna)
+        fallas_principales = []
+        if 'falla_principal' in diagnosticos_tecnico.columns:
+            fallas_texto = ' '.join(diagnosticos_tecnico['falla_principal'].dropna().astype(str).tolist())
+            fallas_texto_limpio = fallas_texto.lower()
+            fallas_palabras = [
+                p for p in fallas_texto_limpio.split() 
+                if len(p) > 4 and p not in stopwords
+            ]
+            fallas_counter = Counter(fallas_palabras)
+            fallas_principales = [
+                {'falla': falla, 'frecuencia': freq}
+                for falla, freq in fallas_counter.most_common(3)
+            ]
+        
+        # Clasificación del técnico
+        if indice_tecnicidad >= 15:
+            clasificacion = 'Muy Técnico'
+            color = 'success'
+        elif indice_tecnicidad >= 8:
+            clasificacion = 'Técnico'
+            color = 'primary'
+        elif indice_tecnicidad >= 4:
+            clasificacion = 'Moderado'
+            color = 'warning'
+        else:
+            clasificacion = 'Básico'
+            color = 'danger'
+        
+        # Clasificación de detalle
+        if promedio_palabras >= 50:
+            nivel_detalle = 'Muy Detallado'
+            color_detalle = 'success'
+        elif promedio_palabras >= 30:
+            nivel_detalle = 'Detallado'
+            color_detalle = 'primary'
+        elif promedio_palabras >= 15:
+            nivel_detalle = 'Moderado'
+            color_detalle = 'warning'
+        else:
+            nivel_detalle = 'Básico'
+            color_detalle = 'danger'
+        
+        analisis_por_tecnico.append({
+            'tecnico': tecnico,
+            'num_diagnosticos': num_diagnosticos,
+            'total_palabras': total_palabras,
+            'promedio_palabras': promedio_palabras,
+            'palabras_unicas': len(set(palabras_validas)),
+            'palabras_tecnicas_count': len(palabras_tecnicas_usadas),
+            'palabras_genericas_count': len(palabras_genericas_usadas),
+            'indice_tecnicidad': indice_tecnicidad,
+            'clasificacion': clasificacion,
+            'color_clasificacion': color,
+            'nivel_detalle': nivel_detalle,
+            'color_detalle': color_detalle,
+            'top_palabras_tecnicas': top_tecnicas,
+            'fallas_principales': fallas_principales,
+        })
+    
+    # ========================================
+    # RANKINGS Y COMPARATIVAS
+    # ========================================
+    
+    # Ranking por nivel de detalle (promedio de palabras)
+    ranking_detalle = sorted(
+        analisis_por_tecnico, 
+        key=lambda x: x['promedio_palabras'], 
+        reverse=True
+    )
+    
+    # Ranking por tecnicidad (uso de terminología técnica)
+    ranking_tecnicidad = sorted(
+        analisis_por_tecnico, 
+        key=lambda x: x['indice_tecnicidad'], 
+        reverse=True
+    )
+    
+    # Métricas comparativas globales
+    promedios_globales = {
+        'promedio_palabras': sum(t['promedio_palabras'] for t in analisis_por_tecnico) / len(analisis_por_tecnico),
+        'promedio_tecnicidad': sum(t['indice_tecnicidad'] for t in analisis_por_tecnico) / len(analisis_por_tecnico),
+        'promedio_diagnosticos': sum(t['num_diagnosticos'] for t in analisis_por_tecnico) / len(analisis_por_tecnico),
+    }
+    
+    # ========================================
+    # ANÁLISIS DE PALABRAS TÉCNICAS GLOBALES
+    # ========================================
+    
+    # Combinar todos los diagnósticos
+    todos_diagnosticos_texto = ' '.join(df_con_diagnostico['diagnostico_sic'].astype(str).tolist())
+    texto_global_limpio = todos_diagnosticos_texto.lower()
+    texto_global_limpio = re.sub(r'[^\w\sáéíóúñü]', ' ', texto_global_limpio)
+    
+    palabras_globales = [
+        p for p in texto_global_limpio.split() 
+        if len(p) > 3 and p not in stopwords and p in terminologia_tecnica
+    ]
+    contador_global = Counter(palabras_globales)
+    
+    palabras_tecnicas_globales = [
+        {'palabra': palabra, 'frecuencia': freq}
+        for palabra, freq in contador_global.most_common(15)
+    ]
+    
+    # ========================================
+    # INSIGHTS AUTOMÁTICOS
+    # ========================================
+    
+    insights = []
+    
+    # Insight 1: Técnico más detallado
+    if ranking_detalle:
+        mejor_detalle = ranking_detalle[0]
+        if mejor_detalle['promedio_palabras'] >= 40:
+            insights.append({
+                'tipo': 'excelente',
+                'icono': '🏆',
+                'titulo': f'Mejor Detalle: {mejor_detalle["tecnico"]}',
+                'mensaje': f'Escribe diagnósticos muy completos con un promedio de {mejor_detalle["promedio_palabras"]:.0f} palabras.',
+                'accion': 'Considerarlo como referencia para capacitación de otros técnicos.',
+                'color': 'success'
+            })
+        
+        # Técnico menos detallado
+        peor_detalle = ranking_detalle[-1]
+        if peor_detalle['promedio_palabras'] < 15:
+            insights.append({
+                'tipo': 'mejora',
+                'icono': '⚠️',
+                'titulo': f'Necesita Mejorar: {peor_detalle["tecnico"]}',
+                'mensaje': f'Diagnósticos muy breves ({peor_detalle["promedio_palabras"]:.0f} palabras promedio). Falta detalle técnico.',
+                'accion': 'Capacitar en redacción de diagnósticos más completos y específicos.',
+                'color': 'warning'
+            })
+    
+    # Insight 2: Técnico más técnico
+    if ranking_tecnicidad:
+        mejor_tecnicidad = ranking_tecnicidad[0]
+        if mejor_tecnicidad['indice_tecnicidad'] >= 12:
+            insights.append({
+                'tipo': 'excelente',
+                'icono': '🔬',
+                'titulo': f'Más Técnico: {mejor_tecnicidad["tecnico"]}',
+                'mensaje': f'Usa terminología técnica especializada en {mejor_tecnicidad["indice_tecnicidad"]:.1f}% de sus diagnósticos.',
+                'accion': 'Lenguaje profesional y técnico excelente. Modelo a seguir.',
+                'color': 'success'
+            })
+        
+        # Técnico menos técnico
+        peor_tecnicidad = ranking_tecnicidad[-1]
+        if peor_tecnicidad['indice_tecnicidad'] < 5:
+            insights.append({
+                'tipo': 'mejora',
+                'icono': '📚',
+                'titulo': f'Mejorar Tecnicidad: {peor_tecnicidad["tecnico"]}',
+                'mensaje': f'Bajo uso de terminología técnica ({peor_tecnicidad["indice_tecnicidad"]:.1f}%). Lenguaje muy coloquial.',
+                'accion': 'Capacitar en terminología técnica especializada y estándares de la industria.',
+                'color': 'danger'
+            })
+    
+    # Insight 3: Consistencia del equipo
+    variabilidad_detalle = max(t['promedio_palabras'] for t in analisis_por_tecnico) - min(t['promedio_palabras'] for t in analisis_por_tecnico)
+    if variabilidad_detalle > 30:
+        insights.append({
+            'tipo': 'info',
+            'icono': '📊',
+            'titulo': 'Alta Variabilidad entre Técnicos',
+            'mensaje': f'Diferencia de {variabilidad_detalle:.0f} palabras entre el técnico más y menos detallado.',
+            'accion': 'Estandarizar procesos de diagnóstico. Crear plantilla o guía de diagnósticos.',
+            'color': 'info'
+        })
+    
+    # Insight 4: Palabras técnicas globales
+    if palabras_tecnicas_globales:
+        top_palabra = palabras_tecnicas_globales[0]
+        insights.append({
+            'tipo': 'info',
+            'icono': '🔧',
+            'titulo': f'Término Más Usado: "{top_palabra["palabra"].title()}"',
+            'mensaje': f'Aparece {top_palabra["frecuencia"]} veces en los diagnósticos. Es el componente más frecuentemente diagnosticado.',
+            'accion': 'Considerar capacitación especializada o stock de repuestos para este componente.',
+            'color': 'primary'
+        })
+    
+    # Insight 5: Calidad general del equipo
+    tecnicos_excelentes = sum(1 for t in analisis_por_tecnico if t['indice_tecnicidad'] >= 10)
+    porcentaje_excelentes = (tecnicos_excelentes / len(analisis_por_tecnico)) * 100
+    
+    if porcentaje_excelentes >= 70:
+        insights.append({
+            'tipo': 'excelente',
+            'icono': '✅',
+            'titulo': 'Equipo de Alta Calidad',
+            'mensaje': f'{porcentaje_excelentes:.0f}% de los técnicos tienen nivel técnico alto o excelente.',
+            'accion': 'Mantener estándares y continuar capacitación técnica.',
+            'color': 'success'
+        })
+    elif porcentaje_excelentes < 30:
+        insights.append({
+            'tipo': 'alerta',
+            'icono': '🚨',
+            'titulo': 'Necesidad de Capacitación',
+            'mensaje': f'Solo {porcentaje_excelentes:.0f}% del equipo tiene nivel técnico alto. Mayoría usa lenguaje básico.',
+            'accion': 'Implementar programa urgente de capacitación técnica y estandarización.',
+            'color': 'danger'
+        })
+    
+    return {
+        'tiene_datos': True,
+        'total_diagnosticos': len(df_con_diagnostico),
+        'total_tecnicos': len(tecnicos_unicos),
+        'analisis_por_tecnico': analisis_por_tecnico,
+        'ranking_detalle': ranking_detalle,
+        'ranking_tecnicidad': ranking_tecnicidad,
+        'promedios_globales': promedios_globales,
+        'palabras_tecnicas_globales': palabras_tecnicas_globales,
+        'insights': insights,
+    }

@@ -8950,6 +8950,160 @@ def dashboard_cotizaciones(request):
         }
     
     # ========================================
+    # 6.6. ANÁLISIS DE DIAGNÓSTICOS TÉCNICOS POR TÉCNICO
+    # ========================================
+    
+    print("\n" + "="*50)
+    print("🔬 ANÁLISIS DE DIAGNÓSTICOS TÉCNICOS POR TÉCNICO")
+    print("="*50)
+    
+    analisis_diagnosticos = {}
+    
+    try:
+        from .utils_cotizaciones import analizar_diagnosticos_tecnicos
+        
+        print("🔍 Preparando datos de órdenes de servicio para análisis...")
+        
+        # Obtener órdenes de servicio con diagnóstico completado
+        # NOTA: Usamos tecnico_asignado_actual (siempre presente) en lugar de tecnico_diagnostico (opcional)
+        ordenes_con_diagnostico = OrdenServicio.objects.filter(
+            fecha_ingreso__gte=fecha_inicio,
+            fecha_ingreso__lte=fecha_fin
+        ).select_related('tecnico_asignado_actual', 'sucursal', 'detalle_equipo')
+        
+        print(f"   📋 Total órdenes en el período: {ordenes_con_diagnostico.count()}")
+        
+        # Aplicar filtros si existen
+        if sucursal_id:
+            ordenes_con_diagnostico = ordenes_con_diagnostico.filter(sucursal_id=sucursal_id)
+            print(f"   🏢 Filtrado por sucursal: {ordenes_con_diagnostico.count()} órdenes")
+        
+        if tecnico_id:
+            # Filtrar por técnico asignado actual (no por tecnico_diagnostico)
+            ordenes_con_diagnostico = ordenes_con_diagnostico.filter(tecnico_asignado_actual_id=tecnico_id)
+            print(f"   👨‍🔧 Filtrado por técnico: {ordenes_con_diagnostico.count()} órdenes")
+        
+        # Convertir a DataFrame
+        if ordenes_con_diagnostico.exists():
+            ordenes_data = []
+            ordenes_sin_diagnostico = 0
+            ordenes_sin_tecnico = 0
+            
+            for orden in ordenes_con_diagnostico:
+                # Verificar que tenga técnico asignado (tecnico_asignado_actual es obligatorio, siempre existe)
+                if not orden.tecnico_asignado_actual:
+                    ordenes_sin_tecnico += 1
+                    continue
+                
+                # Verificar que tenga detalle de equipo con diagnóstico
+                if not hasattr(orden, 'detalle_equipo'):
+                    ordenes_sin_diagnostico += 1
+                    continue
+                
+                diagnostico = orden.detalle_equipo.diagnostico_sic if orden.detalle_equipo.diagnostico_sic else ''
+                falla = orden.detalle_equipo.falla_principal if orden.detalle_equipo.falla_principal else ''
+                
+                # Solo incluir si tiene diagnóstico no vacío
+                if diagnostico.strip():
+                    ordenes_data.append({
+                        'numero_orden': orden.numero_orden_interno,
+                        'tecnico_nombre': orden.tecnico_asignado_actual.nombre_completo,
+                        'diagnostico_sic': diagnostico,
+                        'falla_principal': falla,
+                        'fecha_diagnostico': orden.fecha_diagnostico_sic,
+                    })
+                else:
+                    ordenes_sin_diagnostico += 1
+            
+            print(f"   ✅ {len(ordenes_data)} órdenes con diagnóstico válido")
+            if ordenes_sin_tecnico > 0:
+                print(f"   ⚠️ {ordenes_sin_tecnico} órdenes sin técnico asignado (excluidas)")
+            if ordenes_sin_diagnostico > 0:
+                print(f"   ⚠️ {ordenes_sin_diagnostico} órdenes sin diagnóstico escrito (excluidas)")
+            
+            if not ordenes_data:
+                print("❌ No hay órdenes con diagnóstico válido en el período seleccionado")
+                analisis_diagnosticos = {
+                    'tiene_datos': False,
+                    'mensaje': 'No hay órdenes con diagnóstico técnico completado en el período'
+                }
+            else:
+                df_ordenes = pd.DataFrame(ordenes_data)
+                print(f"📊 DataFrame creado con {len(df_ordenes)} registros")
+                
+                # Mostrar técnicos únicos encontrados
+                tecnicos_unicos = df_ordenes['tecnico_nombre'].unique()
+                print(f"👥 Técnicos encontrados: {', '.join(tecnicos_unicos)}")
+                
+                # Llamar función de análisis de diagnósticos
+                analisis_diagnosticos = analizar_diagnosticos_tecnicos(df_ordenes)
+                
+                if analisis_diagnosticos['tiene_datos']:
+                    print(f"✅ Análisis de diagnósticos completado:")
+                    print(f"   - {analisis_diagnosticos['total_diagnosticos']} diagnósticos analizados")
+                    print(f"   - {analisis_diagnosticos['total_tecnicos']} técnicos evaluados")
+                    print(f"   - Promedio palabras: {analisis_diagnosticos['promedios_globales']['promedio_palabras']:.1f}")
+                    print(f"   - Promedio tecnicidad: {analisis_diagnosticos['promedios_globales']['promedio_tecnicidad']:.1f}%")
+                    print(f"   - {len(analisis_diagnosticos['insights'])} insights generados")
+                    
+                    # Generar visualizaciones de diagnósticos
+                    try:
+                        print("📊 Generando visualizaciones de análisis de diagnósticos...")
+                        
+                        # Gráfico: Ranking por nivel de detalle
+                        graficos['diagnosticos_ranking_detalle'] = convertir_figura_a_html(
+                            visualizer.grafico_ranking_tecnicos_detalle(analisis_diagnosticos['analisis_por_tecnico'])
+                        )
+                        print("   ✅ Ranking de detalle generado")
+                        
+                        # Gráfico: Ranking por tecnicidad
+                        graficos['diagnosticos_ranking_tecnicidad'] = convertir_figura_a_html(
+                            visualizer.grafico_ranking_tecnicos_tecnicidad(analisis_diagnosticos['analisis_por_tecnico'])
+                        )
+                        print("   ✅ Ranking de tecnicidad generado")
+                        
+                        # Gráfico: Comparativa scatter (detalle vs tecnicidad)
+                        graficos['diagnosticos_comparativa_scatter'] = convertir_figura_a_html(
+                            visualizer.grafico_comparativa_tecnicos_scatter(analisis_diagnosticos['analisis_por_tecnico'])
+                        )
+                        print("   ✅ Comparativa scatter generada")
+                        
+                        # Gráfico: Palabras técnicas globales
+                        if analisis_diagnosticos['palabras_tecnicas_globales']:
+                            graficos['diagnosticos_palabras_tecnicas'] = convertir_figura_a_html(
+                                visualizer.grafico_palabras_tecnicas_globales(analisis_diagnosticos['palabras_tecnicas_globales'])
+                            )
+                            print("   ✅ Palabras técnicas globales generadas")
+                        
+                        print("✅ Todas las visualizaciones de diagnósticos generadas exitosamente")
+                        
+                    except Exception as e_viz_diag:
+                        print(f"⚠️ Error generando visualizaciones de diagnósticos: {str(e_viz_diag)}")
+                        import traceback
+                        print(f"   Detalle: {traceback.format_exc()}")
+                        # No crítico, continuar
+                
+                else:
+                    print(f"ℹ️ {analisis_diagnosticos.get('mensaje', 'No hay suficientes diagnósticos')}")
+        
+        else:
+            print("ℹ️ No se encontraron órdenes con diagnóstico en el período seleccionado")
+            analisis_diagnosticos = {
+                'tiene_datos': False,
+                'mensaje': 'No hay órdenes con diagnóstico en el período seleccionado'
+            }
+    
+    except Exception as e_diagnosticos:
+        print(f"⚠️ Error en análisis de diagnósticos: {str(e_diagnosticos)}")
+        import traceback
+        print(f"   Detalle: {traceback.format_exc()}")
+        analisis_diagnosticos = {
+            'tiene_datos': False,
+            'error': str(e_diagnosticos),
+            'mensaje': 'Error al analizar diagnósticos técnicos'
+        }
+    
+    # ========================================
     # 7. PREPARAR CONTEXTO COMPLETO
     # ========================================
     
@@ -8968,6 +9122,9 @@ def dashboard_cotizaciones(request):
         
         # Análisis de Texto (Text Mining) - NUEVO
         'analisis_texto': analisis_texto,
+        
+        # Análisis de Diagnósticos Técnicos por Técnico - NUEVO
+        'analisis_diagnosticos': analisis_diagnosticos,
         
         # Filtros activos (para mantener estado en el form)
         'filtros_activos': {

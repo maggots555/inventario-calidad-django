@@ -3488,6 +3488,418 @@ class DashboardCotizacionesVisualizer:
         
         return fig
 
+    # ========================================================================
+    # VISUALIZACIONES PARA ANÁLISIS DE DIAGNÓSTICOS TÉCNICOS
+    # ========================================================================
+    
+    def grafico_ranking_tecnicos_detalle(self, analisis_por_tecnico):
+        """
+        Gráfico de barras horizontales mostrando el promedio de palabras
+        por diagnóstico de cada técnico (nivel de detalle).
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Este gráfico muestra qué técnico escribe diagnósticos más completos
+        medido por el promedio de palabras que usa. Ayuda a identificar
+        quién da más detalles y quién necesita mejorar.
+        
+        Args:
+            analisis_por_tecnico: Lista de dicts con análisis de cada técnico
+        
+        Returns:
+            Figure: Gráfico de barras horizontal
+        """
+        if not analisis_por_tecnico:
+            return self._crear_grafico_vacio("No hay datos de técnicos disponibles")
+        
+        # Ordenar por promedio de palabras (descendente)
+        tecnicos_ordenados = sorted(
+            analisis_por_tecnico,
+            key=lambda x: x['promedio_palabras'],
+            reverse=True
+        )
+        
+        tecnicos = [t['tecnico'] for t in tecnicos_ordenados]
+        promedio_palabras = [t['promedio_palabras'] for t in tecnicos_ordenados]
+        colores_barras = [self._mapear_color_nivel(t['color_detalle']) for t in tecnicos_ordenados]
+        
+        # Textos de hover personalizados
+        hover_texts = [
+            f"<b>{t['tecnico']}</b><br>" +
+            f"📝 Promedio: {t['promedio_palabras']:.1f} palabras<br>" +
+            f"📊 Diagnósticos: {t['num_diagnosticos']}<br>" +
+            f"🏷️ Nivel: {t['nivel_detalle']}"
+            for t in tecnicos_ordenados
+        ]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            x=promedio_palabras,
+            y=tecnicos,
+            orientation='h',
+            marker=dict(
+                color=colores_barras,
+                line=dict(color='white', width=1.5)
+            ),
+            text=[f"{p:.0f}" for p in promedio_palabras],
+            textposition='outside',
+            hovertext=hover_texts,
+            hovertemplate='%{hovertext}<extra></extra>'
+        ))
+        
+        # Línea de referencia (promedio global)
+        promedio_global = sum(promedio_palabras) / len(promedio_palabras)
+        fig.add_vline(
+            x=promedio_global,
+            line_dash="dash",
+            line_color="gray",
+            annotation_text=f"Promedio: {promedio_global:.0f}",
+            annotation_position="top"
+        )
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='📝 Ranking: Nivel de Detalle en Diagnósticos',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=16, color=self.colores['dark'])
+            ),
+            xaxis=dict(
+                title='Promedio de Palabras por Diagnóstico',
+                gridcolor='rgba(200,200,200,0.3)'
+            ),
+            yaxis=dict(title=''),
+            height=max(400, len(tecnicos) * 40),
+            showlegend=False
+        )
+        
+        # Ajustar márgenes después del update_layout
+        fig.update_layout(margin=dict(l=150, r=50, t=80, b=60))
+        
+        return fig
+    
+    def grafico_ranking_tecnicos_tecnicidad(self, analisis_por_tecnico):
+        """
+        Gráfico de barras mostrando el índice de tecnicidad de cada técnico
+        (% de palabras técnicas usadas en sus diagnósticos).
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Este gráfico muestra qué técnico usa más terminología técnica
+        especializada (como "motherboard", "cortocircuito", "voltaje", etc.)
+        vs lenguaje coloquial. Ayuda a identificar el nivel profesional.
+        
+        Args:
+            analisis_por_tecnico: Lista de dicts con análisis de cada técnico
+        
+        Returns:
+            Figure: Gráfico de barras horizontal
+        """
+        if not analisis_por_tecnico:
+            return self._crear_grafico_vacio("No hay datos de técnicos disponibles")
+        
+        # Ordenar por índice de tecnicidad (descendente)
+        tecnicos_ordenados = sorted(
+            analisis_por_tecnico,
+            key=lambda x: x['indice_tecnicidad'],
+            reverse=True
+        )
+        
+        tecnicos = [t['tecnico'] for t in tecnicos_ordenados]
+        indice_tecnicidad = [t['indice_tecnicidad'] for t in tecnicos_ordenados]
+        colores_barras = [self._mapear_color_nivel(t['color_clasificacion']) for t in tecnicos_ordenados]
+        
+        # Textos de hover personalizados
+        hover_texts = [
+            f"<b>{t['tecnico']}</b><br>" +
+            f"🔬 Tecnicidad: {t['indice_tecnicidad']:.1f}%<br>" +
+            f"📊 Diagnósticos: {t['num_diagnosticos']}<br>" +
+            f"🏷️ Clasificación: {t['clasificacion']}"
+            for t in tecnicos_ordenados
+        ]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            x=indice_tecnicidad,
+            y=tecnicos,
+            orientation='h',
+            marker=dict(
+                color=colores_barras,
+                line=dict(color='white', width=1.5)
+            ),
+            text=[f"{i:.1f}%" for i in indice_tecnicidad],
+            textposition='outside',
+            hovertext=hover_texts,
+            hovertemplate='%{hovertext}<extra></extra>'
+        ))
+        
+        # Línea de referencia (promedio global)
+        promedio_global = sum(indice_tecnicidad) / len(indice_tecnicidad)
+        fig.add_vline(
+            x=promedio_global,
+            line_dash="dash",
+            line_color="gray",
+            annotation_text=f"Promedio: {promedio_global:.1f}%",
+            annotation_position="top"
+        )
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='🔬 Ranking: Uso de Terminología Técnica',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=16, color=self.colores['dark'])
+            ),
+            xaxis=dict(
+                title='Índice de Tecnicidad (%)',
+                gridcolor='rgba(200,200,200,0.3)',
+                range=[0, max(indice_tecnicidad) * 1.15]
+            ),
+            yaxis=dict(title=''),
+            height=max(400, len(tecnicos) * 40),
+            showlegend=False
+        )
+        
+        # Ajustar márgenes después del update_layout
+        fig.update_layout(margin=dict(l=150, r=50, t=80, b=60))
+        
+        return fig
+    
+    def grafico_comparativa_tecnicos_scatter(self, analisis_por_tecnico):
+        """
+        Gráfico de dispersión (scatter plot) comparando dos dimensiones:
+        - Eje X: Promedio de palabras (nivel de detalle)
+        - Eje Y: Índice de tecnicidad (uso de terminología técnica)
+        
+        Cada técnico es un punto, el tamaño indica cantidad de diagnósticos.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Este gráfico posiciona a cada técnico en un plano donde:
+        - Derecha = Más detallado (escribe más)
+        - Arriba = Más técnico (usa mejores términos)
+        - Tamaño = Más diagnósticos realizados
+        
+        Objetivo: Identificar al técnico ideal (arriba-derecha)
+        y quién necesita más capacitación (abajo-izquierda).
+        
+        Args:
+            analisis_por_tecnico: Lista de dicts con análisis de cada técnico
+        
+        Returns:
+            Figure: Gráfico de dispersión
+        """
+        if not analisis_por_tecnico:
+            return self._crear_grafico_vacio("No hay datos de técnicos disponibles")
+        
+        tecnicos = [t['tecnico'] for t in analisis_por_tecnico]
+        promedio_palabras = [t['promedio_palabras'] for t in analisis_por_tecnico]
+        indice_tecnicidad = [t['indice_tecnicidad'] for t in analisis_por_tecnico]
+        num_diagnosticos = [t['num_diagnosticos'] for t in analisis_por_tecnico]
+        
+        # Textos de hover personalizados
+        hover_texts = [
+            f"<b>{t['tecnico']}</b><br>" +
+            f"📝 Detalle: {t['promedio_palabras']:.0f} palabras<br>" +
+            f"🔬 Tecnicidad: {t['indice_tecnicidad']:.1f}%<br>" +
+            f"📊 Diagnósticos: {t['num_diagnosticos']}<br>" +
+            f"🏷️ {t['nivel_detalle']} / {t['clasificacion']}"
+            for t in analisis_por_tecnico
+        ]
+        
+        # Normalizar tamaños (entre 20 y 80)
+        max_diag = max(num_diagnosticos)
+        sizes = [20 + (n / max_diag) * 60 for n in num_diagnosticos]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=promedio_palabras,
+            y=indice_tecnicidad,
+            mode='markers+text',
+            text=[t.split()[0] for t in tecnicos],  # Solo primer nombre
+            textposition="top center",
+            textfont=dict(size=10, color=self.colores['dark']),
+            marker=dict(
+                size=sizes,
+                color=indice_tecnicidad,
+                colorscale='RdYlGn',  # Rojo-Amarillo-Verde
+                colorbar=dict(
+                    title="Tecnicidad<br>(%)",
+                    thickness=15,
+                    len=0.7
+                ),
+                line=dict(color='white', width=2),
+                opacity=0.8
+            ),
+            hovertext=hover_texts,
+            hovertemplate='%{hovertext}<extra></extra>'
+        ))
+        
+        # Líneas de referencia (promedios)
+        promedio_palabras_global = sum(promedio_palabras) / len(promedio_palabras)
+        promedio_tecnicidad_global = sum(indice_tecnicidad) / len(indice_tecnicidad)
+        
+        fig.add_vline(
+            x=promedio_palabras_global,
+            line_dash="dash",
+            line_color="gray",
+            opacity=0.5,
+            annotation_text=f"Promedio detalle",
+            annotation_position="bottom"
+        )
+        
+        fig.add_hline(
+            y=promedio_tecnicidad_global,
+            line_dash="dash",
+            line_color="gray",
+            opacity=0.5,
+            annotation_text=f"Promedio tecnicidad",
+            annotation_position="left"
+        )
+        
+        # Anotaciones de cuadrantes
+        max_x = max(promedio_palabras)
+        max_y = max(indice_tecnicidad)
+        
+        fig.add_annotation(
+            x=max_x * 0.85,
+            y=max_y * 0.85,
+            text="⭐ IDEAL",
+            showarrow=False,
+            font=dict(size=14, color='green', family='Arial Black'),
+            opacity=0.3
+        )
+        
+        fig.add_annotation(
+            x=max_x * 0.15,
+            y=max_y * 0.15,
+            text="⚠️ NECESITA MEJORA",
+            showarrow=False,
+            font=dict(size=12, color='red', family='Arial Black'),
+            opacity=0.3
+        )
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='🎯 Comparativa: Detalle vs Tecnicidad por Técnico',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=16, color=self.colores['dark'])
+            ),
+            xaxis=dict(
+                title='📝 Promedio de Palabras (Nivel de Detalle)',
+                gridcolor='rgba(200,200,200,0.3)',
+                range=[0, max(promedio_palabras) * 1.15]
+            ),
+            yaxis=dict(
+                title='🔬 Índice de Tecnicidad (%)',
+                gridcolor='rgba(200,200,200,0.3)',
+                range=[0, max(indice_tecnicidad) * 1.15]
+            ),
+            height=600,
+            showlegend=False
+        )
+        
+        # Ajustar hovermode después del update_layout
+        fig.update_layout(hovermode='closest')
+        
+        return fig
+    
+    def grafico_palabras_tecnicas_globales(self, palabras_tecnicas_globales):
+        """
+        Gráfico de barras de las palabras técnicas más usadas globalmente
+        por todos los técnicos.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        ================================
+        Muestra qué términos técnicos se usan más frecuentemente en todos
+        los diagnósticos. Ayuda a identificar componentes problemáticos
+        más comunes y necesidades de capacitación/stock.
+        
+        Args:
+            palabras_tecnicas_globales: Lista de dicts [{'palabra': str, 'frecuencia': int}]
+        
+        Returns:
+            Figure: Gráfico de barras horizontal
+        """
+        if not palabras_tecnicas_globales:
+            return self._crear_grafico_vacio("No hay palabras técnicas para visualizar")
+        
+        # Tomar top 15
+        palabras_top = palabras_tecnicas_globales[:15]
+        
+        palabras = [p['palabra'].title() for p in palabras_top]
+        frecuencias = [p['frecuencia'] for p in palabras_top]
+        
+        # Colores degradados
+        max_freq = max(frecuencias)
+        colores = [
+            f'rgba(13, 110, 253, {0.4 + (freq / max_freq) * 0.6})'
+            for freq in frecuencias
+        ]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            x=frecuencias,
+            y=palabras,
+            orientation='h',
+            marker=dict(
+                color=colores,
+                line=dict(color='white', width=1.5)
+            ),
+            text=frecuencias,
+            textposition='outside',
+            hovertemplate='<b>%{y}</b><br>Frecuencia: %{x}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text='🔧 Top Términos Técnicos Más Usados',
+                x=0.5,
+                xanchor='center',
+                font=dict(size=16, color=self.colores['dark'])
+            ),
+            xaxis=dict(
+                title='Frecuencia de Uso',
+                gridcolor='rgba(200,200,200,0.3)'
+            ),
+            yaxis=dict(title=''),
+            height=max(400, len(palabras) * 30),
+            showlegend=False
+        )
+        
+        # Ajustar márgenes después del update_layout
+        fig.update_layout(margin=dict(l=120, r=50, t=80, b=60))
+        
+        return fig
+    
+    def _mapear_color_nivel(self, color_string):
+        """
+        Mapea los nombres de colores de Bootstrap a colores RGB.
+        
+        Args:
+            color_string: Nombre del color ('success', 'warning', 'danger', 'primary', 'info')
+        
+        Returns:
+            str: Color RGB correspondiente
+        """
+        mapeo = {
+            'success': 'rgba(39, 174, 96, 0.8)',    # Verde
+            'primary': 'rgba(13, 110, 253, 0.8)',   # Azul
+            'warning': 'rgba(255, 193, 7, 0.8)',    # Amarillo
+            'danger': 'rgba(231, 76, 60, 0.8)',     # Rojo
+            'info': 'rgba(23, 162, 184, 0.8)',      # Cian
+        }
+        return mapeo.get(color_string, 'rgba(108, 117, 125, 0.8)')  # Gris por defecto
+
 
 # ============================================================================
 # FUNCIÓN AUXILIAR PARA TEMPLATES
