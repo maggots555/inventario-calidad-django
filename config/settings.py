@@ -97,29 +97,49 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# EXPLICACIÓN: Configuración de la base de datos PostgreSQL
-# - ENGINE: Motor de base de datos (PostgreSQL en este caso)
-# - NAME: Nombre de la base de datos
-# - USER: Usuario de PostgreSQL con permisos sobre la base de datos
-# - PASSWORD: Contraseña del usuario (almacenada en .env por seguridad)
-# - HOST: Servidor donde está PostgreSQL ('localhost' = mismo servidor)
-# - PORT: Puerto de PostgreSQL (5432 es el puerto por defecto)
+# ============================================================================
+# CONFIGURACIÓN DE BASE DE DATOS (Compatible SQLite y PostgreSQL)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Esta configuración detecta automáticamente qué base de datos estás usando:
+# 
+# - SQLite: Base de datos de archivo único, ideal para desarrollo local
+#   * No requiere servidor separado
+#   * Archivo db.sqlite3 en el directorio del proyecto
+#   * Perfecto para Windows durante desarrollo
+# 
+# - PostgreSQL: Base de datos profesional, ideal para producción
+#   * Requiere servidor PostgreSQL corriendo
+#   * Mejor para múltiples usuarios simultáneos
+#   * Usa en servidor Linux para pruebas/producción
+#
+# Las optimizaciones de conexión (CONN_MAX_AGE, connect_timeout) solo se
+# aplican a PostgreSQL, ya que SQLite no las necesita y pueden causar
+# problemas de bloqueo ("database is locked").
 
+# Obtener el motor de base de datos desde variables de entorno
+DB_ENGINE = config('DB_ENGINE', default='django.db.backends.postgresql')
+
+# Configuración base de la base de datos
 DATABASES = {
     'default': {
-        'ENGINE': config('DB_ENGINE', default='django.db.backends.postgresql'),
+        'ENGINE': DB_ENGINE,
         'NAME': config('DB_NAME', default='inventario_django'),
         'USER': config('DB_USER', default='django_user'),
-        'PASSWORD': config('DB_PASSWORD'),
+        'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
-        # Optimizaciones de conexión PostgreSQL para evitar timeouts
-        'CONN_MAX_AGE': 600,  # Mantener conexiones abiertas por 10 minutos
-        'OPTIONS': {
-            'connect_timeout': 10,  # Timeout de conexión 10 segundos
-        },
     }
 }
+
+# Aplicar optimizaciones SOLO si estamos usando PostgreSQL
+# Esto previene problemas de "database is locked" en SQLite
+if DB_ENGINE == 'django.db.backends.postgresql':
+    DATABASES['default']['CONN_MAX_AGE'] = 600  # Mantener conexiones 10 min
+    DATABASES['default']['OPTIONS'] = {
+        'connect_timeout': 10,  # Timeout de conexión 10 segundos
+    }
+    # Nota: Estas optimizaciones solucionan errores 500 por timeout en PostgreSQL
 
 
 # Password validation
