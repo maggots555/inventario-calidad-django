@@ -67,6 +67,11 @@ const PLANTILLAS_RECHAZO: Record<string, string> = {
 [CONTEXTO]: Última comunicación: [FECHA], equipo disponible para recolección
 [ALTERNATIVA]: Se asume no acepta, equipo se pone disponible para retiro`,
 
+    'no_especifica_motivo': `[RAZÓN PRINCIPAL]: Cliente no especifica motivo, únicamente rechaza la cotización
+[DETALLE]: No proporciona detalles adicionales sobre su decisión
+[CONTEXTO]: Comunicación limitada o nula después de la cotización
+[ALTERNATIVA]: Se registra rechazo sin motivo específico`,
+
     'rechazo_sin_decision': `[RAZÓN PRINCIPAL]: Cliente retira equipo sin tomar decisión
 [DETALLE]: Se presenta al centro de servicio y retira sin [aceptar / rechazar] formalmente
 [CONTEXTO]: Menciona que [evaluará opciones / consultará / esperará mejor momento]
@@ -86,6 +91,7 @@ const NOMBRES_MOTIVOS: Record<string, string> = {
     'no_apto': 'Equipo no apto para reparación',
     'solo_venta_mostrador': 'Solo venta mostrador',
     'falta_de_respuesta': 'Falta de respuesta del cliente',
+    'no_especifica_motivo': 'No especifica motivo',
     'rechazo_sin_decision': 'Rechazo sin decisión clara'
 };
 

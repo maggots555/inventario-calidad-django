@@ -185,6 +185,7 @@ MOTIVO_RECHAZO_COTIZACION = [
     ('falta_de_respuesta', 'Se cierra cotización por vigencia y falta de respuesta del cliente'),
     ('no_apto', 'Equipo no apto para diagnóstico o reparación'),
     ('rechazo_sin_decision', 'Cliente desea evaluar las opciones sin tomar decisión inmediata'),
+    ('no_especifica_motivo', 'Cliente no especifica motivo, únicamente rechaza la cotización'),
     ('otro', 'Otro motivo'),
 ]
 
