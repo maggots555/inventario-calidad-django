@@ -16,6 +16,10 @@ from decouple import config
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Crear directorio de logs si no existe (compatible Windows/Linux/Mac)
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -319,7 +323,7 @@ LOGGING = {
         'file_errors': {
             'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'django_errors.log',
+            'filename': LOGS_DIR / 'django_errors.log',
             'maxBytes': 10 * 1024 * 1024,  # 10 MB
             'backupCount': 5,
             'formatter': 'verbose',
@@ -327,7 +331,7 @@ LOGGING = {
         'file_debug': {
             'level': 'DEBUG',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'django_debug.log',
+            'filename': LOGS_DIR / 'django_debug.log',
             'maxBytes': 10 * 1024 * 1024,  # 10 MB
             'backupCount': 3,
             'formatter': 'verbose',
@@ -336,7 +340,7 @@ LOGGING = {
         'file_db': {
             'level': 'DEBUG',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'django_db.log',
+            'filename': LOGS_DIR / 'django_db.log',
             'maxBytes': 5 * 1024 * 1024,  # 5 MB
             'backupCount': 3,
             'formatter': 'verbose',
