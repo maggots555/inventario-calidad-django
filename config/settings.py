@@ -109,6 +109,11 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD'),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
+        # Optimizaciones de conexión PostgreSQL para evitar timeouts
+        'CONN_MAX_AGE': 600,  # Mantener conexiones abiertas por 10 minutos
+        'OPTIONS': {
+            'connect_timeout': 10,  # Timeout de conexión 10 segundos
+        },
     }
 }
 
@@ -270,3 +275,111 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = 'home'  # Redirigir al dashboard después de login
 # LOGOUT_REDIRECT_URL removido para mostrar la página de logout personalizada
+
+# ============================================================================
+# CONFIGURACIÓN DE LOGGING (Registros de Errores y Debug)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# El sistema de logging registra todos los eventos importantes del sistema:
+# - Errores 500 (Internal Server Error)
+# - Consultas SQL lentas
+# - Advertencias del sistema
+# - Información de depuración
+#
+# Los logs se guardan en archivos que puedes revisar cuando algo falla
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name} {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file_errors': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'django_errors.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'file_debug': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'django_debug.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 3,
+            'formatter': 'verbose',
+            'filters': ['require_debug_true'],
+        },
+        'file_db': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'django_db.log',
+            'maxBytes': 5 * 1024 * 1024,  # 5 MB
+            'backupCount': 3,
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        # Logger principal de Django - captura todos los errores
+        'django': {
+            'handlers': ['console', 'file_errors'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Logger de peticiones HTTP - captura errores 500, 404, etc.
+        'django.request': {
+            'handlers': ['console', 'file_errors'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        # Logger de base de datos - captura consultas SQL (solo en DEBUG)
+        'django.db.backends': {
+            'handlers': ['file_db'],
+            'level': 'WARNING',  # Cambiar a DEBUG para ver todas las consultas SQL
+            'propagate': False,
+        },
+        # Logger para tu aplicación - captura errores de tu código
+        'inventario': {
+            'handlers': ['console', 'file_errors', 'file_debug'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'scorecard': {
+            'handlers': ['console', 'file_errors', 'file_debug'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'servicio_tecnico': {
+            'handlers': ['console', 'file_errors', 'file_debug'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file_errors'],
+        'level': 'INFO',
+    },
+}

@@ -82,3 +82,6 @@ mi_sitio_descontinuado/
 
 # Dependencias de Node.js
 /node_modules
+# Django Logs
+logs/
+*.log
