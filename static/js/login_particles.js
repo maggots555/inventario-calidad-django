@@ -27,7 +27,7 @@ class Particle {
         this.y = Math.random() * (canvas.height - this.size * 2) + this.size * 2;
         this.directionX = (Math.random() * 2) - 1; // Velocidad aleatoria X
         this.directionY = (Math.random() * 2) - 1; // Velocidad aleatoria Y
-        this.color = '#818cf8'; // Color base (indigo suave)
+        this.color = '#1897c9ff'; // Color base (indigo suave)
     }
     // Dibujar partícula
     draw() {
@@ -47,23 +47,30 @@ class Particle {
         if (this.y > canvas.height || this.y < 0) {
             this.directionY = -this.directionY;
         }
-        // Detección de colisión con mouse
+        // Sistema de repulsión suave basado en fuerzas
         if (mouse.x !== null && mouse.y !== null) {
             let dx = mouse.x - this.x;
             let dy = mouse.y - this.y;
             let distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance < mouse.radius + this.size) {
-                if (mouse.x < this.x && this.x < canvas.width - this.size * 10) {
-                    this.x += 3;
-                }
-                if (mouse.x > this.x && this.x > this.size * 10) {
-                    this.x -= 3;
-                }
-                if (mouse.y < this.y && this.y < canvas.height - this.size * 10) {
-                    this.y += 3;
-                }
-                if (mouse.y > this.y && this.y > this.size * 10) {
-                    this.y -= 3;
+            // Solo aplicar repulsión si está dentro del radio de interacción
+            if (distance < mouse.radius) {
+                // Normalizar el vector de dirección
+                let forceDirectionX = dx / distance;
+                let forceDirectionY = dy / distance;
+                // Calcular la fuerza de repulsión (más fuerte cuando está más cerca)
+                // Usamos una curva suave para evitar cambios bruscos
+                let forceMagnitude = (mouse.radius - distance) / mouse.radius;
+                let force = forceMagnitude * 0.5; // Factor de suavizado
+                // Aplicar la fuerza a la velocidad (no directamente a la posición)
+                // Esto permite que la partícula mantenga su inercia natural
+                this.directionX -= forceDirectionX * force;
+                this.directionY -= forceDirectionY * force;
+                // Limitar la velocidad máxima para evitar aceleraciones infinitas
+                let speed = Math.sqrt(this.directionX * this.directionX + this.directionY * this.directionY);
+                let maxSpeed = 3;
+                if (speed > maxSpeed) {
+                    this.directionX = (this.directionX / speed) * maxSpeed;
+                    this.directionY = (this.directionY / speed) * maxSpeed;
                 }
             }
         }
@@ -104,7 +111,7 @@ function connect() {
                 opacityValue = 1 - (distance / 20000);
                 if (!ctx)
                     return;
-                ctx.strokeStyle = 'rgba(129, 140, 248,' + opacityValue + ')';
+                ctx.strokeStyle = 'rgb(50, 69, 89,' + opacityValue + ')';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(particlesArray[a].x, particlesArray[a].y);

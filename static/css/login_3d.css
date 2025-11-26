@@ -4,10 +4,10 @@
 */
 
 :root {
-    --primary-color: #4f46e5;
-    --primary-hover: #4338ca;
-    --bg-gradient-1: #0f172a;
-    --bg-gradient-2: #1e1b4b;
+    --primary-color: #1f6391;
+    --primary-hover: #1077bb;
+    --bg-gradient-1: #000203e8;
+    --bg-gradient-2: #1f6391;
     --glass-bg: rgba(255, 255, 255, 0.08);
     --glass-border: rgba(255, 255, 255, 0.1);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
@@ -150,12 +150,12 @@ body.login-3d-page {
     font-size: 1rem;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
-    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+    box-shadow: 0 4px 15px rgba(70, 165, 229, 0.4);
 }
 
 .btn-login-3d:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.6);
+    box-shadow: 0 6px 20px rgba(70, 152, 229, 0.6);
 }
 
 .btn-login-3d:active {
