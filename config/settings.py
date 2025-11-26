@@ -316,7 +316,15 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
+        'console_safe': {
+            # Formateador SEGURO para consola Windows (sin emojis)
+            '()': 'config.logging_formatters.ConsoleFormatter',
+            'format': '[{levelname}] {asctime} {name} {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
         'verbose': {
+            # Formateador para archivos UTF-8 (preserva emojis)
             'format': '[{levelname}] {asctime} {name} {message}',
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
@@ -338,7 +346,9 @@ LOGGING = {
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
+            'formatter': 'console_safe',  # Usa formateador que elimina emojis
+            # SOLUCIÓN WINDOWS: ConsoleFormatter reemplaza emojis por texto ASCII
+            # Evita UnicodeEncodeError en consola Windows (cp1252)
         },
         'file_errors': {
             'level': 'ERROR',
@@ -347,6 +357,7 @@ LOGGING = {
             'maxBytes': 10 * 1024 * 1024,  # 10 MB
             'backupCount': 5,
             'formatter': 'verbose',
+            'encoding': 'utf-8',  # UTF-8 para soportar emojis y caracteres especiales
         },
         'file_debug': {
             'level': 'DEBUG',
@@ -356,6 +367,7 @@ LOGGING = {
             'backupCount': 3,
             'formatter': 'verbose',
             'filters': ['require_debug_true'],
+            'encoding': 'utf-8',  # UTF-8 para soportar emojis y caracteres especiales
         },
         'file_db': {
             'level': 'DEBUG',
@@ -364,6 +376,7 @@ LOGGING = {
             'maxBytes': 5 * 1024 * 1024,  # 5 MB
             'backupCount': 3,
             'formatter': 'verbose',
+            'encoding': 'utf-8',  # UTF-8 para soportar emojis y caracteres especiales
         },
     },
     'loggers': {

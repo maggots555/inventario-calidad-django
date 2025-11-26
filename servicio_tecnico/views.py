@@ -1406,7 +1406,7 @@ def detalle_orden(request, orden_id):
                 if cambios:
                     messages.success(
                         request,
-                        f'✅ Responsables actualizados: {" | ".join(cambios)}'
+                        f'[OK] Responsables actualizados: {" | ".join(cambios)}'
                     )
                 else:
                     messages.info(request, 'ℹ️ No se realizaron cambios en los responsables.')
@@ -1521,9 +1521,9 @@ def detalle_orden(request, orden_id):
                                 empleado=empleado_actual
                             )
                             imagenes_guardadas += 1
-                            logger.info(f"   ✅ Imagen guardada exitosamente: ID {imagen_orden.pk}")
+                            logger.info(f"   [OK] Imagen guardada exitosamente: ID {imagen_orden.pk}")
                         except Exception as e:
-                            logger.error(f"   ❌ Error al guardar {imagen_file.name}: {str(e)}", exc_info=True)
+                            logger.error(f"   [ERROR] Error al guardar {imagen_file.name}: {str(e)}", exc_info=True)
                             errores_procesamiento.append(f"{imagen_file.name}: {str(e)}")
                     
                     # Preparar respuesta
