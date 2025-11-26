@@ -1,7 +1,25 @@
-# Copilot Instructions for Django Projects
+# Copilot Instructions for Django Project
 
 ## Project Overview
-These are Django 5.2.5 projects following Django best practices with proper separation between project configuration and application logic. Both projects demonstrate different architectural approaches and evolution of best practices.
+Django 5.2.5 project with proper separation between project configuration (`config/`) and application logic. Multi-app architecture with advanced data science and analytics capabilities.
+
+### Core Applications
+1. **inventario**: Product inventory, employee management, QR codes, stock tracking
+2. **scorecard**: Quality control system, incident tracking, component management
+3. **servicio_tecnico**: Technical service orders (MAIN APP)
+   - Complete repair lifecycle management
+   - RHITSO integration (external laboratory)
+   - Venta Mostrador (counter sales)
+   - Analytics dashboard with ML predictions
+   - Cotización system with approval workflows
+   - Image management with dynamic storage
+
+### Tech Stack
+- **Backend**: Django 5.2.5, Python 3.10+
+- **Frontend**: Bootstrap 5.3.2, TypeScript 5.9.3
+- **Data Science**: Plotly, Pandas, Scikit-learn, Matplotlib
+- **Database**: SQLite (dev) / PostgreSQL (production) with connection pooling
+- **Documents**: ReportLab (PDF), OpenPyXL (Excel), QRCode generation
 
 ## 🎓 User Experience Level
 **IMPORTANT**: The user is new to Python programming. When making any modifications or suggesting code changes:
@@ -57,34 +75,7 @@ project_name/
 - **Model Meta options**: Include `ordering`, `verbose_name_plural` for better admin experience
 - **String representation**: Always implement `__str__()` method for models
 - **Validation**: Use `clean()` method for custom model validation
-- **EXPLAIN TO USER**: When creating or modifying models, explain what each field type does (CharField, IntegerField, etc.), what the Meta class is for, and why `__str__()` method is important for displaying objects in admin and templates
-- **Example**:
-```python
-# Este es un modelo de Django - piensa en él como una plantilla para crear objetos en la base de datos
-class Producto(models.Model):
-    # ESTADO_CHOICES es una tupla que define las opciones válidas para el campo estado_calidad
-    ESTADO_CHOICES = [('bueno', 'Bueno'), ('regular', 'Regular'), ('malo', 'Malo')]
-    
-    # CharField: Campo de texto con longitud máxima de 100 caracteres
-    nombre = models.CharField(max_length=100)
-    # TextField: Campo de texto largo, blank=True significa que puede estar vacío
-    descripcion = models.TextField(blank=True)
-    # PositiveIntegerField: Solo acepta números enteros positivos, default=0 pone 0 como valor inicial
-    cantidad = models.PositiveIntegerField(default=0)
-    # DateTimeField: Guarda fecha y hora, auto_now_add=True se llena automáticamente al crear el objeto
-    fecha_ingreso = models.DateTimeField(auto_now_add=True)
-    # CharField con choices: El usuario solo puede elegir entre las opciones definidas arriba
-    estado_calidad = models.CharField(max_length=10, choices=ESTADO_CHOICES, default='bueno')
-    
-    # __str__ define cómo se muestra este objeto cuando se imprime o aparece en el admin
-    def __str__(self):
-        return self.nombre
-    
-    # Meta class: Configuración adicional del modelo
-    class Meta:
-        ordering = ['-fecha_ingreso']  # Ordena por fecha más reciente primero (el - significa descendente)
-        verbose_name_plural = "Productos"  # Nombre en plural para el admin de Django
-```
+- **EXPLAIN TO USER**: When creating or modifying models, explain field types (CharField, IntegerField, etc.), Meta class purpose, and why `__str__()` is important
 
 ### Views & URL Patterns
 - **Function-based views**: Use for simple operations, clear and explicit
@@ -106,27 +97,7 @@ urlpatterns = [
 - **Template inheritance**: Use base.html for consistent layout
 - **Named URLs**: Always use `{% url 'name' %}` instead of hardcoded paths
 - **Bootstrap integration**: Apply Bootstrap classes through form widgets
-- **EXPLAIN TO USER**: When creating forms, explain what ModelForm does (automatically creates form fields based on your model), what widgets are (how the form fields appear in HTML), and why we use template inheritance (to avoid repeating code)
-- **Example form**:
-```python
-# forms.py - Este archivo define cómo se ven y comportan los formularios
-from django import forms
-from .models import Producto
-
-# ModelForm: Django crea automáticamente campos de formulario basados en tu modelo
-class ProductoForm(forms.ModelForm):
-    class Meta:
-        model = Producto  # Le dice a Django qué modelo usar como base
-        fields = ['nombre', 'descripcion', 'cantidad', 'estado_calidad']  # Qué campos incluir
-        
-        # widgets: Define cómo se ve cada campo en HTML (con clases CSS de Bootstrap)
-        widgets = {
-            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre del producto'}),
-            'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'cantidad': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
-            'estado_calidad': forms.Select(attrs={'class': 'form-control'}),
-        }
-```
+- **EXPLAIN TO USER**: When creating forms, explain ModelForm (auto-generates fields from model), widgets (HTML appearance), and template inheritance (avoid code repetition)
 
 ### Frontend Architecture
 - **Bootstrap-based UI**: Use Bootstrap 5+ for responsive design
@@ -192,257 +163,30 @@ project_root/
 ```
 
 #### 🔧 TypeScript Configuration
-**tsconfig.json** should include:
+**tsconfig.json** configured for this project:
 ```json
 {
   "compilerOptions": {
-    "target": "ES6",                    // Compile to ES6 JavaScript
-    "module": "ES6",                    // Use ES6 modules
+    "target": "ES2018",                 // Compile to ES2018 JavaScript
+    "lib": ["ES2018", "DOM"],          // Include ES2018 and DOM libraries
     "outDir": "./static/js",            // Output compiled JS here
-    "rootDir": "./static/ts",           // Source TS files location
     "strict": true,                     // Enable all strict type-checking
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "sourceMap": true,                  // Generate .map files for debugging
-    "noImplicitAny": true,             // Require explicit types
-    "strictNullChecks": true           // Catch null/undefined errors
+    "sourceMap": true                   // Generate .map files for debugging
   },
-  "include": ["static/ts/**/*"],
-  "exclude": ["node_modules", "static/js"]
+  "include": ["static/ts/**/*.ts"]
 }
 ```
 
-#### ✍️ Writing TypeScript - Best Practices
+#### ✍️ TypeScript Development Workflow
 
-**1. Define Interfaces for Data Models**
-```typescript
-// static/ts/types/models.ts
-// EXPLAIN: Una interface define la estructura de un objeto
-// Es como un contrato que dice "este objeto debe tener estos campos"
+**1. Write TypeScript**: Edit `.ts` files in `static/ts/` with proper types and interfaces
+**2. Compile**: Run `npm run watch` (auto-compile) or `npm run build` (single compile)
+**3. Include in Templates**: Load compiled `.js` files with `{% static 'js/file.js' %}`
 
-interface Producto {
-    id: number;                    // ID numérico del producto
-    nombre: string;                // Nombre del producto (texto)
-    descripcion: string;           // Descripción (texto)
-    cantidad: number;              // Cantidad en stock (número)
-    estado_calidad: 'bueno' | 'regular' | 'malo';  // Solo estos 3 valores permitidos
-    fecha_ingreso: string;         // Fecha en formato ISO string
-    codigo_qr?: string;            // Campo opcional (? significa opcional)
-}
-
-interface MovimientoInventario {
-    id: number;
-    producto: Producto;
-    tipo_movimiento: 'entrada' | 'salida' | 'transferencia';
-    cantidad: number;
-    fecha: string;
-    observaciones?: string;
-}
-```
-
-**2. Type-Safe Event Handlers**
-```typescript
-// static/ts/base.ts
-// EXPLAIN: Event handlers con tipos previenen errores comunes
-
-// Confirmar eliminación con tipos seguros
-function confirmarEliminacion(mensaje: string): boolean {
-    return confirm(mensaje);
-}
-
-// Manejar clicks en botones de forma segura
-function setupDeleteButtons(): void {
-    const deleteButtons = document.querySelectorAll<HTMLButtonElement>('.btn-eliminar');
-    
-    deleteButtons.forEach((button: HTMLButtonElement) => {
-        button.addEventListener('click', (event: MouseEvent) => {
-            event.preventDefault();
-            const confirmMsg = button.dataset.confirm || '¿Está seguro?';
-            if (confirmarEliminacion(confirmMsg)) {
-                const form = button.closest('form') as HTMLFormElement;
-                if (form) form.submit();
-            }
-        });
-    });
-}
-
-// Auto-hide alerts after 5 seconds
-function setupAutoHideAlerts(): void {
-    const alerts = document.querySelectorAll<HTMLDivElement>('.alert:not(.alert-permanent)');
-    
-    alerts.forEach((alert: HTMLDivElement) => {
-        setTimeout(() => {
-            alert.style.transition = 'opacity 0.5s';
-            alert.style.opacity = '0';
-            setTimeout(() => alert.remove(), 500);
-        }, 5000);
-    });
-}
-
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    setupDeleteButtons();
-    setupAutoHideAlerts();
-});
-```
-
-**3. API Calls with Type Safety**
-```typescript
-// static/ts/types/api.ts
-// EXPLAIN: Definir tipos para respuestas de API previene errores
-
-interface ApiResponse<T> {
-    success: boolean;
-    data?: T;
-    error?: string;
-    message?: string;
-}
-
-interface ProductoListResponse {
-    productos: Producto[];
-    total: number;
-    page: number;
-}
-
-// static/ts/dashboard.ts
-// EXPLAIN: Funciones async/await con tipos garantizan código seguro
-
-async function cargarProductos(): Promise<ApiResponse<ProductoListResponse>> {
-    try {
-        const response = await fetch('/api/productos/');
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data: ApiResponse<ProductoListResponse> = await response.json();
-        return data;
-        
-    } catch (error) {
-        console.error('Error cargando productos:', error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Error desconocido'
-        };
-    }
-}
-
-// Uso con verificación de tipos
-async function mostrarProductos(): Promise<void> {
-    const result = await cargarProductos();
-    
-    if (result.success && result.data) {
-        // TypeScript sabe que result.data existe aquí
-        result.data.productos.forEach((producto: Producto) => {
-            console.log(`${producto.nombre}: ${producto.cantidad} unidades`);
-        });
-    } else {
-        console.error('Error:', result.error);
-    }
-}
-```
-
-**4. DOM Manipulation with Type Safety**
-```typescript
-// static/ts/scanner.ts
-// EXPLAIN: Manipular el DOM con tipos previene errores de referencias null
-
-class QRScanner {
-    private videoElement: HTMLVideoElement | null = null;
-    private canvasElement: HTMLCanvasElement | null = null;
-    private resultElement: HTMLElement | null = null;
-    
-    constructor() {
-        this.init();
-    }
-    
-    private init(): void {
-        // Type assertions aseguran que los elementos existen
-        this.videoElement = document.getElementById('scanner-video') as HTMLVideoElement;
-        this.canvasElement = document.getElementById('scanner-canvas') as HTMLCanvasElement;
-        this.resultElement = document.getElementById('scan-result');
-        
-        if (!this.videoElement || !this.canvasElement) {
-            console.error('Elementos del scanner no encontrados');
-            return;
-        }
-        
-        this.setupCamera();
-    }
-    
-    private async setupCamera(): Promise<void> {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
-            });
-            
-            if (this.videoElement) {
-                this.videoElement.srcObject = stream;
-                await this.videoElement.play();
-            }
-        } catch (error) {
-            console.error('Error accediendo a la cámara:', error);
-        }
-    }
-    
-    public procesarCodigo(codigo: string): void {
-        if (this.resultElement) {
-            this.resultElement.textContent = `Código escaneado: ${codigo}`;
-        }
-        
-        // Llamar API para buscar producto
-        this.buscarProductoPorCodigo(codigo);
-    }
-    
-    private async buscarProductoPorCodigo(codigo: string): Promise<void> {
-        const response = await fetch(`/api/productos/buscar/?codigo=${codigo}`);
-        const data: ApiResponse<Producto> = await response.json();
-        
-        if (data.success && data.data) {
-            this.mostrarProducto(data.data);
-        }
-    }
-    
-    private mostrarProducto(producto: Producto): void {
-        console.log('Producto encontrado:', producto.nombre);
-        // Actualizar UI con información del producto
-    }
-}
-
-// Inicializar cuando el DOM está listo
-document.addEventListener('DOMContentLoaded', () => {
-    new QRScanner();
-});
-```
-
-#### 🔨 Development Workflow
-
-**1. Write TypeScript (`.ts` files)**:
-- Edit files in `static/ts/`
-- Use proper types and interfaces
-- Leverage VS Code IntelliSense
-
-**2. Compile to JavaScript**:
-```bash
-# Watch mode - auto-compiles on save (RECOMMENDED)
-npm run watch
-
-# Or compile once
-npm run build
-
-# Or use TypeScript compiler directly
-tsc
-```
-
-**3. Include in Templates**:
-```html
-{% load static %}
-
-<!-- Include compiled JavaScript, NOT TypeScript -->
-<script src="{% static 'js/base.js' %}"></script>
-<script src="{% static 'js/scanner.js' %}"></script>
-```
+**EXPLAIN TO USER**: Define interfaces for data structures, use type annotations for functions, leverage VS Code IntelliSense for autocomplete
 
 #### ⚠️ CRITICAL RULES - NEVER VIOLATE
 
@@ -474,72 +218,34 @@ tsc
 }
 ```
 
-#### 🎓 Learning Resources for Beginners
-**EXPLAIN TO USER**: TypeScript puede parecer intimidante al principio, pero te hará un mejor programador:
+### 📊 Data Science & Machine Learning Integration
 
-- **Start simple**: Agrega tipos básicos primero (`string`, `number`, `boolean`)
-- **Use IntelliSense**: VS Code te guía mientras escribes
-- **Read error messages**: TypeScript te dice exactamente qué está mal
-- **Define interfaces**: Piensa en la estructura de tus datos antes de escribir código
-- **Use strict mode**: Más errores en tiempo de desarrollo = menos bugs en producción
+This project includes advanced analytics and predictive capabilities using Python's data science ecosystem.
 
-**Common TypeScript Patterns**:
-```typescript
-// Function with typed parameters and return
-function sumar(a: number, b: number): number {
-    return a + b;
-}
+#### Core Analytics Features
+1. **Dashboard de Cotizaciones**: Interactive analytics dashboard with 20+ Plotly visualizations
+2. **ML Predictor**: Machine learning models for repair outcome predictions
+3. **Excel Exporters**: Automated data export with openpyxl
+4. **Statistical Analysis**: Trend analysis and forecasting
 
-// Optional parameters with default values
-function saludar(nombre: string, titulo?: string): string {
-    return titulo ? `Hola ${titulo} ${nombre}` : `Hola ${nombre}`;
-}
-
-// Array of specific type
-const numeros: number[] = [1, 2, 3, 4, 5];
-const productos: Producto[] = [];
-
-// Union types (one of several types)
-type EstadoProducto = 'bueno' | 'regular' | 'malo';
-let estado: EstadoProducto = 'bueno';  // Only these values allowed
-
-// Null safety
-function buscarProducto(id: number): Producto | null {
-    // Returns Producto or null
-    return null;
-}
-
-// Using the result safely
-const producto = buscarProducto(1);
-if (producto !== null) {
-    // TypeScript knows producto exists here
-    console.log(producto.nombre);
-}
+#### Key Files
+```
+servicio_tecnico/
+├── plotly_visualizations.py    # Interactive Plotly chart generators
+├── ml_predictor.py             # ML models for predictions
+├── ml_advanced/                # Advanced ML algorithms
+│   └── motivo_rechazo.py      # Rejection reason classifier
+├── excel_exporters.py          # Excel export functionality
+└── utils_cotizaciones.py       # Analytics utilities
 ```
 
-#### 🔍 Debugging TypeScript
-- **Source maps enabled**: Debug `.ts` files directly in browser DevTools
-- **VS Code debugging**: Set breakpoints in TypeScript files
-- **Console.log with types**: TypeScript doesn't affect console output
-- **Browser compatibility**: Compiled JavaScript works everywhere
+#### Technologies Used
+- **Plotly**: Interactive charts (line, bar, scatter, heatmaps, sunburst)
+- **Pandas**: Data manipulation and aggregation
+- **Scikit-learn**: Classification, regression, clustering algorithms
+- **Matplotlib/Seaborn**: Statistical visualizations
 
-#### 🚀 Benefits Summary
-**For This Project**:
-- ✅ Catch errors before they reach production
-- ✅ Better code documentation and maintainability
-- ✅ Improved developer experience with autocomplete
-- ✅ Easier refactoring and code navigation
-- ✅ Professional-grade codebase
-- ✅ Scales better as project grows
-
-**For You as a Developer**:
-- ✅ Learn industry-standard tools
-- ✅ Write more reliable code
-- ✅ Get immediate feedback while coding
-- ✅ Build portfolio-quality projects
-- ✅ Prepare for professional development
-
-**REMEMBER**: TypeScript is JavaScript with types. Everything you learn applies to JavaScript too!
+**EXPLAIN TO USER**: When working with analytics, explain what each visualization shows, how ML models make predictions, and how data flows from Django models to Pandas DataFrames to Plotly charts.
 
 ### Static Files Organization & Best Practices
 **CRITICAL**: Never put extensive CSS/JS directly in templates. Always use separate static files for maintainability, performance, and scalability.
@@ -830,47 +536,90 @@ class ModelNameAdmin(admin.ModelAdmin):
     ordering = ['-date_field']
 ```
 
+## Project-Specific Features
+
+### 🔬 RHITSO Integration
+External laboratory management system for specialized equipment testing:
+- Automated email workflows to multiple lab contacts
+- Specialized forms for sending equipment to lab
+- Bidirectional tracking between internal orders and external testing
+- Status synchronization and notifications
+
+### 🛒 Venta Mostrador (Counter Sales)
+Streamlined sales system for direct purchases without full diagnosis:
+- Quick order entry without cotización workflow
+- Simplified pricing and payment tracking
+- Integration with main service orders
+- Independent or complementary to repair services
+
+### 📊 Analytics Dashboard
+Real-time business intelligence with Machine Learning:
+- 20+ interactive Plotly visualizations (trends, heatmaps, sunburst charts)
+- Predictive models for repair outcomes and costs
+- Excel export functionality for offline analysis
+- Statistical trend analysis and forecasting
+- KPI tracking (active orders, delays, revenue projections)
+
+### 💾 Dynamic Storage Management
+Intelligent file storage with automatic disk switching:
+- Primary and alternate disk support (configurable via `.env`)
+- Automatic space monitoring (MIN_FREE_SPACE_GB threshold)
+- Images organized by order (not generic folders)
+- Secure media file serving with Django views
+
+### 📸 Image Management
+Reorganized structure for better scalability:
+- Images stored by order ID: `servicio_tecnico/orden_<ID>/`
+- Automatic directory creation per order
+- Multiple image types: evidencia_inicial, diagnostico, reparacion_progreso, trabajo_finalizado
+- Integration with dynamic storage system
+
 ## File Organization & Project Structure
 
 ### Recommended Directory Structure
 ```
 project_root/
 ├── config/                    # Project configuration
-│   ├── settings.py           # Django settings
+│   ├── settings.py           # Django settings with dual DB support
 │   ├── urls.py              # Main URL routing
-│   ├── wsgi.py              # WSGI config
-│   └── asgi.py              # ASGI config (optional)
-├── apps/                     # Application directory (optional organization)
-│   └── app_name/            # Individual apps
-│       ├── models.py
-│       ├── views.py
-│       ├── forms.py
-│       ├── urls.py
-│       ├── admin.py
-│       ├── apps.py
-│       ├── tests.py
-│       ├── migrations/
-│       └── templates/app_name/
-├── templates/               # Global templates
-│   ├── base.html           # Base template
-│   └── components/         # Reusable components
-├── static/                 # Global static files
-│   ├── css/
-│   │   ├── base.css        # Global styles (layout, navbar, footer)
-│   │   ├── components.css  # Reusable UI components
-│   │   └── forms.css       # Form-specific styling
-│   ├── js/
-│   │   ├── base.js         # Global JavaScript utilities
-│   │   └── feature.js      # Feature-specific JavaScript
+│   ├── constants.py          # Global constants (choices, configs)
+│   ├── storage_utils.py      # Dynamic storage management
+│   └── media_views.py        # Secure media file serving
+├── inventario/               # Inventory management app
+├── scorecard/                # Quality control app
+├── servicio_tecnico/         # Technical service orders (MAIN)
+│   ├── plotly_visualizations.py
+│   ├── ml_predictor.py
+│   ├── ml_advanced/
+│   └── utils/
+├── templates/                # Global templates
+├── static/                   # Global static files
+│   ├── css/                 # Organized CSS files
+│   ├── js/                  # Compiled JavaScript (from TypeScript)
+│   ├── ts/                  # TypeScript source files
 │   └── images/
-│       ├── logos/
-│       └── icons/
-├── media/                  # User uploaded files (production)
-├── requirements.txt        # Python dependencies
-├── .env.example           # Environment variables template
-├── .gitignore            # Git ignore rules
-├── README.md             # Project documentation
-└── manage.py             # Django management script
+├── staticfiles/              # Production static files (collectstatic)
+├── media/                    # User uploads (organized by app)
+│   ├── empleados/
+│   ├── scorecard/
+│   ├── servicio_tecnico/
+│   └── temp/
+├── ml_models/                # Trained ML models
+├── scripts/                  # Utility scripts
+│   ├── poblado/             # Database seeding
+│   ├── testing/             # Test scripts
+│   ├── verificacion/        # Validation scripts
+│   └── ml/                  # ML training scripts
+├── docs/                     # Project documentation
+│   ├── guias/               # Setup and reference guides
+│   └── implementaciones/    # Feature implementation docs
+├── logs/                     # Application logs
+├── package.json              # Node dependencies (TypeScript)
+├── tsconfig.json             # TypeScript configuration
+├── requirements.txt          # Python dependencies
+├── .env                      # Environment variables (not in git)
+├── .env.example             # Environment template
+└── manage.py                # Django management script
 ```
 
 ### Configuration Files
@@ -880,10 +629,59 @@ project_root/
 - **.env.example**: Template for environment variables (never commit actual .env)
 
 ## Key Dependencies
-- Django 5.2.5
-- Bootstrap 5.3.2 (CDN)
-- Bootstrap Icons (CDN)
-- SQLite3 (default database)
+
+### Core Framework
+- **Django** 5.2.5
+- **Python** 3.10+
+- **Bootstrap** 5.3.2 (CDN)
+- **TypeScript** 5.9.3
+
+### Data Science & Analytics
+- **plotly** >= 6.3.0 - Interactive visualizations
+- **pandas** >= 2.3.0 - Data analysis
+- **scikit-learn** >= 1.5.0 - Machine Learning
+- **matplotlib** >= 3.9.0 - Statistical plots
+- **seaborn** >= 0.13.0 - Advanced visualizations
+
+### Document Processing
+- **openpyxl** 3.1.5 - Excel files
+- **reportlab** 4.4.4 - PDF generation
+- **qrcode[pil]** 7.4.2 - QR code generation
+- **Pillow** 11.3.0 - Image processing
+
+### Database & Configuration
+- **SQLite3** (development)
+- **PostgreSQL** (production with connection pooling)
+- **python-decouple** 3.8 - Environment variables
+
+## Database Configuration
+
+### Dual-Database Setup (SQLite + PostgreSQL)
+The project is configured to work with BOTH databases seamlessly using environment variables:
+
+**Development (Windows)**: SQLite3
+```bash
+DB_ENGINE=django.db.backends.sqlite3
+DB_NAME=db.sqlite3
+```
+
+**Production (Linux Server)**: PostgreSQL with optimizations
+```bash
+DB_ENGINE=django.db.backends.postgresql
+DB_NAME=inventario_django
+DB_USER=django_user
+DB_PASSWORD=your_password
+DB_HOST=localhost
+DB_PORT=5432
+```
+
+### PostgreSQL Optimizations
+Settings automatically applied ONLY when using PostgreSQL (prevents SQLite "database locked" issues):
+- **Connection Pooling**: `CONN_MAX_AGE = 600` (10 minutes)
+- **Timeout Protection**: `connect_timeout = 10` seconds
+- **Automatic Detection**: Optimizations skip SQLite to prevent conflicts
+
+**EXPLAIN TO USER**: The system detects the database engine and applies appropriate settings. SQLite is simple for local development; PostgreSQL handles production traffic with connection pooling.
 
 ## Common Patterns to Follow
 
