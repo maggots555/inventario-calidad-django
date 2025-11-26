@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 100">
+  <defs>
+    <!-- Main Gradient: Deep Indigo to Vibrant Purple -->
+    <linearGradient id="mainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d946ef;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Accent Gradient: Cyan glow -->
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22d3ee;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#818cf8;stop-opacity:0" />
+    </linearGradient>
+
+    <!-- Glow Filter -->
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Animations -->
+    <style>
+      .sigma-hex {
+        transform-origin: 40px 40px;
+        animation: spin 12s linear infinite, dashFlow 3s linear infinite;
+      }
+      .sigma-dot {
+        transform-origin: 40px 40px;
+        animation: pulse 3s ease-in-out infinite;
+      }
+      .sigma-dot-end {
+        transform-origin: 330px 82px;
+        animation: pulse 3s ease-in-out infinite;
+        animation-delay: 1.5s; /* Offset for visual interest */
+      }
+      .sigma-infinity {
+        animation: float 4s ease-in-out infinite;
+      }
+      .sigma-text {
+        animation: textGlow 3s ease-in-out infinite alternate;
+      }
+      
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes dashFlow {
+        to { stroke-dashoffset: -60; } /* Moves the dashed line pattern */
+      }
+      
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.15); opacity: 0.9; } /* Subtler pulse */
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-2px); }
+      }
+
+      @keyframes textGlow {
+        0% { filter: drop-shadow(0 0 2px rgba(79, 70, 229, 0.3)); }
+        100% { filter: drop-shadow(0 0 8px rgba(217, 70, 239, 0.8)); } /* Purple glow */
+      }
+    </style>
+  </defs>
+
+  <!-- ICON GROUP (From Creative Version) -->
+  <g transform="translate(10, 10)">
+    <!-- Outer Hexagon: Segmented/Tech feel -->
+    <path class="sigma-hex" d="M40 5 L75 25 L75 55 L40 75 L5 55 L5 25 Z" 
+          fill="none" 
+          stroke="url(#mainGrad)" 
+          stroke-width="3" 
+          stroke-dasharray="20, 10" 
+          stroke-linecap="round" />
+          
+    <!-- Inner Symbol: "Infinity Sigma" - Continuous loop -->
+    <path class="sigma-infinity" d="M25 30 L55 30 L40 40 L55 50 L25 50" 
+          stroke="#ffffff" 
+          stroke-width="5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" 
+          fill="none" 
+          filter="url(#softGlow)" />
+          
+    <!-- Tech Node: Small dot at the center -->
+    <circle class="sigma-dot" cx="40" cy="40" r="3" fill="#22d3ee" />
+  </g>
+
+  <!-- TEXT GROUP (From Version 4) -->
+  <!-- Moved down from y=25 to y=32 to center with icon -->
+  <g class="sigma-text" transform="translate(100, 32)" stroke="#ffffff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    
+    <!-- S -->
+    <path d="M 35 5 C 35 0, 28 0, 18 0 L 10 0 C 5 0, 0 5, 0 10 L 0 12 C 0 18, 5 18, 12 18 L 23 18 C 30 18, 35 18, 35 24 L 35 26 C 35 32, 30 36, 18 36 L 8 36 C 0 36, 0 30, 0 30" />
+    
+    <!-- I -->
+    <path d="M 55 0 L 55 36" />
+    
+    <!-- G -->
+    <path d="M 105 5 C 105 0, 98 0, 90 0 L 85 0 C 70 0, 65 10, 65 18 C 65 26, 70 36, 85 36 L 90 36 C 100 36, 105 32, 105 26 L 105 18 L 88 18" />
+    
+    <!-- M -->
+    <path d="M 125 36 L 125 0 L 147 20 L 170 0 L 170 36" />
+    
+    <!-- A -->
+    <path d="M 190 36 L 207 0 L 225 36 M 196 22 L 218 22" />
+    
+  </g>
+
+  <!-- DECORATION (From Creative Version) -->
+  <!-- Moved down from y=75 to y=82 to maintain spacing with text -->
+  <path d="M 100 82 L 330 82" stroke="url(#accentGrad)" stroke-width="2" stroke-linecap="round" />
+  <circle class="sigma-dot-end" cx="330" cy="82" r="2" fill="#22d3ee" />
+
+</svg>
