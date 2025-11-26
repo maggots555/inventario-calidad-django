@@ -1,0 +1,207 @@
+/* 
+   Login 3D Moderno - Estilos
+   Diseño Glassmorphism con efectos de profundidad
+*/
+
+:root {
+    --primary-color: #4f46e5;
+    --primary-hover: #4338ca;
+    --bg-gradient-1: #0f172a;
+    --bg-gradient-2: #1e1b4b;
+    --glass-bg: rgba(255, 255, 255, 0.08);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+}
+
+body.login-3d-page {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: radial-gradient(circle at center, var(--bg-gradient-2), var(--bg-gradient-1));
+    /* El centrado lo maneja el contenedor Bootstrap, pero aseguramos reset */
+}
+
+/* --- Fondo de Partículas (Canvas) --- */
+#particles-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+}
+
+/* --- Tarjeta Glassmorphism --- */
+.login-card-3d {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 420px;
+    padding: 3rem 2.5rem;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    box-shadow: var(--glass-shadow);
+    transform-style: preserve-3d;
+    transition: transform 0.1s ease-out;
+}
+
+/* Efecto de brillo al mover */
+.login-card-3d::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 24px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Contenido interno con profundidad */
+.card-content {
+    transform: translateZ(20px);
+    position: relative;
+    z-index: 2;
+}
+
+/* --- Elementos del Formulario --- */
+.login-logo-3d {
+    font-size: 3rem;
+    color: var(--text-main);
+    margin-bottom: 1rem;
+    text-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    display: inline-block;
+}
+
+.login-title-3d {
+    color: var(--text-main);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    font-size: 1.75rem;
+}
+
+.login-subtitle-3d {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+    font-weight: 300;
+}
+
+/* Inputs Modernos */
+.input-group-3d {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.input-group-3d i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    z-index: 10;
+    transition: color 0.3s;
+}
+
+.form-control-3d {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+    padding: 12px 15px 12px 45px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.form-control-3d:focus {
+    background: rgba(15, 23, 42, 0.8);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
+    outline: none;
+    color: white;
+}
+
+.form-control-3d:focus+i {
+    color: var(--primary-color);
+}
+
+.form-control-3d::placeholder {
+    color: rgba(148, 163, 184, 0.5);
+}
+
+/* Botón con gradiente */
+.btn-login-3d {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+}
+
+.btn-login-3d:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.6);
+}
+
+.btn-login-3d:active {
+    transform: translateY(0);
+}
+
+/* Footer Credits */
+.footer-credits {
+    margin-top: 2rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 1.5rem;
+}
+
+.footer-credits strong {
+    color: var(--text-main);
+}
+
+.heart-icon {
+    color: #ef4444;
+    animation: beat 1.5s infinite;
+    display: inline-block;
+}
+
+@keyframes beat {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+/* Alertas */
+.alert-3d {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+}
