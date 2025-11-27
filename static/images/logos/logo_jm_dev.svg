@@ -1,0 +1,190 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" id="logo-jm">
+  <defs>
+    <!-- Dynamic Gradient: Nature (Green) to Tech (Blue) -->
+    <linearGradient id="gradJM" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4CAF50" stop-opacity="1">
+        <animate attributeName="stop-color" values="#4CAF50;#66BB6A;#4CAF50" duration="4s" repeatCount="indefinite" />
+      </stop>
+      <stop offset="100%" stop-color="#00D4FF" stop-opacity="1">
+        <animate attributeName="stop-color" values="#00D4FF;#4FC3F7;#00D4FF" duration="4s" repeatCount="indefinite" />
+      </stop>
+    </linearGradient>
+
+    <!-- Glow Filter (Only for main elements now) -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Styles for Professional Animations -->
+    <style>
+      /* Draw-in animation for paths - Loops every 10s */
+      .path-draw {
+        stroke-dasharray: 400;
+        stroke-dashoffset: 400;
+        animation: draw-cycle 10s ease-in-out infinite;
+      }
+
+      @keyframes draw-cycle {
+        0% { stroke-dashoffset: 400; opacity: 1; }
+        20% { stroke-dashoffset: 0; opacity: 1; }
+        90% { stroke-dashoffset: 0; opacity: 1; }
+        95% { stroke-dashoffset: 0; opacity: 0; }
+        100% { stroke-dashoffset: 400; opacity: 0; }
+      }
+
+      /* Gentle sway for the leaf */
+      .leaf-sway {
+        transform-origin: 60px 100px;
+        animation: sway 3s ease-in-out infinite alternate;
+      }
+
+      @keyframes sway {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(5deg); }
+      }
+
+      /* Tech pulse effect */
+      .tech-pulse {
+        transform-origin: 140px 150px;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.5); opacity: 0; }
+        100% { transform: scale(1); opacity: 0; }
+      }
+      
+      /* Circuit activity */
+      .circuit-active {
+        animation: blink 0.5s infinite alternate;
+      }
+      
+      @keyframes blink {
+        from { opacity: 0.3; }
+        to { opacity: 1; }
+      }
+
+      /* Note head bounce */
+      .note-bounce {
+        animation: bounce 3s ease-in-out infinite;
+        transform-origin: 45px 170px;
+      }
+      
+      @keyframes bounce {
+        0%, 100% { transform: translateY(0) rotate(-20deg); }
+        50% { transform: translateY(-3px) rotate(-20deg); }
+      }
+
+      /* Electric Flow Animation */
+      .electric-flow {
+        stroke-dasharray: 8, 12;
+        animation: flow 0.5s linear infinite;
+      }
+
+      @keyframes flow {
+        to { stroke-dashoffset: -20; }
+      }
+      
+      /* Electric Flicker */
+      .electric-flicker {
+        animation: flicker 2s infinite;
+      }
+      
+      @keyframes flicker {
+        0%, 100% { opacity: 0.7; }
+        5%, 15% { opacity: 1; }
+        10% { opacity: 0.6; }
+        50% { opacity: 0.8; }
+        70% { opacity: 0.5; }
+        80% { opacity: 0.9; }
+      }
+
+      /* Digital Pollen Animation */
+      .pollen {
+        font-family: monospace;
+        font-size: 8px;
+        fill: #4CAF50;
+        opacity: 0;
+        animation: float-pollen 4s ease-in infinite;
+      }
+
+      @keyframes float-pollen {
+        0% { transform: translate(0, 0) scale(0.5); opacity: 0; }
+        20% { opacity: 0.8; }
+        80% { opacity: 0.4; }
+        100% { transform: translate(10px, -20px) scale(1); opacity: 0; }
+      }
+
+      /* HOVER EFFECTS */
+      svg:hover .tech-pulse {
+        animation-duration: 0.5s; /* Faster pulse */
+      }
+      
+      svg:hover .leaf-sway {
+        animation-duration: 1s; /* Faster sway */
+      }
+      
+      svg:hover .electric-flow {
+        animation-duration: 0.2s; /* Super fast electricity */
+      }
+      
+      svg:hover .pollen {
+        fill: #00D4FF; /* Pollen turns into data (blue) on hover */
+      }
+
+    </style>
+  </defs>
+
+  <!-- Background Electric Lines -->
+  <g class="electric-flicker">
+    <line x1="20" y1="60" x2="180" y2="60" stroke="#00D4FF" stroke-width="2.5" class="electric-flow" />
+    <line x1="20" y1="80" x2="180" y2="80" stroke="#00D4FF" stroke-width="2.5" class="electric-flow" style="animation-direction: reverse; animation-duration: 0.7s;" />
+    <line x1="20" y1="100" x2="180" y2="100" stroke="#00D4FF" stroke-width="2.5" class="electric-flow" style="animation-duration: 0.4s;" />
+  </g>
+
+  <!-- Main Monogram JM -->
+  <path class="path-draw" d="M 60,40 L 60,150 Q 60,180 30,170" 
+        fill="none" stroke="url(#gradJM)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+        
+  <path class="path-draw" d="M 60,40 L 100,90 L 140,40 L 140,150" 
+        fill="none" stroke="url(#gradJM)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" style="animation-delay: 0.2s;" filter="url(#glow)"/>
+
+  <!-- Nature Element: Leaf on the J stem -->
+  <path class="leaf-sway" d="M 60,100 Q 30,90 30,60 Q 60,70 60,100 Z" fill="#4CAF50" opacity="0.9" />
+
+  <!-- Digital Pollen Group 1 (Leaf) -->
+  <g transform="translate(60, 100)">
+    <text x="0" y="0" class="pollen" style="animation-delay: 0s;">1</text>
+    <text x="5" y="-5" class="pollen" style="animation-delay: 1s;">0</text>
+    <text x="-5" y="-10" class="pollen" style="animation-delay: 2s;">1</text>
+    <text x="10" y="5" class="pollen" style="animation-delay: 3s;">0</text>
+    <text x="-10" y="0" class="pollen" style="animation-delay: 1.5s;">1</text>
+  </g>
+
+  <!-- Musical Element: Note Head on the J -->
+  <ellipse class="note-bounce" cx="45" cy="170" rx="14" ry="9" fill="#4CAF50" />
+  
+  <!-- Digital Pollen Group 2 (Note Head) -->
+  <g transform="translate(45, 170)">
+    <text x="0" y="0" class="pollen" style="animation-delay: 0.5s;">0</text>
+    <text x="8" y="-8" class="pollen" style="animation-delay: 1.5s;">1</text>
+    <text x="-8" y="-5" class="pollen" style="animation-delay: 2.5s;">0</text>
+    <text x="5" y="5" class="pollen" style="animation-delay: 3.5s;">1</text>
+  </g>
+
+  <!-- Tech Element: Circuit Node on the M -->
+  <circle cx="140" cy="150" r="12" fill="#001f3f" stroke="#00D4FF" stroke-width="2" />
+  <circle cx="140" cy="150" r="5" fill="#00D4FF" />
+  <circle class="tech-pulse" cx="140" cy="150" r="12" fill="none" stroke="#00D4FF" stroke-width="1" />
+  
+  <!-- Tech Lines extending from right -->
+  <g transform="translate(0,0)">
+    <path d="M 155,150 L 170,150 L 180,130" fill="none" stroke="#00D4FF" stroke-width="2" opacity="0.5">
+        <animate attributeName="stroke-dasharray" values="0,30;30,0" duration="2s" repeatCount="indefinite" />
+    </path>
+    <circle class="circuit-active" cx="180" cy="130" r="2" fill="#00D4FF" />
+  </g>
+
+</svg>
