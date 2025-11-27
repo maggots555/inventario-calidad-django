@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sistema Integral de Gestión{% endblock %}</title>
-    
+
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    
+
     <!-- CSS personalizado - Carga los archivos estáticos de Django -->
     {% load static %}
     <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
@@ -16,7 +17,7 @@
     <link rel="stylesheet" type="text/css" href="{% static 'css/forms.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/scorecard.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/venta_mostrador.css' %}">
-    
+
     <!-- CSS específico por página (opcional) -->
     {% block extra_css %}
     {% endblock %}
@@ -24,7 +25,7 @@
     <script>
         // Aplicar estado colapsado ANTES de que la página se renderice
         // PREDETERMINADO: La sidebar inicia colapsada para usuarios nuevos
-        (function() {
+        (function () {
             const sidebarState = localStorage.getItem('sidebarCollapsed');
             // Si no hay valor (null) o es 'true', aplicar colapsado
             const isCollapsed = sidebarState === null || sidebarState === 'true';
@@ -34,6 +35,7 @@
         })();
     </script>
 </head>
+
 <body class="sidebar-loading">
     <!-- Navbar Moderno -->
     <nav class="modern-navbar">
@@ -41,8 +43,9 @@
             <!-- Logo y Brand -->
             <div class="navbar-brand-section">
                 <a href="{% url 'home' %}" class="navbar-brand-link">
-                    <div class="navbar-logo">
-                        <i class="bi bi-grid-3x3-gap-fill"></i>
+                    <div class="navbar-logo navbar-logo-svg">
+                        <img src="{% static 'images/logos/logo_sigma_combo.svg' %}" alt="Sigma Logo"
+                            class="sigma-logo-img">
                     </div>
                     <div class="navbar-brand-text">
                         <h1>Sistema Integral de Gestión</h1>
@@ -50,14 +53,14 @@
                     </div>
                 </a>
             </div>
-            
+
             <!-- Toggle para móvil -->
             <button class="navbar-mobile-toggle" id="navbarToggle" aria-label="Toggle navigation">
                 <span></span>
                 <span></span>
                 <span></span>
             </button>
-            
+
             <!-- Menú de navegación -->
             <div class="navbar-menu" id="navbarMenu">
                 <!-- MÓDULO: INVENTARIO -->
@@ -99,7 +102,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- MÓDULO: CONTROL DE CALIDAD -->
                 <div class="navbar-menu-item dropdown">
                     <a href="#" class="navbar-menu-link" data-dropdown="calidad">
@@ -136,7 +139,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- MÓDULO: SERVICIO TÉCNICO -->
                 <div class="navbar-menu-item dropdown">
                     <a href="#" class="navbar-menu-link" data-dropdown="servicio">
@@ -189,7 +192,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- MÓDULO: CONFIGURACIÓN -->
                 <div class="navbar-menu-item dropdown">
                     <a href="#" class="navbar-menu-link" data-dropdown="configuracion">
@@ -224,62 +227,64 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Sección de Usuario y Controles -->
             <div class="navbar-user-section">
                 {% if user.is_authenticated %}
-                    <!-- Información del usuario -->
-                    <div class="navbar-user-info">
-                        {% if user.empleado %}
-                            <!-- Si el usuario tiene un perfil de empleado asociado -->
-                            <span class="user-name">{{ user.empleado.nombre_completo }}</span>
-                            <span class="user-role">{{ user.empleado.cargo }}</span>
-                        {% else %}
-                            <!-- Si no tiene empleado asociado, usar info básica del User -->
-                            <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
-                            <span class="user-role">{% if user.is_superuser %}Superusuario{% elif user.is_staff %}Administrador{% else %}Usuario{% endif %}</span>
-                        {% endif %}
-                    </div>
-                    
-                    <!-- Avatar del usuario -->
-                    <div class="navbar-user-avatar" title="{{ user.empleado.nombre_completo|default:user.username }}">
-                        {% if user.empleado and user.empleado.foto_perfil %}
-                            <!-- Mostrar foto de perfil si existe -->
-                            <img src="{{ user.empleado.foto_perfil.url }}" alt="{{ user.empleado.nombre_completo }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
-                        {% else %}
-                            <!-- Mostrar iniciales si no hay foto -->
-                            {% if user.empleado %}
-                                <span>{{ user.empleado.get_iniciales }}</span>
-                            {% else %}
-                                <span>{{ user.first_name.0|default:"U" }}{{ user.last_name.0|default:"S" }}</span>
-                            {% endif %}
-                        {% endif %}
-                    </div>
-                    
-                    <!-- Botones de acción -->
-                    <div class="navbar-actions">
-                        <a href="{% url 'home' %}" class="navbar-action-btn" title="Dashboard Principal">
-                            <i class="bi bi-speedometer2"></i>
-                        </a>
-                        <a href="{% url 'movimiento_rapido' %}" class="navbar-action-btn" title="Scanner QR">
-                            <i class="bi bi-qr-code-scan"></i>
-                        </a>
-                        <a href="/admin/" class="navbar-action-btn" title="Panel Admin">
-                            <i class="bi bi-gear-fill"></i>
-                        </a>
-                        <!-- Formulario de logout con POST -->
-                        <form method="post" action="{% url 'logout' %}" style="display: inline; margin: 0;">
-                            {% csrf_token %}
-                            <button type="submit" class="navbar-action-btn navbar-action-logout" title="Cerrar Sesión">
-                                <i class="bi bi-box-arrow-right"></i>
-                            </button>
-                        </form>
-                    </div>
-                {% else %}
-                    <!-- Si no hay usuario logueado (por si acaso) -->
-                    <a href="{% url 'login' %}" class="btn btn-outline-light btn-sm">
-                        <i class="bi bi-box-arrow-in-right me-1"></i> Iniciar Sesión
+                <!-- Información del usuario -->
+                <div class="navbar-user-info">
+                    {% if user.empleado %}
+                    <!-- Si el usuario tiene un perfil de empleado asociado -->
+                    <span class="user-name">{{ user.empleado.nombre_completo }}</span>
+                    <span class="user-role">{{ user.empleado.cargo }}</span>
+                    {% else %}
+                    <!-- Si no tiene empleado asociado, usar info básica del User -->
+                    <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
+                    <span class="user-role">{% if user.is_superuser %}Superusuario{% elif user.is_staff
+                        %}Administrador{% else %}Usuario{% endif %}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Avatar del usuario -->
+                <div class="navbar-user-avatar" title="{{ user.empleado.nombre_completo|default:user.username }}">
+                    {% if user.empleado and user.empleado.foto_perfil %}
+                    <!-- Mostrar foto de perfil si existe -->
+                    <img src="{{ user.empleado.foto_perfil.url }}" alt="{{ user.empleado.nombre_completo }}"
+                        style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                    {% else %}
+                    <!-- Mostrar iniciales si no hay foto -->
+                    {% if user.empleado %}
+                    <span>{{ user.empleado.get_iniciales }}</span>
+                    {% else %}
+                    <span>{{ user.first_name.0|default:"U" }}{{ user.last_name.0|default:"S" }}</span>
+                    {% endif %}
+                    {% endif %}
+                </div>
+
+                <!-- Botones de acción -->
+                <div class="navbar-actions">
+                    <a href="{% url 'home' %}" class="navbar-action-btn" title="Dashboard Principal">
+                        <i class="bi bi-speedometer2"></i>
                     </a>
+                    <a href="{% url 'movimiento_rapido' %}" class="navbar-action-btn" title="Scanner QR">
+                        <i class="bi bi-qr-code-scan"></i>
+                    </a>
+                    <a href="/admin/" class="navbar-action-btn" title="Panel Admin">
+                        <i class="bi bi-gear-fill"></i>
+                    </a>
+                    <!-- Formulario de logout con POST -->
+                    <form method="post" action="{% url 'logout' %}" style="display: inline; margin: 0;">
+                        {% csrf_token %}
+                        <button type="submit" class="navbar-action-btn navbar-action-logout" title="Cerrar Sesión">
+                            <i class="bi bi-box-arrow-right"></i>
+                        </button>
+                    </form>
+                </div>
+                {% else %}
+                <!-- Si no hay usuario logueado (por si acaso) -->
+                <a href="{% url 'login' %}" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-box-arrow-in-right me-1"></i> Iniciar Sesión
+                </a>
                 {% endif %}
             </div>
         </div>
@@ -290,7 +295,7 @@
         <script>
             // Aplicar clase collapsed inmediatamente
             // PREDETERMINADO: La sidebar inicia colapsada para usuarios nuevos
-            (function() {
+            (function () {
                 const sidebar = document.currentScript.parentElement;
                 const sidebarState = localStorage.getItem('sidebarCollapsed');
                 // Si no hay valor (null) o es 'true', aplicar colapsado
@@ -299,7 +304,7 @@
                 }
             })();
         </script>
-        
+
         <!-- Menú de la Sidebar -->
         <ul class="sidebar-menu">
             <!-- Dashboard -->
@@ -313,7 +318,7 @@
                     </a>
                 </div>
             </li>
-            
+
             <!-- Inventario -->
             <li class="sidebar-section">
                 <div class="sidebar-section-title">Inventario</div>
@@ -358,7 +363,7 @@
                     </ul>
                 </div>
             </li>
-            
+
             <!-- Control de Calidad -->
             <li class="sidebar-section">
                 <div class="sidebar-section-title">Calidad</div>
@@ -391,7 +396,7 @@
                     </ul>
                 </div>
             </li>
-            
+
             <!-- Servicio Técnico -->
             <li class="sidebar-section">
                 <div class="sidebar-section-title">Servicio Técnico</div>
@@ -436,7 +441,7 @@
                     </ul>
                 </div>
             </li>
-            
+
             <!-- Configuración -->
             <li class="sidebar-section">
                 <div class="sidebar-section-title">Configuración</div>
@@ -476,13 +481,13 @@
                 </div>
             </li>
         </ul>
-        
+
         <!-- Botón de Toggle (ubicado al final del sidebar) -->
         <button class="sidebar-toggle" id="sidebarToggle" aria-label="Colapsar/Expandir Sidebar">
             <i class="bi bi-chevron-left"></i>
         </button>
     </aside>
-    
+
     <!-- Overlay para móviles -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
@@ -491,7 +496,7 @@
         <script>
             // Aplicar clase collapsed al wrapper si corresponde
             // PREDETERMINADO: La sidebar inicia colapsada para usuarios nuevos
-            (function() {
+            (function () {
                 const wrapper = document.currentScript.parentElement;
                 const sidebarState = localStorage.getItem('sidebarCollapsed');
                 // Si no hay valor (null) o es 'true', aplicar colapsado
@@ -502,23 +507,23 @@
         </script>
         <!-- Messages de Sistema -->
         {% if messages %}
-            <div class="container-fluid mt-3">
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                        {% if message.tags == 'success' %}
-                            <i class="bi bi-check-circle-fill"></i>
-                        {% elif message.tags == 'error' %}
-                            <i class="bi bi-exclamation-triangle-fill"></i>
-                        {% elif message.tags == 'warning' %}
-                            <i class="bi bi-exclamation-circle-fill"></i>
-                        {% else %}
-                            <i class="bi bi-info-circle-fill"></i>
-                        {% endif %}
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
+        <div class="container-fluid mt-3">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {% if message.tags == 'success' %}
+                <i class="bi bi-check-circle-fill"></i>
+                {% elif message.tags == 'error' %}
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                {% elif message.tags == 'warning' %}
+                <i class="bi bi-exclamation-circle-fill"></i>
+                {% else %}
+                <i class="bi bi-info-circle-fill"></i>
+                {% endif %}
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
+            {% endfor %}
+        </div>
         {% endif %}
 
         <!-- Contenido Principal -->
@@ -535,10 +540,11 @@
         <div class="container">
             <div class="row">
                 <!-- Columna 1: Logo y Branding -->
-                <div class="col-md-4 mb-4">
+                <div class="col-md-5 mb-4">
                     <div class="footer-brand">
-                        <div class="footer-logo">
-                            <i class="bi bi-grid-3x3-gap-fill"></i>
+                        <div class="footer-logo footer-logo-svg">
+                            <img src="{% static 'images/logos/logo_sigma_combo.svg' %}" alt="Sigma Logo"
+                                class="sigma-logo-img">
                         </div>
                         <div class="footer-brand-text">
                             <h5>Sistema Integral de Gestión</h5>
@@ -546,7 +552,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Columna 2: Acceso Rápido -->
                 <div class="col-md-4 mb-4">
                     <div class="footer-section">
@@ -585,9 +591,9 @@
                         </ul>
                     </div>
                 </div>
-                
+
                 <!-- Columna 3: Desarrollador -->
-                <div class="col-md-4 mb-4">
+                <div class="col-md-3 mb-4">
                     <div class="footer-section footer-developer">
                         <h6>Desarrollado por</h6>
                         <div class="developer-avatar">
@@ -600,21 +606,22 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Indicadores decorativos -->
             <div class="footer-indicators">
                 <span class="footer-dot"></span>
                 <span class="footer-dot"></span>
                 <span class="footer-dot"></span>
             </div>
-            
+
             <!-- Copyright y Bottom -->
             <div class="footer-bottom">
                 <p class="footer-copyright">
                     © {% now "Y" %} Sistema Integral de Gestión • Todos los derechos reservados
                 </p>
                 <p class="footer-made-with">
-                    Hecho con <span class="footer-heart">❤️</span> usando <span class="footer-tech">Python • Django • TypeScript</span>
+                    Hecho con <span class="footer-heart">❤️</span> usando <span class="footer-tech">Python • Django •
+                        TypeScript</span>
                 </p>
             </div>
         </div>
@@ -627,12 +634,13 @@
 
     <!-- Scripts de Bootstrap -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <!-- JavaScript personalizado -->
     <script src="{% static 'js/base.js' %}"></script>
-    
+
     <!-- JavaScript específico por página (opcional) -->
     {% block extra_js %}
     {% endblock %}
 </body>
+
 </html>
