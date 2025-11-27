@@ -12,7 +12,7 @@
     --glass-border: rgba(255, 255, 255, 0.1);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     --text-main: #f8fafc;
-    --text-muted: #94a3b8;
+    --text-muted: #adb9ca;
 }
 
 body.login-3d-page {
@@ -136,6 +136,25 @@ body.login-3d-page {
 
 .form-control-3d::placeholder {
     color: rgba(148, 163, 184, 0.5);
+}
+
+/* Input de contraseña con espacio para el botón de toggle */
+#id_password {
+    padding-right: 50px !important;
+}
+
+/* Botón para mostrar/ocultar contraseña */
+.password-toggle-btn {
+    background: transparent !important;
+    border: none !important;
+    padding: 0.5rem !important;
+    right: 20px !important;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+}
+
+.password-toggle-btn:hover {
+    opacity: 1 !important;
 }
 
 /* Botón con gradiente */
