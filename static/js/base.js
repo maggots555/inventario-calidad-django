@@ -522,5 +522,46 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(function () {
         document.body.classList.remove('sidebar-loading');
     }, 100);
+
+    // Inicializar cursor personalizado
+    inicializarCursorPersonalizado();
 });
+
+/**
+ * Inicializa el comportamiento del cursor personalizado
+ */
+function inicializarCursorPersonalizado() {
+    const cursor = document.getElementById('tech-cursor');
+    if (!cursor) return;
+
+    // Mover el cursor
+    document.addEventListener('mousemove', function (e) {
+        // Usar requestAnimationFrame para rendimiento óptimo
+        requestAnimationFrame(() => {
+            cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+        });
+    });
+
+    // Detectar elementos interactivos para efecto hover
+    const interactiveElements = document.querySelectorAll('a, button, input, select, textarea, .btn, .card');
+
+    interactiveElements.forEach(el => {
+        el.addEventListener('mouseenter', () => {
+            cursor.classList.add('hover-active');
+        });
+
+        el.addEventListener('mouseleave', () => {
+            cursor.classList.remove('hover-active');
+        });
+    });
+
+    // Ocultar cursor si sale de la ventana
+    document.addEventListener('mouseleave', () => {
+        cursor.style.opacity = '0';
+    });
+
+    document.addEventListener('mouseenter', () => {
+        cursor.style.opacity = '1';
+    });
+}
 //# sourceMappingURL=base.js.map

@@ -1,0 +1,27 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1"/>
+      <feOffset dx="1" dy="1" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.5"/>
+      </feComponentTransfer>
+      <feMerge> 
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/> 
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Main Arrow Body with Tech Style -->
+  <g filter="url(#dropShadow)">
+    <path d="M2 2 L12 28 L16 18 L26 14 L2 2 Z" fill="#2d3e50" stroke="#06b6d4" stroke-width="1.5" stroke-linejoin="round"/>
+    
+    <!-- Tech Circuit/Detail Lines -->
+    <path d="M16 18 L22 24" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="22" cy="24" r="2" fill="#06b6d4"/>
+    
+    <!-- Core Glow Dot -->
+    <circle cx="8" cy="10" r="1.5" fill="#06b6d4" opacity="0.8"/>
+  </g>
+</svg>

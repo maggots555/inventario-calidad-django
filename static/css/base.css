@@ -166,6 +166,63 @@ body {
     /* overflow-x: hidden aplicado solo en móviles ahora */
     width: 100%;
     max-width: 100%;
+    /* Ocultar cursor por defecto para usar el personalizado JS */
+    cursor: none;
+}
+
+/* REGLA MAESTRA: Ocultar cursor del sistema en TODO el sitio */
+*,
+*::before,
+*::after {
+    cursor: none !important;
+}
+
+/* ===== CUSTOM TECH CURSOR ===== */
+.tech-cursor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 32px;
+    height: 32px;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-100px, -100px);
+    /* Oculto inicialmente */
+    will-change: transform;
+    /* Optimización de rendimiento */
+}
+
+/* Animación del punto central */
+.cursor-core-dot {
+    animation: pulseDot 1.5s infinite ease-in-out;
+    transform-origin: 8px 10px;
+}
+
+@keyframes pulseDot {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+
+    50% {
+        transform: scale(1.8);
+        opacity: 1;
+        fill: #ffffff;
+        /* Brillo blanco al expandirse */
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+}
+
+/* Estado Hover (cuando pasa sobre enlaces) */
+.tech-cursor.hover-active .cursor-core-dot {
+    fill: #ef4444;
+    /* Cambia a rojo o color de acción */
+    animation: pulseDot 0.5s infinite ease-in-out;
+    /* Late más rápido */
 }
 
 /* Mejora del scroll */
