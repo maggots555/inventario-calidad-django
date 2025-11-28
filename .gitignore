@@ -35,6 +35,16 @@ inventario.json
 scorecard.json
 servicio_tecnico.json
 
+# PostgreSQL backups (archivos .sql)
+backup_postgres*.sql
+backup_*.sql
+*_backup.sql
+*.dump
+*.sql.gz
+*.sql.bz2
+BD backup/
+backup_sqlite_utf8/
+
 # IDEs
 .vscode/
 .idea/
