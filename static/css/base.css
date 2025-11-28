@@ -143,6 +143,7 @@
 /* ===== ESTILOS GENERALES ===== */
 /* Importamos una fuente moderna de Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fascinate+Inline&family=Scope+One&family=TikTok+Sans:opsz,wght@12..36,300..900&display=swap');
 
 /* Reset y estilos base mejorados */
 * {
@@ -2741,4 +2742,30 @@ footer::after {
         width: 15px;
         height: 2px;
     }
+}
+
+/* ============================================================================
+   FUENTES PERSONALIZADAS
+   ============================================================================ */
+.scope-one-regular {
+    font-family: "Scope One", serif;
+    font-weight: 400;
+    font-style: normal;
+}
+
+.fascinate-inline-regular {
+  font-family: "Fascinate Inline", system-ui;
+  font-weight: 400;
+  font-style: normal;
+}
+
+
+.tiktok-sans-regular {
+  font-family: "TikTok Sans", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+  font-variation-settings:
+    "slnt" 0,
+    "wdth" 100;
 }
