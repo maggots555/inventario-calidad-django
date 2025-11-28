@@ -74,12 +74,10 @@ CARACTERÍSTICAS:
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
-    border-radius: 20px;
+    width: 120px; /* Aumentado para que luzca mejor sin fondo */
+    height: 120px;
+    background: transparent; /* Fondo transparente */
     margin-bottom: 1.5rem;
-    box-shadow: var(--shadow-xl);
     animation: float 3s ease-in-out infinite;
 }
 
@@ -183,29 +181,45 @@ CARACTERÍSTICAS:
     height: 64px;
     border-radius: 16px;
     margin-bottom: 1.5rem;
-    box-shadow: var(--shadow-md);
+    box-shadow: transparent;
     transition: all var(--transition-normal);
 }
 
 .module-card.inventario .module-icon {
-    background: linear-gradient(135deg, var(--color-inventario) 0%, var(--color-inventario-dark) 100%);
+    background: transparent;
+    animation: iconPulse 2s ease-in-out infinite; /* Pulse continuo */
 }
 
 .module-card.scorecard .module-icon {
-    background: linear-gradient(135deg, var(--color-scorecard) 0%, var(--color-scorecard-dark) 100%);
+    background: transparent;
+    animation: iconTilt3D 3s ease-in-out infinite; /* Inclinación 3D suave */
 }
 
 .module-card.servicio .module-icon {
-    background: linear-gradient(135deg, var(--color-servicio) 0%, var(--color-servicio-dark) 100%);
+    background: transparent;
+    animation: iconSwing 1.5s ease-in-out infinite; /* Balanceo */
 }
 
-.module-card:hover .module-icon {
-    transform: rotate(5deg) scale(1.1);
+/* Animaciones al hover - Específicas por módulo */
+.module-card.inventario:hover .module-icon {
+    animation: iconBounce 0.6s ease-in-out; /* Rebote al hover */
+}
+
+.module-card.scorecard:hover .module-icon {
+    animation: iconFlip 0.6s ease-in-out; /* Volteo elegante al hover */
+}
+
+.module-card.servicio:hover .module-icon {
+    animation: iconShake 0.5s ease-in-out, iconGlow 1s ease-in-out infinite; /* Vibración + brillo */
 }
 
 .module-icon i {
     font-size: 2rem;
     color: white;
+}
+
+.module-icon img {
+    transition: filter 0.3s ease; /* Transición suave para efectos de imagen */
 }
 
 /* Título del módulo */
@@ -406,6 +420,98 @@ CARACTERÍSTICAS:
     }
     50% {
         opacity: 0.8;
+    }
+}
+
+/* ============================================================================
+   ANIMACIONES DE ÍCONOS DE MÓDULOS
+   ============================================================================ */
+
+/* INVENTARIO - Pulse (respiración) */
+@keyframes iconPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+/* INVENTARIO - Bounce al hover */
+@keyframes iconBounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    25% {
+        transform: translateY(-8px);
+    }
+    50% {
+        transform: translateY(0);
+    }
+    75% {
+        transform: translateY(-4px);
+    }
+}
+
+/* CALIDAD - Tilt 3D (inclinación suave) */
+@keyframes iconTilt3D {
+    0%, 100% {
+        transform: perspective(400px) rotateY(0deg) rotateX(0deg);
+    }
+    25% {
+        transform: perspective(400px) rotateY(10deg) rotateX(5deg);
+    }
+    50% {
+        transform: perspective(400px) rotateY(0deg) rotateX(10deg);
+    }
+    75% {
+        transform: perspective(400px) rotateY(-10deg) rotateX(5deg);
+    }
+}
+
+/* CALIDAD - Flip al hover */
+@keyframes iconFlip {
+    0% {
+        transform: perspective(400px) rotateY(0deg);
+    }
+    100% {
+        transform: perspective(400px) rotateY(360deg);
+    }
+}
+
+/* SERVICIO - Swing/Balanceo */
+@keyframes iconSwing {
+    0%, 100% {
+        transform: rotate(0deg);
+    }
+    25% {
+        transform: rotate(5deg);
+    }
+    75% {
+        transform: rotate(-5deg);
+    }
+}
+
+/* SERVICIO - Shake/Vibración */
+@keyframes iconShake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-3px);
+    }
+    20%, 40%, 60%, 80% {
+        transform: translateX(3px);
+    }
+}
+
+/* SERVICIO - Glow/Brillo */
+@keyframes iconGlow {
+    0%, 100% {
+        filter: drop-shadow(0 0 0px rgba(245, 158, 11, 0));
+    }
+    50% {
+        filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6));
     }
 }
 

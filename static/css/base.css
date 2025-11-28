@@ -225,6 +225,23 @@ body {
     /* Late más rápido */
 }
 
+/* ===== CURSOR TRAIL (Estela) ===== */
+.cursor-trail {
+    position: fixed;
+    width: 6px;
+    height: 6px;
+    background-color: rgba(6, 182, 212, 0.5);
+    /* Cyan con transparencia */
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    /* Justo debajo del cursor principal */
+    transform: translate(-50%, -50%);
+    /* Centrado */
+    transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+    box-shadow: 0 0 4px rgba(6, 182, 212, 0.3);
+}
+
 /* Mejora del scroll */
 html {
     scroll-behavior: smooth;

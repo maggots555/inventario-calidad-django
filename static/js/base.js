@@ -534,12 +534,23 @@ function inicializarCursorPersonalizado() {
     const cursor = document.getElementById('tech-cursor');
     if (!cursor) return;
 
+    // Variables para el trail
+    let lastTrailTime = 0;
+    const trailDelay = 25; // ms entre partículas (ajustable para densidad)
+
     // Mover el cursor
     document.addEventListener('mousemove', function (e) {
         // Usar requestAnimationFrame para rendimiento óptimo
         requestAnimationFrame(() => {
             cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
         });
+
+        // Generar estela (trail)
+        const currentTime = Date.now();
+        if (currentTime - lastTrailTime > trailDelay) {
+            crearParticulaTrail(e.clientX, e.clientY);
+            lastTrailTime = currentTime;
+        }
     });
 
     // Detectar elementos interactivos para efecto hover
@@ -563,5 +574,32 @@ function inicializarCursorPersonalizado() {
     document.addEventListener('mouseenter', () => {
         cursor.style.opacity = '1';
     });
+}
+
+/**
+ * Crea una partícula de estela en la posición dada
+ * @param {number} x - Posición X
+ * @param {number} y - Posición Y
+ */
+function crearParticulaTrail(x, y) {
+    const particle = document.createElement('div');
+    particle.className = 'cursor-trail';
+    particle.style.left = x + 'px';
+    particle.style.top = y + 'px';
+
+    // Añadir al body
+    document.body.appendChild(particle);
+
+    // Animar y eliminar
+    // Usamos setTimeout para permitir que el navegador renderice el estado inicial
+    setTimeout(() => {
+        particle.style.transform = 'translate(-50%, -50%) scale(0)';
+        particle.style.opacity = '0';
+    }, 10);
+
+    // Eliminar del DOM después de la transición
+    setTimeout(() => {
+        particle.remove();
+    }, 510); // Un poco más que la transición CSS (0.5s)
 }
 //# sourceMappingURL=base.js.map
