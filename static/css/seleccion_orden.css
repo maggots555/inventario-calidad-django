@@ -98,6 +98,21 @@ TÉCNICAS CSS UTILIZADAS:
     -webkit-text-fill-color: transparent;
     background-clip: text;
     animation: pulse 2s ease-in-out infinite;
+    /* Estilos para cuando contiene imágenes en lugar de iconos de texto */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Estilos específicos para imágenes dentro del hero-icon */
+.hero-icon img {
+    max-width: 80px;
+    max-height: 80px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    /* Remover el gradiente de fondo cuando es una imagen */
+    background: none;
 }
 
 .hero-title {
@@ -206,6 +221,19 @@ TÉCNICAS CSS UTILIZADAS:
     font-size: 3.5rem;
     margin-bottom: var(--spacing-md);
     transition: transform var(--transition-base);
+    /* Estilos para cuando contiene imágenes en lugar de iconos de texto */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Estilos específicos para imágenes dentro del service-icon */
+.service-icon img {
+    max-width: 100px;
+    max-height: 100px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
 }
 
 .service-card:hover .service-icon {
