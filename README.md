@@ -18,7 +18,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Production-success?style=for-the-badge" alt="Status">
   <img src="https://img.shields.io/badge/Version-3.0-blue?style=for-the-badge" alt="Version">
-  <img src="https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/Modules-4-orange?style=for-the-badge" alt="Modules">
 </p>
 
@@ -868,7 +868,15 @@ mi_proyecto_django/
 
 ## 📄 Licencia
 
-Este proyecto es software propietario desarrollado para uso interno empresarial.
+Este proyecto está licenciado bajo la **GNU General Public License v3.0**.
+
+Copyright © 2025 [Tu Nombre/Organización]
+
+Este programa es software libre: puedes redistribuirlo y/o modificarlo bajo los términos de la GNU General Public License publicada por la Free Software Foundation, ya sea la versión 3 de la Licencia, o (a tu elección) cualquier versión posterior.
+
+Este programa se distribuye con la esperanza de que sea útil, pero SIN NINGUNA GARANTÍA; ni siquiera la garantía implícita de COMERCIABILIDAD o IDONEIDAD PARA UN PROPÓSITO PARTICULAR. Vea la GNU General Public License para más detalles.
+
+Consulte el archivo [LICENSE](./LICENSE) para ver el texto completo de la licencia.
 
 ---
 
