@@ -870,7 +870,7 @@ mi_proyecto_django/
 
 Este proyecto está licenciado bajo la **GNU General Public License v3.0**.
 
-Copyright © 2025 [Tu Nombre/Organización]
+Copyright © 2025 [Jorge Magos/maggosts555 corp]
 
 Este programa es software libre: puedes redistribuirlo y/o modificarlo bajo los términos de la GNU General Public License publicada por la Free Software Foundation, ya sea la versión 3 de la Licencia, o (a tu elección) cualquier versión posterior.
 
