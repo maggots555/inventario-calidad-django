@@ -71,25 +71,7 @@ from .forms import (
 def registrar_historial(orden, tipo_evento, usuario, comentario='', es_sistema=False):
     """
     Función helper para registrar eventos en el historial de la orden.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta función crea un registro en la tabla HistorialOrden cada vez que
-    sucede algo importante en una orden (cambio de estado, comentario, etc.)
-    
-    PARÁMETROS:
-    - orden: La orden de servicio
-    - tipo_evento: Tipo de acción (ej: 'actualizacion', 'estado', 'comentario', 'cotizacion')
-    - usuario: El empleado que realizó la acción (puede ser None para eventos del sistema)
-    - comentario: Descripción detallada del evento (opcional)
-    - es_sistema: True si es un evento automático del sistema
-    
-    TIPOS DE EVENTO VÁLIDOS:
-    - 'estado': Cambio de estado
-    - 'comentario': Comentario agregado
-    - 'actualizacion': Actualización de información
-    - 'imagen': Imagen subida
-    - 'cambio_tecnico': Reasignación de técnico
-    - 'cotizacion': Eventos relacionados con cotización
+
     """
     HistorialOrden.objects.create(
         orden=orden,
@@ -107,15 +89,7 @@ def registrar_historial(orden, tipo_evento, usuario, comentario='', es_sistema=F
 def determinar_categoria_venta(venta_mostrador):
     """
     Determina la categoría principal de una VentaMostrador.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta función analiza una venta mostrador y retorna qué tipo de producto
-    fue vendido. La lógica de prioridad es:
-    1. Si hay paquete (premium/oro/plata) → Mostrar paquete
-    2. Si hay piezas individuales → Mostrar cantidad de piezas
-    3. Si hay servicios → Mostrar tipo de servicio
-    4. Si nada → Mostrar "Otros Servicios"
-    
+
     PARÁMETROS:
     - venta_mostrador: Instancia de VentaMostrador
     
@@ -178,17 +152,7 @@ def determinar_categoria_venta(venta_mostrador):
 def obtener_top_productos_vendidos(ordenes, limite=5):
     """
     Obtiene los TOP N productos más vendidos en las órdenes dadas.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta función recorre todas las órdenes con ventas mostrador y cuenta
-    cuáles piezas individuales fueron vendidas más veces. Retorna el TOP N.
-    
-    Útil para ver qué productos son más populares en mostrador.
-    
-    PARÁMETROS:
-    - ordenes: QuerySet de OrdenServicio
-    - limite: Cantidad de top productos a retornar (default: 5)
-    
+
     RETORNA:
     list de dicts con keys:
         'descripcion': str (nombre de la pieza)
@@ -238,18 +202,7 @@ def obtener_top_productos_vendidos(ordenes, limite=5):
 def seleccionar_tipo_orden(request):
     """
     Vista de selección de tipo de orden de servicio.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta es una vista simple que solo muestra un template. No procesa datos,
-    solo presenta dos opciones al usuario para que elija el tipo de servicio
-    que desea crear.
-    
-    PROPÓSITO:
-    - Clarificar al usuario qué tipo de orden va a crear
-    - Mostrar los prefijos correspondientes (OOW- o FL-)
-    - Mejorar la experiencia de usuario con una interfaz visual atractiva
-    - Prevenir confusiones entre tipos de servicio
-    
+
     Args:
         request: Objeto HttpRequest de Django
         
@@ -266,24 +219,7 @@ def seleccionar_tipo_orden(request):
 def inicio(request):
     """
     Vista principal de Servicio Técnico - Dashboard Completo
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista recopila TODAS las estadísticas importantes del sistema
-    de servicio técnico y las envía al template para mostrarlas de forma
-    visual y organizada.
-    
-    MÉTRICAS CALCULADAS:
-    1. Estadísticas Generales: Total de órdenes, activas, retrasadas, finalizadas
-    2. Órdenes por Estado: Distribución de órdenes en cada etapa del proceso
-    3. Órdenes por Técnico: Carga de trabajo de cada técnico
-    4. Órdenes por Gama: Distribución por tipo de equipo (alta/media/baja)
-    5. Órdenes por Sucursal: Distribución geográfica
-    6. Cotizaciones: Pendientes, aceptadas, rechazadas
-    7. RHITSO: Órdenes en reparación especializada
-    8. Tiempos Promedio: KPIs de rendimiento
-    9. Órdenes Recientes: Últimas 10 órdenes ingresadas
-    10. Alertas: Situaciones que requieren atención inmediata
-    
+
     Returns:
         HttpResponse con el template renderizado y todas las métricas
     """
@@ -572,21 +508,7 @@ def inicio(request):
 def crear_orden(request):
     """
     Vista para crear una nueva orden de servicio técnico.
-    
-    EXPLICACIÓN DEL FLUJO:
-    1. Si la petición es GET (usuario accede al formulario):
-       - Se crea un formulario vacío
-       - Se renderiza el template con el formulario
-    
-    2. Si la petición es POST (usuario envía el formulario):
-       - Se valida el formulario
-       - Si es válido:
-         * Se guarda la orden (esto crea OrdenServicio Y DetalleEquipo)
-         * Se muestra un mensaje de éxito
-         * Se redirige a la página de inicio
-       - Si NO es válido:
-         * Se muestra el formulario con los errores
-    
+
     Args:
         request: Objeto HttpRequest con la petición del usuario
     
@@ -650,19 +572,7 @@ def crear_orden(request):
 def crear_orden_venta_mostrador(request):
     """
     Vista para crear una nueva orden de Venta Mostrador (sin diagnóstico).
-    
-    EXPLICACIÓN DEL FLUJO:
-    Las ventas mostrador son servicios directos que NO requieren diagnóstico técnico:
-    - Instalación de piezas compradas en el momento
-    - Reinstalación de sistema operativo
-    - Limpieza express
-    - Venta de accesorios
-    
-    El flujo es más simple que una orden normal:
-    1. Se crea la orden con tipo_servicio='venta_mostrador'
-    2. El estado inicial es 'recepcion' (pueden empezar de inmediato)
-    3. Se redirige al detalle de la orden para agregar los servicios específicos
-    
+
     Args:
         request: Objeto HttpRequest
     
@@ -718,13 +628,7 @@ def crear_orden_venta_mostrador(request):
 def lista_ordenes_activas(request):
     """
     Vista para listar órdenes activas (no entregadas ni canceladas).
-    
-    EXPLICACIÓN:
-    Muestra todas las órdenes que están en proceso, incluyendo:
-    - En espera, recepción, diagnóstico, cotización
-    - Esperando piezas, en reparación, control de calidad
-    - Finalizadas pero no entregadas
-    
+
     Incluye búsqueda por número de serie y orden de cliente.
     """
     # Obtener parámetro de búsqueda
@@ -984,12 +888,7 @@ def lista_ordenes_activas(request):
 def lista_ordenes_finalizadas(request):
     """
     Vista para listar órdenes finalizadas (entregadas o canceladas).
-    
-    EXPLICACIÓN:
-    Muestra todas las órdenes que ya fueron:
-    - Entregadas al cliente
-    - Canceladas por algún motivo
-    
+
     Incluye búsqueda por número de serie y orden de cliente.
     """
     # Obtener parámetro de búsqueda
@@ -1031,11 +930,7 @@ def lista_ordenes_finalizadas(request):
 def cerrar_orden(request, orden_id):
     """
     Vista para cambiar el estado de una orden a 'entregado'.
-    
-    EXPLICACIÓN:
-    Marca una orden como entregada, registrando la fecha de entrega
-    y cambiando el estado a 'entregado'.
-    
+
     Solo funciona con órdenes en estado 'finalizado'.
     """
     # Obtener la orden o mostrar error 404
@@ -1075,11 +970,7 @@ def cerrar_orden(request, orden_id):
 def cerrar_todas_finalizadas(request):
     """
     Vista para cerrar todas las órdenes en estado 'finalizado'.
-    
-    EXPLICACIÓN:
-    Marca todas las órdenes finalizadas como entregadas en un solo paso.
-    Útil para cerrar múltiples órdenes al final del día.
-    
+
     Solo procesa con método POST para evitar cambios accidentales.
     """
     if request.method == 'POST':
@@ -1122,24 +1013,7 @@ def cerrar_todas_finalizadas(request):
 def detalle_orden(request, orden_id):
     """
     Vista completa de detalles de una orden de servicio.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta es la vista más compleja del sistema porque maneja MÚLTIPLES formularios
-    en una sola página:
-    
-    1. Configuración Adicional (diagnóstico, fechas)
-    2. Reingreso/RHITSO (checkboxes y selects)
-    3. Cambio de Estado (dropdown de estados)
-    4. Comentarios (textarea para agregar notas)
-    5. Subir Imágenes (múltiples archivos)
-    
-    FLUJO DE PROCESAMIENTO:
-    - Si es GET: Mostrar todos los formularios vacíos/llenos con datos actuales
-    - Si es POST: Procesar el formulario específico que se envió
-      * Usamos un campo oculto 'form_type' para saber qué formulario se envió
-      * Solo procesamos ese formulario específico
-      * Los demás formularios se vuelven a crear con datos actuales
-    
+
     Args:
         request: Petición HTTP
         orden_id: ID de la orden a mostrar
@@ -2186,15 +2060,7 @@ def detalle_orden(request, orden_id):
 def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
     """
     Comprime y guarda una imagen con la estructura de carpetas solicitada.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta función hace lo siguiente:
-    1. Crea la estructura de carpetas: media/servicio_tecnico/{service_tag}/{tipo}/
-    2. Genera un nombre único para la imagen: {tipo}_{timestamp}.jpg
-    3. Guarda la imagen ORIGINAL (alta resolución, sin comprimir)
-    4. Crea una versión COMPRIMIDA para mostrar en la galería
-    5. Guarda ambas versiones en el registro de la base de datos
-    
+
     Args:
         orden: OrdenServicio a la que pertenece la imagen
         imagen_file: Archivo de imagen subido
@@ -2282,19 +2148,7 @@ def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
 def descargar_imagen_original(request, imagen_id):
     """
     Descarga la imagen original (alta resolución) de una orden.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista permite descargar la versión original (sin comprimir) de una imagen.
-    Incluye validaciones de seguridad:
-    - Usuario debe estar autenticado
-    - La imagen debe existir
-    - Debe tener versión original guardada
-    
-    IMPORTANTE:
-    Esta función busca la imagen en AMBAS ubicaciones de almacenamiento:
-    1. Disco alterno (D:/Media_Django) - Archivos nuevos
-    2. Disco principal (C:/media) - Archivos antiguos
-    
+
     Args:
         request: Objeto HttpRequest
         imagen_id: ID de la ImagenOrden
@@ -2387,21 +2241,7 @@ def descargar_imagen_original(request, imagen_id):
 def eliminar_imagen(request, imagen_id):
     """
     Elimina una imagen de una orden de servicio.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista elimina completamente una imagen:
-    1. Verifica permisos del usuario
-    2. Elimina el registro de la base de datos
-    3. Elimina los archivos físicos (imagen comprimida y original)
-    4. Registra la acción en el historial
-    5. Retorna JSON con el resultado
-    
-    Validaciones de seguridad:
-    - Usuario debe estar autenticado
-    - Solo método POST permitido
-    - Usuario debe ser empleado activo
-    - La imagen debe existir
-    
+
     Args:
         request: Objeto HttpRequest
         imagen_id: ID de la ImagenOrden a eliminar
@@ -2537,16 +2377,7 @@ def eliminar_imagen(request, imagen_id):
 def lista_referencias_gama(request):
     """
     Lista todas las referencias de gama de equipos con filtros de búsqueda.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista muestra un listado de todas las referencias de gama (alta, media, baja)
-    que se usan para clasificar automáticamente los equipos cuando se crea una orden.
-    
-    Funcionalidad:
-    - Listado completo de referencias
-    - Filtros por marca, modelo y gama
-    - Búsqueda por texto
-    - Ordenamiento por campos
+
     """
     from .models import ReferenciaGamaEquipo
     
@@ -2605,12 +2436,7 @@ def lista_referencias_gama(request):
 def crear_referencia_gama(request):
     """
     Crea una nueva referencia de gama de equipo.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista permite agregar una nueva referencia al catálogo.
-    Cuando creas una referencia (por ejemplo: "Lenovo ThinkPad - Alta"),
-    el sistema automáticamente clasificará equipos Lenovo ThinkPad como gama alta
-    cuando se cree una orden de servicio.
+
     """
     from .models import ReferenciaGamaEquipo
     from .forms import ReferenciaGamaEquipoForm
@@ -2645,13 +2471,7 @@ def crear_referencia_gama(request):
 def editar_referencia_gama(request, referencia_id):
     """
     Edita una referencia de gama existente.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Permite modificar los datos de una referencia ya creada.
-    Útil cuando:
-    - Cambian los rangos de precio de un modelo
-    - Necesitas corregir el nombre de marca o modelo
-    - Quieres cambiar la clasificación de gama
+
     """
     from .models import ReferenciaGamaEquipo
     from .forms import ReferenciaGamaEquipoForm
@@ -2688,14 +2508,7 @@ def editar_referencia_gama(request, referencia_id):
 def eliminar_referencia_gama(request, referencia_id):
     """
     Desactiva (soft delete) una referencia de gama.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    En lugar de eliminar permanentemente la referencia, solo la marca como "inactiva".
-    Esto significa que:
-    - Ya no se usará para calcular gamas automáticamente
-    - Se puede reactivar si es necesario
-    - Se mantiene el historial
-    
+
     Nota: Es mejor desactivar que eliminar para mantener consistencia en el sistema.
     """
     from .models import ReferenciaGamaEquipo
@@ -2729,10 +2542,7 @@ def eliminar_referencia_gama(request, referencia_id):
 def reactivar_referencia_gama(request, referencia_id):
     """
     Reactiva una referencia previamente desactivada.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Si desactivaste una referencia por error o necesitas volver a usarla,
-    esta función la marca como activa nuevamente.
+
     """
     from .models import ReferenciaGamaEquipo
     
@@ -2761,17 +2571,7 @@ def reactivar_referencia_gama(request, referencia_id):
 def agregar_pieza_cotizada(request, orden_id):
     """
     Agrega una nueva pieza a una cotización existente.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista maneja el formulario modal para agregar piezas a una cotización.
-    Responde con JSON para actualizar la interfaz sin recargar la página (AJAX).
-    
-    FLUJO:
-    1. Obtiene la orden y verifica que tenga cotización
-    2. Valida el formulario recibido
-    3. Asocia la pieza a la cotización
-    4. Actualiza los totales de la cotización
-    5. Devuelve JSON con el resultado
+
     """
     from django.http import JsonResponse
     from .forms import PiezaCotizadaForm
@@ -2834,11 +2634,7 @@ def agregar_pieza_cotizada(request, orden_id):
 @require_http_methods(["GET"])
 def obtener_pieza_cotizada(request, pieza_id):
     """
-    Obtiene los datos de una pieza cotizada para edición.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista retorna los datos de una pieza en formato JSON para que
-    JavaScript pueda cargarlos en el formulario de edición.
+    Obtiene los datos de una pieza cotizada para edición
     
     Returns:
         JsonResponse: Datos de la pieza en formato JSON
@@ -2880,10 +2676,7 @@ def obtener_pieza_cotizada(request, pieza_id):
 def editar_pieza_cotizada(request, pieza_id):
     """
     Edita una pieza cotizada existente.
-    
-    EXPLICACIÓN:
-    Permite modificar cantidad, costo, prioridad de una pieza.
-    Puede usarse incluso después de aceptar la cotización (para ajustar costos reales).
+
     """
     from django.http import JsonResponse
     from .forms import PiezaCotizadaForm
@@ -2936,10 +2729,7 @@ def editar_pieza_cotizada(request, pieza_id):
 def eliminar_pieza_cotizada(request, pieza_id):
     """
     Elimina una pieza de la cotización.
-    
-    ⚠️ VALIDACIÓN IMPORTANTE:
-    NO se puede eliminar si la cotización ya fue aceptada por el usuario.
-    En ese caso, se debe editar la cantidad a 0 si ya no se necesita.
+
     """
     from django.http import JsonResponse
     from .models import PiezaCotizada
@@ -2993,22 +2783,7 @@ def eliminar_pieza_cotizada(request, pieza_id):
 def obtener_seguimiento_pieza(request, seguimiento_id):
     """
     Obtiene los datos de un seguimiento en formato JSON.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista devuelve toda la información de un seguimiento específico
-    en formato JSON para que JavaScript pueda cargarla en el formulario
-    de edición. Es como pedirle a Django "dame todos los datos de este
-    seguimiento" y Django responde con un JSON que JavaScript entiende.
-    
-    FLUJO:
-    1. Busca el seguimiento por ID
-    2. Extrae todos sus campos (proveedor, fechas, estado, etc.)
-    3. Convierte las fechas a formato ISO (YYYY-MM-DD) para los inputs type="date"
-    4. Devuelve todo en formato JSON
-    
-    USO:
-    Se llama desde JavaScript cuando el usuario hace clic en "Editar"
-    para poblar el formulario con los datos existentes.
+
     """
     from django.http import JsonResponse
     from .models import SeguimientoPieza
@@ -3048,10 +2823,7 @@ def obtener_seguimiento_pieza(request, seguimiento_id):
 def agregar_seguimiento_pieza(request, orden_id):
     """
     Agrega un nuevo seguimiento de pedido a proveedor.
-    
-    EXPLICACIÓN:
-    Permite registrar un nuevo pedido a un proveedor con su información
-    de tracking: proveedor, fecha de pedido, fecha estimada, etc.
+
     """
     from django.http import JsonResponse
     from .forms import SeguimientoPiezaForm
@@ -3137,10 +2909,7 @@ def agregar_seguimiento_pieza(request, orden_id):
 def editar_seguimiento_pieza(request, seguimiento_id):
     """
     Edita un seguimiento existente.
-    
-    EXPLICACIÓN:
-    Permite actualizar información del seguimiento: cambiar fechas,
-    actualizar estado, agregar notas, etc.
+
     """
     from django.http import JsonResponse
     from .forms import SeguimientoPiezaForm
@@ -3241,13 +3010,7 @@ def eliminar_seguimiento_pieza(request, seguimiento_id):
 def marcar_pieza_recibida(request, seguimiento_id):
     """
     Marca una pieza como recibida y envía notificación al técnico.
-    
-    EXPLICACIÓN:
-    Función especial para marcar un seguimiento como recibido.
-    Requiere la fecha de entrega real y automáticamente:
-    1. Cambia el estado a "recibido"
-    2. Registra la fecha actual como fecha_entrega_real
-    3. Envía email al técnico asignado
+
     """
     from django.http import JsonResponse
     from django.utils import timezone
@@ -3340,36 +3103,7 @@ def marcar_pieza_recibida(request, seguimiento_id):
 def reenviar_notificacion_pieza(request, seguimiento_id):
     """
     Reenvía la notificación de pieza recibida al técnico.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista permite reintentar el envío de la notificación cuando el 
-    envío inicial falló (por problemas de SMTP, email inválido, etc.)
-    
-    IMPORTANTE (Octubre 2025):
-    ==========================
-    Esta función utiliza la MISMA lógica mejorada que incluye información
-    sobre piezas pendientes de otros proveedores. Así que cuando reenvíes,
-    el técnico recibirá el email completo actualizado con el estado actual
-    de TODAS las piezas (recibidas y pendientes).
-    
-    CASO DE USO:
-    1. Se marca una pieza como recibida
-    2. El email falla por algún motivo (SMTP, email inválido, etc.)
-    3. Se muestra un botón "Reenviar Notificación"
-    4. Al hacer clic, se llama a esta vista
-    5. Se intenta enviar nuevamente el email (con info actualizada)
-    6. Se registra el resultado en el historial
-    
-    VENTAJA DEL REENVÍO:
-    Si han pasado días desde el primer intento, el reenvío mostrará el
-    estado ACTUALIZADO de las piezas pendientes (pueden haber llegado más
-    piezas o cambiar estados mientras tanto).
-    
-    SEGURIDAD:
-    - Solo usuarios autenticados pueden reenviar
-    - Solo se puede reenviar si el seguimiento ya está marcado como "recibido"
-    
+
     Args:
         request: HttpRequest con el usuario autenticado
         seguimiento_id: ID del seguimiento de la pieza
@@ -3452,22 +3186,7 @@ def reenviar_notificacion_pieza(request, seguimiento_id):
 def marcar_pieza_incorrecta(request, seguimiento_id):
     """
     Marca una pieza como incorrecta (WPB - Wrong Part Boxed).
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista se usa cuando una pieza llega INCORRECTA:
-    - Es la pieza equivocada (proveedor envió otra cosa)
-    - No es compatible con el equipo
-    - No cumple las especificaciones solicitadas
-    
-    FLUJO DE USO:
-    1. La pieza se marca como "recibido" (llega físicamente)
-    2. Al instalarla/probarla, se detecta que es incorrecta
-    3. Se usa el botón "❌ Pieza Incorrecta" 
-    4. Esta vista cambia el estado a 'incorrecto'
-    5. Se registra en el historial
-    6. Se debe hacer un NUEVO pedido de la pieza correcta
-    
+
     IMPORTANTE:
     - Solo se puede marcar como incorrecta si está en estado 'recibido'
     - El seguimiento queda cerrado con estado 'incorrecto'
@@ -3541,28 +3260,7 @@ def marcar_pieza_incorrecta(request, seguimiento_id):
 def marcar_pieza_danada(request, seguimiento_id):
     """
     Marca una pieza como dañada o no funcional (DOA - Dead On Arrival).
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista se usa cuando una pieza llega DAÑADA o NO FUNCIONA:
-    - Llega físicamente dañada (rota, golpeada, etc.)
-    - No funciona al probarla (defecto de fábrica)
-    - Problemas técnicos que la hacen inservible
-    
-    FLUJO DE USO:
-    1. La pieza se marca como "recibido" (llega físicamente)
-    2. Al instalarla/probarla, se detecta que está dañada o no funciona
-    3. Se usa el botón "⚠️ Pieza Dañada"
-    4. Esta vista cambia el estado a 'danado'
-    5. Se registra en el historial
-    6. Se debe hacer un NUEVO pedido de reemplazo
-    
-    IMPORTANTE:
-    - Solo se puede marcar como dañada si está en estado 'recibido'
-    - El seguimiento queda cerrado con estado 'danado'
-    - Se debe crear un NUEVO seguimiento para el reemplazo
-    - Considerar reclamación al proveedor/garantía
-    
+
     Args:
         request: HttpRequest con el usuario autenticado
         seguimiento_id: ID del seguimiento de la pieza
@@ -3630,21 +3328,7 @@ def marcar_pieza_danada(request, seguimiento_id):
 def cambiar_estado_seguimiento(request, seguimiento_id):
     """
     Cambia el estado de un seguimiento de pieza de forma rápida.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista permite cambiar el estado del seguimiento sin necesidad de 
-    editar todo el formulario. Es útil para actualizaciones rápidas del progreso.
-    
-    FLUJO TÍPICO:
-    pedido → confirmado → transito → retrasado → recibido
-    
-    ESTADOS VÁLIDOS:
-    - pedido: Pedido realizado al proveedor
-    - confirmado: Proveedor confirmó el pedido
-    - transito: Paquete en camino
-    - retrasado: Hay retraso en la entrega
-    - recibido: Pieza recibida (usar marcar_pieza_recibida en su lugar)
-    
+
     RETORNA:
     JSON con el HTML actualizado del card para reemplazarlo dinámicamente
     """
@@ -3727,11 +3411,7 @@ def cambiar_estado_seguimiento(request, seguimiento_id):
 def _render_pieza_row(pieza, cotizacion):
     """
     Renderiza una fila de la tabla de piezas como HTML.
-    
-    EXPLICACIÓN:
-    Esta función genera el HTML de una fila de pieza para insertarla
-    dinámicamente en la tabla después de agregar/editar via AJAX.
-    
+
     NOTA: Idealmente esto debería usar un template parcial, pero por
     simplicidad lo generamos aquí directamente.
     """
@@ -3888,39 +3568,7 @@ def _render_seguimiento_card(seguimiento):
 
 def _enviar_notificacion_pieza_recibida(orden, seguimiento):
     """
-    Envía email al técnico notificando que una pieza fue recibida.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta función se ejecuta automáticamente cuando se marca un seguimiento
-    como "recibido". Envía un email al técnico asignado con copia a su
-    jefe directo y al jefe de calidad.
-    
-    NUEVA FUNCIONALIDAD (Octubre 2025):
-    ====================================
-    Ahora el email incluye información sobre OTRAS PIEZAS PENDIENTES de 
-    diferentes proveedores. Esto permite al técnico saber si:
-    - Puede proceder con la reparación con la pieza recibida
-    - Debe esperar más piezas antes de continuar
-    - Qué piezas siguen en camino y cuándo llegarán
-    
-    EJEMPLO DE ESCENARIO:
-    - Llega SSD de Amazon → Email notifica la pieza recibida
-    - Email también avisa: "Aún pendiente: RAM de MercadoLibre (en tránsito)"
-    
-    DESTINATARIOS:
-    - TO (Para): Técnico asignado a la orden
-    - CC (Copia): Jefe directo del técnico (si existe)
-    - CC (Copia): Jefe de Calidad (desde .env)
-    
-    CONTENIDO DEL EMAIL:
-    - Orden del cliente (no la orden interna)
-    - Información del equipo (marca, modelo, serie)
-    - Proveedor de la pieza RECIBIDA
-    - Descripción de las piezas RECIBIDAS
-    - Fecha de recepción
-    - ⚠️ NUEVO: Listado de piezas PENDIENTES de otros proveedores
-    - ⚠️ NUEVO: Estado y días de retraso de cada pieza pendiente
+    Envía email al técnico notificando que una pieza fue recibida
     
     RETORNA:
     dict con 'success': True/False, 'message': str, 'destinatarios': list
@@ -4137,23 +3785,7 @@ Hecho por Jorge Magos todos los derechos reservados.
 def crear_venta_mostrador(request, orden_id):
     """
     Crea una nueva venta mostrador asociada a una orden.
-    
-    ACTUALIZACIÓN (Octubre 2025): Sistema refactorizado
-    Ya no valida tipo_servicio porque venta_mostrador es un complemento
-    opcional de cualquier orden.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista maneja el formulario modal para crear una venta mostrador.
-    Responde con JSON para actualizar la interfaz sin recargar la página (AJAX).
-    
-    FLUJO:
-    1. Obtiene la orden (cualquier tipo)
-    2. Verifica que NO tenga venta mostrador existente
-    3. Valida el formulario recibido
-    4. Crea la venta mostrador asociada a la orden
-    5. Registra en historial
-    6. Devuelve JSON con el resultado
-    
+
     Args:
         request: HttpRequest con datos POST del formulario
         orden_id: ID de la orden a la que se asocia la venta
@@ -4226,20 +3858,7 @@ def crear_venta_mostrador(request, orden_id):
 def agregar_pieza_venta_mostrador(request, orden_id):
     """
     Agrega una nueva pieza a una venta mostrador existente.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista maneja el formulario modal para agregar piezas individuales
-    a una venta mostrador. Por ejemplo: RAM adicional, cables, accesorios.
-    Responde con JSON para actualizar la interfaz sin recargar (AJAX).
-    
-    FLUJO:
-    1. Obtiene la orden y verifica que tenga venta mostrador
-    2. Valida el formulario de pieza recibido
-    3. Asocia la pieza a la venta mostrador
-    4. Actualiza el total de la venta automáticamente (property)
-    5. Registra en historial
-    6. Devuelve JSON con la fila HTML de la nueva pieza
-    
+
     Args:
         request: HttpRequest con datos POST del formulario
         orden_id: ID de la orden que tiene la venta mostrador
@@ -4314,11 +3933,7 @@ def agregar_pieza_venta_mostrador(request, orden_id):
 def editar_pieza_venta_mostrador(request, pieza_id):
     """
     Edita una pieza de venta mostrador existente.
-    
-    EXPLICACIÓN:
-    Permite modificar cantidad, precio unitario, descripción de una pieza.
-    Actualiza automáticamente el total de la venta.
-    
+
     Args:
         request: HttpRequest con datos POST del formulario
         pieza_id: ID de la pieza a editar
@@ -4384,15 +3999,7 @@ def editar_pieza_venta_mostrador(request, pieza_id):
 def eliminar_pieza_venta_mostrador(request, pieza_id):
     """
     Elimina una pieza de venta mostrador.
-    
-    EXPLICACIÓN:
-    Elimina una pieza vendida y actualiza el total de la venta.
-    Registra la acción en el historial.
-    
-    Args:
-        request: HttpRequest
-        pieza_id: ID de la pieza a eliminar
-    
+
     Returns:
         JsonResponse con success=True/False
     """
@@ -4447,25 +4054,7 @@ def eliminar_pieza_venta_mostrador(request, pieza_id):
 def gestion_rhitso(request, orden_id):
     """
     Vista principal del módulo RHITSO - Panel de gestión completo.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista es el centro de control para órdenes que requieren reparación
-    externa especializada (RHITSO). Muestra toda la información relevante:
-    - Información del equipo y diagnóstico SIC
-    - Estado actual RHITSO y timeline completo
-    - Incidencias registradas y su seguimiento
-    - Galería de imágenes específica RHITSO
-    - Formularios para gestionar el proceso
-    
-    FLUJO DE LA VISTA:
-    1. Obtiene la orden y valida que sea candidato RHITSO
-    2. Prepara información del equipo y diagnóstico
-    3. Obtiene estado RHITSO actual y calcula métricas
-    4. Consulta historial de seguimientos e incidencias
-    5. Filtra galería de imágenes RHITSO
-    6. Prepara formularios para acciones
-    7. Renderiza template con todo el contexto
-    
+
     Args:
         request: HttpRequest object
         orden_id: ID de la orden de servicio
@@ -4479,8 +4068,7 @@ def gestion_rhitso(request, orden_id):
     orden = get_object_or_404(OrdenServicio, pk=orden_id)
     
     # Validar que la orden es candidato RHITSO
-    # EXPLICACIÓN: es_candidato_rhitso es un campo booleano que indica si
-    # la orden requiere reparación externa especializada
+
     if not orden.es_candidato_rhitso:
         messages.error(
             request,
@@ -4492,13 +4080,11 @@ def gestion_rhitso(request, orden_id):
     # =======================================================================
     # PASO 2: OBTENER INFORMACIÓN DEL EQUIPO
     # =======================================================================
-    # EXPLICACIÓN: detalle_equipo es una relación OneToOne que contiene
-    # toda la información técnica del equipo (marca, modelo, serie, etc.)
+
     detalle_equipo = orden.detalle_equipo
     
     # Preparar diccionario con información del equipo
-    # EXPLICACIÓN: Organizamos la información en un diccionario para
-    # facilitar su uso en el template. Incluye datos de la orden y del equipo.
+
     equipo_info = {
         # Información básica del equipo
         'marca': detalle_equipo.marca if detalle_equipo else 'No especificada',
@@ -4523,18 +4109,15 @@ def gestion_rhitso(request, orden_id):
     if orden.estado_rhitso:
         try:
             # Buscar el estado en la tabla EstadoRHITSO para obtener detalles
-            # EXPLICACIÓN: EstadoRHITSO contiene información adicional como
-            # el color para mostrar en la UI y el responsable (owner)
+
             estado_obj = EstadoRHITSO.objects.get(estado=orden.estado_rhitso)
             
             # Calcular días en RHITSO usando property del modelo
-            # EXPLICACIÓN: dias_en_rhitso es una property que calcula
-            # automáticamente los días transcurridos desde el envío
+
             dias_en_rhitso = orden.dias_en_rhitso
             
             # Obtener configuración para alertas (días máximos permitidos)
-            # EXPLICACIÓN: ConfiguracionRHITSO almacena parámetros del sistema
-            # como días máximos antes de alertar
+
             config = ConfiguracionRHITSO.objects.first()
             dias_alerta = config.dias_maximos_rhitso if config else 7
             
@@ -4567,8 +4150,7 @@ def gestion_rhitso(request, orden_id):
     # =======================================================================
     # PASO 4: OBTENER DIAGNÓSTICO SIC
     # =======================================================================
-    # EXPLICACIÓN: El diagnóstico SIC es el diagnóstico inicial realizado
-    # por el técnico de SIC antes de enviar el equipo a RHITSO
+
     diagnostico_info = {
         'diagnostico_sic': detalle_equipo.diagnostico_sic if detalle_equipo else '',
         'motivo_rhitso': orden.get_motivo_rhitso_display() if orden.motivo_rhitso else 'No especificado',
@@ -4583,13 +4165,9 @@ def gestion_rhitso(request, orden_id):
     # =======================================================================
     # PASO 5: OBTENER HISTORIAL RHITSO
     # =======================================================================
-    # EXPLICACIÓN: Obtenemos dos tipos de registros históricos:
-    # 1. Seguimientos automáticos (cambios detectados por signals del sistema)
-    # 2. Seguimientos manuales (cambios registrados por usuarios mediante formulario)
-    
+
     # Seguimientos automáticos del sistema (es_cambio_automatico=True)
-    # EXPLICACIÓN: Estos son cambios que el sistema detectó automáticamente,
-    # como cuando se guarda una orden y cambia el estado_rhitso por programación
+
     seguimientos_sistema = orden.seguimientos_rhitso.filter(
         es_cambio_automatico=True
     ).select_related(
@@ -4598,8 +4176,7 @@ def gestion_rhitso(request, orden_id):
     ).order_by('-fecha_actualizacion')
     
     # Seguimientos manuales (es_cambio_automatico=False)
-    # EXPLICACIÓN: Estos son cambios que un usuario registró manualmente usando
-    # el formulario "Actualizar Estado RHITSO" con observaciones
+
     seguimientos_manuales = orden.seguimientos_rhitso.filter(
         es_cambio_automatico=False
     ).select_related(
@@ -4608,8 +4185,7 @@ def gestion_rhitso(request, orden_id):
     ).order_by('-fecha_actualizacion')
     
     # Obtener último seguimiento RHITSO (de cualquier tipo)
-    # EXPLICACIÓN: Para mostrar las observaciones del estado actual,
-    # priorizamos los seguimientos manuales porque tienen más contexto
+
     ultimo_seguimiento_rhitso = (
         seguimientos_manuales.first() or 
         seguimientos_sistema.first()
@@ -4618,9 +4194,7 @@ def gestion_rhitso(request, orden_id):
     # =======================================================================
     # PASO 6: OBTENER INCIDENCIAS Y CALCULAR ESTADÍSTICAS
     # =======================================================================
-    # EXPLICACIÓN: Las incidencias son problemas o eventos negativos que
-    # ocurren durante el proceso RHITSO (retrasos, daños, costos extra)
-    
+
     # Obtener todas las incidencias de la orden
     incidencias = orden.incidencias_rhitso.select_related(
         'tipo_incidencia',
@@ -4629,8 +4203,7 @@ def gestion_rhitso(request, orden_id):
     ).order_by('-fecha_ocurrencia')
     
     # Calcular estadísticas de incidencias
-    # EXPLICACIÓN: Usamos aggregate y filter para contar incidencias
-    # por diferentes criterios sin hacer múltiples queries
+
     incidencias_stats = {
         'total': incidencias.count(),
         'abiertas': incidencias.filter(estado__in=['ABIERTA', 'EN_REVISION']).count(),
@@ -4647,15 +4220,12 @@ def gestion_rhitso(request, orden_id):
     # =======================================================================
     # PASO 7: OBTENER GALERÍA RHITSO
     # =======================================================================
-    # EXPLICACIÓN: Preparamos las imágenes de la orden organizadas por tipo
-    # para mostrarlas en tabs en la galería RHITSO
-    
+
     # Obtener todas las imágenes de la orden
     imagenes_rhitso = orden.imagenes.select_related('subido_por').order_by('-fecha_subida')
     
     # Organizar imágenes por tipo (igual que en detalle_orden)
-    # EXPLICACIÓN: Creamos un diccionario con las imágenes separadas por tipo
-    # para poder mostrarlas en tabs específicos en el template
+
     imagenes_por_tipo_rhitso = {
         'ingreso': orden.imagenes.filter(tipo='ingreso').order_by('-fecha_subida'),
         'diagnostico': orden.imagenes.filter(tipo='diagnostico').order_by('-fecha_subida'),
@@ -4667,27 +4237,21 @@ def gestion_rhitso(request, orden_id):
     # =======================================================================
     # PASO 8: PREPARAR FORMULARIOS
     # =======================================================================
-    # EXPLICACIÓN: Instanciamos los 4 formularios que permiten gestionar
-    # el proceso RHITSO. Estos formularios fueron creados en la Fase 3
-    
+
     # Formulario para cambiar estado RHITSO
-    # EXPLICACIÓN: Este formulario carga dinámicamente los estados
-    # disponibles desde la base de datos
+
     form_estado = ActualizarEstadoRHITSOForm()
     
     # Formulario para registrar incidencias
-    # EXPLICACIÓN: ModelForm que valida y crea objetos IncidenciaRHITSO
+
     form_incidencia = RegistrarIncidenciaRHITSOForm()
     
     # Formulario para resolver incidencias
-    # EXPLICACIÓN: Form simple para documentar la resolución de una incidencia
+
     form_resolver_incidencia = ResolverIncidenciaRHITSOForm()
     
     # Formulario para editar diagnóstico SIC
-    # EXPLICACIÓN: Formulario multi-modelo que actualiza DetalleEquipo y OrdenServicio
-    # Pre-llenamos con valores actuales usando 'initial'
-    # LÓGICA MEJORADA: Si no hay tecnico_diagnostico asignado, usa el técnico actual de la orden
-    # Esto permite flexibilidad (se puede cambiar) pero automatiza el proceso inicial
+
     tecnico_inicial = orden.tecnico_diagnostico or orden.tecnico_asignado_actual
     
     form_diagnostico = EditarDiagnosticoSICForm(initial={
@@ -4701,19 +4265,16 @@ def gestion_rhitso(request, orden_id):
     # =======================================================================
     # PASO 8.5: PREPARAR DATOS PARA MODAL DE ENVÍO DE CORREO RHITSO
     # =======================================================================
-    # EXPLICACIÓN: Preparamos los datos necesarios para el modal de envío
-    # de correo a RHITSO, incluyendo destinatarios, empleados y archivos
-    
+
     # Importar settings para obtener destinatarios RHITSO
     from django.conf import settings
     
     # A) DESTINATARIOS PRINCIPALES - Desde settings.py
-    # EXPLICACIÓN: Estos son los correos fijos de RHITSO configurados en .env
+
     destinatarios_rhitso = settings.RHITSO_EMAIL_RECIPIENTS
     
     # B) EMPLEADOS PARA "CON COPIA A" - Filtrados por área
-    # EXPLICACIÓN: Filtramos empleados activos de las áreas especificadas
-    # y que tengan email configurado. La búsqueda es case-insensitive.
+
     from django.db.models import Q
     
     # Crear filtros case-insensitive para las áreas
@@ -4796,8 +4357,7 @@ Saludos cordiales."""
     # =======================================================================
     # PASO 9: PREPARAR CONTEXTO COMPLETO
     # =======================================================================
-    # EXPLICACIÓN: El contexto es un diccionario que contiene todos los
-    # datos que necesita el template para renderizar la página
+
     context = {
         # Orden y equipo
         'orden': orden,
@@ -4853,30 +4413,7 @@ Saludos cordiales."""
 def actualizar_estado_rhitso(request, orden_id):
     """
     Vista AJAX para actualizar el estado RHITSO de una orden.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista procesa el formulario de cambio de estado RHITSO.
-    Cuando el usuario selecciona un nuevo estado y lo guarda:
-    1. Valida que el formulario esté correcto
-    2. Actualiza el estado_rhitso en la orden
-    3. Crea un registro automático en SeguimientoRHITSO (vía signal)
-    4. Actualiza fechas especiales (envío/recepción)
-    5. Retorna respuesta JSON con éxito o errores
-    
-    ¿Por qué JsonResponse?
-    Porque el template usa JavaScript para enviar el formulario de forma
-    asíncrona (AJAX). En lugar de recargar toda la página, solo actualizamos
-    la sección del estado.
-    
-    FLUJO COMPLETO:
-    1. Usuario llena formulario en template
-    2. JavaScript envía formulario por AJAX
-    3. Esta vista procesa y valida datos
-    4. Signal crea SeguimientoRHITSO automáticamente
-    5. Vista retorna JSON: {success: true/false, mensaje, data}
-    6. JavaScript actualiza la UI sin recargar página
-    
+
     Args:
         request: HttpRequest con datos POST del formulario
         orden_id: ID de la orden a actualizar
@@ -4928,15 +4465,7 @@ def actualizar_estado_rhitso(request, orden_id):
         orden.estado_rhitso = nuevo_estado
         
         # Paso 6: Actualizar fechas especiales (SOLO SI EL USUARIO LAS PROPORCIONA)
-        # EXPLICACIÓN: Las fechas de envío y recepción son EXCLUSIVAMENTE MANUALES.
-        # No hay detección automática basada en estados. El usuario debe ingresar
-        # explícitamente las fechas en el formulario cuando ocurran estos eventos.
-        # 
-        # ¿Por qué exclusivamente manual?
-        # - Mayor control y precisión sobre las fechas reales de los eventos
-        # - Evita registros automáticos incorrectos por cambios de estado
-        # - El usuario ingresa la fecha exacta cuando ocurre el evento real
-        
+    
         # Si el usuario proporcionó una fecha de envío, usarla
         if fecha_envio:
             orden.fecha_envio_rhitso = fecha_envio
@@ -5029,29 +4558,7 @@ def actualizar_estado_rhitso(request, orden_id):
 def registrar_incidencia(request, orden_id):
     """
     Vista AJAX para registrar una nueva incidencia RHITSO.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Las incidencias son problemas que ocurren durante el proceso RHITSO.
-    Esta vista:
-    1. Valida el formulario de incidencia
-    2. Crea el registro en la base de datos
-    3. Si es incidencia CRÍTICA, crea alerta automática (vía signal)
-    4. Registra en historial de la orden
-    5. Retorna datos de la incidencia creada en JSON
-    
-    ¿Qué es una incidencia?
-    Ejemplos: daño adicional, retraso injustificado, pieza incorrecta,
-    mala comunicación, costo no autorizado, etc.
-    
-    ¿Por qué es importante?
-    Permite documentar todos los problemas y hacer seguimiento de:
-    - Qué salió mal
-    - Cuándo ocurrió
-    - Impacto al cliente
-    - Costo adicional
-    - Cómo se resolvió
-    
+
     Args:
         request: HttpRequest con datos POST del formulario
         orden_id: ID de la orden donde ocurrió la incidencia
@@ -5085,8 +4592,7 @@ def registrar_incidencia(request, orden_id):
             }, status=400)
         
         # Paso 3: Crear incidencia sin guardar aún
-        # EXPLICACIÓN: commit=False crea el objeto pero no lo guarda en BD.
-        # Esto nos permite asignar campos adicionales antes de guardar.
+
         incidencia = form.save(commit=False)
         incidencia.orden = orden
         
@@ -5122,8 +4628,7 @@ def registrar_incidencia(request, orden_id):
         )
         
         # Paso 6: Preparar datos de la incidencia para respuesta JSON
-        # EXPLICACIÓN: Enviamos todos los datos necesarios para que JavaScript
-        # pueda agregar la nueva incidencia a la lista sin recargar la página
+
         return JsonResponse({
             'success': True,
             'mensaje': f'✅ Incidencia "{incidencia.titulo}" registrada correctamente',
@@ -5154,28 +4659,7 @@ def registrar_incidencia(request, orden_id):
 def resolver_incidencia(request, incidencia_id):
     """
     Vista AJAX para resolver/cerrar una incidencia existente.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Cuando una incidencia se resuelve, necesitamos documentar:
-    - Qué acción se tomó para resolverla
-    - Quién la resolvió
-    - Cuándo se resolvió
-    - Si hubo algún costo adicional final
-    
-    Esta vista usa el método marcar_como_resuelta() del modelo IncidenciaRHITSO,
-    que automáticamente:
-    - Cambia el estado a 'RESUELTA'
-    - Guarda la fecha/hora de resolución
-    - Asigna el usuario que resolvió
-    - Guarda la descripción de la acción tomada
-    
-    ¿Por qué es importante resolver incidencias?
-    - Cierra el ciclo de seguimiento
-    - Documenta la solución para futuras referencias
-    - Permite análisis de cuántas incidencias se resuelven
-    - Mejora la relación con RHITSO (si ellos son responsables)
-    
+
     Args:
         request: HttpRequest con datos POST del formulario
         incidencia_id: ID de la incidencia a resolver
@@ -5218,12 +4702,7 @@ def resolver_incidencia(request, incidencia_id):
             incidencia.costo_adicional = costo_adicional_final
         
         # Paso 6: Marcar incidencia como resuelta usando método del modelo
-        # EXPLICACIÓN: Este método hace todo el trabajo:
-        # - Cambia estado a 'RESUELTA'
-        # - Guarda fecha_resolucion = ahora
-        # - Asigna resuelto_por = usuario actual
-        # - Guarda accion_tomada
-        # - Llama a save()
+
         if hasattr(request.user, 'empleado'):
             incidencia.marcar_como_resuelta(
                 usuario=request.user.empleado,
@@ -5273,27 +4752,7 @@ def resolver_incidencia(request, incidencia_id):
 def editar_diagnostico_sic(request, orden_id):
     """
     Vista para editar el diagnóstico SIC y datos relacionados con RHITSO.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista es especial porque maneja campos de DOS modelos diferentes:
-    1. DetalleEquipo → diagnostico_sic (el diagnóstico técnico)
-    2. OrdenServicio → motivo_rhitso, descripcion_rhitso, complejidad_estimada, etc.
-    
-    ¿Cuándo se usa?
-    Cuando el técnico de SIC hace el diagnóstico inicial y determina que
-    el equipo necesita ir a RHITSO. Aquí documenta:
-    - Qué problema tiene el equipo (diagnóstico técnico)
-    - Por qué necesita ir a RHITSO (reballing, soldadura, etc.)
-    - Qué tan complejo es el trabajo
-    - Quién hizo el diagnóstico
-    
-    DIFERENCIA CON OTRAS VISTAS:
-    Las otras 3 vistas retornan JsonResponse porque son AJAX.
-    Esta vista puede:
-    - Retornar JsonResponse si se llama por AJAX
-    - Hacer redirect si se llama normalmente
-    
+
     Args:
         request: HttpRequest con datos POST del formulario
         orden_id: ID de la orden a actualizar
@@ -5413,29 +4872,7 @@ def editar_diagnostico_sic(request, orden_id):
 def agregar_comentario_rhitso(request, orden_id):
     """
     Vista AJAX para agregar un comentario manual al historial RHITSO.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Los comentarios manuales permiten a los usuarios agregar notas,
-    observaciones o actualizaciones al historial RHITSO sin cambiar
-    el estado del proceso.
-    
-    Diferencia entre:
-    - Seguimientos automáticos: Se crean automáticamente al cambiar estado
-    - Comentarios manuales: Los crea el usuario cuando quiere documentar algo
-    
-    Ejemplos de comentarios útiles:
-    - "Llamé a RHITSO para consultar estado, aún no tienen respuesta"
-    - "Cliente preguntó por el equipo, le informé que está en proceso"
-    - "Recibí cotización preliminar de RHITSO: $1,500 MXN"
-    - "RHITSO confirmó que necesitan pieza adicional, llegará mañana"
-    
-    ¿Por qué es importante?
-    - Documentación completa del proceso
-    - Comunicación entre técnicos del mismo equipo
-    - Referencia futura para casos similares
-    - Transparencia con el cliente
-    
+
     Args:
         request: HttpRequest con datos POST (comentario)
         orden_id: ID de la orden donde agregar el comentario
@@ -5477,11 +4914,7 @@ def agregar_comentario_rhitso(request, orden_id):
             }, status=400)
         
         # Paso 3: Registrar comentario en historial
-        # EXPLICACIÓN: Usamos la función registrar_historial que:
-        # - Crea un objeto HistorialOrden
-        # - Asigna tipo_evento='comentario'
-        # - Guarda el usuario que lo creó
-        # - Marca la fecha/hora actual automáticamente
+
         registrar_historial(
             orden=orden,
             tipo_evento='comentario',
@@ -5516,22 +4949,6 @@ def agregar_comentario_rhitso(request, orden_id):
             'mensaje': f'❌ Error al agregar comentario: {str(e)}'
         }, status=500)
 
-
-# Esta vista manejaba la conversión de ventas mostrador a diagnóstico,
-# creando una NUEVA orden cuando el servicio fallaba.
-# 
-# ELIMINADA EN: Octubre 2025 (Sistema Refactorizado)
-# MOTIVO: Venta mostrador ahora es un complemento opcional que puede
-#         coexistir con cotización en la MISMA orden. No se requiere
-#         duplicar órdenes para agregar diagnóstico.
-#
-# BENEFICIOS:
-# - Menos duplicación de datos
-# - Seguimiento más simple (una sola orden)
-# - Código más limpio (~107 líneas eliminadas)
-# - Mayor flexibilidad en el flujo de trabajo
-
-
 # ============================================================================
 # VISTA: ENVIAR CORREO Y FORMATO RHITSO - FASE 10
 # ============================================================================
@@ -5541,29 +4958,7 @@ def agregar_comentario_rhitso(request, orden_id):
 def enviar_correo_rhitso(request, orden_id):
     """
     Vista para enviar correo electrónico a RHITSO con información del equipo.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista procesa el formulario del modal de envío de correo a RHITSO.
-    Realiza las siguientes acciones:
-    
-    1. Valida que la orden sea candidato RHITSO
-    2. Recopila destinatarios principales y empleados en copia
-    3. Prepara los datos del equipo para el correo
-    4. Genera PDF con información del equipo e imágenes de autorización
-    5. Comprime imágenes de ingreso para adjuntar
-    6. Envía el correo con todos los adjuntos
-    7. Registra el envío en el historial de la orden
-    8. Limpia archivos temporales
-    
-    FLUJO DEL CORREO:
-    - Para: Destinatarios RHITSO (configurados en .env)
-    - CC: Empleados seleccionados (CALIDAD, FRONTDESK, COMPRAS)
-    - Asunto: 🔧 Envío de Equipo RHITSO - Orden #[NUMERO]
-    - Adjuntos:
-      * PDF con datos del equipo e imágenes de autorización
-      * Imágenes de ingreso (comprimidas)
-    
+
     Args:
         request: HttpRequest object con datos POST del formulario
         orden_id: ID de la orden de servicio
@@ -5896,17 +5291,7 @@ def enviar_correo_rhitso(request, orden_id):
 def generar_pdf_rhitso_prueba(request, orden_id):
     """
     Vista de prueba para generar el PDF RHITSO.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista es temporal para probar que el generador de PDF funciona correctamente.
-    Una vez integrado al modal, esta vista se puede eliminar.
-    
-    ¿Qué hace?
-    1. Busca la orden de servicio por ID
-    2. Obtiene las imágenes de autorización (si existen)
-    3. Genera el PDF usando PDFGeneratorRhitso
-    4. Devuelve el PDF para descargar o muestra un error
-    
+
     Args:
         request: Objeto HttpRequest de Django
         orden_id: ID de la orden de servicio
@@ -5995,27 +5380,7 @@ def generar_pdf_rhitso_prueba(request, orden_id):
 def enviar_imagenes_cliente(request, orden_id):
     """
     Vista para enviar imágenes de ingreso del equipo al cliente por correo electrónico.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista procesa el formulario del modal de envío de imágenes al cliente.
-    Realiza las siguientes acciones:
-    
-    1. Valida que el cliente tenga un email configurado
-    2. Valida que se hayan seleccionado imágenes para enviar
-    3. Recopila empleados en copia (CALIDAD, FRONTDESK, TÉCNICO)
-    4. Comprime las imágenes seleccionadas para optimizar tamaño
-    5. Genera correo HTML profesional con los datos de la orden
-    6. Envía el correo con las imágenes adjuntas
-    7. Registra el envío en el historial de la orden
-    8. Limpia archivos temporales
-    
-    FLUJO DEL CORREO:
-    - Para: Cliente (email configurado en la orden)
-    - CC: Empleados seleccionados (CALIDAD, FRONTDESK, Técnico asignado)
-    - Asunto: 📸 Fotografías de ingreso - Orden #[NUMERO]
-    - Adjuntos: Imágenes de ingreso seleccionadas (comprimidas)
-    
+
     Args:
         request: HttpRequest object con datos POST del formulario
         orden_id: ID de la orden de servicio
@@ -6377,30 +5742,7 @@ def enviar_imagenes_cliente(request, orden_id):
 def dashboard_rhitso(request):
     """
     Dashboard consolidado de todos los candidatos RHITSO.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Este dashboard replica la funcionalidad del sistema PHP, mostrando:
-    - Estadísticas generales (total candidatos, enviados, con diagnóstico, incidencias)
-    - Estadísticas por sucursal (Satelite, Drop, MIS)
-    - 3 pestañas con tablas filtradas: Activos, Pendientes, Excluidos
-    - Filtros dinámicos por estado RHITSO
-    - Exportación a Excel
-    
-    ¿Por qué un dashboard separado?
-    - Vista rápida de TODAS las órdenes RHITSO (no solo una)
-    - Métricas agregadas para toma de decisiones
-    - Identificación rápida de problemas y retrasos
-    - Reportes y exportaciones
-    
-    Flujo de la vista:
-    1. Consultar todas las órdenes candidatas a RHITSO
-    2. Calcular estadísticas generales y por sucursal
-    3. Preparar datos de cada orden (días hábiles, incidencias, etc.)
-    4. Separar órdenes en 3 categorías (activos, pendientes, excluidos)
-    5. Preparar datos para exportación Excel
-    6. Renderizar template con contexto completo
-    
+ 
     Args:
         request: HttpRequest object
     
@@ -6410,8 +5752,7 @@ def dashboard_rhitso(request):
     # =======================================================================
     # PASO 1: CONSULTA OPTIMIZADA DE CANDIDATOS RHITSO
     # =======================================================================
-    
-    # EXPLICACIÓN: select_related() carga las relaciones en una sola consulta
+
     # Esto evita el "N+1 problem" (hacer una consulta por cada relación)
     candidatos_rhitso = OrdenServicio.objects.filter(
         es_candidato_rhitso=True
@@ -6421,7 +5762,7 @@ def dashboard_rhitso(request):
         'tecnico_asignado_actual',     # Técnico asignado
         'responsable_seguimiento'      # Responsable del seguimiento
     ).prefetch_related(
-        # EXPLICACIÓN: prefetch_related() hace una consulta separada optimizada
+
         # para relaciones many-to-many o reverse foreign keys
         Prefetch(
             'seguimientos_rhitso',
@@ -6694,43 +6035,7 @@ def dashboard_rhitso(request):
 def exportar_excel_rhitso(request):
     """
     Genera y descarga un reporte Excel profesional de candidatos RHITSO.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista genera un archivo Excel (.xlsx) con información de RHITSO usando openpyxl.
-    openpyxl es una librería Python que permite crear y modificar archivos Excel con
-    control total sobre estilos, colores, bordes y formato.
-    
-    ¿Por qué usar openpyxl en vez de XLSX.js?
-    - Control total sobre estilos (colores, fuentes, bordes, alineación)
-    - Funciona en el servidor (backend), más estable y confiable
-    - Mismo estilo profesional que el Excel de inventario
-    - No depende de versiones PRO o de pago
-    
-    Estructura del Excel:
-    - Hoja 1: Activos (órdenes en proceso activo)
-    - Hoja 2: Pendientes (órdenes pendientes de confirmación)
-    - Hoja 3: Excluidos (órdenes cerradas o rechazadas)
-    
-    Cada hoja tiene 17 columnas con información completa:
-    1. Servicio Cliente      10. Incidencias
-    2. N° Serie              11. Fecha Envío RHITSO
-    3. Marca                 12. Días Hábiles SIC
-    4. Modelo                13. Días Hábiles RHITSO
-    5. Fecha Ingreso SIC     14. Días en estatus
-    6. Sucursal              15. Estado Proceso
-    7. Estado General        16. Fecha Último Comentario
-    8. Estado RHITSO         17. Comentario
-    9. Owner
-    
-    Estilos aplicados (como inventario):
-    - Encabezados: Azul #366092, texto blanco, negrita
-    - Filas coloreadas según estado y urgencia
-    - Bordes en todas las celdas
-    - Texto centrado en encabezados
-    - Texto envuelto en comentarios
-    - Anchos de columna optimizados
-    
+
     Args:
         request: HttpRequest object
     
@@ -6951,15 +6256,7 @@ def exportar_excel_rhitso(request):
     def crear_hoja_excel(nombre_hoja, datos_lista, color_categoria):
         """
         Crea una hoja de Excel con formato profesional.
-        
-        EXPLICACIÓN PARA PRINCIPIANTES:
-        Esta función crea una hoja nueva en el archivo Excel, agrega los encabezados,
-        llena los datos y aplica los estilos (colores, bordes, fuentes).
-        
-        Args:
-            nombre_hoja: Nombre de la pestaña (ej: "Activos (15)")
-            datos_lista: Lista de diccionarios con los datos de las órdenes
-            color_categoria: Color base para esta categoría (no usado por ahora)
+
         """
         # Crear la hoja
         ws = wb.create_sheet(nombre_hoja)
@@ -7090,30 +6387,7 @@ def exportar_excel_rhitso(request):
 def dashboard_seguimiento_oow_fl(request):
     """
     Dashboard especializado para seguimiento de órdenes con prefijo OOW- y FL-.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista crea un dashboard completo con métricas, KPIs, gráficos y análisis
-    detallado de las órdenes que tienen orden_cliente que empieza con "OOW-" o "FL-".
-    
-    ¿Qué hace esta vista?
-    1. Filtra órdenes por prefijo OOW-/FL-
-    2. Aplica filtros adicionales (responsable, fechas, estado, sucursal)
-    3. Calcula métricas generales (totales, promedios, tasas)
-    4. Agrupa datos por responsable de seguimiento
-    5. Calcula días promedio por cada estado del proceso
-    6. Genera datos mensuales para comparativas
-    7. Identifica alertas (órdenes retrasadas, sin actualización, etc.)
-    8. Prepara datos para gráficos (Chart.js)
-    
-    Filtros disponibles (GET parameters):
-    - responsable_id: ID del empleado responsable
-    - fecha_desde: Fecha de inicio (formato: YYYY-MM-DD)
-    - fecha_hasta: Fecha fin (formato: YYYY-MM-DD)
-    - estado: Estado de la orden
-    - sucursal_id: ID de la sucursal
-    - prefijo: 'OOW', 'FL', o 'ambos' (default: 'ambos')
-    
+
     Returns:
         HttpResponse: Renderiza el template con todo el contexto de datos
     """
@@ -7711,20 +6985,7 @@ def dashboard_seguimiento_oow_fl(request):
 def exportar_excel_dashboard_oow_fl(request):
     """
     Exporta el dashboard OOW-/FL- a Excel con múltiples hojas de análisis
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista genera un archivo Excel (.xlsx) con múltiples hojas que contienen:
-    - Hoja 1: Resumen General con KPIs
-    - Hoja 2: Consolidado por Responsable
-    - Hoja 3: Top Productos Vendidos
-    - Hoja 4: Análisis por Sucursal
-    - Hojas 5+: Detalle individual por cada responsable (activas y cerradas separadas)
-    - Hoja Final: Todas las órdenes (lista maestra completa)
-    
-    El archivo respeta los filtros aplicados en el dashboard (responsable, fechas, etc.)
-    y genera un nombre descriptivo del archivo según los filtros activos.
-    
+
     Requiere: openpyxl instalado (pip install openpyxl)
     
     Returns:
@@ -8428,18 +7689,9 @@ def exportar_excel_dashboard_oow_fl(request):
 def dashboard_cotizaciones(request):
     """
     Dashboard analítico completo de cotizaciones tipo Power BI.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
+
     Esta vista es el "cerebro" del dashboard. Hace lo siguiente:
-    
-    1. Recibe filtros del usuario (fechas, sucursal, técnico, etc.)
-    2. Obtiene datos de la base de datos y los convierte a Pandas DataFrame
-    3. Calcula KPIs (métricas clave como tasa de aceptación)
-    4. Genera 20+ gráficos interactivos con Plotly
-    5. Ejecuta predicciones con Machine Learning
-    6. Envía todo al template para mostrarlo visualmente
-    
+
     Query Parameters (filtros en URL):
         - fecha_inicio: Fecha inicio filtro (YYYY-MM-DD)
         - fecha_fin: Fecha fin filtro (YYYY-MM-DD)
@@ -9159,17 +8411,7 @@ def dashboard_cotizaciones(request):
 def exportar_dashboard_cotizaciones(request):
     """
     Exporta el dashboard de cotizaciones a Excel con múltiples hojas.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Genera un archivo Excel profesional con 6 hojas:
-    1. Resumen General (KPIs)
-    2. Cotizaciones Detalle
-    3. Análisis de Piezas
-    4. Proveedores
-    5. Ranking Técnicos
-    6. Predicciones ML
-    
+
     Reutiliza los mismos filtros que el dashboard web.
     
     Returns:
@@ -9464,33 +8706,9 @@ def exportar_dashboard_cotizaciones(request):
 def api_buscar_orden_por_serie(request):
     """
     API para buscar órdenes de servicio por número de serie o orden del cliente.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
+
     Este endpoint busca órdenes de servicio de manera inteligente:
-    
-    LÓGICA DE BÚSQUEDA:
-    1. Si el número de serie contiene palabras como "NO VISIBLE", "NO IDENTIFICADO", etc.
-       → Busca por orden_cliente (campo alternativo)
-    2. Si el número de serie es normal → Busca por numero_serie
-    3. Si no encuentra nada → Retorna mensaje indicando que no existe
-    
-    ¿Por qué esta lógica?
-    Algunos equipos no tienen número de serie visible o legible,
-    por lo que se identifican por la orden del cliente.
-    
-    PARÁMETROS GET:
-    - numero_serie: Número de serie del equipo (obligatorio)
-    - orden_cliente: Orden del cliente (opcional, para búsqueda alternativa)
-    
-    RETORNA JSON:
-    {
-        'success': True/False,
-        'encontrado': True/False,
-        'orden': {datos de la orden...} o None,
-        'mensaje': 'Mensaje informativo'
-    }
-    
+
     USO:
     /servicio-tecnico/api/buscar-orden-por-serie/?numero_serie=ABC123
     /servicio-tecnico/api/buscar-orden-por-serie/?orden_cliente=OOW-12345
@@ -9642,29 +8860,7 @@ def api_buscar_orden_por_serie(request):
 def dashboard_seguimiento_piezas(request):
     """
     Dashboard dedicado para seguimiento de piezas en tránsito.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta vista crea un panel de control visual para rastrear piezas pedidas
-    a proveedores. Muestra:
-    - KPIs: Métricas clave como total activo, retrasados, próximos a llegar
-    - Gráficos: Visualizaciones con Plotly (Python, no JavaScript)
-    - Tabla: Lista detallada con filtros y búsqueda
-    - Alertas: Piezas que requieren atención inmediata
-    - Exportación: Botón para descargar todo a Excel
-    
-    Filtros disponibles:
-        - fecha_inicio/fecha_fin: Rango de fechas de pedido
-        - sucursal: Filtrar por sucursal específica
-        - proveedor: Filtrar por proveedor
-        - estado: pedido, transito, recibido, cancelado
-        - busqueda: Búsqueda libre en orden, proveedor, descripción
-    
-    Returns:
-        HttpResponse: Página HTML renderizada con todo el dashboard
-    
-    Ejemplo URL:
-        /servicio-tecnico/dashboard-seguimiento-piezas/?estado=transito&sucursal=1
+
     """
     from datetime import datetime, timedelta, date
     import pandas as pd
@@ -10065,17 +9261,7 @@ def dashboard_seguimiento_piezas(request):
 def exportar_dashboard_seguimiento_piezas(request):
     """
     Exporta el dashboard de seguimiento de piezas a Excel.
-    
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    ================================
-    Esta función toma los mismos filtros que el dashboard y genera un archivo
-    Excel (.xlsx) con múltiples hojas:
-    - Resumen: KPIs principales
-    - Seguimientos: Lista completa de seguimientos
-    - Retrasados: Solo piezas retrasadas
-    - Por Proveedor: Agrupado por proveedor
-    - Por Sucursal: Agrupado por sucursal
-    
+
     Returns:
         HttpResponse: Archivo Excel descargable
     """
