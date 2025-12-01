@@ -174,7 +174,13 @@ body {
 /* REGLA MAESTRA: Ocultar cursor del sistema en TODO el sitio */
 *,
 *::before,
-*::after {
+*::after,
+.select2-container,
+.select2-container *,
+.select2-selection,
+.select2-dropdown,
+.select2-results,
+.select2-results__option {
     cursor: none !important;
 }
 

@@ -191,6 +191,15 @@ urlpatterns = [
          views.api_buscar_orden_por_serie, 
          name='api_buscar_orden_por_serie'),
     
+    # API: BÚSQUEDA DE MODELOS POR MARCA (Diciembre 2025)
+    # ========================================================================
+    # API endpoint para autocompletado del campo "Modelo" en formularios
+    # Busca en ReferenciaGamaEquipo los modelos disponibles para la marca seleccionada
+    # Usado por Select2 para proporcionar sugerencias mientras el usuario escribe
+    path('api/buscar-modelos-por-marca/', 
+         views.api_buscar_modelos_por_marca, 
+         name='api_buscar_modelos_por_marca'),
+    
     # ========================================================================
     # DASHBOARD DE SEGUIMIENTO DE PIEZAS EN TRÁNSITO (Noviembre 2025)
     # ========================================================================

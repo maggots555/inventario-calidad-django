@@ -522,60 +522,9 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(function () {
         document.body.classList.remove('sidebar-loading');
     }, 100);
-
     // Inicializar cursor personalizado
     inicializarCursorPersonalizado();
 });
-
-/**
- * Inicializa el comportamiento del cursor personalizado
- */
-function inicializarCursorPersonalizado() {
-    const cursor = document.getElementById('tech-cursor');
-    if (!cursor) return;
-
-    // Variables para el trail
-    let lastTrailTime = 0;
-    const trailDelay = 25; // ms entre partículas (ajustable para densidad)
-
-    // Mover el cursor
-    document.addEventListener('mousemove', function (e) {
-        // Usar requestAnimationFrame para rendimiento óptimo
-        requestAnimationFrame(() => {
-            cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
-        });
-
-        // Generar estela (trail)
-        const currentTime = Date.now();
-        if (currentTime - lastTrailTime > trailDelay) {
-            crearParticulaTrail(e.clientX, e.clientY);
-            lastTrailTime = currentTime;
-        }
-    });
-
-    // Detectar elementos interactivos para efecto hover
-    const interactiveElements = document.querySelectorAll('a, button, input, select, textarea, .btn, .card');
-
-    interactiveElements.forEach(el => {
-        el.addEventListener('mouseenter', () => {
-            cursor.classList.add('hover-active');
-        });
-
-        el.addEventListener('mouseleave', () => {
-            cursor.classList.remove('hover-active');
-        });
-    });
-
-    // Ocultar cursor si sale de la ventana
-    document.addEventListener('mouseleave', () => {
-        cursor.style.opacity = '0';
-    });
-
-    document.addEventListener('mouseenter', () => {
-        cursor.style.opacity = '1';
-    });
-}
-
 /**
  * Crea una partícula de estela en la posición dada
  * @param {number} x - Posición X
@@ -586,20 +535,58 @@ function crearParticulaTrail(x, y) {
     particle.className = 'cursor-trail';
     particle.style.left = x + 'px';
     particle.style.top = y + 'px';
-
     // Añadir al body
     document.body.appendChild(particle);
-
     // Animar y eliminar
     // Usamos setTimeout para permitir que el navegador renderice el estado inicial
     setTimeout(() => {
         particle.style.transform = 'translate(-50%, -50%) scale(0)';
         particle.style.opacity = '0';
     }, 10);
-
     // Eliminar del DOM después de la transición
     setTimeout(() => {
         particle.remove();
     }, 510); // Un poco más que la transición CSS (0.5s)
+}
+/**
+ * Inicializa el comportamiento del cursor personalizado
+ */
+function inicializarCursorPersonalizado() {
+    const cursor = document.getElementById('tech-cursor');
+    if (!cursor)
+        return;
+    // Variable para controlar la creación de partículas (throttling)
+    let lastTrailTime = 0;
+    const trailInterval = 30; // Crear partícula cada 30ms
+    // Mover el cursor
+    document.addEventListener('mousemove', function (e) {
+        // Usar requestAnimationFrame para rendimiento óptimo
+        requestAnimationFrame(() => {
+            cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+            // Crear partículas de estela con throttling
+            const now = Date.now();
+            if (now - lastTrailTime > trailInterval) {
+                crearParticulaTrail(e.clientX, e.clientY);
+                lastTrailTime = now;
+            }
+        });
+    });
+    // Detectar elementos interactivos para efecto hover
+    const interactiveElements = document.querySelectorAll('a, button, input, select, textarea, .btn, .card, .select2-container, .select2-selection, .select2-results__option');
+    interactiveElements.forEach(el => {
+        el.addEventListener('mouseenter', () => {
+            cursor.classList.add('hover-active');
+        });
+        el.addEventListener('mouseleave', () => {
+            cursor.classList.remove('hover-active');
+        });
+    });
+    // Ocultar cursor si sale de la ventana
+    document.addEventListener('mouseleave', () => {
+        cursor.style.opacity = '0';
+    });
+    document.addEventListener('mouseenter', () => {
+        cursor.style.opacity = '1';
+    });
 }
 //# sourceMappingURL=base.js.map

@@ -8853,6 +8853,109 @@ def api_buscar_orden_por_serie(request):
 
 
 # ============================================================================
+# API ENDPOINT: BUSCAR MODELOS POR MARCA (AUTOCOMPLETADO)
+# ============================================================================
+
+@login_required
+@require_http_methods(["GET"])
+def api_buscar_modelos_por_marca(request):
+    """
+    API endpoint para buscar modelos de equipos disponibles según la marca.
+    
+    Este endpoint se usa para el autocompletado del campo "Modelo" en los
+    formularios de creación de órdenes. Busca en la tabla ReferenciaGamaEquipo
+    y retorna los modelos disponibles para la marca seleccionada.
+    
+    PARÁMETROS GET:
+    - marca: str (requerido) - Marca del equipo (DELL, LENOVO, HP, etc.)
+    - q: str (opcional) - Término de búsqueda para filtrar modelos (Select2 usa 'q')
+    
+    RETORNA:
+    JSON con formato compatible con Select2:
+    {
+        'results': [
+            {'id': 'Inspiron 3000', 'text': 'Inspiron 3000 - Gama Baja', 'gama': 'baja'},
+            {'id': 'XPS 13', 'text': 'XPS 13 - Gama Alta', 'gama': 'alta'},
+            ...
+        ]
+    }
+    
+    EJEMPLO DE USO:
+    /servicio-tecnico/api/buscar-modelos-por-marca/?marca=DELL&q=inspiron
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Esta función se ejecuta cuando el usuario escribe en el campo "Modelo"
+    - Busca en la base de datos los modelos que coincidan con la marca seleccionada
+    - Retorna un JSON que Select2 puede entender y mostrar como opciones
+    - Si el usuario escribe algo (parámetro 'q'), filtra los resultados
+    """
+    from .models import ReferenciaGamaEquipo
+    
+    # Obtener parámetros de la URL
+    marca = request.GET.get('marca', '').strip()
+    query = request.GET.get('q', '').strip()  # Select2 usa 'q' por defecto para el término de búsqueda
+    
+    # Validar que la marca esté presente
+    if not marca:
+        return JsonResponse({
+            'results': [],
+            'mensaje': 'Debe seleccionar una marca primero'
+        })
+    
+    try:
+        # ====================================================================
+        # BÚSQUEDA EN LA BASE DE DATOS
+        # ====================================================================
+        
+        # Buscar referencias de gama para la marca seleccionada
+        # iexact = case-insensitive exact match (DELL = dell = DeLl)
+        referencias = ReferenciaGamaEquipo.objects.filter(
+            marca__iexact=marca,
+            activo=True
+        )
+        
+        # Si hay término de búsqueda, filtrar por modelo_base
+        # icontains = case-insensitive contains (busca coincidencias parciales)
+        if query:
+            referencias = referencias.filter(
+                modelo_base__icontains=query
+            )
+        
+        # Ordenar alfabéticamente por modelo
+        referencias = referencias.order_by('modelo_base')
+        
+        # ====================================================================
+        # FORMATEAR RESULTADOS PARA SELECT2
+        # ====================================================================
+        
+        # Select2 espera un formato específico:
+        # - 'id': El valor que se guardará en el formulario
+        # - 'text': El texto que se mostrará al usuario
+        resultados = []
+        
+        for ref in referencias:
+            resultados.append({
+                'id': ref.modelo_base,  # Valor que se guardará
+                'text': f"{ref.modelo_base} - {ref.get_gama_display()}",  # Texto visible
+                'gama': ref.gama,  # Información adicional (opcional)
+                'rango_costo': f"${ref.rango_costo_min} - ${ref.rango_costo_max}"  # Info adicional
+            })
+        
+        # Retornar JSON en formato Select2
+        return JsonResponse({
+            'results': resultados,
+            'total': len(resultados)
+        })
+        
+    except Exception as e:
+        # Si hay algún error, retornar respuesta vacía con mensaje de error
+        return JsonResponse({
+            'results': [],
+            'error': f'Error al buscar modelos: {str(e)}'
+        })
+
+
+# ============================================================================
 # DASHBOARD DE SEGUIMIENTO DE PIEZAS EN TRÁNSITO
 # ============================================================================
 
