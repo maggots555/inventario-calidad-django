@@ -8936,8 +8936,8 @@ def api_buscar_modelos_por_marca(request):
         for ref in referencias:
             resultados.append({
                 'id': ref.modelo_base,  # Valor que se guardará
-                'text': f"{ref.modelo_base} - {ref.get_gama_display()}",  # Texto visible
-                'gama': ref.gama,  # Información adicional (opcional)
+                'text': ref.modelo_base,  # Solo el nombre del modelo (sin gama)
+                'gama': ref.gama,  # Información adicional (opcional, no se muestra)
                 'rango_costo': f"${ref.rango_costo_min} - ${ref.rango_costo_max}"  # Info adicional
             })
         

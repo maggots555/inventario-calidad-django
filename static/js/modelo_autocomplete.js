@@ -120,24 +120,8 @@ class ModeloAutocomplete {
                 if (!result.id) {
                     return result.text; // Mostrar "Buscando..." o "No hay resultados"
                 }
-                // Crear HTML personalizado para cada resultado
-                const $result = $('<div class="select2-result-item"></div>');
-                // Agregar el nombre del modelo
-                const $modeloText = $('<span class="modelo-text"></span>').text(result.id);
-                $result.append($modeloText);
-                // Si tiene gama, agregar badge con color
-                if (result.gama) {
-                    const gamaColors = {
-                        'alta': 'success',
-                        'media': 'warning',
-                        'baja': 'danger'
-                    };
-                    const colorClass = gamaColors[result.gama] || 'secondary';
-                    const gamaDisplay = result.gama.charAt(0).toUpperCase() + result.gama.slice(1);
-                    const $gamaBadge = $(`<span class="badge bg-${colorClass} ms-2"></span>`).text(`Gama ${gamaDisplay}`);
-                    $result.append($gamaBadge);
-                }
-                return $result;
+                // Mostrar solo el nombre del modelo (sin gama)
+                return result.id;
             },
             // Personalizar cómo se muestra la selección
             templateSelection: (selection) => {
