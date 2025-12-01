@@ -171,7 +171,7 @@
                         <i class="bi bi-pencil-square"></i> Editar información
                     </button>
                 </div>
-                <div class="card-body">
+                <div class="card-body" style="font-size: 110%;">
                     <div class="row">
                         <!-- Estado y Días en Servicio -->
                         <div class="col-md-6 mb-3">
@@ -308,16 +308,12 @@
                         
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small">Técnico Asignado</label>
-                            <p class="mb-0">
-                                <i class="bi bi-person-badge"></i> {{ orden.tecnico_asignado_actual.nombre_completo }}
-                            </p>
+                            <p class="mb-0"><i class="bi bi-person-badge"></i> <code>{{ orden.tecnico_asignado_actual.nombre_completo }}</code></p>
                         </div>
                         
                         <div class="col-md-12 mb-3">
                             <label class="form-label text-muted small">Responsable de Seguimiento</label>
-                            <p class="mb-0">
-                                <i class="bi bi-person-check"></i> {{ orden.responsable_seguimiento.nombre_completo }}
-                            </p>
+                            <p class="mb-0"><i class="bi bi-person-check"></i> <code>{{ orden.responsable_seguimiento.nombre_completo }}</code></p>
                         </div>
                         
                         <!-- Equipo Enciende -->
