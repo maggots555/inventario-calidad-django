@@ -1222,6 +1222,8 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'modelo': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ej: Inspiron 15, ThinkPad X1 (opcional)',
+                'data-api-url': '/servicio-tecnico/api/buscar-modelos-por-marca/',
+                'data-enable-select2': 'true',  # Flag para habilitar Select2 via JS
             }),
             'numero_serie': forms.TextInput(attrs={
                 'class': 'form-control',

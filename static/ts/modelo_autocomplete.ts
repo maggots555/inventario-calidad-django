@@ -146,6 +146,15 @@ class ModeloAutocomplete {
                         return { results: [] };
                     }
 
+                    // Log de resultados para debugging (solo en desarrollo)
+                    if (data.results && data.results.length > 0) {
+                        const marca = this.marcaSelect?.val() as string;
+                        console.log(`✅ ${data.results.length} modelos encontrados para marca: ${marca}`);
+                    } else {
+                        const marca = this.marcaSelect?.val() as string;
+                        console.log(`ℹ️ No hay modelos registrados para marca: ${marca}`);
+                    }
+
                     return {
                         results: data.results || []
                     };
@@ -177,7 +186,21 @@ class ModeloAutocomplete {
                     return result.text; // Mostrar "Buscando..." o "No hay resultados"
                 }
 
-                // Mostrar solo el nombre del modelo (sin gama)
+                // Crear elemento HTML con badge de gama
+                if (result.gama) {
+                    const gamaClass = result.gama === 'alta' ? 'bg-success' : 
+                                     result.gama === 'media' ? 'bg-primary' : 'bg-secondary';
+                    
+                    const $result = $(`
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>${result.id}</span>
+                            <span class="badge ${gamaClass} ms-2">${result.gama.toUpperCase()}</span>
+                        </div>
+                    `);
+                    return $result;
+                }
+
+                // Si no hay gama, mostrar solo el nombre
                 return result.id;
             },
             // Personalizar cómo se muestra la selección
@@ -188,6 +211,12 @@ class ModeloAutocomplete {
 
         // Aplicar Select2 al elemento
         this.modeloSelect.select2(config);
+
+        // Manejar errores de AJAX
+        this.modeloSelect.on('select2:error', (e: any) => {
+            console.error('Error en Select2 AJAX:', e.params.jqXHR.responseText);
+            this.showErrorNotification('Error al cargar modelos. Verifica tu conexión.');
+        });
 
         // Reinicializar cursor personalizado para elementos de Select2
         this.reinicializarCursorPersonalizado();
@@ -289,6 +318,32 @@ class ModeloAutocomplete {
         }
 
         console.log('Advertencia mostrada: Seleccionar marca primero');
+    }
+
+    /**
+     * Mostrar notificación de error
+     */
+    private showErrorNotification(mensaje: string): void {
+        if (!this.modeloSelect) return;
+        
+        const $container = this.modeloSelect.closest('.mb-3');
+        
+        if ($container) {
+            const $error = $('<div class="alert alert-danger alert-dismissible fade show mt-2" role="alert"></div>');
+            $error.html(`
+                <i class="bi bi-exclamation-octagon"></i> 
+                <strong>Error:</strong> ${mensaje}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `);
+            
+            $container.append($error);
+
+            setTimeout(() => {
+                $error.fadeOut(() => $error.remove());
+            }, 5000);
+        }
+
+        console.error('Error mostrado:', mensaje);
     }
 }
 

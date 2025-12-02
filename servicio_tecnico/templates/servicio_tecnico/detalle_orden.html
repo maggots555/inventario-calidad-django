@@ -5098,4 +5098,23 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- ============================================================================ -->
+<!-- SCRIPT: AUTOCOMPLETADO DE MODELOS EN MODAL DE EDICIÓN -->
+<!-- ============================================================================ -->
+<!-- 
+    EXPLICACIÓN:
+    Este script habilita la funcionalidad de autocompletado inteligente del campo
+    "Modelo" dentro del modal de edición de información del equipo.
+    
+    CARACTERÍSTICAS:
+    - Se activa automáticamente cuando el modal se abre
+    - Convierte el campo en un Select2 con búsqueda AJAX
+    - Muestra modelos disponibles con badges de gama (Alta/Media/Baja)
+    - Permite escribir modelos personalizados si no existen en la base
+    - Se limpia automáticamente al cerrar el modal (previene memory leaks)
+    
+    COMPILADO DESDE: static/ts/modelo_autocomplete_modal.ts
+-->
+<script src="{% static 'js/modelo_autocomplete_modal.js' %}"></script>
+
 {% endblock %}

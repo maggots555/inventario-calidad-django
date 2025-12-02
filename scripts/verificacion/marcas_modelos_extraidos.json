@@ -1,0 +1,1188 @@
+{
+  "metadata": {
+    "total_registros_bd": 905,
+    "registros_utiles": 481,
+    "registros_excluidos": 424,
+    "total_marcas": 8,
+    "fecha_extraccion": "2025-12-02T09:27:16.720020",
+    "total_modelos": 284
+  },
+  "marcas": {
+    "Acer": {
+      "total_modelos": 2,
+      "modelos": [
+        {
+          "modelo": "Aspire A515-45",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "PREDATOR HELIOS 3000 SERIES",
+          "frecuencia": 1
+        }
+      ]
+    },
+    "Apple": {
+      "total_modelos": 1,
+      "modelos": [
+        {
+          "modelo": "MacBook Pro 13-inch",
+          "frecuencia": 1
+        }
+      ]
+    },
+    "Asus": {
+      "total_modelos": 6,
+      "modelos": [
+        {
+          "modelo": "G512LI",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "REPUBLIC GZ301Z",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "VIVOBOOK 16",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "X1404ZA-NK100W",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "X1502Z",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "X512J",
+          "frecuencia": 1
+        }
+      ]
+    },
+    "Dell": {
+      "total_modelos": 140,
+      "modelos": [
+        {
+          "modelo": "ALIENWARE",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ALIENWARE 17 R4",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ALIENWARE M 16 R2",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Alienware",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Alienware 17 R4",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Alienware 17 r5",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Alienware 18 Area-51",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Alienware Area-51m",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Alienware Aurora R16",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Alienware Aurora R7",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Alienware Aurora r16",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Alienware M15 R7",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Alienware m15 R6",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Alienware m15 R7",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Alienware m15 R7 AMD",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Alienware x17 R2",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "De 15",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Dell 15",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Dell G15 5511",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Dell G15 5530",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Dell G3 15 3590",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Dell G3 3779",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Dell G5 15 5500",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Dell Pro",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "G15",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "G15 5510",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "G15 5511",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "G15 5515",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "G15 5515 Ryzen Edition",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "G15 5520",
+          "frecuencia": 5
+        },
+        {
+          "modelo": "G15 5525",
+          "frecuencia": 4
+        },
+        {
+          "modelo": "G15 5530",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "G3",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "G3 15 3590",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "G5 15 5500",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "G5 15 5590",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "G7 15 7588",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "G7 17",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "G7 17 7700",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "INSPIRON 15 3520",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "INSPIRON 5348",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron",
+          "frecuencia": 22
+        },
+        {
+          "modelo": "Inspiron 13 5310",
+          "frecuencia": 4
+        },
+        {
+          "modelo": "Inspiron 13 5378 2-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 13 5378 2-in-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 14 5410 2-in-1",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 14 5440",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 14 7420",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 14 7420 2-in-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 14 7425 2-in-1",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 14 7430 2-in-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 14 7460",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 15 3511",
+          "frecuencia": 13
+        },
+        {
+          "modelo": "Inspiron 15 3515",
+          "frecuencia": 7
+        },
+        {
+          "modelo": "Inspiron 15 3520",
+          "frecuencia": 14
+        },
+        {
+          "modelo": "Inspiron 15 3525",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Inspiron 15 3535",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Inspiron 15 5510/5518",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 15 5567",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 15 5579 2-in-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 15 5584",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 15 Gaming 7566",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 16 5620",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 16 5640",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 24 5410",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 24 5415",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 24 5430",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 3501",
+          "frecuencia": 6
+        },
+        {
+          "modelo": "Inspiron 3505",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 3585",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 5400",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 5400 AIO",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 5406 2-in-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 5447",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 5502/5509",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 5559",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 5570",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 5593",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 7380",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Inspiron 7490",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 7537",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 7568 2-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 7586 2-in-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 7700",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Inspiron 7706 2-in-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude",
+          "frecuencia": 8
+        },
+        {
+          "modelo": "Latitude 3320",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 3410",
+          "frecuencia": 5
+        },
+        {
+          "modelo": "Latitude 3420",
+          "frecuencia": 7
+        },
+        {
+          "modelo": "Latitude 3440",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 3520",
+          "frecuencia": 9
+        },
+        {
+          "modelo": "Latitude 3540",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Latitude 3550",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Latitude 5340",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 5400",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Latitude 5410",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Latitude 5420",
+          "frecuencia": 4
+        },
+        {
+          "modelo": "Latitude 5430",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 5440",
+          "frecuencia": 4
+        },
+        {
+          "modelo": "Latitude 5480/5488",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 5511",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 5540",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 7200 2-in-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 7320",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 7330",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 7430",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 7480",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 7490",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude E7470",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitudes 7300",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "OptiPlex 3070 Small Form Factor",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "OptiPlex 3080 Micro",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "OptiPlex 7410",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "OptiPlex Small Form Factor 7020",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Optilplex",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Optiplex small form factor plus 701",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Precision",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Precision 3561",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Precision 3571",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Precision 5570",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Precision 5820 Tower",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Precision 7710",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Precision 7740",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Precisión 7740",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Pro 14 PC14250",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "VOSTRO 3401",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Vostro 14 5410",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Vostro 15 3510",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Vostro 15 3530",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Vostro 3400",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Vostro 3405",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "XPS 12 9Q23",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "XPS 13 9340",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "XPS 13 9343",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "XPS 13 9350",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "XPS 13 9360",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "XPS 13 Plus 9320",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "XPS 15 9560",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "inspiron",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "inspiron 5570",
+          "frecuencia": 1
+        }
+      ]
+    },
+    "HP": {
+      "total_modelos": 13,
+      "modelos": [
+        {
+          "modelo": "15-DB0004LA",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "15-EF2500LA",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "240 G8",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ELITEDESK 800 G1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ENVY Recline",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ENVY X360 2-IN-1",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "HP ELITEBOOK 840 C6",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "HP PAVILON MODEL 13",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "HP Pavilion - 15",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Pavilion - 15-cw1012la",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Pavillion",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ProBook 440 G6",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ProBook 440 g6",
+          "frecuencia": 1
+        }
+      ]
+    },
+    "Lenovo": {
+      "total_modelos": 117,
+      "modelos": [
+        {
+          "modelo": "24irh9 i31315u512g 512g 8 g",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "320-15IKB",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "320-15IKB IdeaPad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "330-15AST ideapad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "330S-14IKB IdeaPad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "330S-15IKB IdeaPad",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "500-15ACZ IdeaPad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "520S-14IKB",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "520S-14IKB ideapad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "530S-14IKB",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "530S-14IKB IdeaPad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "530S-14IKB Laptop",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "A540-24API ideacentre",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "AIO 330-20AST IdeaCenter",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "AIO 520-22AST IdeaCenter",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Aio",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Alienware m15 R7",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "E14 Gen 2",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "E15 Gen 2",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "E15 Gen 3",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Flex 5-14",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "G480 - Type 2688",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IDEAPAD 300-14ISK",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "INSPIRON 24 5415 ALL-IN-ONE",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IP 3 14ITL6 4G 4G 1T 256G 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IP 3 15ALC6R7 8G 512G 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IP SLIM 3 15IAN8 N100 8G 256G 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IPFLEX 5 14ABR8 R5 512G 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IdeaCentre 3",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "IdeaCentre AIO 3",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "IdeaCentre AIO 3-24ITL6",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IdeaPad 1",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "IdeaPad 1 15AMN7",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IdeaPad 1- 15IAU7",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IdeaPad 3",
+          "frecuencia": 8
+        },
+        {
+          "modelo": "IdeaPad 3305",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IdeaPad 5",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IdeaPad 5 Pro",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IdeaPad 5-14ITL05",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IdeaPad Gaming 3",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "IdeaPad S145",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "IdeaPad Slim 3",
+          "frecuencia": 8
+        },
+        {
+          "modelo": "IdeaPad Slim 5",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "IdeaPad Slim 5 14IAH8",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Ideapad",
+          "frecuencia": 7
+        },
+        {
+          "modelo": "Ideapad 3",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Ideapad 5",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Ideapad 5-15ITL05",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "L15 Gen 3 ThinkPad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "L15 Gen 4",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "LN LEGION GO S 8ARP1Z2_GO16G 512G 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "LN V14 G3 IAP 15 8G 256G 11P",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "LOQ 15IAX9 15 16G 512G 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Latitude 7420",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion 5",
+          "frecuencia": 6
+        },
+        {
+          "modelo": "Legion 5 Pro",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion 5 Pro 16IAH7H",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion 5-15IMH05H",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion Go",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion Pro 7",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion S7",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion Y40",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion Y520",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion Y540-15IRH",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Legion Y740",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legion Y740-15IRHg",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Legión go",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Lo",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Loq",
+          "frecuencia": 5
+        },
+        {
+          "modelo": "NB IP 3 CHROME 15 IJL6 N4500 8G 128G CRM",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "NB LOQ 15IAX9E 1T 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "NB PI 3 15ALC6 R7 8G 512G 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "NB PI 3 15IRU8 I5 8G 512G 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "NB TP T14 AMD G2 R5_PRO 16G 512G 10P",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "NB YG BOOK 9 13IMU9 ULT7 16G 1T 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "NOTE BOOK THINKPAD P16 GEN 2 21FBCTO1WW R",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "NP IP 1 15IJL7 N4500 8G 256G 11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "NP IP 1 15iru8 I5 8G 512G11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "NP IP SLIM 3 15IAH8 I5 8G 512G11S",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Nb ip slim 3 15irub 13",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "P1 Gen 6",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "P14s Gen 3 ThinkPad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "P15",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "P15s Gen 2 ThinkPad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "P43s",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "P70 - ThinkPad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "S145-14API ideapad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "S145-15IIL IdeaPad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "S340-14IWL",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "T14 Gen 2",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "T16 Gen 2",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "T490 ThinkPad",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Thikstation",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ThinkBook 13s G2",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ThinkBook 14 G2",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "ThinkPad 13",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ThinkPad E14 Gen 2",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Thinkbook",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "V14 G2-ALC",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "V14 G2-ALC Laptop",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "V14 G2-ITL",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "V50s-07IMB - Type 11EE",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "X1 Yoga 2nd Gen",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "X1 Yoga 4th Gen (Type 20QF, 20QG)",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Y50-70",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Y700-17ISK",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Yoga 510",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Yoga 520",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Yoga 7",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Yoga 7 2-in-1",
+          "frecuencia": 2
+        },
+        {
+          "modelo": "Yoga 7-14ITL5",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "Yoga S940",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "Yoga Slim 9",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ideapad 3",
+          "frecuencia": 3
+        },
+        {
+          "modelo": "ideapad 3-15ITL6",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "ideapad 5",
+          "frecuencia": 2
+        }
+      ]
+    },
+    "MSI": {
+      "total_modelos": 4,
+      "modelos": [
+        {
+          "modelo": "Cyborg",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "GL65 Leopard",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "LEOPARD 8RE",
+          "frecuencia": 1
+        },
+        {
+          "modelo": "MS-16R3",
+          "frecuencia": 1
+        }
+      ]
+    },
+    "Sony": {
+      "total_modelos": 1,
+      "modelos": [
+        {
+          "modelo": "SVF142C29U",
+          "frecuencia": 1
+        }
+      ]
+    }
+  }
+}
