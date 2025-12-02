@@ -619,16 +619,24 @@ def calcular_metricas_por_responsable(df):
 
 def analizar_proveedores_con_conversion(cotizacion_ids=None):
     """
-    Analiza el impacto de proveedores en la conversión de ventas.
+    Analiza el impacto de proveedores en la conversión de ventas A NIVEL DE PIEZA.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta función cruza datos de proveedores (tiempos, costos) con resultados
-    de negocio (aceptación de cotizaciones, ingresos generados).
+    Esta función analiza TODAS las piezas cotizadas con proveedor asignado,
+    independientemente de si tienen seguimiento o no. Esto permite ver:
+    - Piezas aceptadas (que generaron pedidos)
+    - Piezas rechazadas (que el cliente no quiso)
+    - Piezas pendientes de respuesta
     
     ¿Por qué es importante?
     - No todos los proveedores contribuyen igual a las ventas
-    - Un proveedor rápido pero caro puede tener baja conversión
-    - Un proveedor barato pero lento puede perder ventas por demora
+    - Un proveedor puede tener piezas rechazadas frecuentemente
+    - Permite identificar proveedores con baja conversión
+    - Una cotización puede tener PIEZAS aceptadas y otras rechazadas
+    
+    CORRECCIÓN DICIEMBRE 2025:
+    Ahora analiza TODAS las piezas cotizadas con proveedor, no solo las que
+    tienen seguimiento. Esto incluye piezas rechazadas que nunca generan pedido.
     
     Args:
         cotizacion_ids (list): Lista de IDs de cotizaciones a analizar (opcional)
@@ -638,97 +646,122 @@ def analizar_proveedores_con_conversion(cotizacion_ids=None):
         
     Columnas retornadas:
         - proveedor: Nombre del proveedor
-        - total_pedidos: Total de pedidos realizados
-        - total_cotizaciones: Cotizaciones que usaron piezas de este proveedor
-        - cotizaciones_aceptadas: Cuántas cotizaciones fueron aceptadas
-        - cotizaciones_rechazadas: Cuántas fueron rechazadas
-        - tasa_aceptacion: % de aceptación
-        - tiempo_entrega_promedio: Días promedio de entrega
-        - valor_cotizado_total: Valor total cotizado con piezas de este proveedor
-        - valor_generado: Ingresos reales (solo cotizaciones aceptadas)
+        - total_piezas_cotizadas: Total de piezas cotizadas con este proveedor
+        - piezas_aceptadas: Piezas aceptadas por el cliente
+        - piezas_rechazadas: Piezas rechazadas por el cliente
+        - piezas_sin_respuesta: Piezas sin respuesta del cliente
+        - tasa_aceptacion: % de piezas aceptadas
+        - tasa_rechazo: % de piezas rechazadas
+        - total_pedidos: Seguimientos/pedidos realizados a este proveedor
+        - tiempo_entrega_promedio: Días promedio de entrega (solo piezas con seguimiento)
+        - valor_cotizado_total: Valor total cotizado
+        - valor_generado: Ingresos reales (solo piezas aceptadas)
     """
-    from servicio_tecnico.models import SeguimientoPieza, Cotizacion
+    from servicio_tecnico.models import PiezaCotizada, SeguimientoPieza
     
-    # QuerySet base
-    seguimientos = SeguimientoPieza.objects.select_related(
+    # PASO 1: Obtener TODAS las piezas cotizadas con proveedor asignado
+    piezas_query = PiezaCotizada.objects.select_related(
         'cotizacion',
-        'cotizacion__orden'
-    ).prefetch_related('piezas')
+        'cotizacion__orden',
+        'componente'
+    ).exclude(proveedor='').exclude(proveedor__isnull=True)
     
     # Filtrar por cotizaciones específicas si se proporcionan
     if cotizacion_ids:
-        seguimientos = seguimientos.filter(cotizacion_id__in=cotizacion_ids)
+        piezas_query = piezas_query.filter(cotizacion_id__in=cotizacion_ids)
     
     # Convertir a lista para procesamiento
-    data = []
+    data_piezas = []
     
-    for seg in seguimientos:
-        cotizacion = seg.cotizacion
-        
-        # Calcular tiempo de entrega real (solo si se recibió)
-        tiempo_entrega = None
-        if seg.fecha_entrega_real:
-            tiempo_entrega = (seg.fecha_entrega_real - seg.fecha_pedido).days
-        
-        data.append({
-            'seguimiento_id': seg.id,
-            'proveedor': seg.proveedor,
-            'cotizacion_id': cotizacion.pk,  # pk es igual a orden_id
-            'cotizacion_aceptada': cotizacion.usuario_acepto if cotizacion.usuario_acepto is not None else None,
-            'costo_total_cotizacion': float(cotizacion.costo_total) if cotizacion.costo_total else 0,
-            'costo_final_cotizacion': float(cotizacion.costo_total_final) if cotizacion.usuario_acepto else 0,
-            'tiempo_entrega_dias': tiempo_entrega,
-            'estado_seguimiento': seg.estado,
-            'fecha_pedido': seg.fecha_pedido,
+    for pieza in piezas_query:
+        data_piezas.append({
+            'pieza_id': pieza.id,
+            'proveedor': pieza.proveedor,
+            'componente': pieza.componente.nombre,
+            'cantidad': pieza.cantidad,
+            'costo_total': float(pieza.costo_total),
+            'aceptada': pieza.aceptada_por_cliente,  # True/False/None
+            'cotizacion_id': pieza.cotizacion_id,
         })
     
-    df = pd.DataFrame(data)
+    df_piezas = pd.DataFrame(data_piezas)
     
-    if df.empty:
+    if df_piezas.empty:
         return pd.DataFrame(columns=[
-            'proveedor', 'total_pedidos', 'total_cotizaciones',
-            'cotizaciones_aceptadas', 'cotizaciones_rechazadas',
-            'tasa_aceptacion', 'tiempo_entrega_promedio',
-            'valor_cotizado_total', 'valor_generado'
+            'proveedor', 'total_piezas_cotizadas', 'piezas_aceptadas', 
+            'piezas_rechazadas', 'piezas_sin_respuesta',
+            'tasa_aceptacion', 'tasa_rechazo', 'total_pedidos',
+            'tiempo_entrega_promedio', 'valor_cotizado_total', 'valor_generado'
         ])
     
-    # Agrupar por proveedor y calcular métricas
+    # PASO 2: Obtener datos de seguimientos para tiempos de entrega
+    seguimientos_query = SeguimientoPieza.objects.all()
+    if cotizacion_ids:
+        seguimientos_query = seguimientos_query.filter(cotizacion_id__in=cotizacion_ids)
+    
+    # Crear diccionario de tiempos de entrega por proveedor
+    tiempos_por_proveedor = {}
+    pedidos_por_proveedor = {}
+    
+    for seg in seguimientos_query:
+        proveedor = seg.proveedor
+        
+        # Contar pedidos
+        if proveedor not in pedidos_por_proveedor:
+            pedidos_por_proveedor[proveedor] = 0
+        pedidos_por_proveedor[proveedor] += 1
+        
+        # Calcular tiempo de entrega
+        if seg.fecha_entrega_real:
+            tiempo_entrega = (seg.fecha_entrega_real - seg.fecha_pedido).days
+            if proveedor not in tiempos_por_proveedor:
+                tiempos_por_proveedor[proveedor] = []
+            tiempos_por_proveedor[proveedor].append(tiempo_entrega)
+    
+    # PASO 3: Agrupar por proveedor y calcular métricas
     metricas = []
     
-    for proveedor in df['proveedor'].unique():
-        df_prov = df[df['proveedor'] == proveedor]
+    for proveedor in df_piezas['proveedor'].unique():
+        df_prov = df_piezas[df_piezas['proveedor'] == proveedor]
         
-        # Métricas básicas
-        total_pedidos = len(df_prov)
-        cotizaciones_unicas = df_prov['cotizacion_id'].nunique()
+        # Métricas de piezas
+        total_piezas = len(df_prov)
+        piezas_aceptadas = (df_prov['aceptada'] == True).sum()
+        piezas_rechazadas = (df_prov['aceptada'] == False).sum()
+        piezas_sin_respuesta = (df_prov['aceptada'].isna()).sum()
         
-        # Filtrar solo cotizaciones con respuesta
-        df_con_respuesta = df_prov[df_prov['cotizacion_aceptada'].notna()]
+        # Calcular tasas (solo sobre piezas con respuesta)
+        piezas_con_respuesta = piezas_aceptadas + piezas_rechazadas
         
-        if len(df_con_respuesta) > 0:
-            aceptadas = (df_con_respuesta['cotizacion_aceptada'] == True).sum()
-            rechazadas = (df_con_respuesta['cotizacion_aceptada'] == False).sum()
-            tasa_aceptacion = (aceptadas / len(df_con_respuesta) * 100) if len(df_con_respuesta) > 0 else 0
+        if piezas_con_respuesta > 0:
+            tasa_aceptacion = (piezas_aceptadas / piezas_con_respuesta * 100)
+            tasa_rechazo = (piezas_rechazadas / piezas_con_respuesta * 100)
         else:
-            aceptadas = 0
-            rechazadas = 0
             tasa_aceptacion = 0
+            tasa_rechazo = 0
         
-        # Tiempo de entrega (solo pedidos entregados)
-        tiempos = df_prov['tiempo_entrega_dias'].dropna()
-        tiempo_promedio = tiempos.mean() if len(tiempos) > 0 else None
+        # Tiempo de entrega promedio (de seguimientos)
+        if proveedor in tiempos_por_proveedor and len(tiempos_por_proveedor[proveedor]) > 0:
+            tiempo_promedio = sum(tiempos_por_proveedor[proveedor]) / len(tiempos_por_proveedor[proveedor])
+        else:
+            tiempo_promedio = None
+        
+        # Total de pedidos (de seguimientos)
+        total_pedidos = pedidos_por_proveedor.get(proveedor, 0)
         
         # Valores monetarios
-        valor_cotizado = df_prov['costo_total_cotizacion'].sum()
-        valor_generado = df_prov[df_prov['cotizacion_aceptada'] == True]['costo_final_cotizacion'].sum()
+        valor_cotizado = df_prov['costo_total'].sum()
+        valor_generado = df_prov[df_prov['aceptada'] == True]['costo_total'].sum()
         
         metricas.append({
             'proveedor': proveedor,
-            'total_pedidos': total_pedidos,
-            'total_cotizaciones': cotizaciones_unicas,
-            'cotizaciones_aceptadas': aceptadas,
-            'cotizaciones_rechazadas': rechazadas,
+            'total_piezas_cotizadas': total_piezas,
+            'piezas_aceptadas': piezas_aceptadas,
+            'piezas_rechazadas': piezas_rechazadas,
+            'piezas_sin_respuesta': piezas_sin_respuesta,
             'tasa_aceptacion': round(tasa_aceptacion, 1),
+            'tasa_rechazo': round(tasa_rechazo, 1),
+            'total_pedidos': total_pedidos,
             'tiempo_entrega_promedio': round(tiempo_promedio, 1) if tiempo_promedio else None,
             'valor_cotizado_total': round(valor_cotizado, 2),
             'valor_generado': round(valor_generado, 2),
@@ -748,17 +781,23 @@ def analizar_proveedores_con_conversion(cotizacion_ids=None):
 
 def analizar_componentes_por_proveedor(cotizacion_ids=None):
     """
-    Analiza qué componentes suministra cada proveedor y su resultado.
+    Analiza qué componentes suministra cada proveedor y su resultado (TODAS las piezas).
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     Esta función crea una vista detallada de qué tipo de piezas (RAM, disco,
     pantalla, etc.) suministra cada proveedor y qué tan exitosas son.
+    Analiza TODAS las piezas cotizadas con proveedor, incluyendo rechazadas.
     
     ¿Para qué sirve?
     - Identificar especialización de proveedores
     - Detectar proveedores con buena calidad en ciertos componentes
+    - Ver qué componentes generan más rechazo por proveedor
     - Diversificar riesgos (no depender de un solo proveedor)
     - Negociar mejores precios en componentes donde tienen volumen
+    
+    CORRECCIÓN DICIEMBRE 2025:
+    Ahora analiza TODAS las piezas cotizadas con proveedor asignado,
+    no solo las que tienen seguimiento. Esto incluye piezas rechazadas.
     
     Args:
         cotizacion_ids (list): Lista de IDs de cotizaciones a analizar (opcional)
@@ -773,69 +812,37 @@ def analizar_componentes_por_proveedor(cotizacion_ids=None):
         - cantidad: Número de piezas en esta combinación
         - valor_total: Valor total de esas piezas
     """
-    from servicio_tecnico.models import SeguimientoPieza, PiezaCotizada
+    from servicio_tecnico.models import PiezaCotizada
     
-    # QuerySet base
-    seguimientos = SeguimientoPieza.objects.select_related(
+    # Obtener TODAS las piezas cotizadas con proveedor asignado
+    piezas_query = PiezaCotizada.objects.select_related(
+        'componente',
         'cotizacion'
-    ).prefetch_related(
-        'piezas__componente',
-        'piezas__cotizacion'
-    )
+    ).exclude(proveedor='').exclude(proveedor__isnull=True)
     
     # Filtrar por cotizaciones específicas si se proporcionan
     if cotizacion_ids:
-        seguimientos = seguimientos.filter(cotizacion_id__in=cotizacion_ids)
+        piezas_query = piezas_query.filter(cotizacion_id__in=cotizacion_ids)
     
     # Convertir a lista para procesamiento
     data = []
     
-    for seg in seguimientos:
-        proveedor = seg.proveedor
-        
-        # Obtener piezas asociadas a este seguimiento
-        piezas = seg.piezas.all()
-        
-        if piezas.exists():
-            # Caso 1: Seguimiento tiene piezas específicas vinculadas
-            for pieza in piezas:
-                # Determinar resultado
-                if pieza.aceptada_por_cliente is None:
-                    resultado = 'Sin Respuesta'
-                elif pieza.aceptada_por_cliente:
-                    resultado = 'Aceptado'
-                else:
-                    resultado = 'Rechazado'
-                
-                data.append({
-                    'componente_nombre': pieza.componente.nombre,
-                    'proveedor': proveedor,
-                    'resultado': resultado,
-                    'cantidad': pieza.cantidad,
-                    'valor_total': float(pieza.costo_total),
-                })
+    for pieza in piezas_query:
+        # Determinar resultado basado en aceptación del cliente
+        if pieza.aceptada_por_cliente is None:
+            resultado = 'Sin Respuesta'
+        elif pieza.aceptada_por_cliente:
+            resultado = 'Aceptado'
         else:
-            # Caso 2: Seguimiento sin piezas vinculadas específicas
-            # Usar todas las piezas de la cotización como referencia
-            cotizacion = seg.cotizacion
-            piezas_cotizacion = cotizacion.piezas_cotizadas.all()
-            
-            for pieza in piezas_cotizacion:
-                # Determinar resultado
-                if pieza.aceptada_por_cliente is None:
-                    resultado = 'Sin Respuesta'
-                elif pieza.aceptada_por_cliente:
-                    resultado = 'Aceptado'
-                else:
-                    resultado = 'Rechazado'
-                
-                data.append({
-                    'componente_nombre': pieza.componente.nombre,
-                    'proveedor': proveedor,
-                    'resultado': resultado,
-                    'cantidad': pieza.cantidad,
-                    'valor_total': float(pieza.costo_total),
-                })
+            resultado = 'Rechazado'
+        
+        data.append({
+            'componente_nombre': pieza.componente.nombre,
+            'proveedor': pieza.proveedor,
+            'resultado': resultado,
+            'cantidad': pieza.cantidad,
+            'valor_total': float(pieza.costo_total),
+        })
     
     df = pd.DataFrame(data)
     
@@ -844,7 +851,7 @@ def analizar_componentes_por_proveedor(cotizacion_ids=None):
             'componente_nombre', 'proveedor', 'resultado', 'cantidad', 'valor_total'
         ])
     
-    # Agrupar y sumar
+    # Agrupar y sumar por componente, proveedor y resultado
     df_agrupado = df.groupby(['componente_nombre', 'proveedor', 'resultado']).agg({
         'cantidad': 'sum',
         'valor_total': 'sum'

@@ -1255,13 +1255,14 @@ class DashboardCotizacionesVisualizer:
     
     def grafico_proveedores_impacto_conversion(self, df_proveedores_conversion):
         """
-        Heatmap: Impacto de proveedores en conversión de ventas.
+        Heatmap: Impacto de proveedores en conversión de ventas A NIVEL DE PIEZA.
         
         EXPLICACIÓN PARA PRINCIPIANTES:
-        Este heatmap (mapa de calor) muestra 3 métricas clave por proveedor:
-        1. Tasa de Aceptación (%) - ¿Las cotizaciones con este proveedor se aceptan?
-        2. Tiempo de Entrega (días) - ¿Qué tan rápido entrega?
-        3. Valor Generado ($) - ¿Cuántos ingresos reales genera?
+        Este heatmap (mapa de calor) muestra 4 métricas clave por proveedor:
+        1. Tasa de Aceptación (%) - ¿Las PIEZAS de este proveedor se aceptan?
+        2. Tasa de Rechazo (%) - ¿Cuántas PIEZAS son rechazadas?
+        3. Velocidad de Entrega - Score normalizado (100 = más rápido)
+        4. Valor Generado ($) - ¿Cuántos ingresos reales genera?
         
         Colores:
         - Verde: Buen desempeño
@@ -1271,6 +1272,9 @@ class DashboardCotizacionesVisualizer:
         INSIGHT CLAVE:
         Permite identificar proveedores "estrella" (alto en las 3 métricas) vs
         proveedores "problemáticos" (alto volumen pero baja conversión).
+        
+        CORRECCIÓN NOVIEMBRE 2025:
+        Ahora muestra rechazos A NIVEL DE PIEZA, no de cotización completa.
         
         Args:
             df_proveedores_conversion (DataFrame): DataFrame de métricas de proveedores
@@ -1294,13 +1298,18 @@ class DashboardCotizacionesVisualizer:
         # 1. Tasa de aceptación (ya está en 0-100)
         tasa_aceptacion = df_top['tasa_aceptacion'].values
         
-        # 2. Tiempo de entrega (invertir: menos días = mejor)
+        # 2. Tasa de rechazo (NUEVO - invertir para visualización: menos rechazo = mejor)
+        # Invertir: 100 - rechazo, para que verde = bajo rechazo
+        tasa_rechazo = df_top['tasa_rechazo'].values
+        tasa_rechazo_invertida = 100 - tasa_rechazo
+        
+        # 3. Tiempo de entrega (invertir: menos días = mejor)
         # Normalizar a escala 0-100 donde 100 = más rápido
         tiempos = df_top['tiempo_entrega_promedio'].fillna(df_top['tiempo_entrega_promedio'].max())
         max_tiempo = tiempos.max() if tiempos.max() > 0 else 1
         tiempo_normalizado = 100 - (tiempos / max_tiempo * 100)
         
-        # 3. Valor generado (normalizar a 0-100)
+        # 4. Valor generado (normalizar a 0-100)
         valores = df_top['valor_generado'].values
         max_valor = valores.max() if valores.max() > 0 else 1
         valor_normalizado = (valores / max_valor * 100)
@@ -1308,6 +1317,7 @@ class DashboardCotizacionesVisualizer:
         # Crear matriz de datos (proveedores x métricas)
         z_data = [
             tasa_aceptacion.tolist(),
+            tasa_rechazo_invertida.tolist(),  # NUEVO: Tasa de rechazo invertida
             tiempo_normalizado.tolist(),
             valor_normalizado.tolist()
         ]
@@ -1315,6 +1325,7 @@ class DashboardCotizacionesVisualizer:
         # Etiquetas de texto para mostrar valores reales
         text_data = [
             [f"{val:.1f}%" for val in tasa_aceptacion],
+            [f"{val:.1f}%" for val in tasa_rechazo],  # Mostrar valor real (no invertido)
             [f"{val:.0f} días" for val in tiempos],
             [f"${val:,.0f}" for val in valores]
         ]
@@ -1323,10 +1334,10 @@ class DashboardCotizacionesVisualizer:
         fig = go.Figure(data=go.Heatmap(
             z=z_data,
             x=df_top['proveedor'].tolist(),
-            y=['Tasa de Aceptación', 'Velocidad de Entrega', 'Valor Generado'],
+            y=['Tasa Aceptación', 'Tasa Rechazo', 'Velocidad Entrega', 'Valor Generado'],
             text=text_data,
             texttemplate='%{text}',
-            textfont={"size": 11, "color": "white"},
+            textfont={"size": 10, "color": "white"},
             colorscale='RdYlGn',  # Rojo-Amarillo-Verde
             showscale=True,
             colorbar=dict(
@@ -1344,10 +1355,10 @@ class DashboardCotizacionesVisualizer:
         fig.update_layout(
             **LAYOUT_BASE,
             title=dict(
-                text='🎯 Impacto de Proveedores en Conversión de Ventas (Top 15)',
+                text='🎯 Impacto de Proveedores en Conversión (Top 15) - Análisis por Pieza',
                 x=0.5,
                 xanchor='center',
-                font=dict(size=18, color=self.colores['dark'])
+                font=dict(size=17, color=self.colores['dark'])
             ),
             xaxis=dict(
                 title='',
@@ -1356,9 +1367,9 @@ class DashboardCotizacionesVisualizer:
             ),
             yaxis=dict(
                 title='',
-                tickfont=dict(size=12)
+                tickfont=dict(size=11)
             ),
-            height=500
+            height=550
         )
         
         # Actualizar margen por separado para evitar conflicto con LAYOUT_BASE

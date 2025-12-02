@@ -963,13 +963,14 @@
                             {% if graficos.proveedores_impacto_conversion %}
                                 {{ graficos.proveedores_impacto_conversion|safe }}
                                 <div class="alert alert-success alert-dashboard mt-3">
-                                    <strong><i class="bi bi-lightbulb-fill"></i> Insight Estratégico:</strong>
+                                    <strong><i class="bi bi-lightbulb-fill"></i> Insight Estratégico (Análisis por Pieza):</strong>
                                     <ul class="mb-0 mt-2">
-                                        <li><strong>Tasa de Aceptación:</strong> % de cotizaciones aceptadas con piezas de este proveedor</li>
+                                        <li><strong>Tasa de Aceptación:</strong> % de PIEZAS aceptadas por el cliente (a nivel individual)</li>
+                                        <li><strong>Tasa de Rechazo:</strong> % de PIEZAS rechazadas - Menor es mejor</li>
                                         <li><strong>Velocidad de Entrega:</strong> Rapidez normalizada (100 = más rápido)</li>
-                                        <li><strong>Valor Generado:</strong> Ingresos reales en cotizaciones aceptadas</li>
+                                        <li><strong>Valor Generado:</strong> Ingresos reales de piezas aceptadas</li>
                                         <li><strong>Verde:</strong> Excelente desempeño | <strong>Amarillo:</strong> Regular | <strong>Rojo:</strong> Mejorar</li>
-                                        <li><strong>Acción:</strong> Priorizar proveedores con las 3 métricas en verde</li>
+                                        <li><strong>Acción:</strong> Priorizar proveedores con alta aceptación, bajo rechazo y entregas rápidas</li>
                                     </ul>
                                 </div>
                             {% else %}
@@ -998,6 +999,7 @@
                                         <li><strong>Centro:</strong> Todas las piezas suministradas</li>
                                         <li><strong>Anillo 1:</strong> Tipo de componente (RAM, Disco, Pantalla, etc.)</li>
                                         <li><strong>Anillo 2:</strong> Proveedores que suministran cada componente</li>
+                                        <li><strong>Anillo 3:</strong> Resultado por pieza (Verde=Aceptado, Rojo=Rechazado, Gris=Sin Respuesta)</li>
                                         <li><strong>Anillo 3:</strong> Resultado (Aceptado/Rechazado/Sin Respuesta)</li>
                                         <li><strong>Tamaño:</strong> Proporcional a cantidad de piezas</li>
                                         <li><strong>Insight:</strong> Identifica especialización y diversificación de proveedores</li>
