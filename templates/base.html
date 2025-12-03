@@ -177,49 +177,54 @@
                         <i class="bi bi-tools"></i> Servicio Técnico
                         <i class="bi bi-chevron-down ms-1"></i>
                     </a>
-                    <div class="navbar-dropdown" id="dropdown-servicio">
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6>
-                            <a href="{% url 'servicio_tecnico:inicio' %}" class="dropdown-item">
-                                <i class="bi bi-house"></i> Inicio Servicio Técnico
-                            </a>
-                            <a href="{% url 'servicio_tecnico:dashboard_seguimiento_oow_fl' %}" class="dropdown-item">
-                                <i class="bi bi-graph-up-arrow text-info"></i> Dashboard OOW-/FL-
-                            </a>
-                            <a href="{% url 'servicio_tecnico:dashboard_cotizaciones' %}" class="dropdown-item">
-                                <i class="bi bi-bar-chart-line-fill text-primary"></i> Dashboard de Cotizaciones
-                                <span class="badge bg-success ms-2" style="font-size: 0.7rem;">NUEVO</span>
-                            </a>
+                    <div class="navbar-dropdown dropdown-mega" id="dropdown-servicio">
+                        <!-- Columna 1: General + Órdenes -->
+                        <div class="dropdown-column">
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6>
+                                <a href="{% url 'servicio_tecnico:inicio' %}" class="dropdown-item">
+                                    <i class="bi bi-house"></i> Inicio Servicio Técnico
+                                </a>
+                                <a href="{% url 'servicio_tecnico:dashboard_seguimiento_oow_fl' %}" class="dropdown-item">
+                                    <i class="bi bi-graph-up-arrow text-info"></i> Dashboard OOW-/FL-
+                                </a>
+                                <a href="{% url 'servicio_tecnico:dashboard_cotizaciones' %}" class="dropdown-item">
+                                    <i class="bi bi-bar-chart-line-fill text-primary"></i> Dashboard Cotizaciones
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Órdenes</h6>
+                                <a href="{% url 'servicio_tecnico:seleccionar_tipo_orden' %}" class="dropdown-item">
+                                    <i class="bi bi-plus-circle-fill text-success"></i> Nueva Orden de Servicio
+                                </a>
+                                <a href="{% url 'servicio_tecnico:lista_activas' %}" class="dropdown-item">
+                                    <i class="bi bi-hourglass-split text-primary"></i> Órdenes Activas
+                                </a>
+                                <a href="{% url 'servicio_tecnico:lista_finalizadas' %}" class="dropdown-item">
+                                    <i class="bi bi-check-circle text-success"></i> Órdenes Finalizadas
+                                </a>
+                            </div>
                         </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Órdenes</h6>
-                            <a href="{% url 'servicio_tecnico:seleccionar_tipo_orden' %}" class="dropdown-item">
-                                <i class="bi bi-plus-circle-fill text-success"></i> Nueva Orden de Servicio
-                            </a>
-                            <a href="{% url 'servicio_tecnico:lista_activas' %}" class="dropdown-item">
-                                <i class="bi bi-hourglass-split text-primary"></i> Órdenes Activas
-                            </a>
-                            <a href="{% url 'servicio_tecnico:lista_finalizadas' %}" class="dropdown-item">
-                                <i class="bi bi-check-circle text-success"></i> Órdenes Finalizadas
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-receipt"></i> Cotizaciones y Piezas</h6>
-                            <a href="{% url 'servicio_tecnico:dashboard_seguimiento_piezas' %}" class="dropdown-item">
-                                <i class="bi bi-speedometer2 text-info"></i> Dashboard Seguimiento de Piezas
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-microchip"></i> Módulo RHITSO</h6>
-                            <a href="{% url 'servicio_tecnico:dashboard_rhitso' %}" class="dropdown-item">
-                                <i class="bi bi-speedometer text-primary"></i> Dashboard RHITSO
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
-                            <a href="{% url 'servicio_tecnico:lista_referencias_gama' %}" class="dropdown-item">
-                                <i class="bi bi-bookmark-star"></i> Gestión de Referencias de Gama
-                            </a>
+                        <!-- Columna 2: Piezas + RHITSO + Config -->
+                        <div class="dropdown-column">
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-receipt"></i> Cotizaciones y Piezas</h6>
+                                <a href="{% url 'servicio_tecnico:dashboard_seguimiento_piezas' %}" class="dropdown-item">
+                                    <i class="bi bi-speedometer2 text-info"></i> Seguimiento de Piezas
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-microchip"></i> Módulo RHITSO</h6>
+                                <a href="{% url 'servicio_tecnico:dashboard_rhitso' %}" class="dropdown-item">
+                                    <i class="bi bi-speedometer text-primary"></i> Dashboard RHITSO
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
+                                <a href="{% url 'servicio_tecnico:lista_referencias_gama' %}" class="dropdown-item">
+                                    <i class="bi bi-bookmark-star"></i> Referencias de Gama
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -230,57 +235,60 @@
                         <i class="bi bi-box-seam-fill"></i> Almacén
                         <i class="bi bi-chevron-down ms-1"></i>
                     </a>
-                    <div class="navbar-dropdown" id="dropdown-almacen">
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6>
-                            <a href="{% url 'almacen:dashboard' %}" class="dropdown-item">
-                                <i class="bi bi-graph-up"></i> Dashboard Almacén
-                            </a>
+                    <div class="navbar-dropdown dropdown-mega" id="dropdown-almacen">
+                        <!-- Columna 1: General + Productos (con Unidades) -->
+                        <div class="dropdown-column">
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6>
+                                <a href="{% url 'almacen:dashboard' %}" class="dropdown-item">
+                                    <i class="bi bi-graph-up"></i> Dashboard Almacén
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-box"></i> Productos y Unidades</h6>
+                                <a href="{% url 'almacen:lista_productos' %}" class="dropdown-item">
+                                    <i class="bi bi-list-ul"></i> Lista de Productos
+                                </a>
+                                <a href="{% url 'almacen:crear_producto' %}" class="dropdown-item">
+                                    <i class="bi bi-plus-circle"></i> Nuevo Producto
+                                </a>
+                                <a href="{% url 'almacen:lista_unidades' %}" class="dropdown-item">
+                                    <i class="bi bi-collection"></i> Unidades Individuales
+                                </a>
+                                <a href="{% url 'almacen:crear_unidad' %}" class="dropdown-item">
+                                    <i class="bi bi-plus-circle-dotted"></i> Nueva Unidad
+                                </a>
+                            </div>
                         </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-box"></i> Productos</h6>
-                            <a href="{% url 'almacen:lista_productos' %}" class="dropdown-item">
-                                <i class="bi bi-list-ul"></i> Lista de Productos
-                            </a>
-                            <a href="{% url 'almacen:crear_producto' %}" class="dropdown-item">
-                                <i class="bi bi-plus-circle"></i> Nuevo Producto
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-hdd-stack"></i> Unidades Individuales</h6>
-                            <a href="{% url 'almacen:lista_unidades' %}" class="dropdown-item">
-                                <i class="bi bi-collection"></i> Lista de Unidades
-                            </a>
-                            <a href="{% url 'almacen:crear_unidad' %}" class="dropdown-item">
-                                <i class="bi bi-plus-circle"></i> Nueva Unidad
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-arrow-left-right"></i> Movimientos</h6>
-                            <a href="{% url 'almacen:lista_movimientos' %}" class="dropdown-item">
-                                <i class="bi bi-arrow-down-up"></i> Historial de Movimientos
-                            </a>
-                            <a href="{% url 'almacen:registrar_entrada' %}" class="dropdown-item">
-                                <i class="bi bi-box-arrow-in-down text-success"></i> Registrar Entrada
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-cart-dash"></i> Solicitudes</h6>
-                            <a href="{% url 'almacen:lista_solicitudes' %}" class="dropdown-item">
-                                <i class="bi bi-hourglass-split text-warning"></i> Solicitudes de Baja
-                            </a>
-                            <a href="{% url 'almacen:crear_solicitud' %}" class="dropdown-item">
-                                <i class="bi bi-cart-plus"></i> Nueva Solicitud
-                            </a>
-                        </div>
-                        <div class="dropdown-section">
-                            <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
-                            <a href="{% url 'almacen:lista_proveedores' %}" class="dropdown-item">
-                                <i class="bi bi-truck"></i> Proveedores
-                            </a>
-                            <a href="{% url 'almacen:lista_categorias' %}" class="dropdown-item">
-                                <i class="bi bi-tags"></i> Categorías
-                            </a>
+                        <!-- Columna 2: Movimientos + Solicitudes + Config -->
+                        <div class="dropdown-column">
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-arrow-left-right"></i> Movimientos</h6>
+                                <a href="{% url 'almacen:lista_movimientos' %}" class="dropdown-item">
+                                    <i class="bi bi-arrow-down-up"></i> Historial
+                                </a>
+                                <a href="{% url 'almacen:registrar_entrada' %}" class="dropdown-item">
+                                    <i class="bi bi-box-arrow-in-down text-success"></i> Registrar Entrada
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-cart-dash"></i> Solicitudes</h6>
+                                <a href="{% url 'almacen:lista_solicitudes' %}" class="dropdown-item">
+                                    <i class="bi bi-hourglass-split text-warning"></i> Solicitudes de Baja
+                                </a>
+                                <a href="{% url 'almacen:crear_solicitud' %}" class="dropdown-item">
+                                    <i class="bi bi-cart-plus"></i> Nueva Solicitud
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
+                                <a href="{% url 'almacen:lista_proveedores' %}" class="dropdown-item">
+                                    <i class="bi bi-truck"></i> Proveedores
+                                </a>
+                                <a href="{% url 'almacen:lista_categorias' %}" class="dropdown-item">
+                                    <i class="bi bi-tags"></i> Categorías
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -528,6 +536,51 @@
                             <a href="{% url 'servicio_tecnico:lista_activas' %}" class="sidebar-link">
                                 <i class="sidebar-icon bi bi-hourglass-split"></i>
                                 <span class="sidebar-text">Órdenes Activas</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+
+            <!-- Almacén -->
+            <li class="sidebar-section">
+                <div class="sidebar-section-title">Almacén</div>
+                <div class="sidebar-item has-submenu" id="almacen-menu">
+                    <a href="#" class="sidebar-link">
+                        <i class="sidebar-icon bi bi-box-seam-fill"></i>
+                        <span class="sidebar-text">Almacén Central</span>
+                        <i class="sidebar-arrow bi bi-chevron-right"></i>
+                        <span class="sidebar-tooltip">Módulo de Almacén</span>
+                    </a>
+                    <ul class="sidebar-submenu">
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'almacen:dashboard' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-graph-up"></i>
+                                <span class="sidebar-text">Dashboard</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'almacen:lista_productos' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-list-ul"></i>
+                                <span class="sidebar-text">Productos</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'almacen:lista_unidades' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-collection"></i>
+                                <span class="sidebar-text">Unidades</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'almacen:lista_movimientos' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-arrow-down-up"></i>
+                                <span class="sidebar-text">Movimientos</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'almacen:lista_solicitudes' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-hourglass-split"></i>
+                                <span class="sidebar-text">Solicitudes</span>
                             </a>
                         </li>
                     </ul>
