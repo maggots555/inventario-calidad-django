@@ -1352,3 +1352,68 @@ def api_unidades_producto(request):
             'unidades': [],
             'stock_info': ''
         })
+
+
+@login_required
+def api_tecnicos_disponibles(request):
+    """
+    API para obtener la lista de técnicos de laboratorio disponibles (JSON).
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista se usa en el formulario de solicitud de baja.
+    Cuando el usuario selecciona "Servicio Técnico" como tipo de solicitud,
+    JavaScript llama a esta API para obtener la lista de técnicos disponibles.
+    
+    Los técnicos se filtran por:
+    - activo=True: Solo empleados activos
+    - cargo__icontains='TECNICO DE LABORATORIO': Solo técnicos de laboratorio
+    
+    Retorna:
+    - success: bool indicando si la operación fue exitosa
+    - tecnicos: Lista de técnicos con id y nombre
+    - total: Cantidad de técnicos disponibles
+    
+    Ejemplo de respuesta:
+    {
+        "success": true,
+        "tecnicos": [
+            {"id": 1, "nombre": "Juan Pérez", "sucursal": "Matriz"},
+            {"id": 2, "nombre": "María García", "sucursal": "Sucursal Norte"}
+        ],
+        "total": 2
+    }
+    """
+    # Importar Empleado desde inventario
+    from inventario.models import Empleado
+    
+    try:
+        # Filtrar técnicos de laboratorio activos
+        tecnicos = Empleado.objects.filter(
+            activo=True,
+            cargo__icontains='TECNICO DE LABORATORIO'
+        ).select_related('sucursal').order_by('nombre_completo')
+        
+        # Construir lista de técnicos
+        tecnicos_data = []
+        for tecnico in tecnicos:
+            tecnicos_data.append({
+                'id': tecnico.pk,
+                'nombre': tecnico.nombre_completo,
+                'cargo': tecnico.cargo,
+                'sucursal': tecnico.sucursal.nombre if tecnico.sucursal else 'Sin asignar',
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'tecnicos': tecnicos_data,
+            'total': len(tecnicos_data)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'tecnicos': [],
+            'total': 0
+        })

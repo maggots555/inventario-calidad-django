@@ -80,6 +80,21 @@
                                 <small class="text-muted">Vincular a una orden de servicio existente</small>
                             </div>
                             
+                            <!-- Técnico de Laboratorio (mostrar solo para Servicio Técnico) -->
+                            <div class="col-12 mb-3" id="tecnico-container" style="display: none;">
+                                <label class="form-label">
+                                    <i class="bi bi-person-gear me-1"></i>Técnico de Laboratorio
+                                </label>
+                                {{ form.tecnico_asignado }}
+                                {% if form.tecnico_asignado.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.tecnico_asignado.errors.0 }}</div>
+                                {% endif %}
+                                <small class="text-muted">
+                                    Técnico de laboratorio que utilizará el producto. 
+                                    <strong>Obligatorio para solicitudes de Servicio Técnico.</strong>
+                                </small>
+                            </div>
+                            
                             <!-- Observaciones / Motivo -->
                             <div class="col-12 mb-3">
                                 <label class="form-label">Motivo / Justificación *</label>
@@ -108,79 +123,24 @@
 {% endblock almacen_content %}
 
 {% block extra_js %}
+<!-- Cargar el script TypeScript compilado para el formulario de solicitud de baja -->
+<script src="{% static 'js/solicitud_baja_form.js' %}"></script>
 <script>
-/**
- * Carga dinámica de unidades cuando se selecciona un producto.
- * 
- * EXPLICACIÓN PARA PRINCIPIANTES:
- * --------------------------------
- * Cuando el usuario selecciona un producto en el dropdown, este script:
- * 1. Hace una petición AJAX al servidor para obtener las unidades de ese producto
- * 2. Llena el dropdown de "Unidad Específica" con las opciones disponibles
- * 3. Muestra el contenedor de unidades si hay unidades disponibles
- */
-document.addEventListener('DOMContentLoaded', function() {
-    const productoSelect = document.getElementById('id_producto');
-    const unidadSelect = document.getElementById('id_unidad_inventario');
-    const unidadContainer = document.getElementById('unidad-container');
-    const stockInfo = document.getElementById('stock-info');
-    
-    if (productoSelect && unidadSelect) {
-        productoSelect.addEventListener('change', function() {
-            const productoId = this.value;
-            
-            // Limpiar el select de unidades
-            unidadSelect.innerHTML = '<option value="">-- Cargando unidades... --</option>';
-            
-            if (!productoId) {
-                unidadSelect.innerHTML = '<option value="">-- Seleccione un producto primero --</option>';
-                unidadContainer.style.display = 'none';
-                stockInfo.textContent = '';
-                return;
-            }
-            
-            // Hacer petición AJAX para obtener las unidades del producto
-            fetch(`{% url 'almacen:api_unidades_producto' %}?producto_id=${productoId}`)
-                .then(response => response.json())
-                .then(data => {
-                    // Mostrar info de stock
-                    if (data.stock_info) {
-                        stockInfo.innerHTML = `<span class="text-success"><i class="bi bi-box-seam me-1"></i>${data.stock_info}</span>`;
-                    }
-                    
-                    // Llenar el select de unidades
-                    unidadSelect.innerHTML = '<option value="">-- Cualquier unidad disponible --</option>';
-                    
-                    if (data.unidades && data.unidades.length > 0) {
-                        data.unidades.forEach(function(unidad) {
-                            const option = document.createElement('option');
-                            option.value = unidad.id;
-                            // Formato: "Samsung 870 EVO - S/N: ABC123 (Nuevo)"
-                            let texto = '';
-                            if (unidad.marca) texto += unidad.marca;
-                            if (unidad.modelo) texto += ' ' + unidad.modelo;
-                            if (unidad.numero_serie) texto += ' - S/N: ' + unidad.numero_serie;
-                            texto += ' (' + unidad.estado_display + ')';
-                            option.textContent = texto.trim() || `Unidad #${unidad.id}`;
-                            unidadSelect.appendChild(option);
-                        });
-                        unidadContainer.style.display = 'block';
-                    } else {
-                        unidadSelect.innerHTML = '<option value="">-- No hay unidades registradas --</option>';
-                        unidadContainer.style.display = 'block';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error cargando unidades:', error);
-                    unidadSelect.innerHTML = '<option value="">-- Error al cargar unidades --</option>';
-                });
-        });
-        
-        // Si ya hay un producto seleccionado (ej: al recargar por error), disparar el evento
-        if (productoSelect.value) {
-            productoSelect.dispatchEvent(new Event('change'));
-        }
-    }
-});
+    /**
+     * Inicializar el formulario de solicitud de baja
+     * 
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * --------------------------------
+     * Esta función inicializa el handler de TypeScript que maneja:
+     * 1. Carga dinámica de unidades cuando se selecciona un producto
+     * 2. Mostrar/ocultar el campo de técnico según el tipo de solicitud
+     * 
+     * Pasamos las URLs de Django al JavaScript usando la etiqueta url para que
+     * siempre apunten a las rutas correctas, incluso si cambian en urls.py
+     */
+    initSolicitudBajaForm(
+        "{% url 'almacen:api_unidades_producto' %}",
+        "{% url 'almacen:api_tecnicos_disponibles' %}"
+    );
 </script>
 {% endblock extra_js %}

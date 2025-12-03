@@ -933,6 +933,17 @@ class SolicitudBaja(models.Model):
         help_text='Vincular con orden de servicio técnico (si aplica)'
     )
     
+    # Técnico de laboratorio asignado (solo para tipo_solicitud='servicio_tecnico')
+    tecnico_asignado = models.ForeignKey(
+        'inventario.Empleado',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='solicitudes_tecnico_asignado',
+        verbose_name='Técnico Asignado',
+        help_text='Técnico de laboratorio que utilizará el producto (obligatorio para Servicio Técnico)'
+    )
+    
     # ========== SOLICITANTE ==========
     solicitante = models.ForeignKey(
         'inventario.Empleado',

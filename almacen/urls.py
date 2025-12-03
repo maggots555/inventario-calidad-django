@@ -85,5 +85,6 @@ urlpatterns = [
     path('api/unidad/<int:pk>/', views.api_unidad_info, name='api_unidad_info'),
     path('api/unidad/<int:pk>/cambiar-estado/', views.cambiar_estado_unidad, name='cambiar_estado_unidad'),
     path('api/unidades-producto/', views.api_unidades_producto, name='api_unidades_producto'),
+    path('api/tecnicos-disponibles/', views.api_tecnicos_disponibles, name='api_tecnicos_disponibles'),
 ]
 

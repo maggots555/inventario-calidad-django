@@ -512,6 +512,7 @@ class SolicitudBajaForm(forms.ModelForm):
     1. Usuario selecciona un Producto (tipo genérico: "SSD 1TB")
     2. Se cargan dinámicamente las UnidadInventario disponibles de ese producto
     3. Usuario puede elegir una unidad específica (opcional) o dejar genérico
+    4. Si tipo_solicitud es 'servicio_tecnico', se muestra selector de técnico (obligatorio)
     """
     
     class Meta:
@@ -522,6 +523,7 @@ class SolicitudBajaForm(forms.ModelForm):
             'unidad_inventario',
             'cantidad',
             'orden_servicio',
+            'tecnico_asignado',  # Nuevo campo: técnico de laboratorio
             'observaciones',
         ]
         widgets = {
@@ -544,6 +546,10 @@ class SolicitudBajaForm(forms.ModelForm):
             'orden_servicio': forms.Select(attrs={
                 'class': 'form-control form-select',
             }),
+            'tecnico_asignado': forms.Select(attrs={
+                'class': 'form-control form-select',
+                'id': 'id_tecnico_asignado',
+            }),
             'observaciones': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 2,
@@ -556,16 +562,22 @@ class SolicitudBajaForm(forms.ModelForm):
             'unidad_inventario': 'Unidad Específica (opcional)',
             'cantidad': 'Cantidad Solicitada',
             'orden_servicio': 'Orden de Servicio (opcional)',
+            'tecnico_asignado': 'Técnico de Laboratorio',
             'observaciones': 'Observaciones',
         }
         help_texts = {
             'tipo_solicitud': 'Propósito de la salida del producto',
             'unidad_inventario': 'Seleccione una unidad específica o deje vacío para genérico',
             'orden_servicio': 'Solo si es para servicio técnico',
+            'tecnico_asignado': 'Obligatorio cuando el tipo es Servicio Técnico',
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Importar Empleado aquí para evitar importación circular
+        from inventario.models import Empleado
+        
+        # ========== CONFIGURACIÓN UNIDAD_INVENTARIO ==========
         # Inicialmente, el campo de unidad está vacío
         # Se llenará dinámicamente con JavaScript cuando se seleccione un producto
         self.fields['unidad_inventario'].queryset = UnidadInventario.objects.none()
@@ -586,6 +598,17 @@ class SolicitudBajaForm(forms.ModelForm):
                 producto=self.instance.producto,
                 disponibilidad='disponible'
             ).select_related('producto')
+        
+        # ========== CONFIGURACIÓN TECNICO_ASIGNADO ==========
+        # Cargar solo técnicos de laboratorio activos
+        # El campo cargo contiene "TECNICO DE LABORATORIO" para los técnicos
+        self.fields['tecnico_asignado'].queryset = Empleado.objects.filter(
+            activo=True,
+            cargo__icontains='TECNICO DE LABORATORIO'
+        ).order_by('nombre_completo')
+        
+        # Inicialmente no requerido - JavaScript lo hará requerido dinámicamente
+        self.fields['tecnico_asignado'].required = False
     
     def clean_cantidad(self):
         """Validar que haya stock disponible"""
@@ -599,6 +622,30 @@ class SolicitudBajaForm(forms.ModelForm):
                 )
         
         return cantidad
+    
+    def clean(self):
+        """
+        Validación a nivel de formulario completo.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        El método clean() se ejecuta después de validar cada campo individualmente.
+        Aquí validamos reglas que dependen de múltiples campos.
+        
+        En este caso: Si tipo_solicitud es 'servicio_tecnico', entonces
+        tecnico_asignado es OBLIGATORIO.
+        """
+        cleaned_data = super().clean()
+        tipo_solicitud = cleaned_data.get('tipo_solicitud')
+        tecnico_asignado = cleaned_data.get('tecnico_asignado')
+        
+        # Si es Servicio Técnico, el técnico es obligatorio
+        if tipo_solicitud == 'servicio_tecnico' and not tecnico_asignado:
+            raise ValidationError({
+                'tecnico_asignado': 'Debe seleccionar un técnico de laboratorio para solicitudes de Servicio Técnico.'
+            })
+        
+        return cleaned_data
 
 
 # ============================================================================
