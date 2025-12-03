@@ -223,6 +223,7 @@ MOTIVO_RHITSO_CHOICES = [
     ('corrosion', 'Corrosión severa en placa'),
     ('cortocircuito', 'Cortocircuito en circuitería'),
     ('diagnostico_profundo', 'Requiere diagnóstico más profundo'),
+    ('no_hay_piezas', 'No hay partes en el mercado'),
     ('otro', 'Otro motivo especializado'),
 ]
 
