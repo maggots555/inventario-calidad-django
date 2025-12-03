@@ -80,7 +80,7 @@
                     </div>
                     <div class="navbar-brand-text">
                         <h1>Sistema Integral de Gestión</h1>
-                        <span>Inventario • Scorecard • Servicio Técnico</span>
+                        <span>Inventario • Scorecard • Servicio Técnico • Almacén</span>
                     </div>
                 </a>
             </div>
@@ -219,6 +219,67 @@
                             <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
                             <a href="{% url 'servicio_tecnico:lista_referencias_gama' %}" class="dropdown-item">
                                 <i class="bi bi-bookmark-star"></i> Gestión de Referencias de Gama
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MÓDULO: ALMACÉN CENTRAL -->
+                <div class="navbar-menu-item dropdown">
+                    <a href="#" class="navbar-menu-link" data-dropdown="almacen">
+                        <i class="bi bi-box-seam-fill"></i> Almacén
+                        <i class="bi bi-chevron-down ms-1"></i>
+                    </a>
+                    <div class="navbar-dropdown" id="dropdown-almacen">
+                        <div class="dropdown-section">
+                            <h6 class="dropdown-header"><i class="bi bi-speedometer2"></i> General</h6>
+                            <a href="{% url 'almacen:dashboard' %}" class="dropdown-item">
+                                <i class="bi bi-graph-up"></i> Dashboard Almacén
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <h6 class="dropdown-header"><i class="bi bi-box"></i> Productos</h6>
+                            <a href="{% url 'almacen:lista_productos' %}" class="dropdown-item">
+                                <i class="bi bi-list-ul"></i> Lista de Productos
+                            </a>
+                            <a href="{% url 'almacen:crear_producto' %}" class="dropdown-item">
+                                <i class="bi bi-plus-circle"></i> Nuevo Producto
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <h6 class="dropdown-header"><i class="bi bi-hdd-stack"></i> Unidades Individuales</h6>
+                            <a href="{% url 'almacen:lista_unidades' %}" class="dropdown-item">
+                                <i class="bi bi-collection"></i> Lista de Unidades
+                            </a>
+                            <a href="{% url 'almacen:crear_unidad' %}" class="dropdown-item">
+                                <i class="bi bi-plus-circle"></i> Nueva Unidad
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <h6 class="dropdown-header"><i class="bi bi-arrow-left-right"></i> Movimientos</h6>
+                            <a href="{% url 'almacen:lista_movimientos' %}" class="dropdown-item">
+                                <i class="bi bi-arrow-down-up"></i> Historial de Movimientos
+                            </a>
+                            <a href="{% url 'almacen:registrar_entrada' %}" class="dropdown-item">
+                                <i class="bi bi-box-arrow-in-down text-success"></i> Registrar Entrada
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <h6 class="dropdown-header"><i class="bi bi-cart-dash"></i> Solicitudes</h6>
+                            <a href="{% url 'almacen:lista_solicitudes' %}" class="dropdown-item">
+                                <i class="bi bi-hourglass-split text-warning"></i> Solicitudes de Baja
+                            </a>
+                            <a href="{% url 'almacen:crear_solicitud' %}" class="dropdown-item">
+                                <i class="bi bi-cart-plus"></i> Nueva Solicitud
+                            </a>
+                        </div>
+                        <div class="dropdown-section">
+                            <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
+                            <a href="{% url 'almacen:lista_proveedores' %}" class="dropdown-item">
+                                <i class="bi bi-truck"></i> Proveedores
+                            </a>
+                            <a href="{% url 'almacen:lista_categorias' %}" class="dropdown-item">
+                                <i class="bi bi-tags"></i> Categorías
                             </a>
                         </div>
                     </div>

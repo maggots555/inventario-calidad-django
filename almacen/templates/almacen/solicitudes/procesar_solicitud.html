@@ -1,0 +1,184 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% block title %}Procesar Solicitud - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'almacen:dashboard' %}">Almacén</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'almacen:lista_solicitudes' %}">Solicitudes</a></li>
+            <li class="breadcrumb-item active">Procesar #{{ solicitud.pk }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Información de la Solicitud -->
+        <div class="col-md-5">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="bi bi-hourglass-split me-2"></i>Solicitud #{{ solicitud.pk }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Producto:</dt>
+                        <dd class="col-sm-8">
+                            <a href="{% url 'almacen:detalle_producto' solicitud.producto.pk %}">
+                                {{ solicitud.producto.codigo_producto }}
+                            </a>
+                            <br>
+                            <small class="text-muted">{{ solicitud.producto.nombre }}</small>
+                        </dd>
+                        
+                        {% if solicitud.unidad_inventario %}
+                        <!-- Información de la Unidad Específica Solicitada -->
+                        <dt class="col-sm-4">Unidad Específica:</dt>
+                        <dd class="col-sm-8">
+                            <div class="border rounded p-2 bg-light">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-cpu text-primary me-2 fs-5"></i>
+                                    <div>
+                                        <strong>
+                                            {% if solicitud.unidad_inventario.marca %}{{ solicitud.unidad_inventario.marca }}{% endif %}
+                                            {% if solicitud.unidad_inventario.modelo %}{{ solicitud.unidad_inventario.modelo }}{% endif %}
+                                            {% if not solicitud.unidad_inventario.marca and not solicitud.unidad_inventario.modelo %}
+                                                Unidad #{{ solicitud.unidad_inventario.pk }}
+                                            {% endif %}
+                                        </strong>
+                                        {% if solicitud.unidad_inventario.numero_serie %}
+                                        <br><small class="text-muted">S/N: {{ solicitud.unidad_inventario.numero_serie }}</small>
+                                        {% endif %}
+                                        {% if solicitud.unidad_inventario.codigo_interno %}
+                                        <br><small class="text-muted">Código: {{ solicitud.unidad_inventario.codigo_interno }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <span class="badge bg-{% if solicitud.unidad_inventario.estado == 'nuevo' %}success{% elif solicitud.unidad_inventario.estado == 'usado_bueno' %}info{% elif solicitud.unidad_inventario.estado == 'usado_regular' %}warning{% else %}secondary{% endif %}">
+                                        {{ solicitud.unidad_inventario.get_estado_display }}
+                                    </span>
+                                    <span class="badge bg-{% if solicitud.unidad_inventario.disponibilidad == 'disponible' %}success{% else %}danger{% endif %}">
+                                        {{ solicitud.unidad_inventario.get_disponibilidad_display }}
+                                    </span>
+                                    <span class="badge bg-secondary">
+                                        {{ solicitud.unidad_inventario.get_origen_display }}
+                                    </span>
+                                </div>
+                                <a href="{% url 'almacen:detalle_unidad' solicitud.unidad_inventario.pk %}" class="btn btn-sm btn-outline-primary mt-2">
+                                    <i class="bi bi-eye me-1"></i>Ver detalles
+                                </a>
+                            </div>
+                        </dd>
+                        {% endif %}
+                        
+                        <dt class="col-sm-4">Cantidad:</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge bg-primary fs-5">{{ solicitud.cantidad }}</span>
+                        </dd>
+                        
+                        <dt class="col-sm-4">Stock Actual:</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge bg-{% if solicitud.producto.stock_actual >= solicitud.cantidad %}success{% else %}danger{% endif %} fs-5">
+                                {{ solicitud.producto.stock_actual }}
+                            </span>
+                            {% if solicitud.producto.stock_actual < solicitud.cantidad %}
+                            <br><small class="text-danger">¡Stock insuficiente!</small>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-4">Solicitante:</dt>
+                        <dd class="col-sm-8">{{ solicitud.solicitante }}</dd>
+                        
+                        <dt class="col-sm-4">Tipo:</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge bg-info">{{ solicitud.get_tipo_solicitud_display }}</span>
+                        </dd>
+                        
+                        {% if solicitud.orden_servicio %}
+                        <dt class="col-sm-4">Orden:</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge bg-primary">OS-{{ solicitud.orden_servicio.pk }}</span>
+                        </dd>
+                        {% endif %}
+                        
+                        <dt class="col-sm-4">Fecha:</dt>
+                        <dd class="col-sm-8">{{ solicitud.fecha_solicitud|date:"d/m/Y H:i" }}</dd>
+                        
+                        {% if solicitud.observaciones %}
+                        <dt class="col-sm-4">Motivo:</dt>
+                        <dd class="col-sm-8">{{ solicitud.observaciones }}</dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulario de Procesamiento -->
+        <div class="col-md-7">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clipboard-check me-2"></i>Procesar Solicitud
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label">Decisión *</label>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <div class="form-check border rounded p-3 h-100">
+                                        <input class="form-check-input" type="radio" name="accion" id="aprobar" value="aprobar" required>
+                                        <label class="form-check-label w-100" for="aprobar">
+                                            <span class="d-block h5 text-success">
+                                                <i class="bi bi-check-circle me-1"></i>Aprobar
+                                            </span>
+                                            <small class="text-muted">
+                                                Se deducirán {{ solicitud.cantidad }} unidades del stock
+                                            </small>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="form-check border rounded p-3 h-100">
+                                        <input class="form-check-input" type="radio" name="accion" id="rechazar" value="rechazar">
+                                        <label class="form-check-label w-100" for="rechazar">
+                                            <span class="d-block h5 text-danger">
+                                                <i class="bi bi-x-circle me-1"></i>Rechazar
+                                            </span>
+                                            <small class="text-muted">
+                                                No se modificará el stock
+                                            </small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">Observaciones</label>
+                            {{ form.observaciones }}
+                            <small class="text-muted">Opcional: Agregue notas sobre la decisión</small>
+                        </div>
+
+                        <div class="d-flex justify-content-between pt-3 border-top">
+                            <a href="{% url 'almacen:lista_solicitudes' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Volver
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-lg me-1"></i>Confirmar Decisión
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock almacen_content %}

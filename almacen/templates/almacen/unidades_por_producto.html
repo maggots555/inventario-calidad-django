@@ -1,0 +1,370 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% comment %}
+Template: Unidades por Producto
+===============================
+Muestra todas las unidades de un producto específico con resúmenes.
+
+Contexto esperado:
+- producto: Objeto ProductoAlmacen
+- page_obj: Página actual de unidades
+- total_unidades: Total de unidades del producto
+- unidades_disponibles: Cantidad de unidades disponibles
+- resumen_marcas: QuerySet con conteo por marca
+- resumen_estados: QuerySet con conteo por estado
+- resumen_disponibilidad: QuerySet con conteo por disponibilidad
+{% endcomment %}
+
+{% block title %}Unidades de {{ producto.nombre }} - {{ block.super }}{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    
+    <!-- Navegación / Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'almacen:dashboard' %}">
+                    <i class="bi bi-house me-1"></i>Almacén
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'almacen:lista_productos' %}">Productos</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'almacen:detalle_producto' producto.pk %}">{{ producto.nombre|truncatechars:20 }}</a>
+            </li>
+            <li class="breadcrumb-item active">Unidades</li>
+        </ol>
+    </nav>
+    
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="bi bi-collection text-primary me-2"></i>
+                Unidades de: {{ producto.nombre }}
+            </h2>
+            <p class="text-muted mb-0">
+                <span class="me-3">
+                    <i class="bi bi-upc me-1"></i>{{ producto.codigo_producto }}
+                </span>
+                {% if producto.categoria %}
+                <span>
+                    <i class="bi bi-folder me-1"></i>{{ producto.categoria.nombre }}
+                </span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'almacen:crear_unidad_producto' producto.pk %}" class="btn btn-success">
+                <i class="bi bi-plus-circle me-1"></i>
+                Nueva Unidad
+            </a>
+            <a href="{% url 'almacen:detalle_producto' producto.pk %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>
+                Volver al Producto
+            </a>
+        </div>
+    </div>
+    
+    <!-- Resumen General -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 bg-primary bg-opacity-10">
+                <div class="card-body text-center">
+                    <h2 class="mb-0 text-primary">{{ total_unidades }}</h2>
+                    <small class="text-muted">Total Unidades Rastreadas</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 bg-success bg-opacity-10">
+                <div class="card-body text-center">
+                    <h2 class="mb-0 text-success">{{ unidades_disponibles }}</h2>
+                    <small class="text-muted">Disponibles</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 bg-secondary bg-opacity-10">
+                <div class="card-body text-center">
+                    <h2 class="mb-0 text-secondary">{{ producto.stock_actual }}</h2>
+                    <small class="text-muted">Stock Total del Producto</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 {% if total_unidades < producto.stock_actual %}bg-warning bg-opacity-10{% else %}bg-light{% endif %}">
+                <div class="card-body text-center">
+                    <h2 class="mb-0 {% if total_unidades < producto.stock_actual %}text-warning{% else %}text-success{% endif %}">
+                        {{ total_unidades }}/{{ producto.stock_actual }}
+                    </h2>
+                    <small class="text-muted">Unidades Rastreadas vs Stock</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        <!-- Resúmenes laterales -->
+        <div class="col-lg-3">
+            
+            <!-- Resumen por Marca -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <i class="bi bi-tags me-2"></i>Por Marca
+                </div>
+                <div class="card-body p-0">
+                    {% if resumen_marcas %}
+                    <ul class="list-group list-group-flush">
+                        {% for item in resumen_marcas %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                {% if item.marca %}
+                                    {{ item.marca }}
+                                {% else %}
+                                    <span class="text-muted">Sin marca</span>
+                                {% endif %}
+                            </span>
+                            <span class="badge bg-primary rounded-pill">{{ item.cantidad }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="p-3 text-center text-muted">
+                        Sin datos
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Resumen por Estado -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <i class="bi bi-check2-square me-2"></i>Por Estado
+                </div>
+                <div class="card-body p-0">
+                    {% if resumen_estados %}
+                    <ul class="list-group list-group-flush">
+                        {% for item in resumen_estados %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                {% if item.estado == 'nuevo' %}
+                                    <span class="badge bg-success me-1">🆕</span> Nuevo
+                                {% elif item.estado == 'usado_bueno' %}
+                                    <span class="badge bg-primary me-1">👍</span> Usado Bueno
+                                {% elif item.estado == 'usado_regular' %}
+                                    <span class="badge bg-warning me-1">👌</span> Usado Regular
+                                {% elif item.estado == 'reparado' %}
+                                    <span class="badge bg-info me-1">🔧</span> Reparado
+                                {% elif item.estado == 'defectuoso' %}
+                                    <span class="badge bg-danger me-1">❌</span> Defectuoso
+                                {% elif item.estado == 'para_revision' %}
+                                    <span class="badge bg-secondary me-1">🔍</span> Para Revisión
+                                {% endif %}
+                            </span>
+                            <span class="badge bg-secondary rounded-pill">{{ item.cantidad }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="p-3 text-center text-muted">
+                        Sin datos
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Resumen por Disponibilidad -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <i class="bi bi-toggle-on me-2"></i>Por Disponibilidad
+                </div>
+                <div class="card-body p-0">
+                    {% if resumen_disponibilidad %}
+                    <ul class="list-group list-group-flush">
+                        {% for item in resumen_disponibilidad %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                {% if item.disponibilidad == 'disponible' %}
+                                    ✅ Disponible
+                                {% elif item.disponibilidad == 'reservada' %}
+                                    📌 Reservada
+                                {% elif item.disponibilidad == 'asignada' %}
+                                    🔗 Asignada
+                                {% elif item.disponibilidad == 'vendida' %}
+                                    💰 Vendida
+                                {% elif item.disponibilidad == 'descartada' %}
+                                    🗑️ Descartada
+                                {% endif %}
+                            </span>
+                            <span class="badge bg-secondary rounded-pill">{{ item.cantidad }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="p-3 text-center text-muted">
+                        Sin datos
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+        </div>
+        
+        <!-- Lista de unidades -->
+        <div class="col-lg-9">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="bi bi-list-ul me-2"></i>Lista de Unidades
+                    </span>
+                    <a href="{% url 'almacen:lista_unidades' %}?producto={{ producto.pk }}" 
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-filter me-1"></i>Ver con Filtros
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Marca / Modelo</th>
+                                    <th>N° Serie</th>
+                                    <th class="text-center">Estado</th>
+                                    <th class="text-center">Disponibilidad</th>
+                                    <th>Origen</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for unidad in page_obj %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'almacen:detalle_unidad' unidad.pk %}" 
+                                           class="fw-semibold text-decoration-none">
+                                            {{ unidad.codigo_interno }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if unidad.marca %}
+                                            <span class="fw-medium">{{ unidad.marca }}</span>
+                                            {% if unidad.modelo %}
+                                                <br><small class="text-muted">{{ unidad.modelo }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if unidad.numero_serie %}
+                                            <code class="small">{{ unidad.numero_serie|truncatechars:15 }}</code>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if unidad.estado == 'nuevo' %}
+                                            <span class="badge bg-success">Nuevo</span>
+                                        {% elif unidad.estado == 'usado_bueno' %}
+                                            <span class="badge bg-primary">Usado Bueno</span>
+                                        {% elif unidad.estado == 'usado_regular' %}
+                                            <span class="badge bg-warning text-dark">Usado Regular</span>
+                                        {% elif unidad.estado == 'reparado' %}
+                                            <span class="badge bg-info">Reparado</span>
+                                        {% elif unidad.estado == 'defectuoso' %}
+                                            <span class="badge bg-danger">Defectuoso</span>
+                                        {% elif unidad.estado == 'para_revision' %}
+                                            <span class="badge bg-secondary">Para Revisión</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if unidad.disponibilidad == 'disponible' %}
+                                            <span class="badge bg-success">Disponible</span>
+                                        {% elif unidad.disponibilidad == 'reservada' %}
+                                            <span class="badge bg-warning text-dark">Reservada</span>
+                                        {% elif unidad.disponibilidad == 'asignada' %}
+                                            <span class="badge bg-info">Asignada</span>
+                                        {% elif unidad.disponibilidad == 'vendida' %}
+                                            <span class="badge bg-secondary">Vendida</span>
+                                        {% elif unidad.disponibilidad == 'descartada' %}
+                                            <span class="badge bg-dark">Descartada</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>{{ unidad.get_origen_display }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'almacen:detalle_unidad' unidad.pk %}" 
+                                               class="btn btn-outline-primary btn-sm"
+                                               title="Ver">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'almacen:editar_unidad' unidad.pk %}" 
+                                               class="btn btn-outline-secondary btn-sm"
+                                               title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginación -->
+                    {% if page_obj.has_other_pages %}
+                    <div class="card-footer bg-light">
+                        <nav aria-label="Navegación de páginas">
+                            <ul class="pagination pagination-sm justify-content-center mb-0">
+                                {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </a>
+                                </li>
+                                {% endif %}
+                                
+                                <li class="page-item disabled">
+                                    <span class="page-link">
+                                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                                    </span>
+                                </li>
+                                
+                                {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    </div>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
+                        <h5 class="text-muted mt-3">No hay unidades registradas</h5>
+                        <p class="text-muted">
+                            Este producto no tiene unidades individuales rastreadas.
+                        </p>
+                        <a href="{% url 'almacen:crear_unidad_producto' producto.pk %}" class="btn btn-success">
+                            <i class="bi bi-plus-circle me-1"></i>Registrar Primera Unidad
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+{% endblock almacen_content %}

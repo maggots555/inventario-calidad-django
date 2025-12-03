@@ -1,0 +1,182 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% block title %}Solicitudes de Baja - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">
+                <i class="bi bi-cart-dash me-2"></i>Solicitudes de Baja
+            </h1>
+        </div>
+        <div>
+            <a href="{% url 'almacen:dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left me-1"></i>Dashboard
+            </a>
+            <a href="{% url 'almacen:crear_solicitud' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Nueva Solicitud
+            </a>
+        </div>
+    </div>
+
+    <!-- Tabs de filtro por estado -->
+    <ul class="nav nav-pills mb-4">
+        <li class="nav-item">
+            <a class="nav-link {% if not estado_filtro %}active{% endif %}" href="{% url 'almacen:lista_solicitudes' %}">
+                Todas
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if estado_filtro == 'pendiente' %}active{% endif %} position-relative" href="?estado=pendiente">
+                Pendientes
+                {% if contadores.pendientes > 0 %}
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark">
+                    {{ contadores.pendientes }}
+                </span>
+                {% endif %}
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if estado_filtro == 'aprobada' %}active{% endif %}" href="?estado=aprobada">
+                Aprobadas
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if estado_filtro == 'rechazada' %}active{% endif %}" href="?estado=rechazada">
+                Rechazadas
+            </a>
+        </li>
+    </ul>
+
+    <!-- Tabla -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Producto / Unidad</th>
+                            <th class="text-center">Cantidad</th>
+                            <th>Solicitante</th>
+                            <th>Tipo</th>
+                            <th>Orden Servicio</th>
+                            <th>Estado</th>
+                            <th>Fecha</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sol in solicitudes %}
+                        <tr>
+                            <td>{{ sol.pk }}</td>
+                            <td>
+                                <a href="{% url 'almacen:detalle_producto' sol.producto.pk %}" class="text-decoration-none">
+                                    <strong>{{ sol.producto.codigo_producto }}</strong>
+                                </a>
+                                <br>
+                                <small class="text-muted">{{ sol.producto.nombre|truncatechars:30 }}</small>
+                                {% if sol.unidad_inventario %}
+                                <div class="mt-1 p-1 border-start border-primary border-3 ps-2 bg-light">
+                                    <small class="text-primary">
+                                        <i class="bi bi-cpu me-1"></i>
+                                        <strong>
+                                            {% if sol.unidad_inventario.marca %}{{ sol.unidad_inventario.marca }}{% endif %}
+                                            {% if sol.unidad_inventario.modelo %}{{ sol.unidad_inventario.modelo }}{% endif %}
+                                        </strong>
+                                        {% if sol.unidad_inventario.numero_serie %}
+                                        <br>S/N: {{ sol.unidad_inventario.numero_serie }}
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary fs-6">{{ sol.cantidad }}</span>
+                            </td>
+                            <td>{{ sol.solicitante }}</td>
+                            <td>
+                                <span class="badge bg-{% if sol.tipo_solicitud == 'orden' %}primary{% elif sol.tipo_solicitud == 'reparacion' %}info{% else %}warning{% endif %}">
+                                    {{ sol.get_tipo_solicitud_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if sol.orden_servicio %}
+                                    <span class="badge bg-primary">OS-{{ sol.orden_servicio.pk }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if sol.estado == 'pendiente' %}warning text-dark{% elif sol.estado == 'aprobada' %}success{% elif sol.estado == 'rechazada' %}danger{% else %}secondary{% endif %}">
+                                    {{ sol.get_estado_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <small>{{ sol.fecha_solicitud|date:"d/m/Y H:i" }}</small>
+                            </td>
+                            <td class="text-end">
+                                {% if sol.estado == 'pendiente' %}
+                                <a href="{% url 'almacen:procesar_solicitud' sol.pk %}" class="btn btn-sm btn-success">
+                                    <i class="bi bi-check-lg me-1"></i>Procesar
+                                </a>
+                                {% else %}
+                                <span class="text-muted small">
+                                    {% if sol.agente_almacen %}
+                                        Por: {{ sol.agente_almacen }}
+                                    {% endif %}
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center py-5">
+                                <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
+                                <p class="text-muted">No hay solicitudes {% if estado_filtro %}con este estado{% endif %}</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paginación -->
+    {% if solicitudes.has_other_pages %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if solicitudes.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ solicitudes.previous_page_number }}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+            
+            {% for num in solicitudes.paginator.page_range %}
+                {% if solicitudes.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% elif num > solicitudes.number|add:'-3' and num < solicitudes.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if solicitudes.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ solicitudes.next_page_number }}{% if estado_filtro %}&estado={{ estado_filtro }}{% endif %}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock almacen_content %}

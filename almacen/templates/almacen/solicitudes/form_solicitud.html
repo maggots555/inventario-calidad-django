@@ -1,0 +1,186 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% block title %}Nueva Solicitud - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'almacen:dashboard' %}">Almacén</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'almacen:lista_solicitudes' %}">Solicitudes</a></li>
+            <li class="breadcrumb-item active">Nueva Solicitud</li>
+        </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-cart-plus me-2"></i>{{ titulo }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <!-- Producto -->
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label">Producto *</label>
+                                {{ form.producto }}
+                                {% if form.producto.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.producto.errors.0 }}</div>
+                                {% endif %}
+                                <small class="text-muted" id="stock-info"></small>
+                            </div>
+                            
+                            <!-- Cantidad -->
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Cantidad *</label>
+                                {{ form.cantidad }}
+                                {% if form.cantidad.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.cantidad.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Unidad Específica (carga dinámica) -->
+                            <div class="col-12 mb-3" id="unidad-container" style="display: none;">
+                                <label class="form-label">
+                                    <i class="bi bi-cpu me-1"></i>Unidad Específica (opcional)
+                                </label>
+                                {{ form.unidad_inventario }}
+                                {% if form.unidad_inventario.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.unidad_inventario.errors.0 }}</div>
+                                {% endif %}
+                                <small class="text-muted">
+                                    Si desea una marca/modelo específico, selecciónelo aquí. 
+                                    De lo contrario, se asignará cualquier unidad disponible.
+                                </small>
+                            </div>
+                            
+                            <!-- Tipo de Solicitud -->
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Tipo de Solicitud *</label>
+                                {{ form.tipo_solicitud }}
+                                {% if form.tipo_solicitud.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.tipo_solicitud.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Orden de Servicio -->
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Orden de Servicio (opcional)</label>
+                                {{ form.orden_servicio }}
+                                {% if form.orden_servicio.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.orden_servicio.errors.0 }}</div>
+                                {% endif %}
+                                <small class="text-muted">Vincular a una orden de servicio existente</small>
+                            </div>
+                            
+                            <!-- Observaciones / Motivo -->
+                            <div class="col-12 mb-3">
+                                <label class="form-label">Motivo / Justificación *</label>
+                                {{ form.observaciones }}
+                                {% if form.observaciones.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.observaciones.errors.0 }}</div>
+                                {% endif %}
+                                <small class="text-muted">Explique por qué necesita estos productos</small>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between pt-3 border-top">
+                            <a href="{% url 'almacen:lista_solicitudes' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg me-1"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-send me-1"></i>Enviar Solicitud
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock almacen_content %}
+
+{% block extra_js %}
+<script>
+/**
+ * Carga dinámica de unidades cuando se selecciona un producto.
+ * 
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * --------------------------------
+ * Cuando el usuario selecciona un producto en el dropdown, este script:
+ * 1. Hace una petición AJAX al servidor para obtener las unidades de ese producto
+ * 2. Llena el dropdown de "Unidad Específica" con las opciones disponibles
+ * 3. Muestra el contenedor de unidades si hay unidades disponibles
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    const productoSelect = document.getElementById('id_producto');
+    const unidadSelect = document.getElementById('id_unidad_inventario');
+    const unidadContainer = document.getElementById('unidad-container');
+    const stockInfo = document.getElementById('stock-info');
+    
+    if (productoSelect && unidadSelect) {
+        productoSelect.addEventListener('change', function() {
+            const productoId = this.value;
+            
+            // Limpiar el select de unidades
+            unidadSelect.innerHTML = '<option value="">-- Cargando unidades... --</option>';
+            
+            if (!productoId) {
+                unidadSelect.innerHTML = '<option value="">-- Seleccione un producto primero --</option>';
+                unidadContainer.style.display = 'none';
+                stockInfo.textContent = '';
+                return;
+            }
+            
+            // Hacer petición AJAX para obtener las unidades del producto
+            fetch(`{% url 'almacen:api_unidades_producto' %}?producto_id=${productoId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Mostrar info de stock
+                    if (data.stock_info) {
+                        stockInfo.innerHTML = `<span class="text-success"><i class="bi bi-box-seam me-1"></i>${data.stock_info}</span>`;
+                    }
+                    
+                    // Llenar el select de unidades
+                    unidadSelect.innerHTML = '<option value="">-- Cualquier unidad disponible --</option>';
+                    
+                    if (data.unidades && data.unidades.length > 0) {
+                        data.unidades.forEach(function(unidad) {
+                            const option = document.createElement('option');
+                            option.value = unidad.id;
+                            // Formato: "Samsung 870 EVO - S/N: ABC123 (Nuevo)"
+                            let texto = '';
+                            if (unidad.marca) texto += unidad.marca;
+                            if (unidad.modelo) texto += ' ' + unidad.modelo;
+                            if (unidad.numero_serie) texto += ' - S/N: ' + unidad.numero_serie;
+                            texto += ' (' + unidad.estado_display + ')';
+                            option.textContent = texto.trim() || `Unidad #${unidad.id}`;
+                            unidadSelect.appendChild(option);
+                        });
+                        unidadContainer.style.display = 'block';
+                    } else {
+                        unidadSelect.innerHTML = '<option value="">-- No hay unidades registradas --</option>';
+                        unidadContainer.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error cargando unidades:', error);
+                    unidadSelect.innerHTML = '<option value="">-- Error al cargar unidades --</option>';
+                });
+        });
+        
+        // Si ya hay un producto seleccionado (ej: al recargar por error), disparar el evento
+        if (productoSelect.value) {
+            productoSelect.dispatchEvent(new Event('change'));
+        }
+    }
+});
+</script>
+{% endblock extra_js %}

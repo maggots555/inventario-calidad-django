@@ -383,3 +383,279 @@ PROVEEDORES_CHOICES = [
     ('ULRA', 'ULTRA'),
     ('OTRO', 'Otro proveedor'),  # Opción para proveedor no listado
 ]
+
+
+# ============================================================================
+# MÓDULO ALMACÉN - Sistema de Inventario de Almacén Central
+# Agregado: Diciembre 2025
+# ============================================================================
+
+# TIPOS DE PRODUCTO EN ALMACÉN
+# Determina el comportamiento del producto respecto a stock y alertas
+TIPO_PRODUCTO_ALMACEN_CHOICES = [
+    ('resurtible', 'Resurtible (Stock Permanente)'),
+    ('unico', 'Único (Compra Específica)'),
+]
+
+# CATEGORÍAS DE PRODUCTOS DE ALMACÉN
+# Clasificación general de productos
+CATEGORIA_ALMACEN_CHOICES = [
+    ('repuesto', 'Repuesto/Pieza'),
+    ('consumible', 'Consumible'),
+    ('herramienta', 'Herramienta'),
+    ('accesorio', 'Accesorio'),
+    ('quimico', 'Químico/Limpieza'),
+    ('paquete', 'Paquete/Kit'),
+    ('otro', 'Otro'),
+]
+
+# TIPOS DE MOVIMIENTO EN ALMACÉN
+# Entrada: incrementa stock, Salida: decrementa stock
+TIPO_MOVIMIENTO_ALMACEN_CHOICES = [
+    ('entrada', 'Entrada'),
+    ('salida', 'Salida'),
+]
+
+# TIPOS DE SOLICITUD DE BAJA
+# Define el propósito de la salida de producto
+TIPO_SOLICITUD_ALMACEN_CHOICES = [
+    ('consumo_interno', 'Consumo Interno'),
+    ('servicio_tecnico', 'Servicio Técnico'),
+    ('venta_mostrador', 'Venta Mostrador'),
+    ('transferencia', 'Transferencia entre Sucursales'),
+]
+
+# ESTADOS DE SOLICITUD DE BAJA
+# Workflow de aprobación de salidas
+ESTADO_SOLICITUD_BAJA_CHOICES = [
+    ('pendiente', 'Pendiente'),
+    ('aprobada', 'Aprobada'),
+    ('rechazada', 'Rechazada'),
+    ('en_espera', 'En Espera - Producto no Disponible'),
+]
+
+# TIPOS DE AUDITORÍA DE INVENTARIO
+# Diferentes enfoques de auditoría según necesidad
+TIPO_AUDITORIA_CHOICES = [
+    ('completa', 'Auditoría Completa'),
+    ('ciclica', 'Auditoría Cíclica'),
+    ('diferencias', 'Auditoría por Diferencias'),
+    ('abc', 'Auditoría ABC (Alto Valor)'),
+]
+
+# ESTADOS DE AUDITORÍA
+# Progreso de la auditoría
+ESTADO_AUDITORIA_CHOICES = [
+    ('en_proceso', 'En Proceso'),
+    ('completada', 'Completada'),
+    ('con_diferencias', 'Completada con Diferencias'),
+]
+
+# RAZONES DE DIFERENCIA EN AUDITORÍA
+# Catalogar causas de discrepancias entre sistema y físico
+RAZON_DIFERENCIA_AUDITORIA_CHOICES = [
+    ('merma_natural', 'Merma Natural'),
+    ('dano', 'Producto Dañado'),
+    ('robo', 'Robo/Pérdida'),
+    ('error_sistema', 'Error de Sistema'),
+    ('error_recepcion', 'Error al Recibir'),
+    ('error_despacho', 'Error al Despachar'),
+    ('desconocida', 'Razón Desconocida'),
+]
+
+# CLASIFICACIÓN DE ESTADOS PARA LÓGICA DE SOLICITUDES
+# Útil para filtros y validaciones en código
+ESTADOS_SOLICITUD_PENDIENTES = ['pendiente', 'en_espera']
+ESTADOS_SOLICITUD_FINALIZADOS = ['aprobada', 'rechazada']
+
+
+# ============================================================================
+# FUNCIONES DE UTILIDAD - MÓDULO ALMACÉN
+# ============================================================================
+
+def obtener_nombre_tipo_producto(codigo_tipo):
+    """
+    Retorna el nombre legible de un tipo de producto de almacén
+    
+    Args:
+        codigo_tipo (str): Código del tipo ('resurtible', 'unico')
+    
+    Returns:
+        str: Nombre del tipo
+    """
+    for codigo, nombre in TIPO_PRODUCTO_ALMACEN_CHOICES:
+        if codigo == codigo_tipo:
+            return nombre
+    return 'Tipo Desconocido'
+
+
+def obtener_nombre_estado_solicitud(codigo_estado):
+    """
+    Retorna el nombre legible de un estado de solicitud de baja
+    
+    Args:
+        codigo_estado (str): Código del estado
+    
+    Returns:
+        str: Nombre del estado
+    """
+    for codigo, nombre in ESTADO_SOLICITUD_BAJA_CHOICES:
+        if codigo == codigo_estado:
+            return nombre
+    return 'Estado Desconocido'
+
+
+def es_solicitud_pendiente(codigo_estado):
+    """
+    Verifica si una solicitud está en estado pendiente
+    
+    Args:
+        codigo_estado (str): Código del estado
+    
+    Returns:
+        bool: True si está pendiente
+    """
+    return codigo_estado in ESTADOS_SOLICITUD_PENDIENTES
+
+
+# ============================================================================
+# UNIDAD DE INVENTARIO - Rastreo Individual de Piezas/Productos
+# Agregado: Diciembre 2025
+# ============================================================================
+
+# ESTADO DE LA UNIDAD INDIVIDUAL
+# Representa la condición física/funcional de cada pieza
+ESTADO_UNIDAD_CHOICES = [
+    ('nuevo', 'Nuevo'),
+    ('usado_bueno', 'Usado - Buen Estado'),
+    ('usado_regular', 'Usado - Estado Regular'),
+    ('reparado', 'Reparado'),
+    ('defectuoso', 'Defectuoso'),
+    ('para_revision', 'Para Revisión'),
+]
+
+# ORIGEN DE LA UNIDAD
+# De dónde proviene esta pieza específica
+ORIGEN_UNIDAD_CHOICES = [
+    ('compra', 'Compra Directa'),
+    ('orden_servicio', 'Recuperada de Orden de Servicio'),
+    ('devolucion_cliente', 'Devolución de Cliente'),
+    ('transferencia', 'Transferencia entre Sucursales'),
+    ('inventario_inicial', 'Inventario Inicial'),
+    ('donacion', 'Donación'),
+    ('otro', 'Otro'),
+]
+
+# DISPONIBILIDAD DE LA UNIDAD
+# Estado operativo actual
+DISPONIBILIDAD_UNIDAD_CHOICES = [
+    ('disponible', 'Disponible'),
+    ('reservada', 'Reservada'),
+    ('asignada', 'Asignada a Orden'),
+    ('vendida', 'Vendida'),
+    ('descartada', 'Descartada/Baja'),
+]
+
+# MARCAS COMUNES DE COMPONENTES
+# Para autocompletado y estandarización
+MARCAS_COMPONENTES_CHOICES = [
+    ('', '-- Seleccionar marca --'),
+    # Almacenamiento
+    ('Samsung', 'Samsung'),
+    ('Kingston', 'Kingston'),
+    ('Crucial', 'Crucial'),
+    ('Western Digital', 'Western Digital'),
+    ('Seagate', 'Seagate'),
+    ('SanDisk', 'SanDisk'),
+    ('SK Hynix', 'SK Hynix'),
+    ('Toshiba', 'Toshiba'),
+    # RAM
+    ('Corsair', 'Corsair'),
+    ('G.Skill', 'G.Skill'),
+    ('ADATA', 'ADATA'),
+    ('TeamGroup', 'TeamGroup'),
+    # Tarjetas Madre / Componentes
+    ('Asus', 'Asus'),
+    ('MSI', 'MSI'),
+    ('Gigabyte', 'Gigabyte'),
+    ('ASRock', 'ASRock'),
+    ('Intel', 'Intel'),
+    ('AMD', 'AMD'),
+    ('Nvidia', 'Nvidia'),
+    # Laptops / OEM
+    ('Dell', 'Dell'),
+    ('HP', 'HP'),
+    ('Lenovo', 'Lenovo'),
+    ('Acer', 'Acer'),
+    ('Apple', 'Apple'),
+    # Genérico
+    ('Genérico', 'Genérico / Sin Marca'),
+    ('Otra', 'Otra Marca'),
+]
+
+# CLASIFICACIÓN DE ESTADOS PARA LÓGICA DE UNIDADES
+ESTADOS_UNIDAD_USABLES = ['nuevo', 'usado_bueno', 'reparado']
+ESTADOS_UNIDAD_DISPONIBLES = ['disponible']
+DISPONIBILIDADES_ACTIVAS = ['disponible', 'reservada', 'asignada']
+
+
+# ============================================================================
+# FUNCIONES DE UTILIDAD - UNIDADES DE INVENTARIO
+# ============================================================================
+
+def obtener_nombre_estado_unidad(codigo_estado):
+    """
+    Retorna el nombre legible de un estado de unidad
+    
+    Args:
+        codigo_estado (str): Código del estado
+    
+    Returns:
+        str: Nombre del estado
+    """
+    for codigo, nombre in ESTADO_UNIDAD_CHOICES:
+        if codigo == codigo_estado:
+            return nombre
+    return 'Estado Desconocido'
+
+
+def obtener_nombre_origen_unidad(codigo_origen):
+    """
+    Retorna el nombre legible del origen de una unidad
+    
+    Args:
+        codigo_origen (str): Código del origen
+    
+    Returns:
+        str: Nombre del origen
+    """
+    for codigo, nombre in ORIGEN_UNIDAD_CHOICES:
+        if codigo == codigo_origen:
+            return nombre
+    return 'Origen Desconocido'
+
+
+def es_unidad_usable(codigo_estado):
+    """
+    Verifica si una unidad está en estado usable para asignar
+    
+    Args:
+        codigo_estado (str): Código del estado
+    
+    Returns:
+        bool: True si está en buen estado para usar
+    """
+    return codigo_estado in ESTADOS_UNIDAD_USABLES
+
+
+def es_unidad_disponible(codigo_disponibilidad):
+    """
+    Verifica si una unidad está disponible para asignar
+    
+    Args:
+        codigo_disponibilidad (str): Código de disponibilidad
+    
+    Returns:
+        bool: True si está disponible
+    """
+    return codigo_disponibilidad in ESTADOS_UNIDAD_DISPONIBLES

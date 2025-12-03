@@ -1,0 +1,312 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% comment %}
+Template: Editar Unidad de Inventario
+=====================================
+Formulario para editar una unidad existente.
+
+Contexto esperado:
+- form: UnidadInventarioForm con instance
+- unidad: Objeto UnidadInventario
+- titulo: Título de la página
+{% endcomment %}
+
+{% block title %}{{ titulo }} - {{ block.super }}{% endblock %}
+
+{% block almacen_content %}
+<div class="container py-4">
+    
+    <!-- Navegación / Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'almacen:dashboard' %}">
+                    <i class="bi bi-house me-1"></i>Almacén
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'almacen:lista_unidades' %}">Unidades</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'almacen:detalle_unidad' unidad.pk %}">{{ unidad.codigo_interno }}</a>
+            </li>
+            <li class="breadcrumb-item active">Editar</li>
+        </ol>
+    </nav>
+    
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">
+                <i class="bi bi-pencil-square text-warning me-2"></i>
+                {{ titulo }}
+            </h2>
+            <p class="text-muted mb-0">
+                Modificando: {{ unidad.producto.nombre }}
+                {% if unidad.marca %} • {{ unidad.marca }}{% endif %}
+            </p>
+        </div>
+        <a href="{% url 'almacen:detalle_unidad' unidad.pk %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>
+            Volver
+        </a>
+    </div>
+    
+    <!-- Formulario -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <i class="bi bi-hdd me-2"></i>Datos de la Unidad
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Código (solo lectura) -->
+                        <div class="mb-4">
+                            <div class="alert alert-light border">
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <small class="text-muted d-block">Código Interno</small>
+                                        <strong class="fs-5">{{ unidad.codigo_interno }}</strong>
+                                    </div>
+                                    <div class="col-md-6 text-md-end">
+                                        <small class="text-muted">Este código no se puede modificar</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Producto (solo lectura) -->
+                        <div class="mb-4">
+                            <h6 class="text-muted border-bottom pb-2">
+                                <i class="bi bi-box me-2"></i>Producto Asociado
+                            </h6>
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>{{ unidad.producto.nombre }}</strong>
+                                <span class="text-muted ms-2">({{ unidad.producto.codigo_producto }})</span>
+                                <br>
+                                <small class="text-muted">El producto no se puede cambiar después de crear la unidad.</small>
+                            </div>
+                            <!-- Campo oculto para mantener el producto -->
+                            <input type="hidden" name="producto" value="{{ unidad.producto.pk }}">
+                        </div>
+                        
+                        <!-- Especificaciones del Item -->
+                        <div class="mb-4">
+                            <h6 class="text-muted border-bottom pb-2">
+                                <i class="bi bi-tags me-2"></i>Especificaciones del Item
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.marca.label }}</label>
+                                    {{ form.marca }}
+                                    {% if form.marca.errors %}
+                                        <div class="text-danger small">{{ form.marca.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.modelo.label }}</label>
+                                    {{ form.modelo }}
+                                    {% if form.modelo.errors %}
+                                        <div class="text-danger small">{{ form.modelo.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.numero_serie.label }}</label>
+                                    {{ form.numero_serie }}
+                                    {% if form.numero_serie.errors %}
+                                        <div class="text-danger small">{{ form.numero_serie.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.ubicacion_especifica.label }}</label>
+                                    {{ form.ubicacion_especifica }}
+                                    {% if form.ubicacion_especifica.errors %}
+                                        <div class="text-danger small">{{ form.ubicacion_especifica.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.especificaciones.label }}</label>
+                                    {{ form.especificaciones }}
+                                    {% if form.especificaciones.errors %}
+                                        <div class="text-danger small">{{ form.especificaciones.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Estado y Disponibilidad -->
+                        <div class="mb-4">
+                            <h6 class="text-muted border-bottom pb-2">
+                                <i class="bi bi-check2-circle me-2"></i>Estado y Disponibilidad
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.estado.label }} *</label>
+                                    {{ form.estado }}
+                                    {% if form.estado.errors %}
+                                        <div class="text-danger small">{{ form.estado.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.disponibilidad.label }} *</label>
+                                    {{ form.disponibilidad }}
+                                    {% if form.disponibilidad.errors %}
+                                        <div class="text-danger small">{{ form.disponibilidad.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Origen y Trazabilidad -->
+                        <div class="mb-4">
+                            <h6 class="text-muted border-bottom pb-2">
+                                <i class="bi bi-signpost-split me-2"></i>Origen y Trazabilidad
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ form.origen.label }} *</label>
+                                    {{ form.origen }}
+                                    {% if form.origen.errors %}
+                                        <div class="text-danger small">{{ form.origen.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ form.compra.label }}</label>
+                                    {{ form.compra }}
+                                    {% if form.compra.errors %}
+                                        <div class="text-danger small">{{ form.compra.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ form.orden_servicio_origen.label }}</label>
+                                    {{ form.orden_servicio_origen }}
+                                    {% if form.orden_servicio_origen.errors %}
+                                        <div class="text-danger small">{{ form.orden_servicio_origen.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Costo -->
+                        <div class="mb-4">
+                            <h6 class="text-muted border-bottom pb-2">
+                                <i class="bi bi-currency-dollar me-2"></i>Valor
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ form.costo_unitario.label }}</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        {{ form.costo_unitario }}
+                                    </div>
+                                    {% if form.costo_unitario.errors %}
+                                        <div class="text-danger small">{{ form.costo_unitario.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Notas -->
+                        <div class="mb-4">
+                            <h6 class="text-muted border-bottom pb-2">
+                                <i class="bi bi-chat-left-text me-2"></i>Notas Adicionales
+                            </h6>
+                            {{ form.notas }}
+                            {% if form.notas.errors %}
+                                <div class="text-danger small">{{ form.notas.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Botones -->
+                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                            <a href="{% url 'almacen:detalle_unidad' unidad.pk %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-1"></i>
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle me-1"></i>
+                                Guardar Cambios
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Panel lateral de información -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-warning text-dark">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Estado Actual
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <small class="text-muted d-block">Estado Físico</small>
+                        {% if unidad.estado == 'nuevo' %}
+                            <span class="badge bg-success">🆕 Nuevo</span>
+                        {% elif unidad.estado == 'usado_bueno' %}
+                            <span class="badge bg-primary">👍 Usado Bueno</span>
+                        {% elif unidad.estado == 'usado_regular' %}
+                            <span class="badge bg-warning text-dark">👌 Usado Regular</span>
+                        {% elif unidad.estado == 'reparado' %}
+                            <span class="badge bg-info">🔧 Reparado</span>
+                        {% elif unidad.estado == 'defectuoso' %}
+                            <span class="badge bg-danger">❌ Defectuoso</span>
+                        {% elif unidad.estado == 'para_revision' %}
+                            <span class="badge bg-secondary">🔍 Para Revisión</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Disponibilidad</small>
+                        {% if unidad.disponibilidad == 'disponible' %}
+                            <span class="badge bg-success">✅ Disponible</span>
+                        {% elif unidad.disponibilidad == 'reservada' %}
+                            <span class="badge bg-warning text-dark">📌 Reservada</span>
+                        {% elif unidad.disponibilidad == 'asignada' %}
+                            <span class="badge bg-info">🔗 Asignada</span>
+                        {% elif unidad.disponibilidad == 'vendida' %}
+                            <span class="badge bg-secondary">💰 Vendida</span>
+                        {% elif unidad.disponibilidad == 'descartada' %}
+                            <span class="badge bg-dark">🗑️ Descartada</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <i class="bi bi-clock-history me-2"></i>Información
+                </div>
+                <div class="card-body small">
+                    <div class="mb-2">
+                        <strong>Fecha de Ingreso:</strong><br>
+                        {{ unidad.fecha_registro|date:"d/m/Y H:i" }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Última Actualización:</strong><br>
+                        {{ unidad.fecha_actualizacion|date:"d/m/Y H:i" }}
+                    </div>
+                    {% if unidad.numero_serie %}
+                    <div>
+                        <strong>Número de Serie:</strong><br>
+                        <code>{{ unidad.numero_serie }}</code>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+{% endblock almacen_content %}

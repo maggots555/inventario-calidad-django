@@ -1,0 +1,116 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% block title %}Registrar Entrada - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'almacen:dashboard' %}">Almacén</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'almacen:lista_movimientos' %}">Movimientos</a></li>
+            <li class="breadcrumb-item active">Registrar Entrada</li>
+        </ol>
+    </nav>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-box-arrow-in-down me-2"></i>{{ titulo }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Producto y Cantidad -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="border-bottom pb-2 mb-3">
+                                    <i class="bi bi-box me-2"></i>Datos del Producto
+                                </h6>
+                            </div>
+                            
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label">Producto *</label>
+                                {{ form.producto }}
+                                {% if form.producto.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.producto.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Cantidad *</label>
+                                {{ form.cantidad }}
+                                {% if form.cantidad.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.cantidad.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Información de Compra -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="border-bottom pb-2 mb-3">
+                                    <i class="bi bi-cart me-2"></i>Información de Compra
+                                </h6>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Costo Unitario *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    {{ form.costo_unitario }}
+                                </div>
+                                {% if form.costo_unitario.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.costo_unitario.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Proveedor</label>
+                                {{ form.proveedor }}
+                                {% if form.proveedor.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.proveedor.errors.0 }}</div>
+                                {% endif %}
+                                <small class="text-muted">Registra compra si se selecciona</small>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Número de Factura</label>
+                                {{ form.numero_factura }}
+                                {% if form.numero_factura.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.numero_factura.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Observaciones -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <label class="form-label">Observaciones</label>
+                                {{ form.observaciones }}
+                                {% if form.observaciones.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.observaciones.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between pt-3 border-top">
+                            <a href="{% url 'almacen:lista_movimientos' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg me-1"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-check-lg me-1"></i>Registrar Entrada
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock almacen_content %}

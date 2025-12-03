@@ -1,0 +1,338 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% comment %}
+Dashboard Principal del Módulo Almacén
+Muestra KPIs, solicitudes pendientes, productos con stock bajo y accesos rápidos.
+{% endcomment %}
+
+{% block title %}Dashboard - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">
+                <i class="bi bi-box-seam me-2"></i>Dashboard Almacén
+            </h1>
+            <p class="text-muted mb-0">Inventario Central - Vista General</p>
+        </div>
+        <div>
+            <a href="{% url 'almacen:crear_producto' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Nuevo Producto
+            </a>
+            <a href="{% url 'almacen:registrar_entrada' %}" class="btn btn-success">
+                <i class="bi bi-box-arrow-in-down me-1"></i>Registrar Entrada
+            </a>
+        </div>
+    </div>
+
+    <!-- KPIs Row -->
+    <div class="row g-3 mb-4">
+        <!-- Solicitudes Pendientes -->
+        <div class="col-12 col-sm-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100 {% if solicitudes_pendientes > 0 %}border-start border-4 border-warning{% endif %}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small">Solicitudes Pendientes</p>
+                            <h3 class="mb-0 {% if solicitudes_pendientes > 0 %}text-warning{% endif %}">
+                                {{ solicitudes_pendientes }}
+                            </h3>
+                        </div>
+                        <div class="bg-warning bg-opacity-10 rounded-3 p-2">
+                            <i class="bi bi-hourglass-split text-warning fs-4"></i>
+                        </div>
+                    </div>
+                    {% if solicitudes_pendientes > 0 %}
+                    <a href="{% url 'almacen:lista_solicitudes' %}?estado=pendiente" class="stretched-link"></a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Bajo -->
+        <div class="col-12 col-sm-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100 {% if productos_stock_bajo > 0 %}border-start border-4 border-danger{% endif %}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small">Stock Bajo</p>
+                            <h3 class="mb-0 {% if productos_stock_bajo > 0 %}text-danger{% endif %}">
+                                {{ productos_stock_bajo }}
+                            </h3>
+                        </div>
+                        <div class="bg-danger bg-opacity-10 rounded-3 p-2">
+                            <i class="bi bi-exclamation-triangle text-danger fs-4"></i>
+                        </div>
+                    </div>
+                    {% if productos_stock_bajo > 0 %}
+                    <a href="{% url 'almacen:lista_productos' %}?stock=bajo" class="stretched-link"></a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Productos Agotados -->
+        <div class="col-12 col-sm-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100 {% if productos_agotados > 0 %}border-start border-4 border-dark{% endif %}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small">Agotados</p>
+                            <h3 class="mb-0 {% if productos_agotados > 0 %}text-dark{% endif %}">
+                                {{ productos_agotados }}
+                            </h3>
+                        </div>
+                        <div class="bg-dark bg-opacity-10 rounded-3 p-2">
+                            <i class="bi bi-x-octagon text-dark fs-4"></i>
+                        </div>
+                    </div>
+                    {% if productos_agotados > 0 %}
+                    <a href="{% url 'almacen:lista_productos' %}?stock=agotado" class="stretched-link"></a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Productos -->
+        <div class="col-12 col-sm-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small">Total Productos</p>
+                            <h3 class="mb-0 text-primary">{{ total_productos }}</h3>
+                        </div>
+                        <div class="bg-primary bg-opacity-10 rounded-3 p-2">
+                            <i class="bi bi-box text-primary fs-4"></i>
+                        </div>
+                    </div>
+                    <a href="{% url 'almacen:lista_productos' %}" class="stretched-link"></a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Valor Inventario -->
+        <div class="col-12 col-sm-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small">Valor Inventario</p>
+                            <h3 class="mb-0 text-success">${{ valor_inventario|floatformat:0|default:"0" }}</h3>
+                        </div>
+                        <div class="bg-success bg-opacity-10 rounded-3 p-2">
+                            <i class="bi bi-currency-dollar text-success fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auditorías en Proceso -->
+        <div class="col-12 col-sm-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small">Auditorías Activas</p>
+                            <h3 class="mb-0 text-info">{{ auditorias_en_proceso }}</h3>
+                        </div>
+                        <div class="bg-info bg-opacity-10 rounded-3 p-2">
+                            <i class="bi bi-clipboard-check text-info fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido Principal -->
+    <div class="row g-4">
+        <!-- Columna Izquierda -->
+        <div class="col-lg-8">
+            <!-- Solicitudes Pendientes -->
+            {% if ultimas_solicitudes %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-hourglass-split text-warning me-2"></i>
+                        Solicitudes Pendientes
+                    </h5>
+                    <a href="{% url 'almacen:lista_solicitudes' %}?estado=pendiente" class="btn btn-sm btn-outline-primary">
+                        Ver todas
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Producto</th>
+                                    <th class="text-center">Cantidad</th>
+                                    <th>Solicitante</th>
+                                    <th>Tipo</th>
+                                    <th>Fecha</th>
+                                    <th class="text-end">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sol in ultimas_solicitudes %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ sol.producto.codigo_producto }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ sol.producto.nombre|truncatechars:30 }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary">{{ sol.cantidad }}</span>
+                                    </td>
+                                    <td>{{ sol.solicitante }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if sol.tipo_solicitud == 'orden' %}primary{% elif sol.tipo_solicitud == 'reparacion' %}info{% else %}warning{% endif %}">
+                                            {{ sol.get_tipo_solicitud_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ sol.fecha_solicitud|date:"d/m/Y H:i" }}</small>
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{% url 'almacen:procesar_solicitud' sol.pk %}" class="btn btn-sm btn-success">
+                                            <i class="bi bi-check-lg"></i> Procesar
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Últimos Movimientos -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-arrow-left-right text-primary me-2"></i>
+                        Últimos Movimientos
+                    </h5>
+                    <a href="{% url 'almacen:lista_movimientos' %}" class="btn btn-sm btn-outline-primary">
+                        Ver todos
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Tipo</th>
+                                    <th>Producto</th>
+                                    <th class="text-center">Cantidad</th>
+                                    <th>Empleado</th>
+                                    <th>Fecha</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mov in ultimos_movimientos %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-{% if mov.tipo == 'entrada' %}success{% elif mov.tipo == 'salida' %}danger{% else %}info{% endif %}">
+                                            <i class="bi bi-{% if mov.tipo == 'entrada' %}box-arrow-in-down{% elif mov.tipo == 'salida' %}box-arrow-up{% else %}arrow-repeat{% endif %} me-1"></i>
+                                            {{ mov.get_tipo_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'almacen:detalle_producto' mov.producto.pk %}" class="text-decoration-none">
+                                            {{ mov.producto.codigo_producto }}
+                                        </a>
+                                    </td>
+                                    <td class="text-center">{{ mov.cantidad }}</td>
+                                    <td>{{ mov.empleado|default:"-" }}</td>
+                                    <td><small>{{ mov.fecha|date:"d/m/Y H:i" }}</small></td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                        No hay movimientos registrados
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha -->
+        <div class="col-lg-4">
+            <!-- Accesos Rápidos -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-lightning text-warning me-2"></i>
+                        Accesos Rápidos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'almacen:lista_productos' %}" class="btn btn-outline-primary text-start">
+                            <i class="bi bi-box-seam me-2"></i>Ver Productos
+                        </a>
+                        <a href="{% url 'almacen:lista_proveedores' %}" class="btn btn-outline-secondary text-start">
+                            <i class="bi bi-truck me-2"></i>Proveedores
+                        </a>
+                        <a href="{% url 'almacen:lista_categorias' %}" class="btn btn-outline-info text-start">
+                            <i class="bi bi-tags me-2"></i>Categorías
+                        </a>
+                        <a href="{% url 'almacen:crear_solicitud' %}" class="btn btn-outline-warning text-start">
+                            <i class="bi bi-cart-plus me-2"></i>Nueva Solicitud
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Productos con Stock Bajo -->
+            {% if productos_reposicion %}
+            <div class="card shadow-sm border-danger">
+                <div class="card-header bg-danger text-white py-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Requieren Reposición
+                    </h5>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for prod in productos_reposicion %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <a href="{% url 'almacen:detalle_producto' prod.pk %}" class="text-decoration-none">
+                                <strong>{{ prod.codigo_producto }}</strong>
+                            </a>
+                            <br>
+                            <small class="text-muted">{{ prod.nombre|truncatechars:25 }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-{% if prod.stock_actual == 0 %}dark{% else %}danger{% endif %} fs-6">
+                                {{ prod.stock_actual }}
+                            </span>
+                            <br>
+                            <small class="text-muted">Mín: {{ prod.stock_minimo }}</small>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="card-footer bg-white">
+                    <a href="{% url 'almacen:lista_productos' %}?stock=bajo" class="btn btn-sm btn-outline-danger w-100">
+                        Ver todos los productos con stock bajo
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock almacen_content %}

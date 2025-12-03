@@ -30,7 +30,7 @@ Actualmente el sistema cuenta con un **inventario de oficina** para materiales d
 - Control estricto de productos mediante códigos únicos
 - Sistema de auditorías con registro de diferencias
 - Flujo de aprobación para bajas de inventario
-- Notificaciones en tiempo real entre recepción y almacén
+- Notificaciones en tiempo real entre recepción/responsable de la orden y almacén
 - Trazabilidad completa de movimientos
 - Reportes de discrepancias y análisis de diferencias
 
@@ -65,13 +65,12 @@ Actualmente el sistema cuenta con un **inventario de oficina** para materiales d
    ↓ Técnico diagnostica equipo
    ↓ Identifica pieza necesaria
    ↓ Crea solicitud de pieza desde orden de servicio
-   ↓ Solicitud llega a Almacén
    
 2. RECEPCIÓN DE PIEZA (Almacén)
    ↓ Pieza llega del proveedor
    ↓ Se da de alta en almacén
    ↓ Se vincula con orden de servicio
-   ↓ Estado: "Disponible para servicio"
+   ↓ Estado: "Disponible para servicio - "orden cliente"
    
 3. ASIGNACIÓN (Almacén → Servicio Técnico)
    ↓ Agente de almacén aprueba salida
@@ -82,13 +81,11 @@ Actualmente el sistema cuenta con un **inventario de oficina** para materiales d
 4. SEGUIMIENTO
    ↓ Historial en orden de servicio
    ↓ Historial en producto de almacén
-   ↓ Costo de pieza se suma al servicio
    ↓ Auditoría: quién, cuándo, para qué orden
 ```
 
 **Beneficios de esta Integración:**
 - 📊 **Trazabilidad Total:** Sabes exactamente qué pieza se usó en qué equipo
-- 💰 **Costeo Preciso:** Suma automática del costo de piezas al servicio
 - 📈 **Analytics:** Piezas más usadas, tiempos de espera, proveedores
 - 🔍 **Auditoría:** Verificación cruzada entre inventario y servicios
 - ⚡ **Eficiencia:** Menos errores en asignación de piezas
@@ -120,6 +117,8 @@ Actualmente el sistema cuenta con un **inventario de oficina** para materiales d
 - QRCode[pil] 7.4.2        # Códigos QR automáticos
 - Pillow 11.3.0            # Procesamiento de imágenes
 ```
+
+###SE TIENEN QUE UTILIZAR CONSTANTES, PARA QUE SEA FACIL LA MANIPULACIÓN DE PROVEEDORES, ESTATUS, ETC.
 
 ### Viabilidad Operativa: **ALTA** ✅
 
@@ -240,9 +239,9 @@ urlpatterns = [
 ### 1. Gestión de Productos de Almacén
 
 **Características:**
-- Código único por producto (SKU, EAN, código interno)
+- Código único por producto (código interno)
 - Información detallada (nombre, descripción, categoría)
-- Ubicación física en almacén (pasillo-estante-nivel)
+- Ubicación física en almacén (donde se localiza)
 - Tracking de stock (actual, mínimo, máximo)
 - **Tipo de producto: Resurtible vs Único** (nueva característica)
 - Generación automática de código QR
@@ -260,9 +259,11 @@ urlpatterns = [
      - Botellas de limpiador LCD
      - Alcohol isopropílico
      - Pasta térmica
-     - Cables HDMI genéricos
-     - Cajas de cartón
-     - Bolsas antiestáticas
+     - Baterías de cierto voltaje
+     - Cargadores de cierto voltaje
+     - RAM´s
+     - SSD SATA
+     - SSD M.2
    - **Comportamiento:**
      - Cuando baja del mínimo → Alerta de reposición
      - Se compran en cantidad para mantener stock
@@ -299,7 +300,8 @@ urlpatterns = [
 **Propósito:** Comunicación fluida entre recepción y almacén
 
 **Actores:**
-- **Solicitante (Recepción):** Persona que necesita un producto
+- **Solicitante (Recepción):** Personal que normalmente hace ventas mostrador que necesita un producto, como cubre teclados, USB, etc. Paquete Plata, Oro y Premium. Piezas, etc.
+- **Solicitante (Compras):** Personal que solicita a almacén alguna pieza en en stock para surtir internamente ordenes, por ejemplo kit´s de limpieza, RAM´s, Paquetes Plata, Oro y Premium (estos paquetes incluyen RAM, SSD y Kit´´s en algunos casos)
 - **Agente de Almacén:** Persona que aprueba y ejecuta la baja
 
 **Tipos de Solicitud:**
@@ -319,8 +321,8 @@ urlpatterns = [
 - Producto solicitado
 - Cantidad requerida
 - Tipo de solicitud (consumo, servicio técnico, venta, transferencia)
-- **Orden de servicio técnico** (si aplica - ForeignKey a servicio_tecnico.OrdenServicio)
-- Solicitante (empleado de recepción o técnico)
+- **Orden de servicio técnico** (si aplica - ForeignKey a servicio_tecnico.OrdenServicio.orden_cliente)
+- Solicitante (empleado de recepción, compras o técnico)
 - Fecha y hora de solicitud
 - Observaciones del solicitante
 - Estado actual
@@ -374,8 +376,8 @@ orden_servicio = models.ForeignKey(
 ```
 PASO 1: Creación de Auditoría
 ├─ Seleccionar tipo
-├─ Asignar auditor
-├─ Definir productos a auditar
+├─ Asignar auditor - del modelo de empleados existente
+├─ Definir Sucursal a la cual auditar 
 └─ Estado: "En Proceso"
 
 PASO 2: Conteo Físico
@@ -505,8 +507,8 @@ PASO 4: Aprobación y Ajuste
 │         └─ Buscar Orden: [ST-2024-___] 🔍                  │
 │                                                             │
 │  • Campo de búsqueda de órdenes activas:                    │
-│    - Busca por número de orden                              │
-│    - Busca por cliente                                      │
+│    - Busca por número de orden del cliente                  │
+│    - Busca numero de serie                                  │
 │    - Busca por equipo                                       │
 │    - Muestra solo órdenes activas (en proceso)              │
 │                                                             │
@@ -523,16 +525,14 @@ PASO 4: Aprobación y Ajuste
 ├─────────────────────────────────────────────────────────────┤
 │  • Técnico retira la pieza                                  │
 │  • Stock se descuenta automáticamente                       │
-│  • Costo de pieza se suma al servicio                       │
+│                │
 │  • Trazabilidad completa: Orden → Pieza → Equipo           │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
 │  CONSULTAS Y REPORTES                                       │
 ├─────────────────────────────────────────────────────────────┤
-│  DESDE ORDEN DE SERVICIO:                                   │
-│    • Ver qué piezas se usaron                               │
-│    • Costo total de piezas                                  │
+│                             │
 │                                                             │
 │  DESDE PRODUCTO DE ALMACÉN:                                 │
 │    • Ver en qué órdenes se usó                              │
@@ -624,19 +624,19 @@ class OrdenServicio(models.Model):
 │  │   Buscar Orden Activa:                                │ │
 │  │   [ST-2024-___________] 🔍 Buscar                    │ │
 │  │                                                       │ │
-│  │   📋 Órdenes Activas Recientes:                       │ │
+│  │   📋 Órdenes vinculadas recientemente                      │ │
 │  │   ┌─────────────────────────────────────────────────┐ │ │
-│  │   │ ○ ST-2024-145 - Juan Pérez                      │ │ │
-│  │   │   Laptop HP EliteBook 840 G8                    │ │ │
-│  │   │   Técnico: Carlos Méndez                        │ │ │
+│  │   │ ○                    │ │ │
+│  │   │                     │ │ │
+│  │   │                     │ │ │
 │  │   ├─────────────────────────────────────────────────┤ │ │
-│  │   │ ○ ST-2024-148 - María González                  │ │ │
-│  │   │   Desktop Dell OptiPlex 7090                    │ │ │
-│  │   │   Técnico: Ana Torres                           │ │ │
+│  │   │ ○                 │ │ │
+│  │   │                      │ │ │
+│  │   │                           │ │ │
 │  │   ├─────────────────────────────────────────────────┤ │ │
-│  │   │ ○ ST-2024-150 - Roberto Sánchez                 │ │ │
-│  │   │   Laptop Lenovo ThinkPad X1                     │ │ │
-│  │   │   Técnico: Carlos Méndez                        │ │ │
+│  │   │ ○               │ │ │
+│  │   │                     │ │ │
+│  │   │                       │ │ │
 │  │   └─────────────────────────────────────────────────┘ │ │
 │  └───────────────────────────────────────────────────────┘ │
 │                                                             │
@@ -648,7 +648,7 @@ class OrdenServicio(models.Model):
 Al guardar:
 ✅ Stock aumenta automáticamente
 ✅ Pieza queda vinculada a ST-2024-145
-✅ Aparece en el historial de la orden de servicio
+✅ Aparece en el historial remarcado de la orden de servicio
 ```
 
 **2. Vista en la Orden de Servicio Técnico:**
@@ -672,12 +672,12 @@ Al guardar:
 │  │    Almacenista: Pedro López                           │ │
 │  └───────────────────────────────────────────────────────┘ │
 │                                                             │
-│  💰 RESUMEN DE COSTOS:                                      │
-│     Diagnóstico: $200                                       │
-│     Mano de Obra: $500                                      │
-│     Piezas Almacén: $1,200                                  │
+│                                    │
+│                                │
+│                                     │
+│                                    │
 │     ─────────────────                                       │
-│     Total: $1,900                                           │
+│                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -735,11 +735,6 @@ Al guardar:
 - Sabes qué pieza se usó en qué equipo
 - Historial visible desde ambos módulos
 - Vinculación permanente en la base de datos
-
-✅ **Costeo Automático:**
-- El costo de la pieza se suma automáticamente al servicio
-- No hay cálculos manuales
-- Cotización precisa
 
 ✅ **Control de Inventario:**
 - Stock actualizado automáticamente

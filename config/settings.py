@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'inventario',
     'scorecard',  # Nueva app para Score Card de Calidad
     'servicio_tecnico',  # Nueva app para Gestión de Órdenes de Servicio Técnico
+    'almacen',  # Nueva app para Inventario de Almacén Central - Dic 2025
 ]
 
 MIDDLEWARE = [

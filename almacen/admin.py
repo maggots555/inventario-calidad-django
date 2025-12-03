@@ -1,0 +1,935 @@
+"""
+Configuración del Admin para el módulo Almacén.
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+-------------------------------
+Este archivo configura cómo se ven y comportan los modelos en el panel
+de administración de Django (/admin/).
+
+Cada clase Admin define:
+- list_display: Columnas visibles en la lista
+- list_filter: Filtros en la barra lateral
+- search_fields: Campos donde se puede buscar
+- ordering: Orden por defecto
+- fieldsets: Organización de campos en el formulario
+- inlines: Modelos relacionados que se editan junto al principal
+
+Los decoradores @admin.register(Modelo) registran cada modelo.
+"""
+
+from django.contrib import admin
+from django.utils.html import format_html
+from django.utils import timezone
+
+from .models import (
+    Proveedor,
+    CategoriaAlmacen,
+    ProductoAlmacen,
+    CompraProducto,
+    MovimientoAlmacen,
+    SolicitudBaja,
+    Auditoria,
+    DiferenciaAuditoria,
+    UnidadInventario,
+)
+
+from config.constants import (
+    ESTADO_UNIDAD_CHOICES,
+    DISPONIBILIDAD_UNIDAD_CHOICES,
+    ORIGEN_UNIDAD_CHOICES,
+)
+
+
+# ============================================================================
+# ADMIN: PROVEEDOR
+# ============================================================================
+@admin.register(Proveedor)
+class ProveedorAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Proveedores.
+    Permite gestionar la lista de proveedores del almacén.
+    """
+    
+    list_display = (
+        'nombre',
+        'contacto',
+        'telefono',
+        'email',
+        'tiempo_entrega_dias',
+        'activo_badge',
+        'total_compras',
+    )
+    
+    list_filter = (
+        'activo',
+        'tiempo_entrega_dias',
+    )
+    
+    search_fields = (
+        'nombre',
+        'contacto',
+        'email',
+        'telefono',
+    )
+    
+    ordering = ['nombre']
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('nombre', 'activo')
+        }),
+        ('Datos de Contacto', {
+            'fields': ('contacto', 'telefono', 'email', 'direccion')
+        }),
+        ('Métricas de Servicio', {
+            'fields': ('tiempo_entrega_dias', 'notas')
+        }),
+    )
+    
+    def activo_badge(self, obj):
+        """Muestra badge de color según estado activo"""
+        if obj.activo:
+            return format_html('<span style="color: green;">✓ Activo</span>')
+        return format_html('<span style="color: red;">✗ Inactivo</span>')
+    activo_badge.short_description = 'Estado'
+    
+    def total_compras(self, obj):
+        """Muestra el número de compras realizadas a este proveedor"""
+        return obj.compras_realizadas.count()
+    total_compras.short_description = 'Compras'
+
+
+# ============================================================================
+# ADMIN: CATEGORÍA DE ALMACÉN
+# ============================================================================
+@admin.register(CategoriaAlmacen)
+class CategoriaAlmacenAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Categorías de Almacén.
+    """
+    
+    list_display = (
+        'nombre',
+        'descripcion_corta',
+        'cantidad_productos',
+        'activo_badge',
+    )
+    
+    list_filter = ('activo',)
+    
+    search_fields = ('nombre', 'descripcion')
+    
+    ordering = ['nombre']
+    
+    def descripcion_corta(self, obj):
+        """Muestra descripción truncada a 50 caracteres"""
+        if obj.descripcion:
+            return obj.descripcion[:50] + '...' if len(obj.descripcion) > 50 else obj.descripcion
+        return '-'
+    descripcion_corta.short_description = 'Descripción'
+    
+    def cantidad_productos(self, obj):
+        """Muestra cuántos productos tiene la categoría"""
+        return obj.productos.filter(activo=True).count()
+    cantidad_productos.short_description = 'Productos'
+    
+    def activo_badge(self, obj):
+        if obj.activo:
+            return format_html('<span style="color: green;">✓</span>')
+        return format_html('<span style="color: red;">✗</span>')
+    activo_badge.short_description = 'Activa'
+
+
+# ============================================================================
+# INLINE: UNIDADES DE INVENTARIO (para ver en ProductoAlmacen)
+# ============================================================================
+class UnidadInventarioInline(admin.TabularInline):
+    """
+    Muestra las unidades individuales dentro del admin de ProductoAlmacen.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Un "inline" permite ver y editar registros relacionados directamente
+    dentro del formulario de otro modelo. Aquí, cuando editas un ProductoAlmacen,
+    puedes ver todas las unidades individuales (UnidadInventario) que pertenecen
+    a ese producto sin tener que ir a otra página.
+    
+    TabularInline: Muestra los registros en formato de tabla (más compacto)
+    StackedInline: Mostraría cada registro apilado (ocupa más espacio)
+    """
+    
+    model = UnidadInventario
+    
+    # Campos que se muestran en la tabla inline
+    fields = (
+        'codigo_interno',
+        'numero_serie',
+        'marca',
+        'modelo',
+        'estado',
+        'disponibilidad',
+        'origen',
+        'costo_unitario',
+    )
+    
+    # Campos que solo se pueden ver, no editar desde aquí
+    readonly_fields = ('codigo_interno',)
+    
+    # extra = 0 significa que no mostramos filas vacías adicionales por defecto
+    # (el usuario puede agregar más si quiere, pero no llenamos la pantalla)
+    extra = 0
+    
+    # Cuántos registros mostrar antes de paginar
+    max_num = 50
+    
+    # Mostrar enlace para ver/editar el registro completo
+    show_change_link = True
+    
+    # Clases CSS para el inline
+    classes = ['collapse']  # Colapsable para no abrumar la vista
+
+
+# ============================================================================
+# ADMIN: PRODUCTO DE ALMACÉN
+# ============================================================================
+@admin.register(ProductoAlmacen)
+class ProductoAlmacenAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Productos de Almacén.
+    Este es el modelo principal - se configura con más detalle.
+    """
+    
+    list_display = (
+        'codigo_producto',
+        'nombre',
+        'tipo_producto_badge',
+        'categoria',
+        'stock_badge',
+        'unidades_rastreadas',
+        'costo_unitario',
+        'proveedor_principal',
+        'activo_badge',
+    )
+    
+    list_filter = (
+        'tipo_producto',
+        'categoria',
+        'activo',
+        'proveedor_principal',
+        'sucursal',
+    )
+    
+    search_fields = (
+        'codigo_producto',
+        'nombre',
+        'descripcion',
+    )
+    
+    ordering = ['nombre']
+    
+    readonly_fields = ('fecha_creacion', 'fecha_actualizacion', 'qr_code')
+    
+    fieldsets = (
+        ('Identificación', {
+            'fields': ('codigo_producto', 'nombre', 'descripcion', 'imagen')
+        }),
+        ('Clasificación', {
+            'fields': ('categoria', 'tipo_producto')
+        }),
+        ('Ubicación', {
+            'fields': ('ubicacion_fisica', 'sucursal')
+        }),
+        ('Stock', {
+            'fields': ('stock_actual', 'stock_minimo', 'stock_maximo'),
+            'description': 'Stock mínimo y máximo solo aplican para productos resurtibles.'
+        }),
+        ('Costos y Proveedor', {
+            'fields': ('costo_unitario', 'proveedor_principal', 'tiempo_reposicion_dias')
+        }),
+        ('Estado', {
+            'fields': ('activo', 'creado_por')
+        }),
+        ('Información del Sistema', {
+            'fields': ('qr_code', 'fecha_creacion', 'fecha_actualizacion'),
+            'classes': ('collapse',)  # Sección colapsable
+        }),
+    )
+    
+    def tipo_producto_badge(self, obj):
+        """Muestra el tipo con emoji"""
+        if obj.tipo_producto == 'resurtible':
+            return format_html('<span title="Stock permanente">📦 Resurtible</span>')
+        return format_html('<span title="Compra específica">🔧 Único</span>')
+    tipo_producto_badge.short_description = 'Tipo'
+    
+    def stock_badge(self, obj):
+        """Muestra el stock con color según nivel"""
+        if obj.stock_actual == 0:
+            color = 'red'
+            texto = f'⚠️ {obj.stock_actual}'
+        elif obj.esta_bajo_minimo():
+            color = 'orange'
+            texto = f'⚡ {obj.stock_actual}'
+        else:
+            color = 'green'
+            texto = str(obj.stock_actual)
+        
+        if obj.tipo_producto == 'resurtible' and obj.stock_maximo > 0:
+            return format_html(
+                '<span style="color: {};">{} / {}</span>',
+                color, texto, obj.stock_maximo
+            )
+        return format_html('<span style="color: {};">{}</span>', color, texto)
+    stock_badge.short_description = 'Stock'
+    
+    def activo_badge(self, obj):
+        if obj.activo:
+            return format_html('<span style="color: green;">✓</span>')
+        return format_html('<span style="color: red;">✗</span>')
+    activo_badge.short_description = 'Activo'
+    
+    def unidades_rastreadas(self, obj):
+        """
+        Muestra cuántas unidades individuales están rastreadas vs stock total.
+        
+        EXPLICACIÓN:
+        - Si el producto tiene unidades rastreadas, muestra: "5 / 10" (5 rastreadas de 10 en stock)
+        - Si no tiene unidades rastreadas, muestra un guion
+        """
+        if obj.tiene_unidades_rastreadas():
+            disponibles = obj.cantidad_unidades_disponibles()
+            total = obj.unidades.count()
+            return format_html(
+                '<span title="{} disponibles de {} rastreadas">📋 {} disp / {} total</span>',
+                disponibles, total, disponibles, total
+            )
+        return format_html('<span style="color: gray;">—</span>')
+    unidades_rastreadas.short_description = 'Unidades Rastreadas'
+    
+    # Incluir el inline de unidades individuales
+    inlines = [UnidadInventarioInline]
+
+
+# ============================================================================
+# ADMIN: COMPRA DE PRODUCTO
+# ============================================================================
+@admin.register(CompraProducto)
+class CompraProductoAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Compras de Productos.
+    Permite ver y registrar compras realizadas.
+    """
+    
+    list_display = (
+        'producto',
+        'proveedor',
+        'cantidad',
+        'costo_unitario',
+        'costo_total',
+        'fecha_pedido',
+        'fecha_recepcion',
+        'dias_entrega',
+        'orden_servicio',
+    )
+    
+    list_filter = (
+        'proveedor',
+        'fecha_pedido',
+        'fecha_recepcion',
+    )
+    
+    search_fields = (
+        'producto__codigo_producto',
+        'producto__nombre',
+        'proveedor__nombre',
+        'numero_factura',
+        'numero_orden_compra',
+    )
+    
+    ordering = ['-fecha_recepcion', '-fecha_pedido']
+    
+    readonly_fields = ('costo_total', 'dias_entrega', 'fecha_registro')
+    
+    autocomplete_fields = ['producto', 'proveedor', 'orden_servicio']
+    
+    fieldsets = (
+        ('Producto y Proveedor', {
+            'fields': ('producto', 'proveedor')
+        }),
+        ('Cantidades y Costos', {
+            'fields': ('cantidad', 'costo_unitario', 'costo_total')
+        }),
+        ('Fechas', {
+            'fields': ('fecha_pedido', 'fecha_recepcion', 'dias_entrega')
+        }),
+        ('Documentos', {
+            'fields': ('numero_factura', 'numero_orden_compra')
+        }),
+        ('Vinculación', {
+            'fields': ('orden_servicio',),
+            'classes': ('collapse',)
+        }),
+        ('Información Adicional', {
+            'fields': ('observaciones', 'registrado_por', 'fecha_registro'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+# ============================================================================
+# ADMIN: MOVIMIENTO DE ALMACÉN
+# ============================================================================
+@admin.register(MovimientoAlmacen)
+class MovimientoAlmacenAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Movimientos de Almacén.
+    Muestra el historial de entradas y salidas.
+    """
+    
+    list_display = (
+        'tipo_badge',
+        'producto',
+        'cantidad',
+        'costo_unitario',
+        'stock_anterior',
+        'stock_posterior',
+        'empleado',
+        'fecha',
+        'orden_servicio',
+    )
+    
+    list_filter = (
+        'tipo',
+        'fecha',
+        'empleado',
+    )
+    
+    search_fields = (
+        'producto__codigo_producto',
+        'producto__nombre',
+        'observaciones',
+    )
+    
+    ordering = ['-fecha']
+    
+    readonly_fields = ('stock_anterior', 'stock_posterior', 'fecha')
+    
+    fieldsets = (
+        ('Movimiento', {
+            'fields': ('tipo', 'producto', 'cantidad', 'costo_unitario')
+        }),
+        ('Responsable', {
+            'fields': ('empleado',)
+        }),
+        ('Vinculaciones', {
+            'fields': ('orden_servicio', 'compra', 'solicitud_baja'),
+            'classes': ('collapse',)
+        }),
+        ('Tracking', {
+            'fields': ('stock_anterior', 'stock_posterior', 'fecha'),
+        }),
+        ('Observaciones', {
+            'fields': ('observaciones',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def tipo_badge(self, obj):
+        """Muestra el tipo con emoji y color"""
+        if obj.tipo == 'entrada':
+            return format_html('<span style="color: green;">📥 Entrada</span>')
+        return format_html('<span style="color: red;">📤 Salida</span>')
+    tipo_badge.short_description = 'Tipo'
+
+
+# ============================================================================
+# ADMIN: SOLICITUD DE BAJA
+# ============================================================================
+@admin.register(SolicitudBaja)
+class SolicitudBajaAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Solicitudes de Baja.
+    Permite ver y gestionar solicitudes pendientes.
+    """
+    
+    list_display = (
+        'id',
+        'producto',
+        'cantidad',
+        'tipo_solicitud',
+        'estado_badge',
+        'solicitante',
+        'fecha_solicitud',
+        'agente_almacen',
+        'orden_servicio',
+    )
+    
+    list_filter = (
+        'estado',
+        'tipo_solicitud',
+        'fecha_solicitud',
+        'requiere_reposicion',
+    )
+    
+    search_fields = (
+        'producto__codigo_producto',
+        'producto__nombre',
+        'solicitante__nombre_completo',
+        'observaciones',
+    )
+    
+    ordering = ['-fecha_solicitud']
+    
+    readonly_fields = ('fecha_solicitud', 'fecha_procesado')
+    
+    fieldsets = (
+        ('Solicitud', {
+            'fields': ('tipo_solicitud', 'producto', 'cantidad')
+        }),
+        ('Solicitante', {
+            'fields': ('solicitante', 'fecha_solicitud', 'observaciones')
+        }),
+        ('Vinculación', {
+            'fields': ('orden_servicio',),
+            'classes': ('collapse',)
+        }),
+        ('Estado y Procesamiento', {
+            'fields': ('estado', 'agente_almacen', 'fecha_procesado', 'observaciones_agente')
+        }),
+        ('Flags', {
+            'fields': ('requiere_reposicion',)
+        }),
+    )
+    
+    def estado_badge(self, obj):
+        """Muestra el estado con color"""
+        colores = {
+            'pendiente': ('orange', '🟡'),
+            'aprobada': ('green', '🟢'),
+            'rechazada': ('red', '🔴'),
+            'en_espera': ('gray', '⏸️'),
+        }
+        color, emoji = colores.get(obj.estado, ('black', '❓'))
+        return format_html(
+            '<span style="color: {};">{} {}</span>',
+            color, emoji, obj.get_estado_display()
+        )
+    estado_badge.short_description = 'Estado'
+
+
+# ============================================================================
+# INLINE: DIFERENCIAS DE AUDITORÍA
+# ============================================================================
+class DiferenciaAuditoriaInline(admin.TabularInline):
+    """
+    Inline para mostrar diferencias dentro de una Auditoría.
+    Permite ver y editar diferencias directamente en el detalle de auditoría.
+    """
+    model = DiferenciaAuditoria
+    extra = 0  # No mostrar filas vacías extra
+    fields = (
+        'producto',
+        'stock_sistema',
+        'stock_fisico',
+        'diferencia',
+        'razon',
+        'ajuste_realizado',
+    )
+    readonly_fields = ('diferencia',)
+    autocomplete_fields = ['producto']
+
+
+# ============================================================================
+# ADMIN: AUDITORÍA
+# ============================================================================
+@admin.register(Auditoria)
+class AuditoriaAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Auditorías.
+    Incluye inline de diferencias encontradas.
+    """
+    
+    list_display = (
+        'id',
+        'tipo',
+        'estado_badge',
+        'sucursal',
+        'auditor',
+        'fecha_inicio',
+        'fecha_fin',
+        'total_productos_auditados',
+        'total_diferencias_encontradas',
+    )
+    
+    list_filter = (
+        'tipo',
+        'estado',
+        'sucursal',
+        'fecha_inicio',
+    )
+    
+    search_fields = (
+        'auditor__nombre_completo',
+        'observaciones_generales',
+    )
+    
+    ordering = ['-fecha_inicio']
+    
+    readonly_fields = ('fecha_inicio', 'total_diferencias_encontradas')
+    
+    inlines = [DiferenciaAuditoriaInline]
+    
+    fieldsets = (
+        ('Información General', {
+            'fields': ('tipo', 'estado', 'sucursal')
+        }),
+        ('Responsable', {
+            'fields': ('auditor',)
+        }),
+        ('Fechas', {
+            'fields': ('fecha_inicio', 'fecha_fin')
+        }),
+        ('Resultados', {
+            'fields': ('total_productos_auditados', 'total_diferencias_encontradas', 'observaciones_generales')
+        }),
+    )
+    
+    def estado_badge(self, obj):
+        """Muestra el estado con color"""
+        colores = {
+            'en_proceso': ('blue', '🔄'),
+            'completada': ('green', '✅'),
+            'con_diferencias': ('orange', '⚠️'),
+        }
+        color, emoji = colores.get(obj.estado, ('black', '❓'))
+        return format_html(
+            '<span style="color: {};">{} {}</span>',
+            color, emoji, obj.get_estado_display()
+        )
+    estado_badge.short_description = 'Estado'
+
+
+# ============================================================================
+# ADMIN: DIFERENCIA DE AUDITORÍA (standalone)
+# ============================================================================
+@admin.register(DiferenciaAuditoria)
+class DiferenciaAuditoriaAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Diferencias de Auditoría.
+    Permite ver todas las diferencias de forma independiente.
+    """
+    
+    list_display = (
+        'auditoria',
+        'producto',
+        'stock_sistema',
+        'stock_fisico',
+        'diferencia_badge',
+        'razon',
+        'ajuste_badge',
+    )
+    
+    list_filter = (
+        'razon',
+        'ajuste_realizado',
+        'auditoria__sucursal',
+    )
+    
+    search_fields = (
+        'producto__codigo_producto',
+        'producto__nombre',
+        'razon_detalle',
+    )
+    
+    ordering = ['-auditoria__fecha_inicio']
+    
+    readonly_fields = ('diferencia',)
+    
+    fieldsets = (
+        ('Identificación', {
+            'fields': ('auditoria', 'producto')
+        }),
+        ('Cantidades', {
+            'fields': ('stock_sistema', 'stock_fisico', 'diferencia')
+        }),
+        ('Análisis', {
+            'fields': ('razon', 'razon_detalle', 'evidencia')
+        }),
+        ('Ajuste', {
+            'fields': ('ajuste_realizado', 'fecha_ajuste', 'responsable_ajuste', 'acciones_correctivas')
+        }),
+    )
+    
+    def diferencia_badge(self, obj):
+        """Muestra la diferencia con color según signo"""
+        if obj.diferencia > 0:
+            return format_html('<span style="color: blue;">+{}</span>', obj.diferencia)
+        elif obj.diferencia < 0:
+            return format_html('<span style="color: red;">{}</span>', obj.diferencia)
+        return format_html('<span style="color: gray;">0</span>')
+    diferencia_badge.short_description = 'Diferencia'
+    
+    def ajuste_badge(self, obj):
+        """Muestra si el ajuste fue realizado"""
+        if obj.ajuste_realizado:
+            return format_html('<span style="color: green;">✓ Ajustado</span>')
+        return format_html('<span style="color: orange;">Pendiente</span>')
+    ajuste_badge.short_description = 'Ajuste'
+
+
+# ============================================================================
+# ADMIN: UNIDAD DE INVENTARIO
+# ============================================================================
+@admin.register(UnidadInventario)
+class UnidadInventarioAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Unidades Individuales de Inventario.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este admin permite gestionar cada unidad física individual.
+    
+    Por ejemplo, si tienes un producto "SSD 1TB" con stock de 20 unidades,
+    cada una de esas 20 unidades puede ser registrada aquí con:
+    - Su marca específica (Samsung, Kingston, Crucial, etc.)
+    - Su modelo específico (870 EVO, A2000, MX500)
+    - Su número de serie único
+    - Su origen (compra, recuperado de orden de servicio, etc.)
+    - Su estado actual (nuevo, usado bueno, para revisión, etc.)
+    - Su disponibilidad (disponible, reservada, asignada, vendida)
+    
+    Esto permite un control muy granular del inventario, especialmente útil
+    para componentes de computadora donde cada unidad puede tener diferente
+    marca/modelo aunque sea el "mismo producto" conceptualmente.
+    """
+    
+    list_display = (
+        'codigo_interno',
+        'producto_link',
+        'marca',
+        'modelo',
+        'numero_serie_truncado',
+        'estado_badge',
+        'disponibilidad_badge',
+        'origen_badge',
+        'costo_unitario',
+        'fecha_registro',
+    )
+    
+    list_filter = (
+        'estado',
+        'disponibilidad',
+        'origen',
+        'marca',
+        'producto__categoria',
+        'producto__tipo_producto',
+        'fecha_registro',
+    )
+    
+    search_fields = (
+        'codigo_interno',
+        'numero_serie',
+        'marca',
+        'modelo',
+        'producto__nombre',
+        'producto__codigo_producto',
+        'notas',
+    )
+    
+    ordering = ['-fecha_registro', 'producto__nombre', 'marca']
+    
+    date_hierarchy = 'fecha_registro'  # Navegación por fecha en la parte superior
+    
+    readonly_fields = (
+        'codigo_interno',
+        'fecha_registro',
+        'fecha_actualizacion',
+    )
+    
+    # Autocompletar para campos de relación (mejora la búsqueda)
+    autocomplete_fields = ['producto', 'compra']
+    
+    fieldsets = (
+        ('Identificación', {
+            'fields': (
+                'codigo_interno',
+                'producto',
+                'numero_serie',
+            ),
+            'description': 'Información básica que identifica esta unidad específica.'
+        }),
+        ('Especificaciones del Item', {
+            'fields': (
+                'marca',
+                'modelo',
+                'especificaciones',
+            ),
+            'description': 'Detalles específicos de esta unidad particular.'
+        }),
+        ('Estado y Disponibilidad', {
+            'fields': (
+                'estado',
+                'disponibilidad',
+            ),
+            'description': 'Estado físico y disponibilidad para uso.'
+        }),
+        ('Origen y Trazabilidad', {
+            'fields': (
+                'origen',
+                'compra',
+                'orden_servicio_origen',
+                'orden_servicio_destino',
+            ),
+            'description': 'De dónde vino esta unidad y a dónde fue (si aplica).'
+        }),
+        ('Ubicación y Costo', {
+            'fields': (
+                'ubicacion_especifica',
+                'costo_unitario',
+            ),
+        }),
+        ('Notas', {
+            'fields': ('notas',),
+            'classes': ('collapse',),  # Colapsable
+        }),
+        ('Información del Sistema', {
+            'fields': (
+                'fecha_registro',
+                'fecha_actualizacion',
+            ),
+            'classes': ('collapse',),
+        }),
+    )
+    
+    # -------------------------------------------------------------------------
+    # Métodos para personalizar la visualización en la lista
+    # -------------------------------------------------------------------------
+    
+    def producto_link(self, obj):
+        """Muestra el producto como enlace clickeable"""
+        return format_html(
+            '<a href="/admin/almacen/productoalmacen/{}/change/" title="Ver producto">'
+            '{}</a>',
+            obj.producto.id,
+            obj.producto.nombre[:30] + '...' if len(obj.producto.nombre) > 30 else obj.producto.nombre
+        )
+    producto_link.short_description = 'Producto'
+    producto_link.admin_order_field = 'producto__nombre'
+    
+    def numero_serie_truncado(self, obj):
+        """Muestra el número de serie truncado si es muy largo"""
+        if obj.numero_serie:
+            if len(obj.numero_serie) > 15:
+                return format_html(
+                    '<span title="{}">{}</span>',
+                    obj.numero_serie,
+                    obj.numero_serie[:12] + '...'
+                )
+            return obj.numero_serie
+        return format_html('<span style="color: gray;">—</span>')
+    numero_serie_truncado.short_description = 'N° Serie'
+    numero_serie_truncado.admin_order_field = 'numero_serie'
+    
+    def estado_badge(self, obj):
+        """
+        Muestra el estado con colores semánticos.
+        
+        Colores:
+        - Verde: nuevo
+        - Azul: usado_bueno, reparado
+        - Amarillo: usado_regular, para_revision
+        - Rojo: defectuoso
+        """
+        colores = {
+            'nuevo': ('green', '🆕'),
+            'usado_bueno': ('blue', '👍'),
+            'usado_regular': ('orange', '👌'),
+            'reparado': ('teal', '🔧'),
+            'defectuoso': ('red', '❌'),
+            'para_revision': ('purple', '🔍'),
+        }
+        color, emoji = colores.get(obj.estado, ('gray', '❓'))
+        nombre = obj.get_estado_display()
+        return format_html(
+            '<span style="color: {};" title="{}">{} {}</span>',
+            color, nombre, emoji, nombre
+        )
+    estado_badge.short_description = 'Estado'
+    estado_badge.admin_order_field = 'estado'
+    
+    def disponibilidad_badge(self, obj):
+        """
+        Muestra la disponibilidad con colores.
+        
+        Colores:
+        - Verde: disponible
+        - Amarillo: reservada
+        - Azul: asignada
+        - Gris: vendida, descartada
+        """
+        colores = {
+            'disponible': ('green', '✅'),
+            'reservada': ('orange', '📌'),
+            'asignada': ('blue', '🔗'),
+            'vendida': ('gray', '💰'),
+            'descartada': ('darkred', '🗑️'),
+        }
+        color, emoji = colores.get(obj.disponibilidad, ('gray', '❓'))
+        nombre = obj.get_disponibilidad_display()
+        return format_html(
+            '<span style="color: {};" title="{}">{} {}</span>',
+            color, nombre, emoji, nombre
+        )
+    disponibilidad_badge.short_description = 'Disponibilidad'
+    disponibilidad_badge.admin_order_field = 'disponibilidad'
+    
+    def origen_badge(self, obj):
+        """Muestra el origen con emoji identificativo"""
+        emojis = {
+            'compra': '🛒',
+            'orden_servicio': '🔧',
+            'devolucion_cliente': '↩️',
+            'transferencia': '🔄',
+            'inventario_inicial': '📋',
+            'donacion': '🎁',
+            'otro': '❓',
+        }
+        emoji = emojis.get(obj.origen, '❓')
+        nombre = obj.get_origen_display()
+        return format_html('<span title="{}">{} {}</span>', nombre, emoji, nombre)
+    origen_badge.short_description = 'Origen'
+    origen_badge.admin_order_field = 'origen'
+    
+    # -------------------------------------------------------------------------
+    # Acciones personalizadas
+    # -------------------------------------------------------------------------
+    
+    actions = ['marcar_como_disponible', 'marcar_como_defectuoso', 'marcar_para_revision']
+    
+    @admin.action(description='✅ Marcar seleccionados como Disponible')
+    def marcar_como_disponible(self, request, queryset):
+        """Marca las unidades seleccionadas como disponibles"""
+        updated = queryset.update(disponibilidad='disponible')
+        self.message_user(
+            request,
+            f'{updated} unidad(es) marcada(s) como disponible.',
+        )
+    
+    @admin.action(description='❌ Marcar seleccionados como Defectuoso')
+    def marcar_como_defectuoso(self, request, queryset):
+        """Marca las unidades seleccionadas como defectuosas"""
+        updated = queryset.update(estado='defectuoso', disponibilidad='descartada')
+        self.message_user(
+            request,
+            f'{updated} unidad(es) marcada(s) como defectuosa(s).',
+        )
+    
+    @admin.action(description='🔍 Marcar seleccionados Para Revisión')
+    def marcar_para_revision(self, request, queryset):
+        """Marca las unidades seleccionadas para revisión"""
+        updated = queryset.update(estado='para_revision')
+        self.message_user(
+            request,
+            f'{updated} unidad(es) marcada(s) para revisión.',
+        )
+

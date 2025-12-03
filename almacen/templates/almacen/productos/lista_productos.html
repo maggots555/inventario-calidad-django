@@ -1,0 +1,190 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% comment %}
+Lista de Productos del Almacén
+Incluye búsqueda, filtros por categoría/tipo/stock y paginación.
+{% endcomment %}
+
+{% block title %}Productos - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">
+                <i class="bi bi-box-seam me-2"></i>Productos de Almacén
+            </h1>
+            <p class="text-muted mb-0">{{ total }} productos activos</p>
+        </div>
+        <div>
+            <a href="{% url 'almacen:dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left me-1"></i>Dashboard
+            </a>
+            <a href="{% url 'almacen:crear_producto' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Nuevo Producto
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros y Búsqueda -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Buscar</label>
+                    {{ form.q }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Tipo</label>
+                    {{ form.tipo }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Categoría</label>
+                    {{ form.categoria }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Stock</label>
+                    {{ form.stock }}
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search me-1"></i>Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Badges de Resumen -->
+    <div class="mb-3">
+        <span class="badge bg-primary me-2">
+            <i class="bi bi-arrow-repeat me-1"></i>Resurtibles: {{ total_resurtibles }}
+        </span>
+        <span class="badge bg-info">
+            <i class="bi bi-box me-1"></i>Únicos: {{ total_unicos }}
+        </span>
+    </div>
+
+    <!-- Tabla de Productos -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Código</th>
+                            <th>Nombre</th>
+                            <th>Tipo</th>
+                            <th>Categoría</th>
+                            <th class="text-center">Stock</th>
+                            <th class="text-end">Costo Unit.</th>
+                            <th>Proveedor</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for producto in productos %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'almacen:detalle_producto' producto.pk %}" class="fw-bold text-decoration-none">
+                                    {{ producto.codigo_producto }}
+                                </a>
+                            </td>
+                            <td>
+                                {{ producto.nombre|truncatechars:40 }}
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if producto.tipo_producto == 'resurtible' %}primary{% else %}info{% endif %}">
+                                    {{ producto.get_tipo_producto_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if producto.categoria %}
+                                    <span class="badge bg-secondary">{{ producto.categoria.nombre }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if producto.stock_actual == 0 %}
+                                    <span class="badge bg-dark">Agotado</span>
+                                {% elif producto.tipo_producto == 'resurtible' and producto.stock_actual <= producto.stock_minimo %}
+                                    <span class="badge bg-danger">{{ producto.stock_actual }}</span>
+                                {% else %}
+                                    <span class="badge bg-success">{{ producto.stock_actual }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                ${{ producto.costo_unitario|floatformat:2 }}
+                            </td>
+                            <td>
+                                {% if producto.proveedor_principal %}
+                                    {{ producto.proveedor_principal.nombre|truncatechars:20 }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'almacen:detalle_producto' producto.pk %}" class="btn btn-outline-primary" title="Ver detalle">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'almacen:editar_producto' producto.pk %}" class="btn btn-outline-secondary" title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
+                                <p class="text-muted mb-2">No se encontraron productos</p>
+                                <a href="{% url 'almacen:crear_producto' %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-lg me-1"></i>Crear primer producto
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paginación -->
+    {% if productos.has_other_pages %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if productos.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ productos.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+            
+            {% for num in productos.paginator.page_range %}
+                {% if productos.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% elif num > productos.number|add:'-3' and num < productos.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if productos.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ productos.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}{% if request.GET.stock %}&stock={{ request.GET.stock }}{% endif %}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock almacen_content %}

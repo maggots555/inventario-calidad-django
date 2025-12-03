@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% comment %}
+Template base para todas las páginas del módulo Almacén.
+Extiende base.html y añade elementos específicos del módulo.
+{% endcomment %}
+
+{% block title %}{{ block.super }} - Almacén{% endblock %}
+
+{% block extra_css %}
+{# CSS específico del módulo almacén - agregar cuando sea necesario #}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% block almacen_content %}
+    {# Contenido específico de cada página de almacén #}
+    {% endblock almacen_content %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+{# JavaScript específico del módulo almacén - agregar cuando sea necesario #}
+{% endblock %}

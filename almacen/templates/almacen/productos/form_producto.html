@@ -1,0 +1,255 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% comment %}
+Formulario para crear/editar productos de almacén.
+Se reutiliza para ambas operaciones cambiando título y botón.
+{% endcomment %}
+
+{% block title %}{{ titulo }} - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'almacen:dashboard' %}">Almacén</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'almacen:lista_productos' %}">Productos</a></li>
+            <li class="breadcrumb-item active">{{ titulo }}</li>
+        </ol>
+    </nav>
+
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2 mb-0">
+            <i class="bi bi-{% if producto %}pencil{% else %}plus-lg{% endif %} me-2"></i>{{ titulo }}
+        </h1>
+        <a href="{% url 'almacen:lista_productos' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Volver
+        </a>
+    </div>
+
+    <!-- Formulario -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <!-- Mensajes de error generales -->
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <!-- Información Básica -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-info-circle me-2"></i>Información Básica
+                        </h5>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Código Producto *</label>
+                        {{ form.codigo_producto }}
+                        {% if form.codigo_producto.errors %}
+                            <div class="invalid-feedback d-block">{{ form.codigo_producto.errors.0 }}</div>
+                        {% endif %}
+                        <small class="text-muted">Código único de identificación</small>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Nombre *</label>
+                        {{ form.nombre }}
+                        {% if form.nombre.errors %}
+                            <div class="invalid-feedback d-block">{{ form.nombre.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Tipo Producto *</label>
+                        {{ form.tipo_producto }}
+                        {% if form.tipo_producto.errors %}
+                            <div class="invalid-feedback d-block">{{ form.tipo_producto.errors.0 }}</div>
+                        {% endif %}
+                        <small class="text-muted">Resurtible = stock renovable</small>
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <label class="form-label">Descripción</label>
+                        {{ form.descripcion }}
+                        {% if form.descripcion.errors %}
+                            <div class="invalid-feedback d-block">{{ form.descripcion.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Clasificación -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-tags me-2"></i>Clasificación
+                        </h5>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Categoría</label>
+                        {{ form.categoria }}
+                        {% if form.categoria.errors %}
+                            <div class="invalid-feedback d-block">{{ form.categoria.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Proveedor Principal</label>
+                        {{ form.proveedor_principal }}
+                        {% if form.proveedor_principal.errors %}
+                            <div class="invalid-feedback d-block">{{ form.proveedor_principal.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Sucursal (opcional)</label>
+                        {{ form.sucursal }}
+                        {% if form.sucursal.errors %}
+                            <div class="invalid-feedback d-block">{{ form.sucursal.errors.0 }}</div>
+                        {% endif %}
+                        <small class="text-muted">Dejar vacío = Almacén Central</small>
+                    </div>
+                </div>
+
+                <!-- Stock y Costos -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-box me-2"></i>Stock y Costos
+                        </h5>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Stock Actual *</label>
+                        {{ form.stock_actual }}
+                        {% if form.stock_actual.errors %}
+                            <div class="invalid-feedback d-block">{{ form.stock_actual.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Stock Mínimo</label>
+                        {{ form.stock_minimo }}
+                        {% if form.stock_minimo.errors %}
+                            <div class="invalid-feedback d-block">{{ form.stock_minimo.errors.0 }}</div>
+                        {% endif %}
+                        <small class="text-muted">Alerta cuando llegue a este nivel</small>
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Stock Máximo</label>
+                        {{ form.stock_maximo }}
+                        {% if form.stock_maximo.errors %}
+                            <div class="invalid-feedback d-block">{{ form.stock_maximo.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Costo Unitario *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            {{ form.costo_unitario }}
+                        </div>
+                        {% if form.costo_unitario.errors %}
+                            <div class="invalid-feedback d-block">{{ form.costo_unitario.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Ubicación y Reposición -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-geo-alt me-2"></i>Ubicación y Reposición
+                        </h5>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Ubicación Física</label>
+                        {{ form.ubicacion_fisica }}
+                        {% if form.ubicacion_fisica.errors %}
+                            <div class="invalid-feedback d-block">{{ form.ubicacion_fisica.errors.0 }}</div>
+                        {% endif %}
+                        <small class="text-muted">Ej: A-03-2 (pasillo-estante-nivel)</small>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Tiempo de Reposición (días)</label>
+                        {{ form.tiempo_reposicion_dias }}
+                        {% if form.tiempo_reposicion_dias.errors %}
+                            <div class="invalid-feedback d-block">{{ form.tiempo_reposicion_dias.errors.0 }}</div>
+                        {% endif %}
+                        <small class="text-muted">Tiempo estimado para reabastecer</small>
+                    </div>
+                </div>
+
+                <!-- Imagen del Producto -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-image me-2"></i>Imagen del Producto
+                        </h5>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Imagen (opcional)</label>
+                        {{ form.imagen }}
+                        {% if form.imagen.errors %}
+                            <div class="invalid-feedback d-block">{{ form.imagen.errors.0 }}</div>
+                        {% endif %}
+                        <small class="text-muted">Formatos: JPG, PNG, GIF. Máx 5MB.</small>
+                    </div>
+                    
+                    {% if producto and producto.imagen %}
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Imagen Actual</label>
+                        <div class="border rounded p-2 bg-light text-center">
+                            <img src="{{ producto.imagen.url }}" alt="Imagen actual" class="img-thumbnail" style="max-height: 150px;">
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Estado -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="bi bi-toggle-on me-2"></i>Estado
+                        </h5>
+                    </div>
+                    
+                    <div class="col-md-12">
+                        <div class="form-check form-switch">
+                            {{ form.activo }}
+                            <label class="form-check-label" for="{{ form.activo.id_for_label }}">
+                                Producto activo
+                            </label>
+                        </div>
+                        <small class="text-muted">Desactivar para ocultar de listas sin eliminar</small>
+                    </div>
+                </div>
+
+                <!-- Botones -->
+                <div class="d-flex justify-content-between pt-3 border-top">
+                    <a href="{% url 'almacen:lista_productos' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-lg me-1"></i>Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-check-lg me-1"></i>{{ boton }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock almacen_content %}

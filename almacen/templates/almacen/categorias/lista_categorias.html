@@ -1,0 +1,66 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% block title %}Categorías - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">
+                <i class="bi bi-tags me-2"></i>Categorías
+            </h1>
+        </div>
+        <div>
+            <a href="{% url 'almacen:dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left me-1"></i>Dashboard
+            </a>
+            <a href="{% url 'almacen:crear_categoria' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Nueva Categoría
+            </a>
+        </div>
+    </div>
+
+    <!-- Grid de Categorías -->
+    <div class="row g-4">
+        {% for categoria in categorias %}
+        <div class="col-md-4 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title mb-0">{{ categoria.nombre }}</h5>
+                        <span class="badge bg-primary rounded-pill">{{ categoria.num_productos }}</span>
+                    </div>
+                    {% if categoria.descripcion %}
+                    <p class="card-text text-muted small">{{ categoria.descripcion|truncatechars:80 }}</p>
+                    {% endif %}
+                </div>
+                <div class="card-footer bg-white border-top-0">
+                    <div class="btn-group btn-group-sm w-100">
+                        <a href="{% url 'almacen:lista_productos' %}?categoria={{ categoria.pk }}" class="btn btn-outline-primary">
+                            <i class="bi bi-box me-1"></i>Ver Productos
+                        </a>
+                        <a href="{% url 'almacen:editar_categoria' categoria.pk %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-tags fs-1 text-muted d-block mb-2"></i>
+                    <p class="text-muted">No hay categorías registradas</p>
+                    <a href="{% url 'almacen:crear_categoria' %}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i>Crear primera categoría
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock almacen_content %}

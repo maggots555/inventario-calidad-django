@@ -1,0 +1,161 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% block title %}Movimientos - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">
+                <i class="bi bi-arrow-left-right me-2"></i>Movimientos de Almacén
+            </h1>
+        </div>
+        <div>
+            <a href="{% url 'almacen:dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left me-1"></i>Dashboard
+            </a>
+            <a href="{% url 'almacen:registrar_entrada' %}" class="btn btn-success">
+                <i class="bi bi-box-arrow-in-down me-1"></i>Registrar Entrada
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Tipo de Movimiento</label>
+                    <select name="tipo" class="form-select">
+                        <option value="">Todos los tipos</option>
+                        <option value="entrada" {% if tipo_filtro == 'entrada' %}selected{% endif %}>Entradas</option>
+                        <option value="salida" {% if tipo_filtro == 'salida' %}selected{% endif %}>Salidas</option>
+                        <option value="ajuste" {% if tipo_filtro == 'ajuste' %}selected{% endif %}>Ajustes</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary d-block w-100">
+                        <i class="bi bi-filter me-1"></i>Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Producto</th>
+                            <th class="text-center">Cantidad</th>
+                            <th class="text-end">Costo Unit.</th>
+                            <th>Empleado</th>
+                            <th>Referencia</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mov in movimientos %}
+                        <tr>
+                            <td>
+                                <small>{{ mov.fecha|date:"d/m/Y" }}</small>
+                                <br>
+                                <small class="text-muted">{{ mov.fecha|time:"H:i" }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if mov.tipo == 'entrada' %}success{% elif mov.tipo == 'salida' %}danger{% else %}info{% endif %}">
+                                    <i class="bi bi-{% if mov.tipo == 'entrada' %}box-arrow-in-down{% elif mov.tipo == 'salida' %}box-arrow-up{% else %}arrow-repeat{% endif %} me-1"></i>
+                                    {{ mov.get_tipo_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{% url 'almacen:detalle_producto' mov.producto.pk %}" class="text-decoration-none">
+                                    <strong>{{ mov.producto.codigo_producto }}</strong>
+                                </a>
+                                <br>
+                                <small class="text-muted">{{ mov.producto.nombre|truncatechars:25 }}</small>
+                            </td>
+                            <td class="text-center">
+                                <span class="{% if mov.tipo == 'entrada' %}text-success{% elif mov.tipo == 'salida' %}text-danger{% endif %} fw-bold">
+                                    {% if mov.tipo == 'entrada' %}+{% elif mov.tipo == 'salida' %}-{% endif %}{{ mov.cantidad }}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                {% if mov.costo_unitario %}
+                                    ${{ mov.costo_unitario|floatformat:2 }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ mov.empleado|default:"-" }}</td>
+                            <td>
+                                {% if mov.orden_servicio %}
+                                    <span class="badge bg-primary">OS-{{ mov.orden_servicio.pk }}</span>
+                                {% elif mov.solicitud_baja %}
+                                    <span class="badge bg-warning text-dark">Sol #{{ mov.solicitud_baja.pk }}</span>
+                                {% elif mov.compra %}
+                                    <span class="badge bg-success">Compra #{{ mov.compra.pk }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ mov.observaciones|truncatechars:40|default:"-" }}</small>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
+                                <p class="text-muted">No hay movimientos registrados</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paginación -->
+    {% if movimientos.has_other_pages %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if movimientos.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ movimientos.previous_page_number }}{% if tipo_filtro %}&tipo={{ tipo_filtro }}{% endif %}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+            
+            {% for num in movimientos.paginator.page_range %}
+                {% if movimientos.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% elif num > movimientos.number|add:'-3' and num < movimientos.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if tipo_filtro %}&tipo={{ tipo_filtro }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if movimientos.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ movimientos.next_page_number }}{% if tipo_filtro %}&tipo={{ tipo_filtro }}{% endif %}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock almacen_content %}
