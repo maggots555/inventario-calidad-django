@@ -235,7 +235,7 @@
                         <i class="bi bi-box-seam-fill"></i> Almacén
                         <i class="bi bi-chevron-down ms-1"></i>
                     </a>
-                    <div class="navbar-dropdown dropdown-mega" id="dropdown-almacen">
+                    <div class="navbar-dropdown dropdown-mega dropdown-mega-3col" id="dropdown-almacen">
                         <!-- Columna 1: General + Productos (con Unidades) -->
                         <div class="dropdown-column">
                             <div class="dropdown-section">
@@ -293,21 +293,15 @@
                         <!-- Columna 3: Compras y Cotizaciones -->
                         <div class="dropdown-column">
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-cart4"></i> Compras</h6>
+                                <h6 class="dropdown-header"><i class="bi bi-cart4"></i> Compras y Cotizaciones</h6>
                                 <a href="{% url 'almacen:lista_compras' %}" class="dropdown-item">
                                     <i class="bi bi-list-check"></i> Lista de Compras
                                 </a>
                                 <a href="{% url 'almacen:crear_compra' %}" class="dropdown-item">
-                                    <i class="bi bi-cart-plus"></i> Nueva Compra
+                                    <i class="bi bi-cart-plus"></i> Nueva Compra/Cotización
                                 </a>
-                            </div>
-                            <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Cotizaciones</h6>
                                 <a href="{% url 'almacen:panel_cotizaciones' %}" class="dropdown-item">
                                     <i class="bi bi-clipboard-data"></i> Panel Cotizaciones
-                                </a>
-                                <a href="{% url 'almacen:crear_compra' %}?tipo=cotizacion" class="dropdown-item">
-                                    <i class="bi bi-file-earmark-plus"></i> Nueva Cotización
                                 </a>
                             </div>
                         </div>

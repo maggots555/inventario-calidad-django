@@ -2191,6 +2191,12 @@ footer::after {
     padding: 0;
 }
 
+/* Variante de 3 columnas para mega-menus más amplios (ej: Almacén) */
+.dropdown-mega-3col {
+    min-width: 720px;
+    grid-template-columns: repeat(3, 1fr);
+}
+
 .dropdown-mega .dropdown-column {
     display: flex;
     flex-direction: column;
@@ -2198,6 +2204,11 @@ footer::after {
 }
 
 .dropdown-mega .dropdown-column:first-child {
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Bordes entre columnas para mega-menus de 3 columnas */
+.dropdown-mega-3col .dropdown-column:nth-child(2) {
     border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -2446,7 +2457,8 @@ footer::after {
     }
 
     /* Mega-menu en móvil: volver a una sola columna */
-    .dropdown-mega {
+    .dropdown-mega,
+    .dropdown-mega-3col {
         min-width: 100%;
         display: block;
         grid-template-columns: none;
@@ -2456,7 +2468,8 @@ footer::after {
         padding: 0;
     }
 
-    .dropdown-mega .dropdown-column:first-child {
+    .dropdown-mega .dropdown-column:first-child,
+    .dropdown-mega-3col .dropdown-column:nth-child(2) {
         border-right: none;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }

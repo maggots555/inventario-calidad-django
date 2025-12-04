@@ -23,6 +23,7 @@ MARCAS_EQUIPOS_CHOICES = [
     ('Compaq', 'Compaq'),
     ('Dell', 'Dell'),
     ('Gateway', 'Gateway'),
+    ('Gigabyte', 'Gigabyte'),
     ('HP', 'HP'),
     ('Huawei', 'Huawei'),
     ('Lenovo', 'Lenovo'),
@@ -98,7 +99,7 @@ PAQUETES_CHOICES = [
 # Precios fijos de paquetes (en pesos mexicanos, IVA incluido)
 PRECIOS_PAQUETES = {
     'premium': 5500.00,  # RAM 16GB DDR5 + SSD 1TB + Kit Limpieza
-    'oro': 3250.00,      # RAM 8GB DDR5 + SSD 1TB
+    'oro': 3860.00,      # RAM 8GB DDR5 + SSD 1TB
     'plata': 2900.00,    # SSD 1TB
     'ninguno': 0.00,
 }
