@@ -31,6 +31,8 @@ from .models import (
     Auditoria,
     DiferenciaAuditoria,
     UnidadInventario,
+    SolicitudCotizacion,
+    LineaCotizacion,
 )
 
 from config.constants import (
@@ -931,5 +933,264 @@ class UnidadInventarioAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f'{updated} unidad(es) marcada(s) para revisión.',
+        )
+
+
+# ============================================================================
+# ADMIN: SOLICITUD DE COTIZACIÓN (MULTI-PROVEEDOR)
+# ============================================================================
+
+class LineaCotizacionInline(admin.TabularInline):
+    """
+    Inline para editar líneas de cotización dentro de SolicitudCotizacion.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Un "inline" permite editar modelos relacionados directamente dentro
+    del formulario del modelo padre. Así puedes ver y editar todas las
+    líneas de una solicitud sin cambiar de página.
+    """
+    model = LineaCotizacion
+    extra = 1  # Mostrar 1 formulario vacío por defecto
+    
+    fields = (
+        'numero_linea',
+        'producto',
+        'descripcion_pieza',
+        'proveedor',
+        'cantidad',
+        'costo_unitario',
+        'estado_cliente',
+        'compra_generada',
+    )
+    
+    readonly_fields = ('compra_generada',)
+    
+    autocomplete_fields = ['producto', 'proveedor']
+
+
+@admin.register(SolicitudCotizacion)
+class SolicitudCotizacionAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Solicitudes de Cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este admin permite:
+    - Ver todas las solicitudes de cotización
+    - Filtrar por estado, fecha, creador
+    - Buscar por número de solicitud u orden cliente
+    - Editar solicitudes incluyendo sus líneas (inline)
+    """
+    
+    list_display = (
+        'numero_solicitud',
+        'numero_orden_cliente',
+        'estado_badge',
+        'total_lineas_display',
+        'costo_total_display',
+        'creado_por',
+        'fecha_creacion',
+    )
+    
+    list_filter = (
+        'estado',
+        'fecha_creacion',
+        'creado_por',
+    )
+    
+    search_fields = (
+        'numero_solicitud',
+        'numero_orden_cliente',
+        'observaciones',
+    )
+    
+    ordering = ['-fecha_creacion']
+    
+    readonly_fields = (
+        'numero_solicitud',
+        'fecha_creacion',
+        'fecha_actualizacion',
+        'fecha_envio_cliente',
+        'fecha_respuesta_cliente',
+        'fecha_completada',
+    )
+    
+    autocomplete_fields = ['orden_servicio', 'creado_por']
+    
+    inlines = [LineaCotizacionInline]
+    
+    fieldsets = (
+        ('Identificación', {
+            'fields': ('numero_solicitud', 'estado')
+        }),
+        ('Vinculación', {
+            'fields': ('orden_servicio', 'numero_orden_cliente')
+        }),
+        ('Observaciones', {
+            'fields': ('observaciones', 'observaciones_cliente')
+        }),
+        ('Auditoría', {
+            'fields': (
+                'creado_por',
+                'fecha_creacion',
+                'fecha_envio_cliente',
+                'fecha_respuesta_cliente',
+                'fecha_completada',
+                'fecha_actualizacion',
+            ),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    # -------------------------------------------------------------------------
+    # Métodos de visualización personalizados
+    # -------------------------------------------------------------------------
+    
+    @admin.display(description='Estado')
+    def estado_badge(self, obj):
+        """Muestra el estado con un badge de color"""
+        colores = {
+            'borrador': '#6c757d',
+            'enviada_cliente': '#17a2b8',
+            'parcialmente_aprobada': '#ffc107',
+            'totalmente_aprobada': '#28a745',
+            'totalmente_rechazada': '#dc3545',
+            'en_proceso': '#007bff',
+            'completada': '#28a745',
+            'cancelada': '#343a40',
+        }
+        color = colores.get(obj.estado, '#6c757d')
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 8px; '
+            'border-radius: 4px; font-size: 11px;">{}</span>',
+            color,
+            obj.get_estado_display()
+        )
+    
+    @admin.display(description='Líneas')
+    def total_lineas_display(self, obj):
+        """Muestra el número de líneas con desglose"""
+        total = obj.total_lineas
+        aprobadas = obj.lineas_aprobadas
+        rechazadas = obj.lineas_rechazadas
+        
+        return format_html(
+            '<span title="Total: {}, Aprobadas: {}, Rechazadas: {}">'
+            '{} <small class="text-muted">(✓{} ✗{})</small></span>',
+            total, aprobadas, rechazadas,
+            total, aprobadas, rechazadas
+        )
+    
+    @admin.display(description='Costo Total')
+    def costo_total_display(self, obj):
+        """Muestra el costo total formateado"""
+        return f'${obj.costo_total:,.2f}'
+    
+    # -------------------------------------------------------------------------
+    # Acciones personalizadas
+    # -------------------------------------------------------------------------
+    
+    actions = ['enviar_a_cliente', 'generar_compras']
+    
+    @admin.action(description='📧 Enviar seleccionadas a Cliente')
+    def enviar_a_cliente(self, request, queryset):
+        """Cambia el estado de las solicitudes a 'enviada_cliente'"""
+        enviadas = 0
+        for solicitud in queryset.filter(estado='borrador'):
+            if solicitud.enviar_a_cliente():
+                enviadas += 1
+        
+        if enviadas:
+            self.message_user(request, f'{enviadas} solicitud(es) enviada(s) a cliente.')
+        else:
+            self.message_user(request, 'No se pudo enviar ninguna solicitud (deben estar en borrador).', level='warning')
+    
+    @admin.action(description='🛒 Generar Compras para aprobadas')
+    def generar_compras(self, request, queryset):
+        """Genera CompraProducto para las líneas aprobadas"""
+        compras_creadas = 0
+        for solicitud in queryset:
+            if solicitud.puede_generar_compras():
+                compras = solicitud.generar_compras(usuario=request.user)
+                compras_creadas += len(compras)
+        
+        if compras_creadas:
+            self.message_user(request, f'{compras_creadas} compra(s) generada(s).')
+        else:
+            self.message_user(request, 'No se generaron compras (no hay líneas aprobadas pendientes).', level='warning')
+
+
+@admin.register(LineaCotizacion)
+class LineaCotizacionAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Líneas de Cotización.
+    
+    Normalmente las líneas se editan dentro de la solicitud (inline),
+    pero este admin permite verlas y filtrarlas de forma independiente.
+    """
+    
+    list_display = (
+        'solicitud',
+        'numero_linea',
+        'producto',
+        'descripcion_pieza_corta',
+        'proveedor',
+        'cantidad',
+        'costo_unitario',
+        'subtotal_display',
+        'estado_badge',
+    )
+    
+    list_filter = (
+        'estado_cliente',
+        'proveedor',
+        ('solicitud__fecha_creacion', admin.DateFieldListFilter),
+    )
+    
+    search_fields = (
+        'solicitud__numero_solicitud',
+        'descripcion_pieza',
+        'producto__nombre',
+        'proveedor__nombre',
+    )
+    
+    ordering = ['-solicitud__fecha_creacion', 'numero_linea']
+    
+    autocomplete_fields = ['solicitud', 'producto', 'proveedor', 'compra_generada']
+    
+    readonly_fields = ('fecha_creacion', 'fecha_actualizacion', 'fecha_respuesta')
+    
+    # -------------------------------------------------------------------------
+    # Métodos de visualización personalizados
+    # -------------------------------------------------------------------------
+    
+    @admin.display(description='Descripción')
+    def descripcion_pieza_corta(self, obj):
+        """Trunca la descripción para la lista"""
+        if len(obj.descripcion_pieza) > 40:
+            return obj.descripcion_pieza[:40] + '...'
+        return obj.descripcion_pieza
+    
+    @admin.display(description='Subtotal')
+    def subtotal_display(self, obj):
+        """Muestra el subtotal calculado"""
+        return f'${obj.subtotal:,.2f}'
+    
+    @admin.display(description='Estado')
+    def estado_badge(self, obj):
+        """Muestra el estado con un badge de color"""
+        colores = {
+            'pendiente': '#6c757d',
+            'aprobada': '#28a745',
+            'rechazada': '#dc3545',
+            'compra_generada': '#007bff',
+        }
+        color = colores.get(obj.estado_cliente, '#6c757d')
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 8px; '
+            'border-radius: 4px; font-size: 11px;">{}</span>',
+            color,
+            obj.get_estado_cliente_display()
         )
 

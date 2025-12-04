@@ -1,0 +1,246 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% comment %}
+Lista de Solicitudes de Cotización (Multi-Proveedor)
+Muestra todas las solicitudes con filtros y contadores por estado
+{% endcomment %}
+
+{% block title %}Solicitudes de Cotización - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">
+                <i class="bi bi-file-earmark-text me-2"></i>Solicitudes de Cotización
+            </h1>
+            <p class="text-muted mb-0">Cotizaciones con múltiples productos y proveedores</p>
+        </div>
+        <div>
+            <a href="{% url 'almacen:lista_compras' %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-cart3 me-1"></i>Compras Directas
+            </a>
+            <a href="{% url 'almacen:dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left me-1"></i>Dashboard
+            </a>
+            <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Nueva Solicitud
+            </a>
+        </div>
+    </div>
+
+    <!-- Contadores por estado -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center py-2">
+                    <h3 class="mb-0">{{ contadores.borrador|default:0 }}</h3>
+                    <small>Borrador</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center py-2">
+                    <h3 class="mb-0">{{ contadores.enviada_cliente|default:0 }}</h3>
+                    <small>Enviadas</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center py-2">
+                    <h3 class="mb-0">{{ contadores.parcialmente_aprobada|default:0 }}</h3>
+                    <small>Parciales</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center py-2">
+                    <h3 class="mb-0">{{ contadores.totalmente_aprobada|default:0 }}</h3>
+                    <small>Aprobadas</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center py-2">
+                    <h3 class="mb-0">{{ contadores.completada|default:0 }}</h3>
+                    <small>Completadas</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center py-2">
+                    <h3 class="mb-0">{{ contadores.totalmente_rechazada|default:0 }}</h3>
+                    <small>Rechazadas</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Estado</label>
+                    {{ filtro_form.estado }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Desde</label>
+                    {{ filtro_form.fecha_desde }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Hasta</label>
+                    {{ filtro_form.fecha_hasta }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Buscar</label>
+                    {{ filtro_form.buscar }}
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search me-1"></i>Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de Solicitudes -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            {% if solicitudes %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>N° Solicitud</th>
+                            <th>Orden Cliente</th>
+                            <th class="text-center">Líneas</th>
+                            <th class="text-end">Total</th>
+                            <th>Estado</th>
+                            <th>Creado por</th>
+                            <th>Fecha</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for solicitud in solicitudes %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'almacen:detalle_solicitud_cotizacion' solicitud.pk %}" 
+                                   class="fw-bold text-decoration-none">
+                                    {{ solicitud.numero_solicitud }}
+                                </a>
+                            </td>
+                            <td>
+                                {% if solicitud.numero_orden_cliente %}
+                                <span class="badge bg-light text-dark">
+                                    {{ solicitud.numero_orden_cliente }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">Sin vincular</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary">
+                                    {{ solicitud.total_lineas }}
+                                </span>
+                                {% if solicitud.lineas_aprobadas > 0 %}
+                                <span class="badge bg-success" title="Aprobadas">
+                                    {{ solicitud.lineas_aprobadas }} ✓
+                                </span>
+                                {% endif %}
+                                {% if solicitud.lineas_rechazadas > 0 %}
+                                <span class="badge bg-danger" title="Rechazadas">
+                                    {{ solicitud.lineas_rechazadas }} ✗
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-bold">
+                                ${{ solicitud.costo_total|floatformat:2 }}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ solicitud.get_badge_estado }}">
+                                    {{ solicitud.get_estado_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if solicitud.creado_por %}
+                                {{ solicitud.creado_por.get_full_name|default:solicitud.creado_por.username }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'almacen:detalle_solicitud_cotizacion' solicitud.pk %}" 
+                                   class="btn btn-sm btn-outline-primary" title="Ver detalle">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if solicitud.estado == 'borrador' %}
+                                <a href="{% url 'almacen:editar_solicitud_cotizacion' solicitud.pk %}" 
+                                   class="btn btn-sm btn-outline-secondary" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Paginación -->
+            {% if solicitudes.has_other_pages %}
+            <div class="card-footer">
+                <nav aria-label="Paginación">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if solicitudes.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ solicitudes.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                &laquo; Anterior
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        <li class="page-item disabled">
+                            <span class="page-link">
+                                Página {{ solicitudes.number }} de {{ solicitudes.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if solicitudes.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ solicitudes.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                Siguiente &raquo;
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox display-1 text-muted"></i>
+                <h4 class="text-muted mt-3">No hay solicitudes de cotización</h4>
+                <p class="text-muted">Crea una nueva solicitud para comenzar</p>
+                <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Nueva Solicitud
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock almacen_content %}

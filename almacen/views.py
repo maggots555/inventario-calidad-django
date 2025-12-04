@@ -44,6 +44,8 @@ from .models import (
     Auditoria,
     DiferenciaAuditoria,
     UnidadInventario,
+    SolicitudCotizacion,
+    LineaCotizacion,
 )
 from .forms import (
     ProveedorForm,
@@ -65,6 +67,11 @@ from .forms import (
     EntradaRapidaForm,
     UnidadInventarioForm,
     UnidadInventarioFiltroForm,
+    SolicitudCotizacionForm,
+    LineaCotizacionForm,
+    LineaCotizacionFormSet,
+    SolicitudCotizacionFiltroForm,
+    RespuestaLineaCotizacionForm,
 )
 from inventario.models import Empleado
 
@@ -2120,6 +2127,16 @@ def recibir_compra(request, pk):
                 if crear_unidades:
                     unidades_compra = compra.unidades_compra.filter(estado='pendiente')
                     
+                    # Obtener descripción de la línea de cotización si existe
+                    # Esta descripción contiene detalles como "RAM DDR4 16GB Kingston Fury"
+                    descripcion_pieza = ''
+                    orden_servicio = None
+                    if hasattr(compra, 'linea_cotizacion_origen') and compra.linea_cotizacion_origen:
+                        descripcion_pieza = compra.linea_cotizacion_origen.descripcion_pieza
+                        # Obtener la orden de servicio desde la solicitud de cotización
+                        if compra.linea_cotizacion_origen.solicitud:
+                            orden_servicio = compra.linea_cotizacion_origen.solicitud.orden_servicio
+                    
                     if unidades_compra.exists():
                         # Hay unidades definidas, crear una por cada una
                         for unidad_compra in unidades_compra:
@@ -2127,14 +2144,24 @@ def recibir_compra(request, pk):
                     else:
                         # No hay unidades definidas, crear genéricas
                         for i in range(compra.cantidad):
+                            # Si viene de cotización con orden, ya está asignada
+                            # Si no tiene orden, queda disponible
+                            disponibilidad = 'asignada' if orden_servicio else 'disponible'
+                            
                             UnidadInventario.objects.create(
                                 producto=compra.producto,
                                 estado='nuevo',
-                                disponibilidad='disponible',
+                                disponibilidad=disponibilidad,
                                 origen='compra',
                                 compra=compra,
                                 costo_unitario=compra.costo_unitario,
                                 registrado_por=request.user,
+                                # Marca siempre genérica, modelo con descripción de cotización
+                                marca='Genérico/Sin marca',
+                                modelo=descripcion_pieza if descripcion_pieza else '',
+                                especificaciones='',
+                                # Vincular con la orden de servicio de la cotización
+                                orden_servicio_destino=orden_servicio,
                                 notas=f'Creada desde compra #{compra.pk}',
                             )
                 
@@ -2368,4 +2395,482 @@ def problema_unidad_compra(request, compra_pk, pk):
             messages.warning(request, f'Unidad #{unidad.numero_linea} marcada como WPB.')
     
     return redirect('almacen:detalle_compra', pk=compra_pk)
+
+
+# ============================================================================
+# SOLICITUDES DE COTIZACIÓN (MULTI-PROVEEDOR)
+# ============================================================================
+
+@login_required
+def lista_solicitudes_cotizacion(request):
+    """
+    Lista todas las solicitudes de cotización con filtros.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista muestra todas las solicitudes de cotización en una tabla.
+    Permite filtrar por:
+    - Estado (borrador, enviada, aprobada, etc.)
+    - Fecha de creación
+    - Búsqueda por número de solicitud u orden
+    
+    También muestra un resumen con contadores por estado para una
+    visión rápida del flujo de trabajo.
+    """
+    # Obtener todas las solicitudes
+    solicitudes = SolicitudCotizacion.objects.select_related(
+        'orden_servicio',
+        'creado_por'
+    ).prefetch_related('lineas').order_by('-fecha_creacion')
+    
+    # Aplicar filtros
+    filtro_form = SolicitudCotizacionFiltroForm(request.GET)
+    
+    if filtro_form.is_valid():
+        estado = filtro_form.cleaned_data.get('estado')
+        fecha_desde = filtro_form.cleaned_data.get('fecha_desde')
+        fecha_hasta = filtro_form.cleaned_data.get('fecha_hasta')
+        buscar = filtro_form.cleaned_data.get('buscar')
+        
+        if estado:
+            solicitudes = solicitudes.filter(estado=estado)
+        
+        if fecha_desde:
+            solicitudes = solicitudes.filter(fecha_creacion__date__gte=fecha_desde)
+        
+        if fecha_hasta:
+            solicitudes = solicitudes.filter(fecha_creacion__date__lte=fecha_hasta)
+        
+        if buscar:
+            solicitudes = solicitudes.filter(
+                Q(numero_solicitud__icontains=buscar) |
+                Q(numero_orden_cliente__icontains=buscar)
+            )
+    
+    # Contadores por estado para el resumen
+    contadores = SolicitudCotizacion.objects.values('estado').annotate(
+        total=Count('id')
+    )
+    contadores_dict = {c['estado']: c['total'] for c in contadores}
+    
+    # Paginación
+    paginator = Paginator(solicitudes, 20)
+    page = request.GET.get('page', 1)
+    solicitudes_page = paginator.get_page(page)
+    
+    context = {
+        'solicitudes': solicitudes_page,
+        'filtro_form': filtro_form,
+        'contadores': contadores_dict,
+        'titulo': 'Solicitudes de Cotización',
+    }
+    
+    return render(request, 'almacen/cotizaciones/lista_solicitudes.html', context)
+
+
+@login_required
+def crear_solicitud_cotizacion(request):
+    """
+    Crear una nueva solicitud de cotización con múltiples líneas.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista maneja la creación de una solicitud de cotización.
+    
+    El proceso tiene dos partes:
+    1. El formulario principal (SolicitudCotizacionForm) captura:
+       - Número de orden del cliente (para vincular con servicio técnico)
+       - Observaciones internas
+    
+    2. El formset (LineaCotizacionFormSet) captura las líneas:
+       - Cada línea tiene: producto, descripción, proveedor, cantidad, costo
+       - Se pueden agregar múltiples líneas dinámicamente con JavaScript
+    
+    Flujo:
+    1. GET: Muestra formularios vacíos
+    2. POST: Valida ambos formularios
+       - Si válidos: Guarda solicitud y líneas, redirige a detalle
+       - Si inválidos: Muestra errores
+    """
+    if request.method == 'POST':
+        form = SolicitudCotizacionForm(request.POST)
+        formset = LineaCotizacionFormSet(request.POST)
+        
+        if form.is_valid() and formset.is_valid():
+            # Guardar la solicitud (cabecera)
+            solicitud = form.save(commit=False)
+            solicitud.creado_por = request.user
+            solicitud.save()
+            
+            # Guardar las líneas (detalle)
+            formset.instance = solicitud
+            formset.save()
+            
+            messages.success(
+                request,
+                f'Solicitud de cotización {solicitud.numero_solicitud} creada exitosamente.'
+            )
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=solicitud.pk)
+        else:
+            messages.error(request, 'Por favor corrige los errores en el formulario.')
+    else:
+        form = SolicitudCotizacionForm()
+        formset = LineaCotizacionFormSet()
+    
+    context = {
+        'form': form,
+        'formset': formset,
+        'titulo': 'Nueva Solicitud de Cotización',
+        'es_creacion': True,
+    }
+    
+    return render(request, 'almacen/cotizaciones/form_solicitud.html', context)
+
+
+@login_required
+def editar_solicitud_cotizacion(request, pk):
+    """
+    Editar una solicitud de cotización existente.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Similar a crear, pero carga los datos existentes en los formularios.
+    
+    Solo se puede editar si la solicitud está en estado 'borrador'.
+    Una vez enviada al cliente, no se puede modificar.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    # Solo se puede editar en estado borrador
+    if solicitud.estado != 'borrador':
+        messages.error(
+            request,
+            'Solo se pueden editar solicitudes en estado borrador.'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+    
+    if request.method == 'POST':
+        form = SolicitudCotizacionForm(request.POST, instance=solicitud)
+        formset = LineaCotizacionFormSet(request.POST, instance=solicitud)
+        
+        if form.is_valid() and formset.is_valid():
+            form.save()
+            formset.save()
+            
+            messages.success(request, 'Solicitud actualizada exitosamente.')
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+        else:
+            messages.error(request, 'Por favor corrige los errores en el formulario.')
+    else:
+        form = SolicitudCotizacionForm(instance=solicitud)
+        formset = LineaCotizacionFormSet(instance=solicitud)
+    
+    context = {
+        'form': form,
+        'formset': formset,
+        'solicitud': solicitud,
+        'titulo': f'Editar Solicitud {solicitud.numero_solicitud}',
+        'es_creacion': False,
+    }
+    
+    return render(request, 'almacen/cotizaciones/form_solicitud.html', context)
+
+
+@login_required
+def detalle_solicitud_cotizacion(request, pk):
+    """
+    Ver detalle completo de una solicitud de cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista muestra toda la información de una solicitud:
+    - Datos de la cabecera (número, orden vinculada, estado)
+    - Tabla con todas las líneas y sus estados
+    - Totales y resúmenes
+    - Acciones disponibles según el estado
+    
+    Las acciones cambian según el estado:
+    - Borrador: Editar, Enviar a cliente, Cancelar
+    - Enviada: Registrar respuestas del cliente
+    - Aprobada: Generar compras
+    - Completada: Solo visualización
+    """
+    solicitud = get_object_or_404(
+        SolicitudCotizacion.objects.select_related(
+            'orden_servicio',
+            'creado_por'
+        ).prefetch_related(
+            'lineas__producto',
+            'lineas__proveedor',
+            'lineas__compra_generada'
+        ),
+        pk=pk
+    )
+    
+    # Información del equipo desde DetalleEquipo si está vinculada la orden
+    info_orden = None
+    if solicitud.orden_servicio:
+        try:
+            info_orden = solicitud.orden_servicio.detalle_equipo
+        except:
+            pass
+    
+    context = {
+        'solicitud': solicitud,
+        'info_orden': info_orden,
+        'titulo': f'Solicitud {solicitud.numero_solicitud}',
+    }
+    
+    return render(request, 'almacen/cotizaciones/detalle_solicitud.html', context)
+
+
+@login_required
+def enviar_solicitud_cliente(request, pk):
+    """
+    Cambiar estado de la solicitud a 'enviada_cliente'.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta acción marca la solicitud como lista para compartir con el cliente.
+    Recepción podrá entonces enviarla y registrar las respuestas.
+    
+    Requisitos:
+    - Estado debe ser 'borrador'
+    - Debe tener al menos una línea
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    if request.method == 'POST':
+        if solicitud.enviar_a_cliente():
+            messages.success(
+                request,
+                f'Solicitud {solicitud.numero_solicitud} enviada a cliente. '
+                'Recepción puede ahora compartirla y registrar respuestas.'
+            )
+        else:
+            messages.error(
+                request,
+                'No se puede enviar la solicitud. Verifica que esté en estado '
+                'borrador y tenga al menos una línea.'
+            )
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+def responder_linea_cotizacion(request, solicitud_pk, linea_pk):
+    """
+    Registrar la respuesta del cliente para una línea específica.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista permite a Recepción registrar si el cliente aprobó o
+    rechazó una línea específica de la cotización.
+    
+    Si el cliente aprueba: La línea queda marcada para generar compra.
+    Si el cliente rechaza: Se debe indicar el motivo.
+    
+    Después de cada respuesta, se actualiza automáticamente el estado
+    general de la solicitud.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=solicitud_pk)
+    linea = get_object_or_404(LineaCotizacion, pk=linea_pk, solicitud=solicitud)
+    
+    # Solo se puede responder si la solicitud está enviada
+    if solicitud.estado not in ['enviada_cliente', 'parcialmente_aprobada']:
+        messages.error(
+            request,
+            'Solo se pueden registrar respuestas en solicitudes enviadas al cliente.'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=solicitud_pk)
+    
+    if request.method == 'POST':
+        form = RespuestaLineaCotizacionForm(request.POST)
+        
+        if form.is_valid():
+            decision = form.cleaned_data['decision']
+            motivo = form.cleaned_data.get('motivo_rechazo', '')
+            
+            if decision == 'aprobar':
+                if linea.aprobar():
+                    messages.success(
+                        request,
+                        f'Línea #{linea.numero_linea} aprobada por el cliente.'
+                    )
+                else:
+                    messages.error(request, 'No se pudo aprobar la línea.')
+            else:  # rechazar
+                if linea.rechazar(motivo=motivo):
+                    messages.warning(
+                        request,
+                        f'Línea #{linea.numero_linea} rechazada por el cliente.'
+                    )
+                else:
+                    messages.error(request, 'No se pudo rechazar la línea.')
+        else:
+            messages.error(request, 'Por favor corrige los errores.')
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=solicitud_pk)
+
+
+@login_required
+def aprobar_todas_lineas(request, pk):
+    """
+    Aprobar todas las líneas pendientes de una solicitud.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Atajo para cuando el cliente aprueba toda la cotización.
+    En lugar de aprobar línea por línea, se aprueban todas a la vez.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    if request.method == 'POST':
+        lineas_pendientes = solicitud.lineas.filter(estado_cliente='pendiente')
+        aprobadas = 0
+        
+        for linea in lineas_pendientes:
+            if linea.aprobar():
+                aprobadas += 1
+        
+        if aprobadas > 0:
+            messages.success(
+                request,
+                f'Se aprobaron {aprobadas} línea(s) de la cotización.'
+            )
+        else:
+            messages.info(request, 'No había líneas pendientes por aprobar.')
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+def rechazar_todas_lineas(request, pk):
+    """
+    Rechazar todas las líneas pendientes de una solicitud.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Atajo para cuando el cliente rechaza toda la cotización.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    if request.method == 'POST':
+        motivo = request.POST.get('motivo', 'Rechazado por el cliente')
+        lineas_pendientes = solicitud.lineas.filter(estado_cliente='pendiente')
+        rechazadas = 0
+        
+        for linea in lineas_pendientes:
+            if linea.rechazar(motivo=motivo):
+                rechazadas += 1
+        
+        if rechazadas > 0:
+            messages.warning(
+                request,
+                f'Se rechazaron {rechazadas} línea(s) de la cotización.'
+            )
+        else:
+            messages.info(request, 'No había líneas pendientes por rechazar.')
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+def generar_compras_solicitud(request, pk):
+    """
+    Genera CompraProducto para las líneas aprobadas.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Una vez que el cliente ha aprobado las líneas, esta acción crea
+    los registros de CompraProducto para cada línea aprobada.
+    
+    Cada CompraProducto:
+    - Queda vinculado a la línea de cotización
+    - Tiene estado 'pendiente_llegada'
+    - Hereda el producto, proveedor, cantidad y costo de la línea
+    - Se vincula a la misma orden de servicio
+    
+    Esto integra el flujo de cotizaciones con el flujo existente de compras.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    if request.method == 'POST':
+        if not solicitud.puede_generar_compras():
+            messages.error(
+                request,
+                'No se pueden generar compras. Verifica que haya líneas '
+                'aprobadas sin compra generada.'
+            )
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+        
+        compras = solicitud.generar_compras(usuario=request.user)
+        
+        if compras:
+            messages.success(
+                request,
+                f'Se generaron {len(compras)} compra(s) exitosamente. '
+                'Puedes verlas en la lista de compras.'
+            )
+        else:
+            messages.error(request, 'No se pudieron generar las compras.')
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+def cancelar_solicitud_cotizacion(request, pk):
+    """
+    Cancelar una solicitud de cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cancela la solicitud completa. Solo se puede cancelar si no está
+    completada (es decir, si aún no se generaron todas las compras).
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    if request.method == 'POST':
+        motivo = request.POST.get('motivo', '')
+        
+        if solicitud.cancelar(motivo=motivo):
+            messages.success(
+                request,
+                f'Solicitud {solicitud.numero_solicitud} cancelada.'
+            )
+        else:
+            messages.error(
+                request,
+                'No se puede cancelar esta solicitud (ya está completada o cancelada).'
+            )
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+def eliminar_solicitud_cotizacion(request, pk):
+    """
+    Eliminar una solicitud de cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Elimina permanentemente la solicitud y todas sus líneas.
+    Solo se puede eliminar si está en estado 'borrador' o 'cancelada'.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    if solicitud.estado not in ['borrador', 'cancelada']:
+        messages.error(
+            request,
+            'Solo se pueden eliminar solicitudes en estado borrador o canceladas.'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+    
+    if request.method == 'POST':
+        numero = solicitud.numero_solicitud
+        solicitud.delete()
+        messages.success(request, f'Solicitud {numero} eliminada.')
+        return redirect('almacen:lista_solicitudes_cotizacion')
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
 

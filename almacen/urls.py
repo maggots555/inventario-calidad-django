@@ -82,6 +82,28 @@ urlpatterns = [
     path('compras/<int:compra_pk>/unidad/<int:pk>/problema/', views.problema_unidad_compra, name='problema_unidad'),
     
     # ============================================================================
+    # SOLICITUDES DE COTIZACIÓN (MULTI-PROVEEDOR)
+    # ============================================================================
+    # Lista de solicitudes de cotización
+    path('solicitudes-cotizacion/', views.lista_solicitudes_cotizacion, name='lista_solicitudes_cotizacion'),
+    
+    # CRUD de solicitudes
+    path('solicitudes-cotizacion/crear/', views.crear_solicitud_cotizacion, name='crear_solicitud_cotizacion'),
+    path('solicitudes-cotizacion/<int:pk>/', views.detalle_solicitud_cotizacion, name='detalle_solicitud_cotizacion'),
+    path('solicitudes-cotizacion/<int:pk>/editar/', views.editar_solicitud_cotizacion, name='editar_solicitud_cotizacion'),
+    path('solicitudes-cotizacion/<int:pk>/eliminar/', views.eliminar_solicitud_cotizacion, name='eliminar_solicitud_cotizacion'),
+    
+    # Workflow de solicitudes
+    path('solicitudes-cotizacion/<int:pk>/enviar/', views.enviar_solicitud_cliente, name='enviar_solicitud_cliente'),
+    path('solicitudes-cotizacion/<int:pk>/cancelar/', views.cancelar_solicitud_cotizacion, name='cancelar_solicitud_cotizacion'),
+    path('solicitudes-cotizacion/<int:pk>/generar-compras/', views.generar_compras_solicitud, name='generar_compras_solicitud'),
+    
+    # Respuestas del cliente por línea
+    path('solicitudes-cotizacion/<int:solicitud_pk>/linea/<int:linea_pk>/responder/', views.responder_linea_cotizacion, name='responder_linea_cotizacion'),
+    path('solicitudes-cotizacion/<int:pk>/aprobar-todas/', views.aprobar_todas_lineas, name='aprobar_todas_lineas'),
+    path('solicitudes-cotizacion/<int:pk>/rechazar-todas/', views.rechazar_todas_lineas, name='rechazar_todas_lineas'),
+    
+    # ============================================================================
     # SOLICITUDES DE BAJA
     # ============================================================================
     path('solicitudes/', views.lista_solicitudes, name='lista_solicitudes'),

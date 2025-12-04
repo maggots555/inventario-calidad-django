@@ -30,6 +30,8 @@ from .models import (
     Auditoria,
     DiferenciaAuditoria,
     UnidadInventario,
+    SolicitudCotizacion,
+    LineaCotizacion,
 )
 from config.constants import (
     TIPO_PRODUCTO_ALMACEN_CHOICES,
@@ -44,6 +46,8 @@ from config.constants import (
     TIPO_COMPRA_CHOICES,
     ESTADO_COMPRA_CHOICES,
     ESTADO_UNIDAD_COMPRA_CHOICES,
+    ESTADO_SOLICITUD_COTIZACION_CHOICES,
+    ESTADO_LINEA_COTIZACION_CHOICES,
 )
 
 
@@ -1551,3 +1555,359 @@ class UnidadInventarioFiltroForm(forms.Form):
         }),
         label='Buscar',
     )
+
+
+# ============================================================================
+# FORMULARIOS: SOLICITUD DE COTIZACIÓN (MULTI-PROVEEDOR)
+# ============================================================================
+
+class SolicitudCotizacionForm(forms.ModelForm):
+    """
+    Formulario para crear y editar Solicitudes de Cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este formulario crea la "cabecera" de una cotización multi-proveedor.
+    
+    El campo más importante es 'numero_orden_cliente' que permite buscar
+    la orden de servicio a la cual se vinculará esta cotización.
+    
+    La búsqueda se realiza mediante AJAX usando el endpoint existente
+    'buscar_orden_fab' que acepta números tipo OOW-12345 o FL-67890.
+    
+    Campos:
+    - numero_orden_cliente: Para buscar y vincular con OrdenServicio
+    - observaciones: Notas internas sobre la solicitud
+    
+    Los demás campos (numero_solicitud, estado, fechas) se manejan
+    automáticamente por el sistema.
+    """
+    
+    class Meta:
+        model = SolicitudCotizacion
+        fields = [
+            'numero_orden_cliente',
+            'observaciones',
+        ]
+        widgets = {
+            'numero_orden_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: OOW-12345 o FL-67890',
+                'id': 'numero_orden_cliente',
+                'autocomplete': 'off',
+            }),
+            'observaciones': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Notas internas sobre esta solicitud de cotización...',
+            }),
+        }
+        labels = {
+            'numero_orden_cliente': 'Número de Orden del Cliente',
+            'observaciones': 'Observaciones Internas',
+        }
+        help_texts = {
+            'numero_orden_cliente': 'Ingresa el número de orden y presiona Tab para buscar',
+            'observaciones': 'Estas notas son internas, no se muestran al cliente',
+        }
+    
+    def clean_numero_orden_cliente(self):
+        """
+        Valida y normaliza el número de orden del cliente.
+        
+        EXPLICACIÓN:
+        - Convierte a mayúsculas
+        - Verifica que exista una orden con ese número
+        - Si existe, guarda la referencia para vincularla después
+        
+        NOTA: El campo 'orden_cliente' está en DetalleEquipo, que tiene 
+        relación OneToOne con OrdenServicio a través de 'detalle_equipo'.
+        """
+        numero = self.cleaned_data.get('numero_orden_cliente', '').strip().upper()
+        
+        if not numero:
+            return numero
+        
+        # Buscar la orden de servicio a través de DetalleEquipo
+        from servicio_tecnico.models import DetalleEquipo
+        
+        try:
+            detalle = DetalleEquipo.objects.select_related('orden').get(
+                orden_cliente__iexact=numero
+            )
+            # Guardar la orden encontrada para usarla en el save
+            self._orden_servicio_encontrada = detalle.orden
+        except DetalleEquipo.DoesNotExist:
+            raise ValidationError(
+                f'No se encontró una orden de servicio con el número "{numero}". '
+                'Verifica que el número sea correcto (formato: OOW-12345 o FL-67890).'
+            )
+        
+        return numero
+    
+    def save(self, commit=True):
+        """
+        Guarda la solicitud vinculando la orden de servicio encontrada.
+        """
+        instance = super().save(commit=False)
+        
+        # Vincular la orden de servicio si se encontró
+        if hasattr(self, '_orden_servicio_encontrada'):
+            instance.orden_servicio = self._orden_servicio_encontrada
+        
+        if commit:
+            instance.save()
+        
+        return instance
+
+
+class LineaCotizacionForm(forms.ModelForm):
+    """
+    Formulario para cada línea de la cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este formulario representa UNA línea dentro de la solicitud:
+    - Qué producto se cotiza (del catálogo de almacén)
+    - Descripción específica de la pieza
+    - De qué proveedor se comprará
+    - Cantidad y precio
+    
+    Se usa como parte de un FORMSET (conjunto de formularios) que permite
+    agregar múltiples líneas dinámicamente desde JavaScript.
+    
+    Campos principales:
+    - producto: Selector del catálogo de almacén
+    - descripcion_pieza: Descripción específica (ej: "RAM DDR4 16GB Kingston")
+    - proveedor: De dónde se comprará
+    - cantidad: Cuántas unidades
+    - costo_unitario: Precio por unidad
+    - notas: Observaciones adicionales
+    """
+    
+    class Meta:
+        model = LineaCotizacion
+        fields = [
+            'producto',
+            'descripcion_pieza',
+            'proveedor',
+            'cantidad',
+            'costo_unitario',
+            'tiempo_entrega_estimado',
+            'notas',
+        ]
+        widgets = {
+            'producto': forms.Select(attrs={
+                'class': 'form-select form-select-sm producto-select',
+            }),
+            'descripcion_pieza': forms.TextInput(attrs={
+                'class': 'form-control form-control-sm',
+                'placeholder': 'Ej: RAM DDR4 16GB 3200MHz Kingston Fury',
+            }),
+            'proveedor': forms.Select(attrs={
+                'class': 'form-select form-select-sm proveedor-select',
+            }),
+            'cantidad': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm',
+                'min': 1,
+                'value': 1,
+            }),
+            'costo_unitario': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm',
+                'min': 0,
+                'step': '0.01',
+                'placeholder': '0.00',
+            }),
+            'tiempo_entrega_estimado': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm',
+                'min': 0,
+                'placeholder': 'días',
+            }),
+            'notas': forms.Textarea(attrs={
+                'class': 'form-control form-control-sm',
+                'rows': 1,
+                'placeholder': 'Notas adicionales...',
+            }),
+        }
+        labels = {
+            'producto': 'Producto',
+            'descripcion_pieza': 'Descripción de la Pieza',
+            'proveedor': 'Proveedor',
+            'cantidad': 'Cant.',
+            'costo_unitario': 'Costo Unit.',
+            'tiempo_entrega_estimado': 'Entrega (días)',
+            'notas': 'Notas',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """
+        Personaliza los querysets de los campos relacionales.
+        
+        EXPLICACIÓN:
+        - Solo muestra productos activos
+        - Solo muestra proveedores activos
+        - Ordena alfabéticamente para facilitar búsqueda
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar productos activos y ordenar por nombre
+        self.fields['producto'].queryset = ProductoAlmacen.objects.filter(
+            activo=True
+        ).order_by('nombre')
+        self.fields['producto'].empty_label = '-- Seleccionar Producto --'
+        
+        # Filtrar proveedores activos y ordenar por nombre
+        self.fields['proveedor'].queryset = Proveedor.objects.filter(
+            activo=True
+        ).order_by('nombre')
+        self.fields['proveedor'].empty_label = '-- Seleccionar Proveedor --'
+    
+    def clean(self):
+        """
+        Validaciones que involucran múltiples campos.
+        """
+        cleaned_data = super().clean()
+        producto = cleaned_data.get('producto')
+        descripcion = cleaned_data.get('descripcion_pieza')
+        costo = cleaned_data.get('costo_unitario')
+        
+        # La descripción es obligatoria
+        if not descripcion:
+            self.add_error(
+                'descripcion_pieza',
+                'La descripción de la pieza es obligatoria.'
+            )
+        
+        # El costo debe ser mayor a 0
+        if costo is not None and costo <= 0:
+            self.add_error(
+                'costo_unitario',
+                'El costo debe ser mayor a 0.'
+            )
+        
+        return cleaned_data
+
+
+# Formset para las líneas de cotización
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# --------------------------------
+# Un "formset" es un conjunto de formularios del mismo tipo.
+# Permite manejar múltiples instancias del mismo modelo en una sola vista.
+# 
+# Parámetros importantes:
+# - model: El modelo padre (SolicitudCotizacion)
+# - model: El modelo hijo (LineaCotizacion)
+# - form: El formulario a usar para cada línea
+# - extra: Cuántos formularios vacíos mostrar inicialmente
+# - can_delete: Si se permite eliminar líneas existentes
+# - min_num: Mínimo de formularios (1 = al menos una línea)
+# - validate_min: Si validar el mínimo
+
+LineaCotizacionFormSet = inlineformset_factory(
+    SolicitudCotizacion,  # Modelo padre
+    LineaCotizacion,      # Modelo hijo
+    form=LineaCotizacionForm,
+    extra=1,              # 1 formulario vacío inicial
+    can_delete=True,      # Permite eliminar líneas
+    min_num=1,            # Al menos 1 línea
+    validate_min=True,    # Validar que haya al menos 1
+)
+
+
+class SolicitudCotizacionFiltroForm(forms.Form):
+    """
+    Formulario de filtros para la lista de solicitudes de cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este formulario NO guarda datos en la base de datos.
+    Su único propósito es proporcionar campos para filtrar la lista
+    de solicitudes en la vista de lista.
+    """
+    
+    estado = forms.ChoiceField(
+        choices=[('', 'Todos los estados')] + list(ESTADO_SOLICITUD_COTIZACION_CHOICES),
+        required=False,
+        widget=forms.Select(attrs={
+            'class': 'form-select form-select-sm',
+        }),
+        label='Estado',
+    )
+    
+    fecha_desde = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control form-control-sm',
+            'type': 'date',
+        }),
+        label='Desde',
+    )
+    
+    fecha_hasta = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control form-control-sm',
+            'type': 'date',
+        }),
+        label='Hasta',
+    )
+    
+    buscar = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control form-control-sm',
+            'placeholder': 'Buscar por número de solicitud u orden...',
+        }),
+        label='Buscar',
+    )
+
+
+class RespuestaLineaCotizacionForm(forms.Form):
+    """
+    Formulario para registrar la respuesta del cliente a una línea.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este formulario se usa cuando Recepción registra si el cliente
+    aprobó o rechazó una línea específica de la cotización.
+    
+    Es un Form simple (no ModelForm) porque solo necesitamos capturar
+    la decisión y opcionalmente el motivo del rechazo.
+    """
+    
+    decision = forms.ChoiceField(
+        choices=[
+            ('aprobar', 'Aprobar'),
+            ('rechazar', 'Rechazar'),
+        ],
+        widget=forms.RadioSelect(attrs={
+            'class': 'form-check-input',
+        }),
+        label='Decisión del Cliente',
+    )
+    
+    motivo_rechazo = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Motivo del rechazo (obligatorio si rechaza)...',
+        }),
+        label='Motivo del Rechazo',
+    )
+    
+    def clean(self):
+        """
+        Valida que si la decisión es rechazar, haya un motivo.
+        """
+        cleaned_data = super().clean()
+        decision = cleaned_data.get('decision')
+        motivo = cleaned_data.get('motivo_rechazo')
+        
+        if decision == 'rechazar' and not motivo:
+            self.add_error(
+                'motivo_rechazo',
+                'Debes indicar el motivo del rechazo.'
+            )
+        
+        return cleaned_data

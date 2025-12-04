@@ -43,6 +43,9 @@ from config.constants import (
     TIPO_COMPRA_CHOICES,
     ESTADO_COMPRA_CHOICES,
     ESTADO_UNIDAD_COMPRA_CHOICES,
+    # Constantes para SolicitudCotizacion (nuevo)
+    ESTADO_SOLICITUD_COTIZACION_CHOICES,
+    ESTADO_LINEA_COTIZACION_CHOICES,
 )
 
 
@@ -2292,3 +2295,729 @@ class UnidadInventario(models.Model):
             'descartada': 'dark',
         }
         return disponibilidad_css.get(self.disponibilidad, 'secondary')
+
+
+# ============================================================================
+# MODELO: SOLICITUD DE COTIZACIÓN (MULTI-PROVEEDOR)
+# ============================================================================
+class SolicitudCotizacion(models.Model):
+    """
+    Cabecera de cotización que agrupa múltiples líneas con diferentes proveedores.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este modelo es la "cabecera" o "paraguas" que agrupa varias piezas cotizadas.
+    
+    ¿Por qué es necesario?
+    ----------------------
+    Antes, cada CompraProducto era independiente. Si necesitabas cotizar:
+    - RAM de Amazon
+    - Disco Duro de Mercado Libre
+    - Fuente de poder de Steren
+    
+    Tenías que crear 3 cotizaciones separadas, lo cual era confuso para el cliente.
+    
+    Ahora con SolicitudCotizacion:
+    - Creas UNA solicitud vinculada a la orden de servicio
+    - Agregas múltiples líneas (cada una con su producto y proveedor)
+    - El cliente ve TODO junto y puede aprobar/rechazar línea por línea
+    - Al aprobar, se generan automáticamente las CompraProducto correspondientes
+    
+    FLUJO:
+    ------
+    1. Compras crea la solicitud (estado: borrador)
+    2. Compras agrega las líneas con productos y proveedores
+    3. Compras libera la solicitud (estado: enviada_cliente)
+    4. Recepción comparte con el cliente
+    5. Cliente aprueba/rechaza por línea
+    6. Para líneas aprobadas, se generan CompraProducto automáticamente
+    
+    Campos importantes:
+    - numero_solicitud: Identificador único auto-generado (SOL-2025-0001)
+    - orden_servicio: Vinculación con la orden de servicio técnico
+    - numero_orden_cliente: Número visible para buscar (ej: OOW-12345)
+    - estado: Estado general de la solicitud
+    - lineas: Relación con LineaCotizacion (cada producto/proveedor)
+    """
+    
+    # ========== IDENTIFICACIÓN ==========
+    numero_solicitud = models.CharField(
+        max_length=20,
+        unique=True,
+        editable=False,
+        verbose_name='Número de Solicitud',
+        help_text='Identificador único auto-generado (SOL-2025-0001)'
+    )
+    
+    # ========== VINCULACIÓN CON SERVICIO TÉCNICO ==========
+    orden_servicio = models.ForeignKey(
+        'servicio_tecnico.OrdenServicio',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='solicitudes_cotizacion',
+        verbose_name='Orden de Servicio',
+        help_text='Orden de servicio técnico asociada'
+    )
+    # Campo para búsqueda rápida (se sincroniza desde orden_servicio)
+    numero_orden_cliente = models.CharField(
+        max_length=50,
+        blank=True,
+        db_index=True,
+        verbose_name='Número de Orden Cliente',
+        help_text='Número visible para el cliente (ej: OOW-12345, FL-67890)'
+    )
+    
+    # ========== ESTADO ==========
+    estado = models.CharField(
+        max_length=25,
+        choices=ESTADO_SOLICITUD_COTIZACION_CHOICES,
+        default='borrador',
+        verbose_name='Estado',
+        help_text='Estado actual de la solicitud de cotización'
+    )
+    
+    # ========== FECHAS DE WORKFLOW ==========
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de Creación'
+    )
+    fecha_envio_cliente = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha Envío a Cliente',
+        help_text='Cuándo se liberó para compartir con el cliente'
+    )
+    fecha_respuesta_cliente = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha Respuesta Cliente',
+        help_text='Cuándo el cliente respondió (última respuesta)'
+    )
+    fecha_completada = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha Completada',
+        help_text='Cuándo se generaron todas las compras'
+    )
+    
+    # ========== OBSERVACIONES ==========
+    observaciones = models.TextField(
+        blank=True,
+        verbose_name='Observaciones',
+        help_text='Notas internas sobre esta solicitud'
+    )
+    observaciones_cliente = models.TextField(
+        blank=True,
+        verbose_name='Observaciones del Cliente',
+        help_text='Comentarios o feedback del cliente'
+    )
+    
+    # ========== AUDITORÍA ==========
+    creado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='solicitudes_cotizacion_creadas',
+        verbose_name='Creado por'
+    )
+    fecha_actualizacion = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Última Actualización'
+    )
+    
+    class Meta:
+        verbose_name = 'Solicitud de Cotización'
+        verbose_name_plural = 'Solicitudes de Cotización'
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['numero_solicitud']),
+            models.Index(fields=['numero_orden_cliente']),
+            models.Index(fields=['estado']),
+        ]
+    
+    def __str__(self):
+        """
+        Representación en texto de la solicitud.
+        Muestra: número de solicitud + orden cliente + estado
+        """
+        orden_info = f" | {self.numero_orden_cliente}" if self.numero_orden_cliente else ""
+        return f"📋 {self.numero_solicitud}{orden_info} ({self.get_estado_display()})"
+    
+    def save(self, *args, **kwargs):
+        """
+        Override de save() para:
+        1. Generar número de solicitud automáticamente
+        2. Sincronizar numero_orden_cliente desde orden_servicio
+        """
+        # Generar número de solicitud si es nuevo
+        if not self.numero_solicitud:
+            self.numero_solicitud = self._generar_numero_solicitud()
+        
+        # Sincronizar número de orden cliente desde DetalleEquipo
+        if self.orden_servicio and hasattr(self.orden_servicio, 'detalle_equipo'):
+            detalle = getattr(self.orden_servicio, 'detalle_equipo', None)
+            if detalle and hasattr(detalle, 'orden_cliente'):
+                self.numero_orden_cliente = detalle.orden_cliente or ''
+        
+        super().save(*args, **kwargs)
+    
+    def _generar_numero_solicitud(self):
+        """
+        Genera un número de solicitud único con formato: SOL-YYYY-NNNN
+        
+        EXPLICACIÓN:
+        - SOL: Prefijo para Solicitud
+        - YYYY: Año actual
+        - NNNN: Número secuencial con ceros a la izquierda
+        
+        Returns:
+            str: Número generado (ej: SOL-2025-0001)
+        """
+        from django.db.models import Max
+        import re
+        
+        año_actual = timezone.now().year
+        prefijo = f"SOL-{año_actual}-"
+        
+        # Buscar el último número de este año
+        ultima_solicitud = SolicitudCotizacion.objects.filter(
+            numero_solicitud__startswith=prefijo
+        ).aggregate(Max('numero_solicitud'))['numero_solicitud__max']
+        
+        if ultima_solicitud:
+            # Extraer el número secuencial
+            match = re.search(r'(\d{4})$', ultima_solicitud)
+            if match:
+                siguiente_numero = int(match.group(1)) + 1
+            else:
+                siguiente_numero = 1
+        else:
+            siguiente_numero = 1
+        
+        return f"{prefijo}{siguiente_numero:04d}"
+    
+    # ========== PROPIEDADES CALCULADAS ==========
+    
+    @property
+    def total_lineas(self):
+        """Número total de líneas en esta solicitud"""
+        return self.lineas.count()
+    
+    @property
+    def lineas_aprobadas(self):
+        """Número de líneas aprobadas por el cliente"""
+        return self.lineas.filter(estado_cliente='aprobada').count()
+    
+    @property
+    def lineas_rechazadas(self):
+        """Número de líneas rechazadas por el cliente"""
+        return self.lineas.filter(estado_cliente='rechazada').count()
+    
+    @property
+    def lineas_pendientes(self):
+        """Número de líneas pendientes de respuesta"""
+        return self.lineas.filter(estado_cliente='pendiente').count()
+    
+    @property
+    def costo_total(self):
+        """
+        Suma total de todas las líneas.
+        
+        Returns:
+            Decimal: Suma de (cantidad × costo_unitario) de todas las líneas
+        """
+        from django.db.models import Sum, F
+        total = self.lineas.aggregate(
+            total=Sum(F('cantidad') * F('costo_unitario'))
+        )['total']
+        return total or 0
+    
+    @property
+    def costo_aprobado(self):
+        """
+        Suma de las líneas aprobadas por el cliente.
+        
+        Returns:
+            Decimal: Suma solo de líneas con estado_cliente='aprobada'
+        """
+        from django.db.models import Sum, F
+        total = self.lineas.filter(estado_cliente='aprobada').aggregate(
+            total=Sum(F('cantidad') * F('costo_unitario'))
+        )['total']
+        return total or 0
+    
+    # ========== MÉTODOS DE WORKFLOW ==========
+    
+    def puede_enviar_a_cliente(self):
+        """
+        Verifica si la solicitud puede enviarse al cliente.
+        
+        Condiciones:
+        - Estado debe ser 'borrador'
+        - Debe tener al menos una línea
+        """
+        return self.estado == 'borrador' and self.total_lineas > 0
+    
+    def enviar_a_cliente(self, usuario=None):
+        """
+        Cambia el estado a 'enviada_cliente' para que Recepción pueda compartir.
+        
+        Args:
+            usuario: Usuario que realiza la acción (opcional, para auditoría)
+        
+        Returns:
+            bool: True si se cambió el estado exitosamente
+        """
+        if not self.puede_enviar_a_cliente():
+            return False
+        
+        self.estado = 'enviada_cliente'
+        self.fecha_envio_cliente = timezone.now()
+        self.save()
+        return True
+    
+    def actualizar_estado_segun_lineas(self):
+        """
+        Actualiza el estado de la solicitud basándose en las respuestas de las líneas.
+        
+        LÓGICA:
+        - Si todas las líneas están aprobadas → 'totalmente_aprobada'
+        - Si todas las líneas están rechazadas → 'totalmente_rechazada'
+        - Si hay mezcla de aprobadas y rechazadas → 'parcialmente_aprobada'
+        - Si aún hay pendientes → mantiene 'enviada_cliente'
+        
+        Returns:
+            str: Nuevo estado de la solicitud
+        """
+        if self.estado not in ['enviada_cliente', 'parcialmente_aprobada']:
+            return self.estado
+        
+        total = self.total_lineas
+        aprobadas = self.lineas_aprobadas
+        rechazadas = self.lineas_rechazadas
+        pendientes = self.lineas_pendientes
+        
+        if pendientes > 0:
+            # Aún hay líneas sin respuesta
+            return self.estado
+        
+        # Todas las líneas tienen respuesta
+        self.fecha_respuesta_cliente = timezone.now()
+        
+        if aprobadas == total:
+            self.estado = 'totalmente_aprobada'
+        elif rechazadas == total:
+            self.estado = 'totalmente_rechazada'
+        else:
+            self.estado = 'parcialmente_aprobada'
+        
+        self.save()
+        return self.estado
+    
+    def puede_generar_compras(self):
+        """
+        Verifica si se pueden generar las CompraProducto.
+        
+        Condiciones:
+        - Estado debe ser 'totalmente_aprobada' o 'parcialmente_aprobada'
+        - Debe haber al menos una línea aprobada sin compra generada
+        """
+        return (
+            self.estado in ['totalmente_aprobada', 'parcialmente_aprobada'] and
+            self.lineas.filter(estado_cliente='aprobada', compra_generada__isnull=True).exists()
+        )
+    
+    def generar_compras(self, usuario=None):
+        """
+        Genera CompraProducto para cada línea aprobada.
+        
+        Este método:
+        1. Itera sobre las líneas aprobadas sin compra
+        2. Crea un CompraProducto para cada una
+        3. Vincula la compra con la línea
+        4. Actualiza el estado de la solicitud a 'completada' cuando termina
+        
+        Args:
+            usuario: Usuario que genera las compras (para registrado_por)
+        
+        Returns:
+            list: Lista de CompraProducto creados
+        """
+        if not self.puede_generar_compras():
+            return []
+        
+        compras_creadas = []
+        lineas_pendientes = self.lineas.filter(
+            estado_cliente='aprobada',
+            compra_generada__isnull=True
+        )
+        
+        for linea in lineas_pendientes:
+            compra = CompraProducto.objects.create(
+                tipo='cotizacion',  # Es cotización porque viene del sistema de cotizaciones
+                estado='pendiente_llegada',
+                producto=linea.producto,
+                proveedor=linea.proveedor,
+                cantidad=linea.cantidad,
+                costo_unitario=linea.costo_unitario,
+                costo_total=linea.cantidad * linea.costo_unitario,
+                fecha_pedido=timezone.now().date(),
+                orden_servicio=self.orden_servicio,
+                orden_cliente=self.numero_orden_cliente,
+                observaciones=f"Generada desde solicitud {self.numero_solicitud}",
+                registrado_por=usuario,
+            )
+            
+            # Vincular la compra con la línea
+            linea.compra_generada = compra
+            linea.estado_cliente = 'compra_generada'
+            linea.save()
+            
+            compras_creadas.append(compra)
+        
+        # Actualizar estado de la solicitud
+        if not self.lineas.filter(estado_cliente='aprobada', compra_generada__isnull=True).exists():
+            self.estado = 'completada'
+            self.fecha_completada = timezone.now()
+            self.save()
+        else:
+            self.estado = 'en_proceso'
+            self.save()
+        
+        return compras_creadas
+    
+    def cancelar(self, motivo=''):
+        """
+        Cancela la solicitud.
+        
+        Args:
+            motivo: Razón de la cancelación (se guarda en observaciones)
+        
+        Returns:
+            bool: True si se canceló exitosamente
+        """
+        if self.estado in ['completada', 'cancelada']:
+            return False
+        
+        self.estado = 'cancelada'
+        if motivo:
+            self.observaciones = f"{self.observaciones}\n[CANCELADA] {motivo}".strip()
+        self.save()
+        return True
+    
+    # ========== MÉTODOS DE VISUALIZACIÓN ==========
+    
+    def get_badge_estado(self):
+        """
+        Retorna la clase CSS de Bootstrap para el badge de estado.
+        
+        Returns:
+            str: Clase CSS (success, warning, danger, etc.)
+        """
+        estados_css = {
+            'borrador': 'secondary',
+            'enviada_cliente': 'info',
+            'parcialmente_aprobada': 'warning',
+            'totalmente_aprobada': 'success',
+            'totalmente_rechazada': 'danger',
+            'en_proceso': 'primary',
+            'completada': 'success',
+            'cancelada': 'dark',
+        }
+        return estados_css.get(self.estado, 'secondary')
+    
+    def get_progreso_respuesta(self):
+        """
+        Calcula el porcentaje de respuestas recibidas.
+        
+        Returns:
+            int: Porcentaje de 0 a 100
+        """
+        total = self.total_lineas
+        if total == 0:
+            return 0
+        respondidas = self.lineas_aprobadas + self.lineas_rechazadas
+        return int((respondidas / total) * 100)
+
+
+# ============================================================================
+# MODELO: LÍNEA DE COTIZACIÓN
+# ============================================================================
+class LineaCotizacion(models.Model):
+    """
+    Cada línea representa un producto + proveedor dentro de una SolicitudCotizacion.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Mientras SolicitudCotizacion es la "cabecera" (información general),
+    LineaCotizacion son los "detalles" (cada producto específico).
+    
+    Piensa en una factura:
+    - La factura (SolicitudCotizacion) tiene: cliente, fecha, número
+    - Cada línea (LineaCotizacion) tiene: producto, cantidad, precio
+    
+    ¿Qué hace especial a LineaCotizacion?
+    --------------------------------------
+    1. Cada línea puede tener un PROVEEDOR DIFERENTE
+       - Línea 1: RAM DDR4 de Amazon
+       - Línea 2: SSD de Mercado Libre
+       - Línea 3: Fuente de Steren
+    
+    2. El cliente puede aprobar/rechazar CADA LÍNEA por separado
+       - "Sí quiero la RAM, pero no el SSD"
+    
+    3. Al aprobar una línea, se genera automáticamente una CompraProducto
+       - La compra queda vinculada a esta línea para trazabilidad
+    
+    Campos importantes:
+    - solicitud: FK a SolicitudCotizacion (la cabecera)
+    - producto: FK a ProductoAlmacen (qué se cotiza)
+    - descripcion_pieza: Descripción específica de la pieza (no del producto genérico)
+    - proveedor: FK a Proveedor (de dónde se comprará)
+    - cantidad: Cuántas unidades
+    - costo_unitario: Precio por unidad
+    - estado_cliente: Si el cliente aprobó/rechazó esta línea
+    - compra_generada: FK a CompraProducto (cuando se genera la compra)
+    """
+    
+    # ========== RELACIÓN CON SOLICITUD ==========
+    solicitud = models.ForeignKey(
+        SolicitudCotizacion,
+        on_delete=models.CASCADE,
+        related_name='lineas',
+        verbose_name='Solicitud de Cotización'
+    )
+    numero_linea = models.PositiveIntegerField(
+        default=0,  # 0 indica que debe auto-asignarse
+        verbose_name='Número de Línea',
+        help_text='Orden de la línea dentro de la solicitud (se asigna automáticamente)'
+    )
+    
+    # ========== PRODUCTO Y DESCRIPCIÓN ==========
+    producto = models.ForeignKey(
+        ProductoAlmacen,
+        on_delete=models.PROTECT,
+        related_name='lineas_cotizacion',
+        verbose_name='Producto',
+        help_text='Producto del catálogo de almacén'
+    )
+    descripcion_pieza = models.CharField(
+        max_length=255,
+        verbose_name='Descripción de la Pieza',
+        help_text='Descripción específica (ej: "RAM DDR4 16GB 3200MHz Kingston Fury")'
+    )
+    
+    # ========== PROVEEDOR ==========
+    proveedor = models.ForeignKey(
+        Proveedor,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='lineas_cotizacion',
+        verbose_name='Proveedor',
+        help_text='Proveedor donde se comprará esta pieza'
+    )
+    
+    # ========== CANTIDADES Y COSTOS ==========
+    cantidad = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+        verbose_name='Cantidad',
+        help_text='Número de unidades a cotizar'
+    )
+    costo_unitario = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        verbose_name='Costo Unitario',
+        help_text='Precio por unidad (MXN)'
+    )
+    
+    # ========== ESTADO DEL CLIENTE ==========
+    estado_cliente = models.CharField(
+        max_length=20,
+        choices=ESTADO_LINEA_COTIZACION_CHOICES,
+        default='pendiente',
+        verbose_name='Estado del Cliente',
+        help_text='Respuesta del cliente para esta línea'
+    )
+    fecha_respuesta = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de Respuesta',
+        help_text='Cuándo el cliente respondió'
+    )
+    motivo_rechazo = models.TextField(
+        blank=True,
+        verbose_name='Motivo de Rechazo',
+        help_text='Si el cliente rechazó, por qué'
+    )
+    
+    # ========== VINCULACIÓN CON COMPRA ==========
+    compra_generada = models.OneToOneField(
+        CompraProducto,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='linea_cotizacion_origen',
+        verbose_name='Compra Generada',
+        help_text='CompraProducto creada al aprobar esta línea'
+    )
+    
+    # ========== INFORMACIÓN ADICIONAL ==========
+    notas = models.TextField(
+        blank=True,
+        verbose_name='Notas',
+        help_text='Observaciones sobre esta línea'
+    )
+    tiempo_entrega_estimado = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Tiempo de Entrega (días)',
+        help_text='Días estimados para recibir del proveedor'
+    )
+    
+    # ========== AUDITORÍA ==========
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de Creación'
+    )
+    fecha_actualizacion = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Última Actualización'
+    )
+    
+    class Meta:
+        verbose_name = 'Línea de Cotización'
+        verbose_name_plural = 'Líneas de Cotización'
+        ordering = ['solicitud', 'numero_linea']
+        unique_together = ['solicitud', 'numero_linea']
+    
+    def __str__(self):
+        """
+        Representación en texto de la línea.
+        Muestra: número de línea + descripción + cantidad + proveedor
+        """
+        proveedor_nombre = self.proveedor.nombre if self.proveedor else 'Sin proveedor'
+        return f"#{self.numero_linea}: {self.descripcion_pieza} x{self.cantidad} ({proveedor_nombre})"
+    
+    def save(self, *args, **kwargs):
+        """
+        Override de save() para:
+        1. Auto-asignar número de línea si es nuevo o tiene valor 0
+        2. Copiar tiempo de entrega del proveedor si no se especifica
+        
+        EXPLICACIÓN:
+        - numero_linea=0 indica que debe auto-asignarse
+        - El formset envía todas las líneas con numero_linea=0
+        - Esta lógica calcula el siguiente número disponible
+        """
+        # Auto-asignar número de línea si es nuevo o tiene valor 0
+        if not self.numero_linea or self.numero_linea == 0:
+            max_linea = LineaCotizacion.objects.filter(
+                solicitud=self.solicitud
+            ).aggregate(models.Max('numero_linea'))['numero_linea__max']
+            self.numero_linea = (max_linea or 0) + 1
+        
+        # Copiar tiempo de entrega del proveedor si no se especifica
+        if self.tiempo_entrega_estimado is None and self.proveedor:
+            self.tiempo_entrega_estimado = self.proveedor.tiempo_entrega_dias
+        
+        super().save(*args, **kwargs)
+    
+    # ========== PROPIEDADES CALCULADAS ==========
+    
+    @property
+    def subtotal(self):
+        """
+        Calcula el subtotal de esta línea.
+        
+        Returns:
+            Decimal: cantidad × costo_unitario
+        """
+        return self.cantidad * self.costo_unitario
+    
+    # ========== MÉTODOS DE WORKFLOW ==========
+    
+    def puede_aprobar(self):
+        """Verifica si la línea puede ser aprobada"""
+        return self.estado_cliente == 'pendiente'
+    
+    def puede_rechazar(self):
+        """Verifica si la línea puede ser rechazada"""
+        return self.estado_cliente == 'pendiente'
+    
+    def aprobar(self):
+        """
+        Marca la línea como aprobada por el cliente.
+        
+        Returns:
+            bool: True si se aprobó exitosamente
+        """
+        if not self.puede_aprobar():
+            return False
+        
+        self.estado_cliente = 'aprobada'
+        self.fecha_respuesta = timezone.now()
+        self.save()
+        
+        # Actualizar estado de la solicitud
+        self.solicitud.actualizar_estado_segun_lineas()
+        
+        return True
+    
+    def rechazar(self, motivo=''):
+        """
+        Marca la línea como rechazada por el cliente.
+        
+        Args:
+            motivo: Razón del rechazo
+        
+        Returns:
+            bool: True si se rechazó exitosamente
+        """
+        if not self.puede_rechazar():
+            return False
+        
+        self.estado_cliente = 'rechazada'
+        self.fecha_respuesta = timezone.now()
+        if motivo:
+            self.motivo_rechazo = motivo
+        self.save()
+        
+        # Actualizar estado de la solicitud
+        self.solicitud.actualizar_estado_segun_lineas()
+        
+        return True
+    
+    # ========== MÉTODOS DE VISUALIZACIÓN ==========
+    
+    def get_badge_estado(self):
+        """
+        Retorna la clase CSS de Bootstrap para el badge de estado.
+        
+        Returns:
+            str: Clase CSS (success, warning, danger, etc.)
+        """
+        estados_css = {
+            'pendiente': 'secondary',
+            'aprobada': 'success',
+            'rechazada': 'danger',
+            'compra_generada': 'primary',
+        }
+        return estados_css.get(self.estado_cliente, 'secondary')
+    
+    def get_estado_icon(self):
+        """
+        Retorna el icono Bootstrap Icons para el estado.
+        
+        Returns:
+            str: Nombre del icono (ej: 'check-circle', 'x-circle')
+        """
+        estados_icon = {
+            'pendiente': 'hourglass-split',
+            'aprobada': 'check-circle-fill',
+            'rechazada': 'x-circle-fill',
+            'compra_generada': 'cart-check-fill',
+        }
+        return estados_icon.get(self.estado_cliente, 'question-circle')
