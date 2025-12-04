@@ -475,6 +475,56 @@ ESTADOS_SOLICITUD_FINALIZADOS = ['aprobada', 'rechazada']
 
 
 # ============================================================================
+# COMPRAS DE PRODUCTO - Sistema de Cotizaciones y Compras
+# Agregado: Diciembre 2025
+# ============================================================================
+
+# TIPO DE REGISTRO DE COMPRA
+# Diferencia entre cotización (pendiente de aprobación) y compra formal
+TIPO_COMPRA_CHOICES = [
+    ('cotizacion', 'Cotización'),
+    ('compra', 'Compra Formal'),
+]
+
+# ESTADOS DE COMPRA/COTIZACIÓN
+# Flujo completo: cotización → aprobación → llegada → problemas/devolución
+ESTADO_COMPRA_CHOICES = [
+    # Estados de cotización
+    ('pendiente_aprobacion', 'Pendiente de Aprobación'),
+    ('aprobada', 'Aprobada por Cliente'),
+    ('rechazada', 'Rechazada por Cliente'),
+    # Estados de compra
+    ('pendiente_llegada', 'Pendiente de Llegada'),
+    ('recibida', 'Recibida'),
+    # Estados de problema
+    ('wpb', 'WPB - Wrong Part (Pieza Incorrecta)'),
+    ('doa', 'DOA - Dead On Arrival (Dañada al Llegar)'),
+    # Estados de devolución
+    ('devolucion_garantia', 'En Devolución (Garantía)'),
+    ('devuelta', 'Devuelta al Proveedor'),
+    # Estado cancelado
+    ('cancelada', 'Cancelada'),
+]
+
+# ESTADOS DE UNIDAD EN COMPRA (para cada pieza individual)
+# Permite tracking por unidad dentro de una compra
+ESTADO_UNIDAD_COMPRA_CHOICES = [
+    ('pendiente', 'Pendiente de Recibir'),
+    ('recibida', 'Recibida OK'),
+    ('wpb', 'WPB - Pieza Incorrecta'),
+    ('doa', 'DOA - Dañada al Llegar'),
+    ('devolucion', 'En Devolución'),
+    ('devuelta', 'Devuelta'),
+]
+
+# CLASIFICACIÓN DE ESTADOS PARA LÓGICA DE COMPRAS
+ESTADOS_COMPRA_COTIZACION = ['pendiente_aprobacion', 'aprobada', 'rechazada']
+ESTADOS_COMPRA_ACTIVOS = ['aprobada', 'pendiente_llegada']
+ESTADOS_COMPRA_PROBLEMAS = ['wpb', 'doa', 'devolucion_garantia']
+ESTADOS_COMPRA_FINALIZADOS = ['recibida', 'devuelta', 'cancelada', 'rechazada']
+
+
+# ============================================================================
 # FUNCIONES DE UTILIDAD - MÓDULO ALMACÉN
 # ============================================================================
 

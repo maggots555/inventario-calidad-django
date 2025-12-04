@@ -38,6 +38,7 @@ from .models import (
     CategoriaAlmacen,
     ProductoAlmacen,
     CompraProducto,
+    UnidadCompra,
     MovimientoAlmacen,
     SolicitudBaja,
     Auditoria,
@@ -49,6 +50,12 @@ from .forms import (
     CategoriaAlmacenForm,
     ProductoAlmacenForm,
     CompraProductoForm,
+    UnidadCompraForm,
+    UnidadCompraFormSet,
+    RecepcionCompraForm,
+    ProblemaCompraForm,
+    RechazoCotizacionForm,
+    DevolucionCompraForm,
     MovimientoAlmacenForm,
     SolicitudBajaForm,
     ProcesarSolicitudForm,
@@ -1683,4 +1690,682 @@ def api_buscar_crear_orden_cliente(request):
             'error': 'Método no permitido. Use GET para buscar o POST para crear.',
             'found': False
         }, status=405)
+
+
+# ============================================================================
+# COMPRAS Y COTIZACIONES
+# ============================================================================
+
+@login_required
+def lista_compras(request):
+    """
+    Lista de todas las compras y cotizaciones.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista muestra una tabla con todas las compras/cotizaciones,
+    permitiendo filtrar por tipo, estado, producto y proveedor.
+    
+    Filtros disponibles:
+    - tipo: 'cotizacion' o 'compra'
+    - estado: cualquier estado del workflow
+    - producto: ID del producto
+    - proveedor: ID del proveedor
+    - orden_cliente: búsqueda por número de orden visible
+    """
+    compras = CompraProducto.objects.select_related(
+        'producto', 'proveedor', 'orden_servicio', 'registrado_por'
+    ).prefetch_related('unidades_compra')
+    
+    # Filtro por tipo
+    tipo = request.GET.get('tipo', '')
+    if tipo:
+        compras = compras.filter(tipo=tipo)
+    
+    # Filtro por estado
+    estado = request.GET.get('estado', '')
+    if estado:
+        compras = compras.filter(estado=estado)
+    
+    # Filtro por producto
+    producto_id = request.GET.get('producto', '')
+    if producto_id:
+        compras = compras.filter(producto_id=producto_id)
+    
+    # Filtro por proveedor
+    proveedor_id = request.GET.get('proveedor', '')
+    if proveedor_id:
+        compras = compras.filter(proveedor_id=proveedor_id)
+    
+    # Búsqueda por orden_cliente
+    orden_cliente = request.GET.get('orden_cliente', '').strip()
+    if orden_cliente:
+        compras = compras.filter(orden_cliente__icontains=orden_cliente)
+    
+    compras = compras.order_by('-fecha_registro')
+    
+    # Paginación
+    paginator = Paginator(compras, 25)
+    page = request.GET.get('page', 1)
+    compras_page = paginator.get_page(page)
+    
+    # Datos para filtros
+    productos = ProductoAlmacen.objects.filter(activo=True).order_by('nombre')
+    proveedores = Proveedor.objects.filter(activo=True).order_by('nombre')
+    
+    context = {
+        'compras': compras_page,
+        'productos': productos,
+        'proveedores': proveedores,
+        'tipo_filtro': tipo,
+        'estado_filtro': estado,
+        'producto_filtro': producto_id,
+        'proveedor_filtro': proveedor_id,
+        'orden_cliente_filtro': orden_cliente,
+    }
+    
+    return render(request, 'almacen/compras/lista_compras.html', context)
+
+
+@login_required
+def panel_cotizaciones(request):
+    """
+    Panel de cotizaciones pendientes de aprobación.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista muestra un dashboard específico para las cotizaciones
+    que están esperando respuesta del cliente.
+    
+    Incluye:
+    - Cotizaciones pendientes (sin respuesta)
+    - Alertas de cotizaciones con muchos días sin respuesta
+    - Estadísticas de aprobación/rechazo
+    """
+    # Cotizaciones pendientes
+    cotizaciones_pendientes = CompraProducto.objects.filter(
+        tipo='cotizacion',
+        estado='pendiente_aprobacion'
+    ).select_related(
+        'producto', 'proveedor', 'orden_servicio'
+    ).order_by('-fecha_registro')
+    
+    # Alertas: cotizaciones con más de 3 días sin respuesta
+    from datetime import timedelta
+    fecha_limite = timezone.now() - timedelta(days=3)
+    cotizaciones_urgentes = cotizaciones_pendientes.filter(
+        fecha_registro__lt=fecha_limite
+    ).count()
+    
+    # Estadísticas del mes
+    inicio_mes = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    cotizaciones_mes = CompraProducto.objects.filter(
+        tipo='cotizacion',
+        fecha_registro__gte=inicio_mes
+    )
+    
+    total_mes = cotizaciones_mes.count()
+    aprobadas_mes = cotizaciones_mes.filter(estado__in=['aprobada', 'pendiente_llegada', 'recibida']).count()
+    rechazadas_mes = cotizaciones_mes.filter(estado='rechazada').count()
+    
+    tasa_aprobacion = (aprobadas_mes / total_mes * 100) if total_mes > 0 else 0
+    
+    context = {
+        'cotizaciones': cotizaciones_pendientes,
+        'cotizaciones_urgentes': cotizaciones_urgentes,
+        'total_pendientes': cotizaciones_pendientes.count(),
+        'estadisticas': {
+            'total_mes': total_mes,
+            'aprobadas_mes': aprobadas_mes,
+            'rechazadas_mes': rechazadas_mes,
+            'tasa_aprobacion': round(tasa_aprobacion, 1),
+        }
+    }
+    
+    return render(request, 'almacen/compras/panel_cotizaciones.html', context)
+
+
+@login_required
+def crear_compra(request):
+    """
+    Crear nueva compra o cotización con unidades individuales.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista maneja un formulario con "formset", que es una técnica
+    de Django para manejar múltiples formularios relacionados.
+    
+    Estructura:
+    - Formulario principal: CompraProductoForm (producto, cantidad, etc.)
+    - Formset: UnidadCompraFormSet (detalles de cada pieza individual)
+    
+    Cuando el usuario guarda:
+    1. Se valida el formulario principal
+    2. Se validan todas las unidades del formset
+    3. Se guarda la compra
+    4. Se guardan las unidades vinculadas a la compra
+    """
+    if request.method == 'POST':
+        form = CompraProductoForm(request.POST)
+        formset = UnidadCompraFormSet(request.POST, prefix='unidades')
+        
+        if form.is_valid():
+            # Guardar compra sin commit para agregar campos adicionales
+            compra = form.save(commit=False)
+            compra.registrado_por = request.user
+            
+            # Si es cotización, iniciar en estado pendiente_aprobacion
+            if compra.tipo == 'cotizacion':
+                compra.estado = 'pendiente_aprobacion'
+            else:
+                # Si es compra directa, iniciar en pendiente_llegada
+                compra.estado = 'pendiente_llegada'
+            
+            compra.save()
+            
+            # Ahora procesar el formset de unidades
+            formset = UnidadCompraFormSet(request.POST, prefix='unidades', instance=compra)
+            
+            if formset.is_valid():
+                unidades = formset.save(commit=False)
+                
+                # Asignar número de línea secuencial
+                for i, unidad in enumerate(unidades, start=1):
+                    unidad.numero_linea = i
+                    unidad.save()
+                
+                # Eliminar las marcadas para borrar
+                for obj in formset.deleted_objects:
+                    obj.delete()
+                
+                tipo_texto = 'Cotización' if compra.tipo == 'cotizacion' else 'Compra'
+                messages.success(
+                    request,
+                    f'{tipo_texto} #{compra.pk} creada exitosamente para {compra.producto.nombre}'
+                )
+                return redirect('almacen:detalle_compra', pk=compra.pk)
+            else:
+                # Si el formset tiene errores, eliminar la compra creada
+                compra.delete()
+                messages.error(request, 'Error en los detalles de unidades. Verifica los datos.')
+        else:
+            messages.error(request, 'Error en el formulario. Verifica los datos.')
+            formset = UnidadCompraFormSet(request.POST, prefix='unidades')
+    else:
+        form = CompraProductoForm(initial={
+            'fecha_pedido': timezone.now().date(),
+            'tipo': 'cotizacion',
+        })
+        formset = UnidadCompraFormSet(prefix='unidades')
+    
+    context = {
+        'form': form,
+        'formset': formset,
+        'titulo': 'Nueva Compra/Cotización',
+        'es_creacion': True,
+    }
+    
+    return render(request, 'almacen/compras/form_compra.html', context)
+
+
+@login_required
+def detalle_compra(request, pk):
+    """
+    Detalle de una compra o cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Muestra toda la información de una compra/cotización:
+    - Datos generales (producto, cantidad, costos)
+    - Estado actual y botones de acción disponibles
+    - Lista de unidades individuales con sus estados
+    - Historial de cambios (si aplica)
+    """
+    compra = get_object_or_404(
+        CompraProducto.objects.select_related(
+            'producto', 'proveedor', 'orden_servicio', 'registrado_por'
+        ).prefetch_related('unidades_compra'),
+        pk=pk
+    )
+    
+    # Obtener unidades ordenadas por número de línea
+    unidades = compra.unidades_compra.all().order_by('numero_linea')
+    
+    # Calcular estadísticas de unidades
+    total_unidades = unidades.count()
+    unidades_recibidas = unidades.filter(estado='recibida').count()
+    unidades_problema = unidades.filter(estado__in=['wpb', 'doa']).count()
+    
+    context = {
+        'compra': compra,
+        'unidades': unidades,
+        'estadisticas_unidades': {
+            'total': total_unidades,
+            'recibidas': unidades_recibidas,
+            'problema': unidades_problema,
+            'pendientes': total_unidades - unidades_recibidas - unidades_problema,
+        },
+    }
+    
+    return render(request, 'almacen/compras/detalle_compra.html', context)
+
+
+@login_required
+def editar_compra(request, pk):
+    """
+    Editar una compra o cotización existente.
+    
+    NOTA: Solo se puede editar si no ha sido recibida o está en estado final.
+    """
+    compra = get_object_or_404(CompraProducto, pk=pk)
+    
+    # Validar que se puede editar
+    if compra.estado in ['recibida', 'devuelta', 'cancelada']:
+        messages.error(request, 'No se puede editar una compra en estado final.')
+        return redirect('almacen:detalle_compra', pk=pk)
+    
+    if request.method == 'POST':
+        form = CompraProductoForm(request.POST, instance=compra)
+        formset = UnidadCompraFormSet(request.POST, prefix='unidades', instance=compra)
+        
+        if form.is_valid() and formset.is_valid():
+            form.save()
+            
+            unidades = formset.save(commit=False)
+            
+            # Reasignar números de línea
+            for i, unidad in enumerate(unidades, start=1):
+                unidad.numero_linea = i
+                unidad.save()
+            
+            for obj in formset.deleted_objects:
+                obj.delete()
+            
+            messages.success(request, 'Compra actualizada exitosamente.')
+            return redirect('almacen:detalle_compra', pk=pk)
+    else:
+        form = CompraProductoForm(instance=compra)
+        formset = UnidadCompraFormSet(prefix='unidades', instance=compra)
+    
+    context = {
+        'form': form,
+        'formset': formset,
+        'compra': compra,
+        'titulo': f'Editar Compra #{compra.pk}',
+        'es_creacion': False,
+    }
+    
+    return render(request, 'almacen/compras/form_compra.html', context)
+
+
+@login_required
+def aprobar_cotizacion(request, pk):
+    """
+    Aprobar una cotización y convertirla en compra.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando el cliente acepta la cotización:
+    1. El tipo cambia de 'cotizacion' a 'compra'
+    2. El estado cambia a 'pendiente_llegada'
+    3. Se registra la fecha de aprobación
+    """
+    compra = get_object_or_404(CompraProducto, pk=pk)
+    
+    if not compra.puede_aprobar():
+        messages.error(request, 'Esta cotización no puede ser aprobada.')
+        return redirect('almacen:detalle_compra', pk=pk)
+    
+    if request.method == 'POST':
+        if compra.aprobar(usuario=request.user):
+            messages.success(
+                request,
+                f'Cotización #{compra.pk} aprobada. Estado: Pendiente de Llegada.'
+            )
+        else:
+            messages.error(request, 'Error al aprobar la cotización.')
+    
+    return redirect('almacen:detalle_compra', pk=pk)
+
+
+@login_required
+def rechazar_cotizacion(request, pk):
+    """
+    Rechazar una cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando el cliente no acepta la cotización:
+    1. El estado cambia a 'rechazada'
+    2. Se registra el motivo del rechazo
+    3. La cotización queda cerrada (no se puede reactivar)
+    """
+    compra = get_object_or_404(CompraProducto, pk=pk)
+    
+    if not compra.puede_rechazar():
+        messages.error(request, 'Esta cotización no puede ser rechazada.')
+        return redirect('almacen:detalle_compra', pk=pk)
+    
+    if request.method == 'POST':
+        form = RechazoCotizacionForm(request.POST)
+        if form.is_valid():
+            motivo = form.cleaned_data.get('motivo', '')
+            if compra.rechazar(motivo=motivo, usuario=request.user):
+                messages.success(request, f'Cotización #{compra.pk} rechazada.')
+            else:
+                messages.error(request, 'Error al rechazar la cotización.')
+            return redirect('almacen:detalle_compra', pk=pk)
+    else:
+        form = RechazoCotizacionForm()
+    
+    context = {
+        'compra': compra,
+        'form': form,
+    }
+    
+    return render(request, 'almacen/compras/rechazar_cotizacion.html', context)
+
+
+@login_required
+def recibir_compra(request, pk):
+    """
+    Confirmar la recepción de una compra.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando llega la compra al almacén:
+    1. Se registra la fecha de recepción
+    2. Se crean MovimientoAlmacen de entrada (actualiza stock)
+    3. Se pueden crear UnidadInventario automáticamente
+    4. El estado cambia a 'recibida'
+    """
+    compra = get_object_or_404(
+        CompraProducto.objects.select_related('producto'),
+        pk=pk
+    )
+    
+    if not compra.puede_recibir():
+        messages.error(request, 'Esta compra no puede ser recibida en su estado actual.')
+        return redirect('almacen:detalle_compra', pk=pk)
+    
+    if request.method == 'POST':
+        form = RecepcionCompraForm(request.POST)
+        if form.is_valid():
+            fecha_recepcion = form.cleaned_data['fecha_recepcion']
+            crear_unidades = form.cleaned_data['crear_unidades']
+            observaciones = form.cleaned_data.get('observaciones', '')
+            
+            # Obtener empleado para el movimiento
+            try:
+                empleado = Empleado.objects.get(user=request.user)
+            except Empleado.DoesNotExist:
+                messages.error(request, 'No tienes perfil de empleado asociado.')
+                return redirect('almacen:detalle_compra', pk=pk)
+            
+            # Recibir la compra
+            if compra.recibir(fecha_recepcion=fecha_recepcion, crear_unidades=False):
+                # Crear movimiento de entrada
+                MovimientoAlmacen.objects.create(
+                    tipo='entrada',
+                    producto=compra.producto,
+                    cantidad=compra.cantidad,
+                    costo_unitario=compra.costo_unitario,
+                    empleado=empleado,
+                    compra=compra,
+                    observaciones=f'Recepción de compra #{compra.pk}. {observaciones}'.strip(),
+                )
+                
+                # Crear UnidadInventario si se solicitó
+                if crear_unidades:
+                    unidades_compra = compra.unidades_compra.filter(estado='pendiente')
+                    
+                    if unidades_compra.exists():
+                        # Hay unidades definidas, crear una por cada una
+                        for unidad_compra in unidades_compra:
+                            unidad_compra.recibir(crear_unidad_inventario=True)
+                    else:
+                        # No hay unidades definidas, crear genéricas
+                        for i in range(compra.cantidad):
+                            UnidadInventario.objects.create(
+                                producto=compra.producto,
+                                estado='nuevo',
+                                disponibilidad='disponible',
+                                origen='compra',
+                                compra=compra,
+                                costo_unitario=compra.costo_unitario,
+                                registrado_por=request.user,
+                                notas=f'Creada desde compra #{compra.pk}',
+                            )
+                
+                messages.success(
+                    request,
+                    f'Compra #{compra.pk} recibida. {compra.cantidad} unidades agregadas al inventario.'
+                )
+            else:
+                messages.error(request, 'Error al recibir la compra.')
+            
+            return redirect('almacen:detalle_compra', pk=pk)
+    else:
+        form = RecepcionCompraForm(initial={
+            'fecha_recepcion': timezone.now().date(),
+            'crear_unidades': True,
+        })
+    
+    context = {
+        'compra': compra,
+        'form': form,
+    }
+    
+    return render(request, 'almacen/compras/recibir_compra.html', context)
+
+
+@login_required
+def reportar_problema_compra(request, pk):
+    """
+    Reportar problema con una compra recibida (WPB o DOA).
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Si la pieza recibida tiene problemas:
+    - WPB (Wrong Part): Enviaron una pieza incorrecta
+    - DOA (Dead On Arrival): La pieza está dañada/no funciona
+    
+    Al reportar:
+    1. Se registra el tipo de problema y descripción
+    2. El estado cambia a 'wpb' o 'doa'
+    3. Se puede iniciar proceso de devolución
+    """
+    compra = get_object_or_404(CompraProducto, pk=pk)
+    
+    if not compra.puede_marcar_problema():
+        messages.error(request, 'No se puede reportar problema en esta compra.')
+        return redirect('almacen:detalle_compra', pk=pk)
+    
+    if request.method == 'POST':
+        form = ProblemaCompraForm(request.POST)
+        if form.is_valid():
+            tipo_problema = form.cleaned_data['tipo_problema']
+            motivo = form.cleaned_data['motivo']
+            
+            if tipo_problema == 'wpb':
+                compra.marcar_wpb(motivo=motivo)
+                messages.warning(request, f'Compra #{compra.pk} marcada como WPB (Pieza Incorrecta).')
+            else:
+                compra.marcar_doa(motivo=motivo)
+                messages.warning(request, f'Compra #{compra.pk} marcada como DOA (Dañada al Llegar).')
+            
+            return redirect('almacen:detalle_compra', pk=pk)
+    else:
+        form = ProblemaCompraForm()
+    
+    context = {
+        'compra': compra,
+        'form': form,
+    }
+    
+    return render(request, 'almacen/compras/problema_compra.html', context)
+
+
+@login_required
+def iniciar_devolucion(request, pk):
+    """
+    Iniciar proceso de devolución al proveedor.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Después de reportar un problema (WPB/DOA), se puede iniciar
+    la devolución al proveedor:
+    1. El estado cambia a 'devolucion_garantia'
+    2. Se prepara la pieza para envío de vuelta
+    3. Cuando llegue al proveedor, se confirma la devolución
+    """
+    compra = get_object_or_404(CompraProducto, pk=pk)
+    
+    if not compra.puede_devolver():
+        messages.error(request, 'No se puede iniciar devolución para esta compra.')
+        return redirect('almacen:detalle_compra', pk=pk)
+    
+    if request.method == 'POST':
+        if compra.iniciar_devolucion():
+            messages.info(
+                request,
+                f'Devolución iniciada para compra #{compra.pk}. Confirma cuando sea recibida por el proveedor.'
+            )
+        else:
+            messages.error(request, 'Error al iniciar devolución.')
+    
+    return redirect('almacen:detalle_compra', pk=pk)
+
+
+@login_required
+def confirmar_devolucion(request, pk):
+    """
+    Confirmar que la devolución fue completada.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando el proveedor recibe la pieza devuelta:
+    1. El estado cambia a 'devuelta'
+    2. Se crea un MovimientoAlmacen de salida (descuenta del stock)
+    3. La compra queda cerrada
+    """
+    compra = get_object_or_404(CompraProducto, pk=pk)
+    
+    if not compra.puede_confirmar_devolucion():
+        messages.error(request, 'No se puede confirmar devolución para esta compra.')
+        return redirect('almacen:detalle_compra', pk=pk)
+    
+    if request.method == 'POST':
+        form = DevolucionCompraForm(request.POST)
+        if form.is_valid():
+            observaciones = form.cleaned_data.get('observaciones', '')
+            numero_guia = form.cleaned_data.get('numero_guia', '')
+            
+            if numero_guia:
+                observaciones = f'Guía: {numero_guia}. {observaciones}'.strip()
+            
+            # Obtener empleado
+            try:
+                empleado = Empleado.objects.get(user=request.user)
+            except Empleado.DoesNotExist:
+                empleado = None
+            
+            if compra.confirmar_devolucion(empleado=empleado, observaciones=observaciones):
+                messages.success(
+                    request,
+                    f'Devolución confirmada para compra #{compra.pk}. Stock actualizado.'
+                )
+            else:
+                messages.error(request, 'Error al confirmar devolución.')
+            
+            return redirect('almacen:detalle_compra', pk=pk)
+    else:
+        form = DevolucionCompraForm()
+    
+    context = {
+        'compra': compra,
+        'form': form,
+    }
+    
+    return render(request, 'almacen/compras/confirmar_devolucion.html', context)
+
+
+@login_required
+def cancelar_compra(request, pk):
+    """
+    Cancelar una compra o cotización.
+    
+    NOTA: No se puede cancelar si ya fue recibida sin problemas.
+    """
+    compra = get_object_or_404(CompraProducto, pk=pk)
+    
+    if compra.estado == 'recibida':
+        messages.error(request, 'No se puede cancelar una compra ya recibida.')
+        return redirect('almacen:detalle_compra', pk=pk)
+    
+    if request.method == 'POST':
+        motivo = request.POST.get('motivo', '')
+        if compra.cancelar(motivo=motivo):
+            messages.success(request, f'Compra #{compra.pk} cancelada.')
+        else:
+            messages.error(request, 'Error al cancelar la compra.')
+    
+    return redirect('almacen:detalle_compra', pk=pk)
+
+
+@login_required
+def recibir_unidad_compra(request, compra_pk, pk):
+    """
+    Recibir una unidad individual de una compra.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Si la compra tiene UnidadCompra definidas, se puede recibir
+    cada pieza individualmente en lugar de todas a la vez.
+    
+    Esto es útil cuando:
+    - Las piezas llegan en diferentes momentos
+    - Se quiere verificar cada pieza antes de darla por recibida
+    """
+    compra = get_object_or_404(CompraProducto, pk=compra_pk)
+    unidad = get_object_or_404(UnidadCompra, pk=pk, compra=compra)
+    
+    if not unidad.puede_recibir():
+        messages.error(request, 'Esta unidad no puede ser recibida.')
+        return redirect('almacen:detalle_compra', pk=compra_pk)
+    
+    if request.method == 'POST':
+        unidad_inv = unidad.recibir(crear_unidad_inventario=True)
+        if unidad_inv:
+            messages.success(
+                request,
+                f'Unidad #{unidad.numero_linea} recibida. Inventario: {unidad_inv.codigo_interno}'
+            )
+        else:
+            messages.error(request, 'Error al recibir la unidad.')
+    
+    return redirect('almacen:detalle_compra', pk=compra_pk)
+
+
+@login_required
+def problema_unidad_compra(request, compra_pk, pk):
+    """
+    Reportar problema con una unidad específica de una compra.
+    """
+    compra = get_object_or_404(CompraProducto, pk=compra_pk)
+    unidad = get_object_or_404(UnidadCompra, pk=pk, compra=compra)
+    
+    if request.method == 'POST':
+        tipo = request.POST.get('tipo_problema', 'wpb')
+        motivo = request.POST.get('motivo', '')
+        
+        if tipo == 'doa':
+            unidad.marcar_doa(motivo=motivo)
+            messages.warning(request, f'Unidad #{unidad.numero_linea} marcada como DOA.')
+        else:
+            unidad.marcar_wpb(motivo=motivo)
+            messages.warning(request, f'Unidad #{unidad.numero_linea} marcada como WPB.')
+    
+    return redirect('almacen:detalle_compra', pk=compra_pk)
 

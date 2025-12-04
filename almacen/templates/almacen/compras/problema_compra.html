@@ -1,0 +1,95 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% block title %}Reportar Problema - Compra #{{ compra.pk }} - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <!-- Encabezado -->
+            <div class="mb-4">
+                <a href="{% url 'almacen:detalle_compra' compra.pk %}" class="btn btn-outline-secondary btn-sm mb-2">
+                    <i class="bi bi-arrow-left me-1"></i>Volver al detalle
+                </a>
+                <h1 class="h2">
+                    <i class="bi bi-exclamation-triangle me-2 text-warning"></i>Reportar Problema
+                </h1>
+            </div>
+
+            <!-- Resumen -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Compra #{{ compra.pk }}</h6>
+                    <p class="h5 mb-1">{{ compra.producto.nombre }}</p>
+                    <p class="mb-0">
+                        {{ compra.cantidad }} unidades • Recibida: {{ compra.fecha_recepcion|date:"d/m/Y" }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Formulario -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-circle me-2"></i>Tipo de Problema</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.tipo_problema.label }} <span class="text-danger">*</span></label>
+                            {{ form.tipo_problema }}
+                        </div>
+                        
+                        <!-- Explicación de tipos -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="card bg-light h-100">
+                                    <div class="card-body py-2">
+                                        <strong class="text-danger">WPB - Wrong Part</strong>
+                                        <p class="small mb-0">Pieza incorrecta: enviaron un producto diferente al solicitado.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card bg-light h-100">
+                                    <div class="card-body py-2">
+                                        <strong class="text-danger">DOA - Dead On Arrival</strong>
+                                        <p class="small mb-0">Pieza dañada: llegó defectuosa o no funciona.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">{{ form.motivo.label }} <span class="text-danger">*</span></label>
+                            {{ form.motivo }}
+                            <div class="form-text">{{ form.motivo.help_text }}</div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Después de reportar:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>La compra quedará marcada con el problema</li>
+                                <li>Podrás iniciar el proceso de devolución al proveedor</li>
+                                <li>El stock no se modifica hasta confirmar la devolución</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'almacen:detalle_compra' compra.pk %}" class="btn btn-outline-secondary">
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-exclamation-triangle me-2"></i>Reportar Problema
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock almacen_content %}

@@ -1,0 +1,99 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% block title %}Recibir Compra #{{ compra.pk }} - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Encabezado -->
+            <div class="mb-4">
+                <a href="{% url 'almacen:detalle_compra' compra.pk %}" class="btn btn-outline-secondary btn-sm mb-2">
+                    <i class="bi bi-arrow-left me-1"></i>Volver al detalle
+                </a>
+                <h1 class="h2">
+                    <i class="bi bi-box-arrow-in-down me-2 text-primary"></i>Confirmar Recepción
+                </h1>
+            </div>
+
+            <!-- Resumen de la compra -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Compra #{{ compra.pk }} - {{ compra.producto.nombre }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Producto:</strong> {{ compra.producto.codigo_producto }}</p>
+                            <p class="mb-1"><strong>Cantidad:</strong> {{ compra.cantidad }} unidades</p>
+                            <p class="mb-0"><strong>Proveedor:</strong> {{ compra.proveedor.nombre|default:"-" }}</p>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <p class="mb-1"><strong>Costo Unitario:</strong> ${{ compra.costo_unitario|floatformat:2 }}</p>
+                            <p class="mb-1"><strong>Costo Total:</strong> <span class="h5 text-success">${{ compra.costo_total|floatformat:2 }}</span></p>
+                            <p class="mb-0"><strong>Fecha Pedido:</strong> {{ compra.fecha_pedido|date:"d/m/Y" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulario de recepción -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Datos de Recepción</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.fecha_recepcion.label }} <span class="text-danger">*</span></label>
+                            {{ form.fecha_recepcion }}
+                            <div class="form-text">{{ form.fecha_recepcion.help_text }}</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.crear_unidades }}
+                                <label class="form-check-label" for="{{ form.crear_unidades.id_for_label }}">
+                                    {{ form.crear_unidades.label }}
+                                </label>
+                            </div>
+                            <div class="form-text">{{ form.crear_unidades.help_text }}</div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">{{ form.observaciones.label }}</label>
+                            {{ form.observaciones }}
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Al confirmar la recepción:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Se actualizará el stock del producto (+{{ compra.cantidad }} unidades)</li>
+                                <li>Se registrará un movimiento de entrada en el almacén</li>
+                                {% if compra.unidades_compra.exists %}
+                                <li>Se procesarán las {{ compra.unidades_compra.count }} unidades individuales definidas</li>
+                                {% else %}
+                                <li>Se crearán {{ compra.cantidad }} unidades de inventario (si está marcada la opción)</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'almacen:detalle_compra' compra.pk %}" class="btn btn-outline-secondary">
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-check-lg me-2"></i>Confirmar Recepción
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock almacen_content %}

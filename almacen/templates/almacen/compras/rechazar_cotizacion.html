@@ -1,0 +1,66 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% block title %}Rechazar Cotización #{{ compra.pk }} - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <!-- Encabezado -->
+            <div class="mb-4">
+                <a href="{% url 'almacen:detalle_compra' compra.pk %}" class="btn btn-outline-secondary btn-sm mb-2">
+                    <i class="bi bi-arrow-left me-1"></i>Volver al detalle
+                </a>
+                <h1 class="h2">
+                    <i class="bi bi-x-circle me-2 text-danger"></i>Rechazar Cotización
+                </h1>
+            </div>
+
+            <!-- Resumen -->
+            <div class="card shadow-sm mb-4 border-danger">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Cotización #{{ compra.pk }}</h6>
+                    <p class="h5 mb-1">{{ compra.producto.nombre }}</p>
+                    <p class="mb-0">
+                        {{ compra.cantidad }} unidades × ${{ compra.costo_unitario|floatformat:2 }} = 
+                        <strong>${{ compra.costo_total|floatformat:2 }}</strong>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Formulario -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-x-lg me-2"></i>Confirmar Rechazo</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label">{{ form.motivo.label }}</label>
+                            {{ form.motivo }}
+                            <div class="form-text">{{ form.motivo.help_text }}</div>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Atención:</strong> Una vez rechazada, la cotización no podrá ser reactivada.
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'almacen:detalle_compra' compra.pk %}" class="btn btn-outline-secondary">
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-x-lg me-2"></i>Confirmar Rechazo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock almacen_content %}

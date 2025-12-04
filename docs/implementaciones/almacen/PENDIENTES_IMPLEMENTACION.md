@@ -1,6 +1,6 @@
 # ALMACÉN - Funcionalidades Pendientes de Implementar
 
-**Contexto**: Módulo Almacén creado en Diciembre 2025. Modelos y formularios completos, faltan vistas/templates/URLs.
+**Contexto**: Módulo Almacén creado en Diciembre 2025. Modelos y formularios completos.
 
 ---
 
@@ -11,7 +11,8 @@
 | Proveedor | ✅ ProveedorForm | ✅ CRUD | ✅ | ✅ | **COMPLETO** |
 | CategoriaAlmacen | ✅ CategoriaAlmacenForm | ✅ CRUD | ✅ | ✅ | **COMPLETO** |
 | ProductoAlmacen | ✅ ProductoAlmacenForm | ✅ CRUD | ✅ | ✅ | **COMPLETO** |
-| CompraProducto | ✅ CompraProductoForm | ❌ | ❌ | ❌ | **PENDIENTE** |
+| CompraProducto | ✅ CompraProductoForm | ✅ CRUD + Workflow | ✅ | ✅ | **✅ COMPLETO** |
+| UnidadCompra | ✅ UnidadCompraForm | ✅ Integrado | ✅ | ✅ | **✅ COMPLETO** |
 | MovimientoAlmacen | ✅ MovimientoAlmacenForm | ⚠️ Solo lista/entrada | ⚠️ | ⚠️ | **PARCIAL** |
 | SolicitudBaja | ✅ SolicitudBajaForm | ✅ CRUD | ✅ | ✅ | **COMPLETO** |
 | Auditoria | ✅ AuditoriaForm | ❌ | ❌ | ❌ | **PENDIENTE** |
@@ -20,69 +21,141 @@
 
 ---
 
-## 1️⃣ COMPRAS DE PRODUCTO (CompraProducto)
+## ✅ IMPLEMENTADO: COMPRAS Y COTIZACIONES (Diciembre 2025)
 
-### Modelo: `almacen/models.py` línea 540
-- ForeignKey: producto, proveedor, orden_servicio
-- Campos: cantidad, costo_unitario, costo_total (auto), fecha_pedido, fecha_recepcion
-- Método save(): calcula costo_total, dias_entrega, actualiza costo_unitario del producto
+### Modelo CompraProducto - MEJORADO
+**Ubicación**: `almacen/models.py`
 
-### Formulario: `almacen/forms.py` línea 325 - `CompraProductoForm`
-- Ya creado con todos los campos y widgets Bootstrap
+**Nuevos campos agregados**:
+- `tipo`: 'cotizacion' o 'compra' (diferencia cotización de compra formal)
+- `estado`: Workflow completo con 10 estados:
+  - `pendiente_aprobacion` → `aprobada` → `pendiente_llegada` → `recibida`
+  - Estados de problema: `wpb` (Wrong Part), `doa` (Dead On Arrival)
+  - Estados de devolución: `devolucion_garantia` → `devuelta`
+  - `rechazada`, `cancelada`
+- `orden_cliente`: Búsqueda por número visible al cliente (ej: OS-2024-0001)
+- `fecha_aprobacion`, `fecha_rechazo`, `fecha_problema`, `fecha_devolucion`
+- `motivo_problema`, `motivo_rechazo`
 
-### URLs a crear:
+**Métodos de workflow**:
+- `aprobar()`: Convierte cotización en compra pendiente
+- `rechazar(motivo)`: Rechaza cotización con motivo
+- `recibir(fecha)`: Marca como recibida
+- `marcar_wpb(motivo)`: Marca pieza incorrecta
+- `marcar_doa(motivo)`: Marca pieza dañada
+- `iniciar_devolucion()`: Inicia proceso de devolución
+- `confirmar_devolucion()`: Confirma devolución y descuenta stock
+- `cancelar(motivo)`: Cancela compra/cotización
+
+### Modelo UnidadCompra - NUEVO
+**Ubicación**: `almacen/models.py`
+
+Permite definir especificaciones individuales por pieza en una compra:
+- `compra`: FK a CompraProducto
+- `numero_linea`: Secuencial dentro de la compra
+- `marca`, `modelo`, `numero_serie`, `especificaciones`
+- `costo_unitario`: Costo específico si difiere del general
+- `estado`: pendiente, recibida, wpb, doa, devolucion, devuelta
+- `unidad_inventario`: OneToOne a UnidadInventario creada al recibir
+
+**Métodos**:
+- `recibir()`: Crea UnidadInventario automáticamente
+- `marcar_wpb()`, `marcar_doa()`, `iniciar_devolucion()`, `confirmar_devolucion()`
+
+### Constantes agregadas
+**Ubicación**: `config/constants.py`
+
 ```python
-# En almacen/urls.py agregar:
+TIPO_COMPRA_CHOICES = [('cotizacion', 'Cotización'), ('compra', 'Compra Formal')]
+ESTADO_COMPRA_CHOICES = [10 estados del workflow]
+ESTADO_UNIDAD_COMPRA_CHOICES = [6 estados por unidad]
+```
+
+### Formularios
+**Ubicación**: `almacen/forms.py`
+
+- `CompraProductoForm`: Actualizado con nuevos campos
+- `UnidadCompraForm`: Para detalles de cada pieza
+- `UnidadCompraFormSet`: Formset inline para múltiples unidades
+- `RecepcionCompraForm`: Confirmar recepción
+- `ProblemaCompraForm`: Reportar WPB/DOA
+- `RechazoCotizacionForm`: Rechazar cotización
+- `DevolucionCompraForm`: Confirmar devolución
+
+### URLs implementadas
+**Ubicación**: `almacen/urls.py`
+
+```python
+# CRUD
 path('compras/', views.lista_compras, name='lista_compras'),
+path('cotizaciones/', views.panel_cotizaciones, name='panel_cotizaciones'),
 path('compras/crear/', views.crear_compra, name='crear_compra'),
 path('compras/<int:pk>/', views.detalle_compra, name='detalle_compra'),
 path('compras/<int:pk>/editar/', views.editar_compra, name='editar_compra'),
-# Opcional: recibir compra (actualiza fecha_recepcion y crea MovimientoAlmacen entrada)
+
+# Workflow cotizaciones
+path('compras/<int:pk>/aprobar/', views.aprobar_cotizacion, name='aprobar_cotizacion'),
+path('compras/<int:pk>/rechazar/', views.rechazar_cotizacion, name='rechazar_cotizacion'),
+
+# Workflow compras
 path('compras/<int:pk>/recibir/', views.recibir_compra, name='recibir_compra'),
+path('compras/<int:pk>/problema/', views.reportar_problema_compra, name='reportar_problema'),
+path('compras/<int:pk>/devolucion/', views.iniciar_devolucion, name='iniciar_devolucion'),
+path('compras/<int:pk>/confirmar-devolucion/', views.confirmar_devolucion, name='confirmar_devolucion'),
+path('compras/<int:pk>/cancelar/', views.cancelar_compra, name='cancelar_compra'),
+
+# Unidades individuales
+path('compras/<int:compra_pk>/unidad/<int:pk>/recibir/', views.recibir_unidad_compra, name='recibir_unidad'),
+path('compras/<int:compra_pk>/unidad/<int:pk>/problema/', views.problema_unidad_compra, name='problema_unidad'),
 ```
 
-### Vistas a crear:
-```python
-# lista_compras: filtros por producto, proveedor, fecha, estado (pendiente/recibida)
-# crear_compra: formulario, al guardar NO actualiza stock (se hace al recibir)
-# detalle_compra: mostrar info, historial de producto, tiempo entrega
-# editar_compra: solo si no ha sido recibida
-# recibir_compra: marca fecha_recepcion, crea MovimientoAlmacen tipo='entrada'
-```
+### Templates creados
+**Ubicación**: `almacen/templates/almacen/compras/`
 
-### Templates a crear:
-```
-almacen/templates/almacen/compras/
-├── lista_compras.html      # Tabla con filtros, estado pendiente/recibida
-├── form_compra.html        # Crear/editar compra
-├── detalle_compra.html     # Info completa + botón recibir si pendiente
-```
+- `lista_compras.html`: Tabla con filtros por tipo, estado, producto, proveedor
+- `panel_cotizaciones.html`: Dashboard de cotizaciones pendientes con estadísticas
+- `form_compra.html`: Crear/editar con formset dinámico para unidades
+- `detalle_compra.html`: Info completa + botones de acción según estado
+- `recibir_compra.html`: Confirmar recepción
+- `rechazar_cotizacion.html`: Formulario de rechazo
+- `problema_compra.html`: Reportar WPB/DOA
+- `confirmar_devolucion.html`: Confirmar devolución completada
 
-### Lógica importante:
-1. Al CREAR compra: solo registra, NO modifica stock
-2. Al RECIBIR compra:
-   - Actualiza fecha_recepcion = hoy
-   - Calcula dias_entrega
-   - Crea MovimientoAlmacen(tipo='entrada', cantidad, producto)
-   - El signal de MovimientoAlmacen actualiza stock_actual del producto
+### Navbar actualizado
+**Ubicación**: `almacen/templates/almacen/base_almacen.html`
+
+Agregada nueva columna "Compras y Cotizaciones":
+- Lista de Compras
+- Panel Cotizaciones
+- Nueva Compra/Cotización
 
 ---
 
-## 2️⃣ AUDITORÍAS (Auditoria + DiferenciaAuditoria)
+## 🔧 AJUSTES PENDIENTES EN COMPRAS (Mejoras Menores)
 
-### Modelo Auditoria: `almacen/models.py` línea 1074
+1. **Formset dinámico en frontend**: Agregar botón "Agregar otra unidad" con JavaScript
+2. **Validación de cantidad vs unidades**: Verificar que unidades_compra.count() <= cantidad
+3. **Filtro avanzado en lista_compras**: Agregar filtro por rango de fechas
+4. **Exportar a Excel**: Lista de compras/cotizaciones
+5. **Notificaciones**: Alertas para cotizaciones con muchos días sin respuesta
+
+---
+
+## 1️⃣ AUDITORÍAS (Auditoria + DiferenciaAuditoria) - PENDIENTE
+
+### Modelo Auditoria: `almacen/models.py`
 - Campos: tipo (completa/ciclica/diferencias/abc), estado, sucursal, auditor
 - Métodos: actualizar_totales(), finalizar()
 - Related: diferencias (DiferenciaAuditoria)
 
-### Modelo DiferenciaAuditoria: `almacen/models.py` línea 1188
+### Modelo DiferenciaAuditoria: `almacen/models.py`
 - ForeignKey: auditoria, producto
 - Campos: stock_sistema, stock_fisico, diferencia (auto), razon, evidencia (imagen)
 - Método: aplicar_ajuste(responsable, acciones) - actualiza stock real
 
 ### Formularios existentes:
-- `AuditoriaForm` línea 654
-- `DiferenciaAuditoriaForm` línea 694
+- `AuditoriaForm`
+- `DiferenciaAuditoriaForm`
 
 ### URLs a crear:
 ```python
@@ -95,27 +168,6 @@ path('auditorias/<int:pk>/finalizar/', views.finalizar_auditoria, name='finaliza
 # DIFERENCIAS (dentro de una auditoría)
 path('auditorias/<int:auditoria_pk>/diferencia/crear/', views.crear_diferencia, name='crear_diferencia'),
 path('auditorias/<int:auditoria_pk>/diferencia/<int:pk>/ajustar/', views.ajustar_diferencia, name='ajustar_diferencia'),
-```
-
-### Vistas a crear:
-```python
-# lista_auditorias: filtros por estado, tipo, fecha, auditor
-# crear_auditoria: seleccionar tipo, sucursal, asignar auditor
-# detalle_auditoria: 
-#   - Info general + lista de diferencias
-#   - Botones: agregar diferencia, finalizar auditoría
-#   - Si tiene diferencias sin ajustar, mostrar alerta
-# finalizar_auditoria: marca estado completada/con_diferencias
-# crear_diferencia:
-#   - Seleccionar producto
-#   - Mostrar stock_sistema actual (readonly)
-#   - Ingresar stock_fisico (conteo real)
-#   - diferencia se calcula automáticamente
-#   - Seleccionar razon, subir evidencia opcional
-# ajustar_diferencia:
-#   - Aplica método aplicar_ajuste()
-#   - Actualiza stock del producto al valor físico
-#   - Registra responsable y acciones correctivas
 ```
 
 ### Templates a crear:
@@ -137,24 +189,18 @@ almacen/templates/almacen/auditorias/
 
 ---
 
-## 3️⃣ MOVIMIENTOS - Mejoras pendientes
+## 2️⃣ MOVIMIENTOS - Mejoras pendientes
 
 ### Actualmente implementado:
 - ✅ lista_movimientos (filtros básicos)
 - ✅ registrar_entrada (formulario manual)
-- ✅ Signals para actualizar stock automáticamente
+- ✅ Stock se actualiza automáticamente en save()
 
 ### Faltante:
 ```python
 # URLs adicionales:
 path('movimientos/<int:pk>/', views.detalle_movimiento, name='detalle_movimiento'),
 path('movimientos/salida/', views.registrar_salida_manual, name='registrar_salida'),
-```
-
-### Vistas a crear:
-```python
-# detalle_movimiento: info completa, trazabilidad (qué lo generó: compra, solicitud, etc)
-# registrar_salida_manual: para salidas no vinculadas a solicitud (ajustes, mermas)
 ```
 
 ### Templates:
@@ -166,21 +212,7 @@ almacen/templates/almacen/movimientos/
 
 ---
 
-## 4️⃣ FORMULARIOS AUXILIARES EXISTENTES (no usados aún)
-
-### BusquedaProductoForm (línea 748)
-- Para búsqueda avanzada de productos
-- Campos: codigo, nombre, categoria, tipo, estado_stock, proveedor
-- **Uso**: Mejorar filtros en lista_productos
-
-### EntradaRapidaForm (línea 799)
-- Entrada rápida sin crear compra formal
-- Campos: producto (autocomplete), cantidad, costo_unitario, observaciones
-- **Uso**: Vista rápida para entradas sin todo el proceso de compra
-
----
-
-## 5️⃣ FUNCIONALIDADES ADICIONALES SUGERIDAS
+## 3️⃣ FUNCIONALIDADES ADICIONALES SUGERIDAS
 
 ### Dashboard - Mejorar con:
 - Gráfico de movimientos (entradas vs salidas por mes)
@@ -204,52 +236,40 @@ path('reportes/valorizado/', views.reporte_valorizado, name='reporte_valorizado'
 
 ## 📋 ORDEN DE IMPLEMENTACIÓN SUGERIDO
 
-### Prioridad 1 (Core):
-1. **Compras** - Necesario para entrada formal de productos
-2. **Auditorías** - Control de inventario
+### ✅ Completado:
+1. **Compras y Cotizaciones** - Sistema completo con workflow
+
+### Prioridad 1 (Siguiente):
+2. **Auditorías** - Control de inventario físico vs sistema
 
 ### Prioridad 2 (Mejoras):
 3. **Detalle de movimiento**
 4. **Salida manual**
-5. **Búsqueda avanzada de productos**
+5. **Ajustes menores en Compras** (formset dinámico, etc.)
 
 ### Prioridad 3 (Nice to have):
 6. Reportes y exportación Excel
 7. Gráficos en dashboard
-8. Entrada rápida
-
----
-
-## 🔧 ARCHIVOS A MODIFICAR
-
-### Para cada funcionalidad:
-1. `almacen/urls.py` - Agregar paths
-2. `almacen/views.py` - Crear vistas
-3. `almacen/templates/almacen/` - Crear templates
-4. `almacen/templates/almacen/base_almacen.html` - Agregar enlaces en navbar si es sección nueva
-
-### Navbar actual tiene:
-- Dashboard, Productos, Proveedores, Categorías, Movimientos, Solicitudes, Unidades
-- **Agregar**: Compras, Auditorías
+8. Notificaciones automáticas
 
 ---
 
 ## 📝 NOTAS TÉCNICAS
 
-### Signals existentes (`almacen/models.py`):
-- MovimientoAlmacen post_save → actualiza stock_actual del producto
-- Ya funciona automáticamente para entradas/salidas
+### Migraciones aplicadas:
+- `0004_compraproducto_estado_compraproducto_...` - Nuevos campos en CompraProducto
+- `0005_unidadcompra` - Modelo para tracking individual de unidades
 
 ### Métodos de modelo útiles:
-- `CompraProducto.save()`: calcula totales automáticamente
+- `CompraProducto.aprobar()`, `.rechazar()`, `.recibir()`, `.marcar_wpb()`, `.marcar_doa()`
+- `UnidadCompra.recibir()` - Crea UnidadInventario automáticamente
 - `Auditoria.finalizar()`: cierra auditoría
 - `DiferenciaAuditoria.aplicar_ajuste()`: actualiza stock real
-- `SolicitudBaja.aprobar()`: ya actualiza UnidadInventario.disponibilidad
 
 ### Select_related a usar:
 ```python
 # Compras
-CompraProducto.objects.select_related('producto', 'proveedor', 'orden_servicio')
+CompraProducto.objects.select_related('producto', 'proveedor', 'orden_servicio').prefetch_related('unidades_compra')
 
 # Auditorías
 Auditoria.objects.select_related('sucursal', 'auditor')
@@ -259,4 +279,4 @@ DiferenciaAuditoria.objects.select_related('auditoria', 'producto', 'responsable
 ---
 
 **Última actualización**: Diciembre 2025
-**Estado**: Documento de referencia para implementación futura
+**Estado**: Compras ✅ completado | Auditorías pendiente

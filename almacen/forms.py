@@ -17,12 +17,14 @@ Todos los formularios usan clases de Bootstrap 5 para consistencia visual.
 
 from django import forms
 from django.core.exceptions import ValidationError
+from django.forms import inlineformset_factory
 
 from .models import (
     Proveedor,
     CategoriaAlmacen,
     ProductoAlmacen,
     CompraProducto,
+    UnidadCompra,
     MovimientoAlmacen,
     SolicitudBaja,
     Auditoria,
@@ -39,6 +41,9 @@ from config.constants import (
     DISPONIBILIDAD_UNIDAD_CHOICES,
     ORIGEN_UNIDAD_CHOICES,
     MARCAS_COMPONENTES_CHOICES,
+    TIPO_COMPRA_CHOICES,
+    ESTADO_COMPRA_CHOICES,
+    ESTADO_UNIDAD_COMPRA_CHOICES,
 )
 
 
@@ -324,27 +329,55 @@ class ProductoAlmacenForm(forms.ModelForm):
 # ============================================================================
 class CompraProductoForm(forms.ModelForm):
     """
-    Formulario para registrar compras de productos.
+    Formulario para registrar cotizaciones y compras de productos.
     
-    Registra el historial de compras: a quién se compró, cuánto costó,
-    cuándo llegó, y opcionalmente a qué orden de servicio está vinculada.
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este formulario maneja el registro de compras/cotizaciones:
+    
+    1. COTIZACIÓN: Se crea primero como cotización para que el cliente apruebe
+    2. COMPRA: Una vez aprobada, se convierte en compra formal
+    
+    El campo 'orden_cliente' permite buscar por el número visible al cliente
+    (ej: OS-2024-0001) en lugar del ID interno de la base de datos.
+    
+    Campos importantes:
+    - tipo: Si es cotización (pendiente aprobación) o compra directa
+    - producto: Qué producto se cotiza/compra
+    - cantidad: Número de unidades
+    - orden_cliente: Para vincular con orden de servicio por número visible
     """
+    
+    # Campo adicional para buscar orden por número de cliente
+    buscar_orden_cliente = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: OS-2024-0001',
+            'autocomplete': 'off',
+        }),
+        label='Buscar por Orden Cliente',
+        help_text='Ingresa el número de orden visible para el cliente'
+    )
     
     class Meta:
         model = CompraProducto
         fields = [
+            'tipo',
             'producto',
             'proveedor',
             'cantidad',
             'costo_unitario',
             'fecha_pedido',
-            'fecha_recepcion',
             'numero_factura',
             'numero_orden_compra',
-            'orden_servicio',
+            'orden_cliente',
             'observaciones',
         ]
         widgets = {
+            'tipo': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
             'producto': forms.Select(attrs={
                 'class': 'form-control form-select',
             }),
@@ -366,10 +399,6 @@ class CompraProductoForm(forms.ModelForm):
                 'class': 'form-control',
                 'type': 'date',
             }),
-            'fecha_recepcion': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date',
-            }),
             'numero_factura': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Número de factura del proveedor',
@@ -378,31 +407,293 @@ class CompraProductoForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'Número de orden de compra interno',
             }),
-            'orden_servicio': forms.Select(attrs={
-                'class': 'form-control form-select',
+            'orden_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: OS-2024-0001 (opcional)',
             }),
             'observaciones': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 2,
-                'placeholder': 'Notas sobre esta compra...',
+                'placeholder': 'Notas sobre esta compra/cotización...',
             }),
         }
         labels = {
+            'tipo': 'Tipo de Registro',
             'producto': 'Producto',
             'proveedor': 'Proveedor',
             'cantidad': 'Cantidad',
             'costo_unitario': 'Costo Unitario ($)',
-            'fecha_pedido': 'Fecha de Pedido',
-            'fecha_recepcion': 'Fecha de Recepción',
+            'fecha_pedido': 'Fecha de Pedido/Cotización',
             'numero_factura': 'Número de Factura',
-            'numero_orden_compra': 'Orden de Compra',
-            'orden_servicio': 'Orden de Servicio (opcional)',
+            'numero_orden_compra': 'Orden de Compra Interna',
+            'orden_cliente': 'Número de Orden (Cliente)',
             'observaciones': 'Observaciones',
         }
         help_texts = {
-            'fecha_recepcion': 'Dejar vacío si aún no se ha recibido',
-            'orden_servicio': 'Vincular con orden de servicio técnico si aplica',
+            'tipo': 'Cotización: pendiente de aprobación. Compra: registro formal.',
+            'orden_cliente': 'Número de orden de servicio visible para el cliente',
         }
+    
+    def clean_orden_cliente(self):
+        """
+        Valida y normaliza el número de orden cliente.
+        Convierte a mayúsculas para consistencia.
+        """
+        orden_cliente = self.cleaned_data.get('orden_cliente', '')
+        if orden_cliente:
+            return orden_cliente.upper().strip()
+        return orden_cliente
+
+
+# ============================================================================
+# FORMULARIO: UNIDAD DE COMPRA (Detalle por Pieza)
+# ============================================================================
+class UnidadCompraForm(forms.ModelForm):
+    """
+    Formulario para registrar detalles de cada unidad individual en una compra.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando compras varias piezas del mismo tipo (ej: 3 tarjetas madre),
+    este formulario permite especificar los detalles de CADA UNA:
+    
+    - Marca: Samsung, Kingston, ASUS, etc.
+    - Modelo: Modelo específico del fabricante
+    - Número de serie: S/N único de cada pieza
+    - Costo individual: Si alguna pieza cuesta diferente
+    
+    EJEMPLO:
+    Compra de 3 Tarjetas Madre (ProductoAlmacen genérico):
+    - Línea 1: ASUS ROG STRIX B550-F, S/N: ABC123, $3,500
+    - Línea 2: MSI MAG B550 TOMAHAWK, S/N: DEF456, $3,200
+    - Línea 3: Gigabyte B550 AORUS PRO, S/N: GHI789, $3,400
+    
+    Esto permite rastrear cada pieza individualmente cuando se convierta
+    en UnidadInventario al recibir la compra.
+    """
+    
+    class Meta:
+        model = UnidadCompra
+        fields = [
+            'numero_linea',
+            'marca',
+            'modelo',
+            'numero_serie',
+            'especificaciones',
+            'costo_unitario',
+            'notas',
+        ]
+        widgets = {
+            'numero_linea': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 1,
+                'readonly': True,  # Se asigna automáticamente
+            }),
+            'marca': forms.Select(attrs={
+                'class': 'form-control form-select',
+            }),
+            'modelo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 870 EVO, ROG STRIX B550',
+            }),
+            'numero_serie': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'S/N del fabricante',
+            }),
+            'especificaciones': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Detalles técnicos adicionales...',
+            }),
+            'costo_unitario': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 0,
+                'step': '0.01',
+                'placeholder': 'Dejar vacío para usar el costo general',
+            }),
+            'notas': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 1,
+                'placeholder': 'Notas adicionales...',
+            }),
+        }
+        labels = {
+            'numero_linea': '#',
+            'marca': 'Marca',
+            'modelo': 'Modelo',
+            'numero_serie': 'Número de Serie',
+            'especificaciones': 'Especificaciones',
+            'costo_unitario': 'Costo Específico ($)',
+            'notas': 'Notas',
+        }
+        help_texts = {
+            'costo_unitario': 'Solo si difiere del costo general de la compra',
+        }
+
+
+# Formset para manejar múltiples UnidadCompra dentro de una CompraProducto
+# EXPLICACIÓN: Un "formset" es un conjunto de formularios iguales que Django
+# maneja como grupo. Esto permite crear/editar múltiples UnidadCompra a la vez.
+UnidadCompraFormSet = inlineformset_factory(
+    CompraProducto,          # Modelo padre
+    UnidadCompra,            # Modelo hijo
+    form=UnidadCompraForm,   # Formulario a usar
+    extra=1,                 # Formularios vacíos adicionales (para agregar nuevos)
+    can_delete=True,         # Permitir eliminar unidades
+    min_num=0,               # Mínimo de formularios (0 = opcional)
+    validate_min=False,      # No validar mínimo
+)
+
+
+# ============================================================================
+# FORMULARIO: RECEPCIÓN DE COMPRA
+# ============================================================================
+class RecepcionCompraForm(forms.Form):
+    """
+    Formulario para confirmar la recepción de una compra.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando llega una compra, se usa este formulario para:
+    1. Registrar la fecha de recepción
+    2. Agregar observaciones sobre la recepción
+    3. Decidir si crear UnidadInventario automáticamente
+    
+    Este formulario NO es un ModelForm porque no edita directamente
+    el modelo, sino que llama al método compra.recibir()
+    """
+    
+    fecha_recepcion = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date',
+        }),
+        label='Fecha de Recepción',
+        help_text='Fecha en que se recibió físicamente el producto'
+    )
+    
+    crear_unidades = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+        }),
+        label='Crear Unidades de Inventario',
+        help_text='Crear UnidadInventario automáticamente para cada unidad recibida'
+    )
+    
+    observaciones = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Observaciones sobre la recepción...',
+        }),
+        label='Observaciones'
+    )
+
+
+# ============================================================================
+# FORMULARIO: PROBLEMA EN COMPRA (WPB/DOA)
+# ============================================================================
+class ProblemaCompraForm(forms.Form):
+    """
+    Formulario para reportar problemas en una compra (WPB o DOA).
+    
+    WPB = Wrong Part (Pieza Incorrecta): Enviaron otra cosa
+    DOA = Dead On Arrival (Dañada al Llegar): La pieza no funciona
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este formulario se usa cuando hay un problema con la pieza recibida.
+    Permite documentar el tipo de problema y la razón para iniciar
+    el proceso de devolución al proveedor.
+    """
+    
+    TIPO_PROBLEMA_CHOICES = [
+        ('wpb', 'WPB - Pieza Incorrecta (Wrong Part)'),
+        ('doa', 'DOA - Dañada al Llegar (Dead On Arrival)'),
+    ]
+    
+    tipo_problema = forms.ChoiceField(
+        choices=TIPO_PROBLEMA_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-control form-select',
+        }),
+        label='Tipo de Problema'
+    )
+    
+    motivo = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Describe el problema detalladamente...',
+        }),
+        label='Descripción del Problema',
+        help_text='Incluye toda la información relevante para el reclamo al proveedor'
+    )
+
+
+# ============================================================================
+# FORMULARIO: RECHAZO DE COTIZACIÓN
+# ============================================================================
+class RechazoCotizacionForm(forms.Form):
+    """
+    Formulario para registrar el rechazo de una cotización por el cliente.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando el cliente decide no aceptar una cotización, se usa este
+    formulario para documentar la razón. Esto ayuda a analizar por qué
+    se pierden ventas y mejorar las cotizaciones futuras.
+    """
+    
+    motivo = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Razón del rechazo (precio, tiempo de entrega, etc.)...',
+        }),
+        label='Motivo del Rechazo',
+        help_text='Opcional pero recomendado para análisis'
+    )
+
+
+# ============================================================================
+# FORMULARIO: CONFIRMACIÓN DE DEVOLUCIÓN
+# ============================================================================
+class DevolucionCompraForm(forms.Form):
+    """
+    Formulario para confirmar la devolución de una pieza al proveedor.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Después de reportar un problema (WPB/DOA) y enviar la pieza de vuelta
+    al proveedor, se usa este formulario para confirmar que la devolución
+    fue completada. Esto descuenta la pieza del inventario.
+    """
+    
+    numero_guia = forms.CharField(
+        required=False,
+        max_length=50,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Número de guía de envío',
+        }),
+        label='Número de Guía',
+        help_text='Número de tracking del envío de devolución'
+    )
+    
+    observaciones = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Notas sobre la devolución...',
+        }),
+        label='Observaciones'
+    )
 
 
 # ============================================================================

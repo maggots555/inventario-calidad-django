@@ -34,11 +34,15 @@ from config.constants import (
     TIPO_AUDITORIA_CHOICES,
     ESTADO_AUDITORIA_CHOICES,
     RAZON_DIFERENCIA_AUDITORIA_CHOICES,
-    # Nuevas constantes para UnidadInventario
+    # Constantes para UnidadInventario
     ESTADO_UNIDAD_CHOICES,
     ORIGEN_UNIDAD_CHOICES,
     DISPONIBILIDAD_UNIDAD_CHOICES,
     MARCAS_COMPONENTES_CHOICES,
+    # Constantes para CompraProducto
+    TIPO_COMPRA_CHOICES,
+    ESTADO_COMPRA_CHOICES,
+    ESTADO_UNIDAD_COMPRA_CHOICES,
 )
 
 
@@ -539,29 +543,59 @@ class ProductoAlmacen(models.Model):
 # ============================================================================
 class CompraProducto(models.Model):
     """
-    Historial de compras de productos.
+    Historial de compras y cotizaciones de productos.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Cada vez que compramos productos, se registra aquí. Esto permite:
-    - Ver el historial de precios de cada producto
-    - Comparar proveedores (quién da mejor precio, quién entrega más rápido)
-    - Saber cuánto hemos gastado en cada producto
-    - Vincular compras con órdenes de servicio técnico
+    Este modelo maneja TODO el flujo de adquisición de piezas:
+    
+    1. COTIZACIÓN: Cuando un cliente necesita una pieza, primero se cotiza.
+       - Estado: pendiente_aprobacion
+       - El cliente puede aprobar o rechazar
+    
+    2. COMPRA FORMAL: Una vez aprobada, se convierte en compra.
+       - Estado: aprobada → pendiente_llegada → recibida
+    
+    3. PROBLEMAS: Si la pieza llega mal:
+       - WPB (Wrong Part): Pieza incorrecta (mandaron otra cosa)
+       - DOA (Dead On Arrival): Pieza dañada al llegar
+    
+    4. DEVOLUCIÓN: Si hay problema, se puede devolver al proveedor
+       - Estado: devolucion_garantia → devuelta
+       - Al confirmar devolución, se descuenta del stock
+    
+    FLUJO COMPLETO:
+    ---------------
+    Cotización → Aprobación → Pendiente Llegada → Recibida (OK)
+                     ↓                              ↓
+                 Rechazada                    WPB / DOA
+                                                  ↓
+                                          Devolución Garantía
+                                                  ↓
+                                              Devuelta
     
     Campos importantes:
-    - producto: Qué producto se compró
-    - proveedor: A quién se compró (puede ser diferente al proveedor principal)
-    - cantidad: Cuántas unidades
-    - costo_unitario: Precio por unidad EN ESTA COMPRA
-    - costo_total: cantidad × costo_unitario (calculado automáticamente)
-    - fecha_pedido: Cuándo se hizo el pedido
-    - fecha_recepcion: Cuándo llegó (para calcular días de entrega)
-    - orden_servicio: Si la compra es para un servicio técnico específico
-    
-    NOTA: Al guardar una compra, NO se actualiza automáticamente el stock.
-    El stock se actualiza a través de MovimientoAlmacen (entrada).
+    - tipo: 'cotizacion' o 'compra' (diferencia el tipo de registro)
+    - estado: Estado actual en el flujo
+    - orden_cliente: Número visible para el cliente (ej: "OS-2024-0001")
+    - unidades_compra: Detalle de cada pieza individual con marca/modelo
     """
+    
+    # ========== TIPO Y ESTADO ==========
+    tipo = models.CharField(
+        max_length=15,
+        choices=TIPO_COMPRA_CHOICES,
+        default='cotizacion',
+        verbose_name='Tipo de Registro',
+        help_text='Cotización (pendiente aprobación) o Compra formal'
+    )
+    estado = models.CharField(
+        max_length=25,
+        choices=ESTADO_COMPRA_CHOICES,
+        default='pendiente_aprobacion',
+        verbose_name='Estado',
+        help_text='Estado actual de la compra/cotización'
+    )
     
     # ========== PRODUCTO Y PROVEEDOR ==========
     producto = models.ForeignKey(
@@ -619,6 +653,32 @@ class CompraProducto(models.Model):
         help_text='Días entre pedido y recepción (calculado automáticamente)'
     )
     
+    # ========== FECHAS DE WORKFLOW ==========
+    fecha_aprobacion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de Aprobación',
+        help_text='Cuándo el cliente aprobó la cotización'
+    )
+    fecha_rechazo = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de Rechazo',
+        help_text='Cuándo el cliente rechazó la cotización'
+    )
+    fecha_problema = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de Problema',
+        help_text='Cuándo se detectó WPB/DOA'
+    )
+    fecha_devolucion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de Devolución',
+        help_text='Cuándo se confirmó la devolución al proveedor'
+    )
+    
     # ========== DOCUMENTOS ==========
     numero_factura = models.CharField(
         max_length=50,
@@ -643,6 +703,25 @@ class CompraProducto(models.Model):
         verbose_name='Orden de Servicio',
         help_text='Si esta compra es para un servicio técnico específico'
     )
+    # Campo para búsqueda por orden_cliente (visible para el usuario)
+    orden_cliente = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name='Número de Orden Cliente',
+        help_text='Número de orden visible para el cliente (ej: OS-2024-0001)'
+    )
+    
+    # ========== INFORMACIÓN DE PROBLEMA ==========
+    motivo_problema = models.TextField(
+        blank=True,
+        verbose_name='Motivo del Problema',
+        help_text='Descripción del problema (WPB/DOA)'
+    )
+    motivo_rechazo = models.TextField(
+        blank=True,
+        verbose_name='Motivo del Rechazo',
+        help_text='Razón por la cual el cliente rechazó la cotización'
+    )
     
     # ========== INFORMACIÓN ADICIONAL ==========
     observaciones = models.TextField(
@@ -663,14 +742,24 @@ class CompraProducto(models.Model):
         auto_now_add=True,
         verbose_name='Fecha de Registro'
     )
+    fecha_actualizacion = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Última Actualización'
+    )
     
     class Meta:
         verbose_name = 'Compra de Producto'
         verbose_name_plural = 'Compras de Productos'
-        ordering = ['-fecha_recepcion', '-fecha_pedido']
+        ordering = ['-fecha_registro']
+        indexes = [
+            models.Index(fields=['estado']),
+            models.Index(fields=['tipo']),
+            models.Index(fields=['orden_cliente']),
+        ]
     
     def __str__(self):
-        return f"{self.producto.codigo_producto} - {self.cantidad} uds @ ${self.costo_unitario} ({self.fecha_pedido})"
+        tipo_icon = '📋' if self.tipo == 'cotizacion' else '🛒'
+        return f"{tipo_icon} {self.producto.codigo_producto} - {self.cantidad} uds @ ${self.costo_unitario} ({self.get_estado_display()})"
     
     def calcular_dias_entrega(self):
         """Calcula los días entre pedido y recepción"""
@@ -686,7 +775,7 @@ class CompraProducto(models.Model):
         Al guardar:
         1. Calcula costo_total = cantidad × costo_unitario
         2. Calcula dias_entrega si hay fecha de recepción
-        3. Actualiza el costo_unitario del producto (último costo)
+        3. Sincroniza orden_cliente desde orden_servicio si existe
         """
         # Calcular costo total
         self.costo_total = self.cantidad * self.costo_unitario
@@ -694,12 +783,544 @@ class CompraProducto(models.Model):
         # Calcular días de entrega
         self.dias_entrega = self.calcular_dias_entrega()
         
+        # Sincronizar orden_cliente desde orden_servicio
+        if self.orden_servicio and not self.orden_cliente:
+            self.orden_cliente = self.orden_servicio.orden_cliente
+        
+        super().save(*args, **kwargs)
+    
+    # ========== MÉTODOS DE WORKFLOW ==========
+    
+    def puede_aprobar(self):
+        """Verifica si la cotización puede ser aprobada"""
+        return self.tipo == 'cotizacion' and self.estado == 'pendiente_aprobacion'
+    
+    def puede_rechazar(self):
+        """Verifica si la cotización puede ser rechazada"""
+        return self.tipo == 'cotizacion' and self.estado == 'pendiente_aprobacion'
+    
+    def puede_recibir(self):
+        """Verifica si la compra puede marcarse como recibida"""
+        return self.estado in ['aprobada', 'pendiente_llegada']
+    
+    def puede_marcar_problema(self):
+        """Verifica si se puede marcar como WPB o DOA"""
+        return self.estado == 'recibida'
+    
+    def puede_devolver(self):
+        """Verifica si se puede iniciar devolución"""
+        return self.estado in ['wpb', 'doa']
+    
+    def puede_confirmar_devolucion(self):
+        """Verifica si se puede confirmar que fue devuelta"""
+        return self.estado == 'devolucion_garantia'
+    
+    def aprobar(self, usuario=None):
+        """
+        Aprueba la cotización y la convierte en compra pendiente.
+        
+        Args:
+            usuario: Usuario que aprueba (opcional, para auditoría)
+        
+        Returns:
+            bool: True si se aprobó exitosamente
+        """
+        if not self.puede_aprobar():
+            return False
+        
+        self.tipo = 'compra'
+        self.estado = 'pendiente_llegada'
+        self.fecha_aprobacion = timezone.now()
+        self.save()
+        return True
+    
+    def rechazar(self, motivo='', usuario=None):
+        """
+        Rechaza la cotización.
+        
+        Args:
+            motivo: Razón del rechazo (opcional)
+            usuario: Usuario que rechaza (opcional, para auditoría)
+        
+        Returns:
+            bool: True si se rechazó exitosamente
+        """
+        if not self.puede_rechazar():
+            return False
+        
+        self.estado = 'rechazada'
+        self.fecha_rechazo = timezone.now()
+        if motivo:
+            self.motivo_rechazo = motivo
+        self.save()
+        return True
+    
+    def recibir(self, fecha_recepcion=None, crear_unidades=True):
+        """
+        Marca la compra como recibida y opcionalmente crea las UnidadInventario.
+        
+        Args:
+            fecha_recepcion: Fecha de recepción (default: hoy)
+            crear_unidades: Si True, crea UnidadInventario automáticamente
+        
+        Returns:
+            bool: True si se recibió exitosamente
+        
+        NOTA: Este método crea MovimientoAlmacen de entrada para actualizar stock.
+        """
+        if not self.puede_recibir():
+            return False
+        
+        self.estado = 'recibida'
+        self.fecha_recepcion = fecha_recepcion or timezone.now().date()
+        self.dias_entrega = self.calcular_dias_entrega()
+        
         # Actualizar costo unitario del producto con el último costo
         if self.producto:
             self.producto.costo_unitario = self.costo_unitario
             self.producto.save(update_fields=['costo_unitario', 'fecha_actualizacion'])
         
-        super().save(*args, **kwargs)
+        self.save()
+        return True
+    
+    def marcar_wpb(self, motivo=''):
+        """
+        Marca la compra como WPB (Wrong Part - Pieza Incorrecta).
+        
+        Args:
+            motivo: Descripción del problema
+        
+        Returns:
+            bool: True si se marcó exitosamente
+        """
+        if not self.puede_marcar_problema():
+            return False
+        
+        self.estado = 'wpb'
+        self.fecha_problema = timezone.now()
+        self.motivo_problema = motivo or 'Pieza incorrecta recibida'
+        self.save()
+        return True
+    
+    def marcar_doa(self, motivo=''):
+        """
+        Marca la compra como DOA (Dead On Arrival - Dañada al Llegar).
+        
+        Args:
+            motivo: Descripción del problema
+        
+        Returns:
+            bool: True si se marcó exitosamente
+        """
+        if not self.puede_marcar_problema():
+            return False
+        
+        self.estado = 'doa'
+        self.fecha_problema = timezone.now()
+        self.motivo_problema = motivo or 'Pieza dañada al llegar'
+        self.save()
+        return True
+    
+    def iniciar_devolucion(self):
+        """
+        Inicia el proceso de devolución al proveedor.
+        
+        Returns:
+            bool: True si se inició exitosamente
+        """
+        if not self.puede_devolver():
+            return False
+        
+        self.estado = 'devolucion_garantia'
+        self.save()
+        return True
+    
+    def confirmar_devolucion(self, empleado=None, observaciones=''):
+        """
+        Confirma que la pieza fue devuelta al proveedor.
+        
+        Esto crea un MovimientoAlmacen de salida para descontar del stock
+        si la pieza ya había sido ingresada al inventario.
+        
+        Args:
+            empleado: Empleado que confirma la devolución
+            observaciones: Notas adicionales
+        
+        Returns:
+            bool: True si se confirmó exitosamente
+        """
+        if not self.puede_confirmar_devolucion():
+            return False
+        
+        self.estado = 'devuelta'
+        self.fecha_devolucion = timezone.now()
+        
+        if observaciones:
+            self.observaciones = f"{self.observaciones}\n[DEVOLUCIÓN] {observaciones}".strip()
+        
+        self.save()
+        
+        # Crear movimiento de salida para descontar del stock
+        # Solo si la pieza ya estaba en stock (fue recibida antes)
+        if self.fecha_recepcion:
+            MovimientoAlmacen.objects.create(
+                tipo='salida',
+                producto=self.producto,
+                cantidad=self.cantidad,
+                costo_unitario=self.costo_unitario,
+                empleado=empleado,
+                compra=self,
+                observaciones=f'Devolución por {self.get_estado_display()} - {self.motivo_problema}'
+            )
+        
+        return True
+    
+    def cancelar(self, motivo=''):
+        """
+        Cancela la compra/cotización.
+        
+        Args:
+            motivo: Razón de la cancelación
+        
+        Returns:
+            bool: True si se canceló exitosamente
+        """
+        # No se puede cancelar si ya fue recibida sin problemas
+        if self.estado == 'recibida':
+            return False
+        
+        self.estado = 'cancelada'
+        if motivo:
+            self.observaciones = f"{self.observaciones}\n[CANCELADA] {motivo}".strip()
+        self.save()
+        return True
+    
+    # ========== PROPIEDADES ÚTILES ==========
+    
+    @property
+    def es_cotizacion(self):
+        """Retorna True si es una cotización"""
+        return self.tipo == 'cotizacion'
+    
+    @property
+    def es_compra(self):
+        """Retorna True si es una compra formal"""
+        return self.tipo == 'compra'
+    
+    @property
+    def tiene_problema(self):
+        """Retorna True si tiene WPB o DOA"""
+        return self.estado in ['wpb', 'doa']
+    
+    @property
+    def esta_finalizada(self):
+        """Retorna True si está en estado final"""
+        return self.estado in ['recibida', 'devuelta', 'cancelada', 'rechazada']
+    
+    @property
+    def dias_sin_respuesta(self):
+        """Calcula días desde la cotización sin respuesta del cliente"""
+        if self.estado == 'pendiente_aprobacion':
+            delta = timezone.now() - self.fecha_registro
+            return delta.days
+        return 0
+    
+    def get_badge_estado(self):
+        """Retorna la clase CSS para el badge de estado"""
+        estados_css = {
+            'pendiente_aprobacion': 'warning',
+            'aprobada': 'info',
+            'rechazada': 'secondary',
+            'pendiente_llegada': 'primary',
+            'recibida': 'success',
+            'wpb': 'danger',
+            'doa': 'danger',
+            'devolucion_garantia': 'warning',
+            'devuelta': 'dark',
+            'cancelada': 'secondary',
+        }
+        return estados_css.get(self.estado, 'secondary')
+    
+    def get_tipo_icon(self):
+        """Retorna el icono según el tipo"""
+        return '📋' if self.tipo == 'cotizacion' else '🛒'
+
+
+# ============================================================================
+# MODELO: UNIDAD DE COMPRA (Detalle por Pieza Individual)
+# ============================================================================
+class UnidadCompra(models.Model):
+    """
+    Detalle de cada unidad individual dentro de una compra.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando compras 5 tarjetas madre, cada una puede ser diferente:
+    - 2 pueden ser ASUS ROG STRIX B550
+    - 2 pueden ser MSI MAG B550
+    - 1 puede ser Gigabyte B550 AORUS
+    
+    Este modelo permite registrar CADA PIEZA con sus especificaciones
+    únicas, para luego convertirlas en UnidadInventario cuando lleguen.
+    
+    ¿Por qué necesitamos esto?
+    --------------------------
+    1. ESPECIFICACIONES DIFERENTES: Cada pieza puede tener marca/modelo distinto
+    2. NÚMEROS DE SERIE: Cada pieza tiene su S/N único
+    3. COSTOS INDIVIDUALES: A veces el precio varía por marca
+    4. TRACKING POR PIEZA: Saber el estado de cada una (recibida, WPB, DOA)
+    
+    FLUJO:
+    ------
+    1. Al crear CompraProducto con cantidad=5, se pueden crear 5 UnidadCompra
+    2. Cada UnidadCompra define marca, modelo, costo individual
+    3. Al recibir, cada UnidadCompra se convierte en UnidadInventario
+    4. Si hay problema (WPB/DOA), se marca la unidad específica
+    
+    Relación con otros modelos:
+    - compra: ForeignKey a CompraProducto (la compra padre)
+    - unidad_inventario: OneToOneField a UnidadInventario (cuando se crea)
+    """
+    
+    # ========== RELACIÓN CON COMPRA PADRE ==========
+    compra = models.ForeignKey(
+        CompraProducto,
+        on_delete=models.CASCADE,
+        related_name='unidades_compra',
+        verbose_name='Compra',
+        help_text='Compra a la que pertenece esta unidad'
+    )
+    
+    # ========== IDENTIFICACIÓN DE LA UNIDAD ==========
+    numero_linea = models.PositiveIntegerField(
+        default=1,
+        verbose_name='Número de Línea',
+        help_text='Número secuencial dentro de la compra (1, 2, 3...)'
+    )
+    numero_serie = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Número de Serie',
+        help_text='S/N del fabricante (si se conoce al comprar)'
+    )
+    
+    # ========== MARCA Y MODELO ESPECÍFICOS ==========
+    marca = models.CharField(
+        max_length=50,
+        blank=True,
+        choices=MARCAS_COMPONENTES_CHOICES,
+        verbose_name='Marca',
+        help_text='Marca del fabricante (ej: Samsung, Kingston)'
+    )
+    modelo = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Modelo',
+        help_text='Modelo específico (ej: 870 EVO, A400)'
+    )
+    especificaciones = models.TextField(
+        blank=True,
+        verbose_name='Especificaciones',
+        help_text='Detalles técnicos adicionales de esta unidad'
+    )
+    
+    # ========== COSTO INDIVIDUAL ==========
+    costo_unitario = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name='Costo Unitario',
+        help_text='Costo específico de esta unidad (si difiere del general)'
+    )
+    
+    # ========== ESTADO DE RECEPCIÓN ==========
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_UNIDAD_COMPRA_CHOICES,
+        default='pendiente',
+        verbose_name='Estado',
+        help_text='Estado de recepción de esta unidad específica'
+    )
+    motivo_problema = models.TextField(
+        blank=True,
+        verbose_name='Motivo del Problema',
+        help_text='Descripción del problema si es WPB/DOA'
+    )
+    
+    # ========== VINCULACIÓN CON INVENTARIO ==========
+    unidad_inventario = models.OneToOneField(
+        'UnidadInventario',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='unidad_compra_origen',
+        verbose_name='Unidad de Inventario',
+        help_text='UnidadInventario creada al recibir esta pieza'
+    )
+    
+    # ========== FECHAS ==========
+    fecha_recepcion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de Recepción',
+        help_text='Cuándo se recibió esta unidad específica'
+    )
+    fecha_problema = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de Problema',
+        help_text='Cuándo se detectó el problema'
+    )
+    
+    # ========== AUDITORÍA ==========
+    notas = models.TextField(
+        blank=True,
+        verbose_name='Notas',
+        help_text='Observaciones adicionales'
+    )
+    fecha_registro = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de Registro'
+    )
+    
+    class Meta:
+        verbose_name = 'Unidad de Compra'
+        verbose_name_plural = 'Unidades de Compra'
+        ordering = ['compra', 'numero_linea']
+        unique_together = ['compra', 'numero_linea']
+    
+    def __str__(self):
+        partes = [f"#{self.numero_linea}"]
+        if self.marca:
+            partes.append(self.marca)
+        if self.modelo:
+            partes.append(self.modelo)
+        if not self.marca and not self.modelo:
+            partes.append(self.compra.producto.nombre)
+        partes.append(f"({self.get_estado_display()})")
+        return " ".join(partes)
+    
+    def get_costo(self):
+        """
+        Retorna el costo de esta unidad.
+        Si no tiene costo específico, usa el de la compra padre.
+        """
+        return self.costo_unitario or self.compra.costo_unitario
+    
+    def puede_recibir(self):
+        """Verifica si esta unidad puede marcarse como recibida"""
+        return self.estado == 'pendiente'
+    
+    def recibir(self, crear_unidad_inventario=True):
+        """
+        Marca esta unidad como recibida y opcionalmente crea UnidadInventario.
+        
+        Args:
+            crear_unidad_inventario: Si True, crea la UnidadInventario
+        
+        Returns:
+            UnidadInventario or None: La unidad creada, o None si no se creó
+        """
+        if not self.puede_recibir():
+            return None
+        
+        self.estado = 'recibida'
+        self.fecha_recepcion = timezone.now()
+        
+        unidad = None
+        if crear_unidad_inventario:
+            unidad = UnidadInventario.objects.create(
+                producto=self.compra.producto,
+                numero_serie=self.numero_serie,
+                marca=self.marca,
+                modelo=self.modelo,
+                especificaciones=self.especificaciones,
+                estado='nuevo',
+                disponibilidad='disponible',
+                origen='compra',
+                compra=self.compra,
+                costo_unitario=self.get_costo(),
+                notas=f'Creada desde compra #{self.compra.id}, línea {self.numero_linea}'
+            )
+            self.unidad_inventario = unidad
+        
+        self.save()
+        return unidad
+    
+    def marcar_wpb(self, motivo=''):
+        """
+        Marca esta unidad como WPB (Wrong Part).
+        
+        Args:
+            motivo: Descripción del problema
+        
+        Returns:
+            bool: True si se marcó exitosamente
+        """
+        if self.estado not in ['pendiente', 'recibida']:
+            return False
+        
+        self.estado = 'wpb'
+        self.fecha_problema = timezone.now()
+        self.motivo_problema = motivo or 'Pieza incorrecta'
+        self.save()
+        return True
+    
+    def marcar_doa(self, motivo=''):
+        """
+        Marca esta unidad como DOA (Dead On Arrival).
+        
+        Args:
+            motivo: Descripción del problema
+        
+        Returns:
+            bool: True si se marcó exitosamente
+        """
+        if self.estado not in ['pendiente', 'recibida']:
+            return False
+        
+        self.estado = 'doa'
+        self.fecha_problema = timezone.now()
+        self.motivo_problema = motivo or 'Pieza dañada'
+        self.save()
+        return True
+    
+    def iniciar_devolucion(self):
+        """Inicia el proceso de devolución"""
+        if self.estado not in ['wpb', 'doa']:
+            return False
+        
+        self.estado = 'devolucion'
+        self.save()
+        return True
+    
+    def confirmar_devolucion(self):
+        """Confirma que la pieza fue devuelta"""
+        if self.estado != 'devolucion':
+            return False
+        
+        self.estado = 'devuelta'
+        self.save()
+        
+        # Si tenía UnidadInventario asociada, marcarla como descartada
+        if self.unidad_inventario:
+            self.unidad_inventario.marcar_descartada('Devuelta por problema')
+        
+        return True
+    
+    def get_badge_estado(self):
+        """Retorna la clase CSS para el badge de estado"""
+        estados_css = {
+            'pendiente': 'warning',
+            'recibida': 'success',
+            'wpb': 'danger',
+            'doa': 'danger',
+            'devolucion': 'info',
+            'devuelta': 'dark',
+        }
+        return estados_css.get(self.estado, 'secondary')
 
 
 # ============================================================================

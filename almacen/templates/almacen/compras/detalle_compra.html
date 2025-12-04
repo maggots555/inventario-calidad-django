@@ -1,0 +1,359 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% comment %}
+Detalle de una Compra o Cotización
+Muestra toda la información y botones de acción según el estado
+{% endcomment %}
+
+{% block title %}Compra #{{ compra.pk }} - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">
+                {{ compra.get_tipo_icon }} 
+                {% if compra.tipo == 'cotizacion' %}Cotización{% else %}Compra{% endif %} #{{ compra.pk }}
+            </h1>
+            <p class="text-muted mb-0">
+                {{ compra.producto.nombre }} • 
+                <span class="badge bg-{{ compra.get_badge_estado }}">{{ compra.get_estado_display }}</span>
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'almacen:lista_compras' %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left me-1"></i>Volver
+            </a>
+            {% if compra.estado not in 'recibida,devuelta,cancelada,rechazada' %}
+            <a href="{% url 'almacen:editar_compra' compra.pk %}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil me-1"></i>Editar
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Columna principal -->
+        <div class="col-lg-8">
+            <!-- Información General -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Información General</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <strong>Producto:</strong><br>
+                            <a href="{% url 'almacen:detalle_producto' compra.producto.pk %}" class="text-decoration-none">
+                                {{ compra.producto.codigo_producto }} - {{ compra.producto.nombre }}
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Cantidad:</strong><br>
+                            <span class="h5">{{ compra.cantidad }}</span> unidades
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Costo Unitario:</strong><br>
+                            <span class="h5">${{ compra.costo_unitario|floatformat:2 }}</span>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <strong>Proveedor:</strong><br>
+                            {% if compra.proveedor %}
+                                {{ compra.proveedor.nombre }}
+                            {% else %}
+                                <span class="text-muted">No especificado</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Costo Total:</strong><br>
+                            <span class="h4 text-success">${{ compra.costo_total|floatformat:2 }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Fecha Pedido:</strong><br>
+                            {{ compra.fecha_pedido|date:"d/m/Y" }}
+                        </div>
+                        
+                        {% if compra.orden_cliente %}
+                        <div class="col-md-6">
+                            <strong>Orden de Cliente:</strong><br>
+                            <span class="badge bg-info fs-6">{{ compra.orden_cliente }}</span>
+                            {% if compra.orden_servicio %}
+                            <a href="#" class="ms-2 small">(Ver orden)</a>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        {% if compra.fecha_recepcion %}
+                        <div class="col-md-3">
+                            <strong>Fecha Recepción:</strong><br>
+                            {{ compra.fecha_recepcion|date:"d/m/Y" }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Días de Entrega:</strong><br>
+                            {{ compra.dias_entrega|default:"-" }} días
+                        </div>
+                        {% endif %}
+                        
+                        {% if compra.numero_factura %}
+                        <div class="col-md-6">
+                            <strong>N° Factura:</strong><br>
+                            {{ compra.numero_factura }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if compra.numero_orden_compra %}
+                        <div class="col-md-6">
+                            <strong>N° Orden Compra:</strong><br>
+                            {{ compra.numero_orden_compra }}
+                        </div>
+                        {% endif %}
+                        
+                        {% if compra.observaciones %}
+                        <div class="col-12">
+                            <strong>Observaciones:</strong><br>
+                            <p class="mb-0">{{ compra.observaciones|linebreaks }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información de Problema (si aplica) -->
+            {% if compra.tiene_problema %}
+            <div class="card shadow-sm mb-4 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Problema Reportado: {{ compra.get_estado_display }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Fecha del reporte:</strong> {{ compra.fecha_problema|date:"d/m/Y H:i" }}</p>
+                    <p class="mb-0"><strong>Descripción:</strong></p>
+                    <p class="bg-light p-3 rounded">{{ compra.motivo_problema|default:"Sin descripción"|linebreaks }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Unidades Individuales -->
+            {% if unidades %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-boxes me-2"></i>Unidades Individuales
+                        <span class="badge bg-secondary">{{ unidades|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Marca</th>
+                                    <th>Modelo</th>
+                                    <th>N° Serie</th>
+                                    <th class="text-end">Costo</th>
+                                    <th>Estado</th>
+                                    <th class="text-end">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for unidad in unidades %}
+                                <tr>
+                                    <td>{{ unidad.numero_linea }}</td>
+                                    <td>{{ unidad.marca|default:"-" }}</td>
+                                    <td>{{ unidad.modelo|default:"-" }}</td>
+                                    <td>
+                                        {% if unidad.numero_serie %}
+                                            <code>{{ unidad.numero_serie }}</code>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">${{ unidad.get_costo|floatformat:2 }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ unidad.get_badge_estado }}">
+                                            {{ unidad.get_estado_display }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        {% if unidad.estado == 'pendiente' %}
+                                        <form method="post" action="{% url 'almacen:recibir_unidad' compra.pk unidad.pk %}" 
+                                              class="d-inline" onsubmit="return confirm('¿Confirmar recepción de esta unidad?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-success" title="Recibir">
+                                                <i class="bi bi-check"></i>
+                                            </button>
+                                        </form>
+                                        <a href="{% url 'almacen:problema_unidad' compra.pk unidad.pk %}" 
+                                           class="btn btn-sm btn-outline-danger" title="Reportar problema">
+                                            <i class="bi bi-exclamation"></i>
+                                        </a>
+                                        {% endif %}
+                                        {% if unidad.unidad_inventario %}
+                                        <a href="{% url 'almacen:detalle_unidad' unidad.unidad_inventario.pk %}" 
+                                           class="btn btn-sm btn-outline-info" title="Ver en inventario">
+                                            <i class="bi bi-box"></i>
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% if estadisticas_unidades.total > 0 %}
+                <div class="card-footer bg-light">
+                    <small>
+                        <span class="text-success"><i class="bi bi-check-circle"></i> Recibidas: {{ estadisticas_unidades.recibidas }}</span> •
+                        <span class="text-warning"><i class="bi bi-hourglass"></i> Pendientes: {{ estadisticas_unidades.pendientes }}</span> •
+                        <span class="text-danger"><i class="bi bi-exclamation-triangle"></i> Con problema: {{ estadisticas_unidades.problema }}</span>
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Columna lateral: Acciones y Timeline -->
+        <div class="col-lg-4">
+            <!-- Acciones disponibles -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightning me-2"></i>Acciones</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if compra.puede_aprobar %}
+                        <form method="post" action="{% url 'almacen:aprobar_cotizacion' compra.pk %}" 
+                              onsubmit="return confirm('¿Aprobar esta cotización? El cliente ha aceptado la pieza.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="bi bi-check-lg me-2"></i>Aprobar Cotización
+                            </button>
+                        </form>
+                        <a href="{% url 'almacen:rechazar_cotizacion' compra.pk %}" class="btn btn-outline-danger">
+                            <i class="bi bi-x-lg me-2"></i>Rechazar Cotización
+                        </a>
+                        {% endif %}
+                        
+                        {% if compra.puede_recibir %}
+                        <a href="{% url 'almacen:recibir_compra' compra.pk %}" class="btn btn-primary">
+                            <i class="bi bi-box-arrow-in-down me-2"></i>Confirmar Recepción
+                        </a>
+                        {% endif %}
+                        
+                        {% if compra.puede_marcar_problema %}
+                        <a href="{% url 'almacen:reportar_problema' compra.pk %}" class="btn btn-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>Reportar Problema (WPB/DOA)
+                        </a>
+                        {% endif %}
+                        
+                        {% if compra.puede_devolver %}
+                        <form method="post" action="{% url 'almacen:iniciar_devolucion' compra.pk %}"
+                              onsubmit="return confirm('¿Iniciar proceso de devolución al proveedor?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-info w-100">
+                                <i class="bi bi-arrow-return-left me-2"></i>Iniciar Devolución
+                            </button>
+                        </form>
+                        {% endif %}
+                        
+                        {% if compra.puede_confirmar_devolucion %}
+                        <a href="{% url 'almacen:confirmar_devolucion' compra.pk %}" class="btn btn-success">
+                            <i class="bi bi-check-circle me-2"></i>Confirmar Devolución
+                        </a>
+                        {% endif %}
+                        
+                        {% if compra.estado not in 'recibida,devuelta,cancelada,rechazada' %}
+                        <hr>
+                        <form method="post" action="{% url 'almacen:cancelar_compra' compra.pk %}"
+                              onsubmit="return confirm('¿Cancelar esta compra/cotización? Esta acción no se puede deshacer.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="motivo" value="Cancelada por usuario">
+                            <button type="submit" class="btn btn-outline-secondary w-100">
+                                <i class="bi bi-x-circle me-2"></i>Cancelar
+                            </button>
+                        </form>
+                        {% endif %}
+                        
+                        {% if compra.esta_finalizada %}
+                        <div class="alert alert-secondary mb-0">
+                            <i class="bi bi-lock me-2"></i>
+                            Esta {% if compra.tipo == 'cotizacion' %}cotización{% else %}compra{% endif %} 
+                            está finalizada y no permite más acciones.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información de auditoría -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Historial</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <small class="text-muted">Registrado:</small><br>
+                            {{ compra.fecha_registro|date:"d/m/Y H:i" }}
+                            {% if compra.registrado_por %}
+                            <br><small class="text-muted">por {{ compra.registrado_por.username }}</small>
+                            {% endif %}
+                        </li>
+                        
+                        {% if compra.fecha_aprobacion %}
+                        <li class="mb-2">
+                            <small class="text-muted">Aprobado:</small><br>
+                            {{ compra.fecha_aprobacion|date:"d/m/Y H:i" }}
+                        </li>
+                        {% endif %}
+                        
+                        {% if compra.fecha_rechazo %}
+                        <li class="mb-2">
+                            <small class="text-muted">Rechazado:</small><br>
+                            {{ compra.fecha_rechazo|date:"d/m/Y H:i" }}
+                            {% if compra.motivo_rechazo %}
+                            <br><small class="text-danger">{{ compra.motivo_rechazo|truncatechars:50 }}</small>
+                            {% endif %}
+                        </li>
+                        {% endif %}
+                        
+                        {% if compra.fecha_recepcion %}
+                        <li class="mb-2">
+                            <small class="text-muted">Recibido:</small><br>
+                            {{ compra.fecha_recepcion|date:"d/m/Y" }}
+                        </li>
+                        {% endif %}
+                        
+                        {% if compra.fecha_problema %}
+                        <li class="mb-2">
+                            <small class="text-muted">Problema reportado:</small><br>
+                            {{ compra.fecha_problema|date:"d/m/Y H:i" }}
+                        </li>
+                        {% endif %}
+                        
+                        {% if compra.fecha_devolucion %}
+                        <li class="mb-2">
+                            <small class="text-muted">Devuelto:</small><br>
+                            {{ compra.fecha_devolucion|date:"d/m/Y H:i" }}
+                        </li>
+                        {% endif %}
+                        
+                        <li>
+                            <small class="text-muted">Última actualización:</small><br>
+                            {{ compra.fecha_actualizacion|date:"d/m/Y H:i" }}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock almacen_content %}

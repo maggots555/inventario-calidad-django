@@ -1,0 +1,326 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% comment %}
+Formulario para crear/editar Compras y Cotizaciones
+Incluye formset para agregar unidades individuales con marca/modelo
+{% endcomment %}
+
+{% block title %}{{ titulo }} - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">
+                <i class="bi bi-{% if es_creacion %}plus-circle{% else %}pencil{% endif %} me-2"></i>{{ titulo }}
+            </h1>
+            <p class="text-muted mb-0">
+                {% if es_creacion %}
+                Registra una nueva cotización o compra de productos
+                {% else %}
+                Modifica los datos de la compra/cotización
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'almacen:lista_compras' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Volver a Lista
+            </a>
+        </div>
+    </div>
+
+    <form method="post" id="compraForm">
+        {% csrf_token %}
+        
+        <!-- Datos principales de la compra -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Datos de la Compra/Cotización</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <!-- Tipo de registro -->
+                    <div class="col-md-3">
+                        <label class="form-label">{{ form.tipo.label }}</label>
+                        {{ form.tipo }}
+                        {% if form.tipo.help_text %}
+                        <div class="form-text">{{ form.tipo.help_text }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Producto -->
+                    <div class="col-md-5">
+                        <label class="form-label">{{ form.producto.label }} <span class="text-danger">*</span></label>
+                        {{ form.producto }}
+                    </div>
+                    
+                    <!-- Cantidad -->
+                    <div class="col-md-2">
+                        <label class="form-label">{{ form.cantidad.label }} <span class="text-danger">*</span></label>
+                        {{ form.cantidad }}
+                    </div>
+                    
+                    <!-- Costo Unitario -->
+                    <div class="col-md-2">
+                        <label class="form-label">{{ form.costo_unitario.label }} <span class="text-danger">*</span></label>
+                        {{ form.costo_unitario }}
+                    </div>
+                    
+                    <!-- Proveedor -->
+                    <div class="col-md-4">
+                        <label class="form-label">{{ form.proveedor.label }}</label>
+                        {{ form.proveedor }}
+                    </div>
+                    
+                    <!-- Fecha de Pedido -->
+                    <div class="col-md-2">
+                        <label class="form-label">{{ form.fecha_pedido.label }} <span class="text-danger">*</span></label>
+                        {{ form.fecha_pedido }}
+                    </div>
+                    
+                    <!-- Orden Cliente (para vincular con servicio técnico) -->
+                    <div class="col-md-3">
+                        <label class="form-label">{{ form.orden_cliente.label }}</label>
+                        {{ form.orden_cliente }}
+                        <div class="form-text">{{ form.orden_cliente.help_text }}</div>
+                    </div>
+                    
+                    <!-- Número de Factura -->
+                    <div class="col-md-3">
+                        <label class="form-label">{{ form.numero_factura.label }}</label>
+                        {{ form.numero_factura }}
+                    </div>
+                    
+                    <!-- Número de Orden de Compra -->
+                    <div class="col-md-3">
+                        <label class="form-label">{{ form.numero_orden_compra.label }}</label>
+                        {{ form.numero_orden_compra }}
+                    </div>
+                    
+                    <!-- Observaciones -->
+                    <div class="col-12">
+                        <label class="form-label">{{ form.observaciones.label }}</label>
+                        {{ form.observaciones }}
+                    </div>
+                </div>
+                
+                <!-- Errores del formulario principal -->
+                {% if form.errors %}
+                <div class="alert alert-danger mt-3">
+                    <strong>Errores en el formulario:</strong>
+                    <ul class="mb-0">
+                    {% for field, errors in form.errors.items %}
+                        {% for error in errors %}
+                        <li>{{ field }}: {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Unidades Individuales (Formset) -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-boxes me-2"></i>Detalle por Unidad Individual
+                    <small class="fw-normal">(Opcional)</small>
+                </h5>
+                <button type="button" id="addUnidadBtn" class="btn btn-light btn-sm">
+                    <i class="bi bi-plus-lg me-1"></i>Agregar Unidad
+                </button>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Si cada pieza tiene diferente marca/modelo, puedes especificar los detalles aquí.
+                    Esto es útil para rastrear cada pieza individualmente.
+                </p>
+                
+                {{ formset.management_form }}
+                
+                <div id="unidadesContainer">
+                    {% for unidad_form in formset %}
+                    <div class="unidad-form border rounded p-3 mb-3 {% if unidad_form.instance.pk %}bg-light{% endif %}">
+                        <div class="row g-2">
+                            <!-- Número de línea -->
+                            <div class="col-md-1">
+                                <label class="form-label small">#</label>
+                                {{ unidad_form.numero_linea }}
+                                {% if unidad_form.instance.pk %}
+                                {{ unidad_form.id }}
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Marca -->
+                            <div class="col-md-2">
+                                <label class="form-label small">Marca</label>
+                                {{ unidad_form.marca }}
+                            </div>
+                            
+                            <!-- Modelo -->
+                            <div class="col-md-3">
+                                <label class="form-label small">Modelo</label>
+                                {{ unidad_form.modelo }}
+                            </div>
+                            
+                            <!-- Número de Serie -->
+                            <div class="col-md-2">
+                                <label class="form-label small">N° Serie</label>
+                                {{ unidad_form.numero_serie }}
+                            </div>
+                            
+                            <!-- Costo específico -->
+                            <div class="col-md-2">
+                                <label class="form-label small">Costo ($)</label>
+                                {{ unidad_form.costo_unitario }}
+                            </div>
+                            
+                            <!-- Eliminar -->
+                            <div class="col-md-2 d-flex align-items-end">
+                                <div class="form-check">
+                                    {{ unidad_form.DELETE }}
+                                    <label class="form-check-label text-danger small">Eliminar</label>
+                                </div>
+                            </div>
+                            
+                            <!-- Especificaciones (fila completa) -->
+                            <div class="col-md-10">
+                                <label class="form-label small">Especificaciones / Notas</label>
+                                <textarea name="{{ unidad_form.especificaciones.html_name }}" 
+                                          class="form-control form-control-sm" rows="1" 
+                                          placeholder="Detalles técnicos adicionales...">{{ unidad_form.especificaciones.value|default:"" }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Template para agregar nuevas unidades (oculto) -->
+                <template id="unidadTemplate">
+                    <div class="unidad-form border rounded p-3 mb-3">
+                        <div class="row g-2">
+                            <div class="col-md-1">
+                                <label class="form-label small">#</label>
+                                <input type="number" name="unidades-__prefix__-numero_linea" 
+                                       class="form-control form-control-sm" min="1" readonly>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">Marca</label>
+                                <select name="unidades-__prefix__-marca" class="form-control form-select form-select-sm">
+                                    <option value="">-- Seleccionar --</option>
+                                    {% for value, label in formset.form.base_fields.marca.choices %}
+                                    {% if value %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Modelo</label>
+                                <input type="text" name="unidades-__prefix__-modelo" 
+                                       class="form-control form-control-sm" placeholder="Ej: 870 EVO">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">N° Serie</label>
+                                <input type="text" name="unidades-__prefix__-numero_serie" 
+                                       class="form-control form-control-sm" placeholder="S/N">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">Costo ($)</label>
+                                <input type="number" name="unidades-__prefix__-costo_unitario" 
+                                       class="form-control form-control-sm" step="0.01" min="0" 
+                                       placeholder="Opcional">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-unidad-btn">
+                                    <i class="bi bi-trash"></i> Quitar
+                                </button>
+                            </div>
+                            <div class="col-md-10">
+                                <label class="form-label small">Especificaciones / Notas</label>
+                                <textarea name="unidades-__prefix__-especificaciones" 
+                                          class="form-control form-control-sm" rows="1"
+                                          placeholder="Detalles técnicos adicionales..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="d-flex justify-content-between">
+            <a href="{% url 'almacen:lista_compras' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-x-lg me-1"></i>Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-check-lg me-1"></i>
+                {% if es_creacion %}Crear{% else %}Guardar Cambios{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock almacen_content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('unidadesContainer');
+    const template = document.getElementById('unidadTemplate');
+    const addBtn = document.getElementById('addUnidadBtn');
+    const totalFormsInput = document.querySelector('[name="unidades-TOTAL_FORMS"]');
+    
+    let formCount = parseInt(totalFormsInput.value);
+    
+    // Función para actualizar números de línea
+    function updateLineNumbers() {
+        const forms = container.querySelectorAll('.unidad-form:not([style*="display: none"])');
+        forms.forEach((form, index) => {
+            const lineInput = form.querySelector('input[name$="-numero_linea"]');
+            if (lineInput) {
+                lineInput.value = index + 1;
+            }
+        });
+    }
+    
+    // Agregar nueva unidad
+    addBtn.addEventListener('click', function() {
+        const newForm = template.content.cloneNode(true);
+        const formHtml = newForm.querySelector('.unidad-form');
+        
+        // Reemplazar __prefix__ con el índice actual
+        formHtml.innerHTML = formHtml.innerHTML.replace(/__prefix__/g, formCount);
+        
+        container.appendChild(newForm);
+        formCount++;
+        totalFormsInput.value = formCount;
+        
+        updateLineNumbers();
+        
+        // Agregar event listener al botón de eliminar
+        const removeBtn = container.lastElementChild.querySelector('.remove-unidad-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function() {
+                this.closest('.unidad-form').remove();
+                updateLineNumbers();
+            });
+        }
+    });
+    
+    // Event listeners para botones de eliminar existentes
+    container.querySelectorAll('.remove-unidad-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            this.closest('.unidad-form').remove();
+            updateLineNumbers();
+        });
+    });
+    
+    // Actualizar números al cargar
+    updateLineNumbers();
+});
+</script>
+{% endblock extra_js %}
