@@ -48,8 +48,12 @@ GAMA_EQUIPO_CHOICES = [
 # ============================================================================
 # ESTADOS DE ORDEN DE SERVICIO - Workflow completo
 # Actualizado: Octubre 2025 - Se agregaron 10 nuevos estados (de 11 a 21)
+# Actualizado: Diciembre 2025 - Agregado estado 'almacen' para órdenes creadas desde Almacén
 # ============================================================================
 ESTADO_ORDEN_CHOICES = [
+    # === FASE 0: ORIGEN ESPECIAL ===
+    ('almacen', 'Proveniente de Almacén'),  # Orden creada automáticamente desde módulo Almacén
+    
     # === FASE 1: INGRESO Y DIAGNÓSTICO ===
     ('espera', 'En Espera'),
     ('recepcion', 'En Recepción'),

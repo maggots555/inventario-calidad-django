@@ -508,12 +508,41 @@ class SolicitudBajaForm(forms.ModelForm):
     Los empleados usan este formulario para solicitar productos del almacén.
     El agente de almacén posteriormente aprueba o rechaza la solicitud.
     
-    FLUJO MEJORADO:
+    FLUJO MEJORADO (Diciembre 2025):
     1. Usuario selecciona un Producto (tipo genérico: "SSD 1TB")
     2. Se cargan dinámicamente las UnidadInventario disponibles de ese producto
     3. Usuario puede elegir una unidad específica (opcional) o dejar genérico
     4. Si tipo_solicitud es 'servicio_tecnico', se muestra selector de técnico (obligatorio)
+    5. Usuario puede escribir el número de orden del cliente (OOW-xxx o FL-xxx)
+       - Si existe: se vincula automáticamente
+       - Si no existe: se crea automáticamente con estado "Proveniente de Almacén"
     """
+    
+    # Campo extra para capturar el número de orden del cliente (texto libre)
+    orden_cliente_input = forms.CharField(
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'id': 'id_orden_cliente_input',
+            'placeholder': 'Ej: OOW-12345 o FL-2025-001',
+            'autocomplete': 'off',
+        }),
+        label='Número de Orden del Cliente',
+        help_text='Escriba el número de orden (OOW-xxx o FL-xxx). Si no existe, se creará automáticamente.',
+    )
+    
+    # Campo extra para seleccionar sucursal (necesario para crear órdenes nuevas)
+    sucursal_orden = forms.ModelChoiceField(
+        queryset=None,  # Se configura en __init__
+        required=False,
+        widget=forms.Select(attrs={
+            'class': 'form-control form-select',
+            'id': 'id_sucursal_orden',
+        }),
+        label='Sucursal para la Orden',
+        help_text='Sucursal donde se registrará la orden (requerido si la orden no existe)',
+    )
     
     class Meta:
         model = SolicitudBaja
@@ -522,8 +551,8 @@ class SolicitudBajaForm(forms.ModelForm):
             'producto',
             'unidad_inventario',
             'cantidad',
-            'orden_servicio',
-            'tecnico_asignado',  # Nuevo campo: técnico de laboratorio
+            'orden_servicio',  # Campo oculto - se llenará automáticamente
+            'tecnico_asignado',  # Técnico de laboratorio
             'observaciones',
         ]
         widgets = {
@@ -543,8 +572,8 @@ class SolicitudBajaForm(forms.ModelForm):
                 'min': 1,
                 'placeholder': '1',
             }),
-            'orden_servicio': forms.Select(attrs={
-                'class': 'form-control form-select',
+            'orden_servicio': forms.HiddenInput(attrs={
+                'id': 'id_orden_servicio',
             }),
             'tecnico_asignado': forms.Select(attrs={
                 'class': 'form-control form-select',
@@ -561,27 +590,37 @@ class SolicitudBajaForm(forms.ModelForm):
             'producto': 'Producto',
             'unidad_inventario': 'Unidad Específica (opcional)',
             'cantidad': 'Cantidad Solicitada',
-            'orden_servicio': 'Orden de Servicio (opcional)',
+            'orden_servicio': 'Orden de Servicio',
             'tecnico_asignado': 'Técnico de Laboratorio',
             'observaciones': 'Observaciones',
         }
         help_texts = {
             'tipo_solicitud': 'Propósito de la salida del producto',
             'unidad_inventario': 'Seleccione una unidad específica o deje vacío para genérico',
-            'orden_servicio': 'Solo si es para servicio técnico',
             'tecnico_asignado': 'Obligatorio cuando el tipo es Servicio Técnico',
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Importar Empleado aquí para evitar importación circular
-        from inventario.models import Empleado
+        # Importar Empleado y Sucursal aquí para evitar importación circular
+        from inventario.models import Empleado, Sucursal
+        
+        # ========== CONFIGURACIÓN SUCURSAL_ORDEN ==========
+        # Cargar todas las sucursales activas para el campo de selección
+        self.fields['sucursal_orden'].queryset = Sucursal.objects.filter(
+            activa=True
+        ).order_by('nombre')
         
         # ========== CONFIGURACIÓN UNIDAD_INVENTARIO ==========
         # Inicialmente, el campo de unidad está vacío
         # Se llenará dinámicamente con JavaScript cuando se seleccione un producto
         self.fields['unidad_inventario'].queryset = UnidadInventario.objects.none()
         self.fields['unidad_inventario'].required = False
+        
+        # ========== CONFIGURACIÓN ORDEN_SERVICIO ==========
+        # El campo orden_servicio es oculto y se llenará automáticamente vía JavaScript
+        # No mostramos todas las órdenes, se busca/crea por orden_cliente
+        self.fields['orden_servicio'].required = False
         
         # Si hay datos del formulario (POST) o instancia existente, cargar las unidades del producto
         if 'producto' in self.data:
@@ -639,10 +678,14 @@ class SolicitudBajaForm(forms.ModelForm):
         tipo_solicitud = cleaned_data.get('tipo_solicitud')
         tecnico_asignado = cleaned_data.get('tecnico_asignado')
         
-        # Si es Servicio Técnico, el técnico es obligatorio
-        if tipo_solicitud == 'servicio_tecnico' and not tecnico_asignado:
+        # Tipos que requieren técnico obligatorio: servicio_tecnico y venta_mostrador
+        # Ambos tipos generan una OrdenServicio que necesita técnico asignado
+        tipos_requieren_tecnico = ['servicio_tecnico', 'venta_mostrador']
+        
+        if tipo_solicitud in tipos_requieren_tecnico and not tecnico_asignado:
+            tipo_display = 'Servicio Técnico' if tipo_solicitud == 'servicio_tecnico' else 'Venta Mostrador'
             raise ValidationError({
-                'tecnico_asignado': 'Debe seleccionar un técnico de laboratorio para solicitudes de Servicio Técnico.'
+                'tecnico_asignado': f'Debe seleccionar un técnico de laboratorio para solicitudes de {tipo_display}.'
             })
         
         return cleaned_data

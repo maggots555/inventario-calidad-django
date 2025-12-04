@@ -1417,3 +1417,270 @@ def api_tecnicos_disponibles(request):
             'tecnicos': [],
             'total': 0
         })
+
+
+# ============================================================================
+# API: BUSCAR O CREAR ORDEN DE SERVICIO POR ORDEN_CLIENTE
+# ============================================================================
+@login_required
+def api_buscar_crear_orden_cliente(request):
+    """
+    API para buscar una orden de servicio por orden_cliente o crearla si no existe.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta API se usa en el formulario de solicitud de baja del almacén.
+    Permite al usuario:
+    1. Buscar órdenes existentes escribiendo el número de orden del cliente
+    2. Si no existe, crear automáticamente una nueva orden de servicio
+    
+    El campo orden_cliente está en el modelo DetalleEquipo (no en OrdenServicio),
+    por eso buscamos en DetalleEquipo y accedemos a la orden a través de la relación.
+    
+    VALIDACIÓN DE FORMATO:
+    - El número de orden debe empezar con 'OOW-' o 'FL-'
+    - Ejemplo válido: 'OOW-12345' o 'FL-2025-001'
+    
+    MÉTODOS HTTP:
+    - GET: Buscar orden existente por orden_cliente
+    - POST: Crear nueva orden si no existe
+    
+    PARÁMETROS GET:
+    - orden_cliente: Número de orden del cliente a buscar
+    
+    PARÁMETROS POST (JSON):
+    - orden_cliente: Número de orden del cliente
+    - sucursal_id: ID de la sucursal donde se registra
+    - tecnico_id: ID del técnico asignado (obligatorio para servicio técnico)
+    
+    RETORNA:
+    {
+        "success": true/false,
+        "found": true/false (si se encontró orden existente),
+        "created": true/false (si se creó nueva orden),
+        "orden_id": int (ID de OrdenServicio),
+        "orden_cliente": str,
+        "numero_orden_interno": str,
+        "estado": str,
+        "sucursal": str,
+        "error": str (si hay error)
+    }
+    """
+    import re
+    import json
+    from servicio_tecnico.models import OrdenServicio, DetalleEquipo
+    from inventario.models import Sucursal, Empleado
+    
+    # Validar formato de orden_cliente (debe empezar con OOW- o FL-)
+    def validar_formato_orden(orden_cliente: str) -> tuple[bool, str]:
+        """
+        Valida que el número de orden tenga el formato correcto.
+        
+        Retorna:
+        - (True, '') si el formato es válido
+        - (False, 'mensaje de error') si el formato es inválido
+        """
+        if not orden_cliente:
+            return False, 'El número de orden es requerido'
+        
+        orden_cliente = orden_cliente.strip().upper()
+        
+        # Verificar que empiece con OOW- o FL-
+        if not (orden_cliente.startswith('OOW-') or orden_cliente.startswith('FL-')):
+            return False, 'El número de orden debe empezar con "OOW-" o "FL-"'
+        
+        return True, ''
+    
+    if request.method == 'GET':
+        # ========== MODO BÚSQUEDA ==========
+        orden_cliente = request.GET.get('orden_cliente', '').strip().upper()
+        
+        if not orden_cliente:
+            return JsonResponse({
+                'success': False,
+                'error': 'Se requiere el parámetro orden_cliente',
+                'found': False
+            })
+        
+        # Validar formato
+        formato_valido, error_formato = validar_formato_orden(orden_cliente)
+        if not formato_valido:
+            return JsonResponse({
+                'success': False,
+                'error': error_formato,
+                'found': False,
+                'formato_invalido': True
+            })
+        
+        # Buscar en DetalleEquipo por orden_cliente
+        try:
+            detalle = DetalleEquipo.objects.select_related(
+                'orden', 'orden__sucursal'
+            ).get(orden_cliente__iexact=orden_cliente)
+            
+            orden = detalle.orden
+            
+            return JsonResponse({
+                'success': True,
+                'found': True,
+                'created': False,
+                'orden_id': orden.pk,
+                'orden_cliente': detalle.orden_cliente,
+                'numero_orden_interno': orden.numero_orden_interno,
+                'estado': orden.estado,
+                'estado_display': orden.get_estado_display(),
+                'sucursal': orden.sucursal.nombre if orden.sucursal else 'Sin asignar',
+            })
+            
+        except DetalleEquipo.DoesNotExist:
+            # No se encontró, indicar que se puede crear
+            return JsonResponse({
+                'success': True,
+                'found': False,
+                'created': False,
+                'orden_cliente': orden_cliente,
+                'mensaje': f'No se encontró orden con número "{orden_cliente}". Se puede crear automáticamente.'
+            })
+            
+        except DetalleEquipo.MultipleObjectsReturned:
+            # Caso raro: múltiples órdenes con mismo orden_cliente
+            return JsonResponse({
+                'success': False,
+                'error': f'Se encontraron múltiples órdenes con el número "{orden_cliente}". Contacte al administrador.',
+                'found': False
+            })
+    
+    elif request.method == 'POST':
+        # ========== MODO CREACIÓN ==========
+        try:
+            # Parsear datos JSON del body
+            data = json.loads(request.body)
+            orden_cliente = data.get('orden_cliente', '').strip().upper()
+            sucursal_id = data.get('sucursal_id')
+            tecnico_id = data.get('tecnico_id')
+            
+            # Determinar tipo de servicio según el tipo de solicitud
+            # 'servicio_tecnico' → 'diagnostico', 'venta_mostrador' → 'venta_mostrador'
+            tipo_solicitud = data.get('tipo_solicitud', 'servicio_tecnico')
+            tipo_servicio = 'venta_mostrador' if tipo_solicitud == 'venta_mostrador' else 'diagnostico'
+            
+            # Validar formato
+            formato_valido, error_formato = validar_formato_orden(orden_cliente)
+            if not formato_valido:
+                return JsonResponse({
+                    'success': False,
+                    'error': error_formato,
+                    'created': False,
+                    'formato_invalido': True
+                })
+            
+            # Validar que no exista ya
+            if DetalleEquipo.objects.filter(orden_cliente__iexact=orden_cliente).exists():
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Ya existe una orden con el número "{orden_cliente}"',
+                    'created': False
+                })
+            
+            # Validar sucursal
+            if not sucursal_id:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Se requiere seleccionar una sucursal',
+                    'created': False
+                })
+            
+            try:
+                sucursal = Sucursal.objects.get(pk=sucursal_id)
+            except Sucursal.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Sucursal no válida',
+                    'created': False
+                })
+            
+            # Validar técnico
+            if not tecnico_id:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Se requiere seleccionar un técnico',
+                    'created': False
+                })
+            
+            try:
+                tecnico = Empleado.objects.get(pk=tecnico_id)
+            except Empleado.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Técnico no válido',
+                    'created': False
+                })
+            
+            # Obtener empleado del usuario actual (responsable de seguimiento)
+            try:
+                responsable = Empleado.objects.get(user=request.user)
+            except Empleado.DoesNotExist:
+                # Si el usuario no tiene empleado asociado, usar el técnico como responsable
+                responsable = tecnico
+            
+            # ========== CREAR ORDEN DE SERVICIO ==========
+            # tipo_servicio: 'diagnostico' para Servicio Técnico, 'venta_mostrador' para Venta Mostrador
+            orden = OrdenServicio.objects.create(
+                sucursal=sucursal,
+                responsable_seguimiento=responsable,
+                tecnico_asignado_actual=tecnico,
+                estado='almacen',  # Estado especial: Proveniente de Almacén
+                tipo_servicio=tipo_servicio,  # Dinámico según tipo de solicitud
+            )
+            
+            # ========== CREAR DETALLE DE EQUIPO ==========
+            # Crear DetalleEquipo con datos mínimos requeridos
+            DetalleEquipo.objects.create(
+                orden=orden,
+                orden_cliente=orden_cliente,
+                tipo_equipo='Laptop',  # Valor por defecto
+                marca='Otra',  # Marca genérica - se actualizará después
+                modelo='Por definir',  # Se actualizará después
+                numero_serie='ALMACEN-' + orden_cliente,  # Placeholder
+                gama='media',  # Valor por defecto
+                falla_principal='Orden creada desde Almacén - Pendiente de registrar falla',
+                email_cliente='pendiente@actualizar.com',  # Placeholder
+            )
+            
+            # Determinar descripción del tipo de orden para el mensaje
+            tipo_orden_desc = 'Venta Mostrador' if tipo_servicio == 'venta_mostrador' else 'Diagnóstico'
+            
+            return JsonResponse({
+                'success': True,
+                'found': False,
+                'created': True,
+                'orden_id': orden.pk,
+                'orden_cliente': orden_cliente,
+                'numero_orden_interno': orden.numero_orden_interno,
+                'estado': orden.estado,
+                'estado_display': orden.get_estado_display(),
+                'sucursal': sucursal.nombre,
+                'tipo_servicio': tipo_servicio,
+                'mensaje': f'Orden "{orden_cliente}" ({tipo_orden_desc}) creada exitosamente con estado "Proveniente de Almacén"'
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Datos JSON inválidos',
+                'created': False
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error al crear la orden: {str(e)}',
+                'created': False
+            })
+    
+    else:
+        return JsonResponse({
+            'success': False,
+            'error': 'Método no permitido. Use GET para buscar o POST para crear.',
+            'found': False
+        }, status=405)
+

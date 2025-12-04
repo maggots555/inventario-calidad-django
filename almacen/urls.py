@@ -86,5 +86,8 @@ urlpatterns = [
     path('api/unidad/<int:pk>/cambiar-estado/', views.cambiar_estado_unidad, name='cambiar_estado_unidad'),
     path('api/unidades-producto/', views.api_unidades_producto, name='api_unidades_producto'),
     path('api/tecnicos-disponibles/', views.api_tecnicos_disponibles, name='api_tecnicos_disponibles'),
+    
+    # API endpoint para buscar o crear orden de servicio por orden_cliente
+    path('api/buscar-crear-orden/', views.api_buscar_crear_orden_cliente, name='api_buscar_crear_orden'),
 ]
 

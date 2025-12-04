@@ -23,8 +23,11 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="post">
+                    <form method="post" id="solicitud-baja-form">
                         {% csrf_token %}
+                        
+                        <!-- Campo oculto para orden_servicio (se llena automáticamente) -->
+                        {{ form.orden_servicio }}
                         
                         <div class="row">
                             <!-- Producto -->
@@ -70,18 +73,8 @@
                                 {% endif %}
                             </div>
                             
-                            <!-- Orden de Servicio -->
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Orden de Servicio (opcional)</label>
-                                {{ form.orden_servicio }}
-                                {% if form.orden_servicio.errors %}
-                                    <div class="invalid-feedback d-block">{{ form.orden_servicio.errors.0 }}</div>
-                                {% endif %}
-                                <small class="text-muted">Vincular a una orden de servicio existente</small>
-                            </div>
-                            
                             <!-- Técnico de Laboratorio (mostrar solo para Servicio Técnico) -->
-                            <div class="col-12 mb-3" id="tecnico-container" style="display: none;">
+                            <div class="col-md-6 mb-3" id="tecnico-container" style="display: none;">
                                 <label class="form-label">
                                     <i class="bi bi-person-gear me-1"></i>Técnico de Laboratorio
                                 </label>
@@ -90,9 +83,54 @@
                                     <div class="invalid-feedback d-block">{{ form.tecnico_asignado.errors.0 }}</div>
                                 {% endif %}
                                 <small class="text-muted">
-                                    Técnico de laboratorio que utilizará el producto. 
-                                    <strong>Obligatorio para solicitudes de Servicio Técnico.</strong>
+                                    Técnico que utilizará el producto. 
+                                    <strong>Obligatorio para Servicio Técnico.</strong>
                                 </small>
+                            </div>
+                            
+                            <!-- ============================================= -->
+                            <!-- SECCIÓN: ORDEN DE SERVICIO (Servicio Técnico) -->
+                            <!-- ============================================= -->
+                            <div class="col-12 mb-3" id="orden-container" style="display: none;">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-3">
+                                            <i class="bi bi-link-45deg me-1"></i>Vincular a Orden de Servicio
+                                        </h6>
+                                        
+                                        <!-- Número de Orden del Cliente -->
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-hash me-1"></i>Número de Orden del Cliente
+                                            </label>
+                                            {{ form.orden_cliente_input }}
+                                            {% if form.orden_cliente_input.errors %}
+                                                <div class="invalid-feedback d-block">{{ form.orden_cliente_input.errors.0 }}</div>
+                                            {% endif %}
+                                            <small class="text-muted">
+                                                Escriba el número de orden (debe empezar con <strong>OOW-</strong> o <strong>FL-</strong>).
+                                                Si la orden no existe, se creará automáticamente.
+                                            </small>
+                                            
+                                            <!-- Div para mostrar estado de búsqueda -->
+                                            <div id="orden-status" class="mt-2"></div>
+                                        </div>
+                                        
+                                        <!-- Sucursal (solo si se va a crear orden) -->
+                                        <div class="mb-0" id="sucursal-container" style="display: none;">
+                                            <label class="form-label">
+                                                <i class="bi bi-building me-1"></i>Sucursal para la Orden *
+                                            </label>
+                                            {{ form.sucursal_orden }}
+                                            {% if form.sucursal_orden.errors %}
+                                                <div class="invalid-feedback d-block">{{ form.sucursal_orden.errors.0 }}</div>
+                                            {% endif %}
+                                            <small class="text-muted">
+                                                Sucursal donde se registrará la nueva orden de servicio.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <!-- Observaciones / Motivo -->
@@ -134,13 +172,15 @@
      * Esta función inicializa el handler de TypeScript que maneja:
      * 1. Carga dinámica de unidades cuando se selecciona un producto
      * 2. Mostrar/ocultar el campo de técnico según el tipo de solicitud
+     * 3. Búsqueda y creación automática de órdenes de servicio por orden_cliente
      * 
      * Pasamos las URLs de Django al JavaScript usando la etiqueta url para que
      * siempre apunten a las rutas correctas, incluso si cambian en urls.py
      */
     initSolicitudBajaForm(
         "{% url 'almacen:api_unidades_producto' %}",
-        "{% url 'almacen:api_tecnicos_disponibles' %}"
+        "{% url 'almacen:api_tecnicos_disponibles' %}",
+        "{% url 'almacen:api_buscar_crear_orden' %}"
     );
 </script>
 {% endblock extra_js %}
