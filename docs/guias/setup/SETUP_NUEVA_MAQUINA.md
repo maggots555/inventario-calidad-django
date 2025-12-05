@@ -97,8 +97,8 @@ git config --global --list
 
 **Resultado esperado**:
 ```
-user.name=Jorge Magos
-user.email=jorgemahos@gmail.com
+user.name=user
+user.email=mail@mail.com
 ```
 
 ---
