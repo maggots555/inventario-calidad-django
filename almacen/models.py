@@ -501,6 +501,30 @@ class ProductoAlmacen(models.Model):
         """
         return self.unidades_disponibles().count()
     
+    def unidades_asignadas(self):
+        """
+        Retorna las unidades asignadas a órdenes de servicio.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Estas son piezas que ya están comprometidas con un servicio
+        (provienen de cotizaciones aprobadas) pero aún no han sido
+        físicamente entregadas/usadas en la reparación.
+        
+        Returns:
+            QuerySet: Unidades con disponibilidad='asignada'
+        """
+        return self.unidades.filter(disponibilidad='asignada')
+    
+    def cantidad_unidades_asignadas(self):
+        """
+        Cuenta cuántas unidades están asignadas a servicios.
+        
+        Returns:
+            int: Número de unidades comprometidas con órdenes de servicio
+        """
+        return self.unidades_asignadas().count()
+    
     def unidades_por_marca(self):
         """
         Agrupa las unidades disponibles por marca.
@@ -2546,6 +2570,41 @@ class SolicitudCotizacion(models.Model):
             total=Sum(F('cantidad') * F('costo_unitario'))
         )['total']
         return total or 0
+    
+    @property
+    def total_estimado(self):
+        """
+        Alias de costo_total para compatibilidad con templates.
+        
+        Returns:
+            Decimal: Suma de (cantidad × costo_unitario) de todas las líneas
+        """
+        return self.costo_total
+    
+    @property
+    def dias_sin_respuesta(self):
+        """
+        Calcula los días desde que se envió al cliente sin respuesta.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Esta propiedad calcula cuántos días han pasado desde que la
+        cotización fue enviada al cliente y aún no tiene respuesta completa.
+        
+        Útil para identificar cotizaciones "estancadas" que necesitan
+        seguimiento con el cliente.
+        
+        Returns:
+            int: Número de días sin respuesta (0 si ya fue respondida o no enviada)
+        """
+        if self.estado == 'enviada_cliente' and self.fecha_envio_cliente:
+            delta = timezone.now() - self.fecha_envio_cliente
+            return delta.days
+        elif self.estado == 'enviada_cliente' and not self.fecha_envio_cliente:
+            # Fallback: usar fecha de creación si no hay fecha de envío
+            delta = timezone.now() - self.fecha_creacion
+            return delta.days
+        return 0
     
     # ========== MÉTODOS DE WORKFLOW ==========
     

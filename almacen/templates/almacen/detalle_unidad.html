@@ -202,7 +202,11 @@ Contexto esperado:
                             <label class="form-label text-muted small">Origen</label>
                             <p class="mb-0">
                                 {% if unidad.origen == 'compra' %}
-                                    <span class="badge bg-primary">🛒 {{ unidad.get_origen_display }}</span>
+                                    {% if unidad.compra and unidad.compra.tipo == 'cotizacion' %}
+                                        <span class="badge bg-info">📋 Cotización</span>
+                                    {% else %}
+                                        <span class="badge bg-primary">🛒 Compra Directa</span>
+                                    {% endif %}
                                 {% elif unidad.origen == 'orden_servicio' %}
                                     <span class="badge bg-success">🔧 {{ unidad.get_origen_display }}</span>
                                 {% elif unidad.origen == 'devolucion_cliente' %}

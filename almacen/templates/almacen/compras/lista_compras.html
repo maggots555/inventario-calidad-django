@@ -2,11 +2,15 @@
 {% load static %}
 
 {% comment %}
-Lista de Compras y Cotizaciones del Almacén
+Lista de Compras del Almacén
 Incluye filtros por tipo, estado, producto, proveedor y orden_cliente
+
+NOTA: Las cotizaciones ahora se gestionan en el sistema de SolicitudCotizacion.
+Este listado muestra compras directas y compras generadas desde cotizaciones.
+El campo tipo='cotizacion' indica que la compra proviene de una SolicitudCotizacion.
 {% endcomment %}
 
-{% block title %}Compras y Cotizaciones - Almacén{% endblock %}
+{% block title %}Compras - Almacén{% endblock %}
 
 {% block almacen_content %}
 <div class="container-fluid py-4">
@@ -14,9 +18,9 @@ Incluye filtros por tipo, estado, producto, proveedor y orden_cliente
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h2 mb-0">
-                <i class="bi bi-cart3 me-2"></i>Compras y Cotizaciones
+                <i class="bi bi-cart3 me-2"></i>Compras
             </h1>
-            <p class="text-muted mb-0">Gestión de compras de piezas y cotizaciones</p>
+            <p class="text-muted mb-0">Gestión de compras de piezas</p>
         </div>
         <div>
             <a href="{% url 'almacen:panel_cotizaciones' %}" class="btn btn-outline-warning me-2">
@@ -26,7 +30,7 @@ Incluye filtros por tipo, estado, producto, proveedor y orden_cliente
                 <i class="bi bi-arrow-left me-1"></i>Dashboard
             </a>
             <a href="{% url 'almacen:crear_compra' %}" class="btn btn-primary">
-                <i class="bi bi-plus-lg me-1"></i>Nueva Compra/Cotización
+                <i class="bi bi-plus-lg me-1"></i>Nueva Compra Directa
             </a>
         </div>
     </div>
@@ -40,7 +44,7 @@ Incluye filtros por tipo, estado, producto, proveedor y orden_cliente
                     <select name="tipo" class="form-select">
                         <option value="">Todos</option>
                         <option value="cotizacion" {% if tipo_filtro == 'cotizacion' %}selected{% endif %}>📋 Cotización</option>
-                        <option value="compra" {% if tipo_filtro == 'compra' %}selected{% endif %}>🛒 Compra</option>
+                        <option value="compra" {% if tipo_filtro == 'compra' %}selected{% endif %}>🛒 Compra Directa</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -175,10 +179,10 @@ Incluye filtros por tipo, estado, producto, proveedor y orden_cliente
                         <tr>
                             <td colspan="11" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox display-1 d-block mb-3"></i>
-                                No hay compras/cotizaciones registradas.
+                                No hay compras registradas.
                                 <br>
                                 <a href="{% url 'almacen:crear_compra' %}" class="btn btn-primary mt-3">
-                                    <i class="bi bi-plus-lg me-1"></i>Crear Primera
+                                    <i class="bi bi-plus-lg me-1"></i>Crear Primera Compra
                                 </a>
                             </td>
                         </tr>

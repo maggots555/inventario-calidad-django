@@ -221,7 +221,11 @@ Contexto esperado:
                             </td>
                             <td>
                                 {% if unidad.origen == 'compra' %}
-                                    <span class="text-primary">🛒 Compra</span>
+                                    {% if unidad.compra and unidad.compra.tipo == 'cotizacion' %}
+                                        <span class="text-info">📋 Cotización</span>
+                                    {% else %}
+                                        <span class="text-primary">🛒 Compra</span>
+                                    {% endif %}
                                 {% elif unidad.origen == 'orden_servicio' %}
                                     <span class="text-success">🔧 O. Servicio</span>
                                 {% elif unidad.origen == 'devolucion_cliente' %}

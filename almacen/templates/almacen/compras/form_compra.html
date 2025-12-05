@@ -2,8 +2,11 @@
 {% load static %}
 
 {% comment %}
-Formulario para crear/editar Compras y Cotizaciones
+Formulario para crear/editar COMPRAS DIRECTAS
 Incluye formset para agregar unidades individuales con marca/modelo
+
+NOTA: Las cotizaciones se manejan en el sistema de SolicitudCotizacion
+que permite múltiples proveedores. Este formulario es SOLO para compras.
 {% endcomment %}
 
 {% block title %}{{ titulo }} - Almacén{% endblock %}
@@ -18,9 +21,9 @@ Incluye formset para agregar unidades individuales con marca/modelo
             </h1>
             <p class="text-muted mb-0">
                 {% if es_creacion %}
-                Registra una nueva cotización o compra de productos
+                Registra una nueva compra directa de productos
                 {% else %}
-                Modifica los datos de la compra/cotización
+                Modifica los datos de la compra
                 {% endif %}
             </p>
         </div>
@@ -37,33 +40,24 @@ Incluye formset para agregar unidades individuales con marca/modelo
         <!-- Datos principales de la compra -->
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Datos de la Compra/Cotización</h5>
+                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Datos de la Compra Directa</h5>
             </div>
             <div class="card-body">
                 <div class="row g-3">
-                    <!-- Tipo de registro -->
-                    <div class="col-md-3">
-                        <label class="form-label">{{ form.tipo.label }}</label>
-                        {{ form.tipo }}
-                        {% if form.tipo.help_text %}
-                        <div class="form-text">{{ form.tipo.help_text }}</div>
-                        {% endif %}
-                    </div>
-                    
                     <!-- Producto -->
-                    <div class="col-md-5">
+                    <div class="col-md-6">
                         <label class="form-label">{{ form.producto.label }} <span class="text-danger">*</span></label>
                         {{ form.producto }}
                     </div>
                     
                     <!-- Cantidad -->
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <label class="form-label">{{ form.cantidad.label }} <span class="text-danger">*</span></label>
                         {{ form.cantidad }}
                     </div>
                     
                     <!-- Costo Unitario -->
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <label class="form-label">{{ form.costo_unitario.label }} <span class="text-danger">*</span></label>
                         {{ form.costo_unitario }}
                     </div>
@@ -75,13 +69,13 @@ Incluye formset para agregar unidades individuales con marca/modelo
                     </div>
                     
                     <!-- Fecha de Pedido -->
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <label class="form-label">{{ form.fecha_pedido.label }} <span class="text-danger">*</span></label>
                         {{ form.fecha_pedido }}
                     </div>
                     
                     <!-- Orden Cliente (para vincular con servicio técnico) -->
-                    <div class="col-md-3">
+                    <div class="col-md-5">
                         <label class="form-label">{{ form.orden_cliente.label }}</label>
                         {{ form.orden_cliente }}
                         <div class="form-text">{{ form.orden_cliente.help_text }}</div>

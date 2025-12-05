@@ -333,23 +333,27 @@ class ProductoAlmacenForm(forms.ModelForm):
 # ============================================================================
 class CompraProductoForm(forms.ModelForm):
     """
-    Formulario para registrar cotizaciones y compras de productos.
+    Formulario para registrar COMPRAS DIRECTAS de productos.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Este formulario maneja el registro de compras/cotizaciones:
+    Este formulario maneja el registro de compras directas de piezas.
     
-    1. COTIZACIÓN: Se crea primero como cotización para que el cliente apruebe
-    2. COMPRA: Una vez aprobada, se convierte en compra formal
+    IMPORTANTE - SISTEMA DE COTIZACIONES:
+    Las cotizaciones ahora se manejan en un sistema separado (SolicitudCotizacion)
+    que permite múltiples proveedores por cotización. Este formulario es 
+    EXCLUSIVAMENTE para compras directas.
     
     El campo 'orden_cliente' permite buscar por el número visible al cliente
-    (ej: OS-2024-0001) en lugar del ID interno de la base de datos.
+    (ej: OS-2024-0001, OOW-12345, FL-67890) en lugar del ID interno de la BD.
     
     Campos importantes:
-    - tipo: Si es cotización (pendiente aprobación) o compra directa
-    - producto: Qué producto se cotiza/compra
+    - producto: Qué producto se compra
     - cantidad: Número de unidades
+    - costo_unitario: Precio por unidad
     - orden_cliente: Para vincular con orden de servicio por número visible
+    
+    NOTA: El campo 'tipo' se asigna automáticamente como 'compra' en la vista.
     """
     
     # Campo adicional para buscar orden por número de cliente
@@ -366,8 +370,9 @@ class CompraProductoForm(forms.ModelForm):
     
     class Meta:
         model = CompraProducto
+        # NOTA: 'tipo' se excluye porque se asigna automáticamente en la vista
+        # Las cotizaciones ahora usan el sistema SolicitudCotizacion
         fields = [
-            'tipo',
             'producto',
             'proveedor',
             'cantidad',
@@ -379,9 +384,6 @@ class CompraProductoForm(forms.ModelForm):
             'observaciones',
         ]
         widgets = {
-            'tipo': forms.Select(attrs={
-                'class': 'form-control form-select',
-            }),
             'producto': forms.Select(attrs={
                 'class': 'form-control form-select',
             }),
@@ -422,20 +424,18 @@ class CompraProductoForm(forms.ModelForm):
             }),
         }
         labels = {
-            'tipo': 'Tipo de Registro',
             'producto': 'Producto',
             'proveedor': 'Proveedor',
             'cantidad': 'Cantidad',
             'costo_unitario': 'Costo Unitario ($)',
-            'fecha_pedido': 'Fecha de Pedido/Cotización',
+            'fecha_pedido': 'Fecha de Pedido',
             'numero_factura': 'Número de Factura',
             'numero_orden_compra': 'Orden de Compra Interna',
             'orden_cliente': 'Número de Orden (Cliente)',
             'observaciones': 'Observaciones',
         }
         help_texts = {
-            'tipo': 'Cotización: pendiente de aprobación. Compra: registro formal.',
-            'orden_cliente': 'Número de orden de servicio visible para el cliente',
+            'orden_cliente': 'Número de orden de servicio visible para el cliente (ej: OOW-12345)',
         }
     
     def clean_orden_cliente(self):

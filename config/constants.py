@@ -229,6 +229,7 @@ MOTIVO_RHITSO_CHOICES = [
     ('cortocircuito', 'Cortocircuito en circuitería'),
     ('diagnostico_profundo', 'Requiere diagnóstico más profundo'),
     ('no_hay_piezas', 'No hay partes en el mercado'),
+    ('daño_profundo_mobo', 'Daño profundo en placa madre'),
     ('otro', 'Otro motivo especializado'),
 ]
 

@@ -296,7 +296,17 @@ Contexto esperado:
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <small>{{ unidad.get_origen_display }}</small>
+                                        <small>
+                                            {% if unidad.origen == 'compra' %}
+                                                {% if unidad.compra and unidad.compra.tipo == 'cotizacion' %}
+                                                    <span class="text-info">📋 Cotización</span>
+                                                {% else %}
+                                                    <span class="text-primary">🛒 Compra Directa</span>
+                                                {% endif %}
+                                            {% else %}
+                                                {{ unidad.get_origen_display }}
+                                            {% endif %}
+                                        </small>
                                     </td>
                                     <td class="text-center">
                                         <div class="btn-group btn-group-sm">

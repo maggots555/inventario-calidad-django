@@ -293,24 +293,24 @@
                         <!-- Columna 3: Compras y Cotizaciones -->
                         <div class="dropdown-column">
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-cart4"></i> Compras y Cotizaciones</h6>
+                                <h6 class="dropdown-header"><i class="bi bi-cart4"></i> Compras Directas</h6>
                                 <a href="{% url 'almacen:lista_compras' %}" class="dropdown-item">
                                     <i class="bi bi-list-check"></i> Lista de Compras
                                 </a>
                                 <a href="{% url 'almacen:crear_compra' %}" class="dropdown-item">
-                                    <i class="bi bi-cart-plus"></i> Nueva Compra/Cotización
-                                </a>
-                                <a href="{% url 'almacen:panel_cotizaciones' %}" class="dropdown-item">
-                                    <i class="bi bi-clipboard-data"></i> Panel Cotizaciones
+                                    <i class="bi bi-cart-plus"></i> Nueva Compra Directa
                                 </a>
                             </div>
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Cotización Multi-Proveedor</h6>
+                                <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Cotizaciones Multi-Proveedor</h6>
+                                <a href="{% url 'almacen:panel_cotizaciones' %}" class="dropdown-item">
+                                    <i class="bi bi-clipboard-data"></i> Panel Cotizaciones
+                                </a>
                                 <a href="{% url 'almacen:lista_solicitudes_cotizacion' %}" class="dropdown-item">
-                                    <i class="bi bi-list-ul"></i> Solicitudes de Cotización
+                                    <i class="bi bi-list-ul"></i> Todas las Solicitudes
                                 </a>
                                 <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="dropdown-item">
-                                    <i class="bi bi-plus-circle"></i> Nueva Solicitud
+                                    <i class="bi bi-plus-circle"></i> Nueva Cotización
                                 </a>
                             </div>
                         </div>

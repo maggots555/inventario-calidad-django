@@ -1784,43 +1784,63 @@ def panel_cotizaciones(request):
     Esta vista muestra un dashboard específico para las cotizaciones
     que están esperando respuesta del cliente.
     
+    IMPORTANTE - NUEVO SISTEMA DE COTIZACIONES:
+    Ahora las cotizaciones se manejan con el modelo SolicitudCotizacion,
+    que permite múltiples proveedores por cotización.
+    
+    Estados del nuevo sistema:
+    - borrador: En preparación
+    - enviada_cliente: Esperando respuesta del cliente
+    - parcialmente_aprobada: Algunas líneas aprobadas
+    - totalmente_aprobada: Todas las líneas aprobadas
+    - totalmente_rechazada: Todas las líneas rechazadas
+    - completada: Proceso finalizado
+    
     Incluye:
-    - Cotizaciones pendientes (sin respuesta)
+    - Cotizaciones en diferentes estados
     - Alertas de cotizaciones con muchos días sin respuesta
     - Estadísticas de aprobación/rechazo
     """
-    # Cotizaciones pendientes
-    cotizaciones_pendientes = CompraProducto.objects.filter(
-        tipo='cotizacion',
-        estado='pendiente_aprobacion'
+    from datetime import timedelta
+    from django.db.models import Count, Q
+    
+    # Cotizaciones pendientes de respuesta del cliente
+    cotizaciones_pendientes = SolicitudCotizacion.objects.filter(
+        estado='enviada_cliente'
     ).select_related(
-        'producto', 'proveedor', 'orden_servicio'
-    ).order_by('-fecha_registro')
+        'orden_servicio', 'creado_por'
+    ).prefetch_related('lineas').order_by('-fecha_creacion')
+    
+    # Cotizaciones en borrador (aún no enviadas)
+    cotizaciones_borrador = SolicitudCotizacion.objects.filter(
+        estado='borrador'
+    ).count()
     
     # Alertas: cotizaciones con más de 3 días sin respuesta
-    from datetime import timedelta
     fecha_limite = timezone.now() - timedelta(days=3)
     cotizaciones_urgentes = cotizaciones_pendientes.filter(
-        fecha_registro__lt=fecha_limite
+        fecha_creacion__lt=fecha_limite
     ).count()
     
     # Estadísticas del mes
     inicio_mes = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     
-    cotizaciones_mes = CompraProducto.objects.filter(
-        tipo='cotizacion',
-        fecha_registro__gte=inicio_mes
+    cotizaciones_mes = SolicitudCotizacion.objects.filter(
+        fecha_creacion__gte=inicio_mes
     )
     
     total_mes = cotizaciones_mes.count()
-    aprobadas_mes = cotizaciones_mes.filter(estado__in=['aprobada', 'pendiente_llegada', 'recibida']).count()
-    rechazadas_mes = cotizaciones_mes.filter(estado='rechazada').count()
+    aprobadas_mes = cotizaciones_mes.filter(
+        estado__in=['parcialmente_aprobada', 'totalmente_aprobada', 'completada']
+    ).count()
+    rechazadas_mes = cotizaciones_mes.filter(estado='totalmente_rechazada').count()
     
     tasa_aprobacion = (aprobadas_mes / total_mes * 100) if total_mes > 0 else 0
     
     context = {
         'cotizaciones': cotizaciones_pendientes,
         'cotizaciones_urgentes': cotizaciones_urgentes,
+        'cotizaciones_borrador': cotizaciones_borrador,
         'total_pendientes': cotizaciones_pendientes.count(),
         'estadisticas': {
             'total_mes': total_mes,
@@ -1836,12 +1856,17 @@ def panel_cotizaciones(request):
 @login_required
 def crear_compra(request):
     """
-    Crear nueva compra o cotización con unidades individuales.
+    Crear nueva COMPRA DIRECTA con unidades individuales.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
     Esta vista maneja un formulario con "formset", que es una técnica
     de Django para manejar múltiples formularios relacionados.
+    
+    IMPORTANTE - SISTEMA DE COTIZACIONES:
+    Las cotizaciones ahora se manejan en un sistema separado (SolicitudCotizacion)
+    que permite múltiples proveedores por cotización. Esta vista es 
+    EXCLUSIVAMENTE para compras directas.
     
     Estructura:
     - Formulario principal: CompraProductoForm (producto, cantidad, etc.)
@@ -1850,7 +1875,7 @@ def crear_compra(request):
     Cuando el usuario guarda:
     1. Se valida el formulario principal
     2. Se validan todas las unidades del formset
-    3. Se guarda la compra
+    3. Se guarda la compra (tipo='compra' automáticamente)
     4. Se guardan las unidades vinculadas a la compra
     """
     if request.method == 'POST':
@@ -1862,12 +1887,9 @@ def crear_compra(request):
             compra = form.save(commit=False)
             compra.registrado_por = request.user
             
-            # Si es cotización, iniciar en estado pendiente_aprobacion
-            if compra.tipo == 'cotizacion':
-                compra.estado = 'pendiente_aprobacion'
-            else:
-                # Si es compra directa, iniciar en pendiente_llegada
-                compra.estado = 'pendiente_llegada'
+            # SIEMPRE es compra directa (cotizaciones usan SolicitudCotizacion)
+            compra.tipo = 'compra'
+            compra.estado = 'pendiente_llegada'
             
             compra.save()
             
@@ -1886,10 +1908,9 @@ def crear_compra(request):
                 for obj in formset.deleted_objects:
                     obj.delete()
                 
-                tipo_texto = 'Cotización' if compra.tipo == 'cotizacion' else 'Compra'
                 messages.success(
                     request,
-                    f'{tipo_texto} #{compra.pk} creada exitosamente para {compra.producto.nombre}'
+                    f'Compra #{compra.pk} creada exitosamente para {compra.producto.nombre}'
                 )
                 return redirect('almacen:detalle_compra', pk=compra.pk)
             else:
@@ -1902,14 +1923,13 @@ def crear_compra(request):
     else:
         form = CompraProductoForm(initial={
             'fecha_pedido': timezone.now().date(),
-            'tipo': 'cotizacion',
         })
         formset = UnidadCompraFormSet(prefix='unidades')
     
     context = {
         'form': form,
         'formset': formset,
-        'titulo': 'Nueva Compra/Cotización',
+        'titulo': 'Nueva Compra Directa',
         'es_creacion': True,
     }
     

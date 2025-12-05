@@ -61,17 +61,26 @@ Muestra información, stock, historial de movimientos y compras.
             {% endif %}
             
             <!-- Estado del Stock -->
-            <div class="card shadow-sm mb-4 {% if producto.stock_actual == 0 %}border-dark{% elif producto.tipo_producto == 'resurtible' and producto.stock_actual <= producto.stock_minimo %}border-danger{% else %}border-success{% endif %}">
-                <div class="card-header bg-{% if producto.stock_actual == 0 %}dark{% elif producto.tipo_producto == 'resurtible' and producto.stock_actual <= producto.stock_minimo %}danger{% else %}success{% endif %} text-white">
+            <div class="card shadow-sm mb-4 {% if producto.cantidad_unidades_disponibles == 0 %}border-dark{% elif producto.tipo_producto == 'resurtible' and producto.cantidad_unidades_disponibles <= producto.stock_minimo %}border-danger{% else %}border-success{% endif %}">
+                <div class="card-header bg-{% if producto.cantidad_unidades_disponibles == 0 %}dark{% elif producto.tipo_producto == 'resurtible' and producto.cantidad_unidades_disponibles <= producto.stock_minimo %}danger{% else %}success{% endif %} text-white">
                     <h5 class="mb-0">
                         <i class="bi bi-box me-2"></i>Estado del Stock
                     </h5>
                 </div>
                 <div class="card-body text-center py-4">
-                    <h1 class="display-3 mb-0 {% if producto.stock_actual == 0 %}text-dark{% elif producto.tipo_producto == 'resurtible' and producto.stock_actual <= producto.stock_minimo %}text-danger{% else %}text-success{% endif %}">
-                        {{ producto.stock_actual }}
+                    <h1 class="display-3 mb-0 {% if producto.cantidad_unidades_disponibles == 0 %}text-dark{% elif producto.tipo_producto == 'resurtible' and producto.cantidad_unidades_disponibles <= producto.stock_minimo %}text-danger{% else %}text-success{% endif %}">
+                        {{ producto.cantidad_unidades_disponibles }}
                     </h1>
                     <p class="text-muted mb-3">unidades disponibles</p>
+                    
+                    {% if producto.cantidad_unidades_asignadas > 0 %}
+                    <div class="alert alert-warning py-2 mb-3">
+                        <small>
+                            <i class="bi bi-bookmark-check me-1"></i>
+                            <strong>{{ producto.cantidad_unidades_asignadas }}</strong> unidad(es) asignada(s) a servicios
+                        </small>
+                    </div>
+                    {% endif %}
                     
                     {% if producto.tipo_producto == 'resurtible' %}
                     <div class="d-flex justify-content-center gap-4">
@@ -83,15 +92,19 @@ Muestra información, stock, historial de movimientos y compras.
                             <small class="text-muted d-block">Máximo</small>
                             <strong>{{ producto.stock_maximo|default:"-" }}</strong>
                         </div>
+                        <div>
+                            <small class="text-muted d-block">Total Almacén</small>
+                            <strong>{{ producto.stock_actual }}</strong>
+                        </div>
                     </div>
                     {% endif %}
                 </div>
                 
-                {% if producto.stock_actual == 0 %}
+                {% if producto.cantidad_unidades_disponibles == 0 %}
                 <div class="card-footer bg-dark text-white text-center">
-                    <i class="bi bi-exclamation-octagon me-1"></i>PRODUCTO AGOTADO
+                    <i class="bi bi-exclamation-octagon me-1"></i>SIN UNIDADES DISPONIBLES
                 </div>
-                {% elif producto.tipo_producto == 'resurtible' and producto.stock_actual <= producto.stock_minimo %}
+                {% elif producto.tipo_producto == 'resurtible' and producto.cantidad_unidades_disponibles <= producto.stock_minimo %}
                 <div class="card-footer bg-danger text-white text-center">
                     <i class="bi bi-exclamation-triangle me-1"></i>REQUIERE REPOSICIÓN
                 </div>
@@ -112,13 +125,17 @@ Muestra información, stock, historial de movimientos y compras.
                 </div>
                 <div class="card-body">
                     <div class="row text-center mb-3">
-                        <div class="col-6">
+                        <div class="col-4">
                             <h4 class="mb-0 text-info">{{ producto.unidades.count }}</h4>
                             <small class="text-muted">Total Rastreadas</small>
                         </div>
-                        <div class="col-6">
+                        <div class="col-4">
                             <h4 class="mb-0 text-success">{{ producto.cantidad_unidades_disponibles }}</h4>
                             <small class="text-muted">Disponibles</small>
+                        </div>
+                        <div class="col-4">
+                            <h4 class="mb-0 text-warning">{{ producto.cantidad_unidades_asignadas }}</h4>
+                            <small class="text-muted">Asignadas</small>
                         </div>
                     </div>
                     
