@@ -1354,8 +1354,10 @@ class UnidadInventarioForm(forms.ModelForm):
             'compra': forms.Select(attrs={
                 'class': 'form-select',
             }),
-            'orden_servicio_origen': forms.Select(attrs={
-                'class': 'form-select',
+            # orden_servicio_origen se maneja con campo personalizado (buscador AJAX)
+            # El widget es HiddenInput porque el template usa su propio input de búsqueda
+            'orden_servicio_origen': forms.HiddenInput(attrs={
+                'id': 'orden_servicio_origen_id_fallback',
             }),
             'ubicacion_especifica': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -1572,11 +1574,22 @@ class SolicitudCotizacionForm(forms.ModelForm):
     El campo más importante es 'numero_orden_cliente' que permite buscar
     la orden de servicio a la cual se vinculará esta cotización.
     
+    NUEVO: Modo "Sin Orden Activa"
+    ------------------------------
+    Si aún no existe una orden de servicio (ej: cotización preventiva),
+    se puede marcar 'sin_orden_activa' y capturar un 'folio_referencia'
+    (típicamente el número de serie del equipo) como identificador temporal.
+    
+    Cuando posteriormente se cree la orden y se reciba la pieza, se podrá
+    vincular manualmente la orden desde el formulario de Editar Unidad.
+    
     La búsqueda se realiza mediante AJAX usando el endpoint existente
-    'buscar_orden_fab' que acepta números tipo OOW-12345 o FL-67890.
+    'api_buscar_crear_orden' que acepta números tipo OOW-12345 o FL-67890.
     
     Campos:
     - numero_orden_cliente: Para buscar y vincular con OrdenServicio
+    - sin_orden_activa: Checkbox para modo sin orden
+    - folio_referencia: Identificador temporal cuando no hay orden
     - observaciones: Notas internas sobre la solicitud
     
     Los demás campos (numero_solicitud, estado, fechas) se manejan
@@ -1587,6 +1600,8 @@ class SolicitudCotizacionForm(forms.ModelForm):
         model = SolicitudCotizacion
         fields = [
             'numero_orden_cliente',
+            'sin_orden_activa',
+            'folio_referencia',
             'observaciones',
         ]
         widgets = {
@@ -1596,6 +1611,16 @@ class SolicitudCotizacionForm(forms.ModelForm):
                 'id': 'numero_orden_cliente',
                 'autocomplete': 'off',
             }),
+            'sin_orden_activa': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'id': 'sin_orden_activa',
+            }),
+            'folio_referencia': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Número de serie del equipo',
+                'id': 'folio_referencia',
+                'style': 'text-transform: uppercase;',
+            }),
             'observaciones': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 3,
@@ -1604,56 +1629,90 @@ class SolicitudCotizacionForm(forms.ModelForm):
         }
         labels = {
             'numero_orden_cliente': 'Número de Orden del Cliente',
+            'sin_orden_activa': 'Sin orden activa',
+            'folio_referencia': 'Folio de Referencia',
             'observaciones': 'Observaciones Internas',
         }
         help_texts = {
             'numero_orden_cliente': 'Ingresa el número de orden y presiona Tab para buscar',
+            'sin_orden_activa': 'Marcar si aún no existe una orden de servicio para esta cotización',
+            'folio_referencia': 'Identificador temporal (ej: número de serie) - Se convertirá a mayúsculas',
             'observaciones': 'Estas notas son internas, no se muestran al cliente',
         }
     
-    def clean_numero_orden_cliente(self):
+    def clean_folio_referencia(self):
         """
-        Valida y normaliza el número de orden del cliente.
+        Normaliza el folio de referencia a mayúsculas.
+        """
+        folio = self.cleaned_data.get('folio_referencia', '').strip()
+        return folio.upper() if folio else ''
+    
+    def clean(self):
+        """
+        Validación cruzada de campos.
         
         EXPLICACIÓN:
-        - Convierte a mayúsculas
-        - Verifica que exista una orden con ese número
-        - Si existe, guarda la referencia para vincularla después
-        
-        NOTA: El campo 'orden_cliente' está en DetalleEquipo, que tiene 
-        relación OneToOne con OrdenServicio a través de 'detalle_equipo'.
+        - Si sin_orden_activa=False: Debe haber un numero_orden_cliente válido
+        - Si sin_orden_activa=True: Debe haber un folio_referencia
         """
-        numero = self.cleaned_data.get('numero_orden_cliente', '').strip().upper()
+        cleaned_data = super().clean()
+        sin_orden = cleaned_data.get('sin_orden_activa', False)
+        numero_orden = cleaned_data.get('numero_orden_cliente', '').strip()
+        folio = cleaned_data.get('folio_referencia', '').strip()
         
-        if not numero:
-            return numero
+        if sin_orden:
+            # Modo sin orden: requiere folio_referencia
+            if not folio:
+                self.add_error(
+                    'folio_referencia',
+                    'Debes ingresar un folio de referencia cuando no hay orden activa.'
+                )
+            # Limpiar el número de orden si está en modo sin orden
+            cleaned_data['numero_orden_cliente'] = ''
+        else:
+            # Modo con orden: requiere y valida numero_orden_cliente
+            if not numero_orden:
+                self.add_error(
+                    'numero_orden_cliente',
+                    'Debes ingresar un número de orden o marcar "Sin orden activa".'
+                )
+            else:
+                # Validar que la orden exista
+                numero = numero_orden.upper()
+                from servicio_tecnico.models import DetalleEquipo
+                
+                try:
+                    detalle = DetalleEquipo.objects.select_related('orden').get(
+                        orden_cliente__iexact=numero
+                    )
+                    # Guardar la orden encontrada para usarla en el save
+                    self._orden_servicio_encontrada = detalle.orden
+                    cleaned_data['numero_orden_cliente'] = numero
+                except DetalleEquipo.DoesNotExist:
+                    self.add_error(
+                        'numero_orden_cliente',
+                        f'No se encontró una orden de servicio con el número "{numero}". '
+                        'Verifica que el número sea correcto o marca "Sin orden activa".'
+                    )
         
-        # Buscar la orden de servicio a través de DetalleEquipo
-        from servicio_tecnico.models import DetalleEquipo
-        
-        try:
-            detalle = DetalleEquipo.objects.select_related('orden').get(
-                orden_cliente__iexact=numero
-            )
-            # Guardar la orden encontrada para usarla en el save
-            self._orden_servicio_encontrada = detalle.orden
-        except DetalleEquipo.DoesNotExist:
-            raise ValidationError(
-                f'No se encontró una orden de servicio con el número "{numero}". '
-                'Verifica que el número sea correcto (formato: OOW-12345 o FL-67890).'
-            )
-        
-        return numero
+        return cleaned_data
     
     def save(self, commit=True):
         """
         Guarda la solicitud vinculando la orden de servicio encontrada.
+        
+        EXPLICACIÓN:
+        - Si hay orden encontrada: la vincula
+        - Si está en modo sin_orden: deja orden_servicio=None
         """
         instance = super().save(commit=False)
         
-        # Vincular la orden de servicio si se encontró
-        if hasattr(self, '_orden_servicio_encontrada'):
+        # Vincular la orden de servicio si se encontró (modo normal)
+        if hasattr(self, '_orden_servicio_encontrada') and not instance.sin_orden_activa:
             instance.orden_servicio = self._orden_servicio_encontrada
+        elif instance.sin_orden_activa:
+            # Modo sin orden: asegurar que no hay orden vinculada
+            instance.orden_servicio = None
         
         if commit:
             instance.save()

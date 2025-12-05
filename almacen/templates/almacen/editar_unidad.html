@@ -190,10 +190,42 @@ Contexto esperado:
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">{{ form.orden_servicio_origen.label }}</label>
-                                    {{ form.orden_servicio_origen }}
+                                    <!-- Buscador de Orden por texto -->
+                                    <div class="input-group">
+                                        <input type="text" 
+                                               id="buscar_orden_texto" 
+                                               class="form-control"
+                                               placeholder="Ej: OOW-12345 o FL-67890"
+                                               autocomplete="off"
+                                               value="{% if unidad.orden_servicio_origen and unidad.orden_servicio_origen.detalle_equipo %}{{ unidad.orden_servicio_origen.detalle_equipo.orden_cliente }}{% endif %}">
+                                        <button type="button" class="btn btn-outline-secondary" id="btnBuscarOrden">
+                                            <i class="bi bi-search"></i>
+                                        </button>
+                                    </div>
+                                    <!-- Campo oculto para el ID de la orden -->
+                                    <input type="hidden" 
+                                           name="orden_servicio_origen" 
+                                           id="orden_servicio_origen_id"
+                                           value="{{ form.orden_servicio_origen.value|default:'' }}">
+                                    <div class="form-text">Busca por número de orden del cliente (OOW-* o FL-*)</div>
                                     {% if form.orden_servicio_origen.errors %}
                                         <div class="text-danger small">{{ form.orden_servicio_origen.errors }}</div>
                                     {% endif %}
+                                    <!-- Resultado de búsqueda -->
+                                    <div id="ordenBuscadaInfo" class="mt-2 {% if not unidad.orden_servicio_origen %}d-none{% endif %}">
+                                        {% if unidad.orden_servicio_origen %}
+                                        <div class="alert alert-success py-2 mb-0">
+                                            <i class="bi bi-check-circle me-1"></i>
+                                            <strong>Orden vinculada:</strong> 
+                                            <span id="ordenVinculadaTexto">{{ unidad.orden_servicio_origen }}</span>
+                                        </div>
+                                        {% else %}
+                                        <div class="alert alert-info py-2 mb-0">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            <span id="ordenVinculadaTexto"></span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -310,3 +342,91 @@ Contexto esperado:
     
 </div>
 {% endblock almacen_content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ========== BUSCADOR DE ORDEN DE SERVICIO ==========
+    const buscarOrdenTexto = document.getElementById('buscar_orden_texto');
+    const btnBuscarOrden = document.getElementById('btnBuscarOrden');
+    const ordenIdHidden = document.getElementById('orden_servicio_origen_id');
+    const ordenBuscadaInfo = document.getElementById('ordenBuscadaInfo');
+    const ordenVinculadaTexto = document.getElementById('ordenVinculadaTexto');
+    
+    // Función para buscar orden
+    function buscarOrdenServicio() {
+        const numero = buscarOrdenTexto.value.trim().toUpperCase();
+        
+        if (!numero) {
+            // Si está vacío, limpiar la vinculación
+            ordenIdHidden.value = '';
+            ordenBuscadaInfo.classList.add('d-none');
+            return;
+        }
+        
+        // Validar formato (OOW-* o FL-*)
+        if (!numero.startsWith('OOW-') && !numero.startsWith('FL-')) {
+            mostrarResultado('warning', 'Formato inválido. Use OOW-12345 o FL-67890');
+            ordenIdHidden.value = '';
+            return;
+        }
+        
+        // Normalizar el valor del input
+        buscarOrdenTexto.value = numero;
+        
+        // Buscar usando la API existente
+        fetch(`{% url 'almacen:api_buscar_crear_orden' %}?orden_cliente=${encodeURIComponent(numero)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.found && data.orden_id) {
+                    // Orden encontrada - guardar el ID
+                    ordenIdHidden.value = data.orden_id;
+                    mostrarResultado('success', `
+                        <strong>Orden encontrada:</strong> ${data.orden_cliente}<br>
+                        <small>Estado: ${data.estado_display || data.estado || '-'} | Sucursal: ${data.sucursal || '-'}</small>
+                    `);
+                } else if (data.success && !data.found) {
+                    // No encontrada
+                    ordenIdHidden.value = '';
+                    mostrarResultado('warning', `No se encontró ninguna orden con el número "${numero}".`);
+                } else {
+                    // Error
+                    ordenIdHidden.value = '';
+                    mostrarResultado('danger', data.error || 'Error al buscar la orden.');
+                }
+            })
+            .catch(error => {
+                console.error('Error buscando orden:', error);
+                ordenIdHidden.value = '';
+                mostrarResultado('danger', 'Error de conexión. Intenta de nuevo.');
+            });
+    }
+    
+    // Función para mostrar resultado
+    function mostrarResultado(tipo, mensaje) {
+        ordenBuscadaInfo.classList.remove('d-none');
+        ordenBuscadaInfo.innerHTML = `
+            <div class="alert alert-${tipo} py-2 mb-0">
+                <i class="bi bi-${tipo === 'success' ? 'check-circle' : tipo === 'warning' ? 'exclamation-triangle' : 'x-circle'} me-1"></i>
+                ${mensaje}
+            </div>
+        `;
+    }
+    
+    // Event listeners
+    btnBuscarOrden.addEventListener('click', buscarOrdenServicio);
+    
+    buscarOrdenTexto.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            buscarOrdenServicio();
+        }
+    });
+    
+    // Convertir a mayúsculas mientras se escribe
+    buscarOrdenTexto.addEventListener('input', function() {
+        this.value = this.value.toUpperCase();
+    });
+});
+</script>
+{% endblock extra_js %}

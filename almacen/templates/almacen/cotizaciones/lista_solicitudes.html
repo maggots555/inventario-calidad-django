@@ -140,7 +140,11 @@ Muestra todas las solicitudes con filtros y contadores por estado
                                 </a>
                             </td>
                             <td>
-                                {% if solicitud.numero_orden_cliente %}
+                                {% if solicitud.sin_orden_activa %}
+                                <span class="badge bg-warning text-dark" title="Sin orden de servicio activa">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>{{ solicitud.folio_referencia|default:"Sin orden" }}
+                                </span>
+                                {% elif solicitud.numero_orden_cliente %}
                                 <span class="badge bg-light text-dark">
                                     {{ solicitud.numero_orden_cliente }}
                                 </span>

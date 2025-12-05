@@ -43,8 +43,20 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
             </div>
             <div class="card-body">
                 <div class="row g-3">
-                    <!-- Número de Orden Cliente -->
-                    <div class="col-md-6">
+                    <!-- Checkbox Sin Orden Activa -->
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            {{ form.sin_orden_activa }}
+                            <label class="form-check-label" for="sin_orden_activa">
+                                <i class="bi bi-exclamation-triangle text-warning me-1"></i>
+                                {{ form.sin_orden_activa.label }}
+                            </label>
+                            <div class="form-text">{{ form.sin_orden_activa.help_text }}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Número de Orden Cliente (visible cuando sin_orden_activa=false) -->
+                    <div class="col-md-6" id="ordenClienteContainer">
                         <label class="form-label">
                             {{ form.numero_orden_cliente.label }} 
                             <span class="text-danger">*</span>
@@ -68,6 +80,30 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                         <div id="ordenInfo" class="alert alert-info mt-2 d-none">
                             <strong>Orden encontrada:</strong>
                             <span id="ordenInfoTexto"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Folio de Referencia (visible cuando sin_orden_activa=true) -->
+                    <div class="col-md-6 d-none" id="folioReferenciaContainer">
+                        <label class="form-label">
+                            {{ form.folio_referencia.label }}
+                            <span class="text-danger">*</span>
+                        </label>
+                        {{ form.folio_referencia }}
+                        <div class="form-text">
+                            {{ form.folio_referencia.help_text }}
+                        </div>
+                        {% if form.folio_referencia.errors %}
+                        <div class="text-danger small">
+                            {{ form.folio_referencia.errors.0 }}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Alerta informativa -->
+                        <div class="alert alert-warning mt-2 small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Nota:</strong> La orden de servicio se podrá vincular posteriormente 
+                            desde "Editar Unidad" cuando se reciba la pieza.
                         </div>
                     </div>
                     
@@ -334,7 +370,49 @@ document.addEventListener('DOMContentLoaded', function() {
     const ordenInfo = document.getElementById('ordenInfo');
     const ordenInfoTexto = document.getElementById('ordenInfoTexto');
     
+    // ========== ELEMENTOS MODO SIN ORDEN ==========
+    const sinOrdenCheckbox = document.getElementById('sin_orden_activa');
+    const ordenClienteContainer = document.getElementById('ordenClienteContainer');
+    const folioReferenciaContainer = document.getElementById('folioReferenciaContainer');
+    const folioInput = document.getElementById('folio_referencia');
+    
     let formCount = parseInt(totalFormsInput.value);
+    
+    // ========== FUNCIONES MODO SIN ORDEN ==========
+    
+    function toggleModoSinOrden() {
+        const sinOrden = sinOrdenCheckbox.checked;
+        
+        if (sinOrden) {
+            // Activar modo sin orden
+            ordenClienteContainer.classList.add('d-none');
+            folioReferenciaContainer.classList.remove('d-none');
+            ordenInput.removeAttribute('required');
+            folioInput.setAttribute('required', 'required');
+            // Limpiar campo de orden
+            ordenInput.value = '';
+            ordenInfo.classList.add('d-none');
+        } else {
+            // Desactivar modo sin orden (modo normal)
+            ordenClienteContainer.classList.remove('d-none');
+            folioReferenciaContainer.classList.add('d-none');
+            ordenInput.setAttribute('required', 'required');
+            folioInput.removeAttribute('required');
+            // Limpiar campo de folio
+            folioInput.value = '';
+        }
+    }
+    
+    // Evento para el checkbox
+    sinOrdenCheckbox.addEventListener('change', toggleModoSinOrden);
+    
+    // Inicializar estado al cargar (por si hay errores de validación)
+    toggleModoSinOrden();
+    
+    // Convertir folio a mayúsculas mientras se escribe
+    folioInput.addEventListener('input', function() {
+        this.value = this.value.toUpperCase();
+    });
     
     // ========== FUNCIONES DE LÍNEAS ==========
     
@@ -440,6 +518,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     function buscarOrden() {
+        // No buscar si está en modo sin orden
+        if (sinOrdenCheckbox.checked) return;
+        
         const numero = ordenInput.value.trim().toUpperCase();
         
         if (!numero) {

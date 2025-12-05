@@ -2437,6 +2437,19 @@ class SolicitudCotizacion(models.Model):
         help_text='Comentarios o feedback del cliente'
     )
     
+    # ========== MODO SIN ORDEN ACTIVA ==========
+    sin_orden_activa = models.BooleanField(
+        default=False,
+        verbose_name='Sin Orden Activa',
+        help_text='Marcar si aún no existe una orden de servicio para esta cotización'
+    )
+    folio_referencia = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Folio de Referencia',
+        help_text='Identificador temporal (ej: número de serie) cuando no hay orden activa'
+    )
+    
     # ========== AUDITORÍA ==========
     creado_por = models.ForeignKey(
         User,
@@ -2473,16 +2486,24 @@ class SolicitudCotizacion(models.Model):
         Override de save() para:
         1. Generar número de solicitud automáticamente
         2. Sincronizar numero_orden_cliente desde orden_servicio
+        3. Manejar modo sin_orden_activa con folio_referencia
         """
         # Generar número de solicitud si es nuevo
         if not self.numero_solicitud:
             self.numero_solicitud = self._generar_numero_solicitud()
         
-        # Sincronizar número de orden cliente desde DetalleEquipo
+        # Si tiene orden de servicio, sincronizar numero_orden_cliente
         if self.orden_servicio and hasattr(self.orden_servicio, 'detalle_equipo'):
             detalle = getattr(self.orden_servicio, 'detalle_equipo', None)
             if detalle and hasattr(detalle, 'orden_cliente'):
                 self.numero_orden_cliente = detalle.orden_cliente or ''
+            # Si se vincula una orden, desactivar modo sin_orden
+            self.sin_orden_activa = False
+        elif self.sin_orden_activa:
+            # Si está en modo sin orden, usar folio_referencia como numero_orden_cliente
+            self.folio_referencia = self.folio_referencia.upper().strip()
+            self.numero_orden_cliente = self.folio_referencia
+            self.orden_servicio = None
         
         super().save(*args, **kwargs)
     
