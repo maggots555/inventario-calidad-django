@@ -32,6 +32,7 @@ from .models import (
     UnidadInventario,
     SolicitudCotizacion,
     LineaCotizacion,
+    ImagenLineaCotizacion,
 )
 from config.constants import (
     TIPO_PRODUCTO_ALMACEN_CHOICES,
@@ -1970,3 +1971,181 @@ class RespuestaLineaCotizacionForm(forms.Form):
             )
         
         return cleaned_data
+
+
+# ============================================================================
+# FORMULARIO: IMAGEN DE LÍNEA DE COTIZACIÓN
+# ============================================================================
+class ImagenLineaCotizacionForm(forms.ModelForm):
+    """
+    Formulario para subir imágenes de referencia a una línea de cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este formulario permite al usuario subir una imagen junto con una
+    descripción opcional. La imagen se asocia a una línea específica
+    de la cotización para servir como referencia visual.
+    
+    Características:
+    - Acepta archivos de imagen (JPG, PNG, GIF, WebP)
+    - Tamaño máximo: 10MB (después se comprime si supera 2MB)
+    - La descripción es opcional pero recomendada
+    
+    Validaciones automáticas:
+    - El modelo valida el límite de 5 imágenes por línea
+    - El modelo comprime automáticamente si supera 2MB
+    - Se valida la extensión del archivo
+    """
+    
+    class Meta:
+        model = ImagenLineaCotizacion
+        fields = ['imagen', 'descripcion']
+        widgets = {
+            'imagen': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/jpeg,image/png,image/gif,image/webp',
+            }),
+            'descripcion': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Vista frontal del componente, Etiqueta con modelo...',
+                'maxlength': 200,
+            }),
+        }
+        labels = {
+            'imagen': 'Imagen de Referencia',
+            'descripcion': 'Descripción (opcional)',
+        }
+        help_texts = {
+            'imagen': 'Formatos: JPG, PNG, GIF, WebP. Máximo 10MB. Se comprime automáticamente si supera 2MB.',
+            'descripcion': 'Breve descripción de qué muestra la imagen.',
+        }
+    
+    def __init__(self, *args, linea=None, **kwargs):
+        """
+        Inicializa el formulario con la línea de cotización.
+        
+        EXPLICACIÓN:
+        Recibimos la línea como parámetro para:
+        1. Validar el límite de imágenes
+        2. Mostrar cuántas imágenes quedan disponibles
+        
+        Args:
+            linea: Instancia de LineaCotizacion (opcional en __init__, requerida en clean)
+        """
+        super().__init__(*args, **kwargs)
+        self.linea = linea
+        
+        # Si tenemos la línea, mostrar cuántas imágenes quedan
+        if linea:
+            restantes = ImagenLineaCotizacion.imagenes_restantes(linea)
+            if restantes == 0:
+                self.fields['imagen'].widget.attrs['disabled'] = True
+                self.fields['imagen'].help_text = (
+                    '⚠️ Se alcanzó el límite de 5 imágenes para esta línea.'
+                )
+            else:
+                self.fields['imagen'].help_text = (
+                    f'Puedes subir hasta {restantes} imagen(es) más. '
+                    f'Formatos: JPG, PNG, GIF, WebP. Máximo 10MB.'
+                )
+    
+    def clean_imagen(self):
+        """
+        Valida el archivo de imagen.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Este método se ejecuta automáticamente cuando Django procesa
+        el formulario. Aquí validamos:
+        
+        1. Que se haya seleccionado un archivo
+        2. Que el archivo no sea demasiado grande (10MB máximo)
+        3. Que la extensión sea válida
+        
+        Si algo está mal, lanzamos un ValidationError que Django
+        mostrará al usuario junto al campo correspondiente.
+        
+        Returns:
+            El archivo de imagen validado
+            
+        Raises:
+            ValidationError: Si la validación falla
+        """
+        imagen = self.cleaned_data.get('imagen')
+        
+        if not imagen:
+            raise ValidationError('Debes seleccionar una imagen.')
+        
+        # Validar tamaño máximo (10MB)
+        max_size = 10 * 1024 * 1024  # 10MB en bytes
+        if imagen.size > max_size:
+            raise ValidationError(
+                f'El archivo es demasiado grande ({imagen.size // (1024*1024)}MB). '
+                f'El tamaño máximo es 10MB.'
+            )
+        
+        # Validar extensión
+        extensiones_validas = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+        import os
+        ext = os.path.splitext(imagen.name)[1].lower()
+        if ext not in extensiones_validas:
+            raise ValidationError(
+                f'Extensión "{ext}" no válida. '
+                f'Usa: {", ".join(extensiones_validas)}'
+            )
+        
+        return imagen
+    
+    def clean(self):
+        """
+        Validaciones que involucran múltiples campos y el límite de imágenes.
+        
+        EXPLICACIÓN:
+        Aquí validamos que la línea no haya alcanzado el límite de 5 imágenes.
+        Esta validación es importante porque previene que se suban más
+        imágenes de las permitidas, incluso si el usuario intenta hacerlo
+        manipulando el formulario.
+        """
+        cleaned_data = super().clean()
+        
+        # Validar límite de imágenes si tenemos la línea
+        if self.linea and cleaned_data.get('imagen'):
+            if not ImagenLineaCotizacion.puede_agregar_imagen(self.linea):
+                raise ValidationError(
+                    f'Esta línea ya tiene el máximo de '
+                    f'{ImagenLineaCotizacion.MAX_IMAGENES_POR_LINEA} imágenes.'
+                )
+        
+        return cleaned_data
+    
+    def save(self, commit=True, user=None):
+        """
+        Guarda la imagen asociándola a la línea y al usuario.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Este método extiende el save() normal para:
+        1. Asociar la imagen a la línea de cotización
+        2. Registrar qué usuario subió la imagen
+        
+        Args:
+            commit: Si guardar inmediatamente en la BD (default: True)
+            user: Usuario que está subiendo la imagen
+            
+        Returns:
+            Instancia de ImagenLineaCotizacion guardada
+        """
+        instance = super().save(commit=False)
+        
+        # Asociar la línea si se proporcionó
+        if self.linea:
+            instance.linea = self.linea
+        
+        # Asociar el usuario si se proporcionó
+        if user:
+            instance.subido_por = user
+        
+        if commit:
+            instance.save()
+        
+        return instance

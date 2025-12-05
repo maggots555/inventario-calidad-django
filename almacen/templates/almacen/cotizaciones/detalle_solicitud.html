@@ -99,13 +99,14 @@ Muestra toda la información y acciones según el estado
                             <thead class="table-light">
                                 <tr>
                                     <th width="5%">#</th>
-                                    <th width="25%">Producto / Descripción</th>
-                                    <th width="20%">Proveedor</th>
-                                    <th width="8%" class="text-center">Cant.</th>
-                                    <th width="12%" class="text-end">Costo Unit.</th>
-                                    <th width="12%" class="text-end">Subtotal</th>
+                                    <th width="22%">Producto / Descripción</th>
+                                    <th width="15%">Proveedor</th>
+                                    <th width="6%" class="text-center">Cant.</th>
+                                    <th width="10%" class="text-end">Costo Unit.</th>
+                                    <th width="10%" class="text-end">Subtotal</th>
                                     <th width="10%">Estado</th>
-                                    <th width="8%" class="text-end">Acciones</th>
+                                    <th width="12%" class="text-center">Imágenes</th>
+                                    <th width="10%" class="text-end">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -156,6 +157,29 @@ Muestra toda la información y acciones según el estado
                                         </a>
                                         {% endif %}
                                     </td>
+                                    <!-- Columna de Imágenes -->
+                                    <td class="text-center">
+                                        {% with imagenes_count=linea.imagenes.count %}
+                                        <button type="button" 
+                                                class="btn btn-sm {% if imagenes_count > 0 %}btn-outline-primary{% else %}btn-outline-secondary{% endif %}"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#imagenesModal"
+                                                data-linea-pk="{{ linea.pk }}"
+                                                data-linea-numero="{{ linea.numero_linea }}"
+                                                data-linea-desc="{{ linea.descripcion_pieza }}"
+                                                data-imagenes-count="{{ imagenes_count }}"
+                                                title="Ver/Agregar imágenes">
+                                            <i class="bi bi-images me-1"></i>
+                                            {{ imagenes_count }}/{{ max_imagenes_por_linea }}
+                                        </button>
+                                        {% if imagenes_count > 0 %}
+                                        <br>
+                                        <small class="text-muted">
+                                            <i class="bi bi-check-circle text-success"></i>
+                                        </small>
+                                        {% endif %}
+                                        {% endwith %}
+                                    </td>
                                     <td class="text-end">
                                         {% if linea.estado_cliente == 'pendiente' and solicitud.estado in 'enviada_cliente,parcialmente_aprobada' %}
                                         <div class="btn-group btn-group-sm">
@@ -182,7 +206,7 @@ Muestra toda la información y acciones según el estado
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">
+                                    <td colspan="9" class="text-center text-muted py-4">
                                         No hay líneas en esta solicitud
                                     </td>
                                 </tr>
@@ -192,13 +216,13 @@ Muestra toda la información y acciones según el estado
                                 <tr>
                                     <td colspan="5" class="text-end"><strong>Total:</strong></td>
                                     <td class="text-end"><strong class="fs-5">${{ solicitud.costo_total|floatformat:2 }}</strong></td>
-                                    <td colspan="2"></td>
+                                    <td colspan="3"></td>
                                 </tr>
                                 {% if solicitud.costo_aprobado > 0 %}
                                 <tr>
                                     <td colspan="5" class="text-end text-success"><strong>Total Aprobado:</strong></td>
                                     <td class="text-end text-success"><strong class="fs-5">${{ solicitud.costo_aprobado|floatformat:2 }}</strong></td>
-                                    <td colspan="2"></td>
+                                    <td colspan="3"></td>
                                 </tr>
                                 {% endif %}
                             </tfoot>
@@ -478,12 +502,281 @@ Muestra toda la información y acciones según el estado
         </div>
     </div>
 </div>
+
+<!-- Modal: Gestionar Imágenes de Línea -->
+<div class="modal fade" id="imagenesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-images me-2"></i>Imágenes de Referencia - Línea #<span id="imagenesLineaNumero"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Descripción de la línea -->
+                <div class="alert alert-light mb-3">
+                    <strong>Producto:</strong> <span id="imagenesLineaDesc"></span>
+                </div>
+                
+                <!-- Galería de imágenes existentes -->
+                <div id="galeriaImagenes" class="mb-4">
+                    <h6 class="border-bottom pb-2 mb-3">
+                        <i class="bi bi-collection me-1"></i>Imágenes Actuales
+                        <span id="contadorImagenes" class="badge bg-secondary ms-2">0/{{ max_imagenes_por_linea }}</span>
+                    </h6>
+                    <div id="imagenesContainer" class="row g-3">
+                        <!-- Las imágenes se cargarán dinámicamente aquí -->
+                        <div class="col-12 text-center text-muted py-4" id="sinImagenes">
+                            <i class="bi bi-image fs-1 d-block mb-2"></i>
+                            No hay imágenes para esta línea
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Formulario para subir nueva imagen (solo en borrador) -->
+                {% if puede_subir_imagenes %}
+                <div id="formSubirImagen" class="border-top pt-3">
+                    <h6 class="mb-3">
+                        <i class="bi bi-cloud-upload me-1"></i>Subir Nueva Imagen
+                    </h6>
+                    <form method="post" enctype="multipart/form-data" id="uploadImagenForm">
+                        {% csrf_token %}
+                        <input type="hidden" name="linea_pk" id="uploadLineaPk">
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Imagen <span class="text-danger">*</span></label>
+                                <input type="file" name="imagen" class="form-control" 
+                                       accept="image/jpeg,image/png,image/gif,image/webp" required>
+                                <div class="form-text">
+                                    JPG, PNG, GIF o WebP. Máx 10MB. Se comprime si supera 2MB.
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Descripción (opcional)</label>
+                                <input type="text" name="descripcion" class="form-control" 
+                                       placeholder="Ej: Vista frontal, Etiqueta con modelo..."
+                                       maxlength="200">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary" id="btnSubirImagen">
+                                <i class="bi bi-upload me-1"></i>Subir Imagen
+                            </button>
+                            <span id="espaciosDisponibles" class="ms-3 text-muted small">
+                                Espacios disponibles: <strong>{{ max_imagenes_por_linea }}</strong>
+                            </span>
+                        </div>
+                    </form>
+                </div>
+                {% else %}
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Solo se pueden agregar imágenes cuando la solicitud está en estado <strong>borrador</strong>.
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Ver imagen ampliada -->
+<div class="modal fade" id="imagenAmpliadaModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-0">
+                <h6 class="modal-title text-white" id="imagenAmpliadaDesc"></h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <img id="imagenAmpliadaSrc" src="" alt="Imagen ampliada" class="img-fluid">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Datos de imágenes para JavaScript -->
+<script type="application/json" id="imagenesData">
+{
+    {% for linea in solicitud.lineas.all %}
+    "{{ linea.pk }}": {
+        "numero": {{ linea.numero_linea }},
+        "descripcion": "{{ linea.descripcion_pieza|escapejs }}",
+        "imagenes": [
+            {% for img in linea.imagenes.all %}
+            {
+                "id": {{ img.pk }},
+                "url": "{{ img.imagen.url }}",
+                "nombre": "{{ img.nombre_archivo|escapejs }}",
+                "descripcion": "{{ img.descripcion|escapejs }}",
+                "fecha": "{{ img.fecha_subida|date:'d/m/Y H:i' }}",
+                "comprimida": {{ img.fue_comprimida|yesno:"true,false" }},
+                "tamano_kb": {{ img.tamano_final_kb|default:"0" }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+}
+</script>
 {% endblock almacen_content %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Configurar modal de rechazo de línea individual
+    // Cargar datos de imágenes desde el JSON embebido
+    const imagenesDataEl = document.getElementById('imagenesData');
+    let imagenesData = {};
+    try {
+        imagenesData = JSON.parse(imagenesDataEl.textContent);
+    } catch (e) {
+        console.error('Error parsing imagenesData:', e);
+    }
+    
+    const maxImagenes = {{ max_imagenes_por_linea }};
+    const puedeSubir = {% if puede_subir_imagenes %}true{% else %}false{% endif %};
+    
+    // ========== MODAL DE IMÁGENES ==========
+    const imagenesModal = document.getElementById('imagenesModal');
+    if (imagenesModal) {
+        imagenesModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const lineaPk = button.getAttribute('data-linea-pk');
+            const lineaNumero = button.getAttribute('data-linea-numero');
+            const lineaDesc = button.getAttribute('data-linea-desc');
+            
+            // Actualizar encabezado del modal
+            document.getElementById('imagenesLineaNumero').textContent = lineaNumero;
+            document.getElementById('imagenesLineaDesc').textContent = lineaDesc;
+            
+            // Configurar el formulario de subida
+            const uploadLineaPk = document.getElementById('uploadLineaPk');
+            if (uploadLineaPk) {
+                uploadLineaPk.value = lineaPk;
+            }
+            
+            // Cargar las imágenes de esta línea
+            cargarImagenesLinea(lineaPk);
+        });
+    }
+    
+    function cargarImagenesLinea(lineaPk) {
+        const container = document.getElementById('imagenesContainer');
+        const sinImagenes = document.getElementById('sinImagenes');
+        const contador = document.getElementById('contadorImagenes');
+        const espaciosEl = document.getElementById('espaciosDisponibles');
+        const btnSubir = document.getElementById('btnSubirImagen');
+        const formSubir = document.getElementById('formSubirImagen');
+        
+        // Obtener datos de la línea
+        const lineaData = imagenesData[lineaPk];
+        if (!lineaData) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-4"><i class="bi bi-exclamation-triangle fs-1 d-block mb-2"></i>No se encontraron datos para esta línea</div>';
+            return;
+        }
+        
+        const imagenes = lineaData.imagenes || [];
+        const totalImagenes = imagenes.length;
+        const espaciosDisponibles = maxImagenes - totalImagenes;
+        
+        // Actualizar contador
+        if (contador) {
+            contador.textContent = `${totalImagenes}/${maxImagenes}`;
+            contador.className = `badge ms-2 ${totalImagenes >= maxImagenes ? 'bg-danger' : 'bg-secondary'}`;
+        }
+        
+        // Actualizar espacios disponibles
+        if (espaciosEl) {
+            espaciosEl.innerHTML = `Espacios disponibles: <strong>${espaciosDisponibles}</strong>`;
+        }
+        
+        // Deshabilitar botón si no hay espacio
+        if (btnSubir && puedeSubir) {
+            if (espaciosDisponibles <= 0) {
+                btnSubir.disabled = true;
+                btnSubir.innerHTML = '<i class="bi bi-x-circle me-1"></i>Límite alcanzado';
+            } else {
+                btnSubir.disabled = false;
+                btnSubir.innerHTML = '<i class="bi bi-upload me-1"></i>Subir Imagen';
+            }
+        }
+        
+        // Ocultar formulario si no hay espacio
+        if (formSubir && espaciosDisponibles <= 0) {
+            formSubir.innerHTML = '<div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle me-1"></i>Se alcanzó el límite de ' + maxImagenes + ' imágenes para esta línea.</div>';
+        }
+        
+        // Renderizar imágenes
+        if (totalImagenes === 0) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-4" id="sinImagenes"><i class="bi bi-image fs-1 d-block mb-2"></i>No hay imágenes para esta línea</div>';
+            return;
+        }
+        
+        let html = '';
+        imagenes.forEach(function(img) {
+            html += `
+                <div class="col-md-4 col-sm-6">
+                    <div class="card h-100">
+                        <img src="${img.url}" class="card-img-top cursor-pointer" 
+                             alt="${img.descripcion || img.nombre}"
+                             style="height: 150px; object-fit: cover; cursor: pointer;"
+                             onclick="verImagenAmpliada('${img.url}', '${img.descripcion || img.nombre}')"
+                             title="Clic para ampliar">
+                        <div class="card-body p-2">
+                            <p class="card-text small mb-1 text-truncate" title="${img.descripcion || img.nombre}">
+                                ${img.descripcion || img.nombre}
+                            </p>
+                            <small class="text-muted d-block">
+                                <i class="bi bi-calendar me-1"></i>${img.fecha}
+                                ${img.comprimida ? '<span class="badge bg-info ms-1" title="Imagen comprimida"><i class="bi bi-file-zip"></i></span>' : ''}
+                            </small>
+                            ${img.tamano_kb ? `<small class="text-muted">${img.tamano_kb} KB</small>` : ''}
+                        </div>
+                        ${puedeSubir ? `
+                        <div class="card-footer p-1 text-center">
+                            <form method="post" action="{% url 'almacen:eliminar_imagen_linea' solicitud.pk 0 0 %}"
+                                  onsubmit="return confirm('¿Eliminar esta imagen?');"
+                                  class="eliminar-imagen-form"
+                                  data-solicitud-pk="{{ solicitud.pk }}"
+                                  data-linea-pk="${lineaPk}"
+                                  data-imagen-pk="${img.id}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i> Eliminar
+                                </button>
+                            </form>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+        
+        // Actualizar las URLs de los formularios de eliminación
+        container.querySelectorAll('.eliminar-imagen-form').forEach(function(form) {
+            const solicitudPk = form.dataset.solicitudPk;
+            const lineaPkForm = form.dataset.lineaPk;
+            const imagenPk = form.dataset.imagenPk;
+            form.action = `{% url 'almacen:eliminar_imagen_linea' solicitud.pk 0 0 %}`.replace('/0/', '/' + lineaPkForm + '/').replace('/0/', '/' + imagenPk + '/');
+        });
+    }
+    
+    // Función global para ver imagen ampliada
+    window.verImagenAmpliada = function(url, descripcion) {
+        document.getElementById('imagenAmpliadaSrc').src = url;
+        document.getElementById('imagenAmpliadaDesc').textContent = descripcion || 'Imagen';
+        const modal = new bootstrap.Modal(document.getElementById('imagenAmpliadaModal'));
+        modal.show();
+    };
+    
+    // ========== MODAL DE RECHAZO DE LÍNEA ==========
     const rechazarLineaModal = document.getElementById('rechazarLineaModal');
     if (rechazarLineaModal) {
         rechazarLineaModal.addEventListener('show.bs.modal', function(event) {

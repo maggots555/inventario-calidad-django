@@ -21,8 +21,11 @@ Agregado: Diciembre 2025
 
 from django.db import models
 from django.contrib.auth.models import User
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, FileExtensionValidator
 from django.utils import timezone
+from PIL import Image
+import io
+import os
 
 # Importar constantes centralizadas
 from config.constants import (
@@ -969,6 +972,10 @@ class CompraProducto(models.Model):
         Esto crea un MovimientoAlmacen de salida para descontar del stock
         si la pieza ya había sido ingresada al inventario.
         
+        IMPORTANTE: También actualiza las UnidadInventario asociadas,
+        marcándolas como 'descartada' para reflejar que ya no están
+        disponibles en el inventario físico.
+        
         Args:
             empleado: Empleado que confirma la devolución
             observaciones: Notas adicionales
@@ -999,6 +1006,38 @@ class CompraProducto(models.Model):
                 compra=self,
                 observaciones=f'Devolución por {self.get_estado_display()} - {self.motivo_problema}'
             )
+        
+        # ============================================================
+        # ACTUALIZAR UnidadInventario ASOCIADAS
+        # ============================================================
+        # Las UnidadInventario tienen una relación directa con CompraProducto
+        # a través del campo 'compra'. Al devolver la compra, debemos marcar
+        # todas las unidades como 'descartada' ya que físicamente fueron
+        # devueltas al proveedor.
+        # 
+        # NOTA: Usamos self.unidades (related_name de UnidadInventario.compra)
+        # ============================================================
+        
+        motivo_descarte = f'Devuelta al proveedor - Compra #{self.pk} ({self.get_estado_display()})'
+        if self.motivo_problema:
+            motivo_descarte += f' - {self.motivo_problema}'
+        
+        # Actualizar UnidadInventario vinculadas directamente a esta compra
+        for unidad_inventario in self.unidades.all():
+            # Solo actualizar si no está ya descartada
+            if unidad_inventario.disponibilidad != 'descartada':
+                unidad_inventario.marcar_descartada(motivo_descarte)
+        
+        # También actualizar UnidadCompra si existen (para compras con detalle)
+        for unidad_compra in self.unidades_compra.all():
+            if unidad_compra.estado != 'devuelta':
+                unidad_compra.estado = 'devuelta'
+                unidad_compra.save()
+            
+            # Marcar la UnidadInventario asociada a UnidadCompra
+            if unidad_compra.unidad_inventario:
+                if unidad_compra.unidad_inventario.disponibilidad != 'descartada':
+                    unidad_compra.unidad_inventario.marcar_descartada(motivo_descarte)
         
         return True
     
@@ -3101,3 +3140,370 @@ class LineaCotizacion(models.Model):
             'compra_generada': 'cart-check-fill',
         }
         return estados_icon.get(self.estado_cliente, 'question-circle')
+
+
+# ============================================================================
+# FUNCIONES DE RUTA DE ALMACENAMIENTO PARA IMÁGENES DE COTIZACIÓN
+# ============================================================================
+
+def imagen_linea_cotizacion_upload_path(instance, filename):
+    """
+    Genera la ruta de almacenamiento para imágenes de líneas de cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta función le dice a Django DÓNDE guardar cada imagen que se sube.
+    En lugar de guardar todo en una sola carpeta (que sería un desastre),
+    organizamos las imágenes por:
+    1. Carpeta del módulo: almacen/cotizaciones/
+    2. Subcarpeta por solicitud: SOL-2025-0001/
+    3. Archivo con prefijo de línea: linea_1_imagen_original.jpg
+    
+    Ejemplo de ruta generada:
+    - almacen/cotizaciones/SOL-2025-0001/linea_1_foto_pieza.jpg
+    - almacen/cotizaciones/SOL-2025-0015/linea_3_referencia.png
+    
+    Args:
+        instance: Instancia de ImagenLineaCotizacion que se está guardando
+        filename: Nombre del archivo original (ej: 'foto_pieza.jpg')
+        
+    Returns:
+        str: Ruta completa donde se guardará el archivo
+        
+    NOTA TÉCNICA:
+    - numero_solicitud es único para cada SolicitudCotizacion (formato SOL-YYYY-NNNN)
+    - Usamos el número porque es más legible que un ID numérico
+    - El prefijo linea_N ayuda a identificar a qué línea pertenece la imagen
+    """
+    # Obtener el número de solicitud a través de la relación
+    numero_solicitud = instance.linea.solicitud.numero_solicitud
+    numero_linea = instance.linea.numero_linea
+    
+    # Sanitizar el nombre del archivo (remover caracteres problemáticos)
+    # Mantenemos solo el nombre limpio del archivo original
+    nombre_archivo = os.path.basename(filename)
+    
+    # Generar nombre único con prefijo de línea
+    nombre_final = f"linea_{numero_linea}_{nombre_archivo}"
+    
+    return f'almacen/cotizaciones/{numero_solicitud}/{nombre_final}'
+
+
+# ============================================================================
+# MODELO: IMAGEN DE LÍNEA DE COTIZACIÓN
+# ============================================================================
+class ImagenLineaCotizacion(models.Model):
+    """
+    Imágenes de referencia asociadas a cada línea de cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este modelo permite subir fotos de las piezas que se están cotizando.
+    Por ejemplo, si cotizas una RAM específica, puedes subir fotos de:
+    - El modelo exacto que necesitas
+    - La etiqueta con especificaciones
+    - El equipo donde se instalará
+    
+    ¿Por qué es útil?
+    -----------------
+    1. El proveedor ve exactamente qué pieza necesitas (evita confusiones)
+    2. El cliente puede revisar las especificaciones antes de aprobar
+    3. Cuando llega la pieza, puedes verificar que sea la correcta
+    4. Queda evidencia visual en el historial de la unidad de almacén
+    
+    Características técnicas:
+    -------------------------
+    - Máximo 5 imágenes por línea (para no sobrecargar el sistema)
+    - Compresión automática si el archivo supera 2MB
+    - Se organizan en carpetas por folio de solicitud
+    - Se muestran en el detalle de UnidadInventario (trazabilidad completa)
+    
+    Relación con otros modelos:
+    ---------------------------
+    ImagenLineaCotizacion → LineaCotizacion → SolicitudCotizacion
+                                            ↓
+                        CompraProducto → UnidadInventario (aquí se muestran las imágenes)
+    """
+    
+    # Límite máximo de imágenes por línea
+    MAX_IMAGENES_POR_LINEA = 5
+    
+    # Tamaño máximo en bytes antes de comprimir (2MB)
+    TAMANO_MAXIMO_SIN_COMPRIMIR = 2 * 1024 * 1024  # 2MB
+    
+    # ========== RELACIÓN CON LÍNEA DE COTIZACIÓN ==========
+    linea = models.ForeignKey(
+        LineaCotizacion,
+        on_delete=models.CASCADE,
+        related_name='imagenes',
+        verbose_name='Línea de Cotización',
+        help_text='Línea de cotización a la que pertenece esta imagen'
+    )
+    
+    # ========== IMAGEN ==========
+    imagen = models.ImageField(
+        upload_to=imagen_linea_cotizacion_upload_path,
+        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif', 'webp'])],
+        verbose_name='Imagen',
+        help_text='Imagen de referencia de la pieza (JPG, PNG, GIF, WebP). Máx 10MB.'
+    )
+    
+    # ========== DESCRIPCIÓN ==========
+    descripcion = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name='Descripción',
+        help_text='Descripción breve de la imagen (ej: "Etiqueta con modelo", "Vista frontal")'
+    )
+    
+    # ========== METADATOS ==========
+    fecha_subida = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de Subida',
+        help_text='Fecha y hora en que se subió la imagen'
+    )
+    subido_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='imagenes_cotizacion_subidas',
+        verbose_name='Subido Por',
+        help_text='Usuario que subió la imagen'
+    )
+    
+    # ========== INFORMACIÓN DE COMPRESIÓN ==========
+    fue_comprimida = models.BooleanField(
+        default=False,
+        verbose_name='¿Fue Comprimida?',
+        help_text='Indica si la imagen fue comprimida automáticamente'
+    )
+    tamano_original_kb = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Tamaño Original (KB)',
+        help_text='Tamaño original del archivo antes de compresión'
+    )
+    tamano_final_kb = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Tamaño Final (KB)',
+        help_text='Tamaño final del archivo después de procesamiento'
+    )
+    
+    class Meta:
+        verbose_name = 'Imagen de Línea de Cotización'
+        verbose_name_plural = 'Imágenes de Líneas de Cotización'
+        ordering = ['linea', 'fecha_subida']
+    
+    def __str__(self):
+        """
+        Representación en texto de la imagen.
+        Ejemplo: "Imagen Línea #1 - SOL-2025-0001"
+        """
+        return f"Imagen Línea #{self.linea.numero_linea} - {self.linea.solicitud.numero_solicitud}"
+    
+    @property
+    def nombre_archivo(self):
+        """
+        Retorna solo el nombre del archivo sin la ruta completa.
+        
+        Útil para mostrar en la interfaz de usuario.
+        
+        Returns:
+            str: Nombre del archivo (ej: 'linea_1_foto_pieza.jpg')
+        """
+        return os.path.basename(self.imagen.name) if self.imagen else ''
+    
+    @classmethod
+    def puede_agregar_imagen(cls, linea):
+        """
+        Verifica si se puede agregar otra imagen a una línea.
+        
+        EXPLICACIÓN:
+        Limitamos a 5 imágenes por línea para:
+        - Evitar sobrecargar el servidor de almacenamiento
+        - Mantener las cotizaciones enfocadas
+        - Facilitar la revisión visual
+        
+        Args:
+            linea: Instancia de LineaCotizacion a verificar
+            
+        Returns:
+            bool: True si se puede agregar, False si ya tiene el máximo
+        """
+        imagenes_actuales = cls.objects.filter(linea=linea).count()
+        return imagenes_actuales < cls.MAX_IMAGENES_POR_LINEA
+    
+    @classmethod
+    def imagenes_restantes(cls, linea):
+        """
+        Calcula cuántas imágenes más se pueden subir a una línea.
+        
+        Args:
+            linea: Instancia de LineaCotizacion
+            
+        Returns:
+            int: Número de imágenes que aún se pueden subir (0-5)
+        """
+        imagenes_actuales = cls.objects.filter(linea=linea).count()
+        return max(0, cls.MAX_IMAGENES_POR_LINEA - imagenes_actuales)
+    
+    def save(self, *args, **kwargs):
+        """
+        Override del método save() para:
+        1. Validar el límite de imágenes por línea
+        2. Comprimir la imagen si supera 2MB
+        3. Guardar información de compresión
+        
+        EXPLICACIÓN DETALLADA:
+        ----------------------
+        Este método se ejecuta cada vez que guardamos una imagen.
+        
+        Paso 1 - Validación:
+        Si ya hay 5 imágenes para esta línea, lanzamos un error.
+        Esto previene que se suban más imágenes del límite permitido.
+        
+        Paso 2 - Compresión:
+        Si la imagen pesa más de 2MB, la comprimimos automáticamente.
+        Esto ahorra espacio en disco y hace más rápida la carga de páginas.
+        
+        Paso 3 - Metadatos:
+        Guardamos el tamaño original y final para poder mostrar al usuario
+        cuánto espacio se ahorró con la compresión.
+        
+        Raises:
+            ValueError: Si ya se alcanzó el límite de 5 imágenes
+        """
+        es_nueva = self.pk is None
+        
+        # ========== VALIDAR LÍMITE DE IMÁGENES ==========
+        if es_nueva and not self.puede_agregar_imagen(self.linea):
+            raise ValueError(
+                f"No se pueden agregar más imágenes. Límite máximo: "
+                f"{self.MAX_IMAGENES_POR_LINEA} imágenes por línea."
+            )
+        
+        # ========== PROCESAR Y COMPRIMIR IMAGEN ==========
+        if self.imagen and es_nueva:
+            # Obtener el archivo de imagen
+            imagen_file = self.imagen
+            
+            # Calcular tamaño original
+            imagen_file.seek(0, 2)  # Ir al final del archivo
+            tamano_original = imagen_file.tell()  # Obtener posición (= tamaño)
+            imagen_file.seek(0)  # Volver al inicio
+            
+            self.tamano_original_kb = tamano_original // 1024
+            
+            # Comprimir solo si supera el límite de 2MB
+            if tamano_original > self.TAMANO_MAXIMO_SIN_COMPRIMIR:
+                imagen_comprimida = self._comprimir_imagen(imagen_file)
+                if imagen_comprimida:
+                    self.imagen = imagen_comprimida
+                    self.fue_comprimida = True
+                    
+                    # Calcular nuevo tamaño
+                    imagen_comprimida.seek(0, 2)
+                    tamano_final = imagen_comprimida.tell()
+                    imagen_comprimida.seek(0)
+                    self.tamano_final_kb = tamano_final // 1024
+                else:
+                    # Si falla la compresión, guardar tamaño original
+                    self.tamano_final_kb = self.tamano_original_kb
+            else:
+                # No necesita compresión
+                self.tamano_final_kb = self.tamano_original_kb
+        
+        super().save(*args, **kwargs)
+    
+    def _comprimir_imagen(self, imagen_file):
+        """
+        Comprime una imagen para reducir su tamaño.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Este método usa la librería Pillow (PIL) para:
+        1. Abrir la imagen original
+        2. Convertirla a formato RGB si es necesario (algunas imágenes PNG tienen transparencia)
+        3. Guardarla con menor calidad (85%) para reducir tamaño
+        4. Si aún es muy grande, reduce también las dimensiones
+        
+        La calidad 85% es un buen balance entre:
+        - Tamaño de archivo reducido
+        - Calidad visual aceptable para referencia
+        
+        Args:
+            imagen_file: Archivo de imagen (InMemoryUploadedFile o similar)
+            
+        Returns:
+            ContentFile: Imagen comprimida lista para guardar, o None si falla
+        """
+        from django.core.files.base import ContentFile
+        
+        try:
+            # Abrir la imagen con Pillow
+            img = Image.open(imagen_file)
+            
+            # Convertir a RGB si tiene transparencia (PNG con alpha)
+            if img.mode in ('RGBA', 'LA', 'P'):
+                # Crear fondo blanco para reemplazar transparencia
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Si la imagen es muy grande, redimensionar
+            max_dimension = 1920  # Full HD como máximo
+            if img.width > max_dimension or img.height > max_dimension:
+                # Calcular nuevo tamaño manteniendo proporción
+                ratio = min(max_dimension / img.width, max_dimension / img.height)
+                nuevo_ancho = int(img.width * ratio)
+                nuevo_alto = int(img.height * ratio)
+                img = img.resize((nuevo_ancho, nuevo_alto), Image.Resampling.LANCZOS)
+            
+            # Guardar con compresión JPEG
+            output = io.BytesIO()
+            img.save(output, format='JPEG', quality=85, optimize=True)
+            output.seek(0)
+            
+            # Generar nombre de archivo con extensión .jpg
+            nombre_original = os.path.basename(imagen_file.name)
+            nombre_sin_ext = os.path.splitext(nombre_original)[0]
+            nuevo_nombre = f"{nombre_sin_ext}.jpg"
+            
+            return ContentFile(output.read(), name=nuevo_nombre)
+            
+        except Exception as e:
+            # Si falla la compresión, registrar error y retornar None
+            # La imagen se guardará sin comprimir
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error al comprimir imagen: {e}")
+            return None
+    
+    def delete(self, *args, **kwargs):
+        """
+        Override del método delete() para eliminar el archivo físico.
+        
+        EXPLICACIÓN:
+        Cuando eliminamos un registro de ImagenLineaCotizacion,
+        también debemos eliminar el archivo físico del disco.
+        De lo contrario, quedarían archivos huérfanos ocupando espacio.
+        """
+        # Guardar referencia al archivo antes de eliminar el registro
+        imagen_path = self.imagen.path if self.imagen else None
+        
+        # Eliminar el registro de la base de datos
+        super().delete(*args, **kwargs)
+        
+        # Eliminar el archivo físico si existe
+        if imagen_path and os.path.exists(imagen_path):
+            try:
+                os.remove(imagen_path)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error al eliminar archivo de imagen: {e}")

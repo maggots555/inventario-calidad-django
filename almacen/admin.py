@@ -33,6 +33,7 @@ from .models import (
     UnidadInventario,
     SolicitudCotizacion,
     LineaCotizacion,
+    ImagenLineaCotizacion,
 )
 
 from config.constants import (
@@ -1161,6 +1162,10 @@ class LineaCotizacionAdmin(admin.ModelAdmin):
     
     readonly_fields = ('fecha_creacion', 'fecha_actualizacion', 'fecha_respuesta')
     
+    # NOTA: El inline ImagenLineaCotizacionInline se agrega dinámicamente
+    # después de su definición (ver más abajo en el archivo)
+    inlines = []  # Se poblará después
+    
     # -------------------------------------------------------------------------
     # Métodos de visualización personalizados
     # -------------------------------------------------------------------------
@@ -1194,3 +1199,184 @@ class LineaCotizacionAdmin(admin.ModelAdmin):
             obj.get_estado_cliente_display()
         )
 
+
+# ============================================================================
+# ADMIN: IMAGEN DE LÍNEA DE COTIZACIÓN
+# ============================================================================
+class ImagenLineaCotizacionInline(admin.TabularInline):
+    """
+    Inline para mostrar y gestionar imágenes dentro del admin de LineaCotizacion.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este inline permite ver y agregar imágenes directamente desde
+    la edición de una línea de cotización en el admin.
+    
+    Campos mostrados:
+    - Imagen (preview)
+    - Descripción
+    - Fecha de subida
+    - Información de compresión
+    """
+    model = ImagenLineaCotizacion
+    extra = 0
+    readonly_fields = ('preview_imagen', 'fecha_subida', 'fue_comprimida', 'tamano_original_kb', 'tamano_final_kb')
+    fields = ('preview_imagen', 'imagen', 'descripcion', 'fecha_subida', 'fue_comprimida')
+    
+    @admin.display(description='Vista Previa')
+    def preview_imagen(self, obj):
+        """Muestra una miniatura de la imagen"""
+        if obj.imagen:
+            return format_html(
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 100px; max-height: 100px; border-radius: 4px;"/>'
+                '</a>',
+                obj.imagen.url,
+                obj.imagen.url
+            )
+        return '-'
+
+
+@admin.register(ImagenLineaCotizacion)
+class ImagenLineaCotizacionAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Imágenes de Líneas de Cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este admin permite ver todas las imágenes de cotización del sistema.
+    Útil para:
+    - Auditoría de imágenes subidas
+    - Ver espacio utilizado
+    - Buscar imágenes por solicitud o línea
+    
+    Normalmente las imágenes se gestionan desde el detalle de solicitud,
+    pero este admin permite una vista general del sistema.
+    """
+    
+    list_display = (
+        'id',
+        'preview_imagen',
+        'solicitud_display',
+        'linea_display',
+        'descripcion_corta',
+        'fecha_subida',
+        'subido_por',
+        'fue_comprimida',
+        'tamano_display',
+    )
+    
+    list_filter = (
+        'fue_comprimida',
+        ('fecha_subida', admin.DateFieldListFilter),
+        'linea__solicitud',
+    )
+    
+    search_fields = (
+        'linea__solicitud__numero_solicitud',
+        'linea__descripcion_pieza',
+        'descripcion',
+    )
+    
+    ordering = ['-fecha_subida']
+    
+    readonly_fields = (
+        'preview_imagen_grande',
+        'fecha_subida',
+        'subido_por',
+        'fue_comprimida',
+        'tamano_original_kb',
+        'tamano_final_kb',
+    )
+    
+    fieldsets = (
+        ('Información', {
+            'fields': ('linea', 'descripcion')
+        }),
+        ('Imagen', {
+            'fields': ('preview_imagen_grande', 'imagen')
+        }),
+        ('Metadatos', {
+            'fields': ('fecha_subida', 'subido_por', 'fue_comprimida', 'tamano_original_kb', 'tamano_final_kb'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    # -------------------------------------------------------------------------
+    # Métodos de visualización personalizados
+    # -------------------------------------------------------------------------
+    
+    @admin.display(description='Imagen')
+    def preview_imagen(self, obj):
+        """Muestra una miniatura de la imagen en la lista"""
+        if obj.imagen:
+            return format_html(
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 60px; max-height: 60px; border-radius: 4px;"/>'
+                '</a>',
+                obj.imagen.url,
+                obj.imagen.url
+            )
+        return '-'
+    
+    @admin.display(description='Vista Previa')
+    def preview_imagen_grande(self, obj):
+        """Muestra una imagen más grande en el formulario de detalle"""
+        if obj.imagen:
+            return format_html(
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 300px; max-height: 300px; border-radius: 8px;"/>'
+                '</a>',
+                obj.imagen.url,
+                obj.imagen.url
+            )
+        return '-'
+    
+    @admin.display(description='Solicitud')
+    def solicitud_display(self, obj):
+        """Muestra el número de solicitud"""
+        return obj.linea.solicitud.numero_solicitud
+    
+    @admin.display(description='Línea')
+    def linea_display(self, obj):
+        """Muestra información de la línea"""
+        return f'#{obj.linea.numero_linea}: {obj.linea.descripcion_pieza[:30]}...'
+    
+    @admin.display(description='Descripción')
+    def descripcion_corta(self, obj):
+        """Trunca la descripción para la lista"""
+        if not obj.descripcion:
+            return '-'
+        if len(obj.descripcion) > 30:
+            return obj.descripcion[:30] + '...'
+        return obj.descripcion
+    
+    @admin.display(description='Tamaño')
+    def tamano_display(self, obj):
+        """Muestra el tamaño del archivo"""
+        if obj.tamano_final_kb:
+            if obj.fue_comprimida and obj.tamano_original_kb:
+                ahorro = obj.tamano_original_kb - obj.tamano_final_kb
+                return format_html(
+                    '{} KB <span style="color: green; font-size: 10px;">(-{} KB)</span>',
+                    obj.tamano_final_kb,
+                    ahorro
+                )
+            return f'{obj.tamano_final_kb} KB'
+        return '-'
+
+
+# ============================================================================
+# CONFIGURACIÓN POST-DEFINICIÓN: ASIGNAR INLINE A LineaCotizacionAdmin
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# --------------------------------
+# En Python, las clases se definen de arriba hacia abajo en el archivo.
+# LineaCotizacionAdmin se define ANTES que ImagenLineaCotizacionInline,
+# por lo que no podemos referenciar ImagenLineaCotizacionInline dentro
+# de LineaCotizacionAdmin directamente.
+#
+# La solución es asignar el inline DESPUÉS de que ambas clases existan.
+# Esto es perfectamente válido en Python y es un patrón común.
+# ============================================================================
+LineaCotizacionAdmin.inlines = [ImagenLineaCotizacionInline]

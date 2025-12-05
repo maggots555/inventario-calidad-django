@@ -72,7 +72,7 @@
                                 <div class="row text-center">
                                     <div class="col">
                                         <small class="text-muted">Stock Actual</small>
-                                        <p class="h4 mb-0">{{ compra.producto.cantidad_stock }}</p>
+                                        <p class="h4 mb-0">{{ compra.producto.stock_actual }}</p>
                                     </div>
                                     <div class="col">
                                         <small class="text-muted">A Devolver</small>
@@ -80,9 +80,7 @@
                                     </div>
                                     <div class="col">
                                         <small class="text-muted">Stock Final</small>
-                                        {% with stock_final=compra.producto.cantidad_stock|add:compra.cantidad|stringformat:"i"|add:"-"|add:compra.cantidad|stringformat:"i" %}
-                                        <p class="h4 mb-0 text-primary">{{ compra.producto.cantidad_stock|add:compra.cantidad_negativa|default:compra.producto.cantidad_stock }}</p>
-                                        {% endwith %}
+                                        <p class="h4 mb-0 text-primary">{{ stock_final }}</p>
                                     </div>
                                 </div>
                             </div>

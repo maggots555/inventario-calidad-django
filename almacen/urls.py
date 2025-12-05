@@ -103,6 +103,11 @@ urlpatterns = [
     path('solicitudes-cotizacion/<int:pk>/aprobar-todas/', views.aprobar_todas_lineas, name='aprobar_todas_lineas'),
     path('solicitudes-cotizacion/<int:pk>/rechazar-todas/', views.rechazar_todas_lineas, name='rechazar_todas_lineas'),
     
+    # Gestión de imágenes de líneas de cotización
+    path('solicitudes-cotizacion/<int:solicitud_pk>/linea/<int:linea_pk>/imagenes/', views.gestionar_imagenes_linea, name='gestionar_imagenes_linea'),
+    path('solicitudes-cotizacion/<int:solicitud_pk>/linea/<int:linea_pk>/imagenes/<int:imagen_pk>/eliminar/', views.eliminar_imagen_linea, name='eliminar_imagen_linea'),
+    path('api/linea/<int:linea_pk>/imagenes/', views.api_imagenes_linea, name='api_imagenes_linea'),
+    
     # ============================================================================
     # SOLICITUDES DE BAJA
     # ============================================================================

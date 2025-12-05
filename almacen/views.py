@@ -46,6 +46,7 @@ from .models import (
     UnidadInventario,
     SolicitudCotizacion,
     LineaCotizacion,
+    ImagenLineaCotizacion,
 )
 from .forms import (
     ProveedorForm,
@@ -72,6 +73,7 @@ from .forms import (
     LineaCotizacionFormSet,
     SolicitudCotizacionFiltroForm,
     RespuestaLineaCotizacionForm,
+    ImagenLineaCotizacionForm,
 )
 from inventario.models import Empleado
 
@@ -996,12 +998,18 @@ def detalle_unidad(request, pk):
     - Marca, modelo, número de serie
     - Estado y disponibilidad actual
     - Origen y trazabilidad (de dónde vino, a dónde fue)
+    - Imágenes de referencia de la cotización (si aplica)
     - Historial de cambios (si implementado)
     
     También permite acciones rápidas como:
     - Cambiar estado/disponibilidad
     - Asignar a una orden de servicio
     - Marcar como defectuosa
+    
+    Trazabilidad de imágenes:
+    - Si la unidad proviene de una cotización (compra.linea_cotizacion_origen)
+    - Se muestran las imágenes de referencia que se subieron en la cotización
+    - Esto permite verificar visualmente que la pieza recibida es correcta
     """
     
     unidad = get_object_or_404(
@@ -1010,15 +1018,35 @@ def detalle_unidad(request, pk):
             'producto__categoria',
             'producto__proveedor_principal',
             'compra',
+            'compra__linea_cotizacion_origen',
+            'compra__linea_cotizacion_origen__solicitud',
             'orden_servicio_origen',
             'orden_servicio_destino',
         ),
         pk=pk
     )
     
+    # Obtener imágenes de cotización si existen
+    # La trazabilidad es: UnidadInventario → compra → linea_cotizacion_origen → imagenes
+    imagenes_cotizacion = None
+    linea_cotizacion = None
+    solicitud_cotizacion = None
+    
+    if unidad.compra:
+        try:
+            linea_cotizacion = unidad.compra.linea_cotizacion_origen
+            if linea_cotizacion:
+                solicitud_cotizacion = linea_cotizacion.solicitud
+                imagenes_cotizacion = linea_cotizacion.imagenes.all()
+        except:
+            pass
+    
     context = {
         'unidad': unidad,
         'titulo': f'Unidad: {unidad.codigo_interno}',
+        'imagenes_cotizacion': imagenes_cotizacion,
+        'linea_cotizacion': linea_cotizacion,
+        'solicitud_cotizacion': solicitud_cotizacion,
     }
     
     return render(request, 'almacen/detalle_unidad.html', context)
@@ -2333,6 +2361,8 @@ def confirmar_devolucion(request, pk):
     context = {
         'compra': compra,
         'form': form,
+        # Stock final después de la devolución (stock actual - cantidad a devolver)
+        'stock_final': compra.producto.stock_actual - compra.cantidad if compra.producto else 0,
     }
     
     return render(request, 'almacen/compras/confirmar_devolucion.html', context)
@@ -2606,14 +2636,17 @@ def detalle_solicitud_cotizacion(request, pk):
     Esta vista muestra toda la información de una solicitud:
     - Datos de la cabecera (número, orden vinculada, estado)
     - Tabla con todas las líneas y sus estados
+    - Imágenes de referencia de cada línea
     - Totales y resúmenes
     - Acciones disponibles según el estado
     
     Las acciones cambian según el estado:
-    - Borrador: Editar, Enviar a cliente, Cancelar
+    - Borrador: Editar, Enviar a cliente, Cancelar, Subir imágenes
     - Enviada: Registrar respuestas del cliente
     - Aprobada: Generar compras
     - Completada: Solo visualización
+    
+    También permite subir imágenes a las líneas cuando está en borrador.
     """
     solicitud = get_object_or_404(
         SolicitudCotizacion.objects.select_related(
@@ -2622,7 +2655,8 @@ def detalle_solicitud_cotizacion(request, pk):
         ).prefetch_related(
             'lineas__producto',
             'lineas__proveedor',
-            'lineas__compra_generada'
+            'lineas__compra_generada',
+            'lineas__imagenes',  # Incluir imágenes de cada línea
         ),
         pk=pk
     )
@@ -2635,10 +2669,48 @@ def detalle_solicitud_cotizacion(request, pk):
         except:
             pass
     
+    # Procesar subida de imagen (solo en estado borrador)
+    mensaje_imagen = None
+    if request.method == 'POST' and solicitud.estado == 'borrador':
+        linea_pk = request.POST.get('linea_pk')
+        if linea_pk and 'imagen' in request.FILES:
+            try:
+                linea = solicitud.lineas.get(pk=linea_pk)
+                form = ImagenLineaCotizacionForm(
+                    request.POST,
+                    request.FILES,
+                    linea=linea
+                )
+                if form.is_valid():
+                    imagen = form.save(commit=False)
+                    imagen.linea = linea
+                    imagen.subido_por = request.user
+                    imagen.save()
+                    messages.success(
+                        request,
+                        f'Imagen subida exitosamente a la línea #{linea.numero_linea}.'
+                    )
+                else:
+                    for field, errors in form.errors.items():
+                        for error in errors:
+                            messages.error(request, f'{error}')
+            except LineaCotizacion.DoesNotExist:
+                messages.error(request, 'Línea no encontrada.')
+            except ValueError as e:
+                messages.error(request, str(e))
+            
+            # Redirigir para evitar reenvío del formulario
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+    
+    # Verificar si se puede subir imágenes
+    puede_subir_imagenes = solicitud.estado == 'borrador'
+    
     context = {
         'solicitud': solicitud,
         'info_orden': info_orden,
         'titulo': f'Solicitud {solicitud.numero_solicitud}',
+        'puede_subir_imagenes': puede_subir_imagenes,
+        'max_imagenes_por_linea': ImagenLineaCotizacion.MAX_IMAGENES_POR_LINEA,
     }
     
     return render(request, 'almacen/cotizaciones/detalle_solicitud.html', context)
@@ -2893,4 +2965,222 @@ def eliminar_solicitud_cotizacion(request, pk):
         return redirect('almacen:lista_solicitudes_cotizacion')
     
     return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+# ============================================================================
+# GESTIÓN DE IMÁGENES DE LÍNEAS DE COTIZACIÓN
+# ============================================================================
+
+@login_required
+def gestionar_imagenes_linea(request, solicitud_pk, linea_pk):
+    """
+    Gestionar imágenes de referencia de una línea de cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista permite ver, subir y eliminar imágenes de referencia
+    para una línea específica de cotización.
+    
+    ¿Por qué es útil?
+    - El proveedor ve exactamente qué pieza se necesita
+    - El cliente puede verificar las especificaciones
+    - Queda evidencia visual para trazabilidad
+    
+    Restricciones:
+    - Solo se pueden gestionar imágenes si la solicitud está en estado 'borrador'
+    - Máximo 5 imágenes por línea
+    - Las imágenes mayores a 2MB se comprimen automáticamente
+    
+    Args:
+        request: Solicitud HTTP
+        solicitud_pk: ID de la SolicitudCotizacion
+        linea_pk: ID de la LineaCotizacion
+    
+    Returns:
+        Renderizado del template con el formulario y las imágenes actuales
+    """
+    # Obtener la solicitud y validar acceso
+    solicitud = get_object_or_404(
+        SolicitudCotizacion.objects.select_related('orden_servicio'),
+        pk=solicitud_pk
+    )
+    
+    # Obtener la línea y validar que pertenece a la solicitud
+    linea = get_object_or_404(
+        LineaCotizacion.objects.select_related('producto', 'proveedor'),
+        pk=linea_pk,
+        solicitud=solicitud
+    )
+    
+    # Solo se pueden gestionar imágenes en estado borrador
+    puede_editar = solicitud.estado == 'borrador'
+    
+    # Obtener imágenes existentes
+    imagenes = linea.imagenes.all().order_by('fecha_subida')
+    
+    # Calcular información de límites
+    imagenes_restantes = ImagenLineaCotizacion.imagenes_restantes(linea)
+    puede_agregar = imagenes_restantes > 0 and puede_editar
+    
+    # Procesar formulario de subida
+    if request.method == 'POST' and puede_agregar:
+        form = ImagenLineaCotizacionForm(
+            request.POST,
+            request.FILES,
+            linea=linea
+        )
+        
+        if form.is_valid():
+            try:
+                # Guardar la imagen asociándola a la línea y al usuario
+                imagen = form.save(commit=False)
+                imagen.linea = linea
+                imagen.subido_por = request.user
+                imagen.save()
+                
+                messages.success(
+                    request,
+                    f'Imagen subida exitosamente. '
+                    f'Quedan {ImagenLineaCotizacion.imagenes_restantes(linea)} espacios disponibles.'
+                )
+                
+                # Redirigir para evitar reenvío del formulario
+                return redirect(
+                    'almacen:gestionar_imagenes_linea',
+                    solicitud_pk=solicitud_pk,
+                    linea_pk=linea_pk
+                )
+                
+            except ValueError as e:
+                messages.error(request, str(e))
+        else:
+            # Mostrar errores de validación
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
+    else:
+        form = ImagenLineaCotizacionForm(linea=linea) if puede_agregar else None
+    
+    context = {
+        'solicitud': solicitud,
+        'linea': linea,
+        'imagenes': imagenes,
+        'form': form,
+        'puede_editar': puede_editar,
+        'puede_agregar': puede_agregar,
+        'imagenes_restantes': imagenes_restantes,
+        'max_imagenes': ImagenLineaCotizacion.MAX_IMAGENES_POR_LINEA,
+        'titulo': f'Imágenes - Línea #{linea.numero_linea}',
+    }
+    
+    return render(request, 'almacen/cotizaciones/gestionar_imagenes_linea.html', context)
+
+
+@login_required
+def eliminar_imagen_linea(request, solicitud_pk, linea_pk, imagen_pk):
+    """
+    Eliminar una imagen de una línea de cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista elimina una imagen específica de una línea de cotización.
+    
+    Validaciones:
+    - La imagen debe pertenecer a la línea indicada
+    - La solicitud debe estar en estado 'borrador'
+    - Solo se procesa si es una solicitud POST (para evitar eliminaciones accidentales)
+    
+    Args:
+        request: Solicitud HTTP
+        solicitud_pk: ID de la SolicitudCotizacion
+        linea_pk: ID de la LineaCotizacion
+        imagen_pk: ID de la ImagenLineaCotizacion a eliminar
+    
+    Returns:
+        Redirección a la vista de gestión de imágenes
+    """
+    # Validar la cadena completa: solicitud → línea → imagen
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=solicitud_pk)
+    linea = get_object_or_404(LineaCotizacion, pk=linea_pk, solicitud=solicitud)
+    imagen = get_object_or_404(ImagenLineaCotizacion, pk=imagen_pk, linea=linea)
+    
+    # Solo se pueden eliminar imágenes en estado borrador
+    if solicitud.estado != 'borrador':
+        messages.error(
+            request,
+            'Solo se pueden eliminar imágenes cuando la solicitud está en borrador.'
+        )
+        return redirect(
+            'almacen:gestionar_imagenes_linea',
+            solicitud_pk=solicitud_pk,
+            linea_pk=linea_pk
+        )
+    
+    # Solo procesar eliminación con método POST
+    if request.method == 'POST':
+        nombre_archivo = imagen.nombre_archivo
+        imagen.delete()
+        messages.success(
+            request,
+            f'Imagen "{nombre_archivo}" eliminada correctamente.'
+        )
+    
+    return redirect(
+        'almacen:gestionar_imagenes_linea',
+        solicitud_pk=solicitud_pk,
+        linea_pk=linea_pk
+    )
+
+
+@login_required
+def api_imagenes_linea(request, linea_pk):
+    """
+    API para obtener las imágenes de una línea en formato JSON.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista retorna las imágenes de una línea en formato JSON,
+    útil para actualizar la interfaz con JavaScript sin recargar la página.
+    
+    La respuesta incluye:
+    - Lista de imágenes con su URL, descripción y metadata
+    - Información sobre cuántas imágenes más se pueden subir
+    - Si se puede agregar más imágenes
+    
+    Args:
+        request: Solicitud HTTP
+        linea_pk: ID de la LineaCotizacion
+    
+    Returns:
+        JsonResponse con la información de las imágenes
+    """
+    linea = get_object_or_404(
+        LineaCotizacion.objects.select_related('solicitud'),
+        pk=linea_pk
+    )
+    
+    imagenes = linea.imagenes.all().order_by('fecha_subida')
+    
+    imagenes_data = []
+    for img in imagenes:
+        imagenes_data.append({
+            'id': img.pk,
+            'url': img.imagen.url,
+            'nombre': img.nombre_archivo,
+            'descripcion': img.descripcion or '',
+            'fecha_subida': img.fecha_subida.strftime('%d/%m/%Y %H:%M'),
+            'fue_comprimida': img.fue_comprimida,
+            'tamano_kb': img.tamano_final_kb,
+        })
+    
+    return JsonResponse({
+        'success': True,
+        'imagenes': imagenes_data,
+        'total_imagenes': len(imagenes_data),
+        'imagenes_restantes': ImagenLineaCotizacion.imagenes_restantes(linea),
+        'puede_agregar': ImagenLineaCotizacion.puede_agregar_imagen(linea),
+        'max_imagenes': ImagenLineaCotizacion.MAX_IMAGENES_POR_LINEA,
+        'puede_editar': linea.solicitud.estado == 'borrador',
+    })
+
 
