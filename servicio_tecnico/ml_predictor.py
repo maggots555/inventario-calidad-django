@@ -165,14 +165,42 @@ class PredictorAceptacionCotizacion:
         
         for col, encoder in self.encoders.items():
             if col in df_features.columns:
+                # Rellenar valores nulos con 'desconocido' y normalizar a minúsculas
+                # EXPLICACIÓN: Convertimos todo a minúsculas para evitar errores
+                # por diferencias de mayúsculas (ej: "Laptop" vs "laptop")
+                valores = df_features[col].fillna('desconocido').astype(str).str.lower().str.strip()
+                
                 # Entrenar encoder si no está entrenado
                 if not hasattr(encoder, 'classes_'):
-                    encoder.fit(df_features[col].fillna('desconocido'))
+                    encoder.fit(valores)
                 
-                # Transformar valores
-                df_features[f'{col}_encoded'] = encoder.transform(
-                    df_features[col].fillna('desconocido')
-                )
+                # ========================================
+                # MANEJAR VALORES NO VISTOS (UNSEEN LABELS)
+                # ========================================
+                # EXPLICACIÓN PARA PRINCIPIANTES:
+                # Si aparece un nuevo valor que el encoder no conoce (ej: "tablet"),
+                # lo reemplazamos con un valor conocido para evitar errores.
+                # Usamos el valor más común (clase 0) como valor por defecto.
+                
+                # Obtener valores conocidos por el encoder
+                clases_conocidas = set(encoder.classes_)
+                
+                # Reemplazar valores desconocidos con el primer valor conocido
+                # (esto evita el error "y contains previously unseen labels")
+                valor_por_defecto = encoder.classes_[0]  # Primer valor conocido
+                
+                # Crear copia de valores y reemplazar desconocidos
+                valores_safe = valores.copy()
+                mascara_desconocidos = ~valores.isin(clases_conocidas)
+                
+                if mascara_desconocidos.any():
+                    valores_desconocidos = valores[mascara_desconocidos].unique()
+                    print(f"⚠️ Valores desconocidos en '{col}': {list(valores_desconocidos)}")
+                    print(f"   Reemplazando con valor por defecto: '{valor_por_defecto}'")
+                    valores_safe[mascara_desconocidos] = valor_por_defecto
+                
+                # Transformar valores (ahora todos son conocidos)
+                df_features[f'{col}_encoded'] = encoder.transform(valores_safe)
         
         # ========================================
         # SELECCIONAR FEATURES FINALES

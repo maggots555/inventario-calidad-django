@@ -1518,7 +1518,8 @@
                         <div class="card-body">
                             {% if ml_insights.prediccion_ejemplo %}
                             <p class="text-muted mb-3">
-                                <strong>Cotización ID:</strong> {{ ml_insights.prediccion_ejemplo.cotizacion_id }}<br>
+                                <strong>Orden Cliente:</strong> {{ ml_insights.prediccion_ejemplo.orden_cliente|default:"N/A" }}<br>
+                                <small class="text-secondary">Cotización ID: {{ ml_insights.prediccion_ejemplo.cotizacion_id }}</small><br>
                                 <strong>Costo:</strong> ${{ ml_insights.prediccion_ejemplo.costo|floatformat:2 }}
                             </p>
                             <div class="mb-3">
@@ -1750,7 +1751,7 @@
                                 <dd class="col-7">{{ ml_insights_avanzados.cotizacion_analizada.id }}</dd>
                                 
                                 <dt class="col-5">Orden:</dt>
-                                <dd class="col-7">{{ ml_insights_avanzados.cotizacion_analizada.orden }}</dd>
+                                <dd class="col-7">{{ ml_insights_avanzados.cotizacion_analizada.orden|default:"N/A" }}</dd>
                                 
                                 <dt class="col-5">Costo:</dt>
                                 <dd class="col-7"><strong>${{ ml_insights_avanzados.cotizacion_analizada.costo_actual|floatformat:0 }}</strong></dd>

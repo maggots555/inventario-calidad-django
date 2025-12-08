@@ -7494,6 +7494,15 @@ def exportar_excel_dashboard_oow_fl(request):
                 ws_resp.cell(row=row, column=7).fill = PatternFill(start_color="dc3545", end_color="dc3545", fill_type="solid")
                 ws_resp.cell(row=row, column=7).font = Font(bold=True, color="FFFFFF")
             
+            # Resaltar fila completa si es candidato RHITSO (morado claro)
+            if orden.es_candidato_rhitso:
+                rhitso_color = "ede9fe"  # Morado claro (igual que en dashboard)
+                for col in range(1, 16):  # Columnas 1-15
+                    cell = ws_resp.cell(row=row, column=col)
+                    # Solo aplicar si la celda no tiene ya un color especial (estado, retrasada)
+                    if col not in [6, 7] or (col == 7 and orden.dias_habiles_en_servicio <= 15):
+                        cell.fill = PatternFill(start_color=rhitso_color, end_color=rhitso_color, fill_type="solid")
+            
             row += 1
         
         # ============== SECCIÓN: ÓRDENES CERRADAS (ENTREGADAS) ==============
@@ -7567,6 +7576,15 @@ def exportar_excel_dashboard_oow_fl(request):
             color_estado = get_estado_color(orden.estado)
             ws_resp.cell(row=row, column=6).fill = PatternFill(start_color=color_estado, end_color=color_estado, fill_type="solid")
             ws_resp.cell(row=row, column=6).font = Font(bold=True, color="FFFFFF")
+            
+            # Resaltar fila completa si es candidato RHITSO (morado claro)
+            if orden.es_candidato_rhitso:
+                rhitso_color = "ede9fe"  # Morado claro (igual que en dashboard)
+                for col in range(1, 16):  # Columnas 1-15
+                    cell = ws_resp.cell(row=row, column=col)
+                    # Solo aplicar si la celda no tiene ya un color especial (estado)
+                    if col != 6:
+                        cell.fill = PatternFill(start_color=rhitso_color, end_color=rhitso_color, fill_type="solid")
             
             row += 1
         
@@ -7672,6 +7690,17 @@ def exportar_excel_dashboard_oow_fl(request):
         if orden.estado not in ['entregado', 'cancelado'] and orden.dias_habiles_en_servicio > 15:
             ws_all.cell(row=row, column=9).fill = PatternFill(start_color="dc3545", end_color="dc3545", fill_type="solid")
             ws_all.cell(row=row, column=9).font = Font(bold=True, color="FFFFFF")
+        
+        # Resaltar fila completa si es candidato RHITSO (morado claro)
+        if orden.es_candidato_rhitso:
+            rhitso_color = "ede9fe"  # Morado claro (igual que en dashboard)
+            for col in range(1, 18):  # Columnas 1-17
+                cell = ws_all.cell(row=row, column=col)
+                # Solo aplicar si la celda no tiene ya un color especial (estado en col 6, días en col 9)
+                es_celda_estado = (col == 6)
+                es_celda_retrasada = (col == 9 and orden.estado not in ['entregado', 'cancelado'] and orden.dias_habiles_en_servicio > 15)
+                if not es_celda_estado and not es_celda_retrasada:
+                    cell.fill = PatternFill(start_color=rhitso_color, end_color=rhitso_color, fill_type="solid")
         
         row += 1
     
@@ -7993,6 +8022,7 @@ def dashboard_cotizaciones(request):
                 ml_insights['prediccion_ejemplo'] = {
                     'cotizacion_id': ultima['cotizacion_id'],
                     'orden': ultima['numero_orden'],
+                    'orden_cliente': ultima['orden_cliente'],  # Orden del cliente para referencia
                     'costo': ultima['costo_total'],
                     'prob_aceptacion': prob_aceptacion * 100,
                     'prob_rechazo': prob_rechazo * 100
@@ -8037,7 +8067,8 @@ def dashboard_cotizaciones(request):
                         # Datos de cotización analizada (para mostrar en UI)
                         'cotizacion_analizada': {
                             'id': ultima['cotizacion_id'],
-                            'orden': ultima['numero_orden'],
+                            'orden': ultima['orden_cliente'],  # Mostrar orden del cliente en lugar de orden interna
+                            'orden_interna': ultima['numero_orden'],  # Guardar orden interna por si se necesita
                             'costo_actual': ultima['costo_total'],
                             'total_piezas': ultima['total_piezas'],
                             'gama': ultima['gama'],
