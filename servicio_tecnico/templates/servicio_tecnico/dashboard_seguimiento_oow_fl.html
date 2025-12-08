@@ -570,7 +570,7 @@
                                             </thead>
                                             <tbody>
                                                 {% for item in alertas.cotizaciones_pendientes|slice:":10" %}
-                                                <tr>
+                                                <tr{% if item.es_candidato_rhitso %} class="row-rhitso"{% endif %}>
                                                     <td><strong>{{ item.orden_cliente }}</strong></td>
                                                     <td>
                                                         <span class="badge bg-secondary">
@@ -616,7 +616,7 @@
                                                 <table class="table table-hover table-sm mb-0">
                                                     <tbody>
                                                         {% for item in alertas.cotizaciones_pendientes|slice:"10:" %}
-                                                        <tr>
+                                                        <tr{% if item.es_candidato_rhitso %} class="row-rhitso"{% endif %}>
                                                             <td><strong>{{ item.orden_cliente }}</strong></td>
                                                             <td>
                                                                 <span class="badge bg-secondary">
