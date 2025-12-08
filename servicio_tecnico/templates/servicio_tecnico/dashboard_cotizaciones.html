@@ -310,6 +310,13 @@
                         <div class="card-body">
                             {% if graficos.evolucion_temporal %}
                                 {{ graficos.evolucion_temporal|safe }}
+                                <div class="alert alert-secondary alert-dashboard mt-3">
+                                    <i class="bi bi-info-circle"></i> 
+                                    <strong>¿Cómo interpretar este gráfico?</strong> Las cotizaciones se agrupan por mes y se muestran 
+                                    en la fecha de fin de mes. Por ejemplo, si ves "31 de Diciembre", representa el 
+                                    <strong>total acumulado de cotizaciones de todo el mes de diciembre</strong>, 
+                                    no solo las del día 31.
+                                </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">
                                     <i class="bi bi-info-circle"></i> No hay datos suficientes para mostrar la evolución temporal.

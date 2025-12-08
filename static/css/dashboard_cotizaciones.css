@@ -371,6 +371,11 @@ body {
     font-weight: 700;
 }
 
+.ml-insight-card p {
+    color: white;
+    opacity: 0.95;
+}
+
 .ml-accuracy {
     font-size: 4rem;
     font-weight: 700;
