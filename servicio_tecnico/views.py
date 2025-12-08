@@ -6788,7 +6788,14 @@ def dashboard_seguimiento_oow_fl(request):
     # PASO 6: CALCULAR DÍAS PROMEDIO POR ESTATUS
     # =========================================================================
     
-    dias_por_estatus_promedio = calcular_promedio_dias_por_estatus(ordenes)
+    # Obtener estadísticas separadas: estados de proceso vs estados finales
+    resultado_dias_por_estatus = calcular_promedio_dias_por_estatus(ordenes)
+    
+    # Estados de proceso (sin entregado/cancelado) - para la tabla principal
+    dias_por_estatus_proceso = resultado_dias_por_estatus['estados_proceso']
+    
+    # Estados finales (entregado/cancelado) - para mostrar por separado
+    dias_por_estatus_finales = resultado_dias_por_estatus['estados_finales']
     
     # =========================================================================
     # PASO 7: GENERAR DATOS MENSUALES
@@ -6807,39 +6814,68 @@ def dashboard_seguimiento_oow_fl(request):
         'en_reparacion_larga': [],  # >10 días en estado 'reparacion'
     }
     
+    # Función auxiliar para construir datos de alerta con información completa
+    def construir_datos_alerta(orden, dias, tipo_dias='hábiles'):
+        """
+        Construye un diccionario con toda la información necesaria para mostrar
+        una alerta en el dashboard de forma profesional.
+        
+        Args:
+            orden: Instancia de OrdenServicio
+            dias: Número de días de la alerta
+            tipo_dias: Descripción del tipo de días (hábiles, sin respuesta, etc.)
+        
+        Returns:
+            dict: Diccionario con datos completos de la alerta
+        """
+        return {
+            'orden': orden,
+            'dias': dias,
+            'tipo_dias': tipo_dias,
+            # Información adicional para tablas mejoradas
+            'orden_cliente': orden.detalle_equipo.orden_cliente if orden.detalle_equipo else 'N/A',
+            'estado': orden.get_estado_display(),
+            'estado_codigo': orden.estado,
+            'responsable': orden.responsable_seguimiento.nombre_completo if orden.responsable_seguimiento else 'Sin asignar',
+            'modelo': orden.detalle_equipo.modelo if orden.detalle_equipo else 'N/A',
+            'gama': orden.detalle_equipo.get_gama_display() if orden.detalle_equipo and hasattr(orden.detalle_equipo, 'get_gama_display') else orden.detalle_equipo.gama if orden.detalle_equipo else 'N/A',
+            'es_candidato_rhitso': orden.es_candidato_rhitso,
+        }
+    
     for orden in ordenes:
         # Retrasadas (>15 días hábiles sin entregar)
-        if orden.estado != 'entregado' and orden.dias_habiles_en_servicio > 15:
-            alertas['retrasadas'].append({
-                'orden': orden,
-                'dias': orden.dias_habiles_en_servicio,
-            })
+        # Excluir estados finales: entregado y cancelado
+        if orden.estado not in ['entregado', 'cancelado'] and orden.dias_habiles_en_servicio > 15:
+            alertas['retrasadas'].append(
+                construir_datos_alerta(orden, orden.dias_habiles_en_servicio, 'días hábiles')
+            )
         
         # Sin actualización (>5 días hábiles)
         dias_sin_act = orden.dias_sin_actualizacion_estado
         if dias_sin_act > 5 and orden.estado not in ['entregado', 'cancelado']:
-            alertas['sin_actualizacion'].append({
-                'orden': orden,
-                'dias': dias_sin_act,
-            })
+            alertas['sin_actualizacion'].append(
+                construir_datos_alerta(orden, dias_sin_act, 'días sin cambio')
+            )
         
         # Cotizaciones pendientes (>7 días sin respuesta)
         if hasattr(orden, 'cotizacion') and orden.cotizacion:
             if orden.cotizacion.usuario_acepto is None and orden.cotizacion.dias_sin_respuesta > 7:
-                alertas['cotizaciones_pendientes'].append({
-                    'orden': orden,
-                    'dias': orden.cotizacion.dias_sin_respuesta,
-                })
+                alertas['cotizaciones_pendientes'].append(
+                    construir_datos_alerta(orden, orden.cotizacion.dias_sin_respuesta, 'días sin respuesta')
+                )
         
         # En reparación prolongada (>10 días en estado reparacion)
         if orden.estado == 'reparacion':
             dias_por_estado = calcular_dias_por_estatus(orden)
             dias_reparacion = dias_por_estado.get('reparacion', 0)
             if dias_reparacion > 10:
-                alertas['en_reparacion_larga'].append({
-                    'orden': orden,
-                    'dias': dias_reparacion,
-                })
+                alertas['en_reparacion_larga'].append(
+                    construir_datos_alerta(orden, dias_reparacion, 'días en reparación')
+                )
+    
+    # Ordenar alertas por días (mayor a menor) para priorizar las más críticas
+    for tipo_alerta in alertas:
+        alertas[tipo_alerta].sort(key=lambda x: x['dias'], reverse=True)
     
     # =========================================================================
     # PASO 9: PREPARAR DATOS PARA GRÁFICOS (Chart.js)
@@ -6852,15 +6888,20 @@ def dashboard_seguimiento_oow_fl(request):
     }
     
     # Gráfico 2: Días promedio por estatus
-    # Ordenar estados en el orden lógico del proceso
+    # Ordenar estados en el orden lógico del proceso (sin estados finales)
+    # Los estados finales (entregado/cancelado) se muestran por separado
     orden_estados = ['espera', 'diagnostico', 'cotizacion', 'reparacion', 'finalizado', 'control_calidad']
     estados_ordenados = []
     dias_ordenados = []
     
-    for estado in orden_estados:
-        if estado in dias_por_estatus_promedio:
-            estados_ordenados.append(estado.replace('_', ' ').title())
-            dias_ordenados.append(dias_por_estatus_promedio[estado]['promedio'])
+    # Buscar cada estado en los datos de proceso
+    # Nota: dias_por_estatus_proceso tiene claves formateadas (ej: 'Control Calidad')
+    for estado_codigo in orden_estados:
+        # Convertir código a nombre formateado para buscar en el diccionario
+        nombre_formateado = estado_codigo.replace('_', ' ').title()
+        if nombre_formateado in dias_por_estatus_proceso:
+            estados_ordenados.append(nombre_formateado)
+            dias_ordenados.append(dias_por_estatus_proceso[nombre_formateado]['promedio'])
     
     grafico_dias_estatus = {
         'labels': estados_ordenados,
@@ -6948,8 +6989,11 @@ def dashboard_seguimiento_oow_fl(request):
         # Datos por responsable
         'responsables': responsables_lista,
         
-        # Días por estatus
-        'dias_por_estatus': dias_por_estatus_promedio,
+        # Días por estatus - SEPARADOS: proceso vs finales
+        # 'dias_por_estatus' contiene SOLO estados de proceso (sin entregado/cancelado)
+        # 'dias_por_estatus_finales' contiene estadísticas de cierre (entregado/cancelado)
+        'dias_por_estatus': dias_por_estatus_proceso,
+        'dias_por_estatus_finales': dias_por_estatus_finales,
         
         # Datos mensuales
         'datos_mensuales': datos_mensuales,

@@ -299,6 +299,28 @@
 }
 
 /* ====================================================================
+   BADGE Y FILA PERSONALIZADA - CANDIDATO RHITSO (Morado Claro)
+   ==================================================================== */
+.bg-purple-light {
+    background-color: #d8b4fe !important; /* Morado claro/lavanda */
+    color: #581c87 !important; /* Texto morado oscuro para contraste */
+}
+
+/* Fila de tabla con fondo morado claro para Candidato RHITSO */
+tr.row-rhitso {
+    background-color: #ede9fe !important; /* Morado muy claro para fila */
+}
+
+tr.row-rhitso td {
+    background-color: #ede9fe !important; /* Asegurar que las celdas también tengan el color */
+    border-color: #c4b5fd !important; /* Borde morado suave */
+}
+
+tr.row-rhitso:hover td {
+    background-color: #ddd6fe !important; /* Morado un poco más oscuro en hover */
+}
+
+/* ====================================================================
    RESPONSIVE - AJUSTES PARA MÓVILES Y TABLETS
    ==================================================================== */
 @media (max-width: 768px) {

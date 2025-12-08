@@ -256,120 +256,525 @@
     </div>
     
     <!-- ====================================================================
-         ALERTAS Y ATENCIÓN REQUERIDA
+         ALERTAS Y ATENCIÓN REQUERIDA (MEJORADO)
          ==================================================================== -->
     {% if total_alertas > 0 %}
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card border-danger">
-                <div class="card-header bg-danger text-white">
+            <div class="card border-danger shadow-sm">
+                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
                         <i class="bi bi-exclamation-triangle-fill"></i>
-                        Alertas y Atención Requerida ({{ total_alertas }})
+                        Alertas y Atención Requerida
+                        <span class="badge bg-light text-danger ms-2">{{ total_alertas }}</span>
                     </h5>
+                    <small class="text-white-50">
+                        <i class="bi bi-info-circle"></i> Ordenadas por prioridad (mayor a menor días)
+                    </small>
                 </div>
                 <div class="card-body">
-                    <div class="row">
+                    
+                    <!-- ACORDEÓN DE ALERTAS -->
+                    <div class="accordion" id="acordeonAlertas">
+                        
+                        <!-- ============================================
+                             ALERTA 1: ÓRDENES RETRASADAS (>15 días)
+                             ============================================ -->
                         {% if alertas.retrasadas %}
-                        <div class="col-md-6 mb-3">
-                            <div class="alert alert-danger mb-0">
-                                <h6 class="alert-heading">
-                                    <i class="bi bi-clock-history"></i>
-                                    Órdenes Retrasadas (>15 días)
-                                    <span class="badge bg-dark">{{ alertas.retrasadas|length }}</span>
-                                </h6>
-                                <ul class="mb-0 ps-3">
-                                    {% for item in alertas.retrasadas|slice:":5" %}
-                                    <li>
-                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" class="text-dark">
-                                            {{ item.orden.detalle_equipo.orden_cliente }} - 
-                                            <strong>{{ item.dias }} días hábiles</strong>
-                                        </a>
-                                    </li>
-                                    {% endfor %}
-                                    {% if alertas.retrasadas|length > 5 %}
-                                    <li class="text-muted">... y {{ alertas.retrasadas|length|add:"-5" }} más</li>
+                        <div class="accordion-item border-danger">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button bg-danger bg-opacity-10 text-danger" 
+                                        type="button" data-bs-toggle="collapse" 
+                                        data-bs-target="#alertaRetrasadas" aria-expanded="true">
+                                    <i class="bi bi-clock-history me-2"></i>
+                                    <strong>Órdenes Retrasadas</strong>
+                                    <span class="badge bg-danger ms-2">{{ alertas.retrasadas|length }}</span>
+                                    <small class="ms-auto me-3 text-muted">>15 días hábiles sin entregar</small>
+                                </button>
+                            </h2>
+                            <div id="alertaRetrasadas" class="accordion-collapse collapse show" 
+                                 data-bs-parent="#acordeonAlertas">
+                                <div class="accordion-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-sm mb-0">
+                                            <thead class="table-danger">
+                                                <tr>
+                                                    <th><i class="bi bi-file-text"></i> Orden</th>
+                                                    <th><i class="bi bi-tag"></i> Estado</th>
+                                                    <th><i class="bi bi-clock"></i> Días</th>
+                                                    <th><i class="bi bi-person"></i> Responsable</th>
+                                                    <th><i class="bi bi-laptop"></i> Modelo</th>
+                                                    <th><i class="bi bi-star"></i> Gama</th>
+                                                    <th><i class="bi bi-eye"></i></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in alertas.retrasadas|slice:":10" %}
+                                                <tr{% if item.es_candidato_rhitso %} class="row-rhitso"{% endif %}>
+                                                    <td><strong>{{ item.orden_cliente }}</strong></td>
+                                                    <td>
+                                                        <span class="badge 
+                                                            {% if item.estado_codigo == 'reparacion' %}bg-warning text-dark
+                                                            {% elif item.estado_codigo == 'diagnostico' %}bg-info
+                                                            {% elif item.estado_codigo == 'cotizacion' %}bg-secondary
+                                                            {% elif item.estado_codigo == 'finalizado' %}bg-success
+                                                            {% elif item.estado_codigo == 'candidato_rhitso' %}bg-purple-light
+                                                            {% else %}bg-primary{% endif %}">
+                                                            {{ item.estado }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-danger">
+                                                            {{ item.dias }} días
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ item.responsable|truncatechars:20 }}</td>
+                                                    <td><small>{{ item.modelo|truncatechars:25 }}</small></td>
+                                                    <td>
+                                                        <span class="badge 
+                                                            {% if item.gama == 'Alta' or item.gama == 'alta' %}bg-success
+                                                            {% elif item.gama == 'Media' or item.gama == 'media' %}bg-warning text-dark
+                                                            {% else %}bg-secondary{% endif %}">
+                                                            {{ item.gama }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" 
+                                                           class="btn btn-sm btn-outline-danger" title="Ver detalle">
+                                                            <i class="bi bi-eye"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% if alertas.retrasadas|length > 10 %}
+                                    <div class="p-2 bg-light border-top">
+                                        <button class="btn btn-sm btn-outline-danger w-100" 
+                                                type="button" data-bs-toggle="collapse" 
+                                                data-bs-target="#retrasadasExtras">
+                                            <i class="bi bi-chevron-down"></i> 
+                                            Ver {{ alertas.retrasadas|length|add:"-10" }} órdenes más
+                                        </button>
+                                        <div class="collapse mt-2" id="retrasadasExtras">
+                                            <div class="table-responsive">
+                                                <table class="table table-hover table-sm mb-0">
+                                                    <tbody>
+                                                        {% for item in alertas.retrasadas|slice:"10:" %}
+                                                        <tr{% if item.es_candidato_rhitso %} class="row-rhitso"{% endif %}>
+                                                            <td><strong>{{ item.orden_cliente }}</strong></td>
+                                                            <td>
+                                                                <span class="badge 
+                                                                    {% if item.estado_codigo == 'reparacion' %}bg-warning text-dark
+                                                                    {% elif item.estado_codigo == 'diagnostico' %}bg-info
+                                                                    {% elif item.estado_codigo == 'cotizacion' %}bg-secondary
+                                                                    {% elif item.estado_codigo == 'finalizado' %}bg-success
+                                                                    {% elif item.estado_codigo == 'candidato_rhitso' %}bg-purple-light
+                                                                    {% else %}bg-primary{% endif %}">
+                                                                    {{ item.estado }}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <span class="badge bg-danger">{{ item.dias }} días</span>
+                                                            </td>
+                                                            <td>{{ item.responsable|truncatechars:20 }}</td>
+                                                            <td><small>{{ item.modelo|truncatechars:25 }}</small></td>
+                                                            <td>
+                                                                <span class="badge 
+                                                                    {% if item.gama == 'Alta' or item.gama == 'alta' %}bg-success
+                                                                    {% elif item.gama == 'Media' or item.gama == 'media' %}bg-warning text-dark
+                                                                    {% else %}bg-secondary{% endif %}">
+                                                                    {{ item.gama }}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" 
+                                                                   class="btn btn-sm btn-outline-danger" title="Ver detalle">
+                                                                    <i class="bi bi-eye"></i>
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
                                     {% endif %}
-                                </ul>
+                                </div>
                             </div>
                         </div>
                         {% endif %}
                         
+                        <!-- ============================================
+                             ALERTA 2: SIN ACTUALIZACIÓN (>5 días)
+                             ============================================ -->
                         {% if alertas.sin_actualizacion %}
-                        <div class="col-md-6 mb-3">
-                            <div class="alert alert-warning mb-0">
-                                <h6 class="alert-heading">
-                                    <i class="bi bi-hourglass-split"></i>
-                                    Sin Actualización (>5 días)
-                                    <span class="badge bg-dark">{{ alertas.sin_actualizacion|length }}</span>
-                                </h6>
-                                <ul class="mb-0 ps-3">
-                                    {% for item in alertas.sin_actualizacion|slice:":5" %}
-                                    <li>
-                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" class="text-dark">
-                                            {{ item.orden.detalle_equipo.orden_cliente }} - 
-                                            <strong>{{ item.dias }} días hábiles</strong>
-                                        </a>
-                                    </li>
-                                    {% endfor %}
-                                    {% if alertas.sin_actualizacion|length > 5 %}
-                                    <li class="text-muted">... y {{ alertas.sin_actualizacion|length|add:"-5" }} más</li>
+                        <div class="accordion-item border-warning">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-warning bg-opacity-10 text-warning" 
+                                        type="button" data-bs-toggle="collapse" 
+                                        data-bs-target="#alertaSinActualizacion">
+                                    <i class="bi bi-hourglass-split me-2"></i>
+                                    <strong>Sin Actualización</strong>
+                                    <span class="badge bg-warning text-dark ms-2">{{ alertas.sin_actualizacion|length }}</span>
+                                    <small class="ms-auto me-3 text-muted">>5 días sin cambio de estado</small>
+                                </button>
+                            </h2>
+                            <div id="alertaSinActualizacion" class="accordion-collapse collapse" 
+                                 data-bs-parent="#acordeonAlertas">
+                                <div class="accordion-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-sm mb-0">
+                                            <thead class="table-warning">
+                                                <tr>
+                                                    <th><i class="bi bi-file-text"></i> Orden</th>
+                                                    <th><i class="bi bi-tag"></i> Estado</th>
+                                                    <th><i class="bi bi-clock"></i> Días</th>
+                                                    <th><i class="bi bi-person"></i> Responsable</th>
+                                                    <th><i class="bi bi-laptop"></i> Modelo</th>
+                                                    <th><i class="bi bi-star"></i> Gama</th>
+                                                    <th><i class="bi bi-eye"></i></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in alertas.sin_actualizacion|slice:":10" %}
+                                                <tr{% if item.es_candidato_rhitso %} class="row-rhitso"{% endif %}>
+                                                    <td><strong>{{ item.orden_cliente }}</strong></td>
+                                                    <td>
+                                                        <span class="badge 
+                                                            {% if item.estado_codigo == 'reparacion' %}bg-warning text-dark
+                                                            {% elif item.estado_codigo == 'diagnostico' %}bg-info
+                                                            {% elif item.estado_codigo == 'cotizacion' %}bg-secondary
+                                                            {% elif item.estado_codigo == 'finalizado' %}bg-success
+                                                            {% elif item.estado_codigo == 'candidato_rhitso' %}bg-purple-light
+                                                            {% else %}bg-primary{% endif %}">
+                                                            {{ item.estado }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-warning text-dark">
+                                                            {{ item.dias }} días
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ item.responsable|truncatechars:20 }}</td>
+                                                    <td><small>{{ item.modelo|truncatechars:25 }}</small></td>
+                                                    <td>
+                                                        <span class="badge 
+                                                            {% if item.gama == 'Alta' or item.gama == 'alta' %}bg-success
+                                                            {% elif item.gama == 'Media' or item.gama == 'media' %}bg-warning text-dark
+                                                            {% else %}bg-secondary{% endif %}">
+                                                            {{ item.gama }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" 
+                                                           class="btn btn-sm btn-outline-warning" title="Ver detalle">
+                                                            <i class="bi bi-eye"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% if alertas.sin_actualizacion|length > 10 %}
+                                    <div class="p-2 bg-light border-top">
+                                        <button class="btn btn-sm btn-outline-warning w-100" 
+                                                type="button" data-bs-toggle="collapse" 
+                                                data-bs-target="#sinActualizacionExtras">
+                                            <i class="bi bi-chevron-down"></i> 
+                                            Ver {{ alertas.sin_actualizacion|length|add:"-10" }} órdenes más
+                                        </button>
+                                        <div class="collapse mt-2" id="sinActualizacionExtras">
+                                            <div class="table-responsive">
+                                                <table class="table table-hover table-sm mb-0">
+                                                    <tbody>
+                                                        {% for item in alertas.sin_actualizacion|slice:"10:" %}
+                                                        <tr{% if item.estado_codigo == 'candidato_rhitso' %} class="row-rhitso"{% endif %}>
+                                                            <td><strong>{{ item.orden_cliente }}</strong></td>
+                                                            <td>
+                                                                <span class="badge 
+                                                                    {% if item.estado_codigo == 'reparacion' %}bg-warning text-dark
+                                                                    {% elif item.estado_codigo == 'diagnostico' %}bg-info
+                                                                    {% elif item.estado_codigo == 'cotizacion' %}bg-secondary
+                                                                    {% elif item.estado_codigo == 'finalizado' %}bg-success
+                                                                    {% elif item.estado_codigo == 'candidato_rhitso' %}bg-purple-light
+                                                                    {% else %}bg-primary{% endif %}">
+                                                                    {{ item.estado }}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <span class="badge bg-warning text-dark">{{ item.dias }} días</span>
+                                                            </td>
+                                                            <td>{{ item.responsable|truncatechars:20 }}</td>
+                                                            <td><small>{{ item.modelo|truncatechars:25 }}</small></td>
+                                                            <td>
+                                                                <span class="badge 
+                                                                    {% if item.gama == 'Alta' or item.gama == 'alta' %}bg-success
+                                                                    {% elif item.gama == 'Media' or item.gama == 'media' %}bg-warning text-dark
+                                                                    {% else %}bg-secondary{% endif %}">
+                                                                    {{ item.gama }}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" 
+                                                                   class="btn btn-sm btn-outline-warning" title="Ver detalle">
+                                                                    <i class="bi bi-eye"></i>
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
                                     {% endif %}
-                                </ul>
+                                </div>
                             </div>
                         </div>
                         {% endif %}
                         
+                        <!-- ============================================
+                             ALERTA 3: COTIZACIONES PENDIENTES (>7 días)
+                             ============================================ -->
                         {% if alertas.cotizaciones_pendientes %}
-                        <div class="col-md-6 mb-3">
-                            <div class="alert alert-info mb-0">
-                                <h6 class="alert-heading">
-                                    <i class="bi bi-file-earmark-text"></i>
-                                    Cotizaciones Pendientes (>7 días)
-                                    <span class="badge bg-dark">{{ alertas.cotizaciones_pendientes|length }}</span>
-                                </h6>
-                                <ul class="mb-0 ps-3">
-                                    {% for item in alertas.cotizaciones_pendientes|slice:":5" %}
-                                    <li>
-                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" class="text-dark">
-                                            {{ item.orden.detalle_equipo.orden_cliente }} - 
-                                            <strong>{{ item.dias }} días sin respuesta</strong>
-                                        </a>
-                                    </li>
-                                    {% endfor %}
-                                    {% if alertas.cotizaciones_pendientes|length > 5 %}
-                                    <li class="text-muted">... y {{ alertas.cotizaciones_pendientes|length|add:"-5" }} más</li>
+                        <div class="accordion-item border-info">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-info bg-opacity-10 text-info" 
+                                        type="button" data-bs-toggle="collapse" 
+                                        data-bs-target="#alertaCotizaciones">
+                                    <i class="bi bi-file-earmark-text me-2"></i>
+                                    <strong>Cotizaciones Pendientes</strong>
+                                    <span class="badge bg-info ms-2">{{ alertas.cotizaciones_pendientes|length }}</span>
+                                    <small class="ms-auto me-3 text-muted">>7 días sin respuesta del cliente</small>
+                                </button>
+                            </h2>
+                            <div id="alertaCotizaciones" class="accordion-collapse collapse" 
+                                 data-bs-parent="#acordeonAlertas">
+                                <div class="accordion-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-sm mb-0">
+                                            <thead class="table-info">
+                                                <tr>
+                                                    <th><i class="bi bi-file-text"></i> Orden</th>
+                                                    <th><i class="bi bi-tag"></i> Estado</th>
+                                                    <th><i class="bi bi-clock"></i> Días</th>
+                                                    <th><i class="bi bi-person"></i> Responsable</th>
+                                                    <th><i class="bi bi-laptop"></i> Modelo</th>
+                                                    <th><i class="bi bi-star"></i> Gama</th>
+                                                    <th><i class="bi bi-eye"></i></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in alertas.cotizaciones_pendientes|slice:":10" %}
+                                                <tr>
+                                                    <td><strong>{{ item.orden_cliente }}</strong></td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">
+                                                            {{ item.estado }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-info">
+                                                            {{ item.dias }} días
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ item.responsable|truncatechars:20 }}</td>
+                                                    <td><small>{{ item.modelo|truncatechars:25 }}</small></td>
+                                                    <td>
+                                                        <span class="badge 
+                                                            {% if item.gama == 'Alta' or item.gama == 'alta' %}bg-success
+                                                            {% elif item.gama == 'Media' or item.gama == 'media' %}bg-warning text-dark
+                                                            {% else %}bg-secondary{% endif %}">
+                                                            {{ item.gama }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" 
+                                                           class="btn btn-sm btn-outline-info" title="Ver detalle">
+                                                            <i class="bi bi-eye"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% if alertas.cotizaciones_pendientes|length > 10 %}
+                                    <div class="p-2 bg-light border-top">
+                                        <button class="btn btn-sm btn-outline-info w-100" 
+                                                type="button" data-bs-toggle="collapse" 
+                                                data-bs-target="#cotizacionesExtras">
+                                            <i class="bi bi-chevron-down"></i> 
+                                            Ver {{ alertas.cotizaciones_pendientes|length|add:"-10" }} órdenes más
+                                        </button>
+                                        <div class="collapse mt-2" id="cotizacionesExtras">
+                                            <div class="table-responsive">
+                                                <table class="table table-hover table-sm mb-0">
+                                                    <tbody>
+                                                        {% for item in alertas.cotizaciones_pendientes|slice:"10:" %}
+                                                        <tr>
+                                                            <td><strong>{{ item.orden_cliente }}</strong></td>
+                                                            <td>
+                                                                <span class="badge bg-secondary">
+                                                                    {{ item.estado }}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <span class="badge bg-info">{{ item.dias }} días</span>
+                                                            </td>
+                                                            <td>{{ item.responsable|truncatechars:20 }}</td>
+                                                            <td><small>{{ item.modelo|truncatechars:25 }}</small></td>
+                                                            <td>
+                                                                <span class="badge 
+                                                                    {% if item.gama == 'Alta' or item.gama == 'alta' %}bg-success
+                                                                    {% elif item.gama == 'Media' or item.gama == 'media' %}bg-warning text-dark
+                                                                    {% else %}bg-secondary{% endif %}">
+                                                                    {{ item.gama }}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" 
+                                                                   class="btn btn-sm btn-outline-info" title="Ver detalle">
+                                                                    <i class="bi bi-eye"></i>
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
                                     {% endif %}
-                                </ul>
+                                </div>
                             </div>
                         </div>
                         {% endif %}
                         
+                        <!-- ============================================
+                             ALERTA 4: EN REPARACIÓN PROLONGADA (>10 días)
+                             ============================================ -->
                         {% if alertas.en_reparacion_larga %}
-                        <div class="col-md-6 mb-3">
-                            <div class="alert alert-secondary mb-0">
-                                <h6 class="alert-heading">
-                                    <i class="bi bi-wrench"></i>
-                                    En Reparación Prolongada (>10 días)
-                                    <span class="badge bg-dark">{{ alertas.en_reparacion_larga|length }}</span>
-                                </h6>
-                                <ul class="mb-0 ps-3">
-                                    {% for item in alertas.en_reparacion_larga|slice:":5" %}
-                                    <li>
-                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" class="text-dark">
-                                            {{ item.orden.detalle_equipo.orden_cliente }} - 
-                                            <strong>{{ item.dias }} días en reparación</strong>
-                                        </a>
-                                    </li>
-                                    {% endfor %}
-                                    {% if alertas.en_reparacion_larga|length > 5 %}
-                                    <li class="text-muted">... y {{ alertas.en_reparacion_larga|length|add:"-5" }} más</li>
+                        <div class="accordion-item border-secondary">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-secondary bg-opacity-10 text-secondary" 
+                                        type="button" data-bs-toggle="collapse" 
+                                        data-bs-target="#alertaReparacion">
+                                    <i class="bi bi-wrench me-2"></i>
+                                    <strong>En Reparación Prolongada</strong>
+                                    <span class="badge bg-secondary ms-2">{{ alertas.en_reparacion_larga|length }}</span>
+                                    <small class="ms-auto me-3 text-muted">>10 días en estado reparación</small>
+                                </button>
+                            </h2>
+                            <div id="alertaReparacion" class="accordion-collapse collapse" 
+                                 data-bs-parent="#acordeonAlertas">
+                                <div class="accordion-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-sm mb-0">
+                                            <thead class="table-secondary">
+                                                <tr>
+                                                    <th><i class="bi bi-file-text"></i> Orden</th>
+                                                    <th><i class="bi bi-tag"></i> Estado</th>
+                                                    <th><i class="bi bi-clock"></i> Días</th>
+                                                    <th><i class="bi bi-person"></i> Responsable</th>
+                                                    <th><i class="bi bi-laptop"></i> Modelo</th>
+                                                    <th><i class="bi bi-star"></i> Gama</th>
+                                                    <th><i class="bi bi-eye"></i></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in alertas.en_reparacion_larga|slice:":10" %}
+                                                <tr>
+                                                    <td><strong>{{ item.orden_cliente }}</strong></td>
+                                                    <td>
+                                                        <span class="badge bg-warning text-dark">
+                                                            {{ item.estado }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">
+                                                            {{ item.dias }} días
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ item.responsable|truncatechars:20 }}</td>
+                                                    <td><small>{{ item.modelo|truncatechars:25 }}</small></td>
+                                                    <td>
+                                                        <span class="badge 
+                                                            {% if item.gama == 'Alta' or item.gama == 'alta' %}bg-success
+                                                            {% elif item.gama == 'Media' or item.gama == 'media' %}bg-warning text-dark
+                                                            {% else %}bg-secondary{% endif %}">
+                                                            {{ item.gama }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" 
+                                                           class="btn btn-sm btn-outline-secondary" title="Ver detalle">
+                                                            <i class="bi bi-eye"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% if alertas.en_reparacion_larga|length > 10 %}
+                                    <div class="p-2 bg-light border-top">
+                                        <button class="btn btn-sm btn-outline-secondary w-100" 
+                                                type="button" data-bs-toggle="collapse" 
+                                                data-bs-target="#reparacionExtras">
+                                            <i class="bi bi-chevron-down"></i> 
+                                            Ver {{ alertas.en_reparacion_larga|length|add:"-10" }} órdenes más
+                                        </button>
+                                        <div class="collapse mt-2" id="reparacionExtras">
+                                            <div class="table-responsive">
+                                                <table class="table table-hover table-sm mb-0">
+                                                    <tbody>
+                                                        {% for item in alertas.en_reparacion_larga|slice:"10:" %}
+                                                        <tr>
+                                                            <td><strong>{{ item.orden_cliente }}</strong></td>
+                                                            <td>
+                                                                <span class="badge bg-warning text-dark">
+                                                                    {{ item.estado }}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <span class="badge bg-secondary">{{ item.dias }} días</span>
+                                                            </td>
+                                                            <td>{{ item.responsable|truncatechars:20 }}</td>
+                                                            <td><small>{{ item.modelo|truncatechars:25 }}</small></td>
+                                                            <td>
+                                                                <span class="badge 
+                                                                    {% if item.gama == 'Alta' or item.gama == 'alta' %}bg-success
+                                                                    {% elif item.gama == 'Media' or item.gama == 'media' %}bg-warning text-dark
+                                                                    {% else %}bg-secondary{% endif %}">
+                                                                    {{ item.gama }}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <a href="{% url 'servicio_tecnico:detalle_orden' item.orden.id %}" 
+                                                                   class="btn btn-sm btn-outline-secondary" title="Ver detalle">
+                                                                    <i class="bi bi-eye"></i>
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
                                     {% endif %}
-                                </ul>
+                                </div>
                             </div>
                         </div>
                         {% endif %}
-                    </div>
+                        
+                    </div><!-- Fin acordeón -->
+                    
                 </div>
             </div>
         </div>
@@ -674,7 +1079,7 @@
     </div>
     
     <!-- ====================================================================
-         TABLA: DÍAS PROMEDIO POR ESTATUS
+         TABLA: DÍAS PROMEDIO POR ESTATUS (ESTADOS DE PROCESO)
          ==================================================================== -->
     <div class="row mb-4">
         <div class="col-12">
@@ -682,26 +1087,31 @@
                 <div class="card-header bg-secondary text-white">
                     <h5 class="mb-0">
                         <i class="bi bi-clock-history"></i>
-                        Días Promedio por Estatus (Días Hábiles)
+                        Días Promedio por Estatus (Estados de Proceso)
                     </h5>
                 </div>
                 <div class="card-body">
                     {% if dias_por_estatus %}
+                    <p class="text-muted small mb-3">
+                        <i class="bi bi-info-circle"></i>
+                        Esta tabla muestra únicamente los estados de proceso activo.
+                        Los estados finales (Entregado/Cancelado) se muestran por separado.
+                    </p>
                     <div class="table-responsive">
                         <table class="table table-dashboard table-bordered table-striped">
-                            <thead>
+                            <thead class="table-dark">
                                 <tr>
-                                    <th>Estado</th>
-                                    <th>Promedio (días hábiles)</th>
-                                    <th>Mínimo</th>
-                                    <th>Máximo</th>
-                                    <th>Total Órdenes</th>
+                                    <th><i class="bi bi-tag"></i> Estado</th>
+                                    <th><i class="bi bi-clock"></i> Promedio (días hábiles)</th>
+                                    <th><i class="bi bi-arrow-down-short"></i> Mínimo</th>
+                                    <th><i class="bi bi-arrow-up-short"></i> Máximo</th>
+                                    <th><i class="bi bi-box-seam"></i> Total Órdenes</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for estado, stats in dias_por_estatus.items %}
                                 <tr>
-                                    <td><strong>{{ estado|title }}</strong></td>
+                                    <td><strong>{{ estado }}</strong></td>
                                     <td>
                                         <span class="badge {% if stats.promedio <= 2 %}bg-success{% elif stats.promedio <= 5 %}bg-warning{% else %}bg-danger{% endif %}">
                                             {{ stats.promedio }} días
@@ -709,7 +1119,9 @@
                                     </td>
                                     <td>{{ stats.min }} días</td>
                                     <td>{{ stats.max }} días</td>
-                                    <td>{{ stats.total_ordenes }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ stats.total_ordenes }}</span>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -717,6 +1129,7 @@
                     </div>
                     {% else %}
                     <p class="text-muted text-center mb-0">
+                        <i class="bi bi-exclamation-circle"></i>
                         No hay datos suficientes para calcular promedios por estatus.
                     </p>
                     {% endif %}
@@ -724,6 +1137,73 @@
             </div>
         </div>
     </div>
+    
+    <!-- ====================================================================
+         TABLA: ESTADÍSTICAS DE CIERRE (ESTADOS FINALES)
+         ==================================================================== -->
+    {% if dias_por_estatus_finales %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-check-circle-fill"></i>
+                        Estadísticas de Cierre (Tiempo hasta Entrega/Cancelación)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        <i class="bi bi-info-circle"></i>
+                        Estos son los tiempos promedio desde que una orden entra al estado final
+                        (Entregado o Cancelado). Representan el tiempo total de cierre, no de proceso activo.
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-dashboard table-bordered">
+                            <thead class="table-success">
+                                <tr>
+                                    <th><i class="bi bi-flag-fill"></i> Estado Final</th>
+                                    <th><i class="bi bi-clock"></i> Promedio (días hábiles)</th>
+                                    <th><i class="bi bi-arrow-down-short"></i> Mínimo</th>
+                                    <th><i class="bi bi-arrow-up-short"></i> Máximo</th>
+                                    <th><i class="bi bi-box-seam"></i> Total Órdenes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for estado, stats in dias_por_estatus_finales.items %}
+                                <tr>
+                                    <td>
+                                        {% if 'Entregado' in estado %}
+                                        <span class="badge bg-success fs-6">
+                                            <i class="bi bi-check-lg"></i> {{ estado }}
+                                        </span>
+                                        {% elif 'Cancelado' in estado %}
+                                        <span class="badge bg-danger fs-6">
+                                            <i class="bi bi-x-lg"></i> {{ estado }}
+                                        </span>
+                                        {% else %}
+                                        <strong>{{ estado }}</strong>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info text-dark">
+                                            {{ stats.promedio }} días
+                                        </span>
+                                    </td>
+                                    <td>{{ stats.min }} días</td>
+                                    <td>{{ stats.max }} días</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ stats.total_ordenes }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
     
     <!-- ====================================================================
          TABLA: EVOLUCIÓN MENSUAL

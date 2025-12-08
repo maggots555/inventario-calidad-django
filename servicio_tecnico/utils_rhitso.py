@@ -397,7 +397,43 @@ def calcular_dias_por_estatus(orden):
     return dias_por_estado
 
 
-def calcular_promedio_dias_por_estatus(ordenes_queryset):
+def formatear_nombre_estado(estado_codigo):
+    """
+    Convierte el código interno de estado a un nombre legible para mostrar.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    En la base de datos, los estados se guardan como códigos con guiones bajos
+    (por ejemplo: 'equipo_diagnosticado', 'control_calidad'). Esta función
+    los convierte a texto legible para mostrar en la interfaz de usuario.
+    
+    Ejemplos:
+        'equipo_diagnosticado' → 'Equipo Diagnosticado'
+        'control_calidad' → 'Control Calidad'
+        'espera' → 'Espera'
+        'cotizacion_enviada_proveedor' → 'Cotización Enviada Proveedor'
+    
+    Args:
+        estado_codigo (str): Código interno del estado (ej: 'control_calidad')
+    
+    Returns:
+        str: Nombre formateado para mostrar (ej: 'Control Calidad')
+    """
+    if not estado_codigo:
+        return 'Sin Estado'
+    
+    # Reemplazar guiones bajos por espacios y capitalizar cada palabra
+    nombre_formateado = estado_codigo.replace('_', ' ').title()
+    
+    return nombre_formateado
+
+
+# Estados finales que no deberían contarse en métricas de tiempo de proceso
+# ya que representan el cierre de la orden, no una etapa activa del servicio
+ESTADOS_FINALES = ['entregado', 'cancelado']
+
+
+def calcular_promedio_dias_por_estatus(ordenes_queryset, incluir_estados_finales=False):
     """
     Calcula el promedio de días hábiles por estado para un conjunto de órdenes.
     
@@ -416,46 +452,72 @@ def calcular_promedio_dias_por_estatus(ordenes_queryset):
     1. Para cada orden, obtiene sus días por estado
     2. Suma todos los días de cada estado
     3. Divide entre el número de órdenes que pasaron por ese estado
+    4. NUEVO: Excluye estados finales (entregado/cancelado) del resultado principal
+    5. NUEVO: Devuelve estadísticas de estados finales por separado
+    
+    IMPORTANTE - Estados Finales:
+    -----------------------------
+    Los estados 'entregado' y 'cancelado' son estados de CIERRE de la orden.
+    No deben mezclarse con los estados de proceso porque:
+    - No representan una etapa activa del servicio
+    - Distorsionan los promedios de tiempo de proceso
+    - Su tiempo refleja "días desde finalización", no tiempo de trabajo
+    
+    Por eso esta función los separa en un diccionario aparte llamado
+    'estados_finales' para que puedan mostrarse en una sección diferente
+    del dashboard si es necesario.
     
     Args:
         ordenes_queryset (QuerySet): Conjunto de órdenes a analizar
+        incluir_estados_finales (bool): Si True, incluye entregado/cancelado
+                                        en el resultado principal. Default: False
     
     Returns:
-        dict: Diccionario con estado como key y diccionario de stats como value
-              Ejemplo: {
-                  'espera': {'promedio': 1.5, 'total_ordenes': 10, 'min': 0, 'max': 3},
-                  'diagnostico': {'promedio': 3.2, 'total_ordenes': 8, 'min': 1, 'max': 7}
-              }
+        dict: Diccionario con dos secciones:
+            - 'estados_proceso': Estados activos del proceso (sin entregado/cancelado)
+            - 'estados_finales': Estadísticas de entregado y cancelado por separado
+            
+            Estructura de cada estado:
+            {
+                'nombre_estado': {
+                    'promedio': 1.5,      # Promedio de días hábiles
+                    'total_ordenes': 10,  # Cuántas órdenes pasaron por este estado
+                    'min': 0,             # Mínimo de días
+                    'max': 3              # Máximo de días
+                }
+            }
     
     Ejemplo de uso:
-        # Obtener órdenes OOW-/FL- del último mes
-        ordenes = OrdenServicio.objects.filter(
-            Q(detalle_equipo__orden_cliente__istartswith='OOW-') |
-            Q(detalle_equipo__orden_cliente__istartswith='FL-'),
-            fecha_ingreso__gte=timezone.now() - timedelta(days=30)
-        )
+        ordenes = OrdenServicio.objects.filter(...)
+        resultado = calcular_promedio_dias_por_estatus(ordenes)
         
-        promedios = calcular_promedio_dias_por_estatus(ordenes)
+        # Acceder a estados de proceso
+        for estado, stats in resultado['estados_proceso'].items():
+            print(f"{estado}: {stats['promedio']} días promedio")
         
-        print(f"Promedio en diagnóstico: {promedios['diagnostico']['promedio']:.1f} días")
+        # Acceder a estados finales (si existen)
+        if resultado['estados_finales']:
+            for estado, stats in resultado['estados_finales'].items():
+                print(f"Cierre - {estado}: {stats['promedio']} días promedio")
     
     Nota:
         - Solo incluye estados por los que al menos una orden ha pasado
         - El promedio es redondeado a 1 decimal
         - Incluye min/max para ver el rango completo
+        - Los nombres de estados se formatean automáticamente (sin guiones bajos)
     """
-    # Diccionario para acumular días por estado
+    # Diccionarios para acumular estadísticas por estado
     acumulado_por_estado = {}
     contador_por_estado = {}
     min_por_estado = {}
     max_por_estado = {}
     
-    # Recorrer cada orden
+    # Recorrer cada orden y acumular días por estado
     for orden in ordenes_queryset:
         dias_por_estado = calcular_dias_por_estatus(orden)
         
         for estado, dias in dias_por_estado.items():
-            # Acumular días
+            # Acumular estadísticas para este estado
             if estado in acumulado_por_estado:
                 acumulado_por_estado[estado] += dias
                 contador_por_estado[estado] += 1
@@ -467,19 +529,43 @@ def calcular_promedio_dias_por_estatus(ordenes_queryset):
                 min_por_estado[estado] = dias
                 max_por_estado[estado] = dias
     
-    # Calcular promedios
-    promedios = {}
-    for estado in acumulado_por_estado:
-        if contador_por_estado[estado] > 0:
-            promedio = acumulado_por_estado[estado] / contador_por_estado[estado]
-            promedios[estado] = {
-                'promedio': round(promedio, 1),
-                'total_ordenes': contador_por_estado[estado],
-                'min': min_por_estado[estado],
-                'max': max_por_estado[estado],
-            }
+    # Calcular promedios y separar estados de proceso vs estados finales
+    estados_proceso = {}
+    estados_finales = {}
     
-    return promedios
+    for estado_codigo in acumulado_por_estado:
+        if contador_por_estado[estado_codigo] > 0:
+            promedio = acumulado_por_estado[estado_codigo] / contador_por_estado[estado_codigo]
+            
+            # Formatear el nombre del estado para mostrar (sin guiones bajos)
+            nombre_formateado = formatear_nombre_estado(estado_codigo)
+            
+            # Crear diccionario de estadísticas
+            stats = {
+                'promedio': round(promedio, 1),
+                'total_ordenes': contador_por_estado[estado_codigo],
+                'min': min_por_estado[estado_codigo],
+                'max': max_por_estado[estado_codigo],
+                'codigo': estado_codigo,  # Guardar código original por si se necesita
+            }
+            
+            # Separar estados finales de estados de proceso
+            if estado_codigo in ESTADOS_FINALES:
+                estados_finales[nombre_formateado] = stats
+            else:
+                estados_proceso[nombre_formateado] = stats
+    
+    # Si se solicita incluir estados finales en el resultado principal
+    # (para compatibilidad con código existente)
+    if incluir_estados_finales:
+        estados_proceso.update(estados_finales)
+        return estados_proceso
+    
+    # Retornar estructura separada (comportamiento por defecto)
+    return {
+        'estados_proceso': estados_proceso,
+        'estados_finales': estados_finales,
+    }
 
 
 def agrupar_ordenes_por_mes(ordenes_queryset):
