@@ -1952,7 +1952,7 @@ def detalle_orden(request, orden_id):
     # Estos empleados estarán disponibles para recibir copia del correo al cliente
     
     empleados_copia_imagenes = Empleado.objects.filter(
-        Q(area='CALIDAD') | Q(area='FRONTDESK'),
+        Q(area='CALIDAD') | Q(area='FRONTDESK') | Q(area='CARRY IN'),
         activo=True,
         email__isnull=False
     ).exclude(
@@ -8022,7 +8022,6 @@ def dashboard_cotizaciones(request):
                 ml_insights['prediccion_ejemplo'] = {
                     'cotizacion_id': ultima['cotizacion_id'],
                     'orden': ultima['numero_orden'],
-                    'orden_cliente': ultima['orden_cliente'],  # Orden del cliente para referencia
                     'costo': ultima['costo_total'],
                     'prob_aceptacion': prob_aceptacion * 100,
                     'prob_rechazo': prob_rechazo * 100
@@ -8067,8 +8066,7 @@ def dashboard_cotizaciones(request):
                         # Datos de cotización analizada (para mostrar en UI)
                         'cotizacion_analizada': {
                             'id': ultima['cotizacion_id'],
-                            'orden': ultima['orden_cliente'],  # Mostrar orden del cliente en lugar de orden interna
-                            'orden_interna': ultima['numero_orden'],  # Guardar orden interna por si se necesita
+                            'orden': ultima['numero_orden'],
                             'costo_actual': ultima['costo_total'],
                             'total_piezas': ultima['total_piezas'],
                             'gama': ultima['gama'],
