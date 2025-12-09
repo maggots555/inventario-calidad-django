@@ -8022,6 +8022,7 @@ def dashboard_cotizaciones(request):
                 ml_insights['prediccion_ejemplo'] = {
                     'cotizacion_id': ultima['cotizacion_id'],
                     'orden': ultima['numero_orden'],
+                    'orden_cliente': ultima['orden_cliente'],  # AGREGADO: Campo orden_cliente del DataFrame
                     'costo': ultima['costo_total'],
                     'prob_aceptacion': prob_aceptacion * 100,
                     'prob_rechazo': prob_rechazo * 100
@@ -8067,6 +8068,7 @@ def dashboard_cotizaciones(request):
                         'cotizacion_analizada': {
                             'id': ultima['cotizacion_id'],
                             'orden': ultima['numero_orden'],
+                            'orden_cliente': ultima['orden_cliente'],  # AGREGADO: Campo orden_cliente
                             'costo_actual': ultima['costo_total'],
                             'total_piezas': ultima['total_piezas'],
                             'gama': ultima['gama'],
