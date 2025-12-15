@@ -107,38 +107,345 @@
         <div class="row mt-4 g-4 estadisticas-tecnico-row">
         
         <!-- ========================================================================
-             CARGA DE TRABAJO POR TÉCNICO (Grid siempre visible)
+             CARGA DE TRABAJO POR TÉCNICO CON TRACKING TEMPORAL Y ROTACIÓN
              ======================================================================== -->
         {% if ordenes_por_tecnico %}
         <div class="col-lg-12">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header text-white d-flex justify-content-between align-items-center" 
+                <div class="card-header text-white d-flex justify-content-between align-items-center flex-wrap gap-3" 
                      style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 1rem 1.5rem;">
-                    <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
-                        <i class="bi bi-people-fill" style="font-size: 1.3rem;"></i> Carga de Trabajo por Técnico
-                    </h6>
-                    <span class="badge bg-white text-dark" style="padding: 0.5rem 1rem; font-weight: 600;">
-                        {{ ordenes_por_tecnico|length }} técnico{{ ordenes_por_tecnico|length|pluralize }}
-                    </span>
+                    <div>
+                        <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
+                            <i class="bi bi-people-fill" style="font-size: 1.3rem;"></i> Carga de Trabajo por Técnico - Tracking Temporal
+                        </h6>
+                        <small class="text-white opacity-90">Monitoreo en tiempo real con sugerencia de rotación equitativa</small>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center flex-wrap">
+                        <!-- Filtro temporal -->
+                        <form method="get" id="filtroTemporalForm" class="d-flex gap-2">
+                            {% if busqueda %}
+                                <input type="hidden" name="busqueda" value="{{ busqueda }}">
+                            {% endif %}
+                            <select name="filtro_temporal" class="form-select form-select-sm bg-white" style="min-width: 150px;" onchange="this.form.submit()">
+                                <option value="hoy" {% if filtro_temporal == 'hoy' %}selected{% endif %}>📅 Hoy</option>
+                                <option value="semana" {% if filtro_temporal == 'semana' %}selected{% endif %}>📊 Esta Semana</option>
+                                <option value="historico" {% if filtro_temporal == 'historico' %}selected{% endif %}>📜 Histórico Total</option>
+                            </select>
+                        </form>
+                        
+                        <span class="badge bg-white text-dark" style="padding: 0.5rem 1rem; font-weight: 600;">
+                            {{ ordenes_por_tecnico|length }} técnico{{ ordenes_por_tecnico|length|pluralize }}
+                        </span>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="st-tecnicos-grid">
-                        {% for tecnico in ordenes_por_tecnico %}
-                        <div class="st-tecnico-card">
-                            <div class="st-tecnico-avatar">
-                                {% if tecnico.foto_url %}
-                                    <img src="{{ tecnico.foto_url }}" alt="{{ tecnico.tecnico_nombre }}">
-                                {% else %}
-                                    <div class="st-tecnico-avatar-placeholder">
-                                        {{ tecnico.iniciales }}
-                                    </div>
-                                {% endif %}
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width: 25%;">
+                                        <i class="bi bi-person-badge"></i> Técnico
+                                    </th>
+                                    <th class="text-center" style="width: 12%;">
+                                        <i class="bi bi-hourglass-split"></i><br>
+                                        <small>Activas</small>
+                                    </th>
+                                    <th class="text-center" style="width: 12%;">
+                                        <i class="bi bi-calendar-day"></i><br>
+                                        <small>Hoy</small>
+                                    </th>
+                                    <th class="text-center" style="width: 12%;">
+                                        <i class="bi bi-calendar-week"></i><br>
+                                        <small>Semana</small>
+                                    </th>
+                                    <th class="text-center" style="width: 15%;">
+                                        <i class="bi bi-clock-history"></i><br>
+                                        <small>Última</small>
+                                    </th>
+                                    <th class="text-center" style="width: 24%;">
+                                        <i class="bi bi-speedometer2"></i><br>
+                                        <small>Estado</small>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tecnico in ordenes_por_tecnico %}
+                                <tr class="{% if tecnico.es_siguiente_rotacion %}table-success bg-success bg-opacity-10{% endif %}">
+                                    <!-- Columna: Técnico -->
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="tecnico-avatar-wrapper position-relative">
+                                                {% if tecnico.foto_url %}
+                                                    <img src="{{ tecnico.foto_url }}" 
+                                                         alt="{{ tecnico.tecnico_nombre }}"
+                                                         class="rounded-circle"
+                                                         style="width: 46px; height: 46px; object-fit: cover; border: 2px solid #e5e7eb;">
+                                                {% else %}
+                                                    <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                                                         style="width: 46px; height: 46px; background-color: #6b7280; font-size: 0.9rem; border: 2px solid #e5e7eb;">
+                                                        {{ tecnico.iniciales }}
+                                                    </div>
+                                                {% endif %}
+                                                
+                                                <!-- Badge de rotación sugerida -->
+                                                {% if tecnico.es_siguiente_rotacion %}
+                                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success" 
+                                                          style="font-size: 0.6rem; padding: 0.25rem 0.4rem;"
+                                                          title="Siguiente en rotación sugerida">
+                                                        <i class="bi bi-arrow-right-circle-fill"></i>
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold" style="font-size: 0.9rem;">
+                                                    {{ tecnico.tecnico_nombre }}
+                                                    {% if tecnico.es_siguiente_rotacion %}
+                                                        <span class="badge bg-success ms-1" style="font-size: 0.65rem;">
+                                                            <i class="bi bi-star-fill"></i> SIGUIENTE
+                                                        </span>
+                                                    {% endif %}
+                                                </div>
+                                                {% if tecnico.equipos_no_encienden > 0 %}
+                                                    <small class="text-muted">
+                                                        <i class="bi bi-exclamation-triangle text-warning"></i> 
+                                                        {{ tecnico.equipos_no_encienden }} no enciende{{ tecnico.equipos_no_encienden|pluralize }}
+                                                    </small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    
+                                    <!-- Columna: Órdenes Activas -->
+                                    <td class="text-center">
+                                        {% if tecnico.ordenes_actuales > 0 %}
+                                            <span class="badge bg-primary fs-6 px-3 py-2">
+                                                {{ tecnico.ordenes_actuales }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <!-- Columna: Asignaciones Hoy -->
+                                    <td class="text-center">
+                                        {% if tecnico.asignaciones_hoy > 0 %}
+                                            <span class="badge bg-info text-dark px-2 py-1">
+                                                +{{ tecnico.asignaciones_hoy }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted" style="font-size: 0.85rem;">0</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <!-- Columna: Asignaciones Semana -->
+                                    <td class="text-center">
+                                        {% if filtro_temporal != 'hoy' %}
+                                            {% if tecnico.asignaciones_semana > 0 %}
+                                                <span class="badge bg-secondary px-2 py-1">
+                                                    {{ tecnico.asignaciones_semana }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted" style="font-size: 0.85rem;">0</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted" style="font-size: 0.75rem;">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    
+                                    <!-- Columna: Última Asignación -->
+                                    <td class="text-center">
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="bi bi-clock"></i> {{ tecnico.tiempo_sin_asignar }}
+                                        </span>
+                                    </td>
+                                    
+                                    <!-- Columna: Estado / Alertas -->
+                                    <td class="text-center">
+                                        <div class="d-flex flex-wrap gap-1 justify-content-center">
+                                            {% if tecnico.tiene_sobrecarga %}
+                                                <span class="badge bg-danger" title="Tiene 3+ equipos que no encienden">
+                                                    <i class="bi bi-exclamation-triangle-fill"></i> SOBRECARGA
+                                                </span>
+                                            {% elif tecnico.necesita_alerta_sin_asignaciones %}
+                                                <span class="badge bg-warning text-dark" title="Más de 8 horas sin asignaciones">
+                                                    <i class="bi bi-clock"></i> SIN ASIGNACIONES
+                                                </span>
+                                            {% elif tecnico.esta_balanceado %}
+                                                <span class="badge bg-success" title="Carga equilibrada (±1 del promedio)">
+                                                    <i class="bi bi-check-circle-fill"></i> BALANCEADO
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="bi bi-dash-circle"></i> NORMAL
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Leyenda explicativa -->
+                    <div class="alert alert-light border-top border-0 rounded-0 mb-0 mt-3" role="alert" style="background-color: #f8f9fa;">
+                        <div class="row g-2">
+                            <div class="col-md-3">
+                                <strong><i class="bi bi-info-circle text-primary"></i> Columnas:</strong>
+                                <ul class="mb-0" style="font-size: 0.8rem;">
+                                    <li><strong>Activas:</strong> Órdenes actualmente asignadas</li>
+                                    <li><strong>Hoy:</strong> Asignaciones recibidas hoy</li>
+                                    <li><strong>Semana:</strong> Total de asignaciones esta semana</li>
+                                </ul>
                             </div>
-                            <div class="st-tecnico-nombre">{{ tecnico.tecnico_nombre }}</div>
-                            <div class="st-tecnico-ordenes">{{ tecnico.total_ordenes }}</div>
-                            <div class="st-tecnico-label">Órdenes Activas</div>
+                            <div class="col-md-3">
+                                <strong><i class="bi bi-speedometer2 text-success"></i> Rotación:</strong>
+                                <ul class="mb-0" style="font-size: 0.8rem;">
+                                    <li><span class="badge bg-success" style="font-size: 0.7rem;">SIGUIENTE</span> Técnico sugerido para próxima asignación</li>
+                                    <li><em>Criterio:</em> Menor carga + Tiempo sin asignar + Asignaciones del día</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-3">
+                                <strong><i class="bi bi-shield-check text-info"></i> Estados:</strong>
+                                <ul class="mb-0" style="font-size: 0.8rem;">
+                                    <li><span class="badge bg-danger" style="font-size: 0.7rem;">SOBRECARGA</span> 3+ equipos "No Enciende"</li>
+                                    <li><span class="badge bg-warning text-dark" style="font-size: 0.7rem;">SIN ASIGNACIONES</span> +8h sin recibir</li>
+                                    <li><span class="badge bg-success" style="font-size: 0.7rem;">BALANCEADO</span> Carga equilibrada</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-3">
+                                <strong><i class="bi bi-funnel text-warning"></i> Filtro Temporal:</strong>
+                                <ul class="mb-0" style="font-size: 0.8rem;">
+                                    <li><strong>Hoy:</strong> Solo asignaciones de hoy</li>
+                                    <li><strong>Esta Semana:</strong> Desde el lunes</li>
+                                    <li><strong>Histórico:</strong> Todas las asignaciones</li>
+                                </ul>
+                            </div>
                         </div>
-                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- ========================================================================
+             HISTORIAL DE REASIGNACIONES DEL DÍA
+             ======================================================================== -->
+        {% if reasignaciones_hoy %}
+        <div class="col-lg-12">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header text-white d-flex justify-content-between align-items-center clickable-header" 
+                     data-bs-toggle="collapse" 
+                     data-bs-target="#collapseReasignaciones" 
+                     aria-expanded="false" 
+                     aria-controls="collapseReasignaciones"
+                     role="button"
+                     style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border: none; padding: 1rem 1.5rem; cursor: pointer;">
+                    <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
+                        <i class="bi bi-arrow-left-right" style="font-size: 1.3rem;"></i> Historial de Reasignaciones del Día
+                    </h6>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-white text-dark" style="padding: 0.4rem 0.8rem; font-weight: 600;">
+                            {{ reasignaciones_hoy|length }} reasignacion{{ reasignaciones_hoy|length|pluralize:"es" }}
+                        </span>
+                        <div class="toggle-collapse-icon">
+                            <i class="bi bi-chevron-down collapse-icon" style="font-size: 1.3rem;"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="collapse" id="collapseReasignaciones">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 10%;"><i class="bi bi-clock"></i> Hora</th>
+                                        <th style="width: 15%;"><i class="bi bi-hash"></i> Orden</th>
+                                        <th style="width: 25%;"><i class="bi bi-arrow-left-right"></i> Reasignación</th>
+                                        <th style="width: 35%;"><i class="bi bi-chat-left-text"></i> Motivo / Comentario</th>
+                                        <th style="width: 15%;"><i class="bi bi-person"></i> Realizado por</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for reasignacion in reasignaciones_hoy %}
+                                    <tr>
+                                        <!-- Hora -->
+                                        <td>
+                                            <span class="badge bg-light text-dark border">
+                                                {{ reasignacion.fecha_evento|date:"H:i" }}
+                                            </span>
+                                        </td>
+                                        
+                                        <!-- Orden -->
+                                        <td>
+                                            <a href="{% url 'servicio_tecnico:detalle_orden' reasignacion.orden.id %}" 
+                                               class="text-decoration-none fw-bold text-primary"
+                                               title="Ver detalles de la orden">
+                                                {{ reasignacion.orden.numero_orden_interno }}
+                                            </a>
+                                            <br>
+                                            <small class="text-muted">{{ reasignacion.orden.detalle_equipo.marca }}</small>
+                                        </td>
+                                        
+                                        <!-- Reasignación (De → A) -->
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                                                {% if reasignacion.tecnico_anterior %}
+                                                    <span class="badge bg-secondary text-white px-2 py-1">
+                                                        {{ reasignacion.tecnico_anterior.nombre_completo|truncatechars:15 }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-light text-muted px-2 py-1">Sin asignar</span>
+                                                {% endif %}
+                                                
+                                                <i class="bi bi-arrow-right text-primary"></i>
+                                                
+                                                {% if reasignacion.tecnico_nuevo %}
+                                                    <span class="badge bg-primary text-white px-2 py-1">
+                                                        {{ reasignacion.tecnico_nuevo.nombre_completo|truncatechars:15 }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-light text-muted px-2 py-1">Sin asignar</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        
+                                        <!-- Comentario / Motivo -->
+                                        <td>
+                                            {% if reasignacion.comentario %}
+                                                <small class="text-dark">{{ reasignacion.comentario|truncatechars:60 }}</small>
+                                            {% else %}
+                                                <small class="text-muted fst-italic">Sin comentario</small>
+                                            {% endif %}
+                                        </td>
+                                        
+                                        <!-- Usuario que realizó el cambio -->
+                                        <td>
+                                            {% if reasignacion.usuario %}
+                                                <small class="text-muted">
+                                                    <i class="bi bi-person-circle"></i> {{ reasignacion.usuario.nombre_completo }}
+                                                </small>
+                                            {% elif reasignacion.es_sistema %}
+                                                <small class="text-muted fst-italic">
+                                                    <i class="bi bi-gear"></i> Sistema
+                                                </small>
+                                            {% else %}
+                                                <small class="text-muted fst-italic">N/A</small>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Nota informativa -->
+                        <div class="alert alert-light border-top border-0 rounded-0 mb-0" role="alert" style="font-size: 0.85rem;">
+                            <i class="bi bi-info-circle text-info"></i> 
+                            <strong>Uso:</strong> Monitorea cómo se redistribuyen los equipos durante el día. 
+                            Detecta patrones de reasignación excesiva que puedan indicar problemas de balance de carga o disponibilidad de técnicos.
+                            <em class="text-muted">(Mostrando últimas 20 reasignaciones)</em>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -690,11 +997,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // MANEJO DE COLLAPSE/EXPAND DE TABLAS
     // ============================================
     
+    const collapseReasignaciones = document.getElementById('collapseReasignaciones');
     const collapseNoEnciende = document.getElementById('collapseNoEnciende');
     const collapseGama = document.getElementById('collapseGama');
     
     // Verificar el estado guardado en localStorage
     // Si el usuario expandió manualmente, mantener expandido
+    if (collapseReasignaciones) {
+        const savedStateReasignaciones = localStorage.getItem('collapseReasignaciones');
+        if (savedStateReasignaciones === 'visible') {
+            const bsCollapse = new bootstrap.Collapse(collapseReasignaciones, { toggle: false });
+            bsCollapse.show();
+        }
+        // Por defecto permanece colapsado (no se hace nada)
+    }
+    
     if (collapseNoEnciende) {
         const savedStateNoEnciende = localStorage.getItem('collapseNoEnciende');
         if (savedStateNoEnciende === 'visible') {
@@ -758,6 +1075,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    setupCollapseToggle(collapseReasignaciones, 'collapseReasignaciones');
     setupCollapseToggle(collapseNoEnciende, 'collapseNoEnciende');
     setupCollapseToggle(collapseGama, 'collapseGama');
 });

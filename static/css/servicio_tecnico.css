@@ -1974,4 +1974,165 @@ form:has(#btnSubirImagenes:disabled) textarea {
     }
 }
 
+/* =============================================================================
+   TABLA DE CARGA DE TRABAJO CON TRACKING TEMPORAL Y ROTACIÓN
+   ============================================================================= */
 
+/* Fila con técnico sugerido para siguiente asignación */
+.table-success.bg-success.bg-opacity-10 {
+    background-color: rgba(25, 135, 84, 0.08) !important;
+    border-left: 4px solid #198754;
+}
+
+/* Avatar de técnico con indicador de rotación */
+.tecnico-avatar-wrapper {
+    position: relative;
+}
+
+/* Efecto hover en filas de técnicos */
+.table-hover tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+    cursor: pointer;
+}
+
+/* Badges personalizados para estados */
+.badge.bg-success {
+    background-color: #198754 !important;
+}
+
+.badge.bg-danger {
+    background-color: #dc3545 !important;
+}
+
+.badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #000 !important;
+}
+
+.badge.bg-info {
+    background-color: #0dcaf0 !important;
+    color: #000 !important;
+}
+
+.badge.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+/* Header de tabla sticky */
+thead.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #f8f9fa;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Leyenda explicativa */
+.alert-light.border-top {
+    background-color: #f8f9fa !important;
+    border-top: 2px solid #dee2e6 !important;
+}
+
+/* Estilo para el selector de filtro temporal */
+#filtroTemporalForm .form-select {
+    border-radius: 6px;
+    border: 2px solid #ffffff;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+#filtroTemporalForm .form-select:hover {
+    background-color: #f8f9fa;
+    border-color: #e9ecef;
+}
+
+#filtroTemporalForm .form-select:focus {
+    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.5);
+    border-color: #ffffff;
+}
+
+/* =============================================================================
+   HISTORIAL DE REASIGNACIONES
+   ============================================================================= */
+
+/* Header colapsable con efecto hover */
+.clickable-header {
+    transition: all 0.3s ease;
+}
+
+.clickable-header:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Iconos de colapso/expandir */
+.collapse-icon {
+    transition: transform 0.3s ease;
+}
+
+.clickable-header[aria-expanded="true"] .collapse-icon {
+    transform: rotate(180deg);
+}
+
+/* Tabla de reasignaciones */
+.table-sm td {
+    padding: 0.5rem;
+    vertical-align: middle;
+}
+
+/* Enlaces a órdenes en historial */
+.table a.text-primary {
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.table a.text-primary:hover {
+    color: #0a58ca !important;
+    text-decoration: underline !important;
+}
+
+/* Badges de técnicos en reasignaciones */
+.badge.bg-secondary.text-white {
+    background-color: #6c757d !important;
+}
+
+.badge.bg-primary.text-white {
+    background-color: #0d6efd !important;
+}
+
+/* Flecha de reasignación */
+.bi-arrow-right {
+    font-size: 1.1rem;
+    color: #6c757d;
+}
+
+/* Responsive para tabla de tracking temporal */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.85rem;
+    }
+    
+    thead.sticky-top th {
+        font-size: 0.75rem;
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .table-hover tbody td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .badge {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.4rem;
+    }
+}
+
+/* Animación suave para collapse */
+.collapse {
+    transition: height 0.35s ease;
+}
+
+.collapsing {
+    transition: height 0.35s ease;
+}

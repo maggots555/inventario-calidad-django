@@ -835,8 +835,27 @@ def lista_ordenes_activas(request):
     )
     
     # ========================================================================
-    # CARGA DE TRABAJO POR TÉCNICO (Solo técnicos de laboratorio activos)
+    # CARGA DE TRABAJO POR TÉCNICO CON TRACKING TEMPORAL Y ROTACIÓN
     # ========================================================================
+    from datetime import timedelta
+    from django.db.models import Max, F
+    
+    # Obtener filtro temporal (por defecto: esta semana)
+    filtro_temporal = request.GET.get('filtro_temporal', 'semana')
+    
+    # Calcular fechas según el filtro
+    hoy = timezone.now().date()
+    inicio_semana = hoy - timedelta(days=hoy.weekday())  # Lunes de esta semana
+    
+    if filtro_temporal == 'hoy':
+        fecha_inicio_filtro = timezone.now().replace(hour=0, minute=0, second=0)
+    elif filtro_temporal == 'semana':
+        fecha_inicio_filtro = timezone.datetime.combine(inicio_semana, timezone.datetime.min.time())
+        fecha_inicio_filtro = timezone.make_aware(fecha_inicio_filtro)
+    else:  # 'historico'
+        fecha_inicio_filtro = None
+    
+    # CONSULTA BASE: Órdenes activas por técnico
     ordenes_por_tecnico = OrdenServicio.objects.filter(
         tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
         tecnico_asignado_actual__activo=True
@@ -849,19 +868,148 @@ def lista_ordenes_activas(request):
         total_ordenes=Count('numero_orden_interno')
     ).order_by('-total_ordenes')
     
-    # Enriquecer con información adicional del técnico
+    # CONSULTA: Asignaciones del día (desde HistorialOrden)
+    asignaciones_hoy = HistorialOrden.objects.filter(
+        tipo_evento='cambio_tecnico',
+        fecha_evento__date=hoy
+    ).values('tecnico_nuevo__id').annotate(
+        total=Count('id')
+    )
+    asignaciones_hoy_dict = {item['tecnico_nuevo__id']: item['total'] for item in asignaciones_hoy if item['tecnico_nuevo__id']}
+    
+    # CONSULTA: Asignaciones de la semana o históricas (según filtro)
+    if filtro_temporal == 'historico':
+        # Histórico: todas las asignaciones sin filtro de fecha
+        asignaciones_semana = HistorialOrden.objects.filter(
+            tipo_evento='cambio_tecnico'
+        ).values('tecnico_nuevo__id').annotate(
+            total=Count('id')
+        )
+        asignaciones_semana_dict = {item['tecnico_nuevo__id']: item['total'] for item in asignaciones_semana if item['tecnico_nuevo__id']}
+    elif filtro_temporal == 'semana':
+        # Semana: desde inicio de semana
+        asignaciones_semana = HistorialOrden.objects.filter(
+            tipo_evento='cambio_tecnico',
+            fecha_evento__gte=fecha_inicio_filtro
+        ).values('tecnico_nuevo__id').annotate(
+            total=Count('id')
+        )
+        asignaciones_semana_dict = {item['tecnico_nuevo__id']: item['total'] for item in asignaciones_semana if item['tecnico_nuevo__id']}
+    else:
+        # Hoy: no se muestra columna de semana
+        asignaciones_semana_dict = {}
+    
+    # CONSULTA: Última asignación por técnico (para rotación)
+    ultimas_asignaciones = HistorialOrden.objects.filter(
+        tipo_evento='cambio_tecnico',
+        tecnico_nuevo__cargo='TECNICO DE LABORATORIO',
+        tecnico_nuevo__activo=True
+    ).values('tecnico_nuevo__id').annotate(
+        ultima_fecha=Max('fecha_evento')
+    )
+    ultimas_asignaciones_dict = {item['tecnico_nuevo__id']: item['ultima_fecha'] for item in ultimas_asignaciones}
+    
+    # Obtener todos los técnicos de laboratorio activos
+    tecnicos_laboratorio = Empleado.objects.filter(
+        cargo='TECNICO DE LABORATORIO',
+        activo=True
+    )
+    
+    # Enriquecer con información detallada
     ordenes_por_tecnico_enriquecido = []
-    for item in ordenes_por_tecnico:
-        try:
-            tecnico = Empleado.objects.get(id=item['tecnico_asignado_actual__id'])
-            ordenes_por_tecnico_enriquecido.append({
-                'tecnico_nombre': item['tecnico_asignado_actual__nombre_completo'],
-                'total_ordenes': item['total_ordenes'],
-                'foto_url': tecnico.get_foto_perfil_url(),
-                'iniciales': tecnico.get_iniciales(),
-            })
-        except Empleado.DoesNotExist:
-            pass
+    ordenes_por_tecnico_dict = {item['tecnico_asignado_actual__id']: item['total_ordenes'] for item in ordenes_por_tecnico}
+    
+    for tecnico in tecnicos_laboratorio:
+        ordenes_actuales = ordenes_por_tecnico_dict.get(tecnico.id, 0)
+        asignaciones_hoy_count = asignaciones_hoy_dict.get(tecnico.id, 0)
+        asignaciones_semana_count = asignaciones_semana_dict.get(tecnico.id, 0)
+        ultima_asignacion = ultimas_asignaciones_dict.get(tecnico.id)
+        
+        # Calcular tiempo desde última asignación
+        tiempo_sin_asignar = None
+        if ultima_asignacion:
+            delta = timezone.now() - ultima_asignacion
+            horas = delta.total_seconds() / 3600
+            if horas < 24:
+                tiempo_sin_asignar = f"hace {int(horas)}h"
+            else:
+                dias = int(horas / 24)
+                tiempo_sin_asignar = f"hace {dias}d"
+        else:
+            tiempo_sin_asignar = "Nunca"
+        
+        # Obtener estadísticas de "No Enciende" usando método del modelo
+        stats = tecnico.obtener_estadisticas_ordenes_activas()
+        
+        ordenes_por_tecnico_enriquecido.append({
+            'tecnico_id': tecnico.id,
+            'tecnico_nombre': tecnico.nombre_completo,
+            'foto_url': tecnico.get_foto_perfil_url(),
+            'iniciales': tecnico.get_iniciales(),
+            'ordenes_actuales': ordenes_actuales,
+            'asignaciones_hoy': asignaciones_hoy_count,
+            'asignaciones_semana': asignaciones_semana_count,
+            'ultima_asignacion': ultima_asignacion,
+            'tiempo_sin_asignar': tiempo_sin_asignar,
+            'tiene_sobrecarga': stats['tiene_sobrecarga'],
+            'equipos_no_encienden': stats['equipos_no_encienden'],
+        })
+    
+    # ALGORITMO DE ROTACIÓN: Calcular "siguiente sugerido"
+    # Criterios (en orden de prioridad):
+    # 1. Menor carga actual (ordenes_actuales)
+    # 2. Tiempo desde última asignación (más tiempo = mayor prioridad)
+    # 3. Menos asignaciones en el día (distribuir equitativamente)
+    
+    # Ordenar técnicos por prioridad de asignación
+    tecnicos_ordenados_rotacion = sorted(
+        ordenes_por_tecnico_enriquecido,
+        key=lambda x: (
+            x['ordenes_actuales'],  # Primero: menor carga actual
+            -(x['ultima_asignacion'].timestamp() if x['ultima_asignacion'] else 0),  # Segundo: más tiempo sin asignar (negativo para invertir)
+            x['asignaciones_hoy']  # Tercero: menos asignaciones hoy
+        )
+    )
+    
+    # Marcar el primero como "siguiente en rotación"
+    if tecnicos_ordenados_rotacion:
+        siguiente_id = tecnicos_ordenados_rotacion[0]['tecnico_id']
+        for item in ordenes_por_tecnico_enriquecido:
+            item['es_siguiente_rotacion'] = (item['tecnico_id'] == siguiente_id)
+    
+    # Calcular promedio de carga para determinar "balanceado"
+    if ordenes_por_tecnico_enriquecido:
+        promedio_carga = sum(t['ordenes_actuales'] for t in ordenes_por_tecnico_enriquecido) / len(ordenes_por_tecnico_enriquecido)
+        for item in ordenes_por_tecnico_enriquecido:
+            diferencia = abs(item['ordenes_actuales'] - promedio_carga)
+            item['esta_balanceado'] = diferencia <= 1
+            item['necesita_alerta_sin_asignaciones'] = (
+                item['asignaciones_hoy'] == 0 and 
+                item['ultima_asignacion'] and 
+                (timezone.now() - item['ultima_asignacion']).total_seconds() > 28800  # 8 horas
+            )
+    
+    # ORDENAR LISTA FINAL: "Siguiente en rotación" primero, luego por carga descendente
+    ordenes_por_tecnico_enriquecido.sort(
+        key=lambda x: (
+            not x.get('es_siguiente_rotacion', False),  # False (siguiente) va primero
+            -x['ordenes_actuales'],  # Luego ordenar por carga descendente (negativo para invertir)
+            x['tecnico_nombre']  # Desempate por nombre alfabético
+        )
+    )
+    
+    # ========================================================================
+    # HISTORIAL DE REASIGNACIONES DEL DÍA
+    # ========================================================================
+    reasignaciones_hoy = HistorialOrden.objects.filter(
+        tipo_evento='cambio_tecnico',
+        fecha_evento__date=hoy
+    ).select_related(
+        'orden',
+        'tecnico_anterior',
+        'tecnico_nuevo',
+        'usuario'
+    ).order_by('-fecha_evento')[:20]  # Limitar a últimas 20
     
     # Calcular total de órdenes activas (sin filtro de búsqueda) para las estadísticas
     total_ordenes_activas = OrdenServicio.objects.exclude(
@@ -876,7 +1024,9 @@ def lista_ordenes_activas(request):
         'busqueda': busqueda,
         'equipos_no_enciende_por_tecnico': equipos_no_enciende_por_tecnico,
         'equipos_por_gama_por_tecnico': equipos_por_gama_por_tecnico,
-        'ordenes_por_tecnico': ordenes_por_tecnico_enriquecido,  # Grid de carga de trabajo
+        'ordenes_por_tecnico': ordenes_por_tecnico_enriquecido,  # Datos enriquecidos con tracking temporal
+        'reasignaciones_hoy': reasignaciones_hoy,  # Historial de reasignaciones del día
+        'filtro_temporal': filtro_temporal,  # Filtro activo (hoy/semana/historico)
         'total_ordenes_activas': total_ordenes_activas,  # Para mostrar en estadísticas
         'mostrar_estadisticas': True,  # Siempre mostrar en vista activas
     }
