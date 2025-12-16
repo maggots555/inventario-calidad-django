@@ -165,7 +165,8 @@ def cargar_productos_desde_csv(ruta_csv):
     try:
         # Abrir el archivo CSV
         # EXPLICACIÓN: 'r' = read (lectura), encoding='utf-8' = para leer acentos correctamente
-        with open(ruta_csv, 'r', encoding='utf-8') as archivo:
+        # newline='' = maneja correctamente terminaciones de línea Windows (\r\n) en Linux
+        with open(ruta_csv, 'r', encoding='utf-8', newline='') as archivo:
             # csv.DictReader lee el CSV y crea un diccionario por cada fila
             # Las claves del diccionario son los nombres de las columnas
             lector = csv.DictReader(archivo)
@@ -270,7 +271,8 @@ def main():
     else:
         # Solicitar la ruta del archivo
         print("📁 Por favor, proporciona la ruta completa del archivo CSV:")
-        print("   Ejemplo: C:\\Users\\DELL\\Downloads\\LISTADO DE PRODUCTOS.csv.csv")
+        print("   Ejemplo Linux: /var/www/inventario-django/inventario-calidad-django/scripts/poblado/LISTADO DE PRODUCTOS.csv")
+        print("   Ejemplo Windows: C:\\Users\\DELL\\Downloads\\LISTADO DE PRODUCTOS.csv")
         
         ruta_csv = input("\n👉 Ruta del archivo CSV: ").strip()
         

@@ -92,6 +92,11 @@ mi_sitio_descontinuado/
 
 # Dependencias de Node.js
 /node_modules
+
 # Django Logs
 logs/
 *.log
+
+# Archivos CSV con datos sensibles (productos, precios, inventario)
+scripts/poblado/*.csv
+scripts/poblado/*.xlsx
