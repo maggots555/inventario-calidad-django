@@ -381,10 +381,10 @@
                                             <a href="{% url 'servicio_tecnico:detalle_orden' reasignacion.orden.id %}" 
                                                class="text-decoration-none fw-bold text-primary"
                                                title="Ver detalles de la orden">
-                                                {{ reasignacion.orden.numero_orden_interno }}
+                                                {{ reasignacion.orden.detalle_equipo.orden_cliente }}
                                             </a>
                                             <br>
-                                            <small class="text-muted">{{ reasignacion.orden.detalle_equipo.marca }}</small>
+                                            <small class="text-muted">{{ reasignacion.orden.detalle_equipo.marca }} | {{ reasignacion.orden.numero_orden_interno }}</small>
                                         </td>
                                         
                                         <!-- Reasignación (De → A) -->

@@ -869,8 +869,11 @@ def lista_ordenes_activas(request):
     ).order_by('-total_ordenes')
     
     # CONSULTA: Asignaciones del día (desde HistorialOrden)
+    # IMPORTANTE: Filtrar solo registros manuales (es_sistema=False) para evitar duplicación
+    # Cuando se cambia técnico manualmente, se crean 2 registros: uno manual y uno automático del modelo
     asignaciones_hoy = HistorialOrden.objects.filter(
         tipo_evento='cambio_tecnico',
+        es_sistema=False,  # Solo registros creados por usuarios, no por el sistema
         fecha_evento__date=hoy
     ).values('tecnico_nuevo__id').annotate(
         total=Count('id')
@@ -878,10 +881,12 @@ def lista_ordenes_activas(request):
     asignaciones_hoy_dict = {item['tecnico_nuevo__id']: item['total'] for item in asignaciones_hoy if item['tecnico_nuevo__id']}
     
     # CONSULTA: Asignaciones de la semana o históricas (según filtro)
+    # IMPORTANTE: Filtrar solo registros manuales (es_sistema=False) para evitar duplicación
     if filtro_temporal == 'historico':
         # Histórico: todas las asignaciones sin filtro de fecha
         asignaciones_semana = HistorialOrden.objects.filter(
-            tipo_evento='cambio_tecnico'
+            tipo_evento='cambio_tecnico',
+            es_sistema=False  # Solo registros manuales
         ).values('tecnico_nuevo__id').annotate(
             total=Count('id')
         )
@@ -890,6 +895,7 @@ def lista_ordenes_activas(request):
         # Semana: desde inicio de semana
         asignaciones_semana = HistorialOrden.objects.filter(
             tipo_evento='cambio_tecnico',
+            es_sistema=False,  # Solo registros manuales
             fecha_evento__gte=fecha_inicio_filtro
         ).values('tecnico_nuevo__id').annotate(
             total=Count('id')
@@ -900,8 +906,10 @@ def lista_ordenes_activas(request):
         asignaciones_semana_dict = {}
     
     # CONSULTA: Última asignación por técnico (para rotación)
+    # IMPORTANTE: Filtrar solo registros manuales (es_sistema=False)
     ultimas_asignaciones = HistorialOrden.objects.filter(
         tipo_evento='cambio_tecnico',
+        es_sistema=False,  # Solo registros manuales
         tecnico_nuevo__cargo='TECNICO DE LABORATORIO',
         tecnico_nuevo__activo=True
     ).values('tecnico_nuevo__id').annotate(
@@ -1001,8 +1009,11 @@ def lista_ordenes_activas(request):
     # ========================================================================
     # HISTORIAL DE REASIGNACIONES DEL DÍA
     # ========================================================================
+    # IMPORTANTE: Filtrar solo registros manuales (es_sistema=False) para evitar duplicados
+    # Los cambios automáticos del modelo se excluyen para mostrar solo reasignaciones reales
     reasignaciones_hoy = HistorialOrden.objects.filter(
         tipo_evento='cambio_tecnico',
+        es_sistema=False,  # Solo registros creados por usuarios
         fecha_evento__date=hoy
     ).select_related(
         'orden',

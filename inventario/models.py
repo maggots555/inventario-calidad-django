@@ -638,6 +638,11 @@ class Empleado(models.Model):
         2. Alertar cuando un técnico ya tiene muchos equipos complejos
         3. Distribuir mejor la carga de trabajo
         
+        CRITERIO DE "ACTIVO":
+        Se consideran activas TODAS las órdenes excepto las entregadas y canceladas.
+        Esto incluye: espera, diagnostico, cotizacion, reparacion, finalizado, 
+        pendiente_piezas, pendiente_autorizacion, rechazado, convertida_a_diagnostico, etc.
+        
         Returns:
             dict: Diccionario con estadísticas:
                 - ordenes_activas: Total de órdenes no finalizadas/entregadas
@@ -648,13 +653,11 @@ class Empleado(models.Model):
         # Importar aquí para evitar circular imports
         from servicio_tecnico.models import OrdenServicio
         
-        # Estados que se consideran "activos" (no terminados)
-        estados_activos = ['espera', 'diagnostico', 'cotizacion', 'reparacion']
-        
-        # Obtener órdenes activas del técnico
+        # Obtener órdenes activas del técnico (todas excepto entregadas y canceladas)
         ordenes_activas = OrdenServicio.objects.filter(
-            tecnico_asignado_actual=self,
-            estado__in=estados_activos
+            tecnico_asignado_actual=self
+        ).exclude(
+            estado__in=['entregado', 'cancelado']
         ).select_related('detalle_equipo')
         
         total_ordenes = ordenes_activas.count()
