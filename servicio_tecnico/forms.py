@@ -72,7 +72,7 @@ class NuevaOrdenForm(forms.ModelForm):
             'required': True,
         }),
         label="Tipo de Equipo",
-        help_text="Selecciona el tipo de equipo que ingresa"
+        help_text="Selecciona el tipo de equipo que ingresa (campo obligatorio)"
     )
     
     marca = forms.ChoiceField(

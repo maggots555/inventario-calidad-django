@@ -7,6 +7,7 @@ Mantiene consistencia en choices y valores entre diferentes apps
 # TIPOS DE EQUIPO - Usado por ScoreCard y Servicio Técnico
 # ============================================================================
 TIPO_EQUIPO_CHOICES = [
+    ('', '-- Seleccione un tipo de equipo --'),  # Opción vacía para validación
     ('PC', 'PC'),
     ('Laptop', 'Laptop'),
     ('AIO', 'AIO (All-in-One)'),
