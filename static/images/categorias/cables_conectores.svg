@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="cab_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" />
+    </linearGradient>
+    <filter id="cab_shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#00f2fe" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <circle cx="60" cy="60" r="50" fill="url(#cab_grad)" filter="url(#cab_shadow)" opacity="0.1"/>
+  <!-- USB-C connector left -->
+  <rect x="20" y="50" width="25" height="20" rx="4" fill="url(#cab_grad)" opacity="0.15" stroke="url(#cab_grad)" stroke-width="2.5"/>
+  <rect x="25" y="55" width="15" height="10" rx="2" fill="url(#cab_grad)"/>
+  <!-- Cable curve -->
+  <path d="M45 60 Q60 30 75 60" fill="none" stroke="url(#cab_grad)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M45 60 Q60 90 75 60" fill="none" stroke="url(#cab_grad)" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
+  <!-- USB-C connector right -->
+  <rect x="75" y="50" width="25" height="20" rx="4" fill="url(#cab_grad)" opacity="0.15" stroke="url(#cab_grad)" stroke-width="2.5"/>
+  <rect x="80" y="55" width="15" height="10" rx="2" fill="url(#cab_grad)"/>
+  <!-- Connection dots -->
+  <circle cx="60" cy="38" r="3" fill="url(#cab_grad)"/>
+  <circle cx="60" cy="82" r="3" fill="url(#cab_grad)" opacity="0.5"/>
+</svg>

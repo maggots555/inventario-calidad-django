@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="chg_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f7971e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ffd200;stop-opacity:1" />
+    </linearGradient>
+    <filter id="chg_shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#f7971e" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <circle cx="60" cy="60" r="50" fill="url(#chg_grad)" filter="url(#chg_shadow)" opacity="0.1"/>
+  <!-- Charger body -->
+  <rect x="35" y="30" width="50" height="35" rx="6" fill="url(#chg_grad)" opacity="0.15" stroke="url(#chg_grad)" stroke-width="2.5"/>
+  <!-- Prongs -->
+  <rect x="45" y="20" width="8" height="15" rx="2" fill="url(#chg_grad)"/>
+  <rect x="67" y="20" width="8" height="15" rx="2" fill="url(#chg_grad)"/>
+  <!-- Cable -->
+  <path d="M60 65 Q60 75 50 80 Q35 87 35 97" fill="none" stroke="url(#chg_grad)" stroke-width="3" stroke-linecap="round"/>
+  <!-- USB end -->
+  <rect x="28" y="94" width="15" height="10" rx="2" fill="url(#chg_grad)" opacity="0.15" stroke="url(#chg_grad)" stroke-width="2"/>
+  <rect x="32" y="97" width="7" height="4" rx="1" fill="url(#chg_grad)"/>
+  <!-- Lightning bolt on charger -->
+  <path d="M62 40 L55 50 L62 50 L58 60 L68 48 L61 48 L65 40 Z" fill="url(#chg_grad)"/>
+</svg>

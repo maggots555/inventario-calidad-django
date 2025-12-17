@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="acc_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <filter id="acc_shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#667eea" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <circle cx="60" cy="60" r="50" fill="url(#acc_grad)" filter="url(#acc_shadow)" opacity="0.1"/>
+  <!-- Mouse -->
+  <path d="M45 40C45 35 50 30 60 30C70 30 75 35 75 40V70C75 80 70 85 60 85C50 85 45 80 45 70V40Z" fill="url(#acc_grad)" opacity="0.15" stroke="url(#acc_grad)" stroke-width="2.5"/>
+  <line x1="60" y1="30" x2="60" y2="50" stroke="url(#acc_grad)" stroke-width="2"/>
+  <ellipse cx="60" cy="42" rx="4" ry="6" fill="url(#acc_grad)"/>
+  <!-- USB -->
+  <rect x="30" y="75" width="18" height="14" rx="2" fill="url(#acc_grad)" opacity="0.15" stroke="url(#acc_grad)" stroke-width="2"/>
+  <rect x="34" y="79" width="3" height="6" rx="1" fill="url(#acc_grad)"/>
+  <rect x="41" y="79" width="3" height="6" rx="1" fill="url(#acc_grad)"/>
+  <!-- Headphones mini -->
+  <path d="M80 75 Q80 65 88 65 Q96 65 96 75" fill="none" stroke="url(#acc_grad)" stroke-width="2.5"/>
+  <rect x="78" y="75" width="5" height="10" rx="2" fill="url(#acc_grad)"/>
+  <rect x="93" y="75" width="5" height="10" rx="2" fill="url(#acc_grad)"/>
+</svg>

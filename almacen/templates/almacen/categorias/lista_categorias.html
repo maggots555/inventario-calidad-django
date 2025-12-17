@@ -3,9 +3,124 @@
 
 {% block title %}Categorías - Almacén{% endblock %}
 
+{% block extra_css %}
+<style>
+    .categoria-card {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: none;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .categoria-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .categoria-svg-container {
+        height: 140px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .categoria-svg-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+        pointer-events: none;
+    }
+    
+    .categoria-svg {
+        width: 100px;
+        height: 100px;
+        transition: transform 0.3s ease;
+    }
+    
+    .categoria-card:hover .categoria-svg {
+        transform: scale(1.1);
+    }
+    
+    .categoria-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.75rem;
+        border-radius: 20px;
+        font-weight: 600;
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.9);
+        color: #333;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .categoria-info {
+        padding: 1.25rem;
+        background: #fff;
+    }
+    
+    .categoria-title {
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: #2d3748;
+    }
+    
+    .categoria-description {
+        font-size: 0.875rem;
+        color: #718096;
+        margin-bottom: 0;
+        line-height: 1.5;
+    }
+    
+    .categoria-actions {
+        padding: 0.75rem 1.25rem 1.25rem;
+        background: #fff;
+        border-top: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .btn-categoria {
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    
+    .empty-state-icon {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 1.5rem;
+        opacity: 0.5;
+    }
+    
+    .bg-accesorios { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .bg-audio-video { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .bg-baterias { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+    .bg-cables-conectores { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .bg-carcasas-estructuras { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .bg-cargadores-adaptadores { background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%); }
+    .bg-componentes-input { background: linear-gradient(135deg, #5433ff 0%, #20bdff 100%); }
+    .bg-discos-almacenamiento { background: linear-gradient(135deg, #373b44 0%, #4286f4 100%); }
+    .bg-equipos-completos { background: linear-gradient(135deg, #0f2027 0%, #2c5364 100%); }
+    .bg-general { background: linear-gradient(135deg, #636e72 0%, #b2bec3 100%); }
+    .bg-herramientas-consumibles { background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%); }
+    .bg-memoria-ram { background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%); }
+    .bg-pantallas-displays { background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%); }
+    .bg-placas-tarjetas { background: linear-gradient(135deg, #134e5e 0%, #71b280 100%); }
+    .bg-refrigeracion { background: linear-gradient(135deg, #00c6fb 0%, #005bea 100%); }
+    .bg-servicios-soluciones { background: linear-gradient(135deg, #7f00ff 0%, #e100ff 100%); }
+    .bg-default { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+</style>
+{% endblock %}
+
 {% block almacen_content %}
 <div class="container-fluid py-4">
-    <!-- Encabezado -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h2 mb-0">
@@ -22,26 +137,66 @@
         </div>
     </div>
 
-    <!-- Grid de Categorías -->
     <div class="row g-4">
         {% for categoria in categorias %}
         <div class="col-md-4 col-lg-3">
-            <div class="card shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h5 class="card-title mb-0">{{ categoria.nombre }}</h5>
-                        <span class="badge bg-primary rounded-pill">{{ categoria.num_productos }}</span>
-                    </div>
-                    {% if categoria.descripcion %}
-                    <p class="card-text text-muted small">{{ categoria.descripcion|truncatechars:80 }}</p>
+            <div class="card categoria-card shadow-sm h-100">
+                {% with categoria.nombre|lower as nombre_lower %}
+                <div class="categoria-svg-container {% if 'accesorios' in nombre_lower %}bg-accesorios{% elif 'audio' in nombre_lower or 'video' in nombre_lower %}bg-audio-video{% elif 'bater' in nombre_lower %}bg-baterias{% elif 'cable' in nombre_lower or 'conector' in nombre_lower %}bg-cables-conectores{% elif 'carcasa' in nombre_lower or 'estructura' in nombre_lower %}bg-carcasas-estructuras{% elif 'cargador' in nombre_lower or 'adaptador' in nombre_lower %}bg-cargadores-adaptadores{% elif 'input' in nombre_lower %}bg-componentes-input{% elif 'disco' in nombre_lower or 'almacenamiento' in nombre_lower %}bg-discos-almacenamiento{% elif 'equipo' in nombre_lower or 'completo' in nombre_lower %}bg-equipos-completos{% elif 'general' in nombre_lower %}bg-general{% elif 'herramienta' in nombre_lower or 'consumible' in nombre_lower %}bg-herramientas-consumibles{% elif 'memoria' in nombre_lower or 'ram' in nombre_lower %}bg-memoria-ram{% elif 'pantalla' in nombre_lower or 'display' in nombre_lower %}bg-pantallas-displays{% elif 'placa' in nombre_lower or 'tarjeta' in nombre_lower %}bg-placas-tarjetas{% elif 'refrigera' in nombre_lower or 'enfri' in nombre_lower %}bg-refrigeracion{% elif 'servicio' in nombre_lower or 'solucion' in nombre_lower %}bg-servicios-soluciones{% else %}bg-default{% endif %}">
+                    <span class="categoria-badge">
+                        <i class="bi bi-box me-1"></i>{{ categoria.num_productos }}
+                    </span>
+                    {% if 'accesorios' in nombre_lower %}
+                        <img src="{% static 'images/categorias/accesorios.svg' %}" alt="Accesorios" class="categoria-svg">
+                    {% elif 'audio' in nombre_lower or 'video' in nombre_lower %}
+                        <img src="{% static 'images/categorias/audio_video.svg' %}" alt="Audio y Video" class="categoria-svg">
+                    {% elif 'bater' in nombre_lower %}
+                        <img src="{% static 'images/categorias/baterias.svg' %}" alt="Baterías" class="categoria-svg">
+                    {% elif 'cable' in nombre_lower or 'conector' in nombre_lower %}
+                        <img src="{% static 'images/categorias/cables_conectores.svg' %}" alt="Cables" class="categoria-svg">
+                    {% elif 'carcasa' in nombre_lower or 'estructura' in nombre_lower %}
+                        <img src="{% static 'images/categorias/carcasas_estructuras.svg' %}" alt="Carcasas" class="categoria-svg">
+                    {% elif 'cargador' in nombre_lower or 'adaptador' in nombre_lower %}
+                        <img src="{% static 'images/categorias/cargadores_adaptadores.svg' %}" alt="Cargadores" class="categoria-svg">
+                    {% elif 'input' in nombre_lower %}
+                        <img src="{% static 'images/categorias/componentes_input.svg' %}" alt="Input" class="categoria-svg">
+                    {% elif 'disco' in nombre_lower or 'almacenamiento' in nombre_lower %}
+                        <img src="{% static 'images/categorias/discos_almacenamiento.svg' %}" alt="Discos" class="categoria-svg">
+                    {% elif 'equipo' in nombre_lower or 'completo' in nombre_lower %}
+                        <img src="{% static 'images/categorias/equipos_completos.svg' %}" alt="Equipos" class="categoria-svg">
+                    {% elif 'general' in nombre_lower %}
+                        <img src="{% static 'images/categorias/general.svg' %}" alt="General" class="categoria-svg">
+                    {% elif 'herramienta' in nombre_lower or 'consumible' in nombre_lower %}
+                        <img src="{% static 'images/categorias/herramientas_consumibles.svg' %}" alt="Herramientas" class="categoria-svg">
+                    {% elif 'memoria' in nombre_lower or 'ram' in nombre_lower %}
+                        <img src="{% static 'images/categorias/memoria_ram.svg' %}" alt="RAM" class="categoria-svg">
+                    {% elif 'pantalla' in nombre_lower or 'display' in nombre_lower %}
+                        <img src="{% static 'images/categorias/pantallas_displays.svg' %}" alt="Pantallas" class="categoria-svg">
+                    {% elif 'placa' in nombre_lower or 'tarjeta' in nombre_lower %}
+                        <img src="{% static 'images/categorias/placas_tarjetas.svg' %}" alt="Placas" class="categoria-svg">
+                    {% elif 'refrigera' in nombre_lower or 'enfri' in nombre_lower %}
+                        <img src="{% static 'images/categorias/refrigeracion.svg' %}" alt="Refrigeración" class="categoria-svg">
+                    {% elif 'servicio' in nombre_lower or 'solucion' in nombre_lower %}
+                        <img src="{% static 'images/categorias/servicios_soluciones.svg' %}" alt="Servicios" class="categoria-svg">
+                    {% else %}
+                        <img src="{% static 'images/categorias/general.svg' %}" alt="General" class="categoria-svg">
                     {% endif %}
                 </div>
-                <div class="card-footer bg-white border-top-0">
+                {% endwith %}
+                <div class="categoria-info">
+                    <h5 class="categoria-title">{{ categoria.nombre }}</h5>
+                    {% if categoria.descripcion %}
+                    <p class="categoria-description">{{ categoria.descripcion|truncatechars:80 }}</p>
+                    {% else %}
+                    <p class="categoria-description text-muted fst-italic">Sin descripción</p>
+                    {% endif %}
+                </div>
+                <div class="categoria-actions">
                     <div class="btn-group btn-group-sm w-100">
-                        <a href="{% url 'almacen:lista_productos' %}?categoria={{ categoria.pk }}" class="btn btn-outline-primary">
+                        <a href="{% url 'almacen:lista_productos' %}?categoria={{ categoria.pk }}" class="btn btn-outline-primary btn-categoria">
                             <i class="bi bi-box me-1"></i>Ver Productos
                         </a>
-                        <a href="{% url 'almacen:editar_categoria' categoria.pk %}" class="btn btn-outline-secondary">
+                        <a href="{% url 'almacen:editar_categoria' categoria.pk %}" class="btn btn-outline-secondary btn-categoria">
                             <i class="bi bi-pencil"></i>
                         </a>
                     </div>
@@ -50,7 +205,7 @@
         </div>
         {% empty %}
         <div class="col-12">
-            <div class="card shadow-sm">
+            <div class="card shadow-sm border-0">
                 <div class="card-body text-center py-5">
                     <i class="bi bi-tags fs-1 text-muted d-block mb-2"></i>
                     <p class="text-muted">No hay categorías registradas</p>

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="srv_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7f00ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e100ff;stop-opacity:1" />
+    </linearGradient>
+    <filter id="srv_shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#7f00ff" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <circle cx="60" cy="60" r="50" fill="url(#srv_grad)" filter="url(#srv_shadow)" opacity="0.1"/>
+  <!-- Central gear/cog -->
+  <circle cx="60" cy="55" r="20" fill="url(#srv_grad)" opacity="0.15" stroke="url(#srv_grad)" stroke-width="2"/>
+  <circle cx="60" cy="55" r="10" fill="none" stroke="url(#srv_grad)" stroke-width="2"/>
+  <!-- Gear teeth -->
+  <rect x="56" y="32" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
+  <rect x="56" y="70" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
+  <rect x="77" y="51" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
+  <rect x="35" y="51" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
+  <!-- Diagonal teeth -->
+  <rect x="72" y="37" width="6" height="6" transform="rotate(45 75 40)" fill="url(#srv_grad)" opacity="0.5"/>
+  <rect x="42" y="37" width="6" height="6" transform="rotate(45 45 40)" fill="url(#srv_grad)" opacity="0.5"/>
+  <rect x="42" y="67" width="6" height="6" transform="rotate(45 45 70)" fill="url(#srv_grad)" opacity="0.5"/>
+  <rect x="72" y="67" width="6" height="6" transform="rotate(45 75 70)" fill="url(#srv_grad)" opacity="0.5"/>
+  <!-- Wrench overlay -->
+  <path d="M55 48 L45 38 Q35 42 38 52 L48 58 L55 48 Z" fill="url(#srv_grad)" opacity="0.6"/>
+  <path d="M65 62 L75 72 Q85 68 82 58 L72 52 L65 62 Z" fill="url(#srv_grad)" opacity="0.6"/>
+  <!-- Checkmark/solution -->
+  <path d="M25 85 L35 95 L55 75" fill="none" stroke="url(#srv_grad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Document/service order -->
+  <rect x="70" y="78" width="25" height="30" rx="2" fill="url(#srv_grad)" opacity="0.15" stroke="url(#srv_grad)" stroke-width="2"/>
+  <line x1="74" y1="85" x2="91" y2="85" stroke="url(#srv_grad)" stroke-width="1.5"/>
+  <line x1="74" y1="90" x2="88" y2="90" stroke="url(#srv_grad)" stroke-width="1.5"/>
+  <line x1="74" y1="95" x2="90" y2="95" stroke="url(#srv_grad)" stroke-width="1.5"/>
+  <line x1="74" y1="100" x2="85" y2="100" stroke="url(#srv_grad)" stroke-width="1.5"/>
+</svg>

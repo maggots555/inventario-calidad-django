@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="cool_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00c6fb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#005bea;stop-opacity:1" />
+    </linearGradient>
+    <filter id="cool_shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#005bea" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <circle cx="60" cy="60" r="50" fill="url(#cool_grad)" filter="url(#cool_shadow)" opacity="0.1"/>
+  <!-- Fan outer ring -->
+  <circle cx="60" cy="60" r="38" fill="url(#cool_grad)" opacity="0.15" stroke="url(#cool_grad)" stroke-width="2.5"/>
+  <!-- Fan center hub -->
+  <circle cx="60" cy="60" r="10" fill="url(#cool_grad)" opacity="0.3" stroke="url(#cool_grad)" stroke-width="2"/>
+  <!-- Fan blades -->
+  <path d="M60 50 Q70 35 60 22 Q50 35 60 50" fill="url(#cool_grad)" opacity="0.7"/>
+  <path d="M70 60 Q85 70 98 60 Q85 50 70 60" fill="url(#cool_grad)" opacity="0.7"/>
+  <path d="M60 70 Q50 85 60 98 Q70 85 60 70" fill="url(#cool_grad)" opacity="0.7"/>
+  <path d="M50 60 Q35 50 22 60 Q35 70 50 60" fill="url(#cool_grad)" opacity="0.7"/>
+  <!-- Diagonal blades -->
+  <path d="M67 53 Q82 42 90 30 Q72 42 67 53" fill="url(#cool_grad)" opacity="0.5"/>
+  <path d="M67 67 Q78 82 90 90 Q78 72 67 67" fill="url(#cool_grad)" opacity="0.5"/>
+  <path d="M53 67 Q38 78 30 90 Q42 78 53 67" fill="url(#cool_grad)" opacity="0.5"/>
+  <path d="M53 53 Q42 38 30 30 Q42 48 53 53" fill="url(#cool_grad)" opacity="0.5"/>
+  <!-- Center screw -->
+  <circle cx="60" cy="60" r="4" fill="url(#cool_grad)"/>
+  <!-- Corner screws -->
+  <circle cx="25" cy="25" r="3" fill="url(#cool_grad)" opacity="0.5"/>
+  <circle cx="95" cy="25" r="3" fill="url(#cool_grad)" opacity="0.5"/>
+  <circle cx="25" cy="95" r="3" fill="url(#cool_grad)" opacity="0.5"/>
+  <circle cx="95" cy="95" r="3" fill="url(#cool_grad)" opacity="0.5"/>
+  <!-- Rotation indicator -->
+  <path d="M60 15 Q75 15 75 20" fill="none" stroke="url(#cool_grad)" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
+</svg>
