@@ -1,0 +1,172 @@
+/**
+ * Lista de Categorías - Estilos específicos
+ * ==========================================
+ * CSS dedicado para la vista de lista de categorías del almacén.
+ * 
+ * Estructura:
+ * 1. Tarjetas de categoría (animaciones y layout)
+ * 2. Contenedor de iconos SVG
+ * 3. Badges y etiquetas
+ * 4. Información y acciones
+ * 5. Gradientes de fondo por categoría (contrastan con SVGs blancos/claros)
+ * 6. Estados vacíos
+ */
+
+/* ==========================================================================
+   1. TARJETAS DE CATEGORÍA
+   ========================================================================== */
+
+.categoria-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  overflow: hidden;
+  position: relative;
+  border-radius: 16px;
+}
+
+.categoria-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ==========================================================================
+   2. CONTENEDOR SVG
+   ========================================================================== */
+
+.categoria-svg-container {
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.categoria-svg-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  pointer-events: none;
+}
+
+.categoria-svg {
+  width: 100px;
+  height: 100px;
+  transition: transform 0.3s ease;
+  /* Filtro sutil para mejorar visibilidad en fondos similares */
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.categoria-card:hover .categoria-svg {
+  transform: scale(1.1);
+}
+
+/* ==========================================================================
+   3. BADGES Y ETIQUETAS
+   ========================================================================== */
+
+.categoria-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 20px;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================================================
+   4. INFORMACIÓN Y ACCIONES
+   ========================================================================== */
+
+.categoria-info {
+  padding: 1.25rem;
+  background: #fff;
+}
+
+.categoria-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  color: #2d3748;
+}
+
+.categoria-description {
+  font-size: 0.875rem;
+  color: #718096;
+  margin-bottom: 0;
+  line-height: 1.5;
+}
+
+.categoria-actions {
+  padding: 0.75rem 1.25rem 1.25rem;
+  background: #fff;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.btn-categoria {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+/* ==========================================================================
+   5. FONDOS DE CATEGORÍA (ESTILO BLANCO/LIMPIO)
+   ========================================================================== 
+   Diseño minimalista: Fondo blanco/gris muy suave para resaltar los SVGs.
+*/
+
+.categoria-svg-container {
+    /* Sobrescribimos el color de texto del pseudo-elemento para que no interfiera */
+    background-color: #f8f9fa; /* Gris muy suave */
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+/* Eliminamos los gradientes anteriores y usamos un fondo neutro elegante */
+.bg-accesorios,
+.bg-audio-video,
+.bg-baterias,
+.bg-cables-conectores,
+.bg-carcasas-estructuras,
+.bg-cargadores-adaptadores,
+.bg-componentes-input,
+.bg-discos-almacenamiento,
+.bg-equipos-completos,
+.bg-general,
+.bg-herramientas-consumibles,
+.bg-memoria-ram,
+.bg-pantallas-displays,
+.bg-placas-tarjetas,
+.bg-refrigeracion,
+.bg-servicios-soluciones,
+.bg-default {
+    background: linear-gradient(180deg, #ffffff 0%, #f1f3f5 100%);
+}
+
+/* Ajustamos el pseudo-elemento overlay para que sea muy sutil o invisible en modo blanco */
+.categoria-svg-container::before {
+    background: none;
+}
+
+/* ==========================================================================
+   6. ESTADO VACÍO
+   ========================================================================== */
+
+.empty-state-icon {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 1.5rem;
+  opacity: 0.5;
+}

@@ -233,6 +233,89 @@ class CategoriaAlmacen(models.Model):
         """Retorna cuántos productos tiene esta categoría"""
         return self.productos.filter(activo=True).count()
 
+    def get_bg_class(self):
+        """
+        Retorna la clase CSS para el fondo de la categoría basado en su nombre.
+        Se usa en los templates para asignar colores específicos.
+        """
+        nombre_lower = self.nombre.lower()
+        
+        if 'accesorios' in nombre_lower:
+            return 'bg-accesorios'
+        elif 'audio' in nombre_lower or 'video' in nombre_lower:
+            return 'bg-audio-video'
+        elif 'bater' in nombre_lower:
+            return 'bg-baterias'
+        elif 'cable' in nombre_lower or 'conector' in nombre_lower:
+            return 'bg-cables-conectores'
+        elif 'carcasa' in nombre_lower or 'estructura' in nombre_lower:
+            return 'bg-carcasas-estructuras'
+        elif 'cargador' in nombre_lower or 'adaptador' in nombre_lower:
+            return 'bg-cargadores-adaptadores'
+        elif 'input' in nombre_lower:
+            return 'bg-componentes-input'
+        elif 'disco' in nombre_lower or 'almacenamiento' in nombre_lower:
+            return 'bg-discos-almacenamiento'
+        elif 'equipo' in nombre_lower or 'completo' in nombre_lower:
+            return 'bg-equipos-completos'
+        elif 'general' in nombre_lower:
+            return 'bg-general'
+        elif 'herramienta' in nombre_lower or 'consumible' in nombre_lower:
+            return 'bg-herramientas-consumibles'
+        elif 'memoria' in nombre_lower or 'ram' in nombre_lower:
+            return 'bg-memoria-ram'
+        elif 'pantalla' in nombre_lower or 'display' in nombre_lower:
+            return 'bg-pantallas-displays'
+        elif 'placa' in nombre_lower or 'tarjeta' in nombre_lower:
+            return 'bg-placas-tarjetas'
+        elif 'refrigera' in nombre_lower or 'enfri' in nombre_lower:
+            return 'bg-refrigeracion'
+        elif 'servicio' in nombre_lower or 'solucion' in nombre_lower:
+            return 'bg-servicios-soluciones'
+        else:
+            return 'bg-default'
+
+    def get_icon_name(self):
+        """
+        Retorna el nombre del archivo SVG (sin ruta, solo nombre base) para la categoría.
+        """
+        nombre_lower = self.nombre.lower()
+        
+        if 'accesorios' in nombre_lower:
+            return 'accesorios.svg'
+        elif 'audio' in nombre_lower or 'video' in nombre_lower:
+            return 'audio_video.svg'
+        elif 'bater' in nombre_lower:
+            return 'baterias.svg'
+        elif 'cable' in nombre_lower or 'conector' in nombre_lower:
+            return 'cables_conectores.svg'
+        elif 'carcasa' in nombre_lower or 'estructura' in nombre_lower:
+            return 'carcasas_estructuras.svg'
+        elif 'cargador' in nombre_lower or 'adaptador' in nombre_lower:
+            return 'cargadores_adaptadores.svg'
+        elif 'input' in nombre_lower:
+            return 'componentes_input.svg'
+        elif 'disco' in nombre_lower or 'almacenamiento' in nombre_lower:
+            return 'discos_almacenamiento.svg'
+        elif 'equipo' in nombre_lower or 'completo' in nombre_lower:
+            return 'equipos_completos.svg'
+        elif 'general' in nombre_lower:
+            return 'general.svg'
+        elif 'herramienta' in nombre_lower or 'consumible' in nombre_lower:
+            return 'herramientas_consumibles.svg'
+        elif 'memoria' in nombre_lower or 'ram' in nombre_lower:
+            return 'memoria_ram.svg'
+        elif 'pantalla' in nombre_lower or 'display' in nombre_lower:
+            return 'pantallas_displays.svg'
+        elif 'placa' in nombre_lower or 'tarjeta' in nombre_lower:
+            return 'placas_tarjetas.svg'
+        elif 'refrigera' in nombre_lower or 'enfri' in nombre_lower:
+            return 'refrigeracion.svg'
+        elif 'servicio' in nombre_lower or 'solucion' in nombre_lower:
+            return 'servicios_soluciones.svg'
+        else:
+            return 'general.svg'
+
 
 # ============================================================================
 # MODELO: PRODUCTO DE ALMACÉN
