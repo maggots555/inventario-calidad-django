@@ -8,25 +8,35 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#7f00ff" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+    @keyframes draw-check {
+      0% { stroke-dashoffset: 50; }
+      100% { stroke-dashoffset: 0; }
+    }
+    .checkmark { stroke-dasharray: 50; stroke-dashoffset: 50; animation: draw-check 2s ease-out forwards; animation-delay: 0.5s; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#srv_grad)" filter="url(#srv_shadow)" opacity="0.1"/>
   <!-- Central gear/cog -->
   <circle cx="60" cy="55" r="20" fill="url(#srv_grad)" opacity="0.15" stroke="url(#srv_grad)" stroke-width="2"/>
   <circle cx="60" cy="55" r="10" fill="none" stroke="url(#srv_grad)" stroke-width="2"/>
   <!-- Gear teeth -->
-  <rect x="56" y="32" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
-  <rect x="56" y="70" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
-  <rect x="77" y="51" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
-  <rect x="35" y="51" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
-  <!-- Diagonal teeth -->
-  <rect x="72" y="37" width="6" height="6" transform="rotate(45 75 40)" fill="url(#srv_grad)" opacity="0.5"/>
-  <rect x="42" y="37" width="6" height="6" transform="rotate(45 45 40)" fill="url(#srv_grad)" opacity="0.5"/>
-  <rect x="42" y="67" width="6" height="6" transform="rotate(45 45 70)" fill="url(#srv_grad)" opacity="0.5"/>
-  <rect x="72" y="67" width="6" height="6" transform="rotate(45 75 70)" fill="url(#srv_grad)" opacity="0.5"/>
+  <g class="gear-inner">
+    <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 60 55" to="360 60 55" dur="4s" repeatCount="indefinite"/>
+    <rect x="56" y="32" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
+    <rect x="56" y="70" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
+    <rect x="77" y="51" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
+    <rect x="35" y="51" width="8" height="8" fill="url(#srv_grad)" opacity="0.7"/>
+    <!-- Diagonal teeth -->
+    <rect x="72" y="37" width="6" height="6" transform="rotate(45 75 40)" fill="url(#srv_grad)" opacity="0.5"/>
+    <rect x="42" y="37" width="6" height="6" transform="rotate(45 45 40)" fill="url(#srv_grad)" opacity="0.5"/>
+    <rect x="42" y="67" width="6" height="6" transform="rotate(45 45 70)" fill="url(#srv_grad)" opacity="0.5"/>
+    <rect x="72" y="67" width="6" height="6" transform="rotate(45 75 70)" fill="url(#srv_grad)" opacity="0.5"/>
+  </g>
   <!-- Wrench overlay -->
   <path d="M55 48 L45 38 Q35 42 38 52 L48 58 L55 48 Z" fill="url(#srv_grad)" opacity="0.6"/>
   <path d="M65 62 L75 72 Q85 68 82 58 L72 52 L65 62 Z" fill="url(#srv_grad)" opacity="0.6"/>
   <!-- Checkmark/solution -->
-  <path d="M25 85 L35 95 L55 75" fill="none" stroke="url(#srv_grad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="checkmark" d="M25 85 L35 95 L55 75" fill="none" stroke="url(#srv_grad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
   <!-- Document/service order -->
   <rect x="70" y="78" width="25" height="30" rx="2" fill="url(#srv_grad)" opacity="0.15" stroke="url(#srv_grad)" stroke-width="2"/>
   <line x1="74" y1="85" x2="91" y2="85" stroke="url(#srv_grad)" stroke-width="1.5"/>

@@ -8,15 +8,28 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#20bdff" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+    @keyframes type {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+    @keyframes move-cursor {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-5px, -5px); }
+    }
+    .key-blink { animation: type 0.5s infinite alternate; }
+    .key-blink-slow { animation: type 1s infinite alternate-reverse; }
+    .cursor-anim { animation: move-cursor 3s ease-in-out infinite; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#inp_grad)" filter="url(#inp_shadow)" opacity="0.1"/>
   <!-- Keyboard -->
   <rect x="15" y="60" width="65" height="28" rx="4" fill="url(#inp_grad)" opacity="0.15" stroke="url(#inp_grad)" stroke-width="2.5"/>
   <!-- Keys row 1 -->
-  <rect x="20" y="65" width="7" height="7" rx="1" fill="url(#inp_grad)" opacity="0.6"/>
+  <rect class="key-blink" x="20" y="65" width="7" height="7" rx="1" fill="url(#inp_grad)" opacity="0.6"/>
   <rect x="29" y="65" width="7" height="7" rx="1" fill="url(#inp_grad)" opacity="0.6"/>
-  <rect x="38" y="65" width="7" height="7" rx="1" fill="url(#inp_grad)" opacity="0.6"/>
+  <rect class="key-blink-slow" x="38" y="65" width="7" height="7" rx="1" fill="url(#inp_grad)" opacity="0.6"/>
   <rect x="47" y="65" width="7" height="7" rx="1" fill="url(#inp_grad)" opacity="0.6"/>
-  <rect x="56" y="65" width="7" height="7" rx="1" fill="url(#inp_grad)" opacity="0.6"/>
+  <rect class="key-blink" x="56" y="65" width="7" height="7" rx="1" fill="url(#inp_grad)" opacity="0.6"/>
   <rect x="65" y="65" width="10" height="7" rx="1" fill="url(#inp_grad)" opacity="0.6"/>
   <!-- Keys row 2 -->
   <rect x="20" y="75" width="10" height="7" rx="1" fill="url(#inp_grad)" opacity="0.6"/>
@@ -28,5 +41,5 @@
   <rect x="86" y="78" width="8" height="4" rx="1" fill="url(#inp_grad)" opacity="0.5"/>
   <rect x="95" y="78" width="8" height="4" rx="1" fill="url(#inp_grad)" opacity="0.5"/>
   <!-- Cursor -->
-  <path d="M92 30 L92 48 L97 43 L102 52 L105 50 L100 41 L106 41 Z" fill="url(#inp_grad)"/>
+  <path class="cursor-anim" d="M92 30 L92 48 L97 43 L102 52 L105 50 L100 41 L106 41 Z" fill="url(#inp_grad)"/>
 </svg>

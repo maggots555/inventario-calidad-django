@@ -8,6 +8,15 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#1a2980" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+    @keyframes bar-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 0.9; }
+    }
+    .chart-bar { animation: bar-pulse 2s infinite ease-in-out; }
+    .chart-bar:nth-child(odd) { animation-direction: alternate; }
+    .chart-bar:nth-child(even) { animation-direction: alternate-reverse; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#scr_grad)" filter="url(#scr_shadow)" opacity="0.1"/>
   <!-- Monitor frame -->
   <rect x="18" y="22" width="84" height="58" rx="4" fill="url(#scr_grad)" opacity="0.15" stroke="url(#scr_grad)" stroke-width="2.5"/>
@@ -20,12 +29,14 @@
   <rect x="56" y="45" width="34" height="3" rx="1" fill="url(#scr_grad)" opacity="0.2"/>
   <rect x="28" y="50" width="64" height="20" rx="2" fill="url(#scr_grad)" opacity="0.15"/>
   <!-- Graph bars -->
-  <rect x="33" y="60" width="6" height="8" fill="url(#scr_grad)" opacity="0.6"/>
-  <rect x="42" y="55" width="6" height="13" fill="url(#scr_grad)" opacity="0.6"/>
-  <rect x="51" y="52" width="6" height="16" fill="url(#scr_grad)" opacity="0.6"/>
-  <rect x="60" y="57" width="6" height="11" fill="url(#scr_grad)" opacity="0.6"/>
-  <rect x="69" y="54" width="6" height="14" fill="url(#scr_grad)" opacity="0.6"/>
-  <rect x="78" y="50" width="6" height="18" fill="url(#scr_grad)" opacity="0.6"/>
+  <g>
+    <rect class="chart-bar" x="33" y="60" width="6" height="8" fill="url(#scr_grad)" opacity="0.6"/>
+    <rect class="chart-bar" x="42" y="55" width="6" height="13" fill="url(#scr_grad)" opacity="0.6"/>
+    <rect class="chart-bar" x="51" y="52" width="6" height="16" fill="url(#scr_grad)" opacity="0.6"/>
+    <rect class="chart-bar" x="60" y="57" width="6" height="11" fill="url(#scr_grad)" opacity="0.6"/>
+    <rect class="chart-bar" x="69" y="54" width="6" height="14" fill="url(#scr_grad)" opacity="0.6"/>
+    <rect class="chart-bar" x="78" y="50" width="6" height="18" fill="url(#scr_grad)" opacity="0.6"/>
+  </g>
   <!-- Stand -->
   <rect x="52" y="80" width="16" height="8" fill="url(#scr_grad)" opacity="0.5"/>
   <ellipse cx="60" cy="92" rx="22" ry="5" fill="url(#scr_grad)" opacity="0.3"/>

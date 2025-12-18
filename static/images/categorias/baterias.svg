@@ -8,14 +8,30 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#38ef7d" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+    @keyframes charge {
+      0% { opacity: 0.2; }
+      50% { opacity: 1; }
+      100% { opacity: 0.2; }
+    }
+    .level-1 { animation: charge 2s infinite 0s; }
+    .level-2 { animation: charge 2s infinite 0.6s; }
+    .level-3 { animation: charge 2s infinite 1.2s; }
+    
+    @keyframes zap {
+      0%, 100% { fill-opacity: 0.8; }
+      50% { fill-opacity: 1; transform: scale(1.05); transform-origin: 55px 40px; }
+    }
+    .bolt { animation: zap 1s infinite alternate; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#bat_grad)" filter="url(#bat_shadow)" opacity="0.1"/>
   <!-- Battery main -->
   <rect x="28" y="35" width="55" height="50" rx="6" fill="url(#bat_grad)" opacity="0.15" stroke="url(#bat_grad)" stroke-width="2.5"/>
   <rect x="83" y="50" width="8" height="20" rx="2" fill="url(#bat_grad)"/>
   <!-- Battery level bars -->
-  <rect x="35" y="43" width="12" height="34" rx="2" fill="url(#bat_grad)" opacity="0.9"/>
-  <rect x="51" y="43" width="12" height="34" rx="2" fill="url(#bat_grad)" opacity="0.7"/>
-  <rect x="67" y="43" width="12" height="34" rx="2" fill="url(#bat_grad)" opacity="0.4"/>
+  <rect class="level-1" x="35" y="43" width="12" height="34" rx="2" fill="url(#bat_grad)" opacity="0.9"/>
+  <rect class="level-2" x="51" y="43" width="12" height="34" rx="2" fill="url(#bat_grad)" opacity="0.7"/>
+  <rect class="level-3" x="67" y="43" width="12" height="34" rx="2" fill="url(#bat_grad)" opacity="0.4"/>
   <!-- Lightning bolt -->
-  <path d="M55 28 L50 42 L58 42 L52 55 L65 38 L56 38 L62 28 Z" fill="url(#bat_grad)" opacity="0.8"/>
+  <path class="bolt" d="M55 28 L50 42 L58 42 L52 55 L65 38 L56 38 L62 28 Z" fill="url(#bat_grad)" opacity="0.8"/>
 </svg>

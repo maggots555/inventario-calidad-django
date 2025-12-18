@@ -8,6 +8,13 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#f7971e" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+    @keyframes zap-pulse {
+      0%, 100% { fill-opacity: 0.6; transform: scale(1); }
+      50% { fill-opacity: 1; transform: scale(1.1); }
+    }
+    .energy-bolt { animation: zap-pulse 1.5s infinite alternate; transform-origin: 62px 50px; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#chg_grad)" filter="url(#chg_shadow)" opacity="0.1"/>
   <!-- Charger body -->
   <rect x="35" y="30" width="50" height="35" rx="6" fill="url(#chg_grad)" opacity="0.15" stroke="url(#chg_grad)" stroke-width="2.5"/>
@@ -20,5 +27,5 @@
   <rect x="28" y="94" width="15" height="10" rx="2" fill="url(#chg_grad)" opacity="0.15" stroke="url(#chg_grad)" stroke-width="2"/>
   <rect x="32" y="97" width="7" height="4" rx="1" fill="url(#chg_grad)"/>
   <!-- Lightning bolt on charger -->
-  <path d="M62 40 L55 50 L62 50 L58 60 L68 48 L61 48 L65 40 Z" fill="url(#chg_grad)"/>
+  <path class="energy-bolt" d="M62 40 L55 50 L62 50 L58 60 L68 48 L61 48 L65 40 Z" fill="url(#chg_grad)"/>
 </svg>

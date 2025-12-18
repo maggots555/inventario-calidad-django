@@ -8,6 +8,15 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#f5576c" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+    @keyframes pulse-wave {
+      0% { opacity: 0.4; stroke-width: 2; }
+      50% { opacity: 1; stroke-width: 3; }
+      100% { opacity: 0.4; stroke-width: 2; }
+    }
+    .wave1 { animation: pulse-wave 2s infinite ease-in-out; }
+    .wave2 { animation: pulse-wave 2s infinite ease-in-out 0.8s; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#av_grad)" filter="url(#av_shadow)" opacity="0.1"/>
   <!-- Speaker -->
   <rect x="25" y="38" width="22" height="44" rx="4" fill="url(#av_grad)" opacity="0.15" stroke="url(#av_grad)" stroke-width="2.5"/>
@@ -18,6 +27,6 @@
   <circle cx="75" cy="60" r="22" fill="url(#av_grad)" opacity="0.15" stroke="url(#av_grad)" stroke-width="2.5"/>
   <polygon points="70,50 70,70 86,60" fill="url(#av_grad)"/>
   <!-- Sound waves -->
-  <path d="M52 45 Q56 48 56 60 Q56 72 52 75" fill="none" stroke="url(#av_grad)" stroke-width="2" stroke-linecap="round"/>
-  <path d="M55 40 Q62 45 62 60 Q62 75 55 80" fill="none" stroke="url(#av_grad)" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <path class="wave1" d="M52 45 Q56 48 56 60 Q56 72 52 75" fill="none" stroke="url(#av_grad)" stroke-width="2" stroke-linecap="round"/>
+  <path class="wave2" d="M55 40 Q62 45 62 60 Q62 75 55 80" fill="none" stroke="url(#av_grad)" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
 </svg>

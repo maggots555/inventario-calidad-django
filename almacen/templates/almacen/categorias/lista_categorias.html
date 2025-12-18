@@ -29,7 +29,7 @@ Categorías - Almacén {% endblock %} {% block extra_css %}
             <i class="bi bi-box me-1"></i>{{ categoria.num_productos }}
           </span>
           <img
-            src="{% static 'images/categorias/' %}{{ categoria.get_icon_name }}"
+            src="{% static 'images/categorias/' %}{{ categoria.get_icon_name }}?v=2"
             alt="{{ categoria.nombre }}"
             class="categoria-svg"
           />

@@ -8,6 +8,14 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#00f2fe" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+     @keyframes pulse-dot {
+       0%, 100% { r: 3; opacity: 1; }
+       50% { r: 5; opacity: 0.6; }
+     }
+     .dot1 { animation: pulse-dot 2s infinite; }
+     .dot2 { animation: pulse-dot 2s infinite 1s; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#cab_grad)" filter="url(#cab_shadow)" opacity="0.1"/>
   <!-- USB-C connector left -->
   <rect x="20" y="50" width="25" height="20" rx="4" fill="url(#cab_grad)" opacity="0.15" stroke="url(#cab_grad)" stroke-width="2.5"/>
@@ -19,6 +27,6 @@
   <rect x="75" y="50" width="25" height="20" rx="4" fill="url(#cab_grad)" opacity="0.15" stroke="url(#cab_grad)" stroke-width="2.5"/>
   <rect x="80" y="55" width="15" height="10" rx="2" fill="url(#cab_grad)"/>
   <!-- Connection dots -->
-  <circle cx="60" cy="38" r="3" fill="url(#cab_grad)"/>
-  <circle cx="60" cy="82" r="3" fill="url(#cab_grad)" opacity="0.5"/>
+  <circle class="dot1" cx="60" cy="38" r="3" fill="url(#cab_grad)"/>
+  <circle class="dot2" cx="60" cy="82" r="3" fill="url(#cab_grad)" opacity="0.5"/>
 </svg>

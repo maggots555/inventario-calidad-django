@@ -12,12 +12,21 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#764ba2" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+     @keyframes blink {
+       0%, 100% { opacity: 1; stroke-width: 2; }
+       50% { opacity: 0.4; stroke-width: 1; }
+     }
+     .power-led { animation: blink 3s ease-in-out infinite; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#car_grad2)" filter="url(#car_shadow)" opacity="0.1"/>
   <!-- Computer case front -->
   <rect x="30" y="25" width="60" height="75" rx="4" fill="url(#car_grad2)" opacity="0.15" stroke="url(#car_grad2)" stroke-width="2.5"/>
   <!-- Power button -->
-  <circle cx="60" cy="35" r="5" fill="none" stroke="url(#car_grad2)" stroke-width="2"/>
-  <line x1="60" y1="32" x2="60" y2="35" stroke="url(#car_grad2)" stroke-width="2"/>
+  <g class="power-led">
+    <circle cx="60" cy="35" r="5" fill="none" stroke="url(#car_grad2)" stroke-width="2"/>
+    <line x1="60" y1="32" x2="60" y2="35" stroke="url(#car_grad2)" stroke-width="2"/>
+  </g>
   <!-- Drive bays -->
   <rect x="38" y="45" width="44" height="12" rx="2" fill="url(#car_grad2)" opacity="0.3"/>
   <rect x="38" y="60" width="44" height="12" rx="2" fill="url(#car_grad2)" opacity="0.3"/>

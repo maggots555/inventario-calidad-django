@@ -8,6 +8,12 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#134e5e" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+    @keyframes flow {
+      to { stroke-dashoffset: -20; }
+    }
+    .trace { stroke-dasharray: 4; animation: flow 1s linear infinite; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#pcb_grad)" filter="url(#pcb_shadow)" opacity="0.1"/>
   <!-- Main PCB board -->
   <rect x="20" y="25" width="80" height="70" rx="3" fill="url(#pcb_grad)" opacity="0.15" stroke="url(#pcb_grad)" stroke-width="2.5"/>
@@ -29,9 +35,9 @@
   <rect x="28" y="70" width="44" height="4" rx="0.5" fill="url(#pcb_grad)" opacity="0.2"/>
   <rect x="25" y="80" width="50" height="8" rx="1" fill="url(#pcb_grad)" opacity="0.4"/>
   <!-- Traces/circuits -->
-  <path d="M55 55 L55 68 L40 68" fill="none" stroke="url(#pcb_grad)" stroke-width="1" opacity="0.6"/>
-  <path d="M70 55 L70 65 L80 65 L80 75" fill="none" stroke="url(#pcb_grad)" stroke-width="1" opacity="0.6"/>
-  <path d="M30 50 L30 60 L50 60" fill="none" stroke="url(#pcb_grad)" stroke-width="1" opacity="0.6"/>
+  <path class="trace" d="M55 55 L55 68 L40 68" fill="none" stroke="url(#pcb_grad)" stroke-width="1" opacity="0.6"/>
+  <path class="trace" d="M70 55 L70 65 L80 65 L80 75" fill="none" stroke="url(#pcb_grad)" stroke-width="1" opacity="0.6"/>
+  <path class="trace" d="M30 50 L30 60 L50 60" fill="none" stroke="url(#pcb_grad)" stroke-width="1" opacity="0.6"/>
   <!-- I/O ports -->
   <rect x="82" y="70" width="12" height="20" rx="1" fill="url(#pcb_grad)" opacity="0.3"/>
   <rect x="84" y="73" width="4" height="4" fill="url(#pcb_grad)" opacity="0.5"/>

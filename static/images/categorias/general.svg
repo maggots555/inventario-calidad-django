@@ -12,6 +12,13 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#636e72" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+    @keyframes twinkle {
+       0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.8; }
+       50% { transform: scale(1.2) rotate(15deg); opacity: 1; }
+    }
+    .star-badge { animation: twinkle 3s infinite ease-in-out; transform-origin: 60px 40px; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#gen_grad2)" filter="url(#gen_shadow)" opacity="0.1"/>
   <!-- Box/Package -->
   <rect x="30" y="40" width="60" height="45" rx="3" fill="url(#gen_grad2)" opacity="0.15" stroke="url(#gen_grad2)" stroke-width="2.5"/>
@@ -29,5 +36,5 @@
   <line x1="68" y1="63" x2="68" y2="74" stroke="url(#gen_grad2)" stroke-width="1"/>
   <line x1="73" y1="63" x2="73" y2="74" stroke="url(#gen_grad2)" stroke-width="2"/>
   <!-- Star badge -->
-  <polygon points="60,32 62,37 68,37 63,41 65,46 60,43 55,46 57,41 52,37 58,37" fill="url(#gen_grad2)" opacity="0.8"/>
+  <polygon class="star-badge" points="60,32 62,37 68,37 63,41 65,46 60,43 55,46 57,41 52,37 58,37" fill="url(#gen_grad2)" opacity="0.8"/>
 </svg>

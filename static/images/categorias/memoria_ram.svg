@@ -8,17 +8,31 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#56ab2f" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+    .chip { animation: pulse 2s infinite ease-in-out; }
+    .chip:nth-child(1) { animation-delay: 0.0s; }
+    .chip:nth-child(2) { animation-delay: 0.2s; }
+    .chip:nth-child(3) { animation-delay: 0.4s; }
+    .chip:nth-child(4) { animation-delay: 0.6s; }
+    .chip:nth-child(5) { animation-delay: 0.8s; }
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#ram_grad)" filter="url(#ram_shadow)" opacity="0.1"/>
   <!-- RAM stick base -->
   <rect x="15" y="45" width="90" height="30" rx="3" fill="url(#ram_grad)" opacity="0.15" stroke="url(#ram_grad)" stroke-width="2.5"/>
   <!-- Notch -->
   <rect x="70" y="75" width="8" height="5" fill="#fff"/>
   <!-- Memory chips -->
-  <rect x="22" y="50" width="12" height="20" rx="1" fill="url(#ram_grad)" opacity="0.6"/>
-  <rect x="37" y="50" width="12" height="20" rx="1" fill="url(#ram_grad)" opacity="0.6"/>
-  <rect x="52" y="50" width="12" height="20" rx="1" fill="url(#ram_grad)" opacity="0.6"/>
-  <rect x="67" y="50" width="12" height="20" rx="1" fill="url(#ram_grad)" opacity="0.6"/>
-  <rect x="82" y="50" width="12" height="20" rx="1" fill="url(#ram_grad)" opacity="0.6"/>
+  <g>
+    <rect class="chip" x="22" y="50" width="12" height="20" rx="1" fill="url(#ram_grad)" opacity="0.6"/>
+    <rect class="chip" x="37" y="50" width="12" height="20" rx="1" fill="url(#ram_grad)" opacity="0.6"/>
+    <rect class="chip" x="52" y="50" width="12" height="20" rx="1" fill="url(#ram_grad)" opacity="0.6"/>
+    <rect class="chip" x="67" y="50" width="12" height="20" rx="1" fill="url(#ram_grad)" opacity="0.6"/>
+    <rect class="chip" x="82" y="50" width="12" height="20" rx="1" fill="url(#ram_grad)" opacity="0.6"/>
+  </g>
   <!-- Chip labels -->
   <rect x="25" y="53" width="6" height="8" rx="0.5" fill="url(#ram_grad)" opacity="0.3"/>
   <rect x="40" y="53" width="6" height="8" rx="0.5" fill="url(#ram_grad)" opacity="0.3"/>

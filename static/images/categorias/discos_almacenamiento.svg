@@ -8,12 +8,18 @@
       <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#4286f4" flood-opacity="0.3"/>
     </filter>
   </defs>
+  <style>
+    /* CSS removed for HDD spin, using SMIL */
+  </style>
   <circle cx="60" cy="60" r="50" fill="url(#disk_grad)" filter="url(#disk_shadow)" opacity="0.1"/>
   <!-- HDD -->
   <rect x="20" y="40" width="42" height="50" rx="4" fill="url(#disk_grad)" opacity="0.15" stroke="url(#disk_grad)" stroke-width="2.5"/>
-  <circle cx="41" cy="65" r="15" fill="none" stroke="url(#disk_grad)" stroke-width="2"/>
-  <circle cx="41" cy="65" r="8" fill="none" stroke="url(#disk_grad)" stroke-width="2"/>
-  <circle cx="41" cy="65" r="3" fill="url(#disk_grad)"/>
+  <g class="hdd-platter">
+    <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 41 65" to="360 41 65" dur="2s" repeatCount="indefinite"/>
+    <circle cx="41" cy="65" r="15" fill="none" stroke="url(#disk_grad)" stroke-width="2"/>
+    <circle cx="41" cy="65" r="8" fill="none" stroke="url(#disk_grad)" stroke-width="2"/>
+    <circle cx="41" cy="65" r="3" fill="url(#disk_grad)"/>
+  </g>
   <rect x="25" y="45" width="8" height="6" rx="1" fill="url(#disk_grad)" opacity="0.5"/>
   <!-- SSD -->
   <rect x="68" y="45" width="35" height="40" rx="3" fill="url(#disk_grad)" opacity="0.15" stroke="url(#disk_grad)" stroke-width="2.5"/>
