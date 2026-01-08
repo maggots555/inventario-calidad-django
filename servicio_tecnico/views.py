@@ -3206,14 +3206,38 @@ def marcar_pieza_recibida(request, seguimiento_id):
         seguimiento.fecha_entrega_real = fecha_entrega_real
         seguimiento.save()
         
-        # Enviar notificación por email y capturar resultado
-        resultado_email = _enviar_notificacion_pieza_recibida(orden, seguimiento)
+        # =================================================================
+        # NUEVO (Enero 2026): Verificar si el usuario desea enviar email
+        # =================================================================
+        enviar_email_param = request.POST.get('enviar_email', 'true')
+        debe_enviar_email = enviar_email_param.lower() == 'true'
+        
+        # Variable para rastrear si el email fue omitido por decisión del usuario
+        email_omitido = False
+        
+        # Enviar notificación solo si el usuario lo solicitó
+        if debe_enviar_email:
+            resultado_email = _enviar_notificacion_pieza_recibida(orden, seguimiento)
+        else:
+            # Usuario decidió NO enviar email
+            email_omitido = True
+            resultado_email = {
+                'success': False,
+                'message': 'Email omitido por decisión del usuario',
+                'destinatarios': [],
+                'destinatarios_copia': []
+            }
         
         # =================================================================
         # REGISTRAR EN HISTORIAL CON DETALLES DEL ENVÍO
         # =================================================================
-        if resultado_email['success']:
-            # Construir mensaje de éxito con destinatarios
+        if email_omitido:
+            # Usuario decidió NO enviar email
+            mensaje_historial = f"📬 Pieza recibida - {seguimiento.proveedor}\n"
+            mensaje_historial += f"📭 Email omitido por decisión del usuario\n"
+            mensaje_historial += f"ℹ️ El técnico deberá ser notificado manualmente"
+        elif resultado_email['success']:
+            # Email enviado exitosamente
             destinatarios_str = ', '.join(resultado_email['destinatarios'])
             mensaje_historial = f"📬 Pieza recibida - {seguimiento.proveedor}\n"
             mensaje_historial += f"✉️ Email enviado a: {destinatarios_str}"
@@ -3222,7 +3246,7 @@ def marcar_pieza_recibida(request, seguimiento_id):
                 cc_str = ', '.join(resultado_email['destinatarios_copia'])
                 mensaje_historial += f"\n📧 Con copia a: {cc_str}"
         else:
-            # Construir mensaje de error
+            # Error al enviar email
             mensaje_historial = f"📬 Pieza recibida - {seguimiento.proveedor}\n"
             mensaje_historial += f"❌ Error al enviar email: {resultado_email['message']}\n"
             mensaje_historial += f"⚠️ El técnico NO fue notificado automáticamente"
@@ -3240,7 +3264,10 @@ def marcar_pieza_recibida(request, seguimiento_id):
         # RESPUESTA JSON CON INFORMACIÓN DEL ENVÍO
         # =================================================================
         mensaje_respuesta = '✅ Pieza marcada como recibida.'
-        if resultado_email['success']:
+        
+        if email_omitido:
+            mensaje_respuesta += ' Email omitido por decisión del usuario.'
+        elif resultado_email['success']:
             mensaje_respuesta += ' Email enviado al técnico.'
         else:
             mensaje_respuesta += f" ⚠️ No se pudo enviar el email: {resultado_email['message']}"
@@ -3249,6 +3276,7 @@ def marcar_pieza_recibida(request, seguimiento_id):
             'success': True,
             'message': mensaje_respuesta,
             'email_enviado': resultado_email['success'],
+            'email_omitido': email_omitido,  # NUEVO: Indicador de email omitido
             'seguimiento_html': _render_seguimiento_card(seguimiento)
         })
     
@@ -3291,14 +3319,41 @@ def reenviar_notificacion_pieza(request, seguimiento_id):
             }, status=400)
         
         # =================================================================
-        # INTENTAR ENVIAR EL EMAIL NUEVAMENTE
+        # NUEVO (Enero 2026): Verificar si el usuario desea enviar email
+        # En reenvíos normalmente siempre se quiere enviar, pero mantenemos
+        # consistencia con la función marcar_recibido()
         # =================================================================
-        resultado_email = _enviar_notificacion_pieza_recibida(orden, seguimiento)
+        enviar_email_param = request.POST.get('enviar_email', 'true')
+        debe_enviar_email = enviar_email_param.lower() == 'true'
+        
+        email_omitido = False
+        
+        # =================================================================
+        # INTENTAR ENVIAR EL EMAIL NUEVAMENTE (si el usuario lo solicitó)
+        # =================================================================
+        if debe_enviar_email:
+            resultado_email = _enviar_notificacion_pieza_recibida(orden, seguimiento)
+        else:
+            # Usuario decidió NO reenviar
+            email_omitido = True
+            resultado_email = {
+                'success': False,
+                'message': 'Reenvío omitido por decisión del usuario',
+                'destinatarios': [],
+                'destinatarios_copia': []
+            }
         
         # =================================================================
         # REGISTRAR EN HISTORIAL EL INTENTO DE REENVÍO
         # =================================================================
-        if resultado_email['success']:
+        if email_omitido:
+            # Usuario decidió NO reenviar
+            mensaje_historial = f"🔄 Reenvío de notificación - {seguimiento.proveedor}\n"
+            mensaje_historial += f"📭 Email omitido por decisión del usuario\n"
+            mensaje_historial += f"ℹ️ El técnico deberá ser notificado manualmente si es necesario"
+            
+            mensaje_respuesta = '✓ Reenvío omitido por decisión del usuario'
+        elif resultado_email['success']:
             # Éxito en el reenvío
             destinatarios_str = ', '.join(resultado_email['destinatarios'])
             mensaje_historial = f"🔄 Notificación reenviada - {seguimiento.proveedor}\n"
@@ -3330,9 +3385,10 @@ def reenviar_notificacion_pieza(request, seguimiento_id):
         # RETORNAR RESPUESTA
         # =================================================================
         return JsonResponse({
-            'success': resultado_email['success'],
+            'success': True,  # Siempre True porque la operación se completó (con o sin email)
             'message': mensaje_respuesta,
-            'email_enviado': resultado_email['success']
+            'email_enviado': resultado_email['success'],
+            'email_omitido': email_omitido  # NUEVO: Indicador de email omitido
         })
     
     except Exception as e:

@@ -4133,15 +4133,35 @@ async function cambiarEstadoSeguimiento(seguimientoId, nuevoEstado) {
 // MARCAR SEGUIMIENTO COMO RECIBIDO
 // ============================================================================
 
+/**
+ * Marca una pieza como recibida con opción de enviar o no el correo.
+ * 
+ * MEJORA (Enero 2026):
+ * Ahora pregunta al usuario si desea enviar el correo de notificación,
+ * ya que hay casos donde el técnico ya está informado y no es necesario.
+ * 
+ * @param {number} seguimientoId - ID del seguimiento de la pieza
+ */
 async function marcarRecibido(seguimientoId) {
+    // Paso 1: Solicitar fecha de entrega real
     const fechaReal = prompt('Fecha de entrega real (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
     
-    if (!fechaReal) return;
+    if (!fechaReal) return; // Usuario canceló
     
+    // Paso 2: Preguntar si desea enviar correo de notificación
+    const enviarEmail = confirm(
+        '📧 ¿Deseas enviar email de notificación al técnico?\n\n' +
+        'Selecciona:\n' +
+        '• OK = Enviar email (recomendado)\n' +
+        '• CANCELAR = Omitir envío (si el técnico ya está informado)'
+    );
+    
+    // Paso 3: Preparar datos para enviar al servidor
     const url = "{% url 'servicio_tecnico:marcar_recibido' 0 %}".replace('/0/', `/${seguimientoId}/`);
     const formData = new FormData();
     formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
     formData.append('fecha_entrega_real', fechaReal);
+    formData.append('enviar_email', enviarEmail ? 'true' : 'false'); // Nuevo parámetro
     
     try {
         const response = await fetch(url, {
@@ -4151,8 +4171,16 @@ async function marcarRecibido(seguimientoId) {
         
         const data = await response.json();
         
+        // Procesar respuesta
         if (data.success) {
-            mostrarToast(data.message + ' 📧 Email enviado al técnico', 'success');
+            // Mostrar mensaje contextual según si se envió email o no
+            let mensajeFinal = data.message;
+            
+            if (data.email_omitido) {
+                mensajeFinal += ' (Email omitido por decisión del usuario)';
+            }
+            
+            mostrarToast(mensajeFinal, 'success');
             setTimeout(() => location.reload(), 1500);
         } else {
             mostrarToast(data.error || 'Error al marcar como recibido', 'danger');
@@ -4171,11 +4199,23 @@ async function marcarRecibido(seguimientoId) {
  * Por ejemplo, si hubo un problema con el servidor de correo o el email del técnico
  * estaba mal configurado, se puede corregir y luego usar este botón para reenviar.
  * 
+ * MEJORA (Enero 2026):
+ * Ahora pregunta si realmente desea enviar el correo, permitiendo cancelar si no es necesario.
+ * 
  * @param {number} seguimientoId - ID del seguimiento de la pieza recibida
  */
 async function reenviarNotificacion(seguimientoId) {
-    // Confirmar acción con el usuario
-    if (!confirm('¿Deseas reenviar la notificación de pieza recibida al técnico?')) {
+    // Confirmación mejorada con opción de omitir envío
+    const enviarEmail = confirm(
+        '📧 ¿Deseas reenviar el email de notificación al técnico?\n\n' +
+        'Selecciona:\n' +
+        '• OK = Reenviar email\n' +
+        '• CANCELAR = No enviar (si ya no es necesario)'
+    );
+    
+    if (!enviarEmail) {
+        // Usuario decidió NO reenviar
+        mostrarToast('✓ Reenvío de email cancelado por el usuario', 'info');
         return;
     }
     
@@ -4198,11 +4238,18 @@ async function reenviarNotificacion(seguimientoId) {
         
         // Procesar respuesta
         if (data.success) {
-            mostrarToast(data.message, 'success');
-            // Recargar para mostrar el nuevo registro en el historial
-            setTimeout(() => location.reload(), 2000);
+            // Mensaje contextual
+            const mensaje = data.email_omitido 
+                ? '✓ Email no enviado (omitido por decisión del usuario)'
+                : '✅ Notificación reenviada exitosamente';
+            
+            mostrarToast(mensaje, data.email_omitido ? 'info' : 'success');
+            
+            if (!data.email_omitido) {
+                setTimeout(() => location.reload(), 2000);
+            }
         } else {
-            mostrarToast(data.message || 'Error al reenviar la notificación', 'danger');
+            mostrarToast(data.error || 'Error al reenviar', 'danger');
         }
     } catch (error) {
         console.error('Error al reenviar notificación:', error);
