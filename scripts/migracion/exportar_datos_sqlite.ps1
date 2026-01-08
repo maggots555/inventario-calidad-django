@@ -102,6 +102,17 @@ if ($LASTEXITCODE -eq 0) {
     exit 1
 }
 
+# Exportar almacen
+Write-Host "Exportando almacen..." -ForegroundColor Yellow
+python manage.py dumpdata almacen --indent 2 --output "$backupDir/almacen.json"
+if ($LASTEXITCODE -eq 0) {
+    $size = (Get-Item "$backupDir/almacen.json").Length / 1KB
+    Write-Host "  OK - almacen.json: $("{0:N2}" -f $size) KB" -ForegroundColor Green
+} else {
+    Write-Host "  ERROR exportando almacen" -ForegroundColor Red
+    exit 1
+}
+
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host "  EXPORTACION COMPLETADA CON EXITO" -ForegroundColor Green
