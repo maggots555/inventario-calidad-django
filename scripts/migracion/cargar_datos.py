@@ -30,6 +30,7 @@ def cargar_datos():
     archivos = [
         'backup_sqlite_utf8/users.json',
         'backup_sqlite_utf8/inventario.json',
+        'backup_sqlite_utf8/almacen.json',
         'backup_sqlite_utf8/scorecard.json',
         'backup_sqlite_utf8/servicio_tecnico.json',
     ]
