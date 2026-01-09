@@ -44,6 +44,8 @@ backup_*.sql
 *.sql.bz2
 BD backup/
 backup_sqlite_utf8/
+backup_BD/
+
 
 # IDEs
 .vscode/
