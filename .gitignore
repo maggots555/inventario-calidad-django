@@ -87,6 +87,7 @@ ssl_certs/
 # Machine Learning models (specific to each database)
 # Only ignore .pkl files, keep README and .gitkeep
 ml_models/*.pkl
+ml_models/backup_v1/*.pkl
 
 # Other projects (not part of inventario-calidad-django)
 inventario_calidad_backup/

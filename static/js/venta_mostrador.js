@@ -146,6 +146,16 @@ function mostrarDescripcionPaquete() {
 
 /**
  * Muestra u oculta campo de costo según checkbox
+ * 
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Esta función controla la visibilidad de los campos de costo cuando
+ * marcas o desmarcas un servicio adicional. Además, agrega validaciones
+ * para asegurar que si marcas un servicio, DEBES ingresar un costo válido.
+ * 
+ * VALIDACIONES APLICADAS:
+ * - required: Campo obligatorio (no se puede dejar vacío)
+ * - min=0.01: El valor debe ser mayor a 0 (previene valores negativos o cero)
+ * - step=0.01: Permite ingresar centavos (decimales)
  */
 function toggleCampoCosto(checkboxId, divId) {
     const checkbox = document.getElementById(checkboxId);
@@ -157,19 +167,39 @@ function toggleCampoCosto(checkboxId, divId) {
     const input = div.querySelector('input[type="number"]');
     
     if (checkbox.checked) {
-        // Mostrar campo y habilitar validación
+        // ✅ SERVICIO MARCADO: Mostrar campo y habilitar validación
         div.style.display = 'block';
         if (input) {
             input.required = true;
-            // NO deshabilitar, solo validar cuando visible
+            input.min = '0.01';  // 🆕 NUEVO: Valor mínimo (mayor a 0)
+            input.step = '0.01'; // Permite decimales
+            
+            // 🆕 NUEVO: Validación en tiempo real al cambiar el valor
+            input.addEventListener('input', function() {
+                const valor = parseFloat(this.value) || 0;
+                if (valor <= 0) {
+                    this.setCustomValidity('El costo debe ser mayor a $0.00');
+                    this.classList.add('is-invalid');
+                } else {
+                    this.setCustomValidity('');
+                    this.classList.remove('is-invalid');
+                }
+            });
+            
+            // Disparar validación inicial si ya tiene un valor
+            if (input.value) {
+                input.dispatchEvent(new Event('input'));
+            }
         }
     } else {
-        // Ocultar campo, quitar validación, poner valor por defecto
+        // ❌ SERVICIO DESMARCADO: Ocultar campo y resetear validación
         div.style.display = 'none';
         if (input) {
             input.required = false;
+            input.min = '';
             input.value = '0.00';  // Valor por defecto para enviar en POST
-            // NO deshabilitar para que el valor se envíe
+            input.setCustomValidity(''); // Limpiar errores de validación
+            input.classList.remove('is-invalid');
         }
     }
 }
@@ -258,6 +288,10 @@ function abrirModalVentaMostrador() {
 
 /**
  * Guarda la venta mostrador (CREATE)
+ * 
+ * MEJORA (Enero 2026):
+ * Ahora valida que TODOS los servicios marcados tengan un costo válido (mayor a 0)
+ * antes de enviar el formulario. Previene enviar datos incompletos.
  */
 function guardarVentaMostrador() {
     const form = document.getElementById('formVentaMostrador');
@@ -270,7 +304,7 @@ function guardarVentaMostrador() {
         return;
     }
     
-    // Validar servicios con costos
+    // 🆕 VALIDACIÓN MEJORADA: Servicios con costos obligatorios
     const servicios = [
         { checkbox: 'id_incluye_cambio_pieza', input: 'id_costo_cambio_pieza', nombre: 'Cambio de Pieza' },
         { checkbox: 'id_incluye_limpieza', input: 'id_costo_limpieza', nombre: 'Limpieza' },
@@ -284,11 +318,35 @@ function guardarVentaMostrador() {
         const input = document.getElementById(servicio.input);
         
         if (checkbox && checkbox.checked) {
-            const costo = parseFloat(input.value) || 0;
-            if (costo <= 0) {
-                mostrarAlerta(`Si incluye ${servicio.nombre}, el costo debe ser mayor a 0`, 'danger');
+            // ✅ Servicio marcado: DEBE tener un costo válido
+            const costo = parseFloat(input.value);
+            
+            // 🆕 VALIDACIÓN 1: Campo vacío o no numérico
+            if (!input.value || isNaN(costo)) {
+                mostrarAlerta(
+                    `⚠️ El servicio "${servicio.nombre}" está marcado pero no tiene un costo válido. ` +
+                    `Por favor ingresa un valor mayor a $0.00`,
+                    'danger'
+                );
+                input.focus(); // Enfocar el campo con error
+                input.classList.add('is-invalid'); // Resaltar visualmente
                 return;
             }
+            
+            // 🆕 VALIDACIÓN 2: Costo debe ser mayor a 0
+            if (costo <= 0) {
+                mostrarAlerta(
+                    `⚠️ El costo de "${servicio.nombre}" debe ser mayor a $0.00. ` +
+                    `Valor ingresado: $${costo.toFixed(2)}`,
+                    'danger'
+                );
+                input.focus();
+                input.classList.add('is-invalid');
+                return;
+            }
+            
+            // ✅ Costo válido: Limpiar marcas de error
+            input.classList.remove('is-invalid');
         }
     }
     

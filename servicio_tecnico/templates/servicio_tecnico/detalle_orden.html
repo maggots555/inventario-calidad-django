@@ -2578,12 +2578,12 @@
                             <div class="form-check mb-2">
                                 {{ form_venta_mostrador.incluye_cambio_pieza }}
                                 <label class="form-check-label fw-bold" for="{{ form_venta_mostrador.incluye_cambio_pieza.id_for_label }}">
-                                    Cambio de Pieza
+                                    🔧 Cambio de Pieza
                                 </label>
                             </div>
                             <div id="divCostoCambioPieza" style="display: none;">
                                 <label for="{{ form_venta_mostrador.costo_cambio_pieza.id_for_label }}" class="form-label small">
-                                    Costo de Cambio de Pieza
+                                    Costo de Cambio de Pieza <span class="text-danger">*</span>
                                 </label>
                                 {{ form_venta_mostrador.costo_cambio_pieza }}
                             </div>
@@ -2594,12 +2594,12 @@
                             <div class="form-check mb-2">
                                 {{ form_venta_mostrador.incluye_limpieza }}
                                 <label class="form-check-label fw-bold" for="{{ form_venta_mostrador.incluye_limpieza.id_for_label }}">
-                                    Limpieza de Equipo
+                                    🧹 Limpieza de Equipo
                                 </label>
                             </div>
                             <div id="divCostoLimpieza" style="display: none;">
                                 <label for="{{ form_venta_mostrador.costo_limpieza.id_for_label }}" class="form-label small">
-                                    Costo de Limpieza
+                                    Costo de Limpieza <span class="text-danger">*</span>
                                 </label>
                                 {{ form_venta_mostrador.costo_limpieza }}
                             </div>
@@ -2610,12 +2610,12 @@
                             <div class="form-check mb-2">
                                 {{ form_venta_mostrador.incluye_kit_limpieza }}
                                 <label class="form-check-label fw-bold" for="{{ form_venta_mostrador.incluye_kit_limpieza.id_for_label }}">
-                                    Kit de Limpieza
+                                    🧼 Kit de Limpieza
                                 </label>
                             </div>
                             <div id="divCostoKit" style="display: none;">
                                 <label for="{{ form_venta_mostrador.costo_kit.id_for_label }}" class="form-label small">
-                                    Costo del Kit
+                                    Costo del Kit <span class="text-danger">*</span>
                                 </label>
                                 {{ form_venta_mostrador.costo_kit }}
                             </div>
@@ -2631,7 +2631,7 @@
                             </div>
                             <div id="divCostoReinstalacion" style="display: none;">
                                 <label for="{{ form_venta_mostrador.costo_reinstalacion.id_for_label }}" class="form-label small">
-                                    Costo de Reinstalación
+                                    Costo de Reinstalación <span class="text-danger">*</span>
                                 </label>
                                 {{ form_venta_mostrador.costo_reinstalacion }}
                             </div>
@@ -2647,7 +2647,7 @@
                             </div>
                             <div id="divCostoRespaldo" style="display: none;">
                                 <label for="{{ form_venta_mostrador.costo_respaldo.id_for_label }}" class="form-label small">
-                                    Costo del Respaldo
+                                    Costo del Respaldo <span class="text-danger">*</span>
                                 </label>
                                 {{ form_venta_mostrador.costo_respaldo }}
                             </div>

@@ -27,7 +27,7 @@ from datetime import datetime, timedelta
 import logging
 
 from .base import MLModelBase
-from .motivo_rechazo import PredictorMotivoRechazo
+from .motivo_rechazo_mejorado import PredictorMotivoRechazoMejorado as PredictorMotivoRechazo  # Usar versión mejorada
 from .optimizador_precios import OptimizadorPrecios
 from ..ml_predictor import PredictorAceptacionCotizacion
 

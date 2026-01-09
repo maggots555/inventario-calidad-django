@@ -23,7 +23,8 @@ Versión: 1.0.0
 
 # Importar clases principales para uso externo
 from .base import MLModelBase
-from .motivo_rechazo import PredictorMotivoRechazo
+# from .motivo_rechazo import PredictorMotivoRechazo  # Versión original (37.78%) - deprecada
+from .motivo_rechazo_mejorado import PredictorMotivoRechazoMejorado as PredictorMotivoRechazo  # Versión mejorada (73.33%)
 from .optimizador_precios import OptimizadorPrecios
 from .recomendador_acciones import RecomendadorAcciones
 
