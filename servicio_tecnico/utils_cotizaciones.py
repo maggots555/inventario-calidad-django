@@ -87,13 +87,26 @@ def obtener_dataframe_cotizaciones(fecha_inicio=None, fecha_fin=None,
     # Filtro por rango de fechas
     if fecha_inicio:
         if isinstance(fecha_inicio, str):
-            fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
-        cotizaciones = cotizaciones.filter(fecha_envio__date__gte=fecha_inicio)
+            # Convertir string a datetime timezone-aware
+            fecha_dt = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+            fecha_inicio = timezone.make_aware(fecha_dt) if timezone.is_naive(fecha_dt) else fecha_dt
+        elif isinstance(fecha_inicio, date) and not isinstance(fecha_inicio, datetime):
+            # Convertir date a datetime timezone-aware (inicio del día)
+            fecha_dt = datetime.combine(fecha_inicio, datetime.min.time())
+            fecha_inicio = timezone.make_aware(fecha_dt)
+        cotizaciones = cotizaciones.filter(fecha_envio__gte=fecha_inicio)
     
     if fecha_fin:
         if isinstance(fecha_fin, str):
-            fecha_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
-        cotizaciones = cotizaciones.filter(fecha_envio__date__lte=fecha_fin)
+            # Convertir string a datetime timezone-aware (fin del día)
+            fecha_dt = datetime.strptime(fecha_fin, '%Y-%m-%d')
+            fecha_dt = datetime.combine(fecha_dt, datetime.max.time())
+            fecha_fin = timezone.make_aware(fecha_dt) if timezone.is_naive(fecha_dt) else fecha_dt
+        elif isinstance(fecha_fin, date) and not isinstance(fecha_fin, datetime):
+            # Convertir date a datetime timezone-aware (fin del día)
+            fecha_dt = datetime.combine(fecha_fin, datetime.max.time())
+            fecha_fin = timezone.make_aware(fecha_dt)
+        cotizaciones = cotizaciones.filter(fecha_envio__lte=fecha_fin)
     
     # Filtro por sucursal
     if sucursal_id:
