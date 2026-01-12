@@ -192,6 +192,7 @@ MOTIVO_RECHAZO_COTIZACION = [
     ('no_apto', 'Equipo no apto para diagnóstico o reparación'),
     ('rechazo_sin_decision', 'Cliente desea evaluar las opciones sin tomar decisión inmediata'),
     ('no_especifica_motivo', 'Cliente no especifica motivo, únicamente rechaza la cotización'),
+    ('no_autorizado_por_empresa', 'Cliente informa que su empresa no autoriza la reparación'),
     ('otro', 'Otro motivo'),
 ]
 
@@ -231,6 +232,7 @@ MOTIVO_RHITSO_CHOICES = [
     ('diagnostico_profundo', 'Requiere diagnóstico más profundo'),
     ('no_hay_piezas', 'No hay partes en el mercado'),
     ('daño_profundo_mobo', 'Daño profundo en placa madre'),
+    ('sin_POST', 'No cumple protocolo POST básico'),
     ('otro', 'Otro motivo especializado'),
 ]
 
