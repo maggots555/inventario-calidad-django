@@ -47,6 +47,29 @@ CSRF_TRUSTED_ORIGINS = config(
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 
+# ============================================================================
+# CONFIGURACIONES DE SEGURIDAD PARA PRODUCCIÓN
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Estas configuraciones protegen tu aplicación cuando está expuesta a Internet
+# Solo se activan cuando DEBUG=False (producción)
+
+# HTTPS Strict Transport Security (HSTS)
+# Obliga a los navegadores a usar HTTPS durante 1 año (31536000 segundos)
+# IMPORTANTE: Solo activar cuando estés 100% seguro de que todo funciona con HTTPS
+if not DEBUG:
+    SECURE_HSTS_SECONDS = 31536000  # 1 año
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Cookies seguras (solo se envían por HTTPS)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    
+    # Nota: NO activamos SECURE_SSL_REDIRECT porque Cloudflare maneja la redirección
+    # El tráfico entre Cloudflare y Nginx es HTTP, pero el usuario siempre ve HTTPS
+    # SECURE_SSL_REDIRECT = False  # Cloudflare ya redirige HTTP → HTTPS
+
 # Application definition
 
 INSTALLED_APPS = [

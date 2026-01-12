@@ -93,6 +93,11 @@ ml_models/backup_v1/*.pkl
 inventario_calidad_backup/
 mi_sitio_descontinuado/
 
+# Installation packages (binary files)
+*.deb
+*.rpm
+*.tar.gz
+
 # Dependencias de Node.js
 /node_modules
 
