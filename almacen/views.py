@@ -1936,9 +1936,44 @@ def crear_compra(request):
                 for obj in formset.deleted_objects:
                     obj.delete()
                 
+                # CORRECCIÓN: Crear UnidadCompra genéricas si faltan para completar la cantidad
+                # Esto asegura que siempre haya tantas UnidadCompra como unidades se compraron
+                unidades_existentes = compra.unidades_compra.count()
+                if unidades_existentes < compra.cantidad:
+                    # MEJORA: Buscar la primera unidad con datos para copiar marca/modelo
+                    # Si el usuario especificó "Kingston A400" en la primera, las demás heredan esos datos
+                    primera_unidad = compra.unidades_compra.first()
+                    
+                    # Valores por defecto (si no hay ninguna unidad especificada)
+                    marca_base = 'Genérico/Sin marca'
+                    modelo_base = ''
+                    especificaciones_base = ''
+                    costo_base = None
+                    
+                    # Si existe una unidad especificada, copiar sus datos
+                    if primera_unidad:
+                        marca_base = primera_unidad.marca or marca_base
+                        modelo_base = primera_unidad.modelo or modelo_base
+                        especificaciones_base = primera_unidad.especificaciones or especificaciones_base
+                        costo_base = primera_unidad.costo_unitario
+                    
+                    # Crear las unidades faltantes heredando los datos de la primera
+                    for i in range(unidades_existentes + 1, compra.cantidad + 1):
+                        from almacen.models import UnidadCompra
+                        UnidadCompra.objects.create(
+                            compra=compra,
+                            numero_linea=i,
+                            marca=marca_base,
+                            modelo=modelo_base,
+                            especificaciones=especificaciones_base,
+                            costo_unitario=costo_base,
+                            estado='pendiente',
+                            notas='Unidad creada automáticamente (datos heredados de primera unidad)'
+                        )
+                
                 messages.success(
                     request,
-                    f'Compra #{compra.pk} creada exitosamente para {compra.producto.nombre}'
+                    f'Compra #{compra.pk} creada exitosamente para {compra.producto.nombre} ({compra.cantidad} unidades)'
                 )
                 return redirect('almacen:detalle_compra', pk=compra.pk)
             else:
@@ -2185,13 +2220,36 @@ def recibir_compra(request, pk):
                         if compra.linea_cotizacion_origen.solicitud:
                             orden_servicio = compra.linea_cotizacion_origen.solicitud.orden_servicio
                     
+                    # CORRECCIÓN: Procesar unidades existentes Y crear las faltantes
+                    unidades_creadas = 0
+                    
                     if unidades_compra.exists():
-                        # Hay unidades definidas, crear una por cada una
+                        # Procesar las unidades definidas
                         for unidad_compra in unidades_compra:
                             unidad_compra.recibir(crear_unidad_inventario=True)
-                    else:
-                        # No hay unidades definidas, crear genéricas
-                        for i in range(compra.cantidad):
+                            unidades_creadas += 1
+                    
+                    # IMPORTANTE: Si hay menos UnidadCompra que la cantidad total,
+                    # crear las unidades faltantes heredando datos de la primera
+                    if unidades_creadas < compra.cantidad:
+                        # MEJORA: Buscar la primera UnidadCompra para heredar marca/modelo
+                        primera_unidad_compra = compra.unidades_compra.first()
+                        
+                        # Valores por defecto
+                        marca_base = 'Genérico/Sin marca'
+                        modelo_base = descripcion_pieza if descripcion_pieza else ''
+                        especificaciones_base = ''
+                        costo_base = compra.costo_unitario
+                        
+                        # Si existe una UnidadCompra, heredar sus datos
+                        if primera_unidad_compra:
+                            marca_base = primera_unidad_compra.marca or marca_base
+                            modelo_base = primera_unidad_compra.modelo or modelo_base
+                            especificaciones_base = primera_unidad_compra.especificaciones or especificaciones_base
+                            if primera_unidad_compra.costo_unitario:
+                                costo_base = primera_unidad_compra.costo_unitario
+                        
+                        for i in range(unidades_creadas, compra.cantidad):
                             # Si viene de cotización con orden, ya está asignada
                             # Si no tiene orden, queda disponible
                             disponibilidad = 'asignada' if orden_servicio else 'disponible'
@@ -2202,16 +2260,17 @@ def recibir_compra(request, pk):
                                 disponibilidad=disponibilidad,
                                 origen='compra',
                                 compra=compra,
-                                costo_unitario=compra.costo_unitario,
+                                costo_unitario=costo_base,
                                 registrado_por=request.user,
-                                # Marca siempre genérica, modelo con descripción de cotización
-                                marca='Genérico/Sin marca',
-                                modelo=descripcion_pieza if descripcion_pieza else '',
-                                especificaciones='',
+                                # Heredar marca/modelo de la primera unidad especificada
+                                marca=marca_base,
+                                modelo=modelo_base,
+                                especificaciones=especificaciones_base,
                                 # Vincular con la orden de servicio de la cotización
                                 orden_servicio_destino=orden_servicio,
-                                notas=f'Creada desde compra #{compra.pk}',
+                                notas=f'Creada desde compra #{compra.pk} (unidad {i+1}/{compra.cantidad}, datos heredados)',
                             )
+                            unidades_creadas += 1
                 
                 messages.success(
                     request,
