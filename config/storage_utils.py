@@ -46,20 +46,26 @@ def _get_base_dir():
         # Este archivo está en config/storage_utils.py, así que BASE_DIR es el padre de config/
         return Path(__file__).resolve().parent.parent
 
-# Disco principal (por defecto: carpeta media en el proyecto)
-PRIMARY_STORAGE_PATH = _get_base_dir() / 'media'
+# Disco principal (configurable desde .env)
+# En Linux: /mnt/django_storage/media (disco de 1TB)
+# En Windows: D:/Media_Django/inventario-calidad-django/media
+PRIMARY_STORAGE_PATH = config(
+    'PRIMARY_MEDIA_ROOT',
+    default=str(_get_base_dir() / 'media')
+)
+PRIMARY_STORAGE_PATH = Path(PRIMARY_STORAGE_PATH)
 
 # Disco alterno (configurable desde .env)
-# Ejemplo en .env: ALTERNATE_STORAGE_PATH=D:/Media_Django/inventario-calidad-django/media
+# Fallback cuando el disco principal está lleno
 ALTERNATE_STORAGE_PATH = config(
-    'ALTERNATE_STORAGE_PATH',
-    default='D:/Media_Django/inventario-calidad-django/media'
+    'ALTERNATE_MEDIA_ROOT',
+    default=str(_get_base_dir() / 'media')
 )
 ALTERNATE_STORAGE_PATH = Path(ALTERNATE_STORAGE_PATH)
 
 # Umbral de espacio libre (en GB) para cambiar al disco alterno
 # Si queda menos de este espacio, usa el disco alterno
-MIN_FREE_SPACE_GB = config('MIN_FREE_SPACE_GB', default=5, cast=int)
+MIN_FREE_SPACE_GB = config('MIN_FREE_SPACE_GB', default=50, cast=int)
 
 
 # ============================================================================

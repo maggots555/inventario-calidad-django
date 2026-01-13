@@ -67,9 +67,11 @@ def serve_media_from_multiple_locations(request, path):
     from config.storage_utils import ALTERNATE_STORAGE_PATH, PRIMARY_STORAGE_PATH
     
     # Lista de ubicaciones donde buscar (en orden de prioridad)
+    # IMPORTANTE: Buscar primero en PRIMARY (donde se guardan nuevos archivos)
+    # luego en ALTERNATE (donde están archivos antiguos)
     search_locations = [
-        ALTERNATE_STORAGE_PATH,  # Disco alterno (D:) - Buscar primero aquí
-        PRIMARY_STORAGE_PATH,    # Disco principal (C:) - Buscar aquí si no está en D:
+        PRIMARY_STORAGE_PATH,    # Disco principal - Archivos nuevos (1TB)
+        ALTERNATE_STORAGE_PATH,  # Disco alterno - Archivos antiguos (fallback)
     ]
     
     # Normalizar la ruta (eliminar .. y barras dobles para seguridad)
