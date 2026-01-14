@@ -1523,9 +1523,11 @@ def detalle_orden(request, orden_id):
                 imagenes_omitidas = []
                 errores_procesamiento = []
                 
+                logger.info(f"📸 Procesando {len(imagenes_files)} imagen(es) | Tamaño total: {sum(f.size for f in imagenes_files)/(1024*1024):.2f}MB")
+                
                 try:
                     for idx, imagen_file in enumerate(imagenes_files):
-                        logger.info(f"   - Procesando imagen {idx+1}/{len(imagenes_files)}: {imagen_file.name} ({imagen_file.size} bytes)")
+                        logger.info(f"   [{idx+1}/{len(imagenes_files)}] Procesando: {imagen_file.name}")
                         
                         # Validar tamaño (50MB = 50 * 1024 * 1024 bytes)
                         if imagen_file.size > 50 * 1024 * 1024:
@@ -1539,7 +1541,6 @@ def detalle_orden(request, orden_id):
                             img_test = PILImage.open(imagen_file)
                             img_test.verify()  # Verificar que sea una imagen válida
                             imagen_file.seek(0)  # Resetear el cursor del archivo
-                            logger.info(f"   ✓ Imagen válida: {img_test.format} {img_test.size}")
                         except Exception as e:
                             logger.error(f"   ❌ Imagen inválida {imagen_file.name}: {str(e)}")
                             errores_procesamiento.append(f"{imagen_file.name}: No es una imagen válida o está corrupta")
@@ -1547,7 +1548,6 @@ def detalle_orden(request, orden_id):
                         
                         # Comprimir y guardar imagen
                         try:
-                            logger.info(f"   → Iniciando compresión y guardado...")
                             imagen_orden = comprimir_y_guardar_imagen(
                                 orden=orden,
                                 imagen_file=imagen_file,
@@ -1556,13 +1556,15 @@ def detalle_orden(request, orden_id):
                                 empleado=empleado_actual
                             )
                             imagenes_guardadas += 1
-                            logger.info(f"   [OK] Imagen guardada exitosamente: ID {imagen_orden.pk}")
+                            logger.info(f"   ✅ Guardada: {imagen_file.name} (ID: {imagen_orden.pk})")
                         except Exception as e:
-                            logger.error(f"   [ERROR] Error al guardar {imagen_file.name}: {str(e)}", exc_info=True)
+                            logger.error(f"   ❌ Error al guardar {imagen_file.name}: {str(e)}")
                             errores_procesamiento.append(f"{imagen_file.name}: {str(e)}")
                     
                     # Preparar respuesta
                     if imagenes_guardadas > 0:
+                        logger.info(f"✅ Procesamiento completado: {imagenes_guardadas}/{len(imagenes_files)} imágenes guardadas")
+                        
                         # Registrar en historial
                         HistorialOrden.objects.create(
                             orden=orden,

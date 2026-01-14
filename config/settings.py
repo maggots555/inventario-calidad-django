@@ -240,9 +240,15 @@ STORAGES = {
 # ============================================================================
 # CONFIGURACIÓN DE LÍMITES DE CARGA DE ARCHIVOS
 # ============================================================================
-# Aumentado a 50MB para permitir imágenes de alta resolución desde celulares
-DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
+# Configurado para soportar múltiples imágenes de alta resolución desde celulares
+# Ejemplo: 30 imágenes de 5MB c/u = 150MB total
+DATA_UPLOAD_MAX_MEMORY_SIZE = 200 * 1024 * 1024  # 200MB total por request (múltiples archivos)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024   # 50MB por archivo individual
+
+# Límite de campos por request (incluye archivos múltiples)
+# Configurado para soportar hasta 50 archivos simultáneos + campos del formulario
+# Valor por defecto de Django: 1000
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000  # Permite múltiples archivos sin problemas
 
 # Email Configuration (SMTP)
 # https://docs.djangoproject.com/en/5.2/topics/email/

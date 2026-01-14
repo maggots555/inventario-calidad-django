@@ -1871,7 +1871,7 @@
                                            accept="image/jpeg,image/jpg,image/png,image/gif"
                                            multiple>
                                     <small class="text-muted d-block">
-                                        <i class="bi bi-info-circle"></i> Máximo 7MB por imagen. Formatos: JPG, PNG, GIF
+                                        <i class="bi bi-info-circle"></i> Máximo 30 imágenes por carga, 50MB cada una. Formatos: JPG, PNG, GIF
                                     </small>
                                 </div>
                                 
@@ -3494,12 +3494,12 @@ formSubirImagenes.addEventListener('submit', function(e) {
     
     // Manejar timeout
     xhr.addEventListener('timeout', function() {
-        mostrarErrorCarga('Tiempo de espera agotado. Las imágenes pueden ser muy grandes.');
+        mostrarErrorCarga('Tiempo de espera agotado. Las imágenes pueden ser muy grandes. Revisa los logs del servidor para más detalles.');
     });
     
     // Configurar y enviar la petición
     xhr.open('POST', formSubirImagenes.action || window.location.href);
-    xhr.timeout = 120000; // 2 minutos de timeout
+    xhr.timeout = 600000; // 10 minutos de timeout para procesamiento de múltiples imágenes (aumentado desde 5min)
     xhr.send(formData);
 });
 
