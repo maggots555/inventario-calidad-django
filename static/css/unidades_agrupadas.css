@@ -1,0 +1,86 @@
+/**
+ * Estilos para la vista de Unidades Agrupadas
+ * ============================================
+ * 
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Este archivo contiene los estilos CSS para las filas expandibles/colapsables
+ * de la lista de unidades de inventario agrupadas.
+ * 
+ * Características:
+ * - Filas principales con efecto hover
+ * - Animación del icono de expandir/colapsar (rotación)
+ * - Estilos para la tabla interna expandida
+ * 
+ * USO:
+ * Se carga en el template unidades_por_producto.html
+ */
+
+/* Fila principal del grupo - efecto hover */
+.grupo-principal:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.2s ease;
+}
+
+/* Cursor pointer para indicar que es clickeable */
+.grupo-principal {
+    cursor: pointer;
+}
+
+/* Icono de expansión con animación de rotación */
+.grupo-principal .toggle-icon {
+    transition: transform 0.3s ease;
+    display: inline-block;
+    font-size: 1rem;
+    color: #6c757d;
+}
+
+/* Rotar el icono cuando el grupo está expandido */
+.grupo-principal[aria-expanded="true"] .toggle-icon {
+    transform: rotate(90deg);
+    color: #0d6efd;
+}
+
+/* Tabla interna dentro del collapse */
+.collapse table {
+    background-color: white;
+    margin-bottom: 0;
+}
+
+/* Fondo del área expandida */
+.collapse .bg-light {
+    background-color: #f8f9fa !important;
+}
+
+/* Estilos para la tabla interna expandida */
+.collapse .table-bordered {
+    border: 1px solid #dee2e6;
+}
+
+.collapse .table-bordered th,
+.collapse .table-bordered td {
+    border: 1px solid #dee2e6;
+    padding: 0.5rem;
+}
+
+/* Header de la tabla interna */
+.collapse .table-secondary th {
+    background-color: #e9ecef;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* Badges en el detalle expandido */
+.collapse .badge {
+    font-size: 0.75rem;
+}
+
+/* Responsive: ajustar en pantallas pequeñas */
+@media (max-width: 768px) {
+    .grupo-principal {
+        font-size: 0.875rem;
+    }
+    
+    .collapse table {
+        font-size: 0.75rem;
+    }
+}

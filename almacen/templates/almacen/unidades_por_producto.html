@@ -232,94 +232,169 @@ Contexto esperado:
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Código</th>
+                                    <th style="width: 50px;"></th>
                                     <th>Marca / Modelo</th>
-                                    <th>N° Serie</th>
                                     <th class="text-center">Estado</th>
-                                    <th class="text-center">Disponibilidad</th>
                                     <th>Origen</th>
+                                    <th class="text-center">Cantidad</th>
+                                    <th class="text-center">Disponibles</th>
+                                    <th class="text-end">Costo Prom.</th>
                                     <th class="text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for unidad in page_obj %}
-                                <tr>
-                                    <td>
-                                        <a href="{% url 'almacen:detalle_unidad' unidad.pk %}" 
-                                           class="fw-semibold text-decoration-none">
-                                            {{ unidad.codigo_interno }}
-                                        </a>
+                                {% for grupo in page_obj %}
+                                <!-- Fila Principal del Grupo (Expandible) -->
+                                <tr class="grupo-principal" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#grupo-{{ forloop.counter }}" aria-expanded="false">
+                                    <td class="text-center">
+                                        <i class="bi bi-chevron-right toggle-icon"></i>
                                     </td>
                                     <td>
-                                        {% if unidad.marca %}
-                                            <span class="fw-medium">{{ unidad.marca }}</span>
-                                            {% if unidad.modelo %}
-                                                <br><small class="text-muted">{{ unidad.modelo }}</small>
-                                            {% endif %}
-                                        {% else %}
-                                            <span class="text-muted">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if unidad.numero_serie %}
-                                            <code class="small">{{ unidad.numero_serie|truncatechars:15 }}</code>
-                                        {% else %}
-                                            <span class="text-muted">—</span>
+                                        <span class="fw-medium">{{ grupo.marca }}</span>
+                                        {% if grupo.modelo != 'Sin modelo' %}
+                                            <br><small class="text-muted">{{ grupo.modelo }}</small>
                                         {% endif %}
                                     </td>
                                     <td class="text-center">
-                                        {% if unidad.estado == 'nuevo' %}
-                                            <span class="badge bg-success">Nuevo</span>
-                                        {% elif unidad.estado == 'usado_bueno' %}
-                                            <span class="badge bg-primary">Usado Bueno</span>
-                                        {% elif unidad.estado == 'usado_regular' %}
-                                            <span class="badge bg-warning text-dark">Usado Regular</span>
-                                        {% elif unidad.estado == 'reparado' %}
-                                            <span class="badge bg-info">Reparado</span>
-                                        {% elif unidad.estado == 'defectuoso' %}
-                                            <span class="badge bg-danger">Defectuoso</span>
-                                        {% elif unidad.estado == 'para_revision' %}
-                                            <span class="badge bg-secondary">Para Revisión</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-center">
-                                        {% if unidad.disponibilidad == 'disponible' %}
-                                            <span class="badge bg-success">Disponible</span>
-                                        {% elif unidad.disponibilidad == 'reservada' %}
-                                            <span class="badge bg-warning text-dark">Reservada</span>
-                                        {% elif unidad.disponibilidad == 'asignada' %}
-                                            <span class="badge bg-info">Asignada</span>
-                                        {% elif unidad.disponibilidad == 'vendida' %}
-                                            <span class="badge bg-secondary">Vendida</span>
-                                        {% elif unidad.disponibilidad == 'descartada' %}
-                                            <span class="badge bg-dark">Descartada</span>
+                                        {% if grupo.estado == 'nuevo' %}
+                                            <span class="badge bg-success">🆕 Nuevo</span>
+                                        {% elif grupo.estado == 'usado_bueno' %}
+                                            <span class="badge bg-primary">👍 Usado Bueno</span>
+                                        {% elif grupo.estado == 'usado_regular' %}
+                                            <span class="badge bg-warning text-dark">👌 Usado Regular</span>
+                                        {% elif grupo.estado == 'reparado' %}
+                                            <span class="badge bg-info">🔧 Reparado</span>
+                                        {% elif grupo.estado == 'defectuoso' %}
+                                            <span class="badge bg-danger">❌ Defectuoso</span>
+                                        {% elif grupo.estado == 'para_revision' %}
+                                            <span class="badge bg-secondary">🔍 Para Revisión</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         <small>
-                                            {% if unidad.origen == 'compra' %}
-                                                {% if unidad.compra and unidad.compra.tipo == 'cotizacion' %}
-                                                    <span class="text-info">📋 Cotización</span>
-                                                {% else %}
-                                                    <span class="text-primary">🛒 Compra Directa</span>
-                                                {% endif %}
+                                            {% if grupo.origen == 'compra' %}
+                                                <span class="text-primary">🛒 Compra</span>
+                                            {% elif grupo.origen == 'orden_servicio' %}
+                                                <span class="text-success">🔧 O. Servicio</span>
+                                            {% elif grupo.origen == 'devolucion_cliente' %}
+                                                <span class="text-info">↩️ Devolución</span>
+                                            {% elif grupo.origen == 'transferencia' %}
+                                                <span class="text-warning">🔄 Transfer.</span>
+                                            {% elif grupo.origen == 'inventario_inicial' %}
+                                                <span class="text-secondary">📋 Inv. Inicial</span>
                                             {% else %}
-                                                {{ unidad.get_origen_display }}
+                                                {{ grupo.origen }}
                                             {% endif %}
                                         </small>
                                     </td>
                                     <td class="text-center">
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{% url 'almacen:detalle_unidad' unidad.pk %}" 
-                                               class="btn btn-outline-primary btn-sm"
-                                               title="Ver">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                            <a href="{% url 'almacen:editar_unidad' unidad.pk %}" 
-                                               class="btn btn-outline-secondary btn-sm"
-                                               title="Editar">
-                                                <i class="bi bi-pencil"></i>
-                                            </a>
+                                        <span class="badge bg-secondary rounded-pill fs-6">{{ grupo.cantidad }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success">{{ grupo.disponibles }}</span>
+                                    </td>
+                                    <td class="text-end">
+                                        {% if grupo.costo_promedio > 0 %}
+                                            ${{ grupo.costo_promedio|floatformat:2 }}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-outline-secondary" 
+                                                type="button" 
+                                                data-bs-toggle="collapse" 
+                                                data-bs-target="#grupo-{{ forloop.counter }}"
+                                                title="Expandir/Colapsar">
+                                            <i class="bi bi-arrows-expand"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Detalle Expandible con todas las unidades del grupo -->
+                                <tr class="collapse" id="grupo-{{ forloop.counter }}">
+                                    <td colspan="8" class="p-0">
+                                        <div class="bg-light p-3">
+                                            <table class="table table-sm table-bordered mb-0">
+                                                <thead class="table-secondary">
+                                                    <tr>
+                                                        <th>Código Interno</th>
+                                                        <th>N° Serie</th>
+                                                        <th class="text-center">Disponibilidad</th>
+                                                        <th>Ubicación/Asignación</th>
+                                                        <th class="text-end">Costo</th>
+                                                        <th>Fecha Registro</th>
+                                                        <th class="text-center">Acciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for unidad in grupo.unidades %}
+                                                    <tr>
+                                                        <td>
+                                                            <a href="{% url 'almacen:detalle_unidad' unidad.pk %}" 
+                                                               class="fw-semibold text-decoration-none">
+                                                                {{ unidad.codigo_interno }}
+                                                            </a>
+                                                        </td>
+                                                        <td>
+                                                            {% if unidad.numero_serie %}
+                                                                <code class="small">{{ unidad.numero_serie }}</code>
+                                                            {% else %}
+                                                                <span class="text-muted">—</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">
+                                                            {% if unidad.disponibilidad == 'disponible' %}
+                                                                <span class="badge bg-success">✅ Disponible</span>
+                                                            {% elif unidad.disponibilidad == 'reservada' %}
+                                                                <span class="badge bg-warning text-dark">📌 Reservada</span>
+                                                            {% elif unidad.disponibilidad == 'asignada' %}
+                                                                <span class="badge bg-info">🔗 Asignada</span>
+                                                            {% elif unidad.disponibilidad == 'vendida' %}
+                                                                <span class="badge bg-secondary">💰 Vendida</span>
+                                                            {% elif unidad.disponibilidad == 'descartada' %}
+                                                                <span class="badge bg-dark">🗑️ Descartada</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <small>
+                                                                {% if unidad.orden_servicio_destino %}
+                                                                    🔧 Orden #{{ unidad.orden_servicio_destino.pk }}
+                                                                {% elif unidad.tecnico_asignado %}
+                                                                    👤 {{ unidad.tecnico_asignado.nombre }}
+                                                                {% else %}
+                                                                    <span class="text-muted">En almacén</span>
+                                                                {% endif %}
+                                                            </small>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            {% if unidad.costo_unitario %}
+                                                                ${{ unidad.costo_unitario|floatformat:2 }}
+                                                            {% else %}
+                                                                <span class="text-muted">—</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <small>{{ unidad.fecha_registro|date:"d/m/Y" }}</small>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <div class="btn-group btn-group-sm">
+                                                                <a href="{% url 'almacen:detalle_unidad' unidad.pk %}" 
+                                                                   class="btn btn-outline-primary btn-sm"
+                                                                   title="Ver">
+                                                                    <i class="bi bi-eye"></i>
+                                                                </a>
+                                                                <a href="{% url 'almacen:editar_unidad' unidad.pk %}" 
+                                                                   class="btn btn-outline-secondary btn-sm"
+                                                                   title="Editar">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </a>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </td>
                                 </tr>
@@ -360,6 +435,7 @@ Contexto esperado:
                     {% endif %}
                     
                     {% else %}
+                    <!-- No hay unidades -->
                     <div class="text-center py-5">
                         <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
                         <h5 class="text-muted mt-3">No hay unidades registradas</h5>
@@ -378,3 +454,11 @@ Contexto esperado:
     
 </div>
 {% endblock almacen_content %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/unidades_agrupadas.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/unidades_agrupadas.js' %}"></script>
+{% endblock %}

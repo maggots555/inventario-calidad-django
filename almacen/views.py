@@ -1225,7 +1225,11 @@ def unidades_por_producto(request, producto_id):
     Incluye:
     - Resumen por marca (cuántas de cada marca)
     - Resumen por estado (cuántas nuevas, usadas, defectuosas)
-    - Lista paginada de todas las unidades
+    - Lista AGRUPADA de unidades (expandibles por grupo)
+    
+    AGRUPACIÓN:
+    Las unidades se agrupan por: Producto + Marca + Modelo + Estado + Origen
+    Esto permite mostrar "10 unidades" en lugar de 10 filas separadas.
     """
     
     producto = get_object_or_404(ProductoAlmacen, pk=producto_id)
@@ -1254,8 +1258,37 @@ def unidades_por_producto(request, producto_id):
         cantidad=Count('id')
     ).order_by('disponibilidad')
     
-    # Paginación
-    paginator = Paginator(unidades, 20)
+    # AGRUPACIÓN DE UNIDADES
+    # Agrupar por marca, modelo, estado y origen para mostrar grupos expandibles
+    from itertools import groupby
+    from operator import attrgetter
+    
+    # Ordenar para que groupby funcione correctamente
+    unidades_ordenadas = unidades.order_by('marca', 'modelo', 'estado', 'origen', '-fecha_registro')
+    
+    # Agrupar unidades
+    grupos = []
+    for key, group in groupby(unidades_ordenadas, key=lambda u: (u.marca or 'Sin marca', u.modelo or 'Sin modelo', u.estado, u.origen)):
+        unidades_grupo = list(group)
+        marca, modelo, estado, origen = key
+        
+        # Calcular estadísticas del grupo
+        disponibles_grupo = sum(1 for u in unidades_grupo if u.disponibilidad == 'disponible')
+        costo_promedio = sum(u.costo_unitario or 0 for u in unidades_grupo) / len(unidades_grupo) if unidades_grupo else 0
+        
+        grupos.append({
+            'marca': marca,
+            'modelo': modelo,
+            'estado': estado,
+            'origen': origen,
+            'cantidad': len(unidades_grupo),
+            'unidades': unidades_grupo,
+            'disponibles': disponibles_grupo,
+            'costo_promedio': costo_promedio,
+        })
+    
+    # Paginación de grupos (no de unidades individuales)
+    paginator = Paginator(grupos, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
@@ -1268,6 +1301,7 @@ def unidades_por_producto(request, producto_id):
         'resumen_estados': resumen_estados,
         'resumen_disponibilidad': resumen_disponibilidad,
         'titulo': f'Unidades de: {producto.nombre}',
+        'vista_agrupada': True,  # Indicador para el template
     }
     
     return render(request, 'almacen/unidades_por_producto.html', context)

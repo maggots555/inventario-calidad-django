@@ -40,11 +40,11 @@ def cargar_datos():
     
     # Orden de archivos a cargar (relativo a la raíz del proyecto)
     archivos = [
-        'backup_BD/users.json',
-        'backup_BD/inventario.json',
-        'backup_BD/almacen.json',
-        'backup_BD/scorecard.json',
-        'backup_BD/servicio_tecnico.json',
+        'backup_sqlite_utf8/users.json',
+        'backup_sqlite_utf8/inventario.json',
+        'backup_sqlite_utf8/almacen.json',
+        'backup_sqlite_utf8/scorecard.json',
+        'backup_sqlite_utf8/servicio_tecnico.json',
     ]
     
     # Verificar que los archivos existen
@@ -60,7 +60,7 @@ def cargar_datos():
     
     if not archivos_completos:
         print("\n❌ No se encontraron archivos JSON para cargar")
-        print("💡 Verifica que los archivos estén en la carpeta 'backup_BD/'")
+        print("💡 Verifica que los archivos estén en la carpeta 'backup_sqlite_utf8/'")
         sys.exit(1)
     
     try:
