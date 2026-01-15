@@ -1677,6 +1677,7 @@ class SolicitudBaja(models.Model):
         verbose_name='Producto'
     )
     # Unidad específica (opcional - si se quiere dar de baja una unidad concreta)
+    # DEPRECADO: Mantener por compatibilidad, usar unidades_seleccionadas para nuevas solicitudes
     unidad_inventario = models.ForeignKey(
         'UnidadInventario',
         on_delete=models.SET_NULL,
@@ -1685,6 +1686,14 @@ class SolicitudBaja(models.Model):
         related_name='solicitudes_baja',
         verbose_name='Unidad Específica',
         help_text='Seleccionar si desea dar de baja una unidad específica (con marca/modelo/serie)'
+    )
+    # NUEVO (Enero 2026): Múltiples unidades seleccionadas para trazabilidad completa
+    unidades_seleccionadas = models.ManyToManyField(
+        'UnidadInventario',
+        blank=True,
+        related_name='solicitudes_baja_multiples',
+        verbose_name='Unidades Seleccionadas',
+        help_text='Unidades específicas seleccionadas para esta solicitud (obligatorio para trazabilidad)'
     )
     cantidad = models.IntegerField(
         validators=[MinValueValidator(1)],
@@ -1799,6 +1808,17 @@ class SolicitudBaja(models.Model):
         
         Returns:
             MovimientoAlmacen: El movimiento creado
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Este método hace 3 cosas importantes:
+        1. Cambia el estado de la solicitud a 'aprobada'
+        2. Marca las UnidadInventario como 'asignadas' (usa unidades_seleccionadas)
+        3. Crea un MovimientoAlmacen que descuenta el stock automáticamente
+        
+        ACTUALIZADO (Enero 2026):
+        - Prioriza unidades_seleccionadas (ManyToMany) para trazabilidad 100%
+        - Fallback a lógica antigua si no hay unidades seleccionadas
         """
         self.estado = 'aprobada'
         self.agente_almacen = agente
@@ -1812,13 +1832,46 @@ class SolicitudBaja(models.Model):
         
         self.save()
         
-        # Si hay una unidad específica seleccionada, marcarla como no disponible
-        if self.unidad_inventario:
-            self.unidad_inventario.disponibilidad = 'asignada'
-            # Si es para una orden de servicio, registrar el destino
-            if self.orden_servicio:
-                self.unidad_inventario.orden_servicio_destino = self.orden_servicio
-            self.unidad_inventario.save()
+        # ========== MARCAR UNIDADES COMO ASIGNADAS ==========
+        # PRIORIDAD: Usar unidades_seleccionadas (ManyToMany) - NUEVA LÓGICA
+        unidades_a_marcar = list(self.unidades_seleccionadas.all())
+        
+        if unidades_a_marcar:
+            # ✅ Hay unidades seleccionadas específicamente (nuevo flujo)
+            for unidad in unidades_a_marcar:
+                unidad.disponibilidad = 'asignada'
+                if self.orden_servicio:
+                    unidad.orden_servicio_destino = self.orden_servicio
+                unidad.save()
+        else:
+            # ⚠️ FALLBACK: Lógica antigua para compatibilidad con solicitudes viejas
+            if self.unidad_inventario:
+                # Caso 1: Se seleccionó una unidad específica (campo ForeignKey antiguo)
+                unidades_a_marcar = [self.unidad_inventario]
+                
+                # Si se pidieron más de 1, buscar unidades adicionales
+                if self.cantidad > 1:
+                    unidades_adicionales = UnidadInventario.objects.filter(
+                        producto=self.producto,
+                        disponibilidad='disponible'
+                    ).exclude(
+                        pk=self.unidad_inventario.pk
+                    )[:(self.cantidad - 1)]
+                    
+                    unidades_a_marcar.extend(unidades_adicionales)
+            else:
+                # Caso 2: Solicitud genérica (sin unidad específica)
+                unidades_a_marcar = list(UnidadInventario.objects.filter(
+                    producto=self.producto,
+                    disponibilidad='disponible'
+                )[:self.cantidad])
+            
+            # Marcar todas las unidades seleccionadas como asignadas
+            for unidad in unidades_a_marcar:
+                unidad.disponibilidad = 'asignada'
+                if self.orden_servicio:
+                    unidad.orden_servicio_destino = self.orden_servicio
+                unidad.save()
         
         # Crear movimiento de salida
         movimiento = MovimientoAlmacen.objects.create(

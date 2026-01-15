@@ -99,9 +99,29 @@
                         </dd>
                         
                         {% if solicitud.orden_servicio %}
-                        <dt class="col-sm-4">Orden:</dt>
+                        <dt class="col-sm-4">Orden Cliente:</dt>
                         <dd class="col-sm-8">
-                            <span class="badge bg-primary">OS-{{ solicitud.orden_servicio.pk }}</span>
+                            {% if solicitud.orden_servicio.detalle_equipo.orden_cliente %}
+                                <span class="badge bg-primary fs-6">{{ solicitud.orden_servicio.detalle_equipo.orden_cliente }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Sin número de orden</span>
+                            {% endif %}
+                            <br><small class="text-muted">Orden Interna: OS-{{ solicitud.orden_servicio.pk }}</small>
+                        </dd>
+                        {% endif %}
+                        
+                        {% if solicitud.tecnico_asignado %}
+                        <dt class="col-sm-4">Técnico Asignado:</dt>
+                        <dd class="col-sm-8">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-person-badge text-primary me-2"></i>
+                                <div>
+                                    <strong>{{ solicitud.tecnico_asignado.nombre_completo }}</strong>
+                                    {% if solicitud.tecnico_asignado.cargo %}
+                                    <br><small class="text-muted">{{ solicitud.tecnico_asignado.cargo }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
                         </dd>
                         {% endif %}
                         

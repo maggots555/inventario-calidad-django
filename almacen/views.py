@@ -581,6 +581,8 @@ def lista_solicitudes(request):
 def crear_solicitud(request):
     """
     Crea una nueva solicitud de baja.
+    
+    ACTUALIZADO (Enero 2026): Procesa unidades seleccionadas del formulario
     """
     if request.method == 'POST':
         form = SolicitudBajaForm(request.POST)
@@ -599,6 +601,19 @@ def crear_solicitud(request):
                 return redirect('almacen:lista_solicitudes')
             
             solicitud.save()
+            
+            # ========== GUARDAR UNIDADES SELECCIONADAS (NUEVO) ==========
+            # Obtener IDs de unidades seleccionadas del formulario validado
+            unidades_ids = form.cleaned_data.get('unidades_ids', [])
+            
+            if unidades_ids:
+                # Obtener las unidades y agregarlas al ManyToMany
+                unidades = UnidadInventario.objects.filter(id__in=unidades_ids)
+                solicitud.unidades_seleccionadas.set(unidades)
+            
+            # Guardar formulario completo (incluyendo ManyToMany)
+            form.save_m2m()
+            
             messages.success(request, 'Solicitud creada correctamente.')
             return redirect('almacen:lista_solicitudes')
     else:
@@ -619,7 +634,14 @@ def procesar_solicitud(request, pk):
     Solo para agentes de almacén.
     """
     solicitud = get_object_or_404(
-        SolicitudBaja.objects.select_related('producto', 'unidad_inventario', 'solicitante', 'orden_servicio'),
+        SolicitudBaja.objects.select_related(
+            'producto', 
+            'unidad_inventario', 
+            'solicitante', 
+            'orden_servicio',
+            'orden_servicio__detalle_equipo',  # Cargar detalle_equipo para acceder a orden_cliente
+            'tecnico_asignado'  # Cargar técnico asignado
+        ),
         pk=pk, 
         estado='pendiente'
     )
@@ -1364,12 +1386,17 @@ def api_unidades_producto(request):
     Cuando el usuario selecciona un producto, JavaScript llama a esta API
     para obtener las unidades específicas (con marca/modelo/serie) disponibles.
     
+    ACTUALIZACIÓN (Enero 2026):
+    Ahora retorna las unidades AGRUPADAS por marca/modelo/estado para
+    una mejor visualización en el formulario (similar a unidades_por_producto.html)
+    
     Parámetros GET:
     - producto_id: ID del ProductoAlmacen
     
     Retorna:
-    - Lista de unidades disponibles del producto
-    - Información de stock del producto
+    - grupos: Lista de grupos de unidades (marca/modelo/estado)
+    - unidades: Lista plana de todas las unidades (para compatibilidad)
+    - stock_info: Información del stock del producto
     """
     producto_id = request.GET.get('producto_id')
     
@@ -1378,6 +1405,7 @@ def api_unidades_producto(request):
             'success': False,
             'error': 'Se requiere producto_id',
             'unidades': [],
+            'grupos': [],
             'stock_info': ''
         })
     
@@ -1388,11 +1416,32 @@ def api_unidades_producto(request):
         unidades = UnidadInventario.objects.filter(
             producto_id=producto_id,
             disponibilidad='disponible'
-        ).order_by('marca', 'modelo', 'fecha_registro')
+        ).order_by('marca', 'modelo', 'estado', 'fecha_registro')
         
-        # Construir lista de unidades
+        # Construir lista plana de unidades (para compatibilidad)
         unidades_data = []
         for u in unidades:
+            # ========== DETECTAR SOLICITUDES PENDIENTES (NUEVO - Enero 2026) ==========
+            # Verificar si esta unidad tiene una solicitud pendiente
+            solicitud_pendiente = None
+            tiene_solicitud_pendiente = False
+            
+            # Buscar en solicitudes pendientes que tienen esta unidad seleccionada
+            solicitudes_pendientes = SolicitudBaja.objects.filter(
+                unidades_seleccionadas=u,
+                estado='pendiente'
+            ).select_related('solicitante', 'orden_servicio').first()
+            
+            if solicitudes_pendientes:
+                tiene_solicitud_pendiente = True
+                solicitud_pendiente = {
+                    'id': solicitudes_pendientes.pk,
+                    'solicitante': solicitudes_pendientes.solicitante.nombre_completo if solicitudes_pendientes.solicitante else 'Desconocido',
+                    'fecha': solicitudes_pendientes.fecha_solicitud.strftime('%d/%m/%Y %H:%M'),
+                    'tipo': solicitudes_pendientes.get_tipo_solicitud_display(),
+                    'cantidad': solicitudes_pendientes.cantidad,
+                }
+            
             unidades_data.append({
                 'id': u.pk,
                 'codigo_interno': u.codigo_interno or '',
@@ -1404,6 +1453,60 @@ def api_unidades_producto(request):
                 'disponibilidad': u.disponibilidad,
                 'origen': u.origen,
                 'origen_display': u.get_origen_display(),
+                'costo_unitario': float(u.costo_unitario or 0),
+                'tiene_solicitud_pendiente': tiene_solicitud_pendiente,  # NUEVO
+                'solicitud_pendiente': solicitud_pendiente,  # NUEVO
+            })
+        
+        # ========== AGRUPACIÓN DE UNIDADES ==========
+        # Similar a unidades_por_producto view
+        from itertools import groupby
+        
+        grupos_data = []
+        for key, group in groupby(unidades, key=lambda u: (u.marca or 'Sin marca', u.modelo or 'Sin modelo', u.estado)):
+            unidades_grupo = list(group)
+            marca, modelo, estado = key
+            
+            # Construir lista de unidades del grupo
+            unidades_grupo_data = []
+            for u in unidades_grupo:
+                # Detectar solicitudes pendientes
+                solicitudes_pendientes = SolicitudBaja.objects.filter(
+                    unidades_seleccionadas=u,
+                    estado='pendiente'
+                ).select_related('solicitante').first()
+                
+                tiene_solicitud_pendiente = False
+                solicitud_pendiente = None
+                
+                if solicitudes_pendientes:
+                    tiene_solicitud_pendiente = True
+                    solicitud_pendiente = {
+                        'id': solicitudes_pendientes.pk,
+                        'solicitante': solicitudes_pendientes.solicitante.nombre_completo if solicitudes_pendientes.solicitante else 'Desconocido',
+                        'fecha': solicitudes_pendientes.fecha_solicitud.strftime('%d/%m/%Y %H:%M'),
+                        'tipo': solicitudes_pendientes.get_tipo_solicitud_display(),
+                    }
+                
+                unidades_grupo_data.append({
+                    'id': u.pk,
+                    'codigo_interno': u.codigo_interno or '',
+                    'numero_serie': u.numero_serie or '',
+                    'costo_unitario': float(u.costo_unitario or 0),
+                    'fecha_registro': u.fecha_registro.strftime('%d/%m/%Y'),
+                    'origen': u.origen,
+                    'origen_display': u.get_origen_display(),
+                    'tiene_solicitud_pendiente': tiene_solicitud_pendiente,  # NUEVO
+                    'solicitud_pendiente': solicitud_pendiente,  # NUEVO
+                })
+            
+            grupos_data.append({
+                'marca': marca,
+                'modelo': modelo,
+                'estado': estado,
+                'estado_display': dict(unidades_grupo[0]._meta.get_field('estado').choices).get(estado, estado),
+                'cantidad': len(unidades_grupo),
+                'unidades': unidades_grupo_data,
             })
         
         # Info de stock
@@ -1417,8 +1520,10 @@ def api_unidades_producto(request):
             'producto_nombre': producto.nombre,
             'stock_actual': producto.stock_actual,
             'stock_info': stock_info,
-            'unidades': unidades_data,
-            'total_unidades': len(unidades_data)
+            'unidades': unidades_data,  # Lista plana (compatibilidad)
+            'grupos': grupos_data,  # Grupos (nuevo)
+            'total_unidades': len(unidades_data),
+            'total_grupos': len(grupos_data),
         })
         
     except ProductoAlmacen.DoesNotExist:
@@ -1426,6 +1531,7 @@ def api_unidades_producto(request):
             'success': False,
             'error': 'Producto no encontrado',
             'unidades': [],
+            'grupos': [],
             'stock_info': ''
         })
 

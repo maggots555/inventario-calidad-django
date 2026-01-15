@@ -41,6 +41,8 @@
  * 
  * EXPLICACIÓN: En TypeScript, las interfaces definen la "forma" de un objeto.
  * Esto nos ayuda a saber exactamente qué campos tendrá cada unidad.
+ * 
+ * ACTUALIZADO (Enero 2026): Agregada info de solicitudes pendientes
  */
 interface UnidadData {
     id: number;
@@ -53,10 +55,36 @@ interface UnidadData {
     disponibilidad: string;
     origen: string;
     origen_display: string;
+    costo_unitario?: number;
+    fecha_registro?: string;
+    tiene_solicitud_pendiente?: boolean;  // NUEVO
+    solicitud_pendiente?: {  // NUEVO
+        id: number;
+        solicitante: string;
+        fecha: string;
+        tipo: string;
+        cantidad?: number;
+    };
+}
+
+/**
+ * Interface para grupo de unidades
+ * 
+ * ACTUALIZADO (Enero 2026): Para mostrar unidades agrupadas con checkboxes
+ */
+interface GrupoUnidadData {
+    marca: string;
+    modelo: string;
+    estado: string;
+    estado_display: string;
+    cantidad: number;
+    unidades: UnidadData[];
 }
 
 /**
  * Interface para la respuesta del API de unidades
+ * 
+ * ACTUALIZADO (Enero 2026): Ahora incluye grupos además de lista plana
  */
 interface UnidadesApiResponse {
     success: boolean;
@@ -65,7 +93,9 @@ interface UnidadesApiResponse {
     stock_actual?: number;
     stock_info?: string;
     unidades?: UnidadData[];
+    grupos?: GrupoUnidadData[];  // NUEVO
     total_unidades?: number;
+    total_grupos?: number;  // NUEVO
     error?: string;
 }
 
@@ -117,11 +147,19 @@ class SolicitudBajaFormHandler {
     // Elementos del DOM - Campos principales
     private tipoSolicitudSelect: HTMLSelectElement | null;
     private productoSelect: HTMLSelectElement | null;
+    private cantidadInput: HTMLInputElement | null;  // NUEVO
     private unidadSelect: HTMLSelectElement | null;
     private tecnicoSelect: HTMLSelectElement | null;
     private unidadContainer: HTMLElement | null;
     private tecnicoContainer: HTMLElement | null;
     private stockInfo: HTMLElement | null;
+    
+    // Elementos del DOM - Unidades agrupadas (NUEVO)
+    private unidadesAgrupadasContainer: HTMLElement | null;
+    private gruposUnidadesContent: HTMLElement | null;
+    private contadorSeleccionadas: HTMLElement | null;
+    private cantidadSolicitadaDisplay: HTMLElement | null;
+    private unidadesSeleccionadasInput: HTMLInputElement | null;
     
     // Elementos del DOM - Campos de orden de servicio
     private ordenClienteInput: HTMLInputElement | null;
@@ -140,6 +178,10 @@ class SolicitudBajaFormHandler {
     private ordenId: number | null = null;
     private debounceTimer: ReturnType<typeof setTimeout> | null = null;
     
+    // Estado de selección de unidades (NUEVO)
+    private unidadesSeleccionadas: Set<number> = new Set();
+    private cantidadSolicitada: number = 0;
+    
     constructor(apiUnidadesUrl: string, apiTecnicosUrl: string, apiBuscarCrearOrdenUrl: string) {
         // Guardar URLs de los APIs
         this.apiUnidadesUrl = apiUnidadesUrl;
@@ -149,11 +191,19 @@ class SolicitudBajaFormHandler {
         // Obtener referencias a los elementos del DOM - Campos principales
         this.tipoSolicitudSelect = document.getElementById('id_tipo_solicitud') as HTMLSelectElement;
         this.productoSelect = document.getElementById('id_producto') as HTMLSelectElement;
+        this.cantidadInput = document.getElementById('id_cantidad') as HTMLInputElement;
         this.unidadSelect = document.getElementById('id_unidad_inventario') as HTMLSelectElement;
         this.tecnicoSelect = document.getElementById('id_tecnico_asignado') as HTMLSelectElement;
         this.unidadContainer = document.getElementById('unidad-container');
         this.tecnicoContainer = document.getElementById('tecnico-container');
         this.stockInfo = document.getElementById('stock-info');
+        
+        // Obtener referencias a elementos de unidades agrupadas (NUEVO)
+        this.unidadesAgrupadasContainer = document.getElementById('unidades-agrupadas-container');
+        this.gruposUnidadesContent = document.getElementById('grupos-unidades-content');
+        this.contadorSeleccionadas = document.getElementById('contador-seleccionadas');
+        this.cantidadSolicitadaDisplay = document.getElementById('cantidad-solicitada-display');
+        this.unidadesSeleccionadasInput = document.getElementById('unidades_seleccionadas_ids') as HTMLInputElement;
         
         // Obtener referencias a los elementos del DOM - Campos de orden
         this.ordenClienteInput = document.getElementById('id_orden_cliente_input') as HTMLInputElement;
@@ -190,6 +240,13 @@ class SolicitudBajaFormHandler {
             });
         }
         
+        // Evento: Cambio en cantidad (NUEVO)
+        if (this.cantidadInput) {
+            this.cantidadInput.addEventListener('input', () => {
+                this.handleCantidadChange();
+            });
+        }
+        
         // Evento: Input en orden_cliente (con debounce para no hacer muchas peticiones)
         if (this.ordenClienteInput) {
             this.ordenClienteInput.addEventListener('input', () => {
@@ -202,8 +259,7 @@ class SolicitudBajaFormHandler {
             });
         }
         
-        // Interceptar el submit del formulario para crear orden si es necesario
-        // IMPORTANTE: Usar ID específico porque hay otros formularios en la página (ej: logout)
+        // Interceptar el submit del formulario para validar y crear orden si es necesario
         const form = document.getElementById('solicitud-baja-form') as HTMLFormElement;
         
         if (form) {
@@ -466,8 +522,20 @@ class SolicitudBajaFormHandler {
     /**
      * Maneja el envío del formulario
      * Si hay una orden por crear, la crea primero
+     * 
+     * ACTUALIZADO (Enero 2026): Valida selección de unidades obligatoria
      */
     private handleFormSubmit(e: Event, form: HTMLFormElement): void {
+        // ========== VALIDACIÓN: Unidades seleccionadas (NUEVO) ==========
+        const cantidad = this.cantidadSolicitada;
+        const seleccionadas = this.unidadesSeleccionadas.size;
+        
+        if (cantidad > 0 && seleccionadas !== cantidad) {
+            e.preventDefault();
+            alert(`Debes seleccionar exactamente ${cantidad} unidad(es). Has seleccionado ${seleccionadas}.`);
+            return;
+        }
+        
         const tipoSolicitud = this.tipoSolicitudSelect?.value;
         
         // Solo procesar si es servicio técnico o venta mostrador
@@ -600,6 +668,248 @@ class SolicitudBajaFormHandler {
     }
     
     /**
+     * Maneja el cambio en la cantidad solicitada
+     * 
+     * NUEVO (Enero 2026): Actualiza el display y revalida selección
+     */
+    private handleCantidadChange(): void {
+        const cantidad = parseInt(this.cantidadInput?.value || '0');
+        this.cantidadSolicitada = cantidad;
+        
+        // Actualizar display
+        if (this.cantidadSolicitadaDisplay) {
+            this.cantidadSolicitadaDisplay.textContent = cantidad.toString();
+        }
+        
+        // Si hay unidades agrupadas cargadas, actualizar validación
+        if (this.unidadesAgrupadasContainer?.style.display !== 'none') {
+            this.actualizarContadorSeleccionadas();
+        }
+    }
+    
+    /**
+     * Actualiza el contador de unidades seleccionadas
+     */
+    private actualizarContadorSeleccionadas(): void {
+        if (!this.contadorSeleccionadas) return;
+        
+        const seleccionadas = this.unidadesSeleccionadas.size;
+        const requeridas = this.cantidadSolicitada;
+        
+        const badge = this.contadorSeleccionadas;
+        badge.textContent = `${seleccionadas} / ${requeridas} seleccionadas`;
+        
+        // Cambiar color según estado
+        badge.className = 'badge bg-light text-dark';
+        if (seleccionadas === 0) {
+            badge.className = 'badge bg-secondary';
+        } else if (seleccionadas === requeridas) {
+            badge.className = 'badge bg-success';
+        } else if (seleccionadas > requeridas) {
+            badge.className = 'badge bg-danger';
+        } else {
+            badge.className = 'badge bg-warning text-dark';
+        }
+    }
+    
+    /**
+     * Maneja el click en un checkbox de unidad
+     * 
+     * ACTUALIZADO (Enero 2026): Valida solicitudes pendientes
+     */
+    private handleUnidadCheckboxChange(unidadId: number, checked: boolean): void {
+        if (checked) {
+            // Verificar si la unidad tiene solicitud pendiente
+            const checkbox = document.querySelector(`input[data-unidad-id="${unidadId}"]`) as HTMLInputElement;
+            const tieneSolicitud = checkbox?.getAttribute('data-tiene-solicitud') === 'true';
+            
+            if (tieneSolicitud) {
+                const confirmar = confirm(
+                    '⚠️ ADVERTENCIA: Esta unidad ya tiene una solicitud pendiente.\n\n' +
+                    '¿Estás seguro de que quieres seleccionarla?\n\n' +
+                    'Esto podría causar conflictos de inventario si ambas solicitudes se procesan.'
+                );
+                
+                if (!confirmar) {
+                    // Desmarcar el checkbox si el usuario cancela
+                    checkbox.checked = false;
+                    return;
+                }
+            }
+            
+            // Verificar límite
+            if (this.unidadesSeleccionadas.size >= this.cantidadSolicitada) {
+                alert(`Solo puedes seleccionar ${this.cantidadSolicitada} unidad(es)`);
+                // Desmarcar el checkbox
+                if (checkbox) checkbox.checked = false;
+                return;
+            }
+            this.unidadesSeleccionadas.add(unidadId);
+        } else {
+            this.unidadesSeleccionadas.delete(unidadId);
+        }
+        
+        // Actualizar contador
+        this.actualizarContadorSeleccionadas();
+        
+        // Actualizar input hidden con los IDs
+        this.actualizarUnidadesSeleccionadasInput();
+    }
+    
+    /**
+     * Actualiza el input hidden con los IDs de unidades seleccionadas
+     */
+    private actualizarUnidadesSeleccionadasInput(): void {
+        if (!this.unidadesSeleccionadasInput) return;
+        
+        const idsArray = Array.from(this.unidadesSeleccionadas);
+        this.unidadesSeleccionadasInput.value = idsArray.join(',');
+    }
+    
+    /**
+     * Renderiza los grupos de unidades con checkboxes
+     */
+    private renderizarGruposUnidades(grupos: GrupoUnidadData[]): void {
+        if (!this.gruposUnidadesContent) return;
+        
+        if (!grupos || grupos.length === 0) {
+            this.gruposUnidadesContent.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox fs-1"></i>
+                    <p class="mt-2">No hay unidades disponibles para este producto</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Construir HTML para grupos expandibles
+        let html = '<div class="accordion" id="accordionUnidades">';
+        
+        grupos.forEach((grupo, index) => {
+            const badgeEstado = this.getBadgeEstado(grupo.estado);
+            
+            html += `
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading${index}">
+                        <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" 
+                                data-bs-toggle="collapse" data-bs-target="#collapse${index}" 
+                                aria-expanded="${index === 0 ? 'true' : 'false'}" aria-controls="collapse${index}">
+                            <div class="d-flex align-items-center justify-content-between w-100 me-3">
+                                <div>
+                                    <strong>${grupo.marca}</strong> ${grupo.modelo}
+                                    <span class="ms-2 ${badgeEstado}">${grupo.estado_display}</span>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">${grupo.cantidad} unidades</span>
+                            </div>
+                        </button>
+                    </h2>
+                    <div id="collapse${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" 
+                         aria-labelledby="heading${index}" data-bs-parent="#accordionUnidades">
+                        <div class="accordion-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 40px;"></th>
+                                            <th>Código Interno</th>
+                                            <th>N° Serie</th>
+                                            <th>Origen</th>
+                                            <th class="text-end">Costo</th>
+                                            <th>Fecha Registro</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+            `;
+            
+            grupo.unidades.forEach(unidad => {
+                // Verificar si tiene solicitud pendiente
+                const tieneSolicitudPendiente = unidad.tiene_solicitud_pendiente || false;
+                const solicitudPendiente = unidad.solicitud_pendiente;
+                
+                html += `
+                    <tr ${tieneSolicitudPendiente ? 'class="table-warning"' : ''}>
+                        <td>
+                            <input type="checkbox" class="form-check-input unidad-checkbox" 
+                                   data-unidad-id="${unidad.id}"
+                                   data-tiene-solicitud="${tieneSolicitudPendiente}"
+                                   id="unidad_${unidad.id}">
+                        </td>
+                        <td>
+                            <label for="unidad_${unidad.id}" class="form-label mb-0">
+                                ${unidad.codigo_interno || '—'}
+                                ${tieneSolicitudPendiente ? `
+                                    <span class="badge bg-warning text-dark ms-1" 
+                                          data-bs-toggle="tooltip" 
+                                          data-bs-html="true"
+                                          data-bs-placement="top"
+                                          title="⚠️ <strong>Solicitud Pendiente</strong><br>
+                                                 ID: #${solicitudPendiente?.id}<br>
+                                                 Solicitante: ${solicitudPendiente?.solicitante}<br>
+                                                 Fecha: ${solicitudPendiente?.fecha}<br>
+                                                 Tipo: ${solicitudPendiente?.tipo}<br>
+                                                 Cantidad: ${solicitudPendiente?.cantidad}">
+                                        ⚠️ Pendiente
+                                    </span>
+                                ` : ''}
+                            </label>
+                        </td>
+                        <td><code class="small">${unidad.numero_serie || '—'}</code></td>
+                        <td><small>${unidad.origen_display || '—'}</small></td>
+                        <td class="text-end">
+                            ${unidad.costo_unitario ? '$' + unidad.costo_unitario.toFixed(2) : '—'}
+                        </td>
+                        <td><small>${unidad.fecha_registro || '—'}</small></td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        
+        this.gruposUnidadesContent.innerHTML = html;
+        
+        // Inicializar tooltips de Bootstrap para mostrar detalles de solicitudes pendientes
+        const tooltipTriggerList = this.gruposUnidadesContent.querySelectorAll('[data-bs-toggle="tooltip"]');
+        tooltipTriggerList.forEach(tooltipTriggerEl => {
+            new (window as any).bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
+        // Agregar event listeners a los checkboxes
+        const checkboxes = this.gruposUnidadesContent.querySelectorAll('.unidad-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const target = e.target as HTMLInputElement;
+                const unidadId = parseInt(target.getAttribute('data-unidad-id') || '0');
+                this.handleUnidadCheckboxChange(unidadId, target.checked);
+            });
+        });
+    }
+    
+    /**
+     * Obtiene la clase CSS para el badge de estado
+     */
+    private getBadgeEstado(estado: string): string {
+        const badgeMap: {[key: string]: string} = {
+            'nuevo': 'badge bg-success',
+            'usado_bueno': 'badge bg-primary',
+            'usado_regular': 'badge bg-warning text-dark',
+            'reparado': 'badge bg-info',
+            'defectuoso': 'badge bg-danger',
+            'para_revision': 'badge bg-secondary',
+        };
+        return badgeMap[estado] || 'badge bg-secondary';
+    }
+    
+    /**
      * Maneja el cambio en la selección de producto
      * Carga las unidades disponibles vía AJAX
      */
@@ -610,12 +920,20 @@ class SolicitudBajaFormHandler {
         
         const productoId = this.productoSelect.value;
         
+        // Limpiar selección anterior
+        this.unidadesSeleccionadas.clear();
+        this.actualizarUnidadesSeleccionadasInput();
+        this.actualizarContadorSeleccionadas();
+        
         // Mostrar estado de carga
         this.unidadSelect.innerHTML = '<option value="">-- Cargando unidades... --</option>';
         
         if (!productoId) {
             this.unidadSelect.innerHTML = '<option value="">-- Seleccione un producto primero --</option>';
             this.unidadContainer.style.display = 'none';
+            if (this.unidadesAgrupadasContainer) {
+                this.unidadesAgrupadasContainer.style.display = 'none';
+            }
             if (this.stockInfo) {
                 this.stockInfo.textContent = '';
             }
@@ -636,6 +954,8 @@ class SolicitudBajaFormHandler {
     
     /**
      * Procesa la respuesta del API de unidades
+     * 
+     * ACTUALIZADO (Enero 2026): Renderiza unidades agrupadas con checkboxes
      */
     private processUnidadesResponse(data: UnidadesApiResponse): void {
         if (!this.unidadSelect || !this.unidadContainer) {
@@ -647,29 +967,30 @@ class SolicitudBajaFormHandler {
             this.stockInfo.innerHTML = `<span class="text-success"><i class="bi bi-box-seam me-1"></i>${data.stock_info}</span>`;
         }
         
-        // Limpiar y agregar opción por defecto
-        this.unidadSelect.innerHTML = '<option value="">-- Cualquier unidad disponible --</option>';
+        // Actualizar cantidad solicitada en el display
+        this.handleCantidadChange();
         
-        // Agregar unidades si existen
-        if (data.unidades && data.unidades.length > 0) {
-            data.unidades.forEach((unidad: UnidadData) => {
-                const option = document.createElement('option');
-                option.value = unidad.id.toString();
-                
-                // Formato: "Samsung 870 EVO - S/N: ABC123 (Nuevo)"
-                let texto = '';
-                if (unidad.marca) texto += unidad.marca;
-                if (unidad.modelo) texto += ' ' + unidad.modelo;
-                if (unidad.numero_serie) texto += ' - S/N: ' + unidad.numero_serie;
-                texto += ' (' + unidad.estado_display + ')';
-                
-                option.textContent = texto.trim() || `Unidad #${unidad.id}`;
-                this.unidadSelect!.appendChild(option);
-            });
-            this.unidadContainer.style.display = 'block';
-        } else {
-            this.unidadSelect.innerHTML = '<option value="">-- No hay unidades registradas --</option>';
-            this.unidadContainer.style.display = 'block';
+        // Ocultar selector simple (deprecado)
+        this.unidadContainer.style.display = 'none';
+        
+        // Mostrar contenedor de unidades agrupadas
+        if (this.unidadesAgrupadasContainer && data.grupos && data.grupos.length > 0) {
+            this.unidadesAgrupadasContainer.style.display = 'block';
+            this.renderizarGruposUnidades(data.grupos);
+        } else if (this.unidadesAgrupadasContainer) {
+            this.unidadesAgrupadasContainer.style.display = 'block';
+            if (this.gruposUnidadesContent) {
+                this.gruposUnidadesContent.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <strong>No hay unidades disponibles</strong>
+                        <p class="mb-0 small">
+                            Este producto no tiene unidades individuales disponibles.
+                            Debes registrar unidades antes de poder crear una solicitud.
+                        </p>
+                    </div>
+                `;
+            }
         }
     }
 }

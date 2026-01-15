@@ -49,7 +49,45 @@
                                 {% endif %}
                             </div>
                             
-                            <!-- Unidad Específica (carga dinámica) -->
+                            <!-- ============================================= -->
+                            <!-- SECCIÓN: UNIDADES DISPONIBLES (AGRUPADAS) -->
+                            <!-- ============================================= -->
+                            <div class="col-12 mb-3" id="unidades-agrupadas-container" style="display: none;">
+                                <div class="card border-primary">
+                                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                        <span>
+                                            <i class="bi bi-collection me-2"></i>Seleccionar Unidades Específicas
+                                        </span>
+                                        <span class="badge bg-light text-dark" id="contador-seleccionadas">
+                                            0 / 0 seleccionadas
+                                        </span>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="alert alert-info mb-3">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            <strong>Opcional:</strong> Puedes seleccionar unidades específicas marcando los checkboxes.
+                                            Si no seleccionas ninguna, el sistema asignará automáticamente las unidades disponibles.
+                                            <br>
+                                            <small class="text-muted">
+                                                Cantidad solicitada: <strong id="cantidad-solicitada-display">0</strong> unidades
+                                            </small>
+                                        </div>
+                                        
+                                        <!-- Aquí se cargarán dinámicamente los grupos de unidades -->
+                                        <div id="grupos-unidades-content">
+                                            <div class="text-center text-muted py-4">
+                                                <i class="bi bi-arrow-up-circle fs-1"></i>
+                                                <p class="mt-2">Selecciona un producto y cantidad para ver las unidades disponibles</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Inputs hidden para almacenar IDs de unidades seleccionadas -->
+                                        <input type="hidden" id="unidades_seleccionadas_ids" name="unidades_seleccionadas" value="">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Unidad Específica (DEPRECADO - mantener para compatibilidad) -->
                             <div class="col-12 mb-3" id="unidad-container" style="display: none;">
                                 <label class="form-label">
                                     <i class="bi bi-cpu me-1"></i>Unidad Específica (opcional)
@@ -159,6 +197,11 @@
     </div>
 </div>
 {% endblock almacen_content %}
+
+{% block extra_css %}
+<!-- Estilos para unidades agrupadas -->
+<link rel="stylesheet" href="{% static 'css/unidades_agrupadas.css' %}">
+{% endblock %}
 
 {% block extra_js %}
 <!-- Cargar el script TypeScript compilado para el formulario de solicitud de baja -->

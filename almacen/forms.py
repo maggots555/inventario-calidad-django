@@ -967,12 +967,14 @@ class SolicitudBajaForm(forms.ModelForm):
         El método clean() se ejecuta después de validar cada campo individualmente.
         Aquí validamos reglas que dependen de múltiples campos.
         
-        En este caso: Si tipo_solicitud es 'servicio_tecnico', entonces
-        tecnico_asignado es OBLIGATORIO.
+        ACTUALIZADO (Enero 2026):
+        - Valida que técnico sea obligatorio para servicio_tecnico
+        - Valida que se hayan seleccionado exactamente la cantidad de unidades solicitada
         """
         cleaned_data = super().clean()
         tipo_solicitud = cleaned_data.get('tipo_solicitud')
         tecnico_asignado = cleaned_data.get('tecnico_asignado')
+        cantidad = cleaned_data.get('cantidad', 0)
         
         # Tipos que requieren técnico obligatorio: servicio_tecnico y venta_mostrador
         # Ambos tipos generan una OrdenServicio que necesita técnico asignado
@@ -983,6 +985,50 @@ class SolicitudBajaForm(forms.ModelForm):
             raise ValidationError({
                 'tecnico_asignado': f'Debe seleccionar un técnico de laboratorio para solicitudes de {tipo_display}.'
             })
+        
+        # ========== VALIDACIÓN: Unidades seleccionadas (NUEVO) ==========
+        # Obtener IDs de unidades seleccionadas del POST
+        unidades_seleccionadas_str = self.data.get('unidades_seleccionadas', '')
+        
+        if unidades_seleccionadas_str:
+            # Parsear IDs
+            try:
+                unidades_ids = [int(id_str.strip()) for id_str in unidades_seleccionadas_str.split(',') if id_str.strip()]
+            except (ValueError, AttributeError):
+                raise ValidationError('Error al procesar las unidades seleccionadas.')
+            
+            # Validar que la cantidad de unidades seleccionadas coincida con la cantidad solicitada
+            if len(unidades_ids) != cantidad:
+                raise ValidationError(
+                    f'Debe seleccionar exactamente {cantidad} unidad(es). '
+                    f'Has seleccionado {len(unidades_ids)}.'
+                )
+            
+            # Validar que las unidades existan y estén disponibles
+            from almacen.models import UnidadInventario
+            unidades = UnidadInventario.objects.filter(id__in=unidades_ids, disponibilidad='disponible')
+            
+            if unidades.count() != len(unidades_ids):
+                raise ValidationError('Algunas unidades seleccionadas no están disponibles.')
+            
+            # Almacenar las unidades validadas en cleaned_data para usarlas después
+            cleaned_data['unidades_ids'] = unidades_ids
+        else:
+            # Si no hay unidades seleccionadas, validar que haya suficientes unidades disponibles
+            producto = cleaned_data.get('producto')
+            if producto:
+                from almacen.models import UnidadInventario
+                unidades_disponibles = UnidadInventario.objects.filter(
+                    producto=producto,
+                    disponibilidad='disponible'
+                ).count()
+                
+                if unidades_disponibles < cantidad:
+                    raise ValidationError(
+                        f'No hay suficientes unidades disponibles. '
+                        f'Disponibles: {unidades_disponibles}, Solicitadas: {cantidad}. '
+                        f'Debes seleccionar las unidades específicas.'
+                    )
         
         return cleaned_data
 
