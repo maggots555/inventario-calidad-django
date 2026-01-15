@@ -34,46 +34,90 @@
                             <small class="text-muted">{{ solicitud.producto.nombre }}</small>
                         </dd>
                         
-                        {% if solicitud.unidad_inventario %}
-                        <!-- Información de la Unidad Específica Solicitada -->
-                        <dt class="col-sm-4">Unidad Específica:</dt>
-                        <dd class="col-sm-8">
-                            <div class="border rounded p-2 bg-light">
-                                <div class="d-flex align-items-center">
-                                    <i class="bi bi-cpu text-primary me-2 fs-5"></i>
-                                    <div>
-                                        <strong>
-                                            {% if solicitud.unidad_inventario.marca %}{{ solicitud.unidad_inventario.marca }}{% endif %}
-                                            {% if solicitud.unidad_inventario.modelo %}{{ solicitud.unidad_inventario.modelo }}{% endif %}
-                                            {% if not solicitud.unidad_inventario.marca and not solicitud.unidad_inventario.modelo %}
-                                                Unidad #{{ solicitud.unidad_inventario.pk }}
+                        {% comment %} Mostrar unidades seleccionadas (nuevo campo ManyToMany) {% endcomment %}
+                        {% with unidades=solicitud.unidades_seleccionadas.all %}
+                            {% if unidades %}
+                            <!-- Información de las Unidades Específicas Seleccionadas -->
+                            <dt class="col-sm-4">{% if unidades|length > 1 %}Unidades Seleccionadas:{% else %}Unidad Específica:{% endif %}</dt>
+                            <dd class="col-sm-8">
+                                {% for unidad in unidades %}
+                                <div class="border rounded p-2 bg-light {% if not forloop.first %}mt-2{% endif %}">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-cpu text-primary me-2 fs-5"></i>
+                                        <div>
+                                            <strong>
+                                                {% if unidad.marca %}{{ unidad.marca }}{% endif %}
+                                                {% if unidad.modelo %}{{ unidad.modelo }}{% endif %}
+                                                {% if not unidad.marca and not unidad.modelo %}
+                                                    Unidad #{{ unidad.pk }}
+                                                {% endif %}
+                                            </strong>
+                                            {% if unidad.numero_serie %}
+                                            <br><small class="text-muted">S/N: {{ unidad.numero_serie }}</small>
                                             {% endif %}
-                                        </strong>
-                                        {% if solicitud.unidad_inventario.numero_serie %}
-                                        <br><small class="text-muted">S/N: {{ solicitud.unidad_inventario.numero_serie }}</small>
-                                        {% endif %}
-                                        {% if solicitud.unidad_inventario.codigo_interno %}
-                                        <br><small class="text-muted">Código: {{ solicitud.unidad_inventario.codigo_interno }}</small>
-                                        {% endif %}
+                                            {% if unidad.codigo_interno %}
+                                            <br><small class="text-muted">Código: {{ unidad.codigo_interno }}</small>
+                                            {% endif %}
+                                        </div>
                                     </div>
+                                    <div class="mt-2">
+                                        <span class="badge bg-{% if unidad.estado == 'nuevo' %}success{% elif unidad.estado == 'usado_bueno' %}info{% elif unidad.estado == 'usado_regular' %}warning{% else %}secondary{% endif %}">
+                                            {{ unidad.get_estado_display }}
+                                        </span>
+                                        <span class="badge bg-{% if unidad.disponibilidad == 'disponible' %}success{% else %}danger{% endif %}">
+                                            {{ unidad.get_disponibilidad_display }}
+                                        </span>
+                                        <span class="badge bg-secondary">
+                                            {{ unidad.get_origen_display }}
+                                        </span>
+                                    </div>
+                                    <a href="{% url 'almacen:detalle_unidad' unidad.pk %}" class="btn btn-sm btn-outline-primary mt-2">
+                                        <i class="bi bi-eye me-1"></i>Ver detalles
+                                    </a>
                                 </div>
-                                <div class="mt-2">
-                                    <span class="badge bg-{% if solicitud.unidad_inventario.estado == 'nuevo' %}success{% elif solicitud.unidad_inventario.estado == 'usado_bueno' %}info{% elif solicitud.unidad_inventario.estado == 'usado_regular' %}warning{% else %}secondary{% endif %}">
-                                        {{ solicitud.unidad_inventario.get_estado_display }}
-                                    </span>
-                                    <span class="badge bg-{% if solicitud.unidad_inventario.disponibilidad == 'disponible' %}success{% else %}danger{% endif %}">
-                                        {{ solicitud.unidad_inventario.get_disponibilidad_display }}
-                                    </span>
-                                    <span class="badge bg-secondary">
-                                        {{ solicitud.unidad_inventario.get_origen_display }}
-                                    </span>
+                                {% endfor %}
+                            </dd>
+                            {% elif solicitud.unidad_inventario %}
+                            <!-- Fallback: Información de la Unidad Específica (campo antiguo) -->
+                            <dt class="col-sm-4">Unidad Específica:</dt>
+                            <dd class="col-sm-8">
+                                <div class="border rounded p-2 bg-light">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-cpu text-primary me-2 fs-5"></i>
+                                        <div>
+                                            <strong>
+                                                {% if solicitud.unidad_inventario.marca %}{{ solicitud.unidad_inventario.marca }}{% endif %}
+                                                {% if solicitud.unidad_inventario.modelo %}{{ solicitud.unidad_inventario.modelo }}{% endif %}
+                                                {% if not solicitud.unidad_inventario.marca and not solicitud.unidad_inventario.modelo %}
+                                                    Unidad #{{ solicitud.unidad_inventario.pk }}
+                                                {% endif %}
+                                            </strong>
+                                            {% if solicitud.unidad_inventario.numero_serie %}
+                                            <br><small class="text-muted">S/N: {{ solicitud.unidad_inventario.numero_serie }}</small>
+                                            {% endif %}
+                                            {% if solicitud.unidad_inventario.codigo_interno %}
+                                            <br><small class="text-muted">Código: {{ solicitud.unidad_inventario.codigo_interno }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <span class="badge bg-{% if solicitud.unidad_inventario.estado == 'nuevo' %}success{% elif solicitud.unidad_inventario.estado == 'usado_bueno' %}info{% elif solicitud.unidad_inventario.estado == 'usado_regular' %}warning{% else %}secondary{% endif %}">
+                                            {{ solicitud.unidad_inventario.get_estado_display }}
+                                        </span>
+                                        <span class="badge bg-{% if solicitud.unidad_inventario.disponibilidad == 'disponible' %}success{% else %}danger{% endif %}">
+                                            {{ solicitud.unidad_inventario.get_disponibilidad_display }}
+                                        </span>
+                                        <span class="badge bg-secondary">
+                                            {{ solicitud.unidad_inventario.get_origen_display }}
+                                        </span>
+                                    </div>
+                                    <a href="{% url 'almacen:detalle_unidad' solicitud.unidad_inventario.pk %}" class="btn btn-sm btn-outline-primary mt-2">
+                                        <i class="bi bi-eye me-1"></i>Ver detalles
+                                    </a>
                                 </div>
-                                <a href="{% url 'almacen:detalle_unidad' solicitud.unidad_inventario.pk %}" class="btn btn-sm btn-outline-primary mt-2">
-                                    <i class="bi bi-eye me-1"></i>Ver detalles
-                                </a>
-                            </div>
-                        </dd>
-                        {% endif %}
+                            </dd>
+                            {% endif %}
+                        {% endwith %}
                         
                         <dt class="col-sm-4">Cantidad:</dt>
                         <dd class="col-sm-8">

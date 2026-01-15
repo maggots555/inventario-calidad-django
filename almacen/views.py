@@ -543,7 +543,7 @@ def lista_solicitudes(request):
     """
     solicitudes = SolicitudBaja.objects.select_related(
         'producto', 'unidad_inventario', 'solicitante', 'agente_almacen', 'orden_servicio'
-    )
+    ).prefetch_related('unidades_seleccionadas')
     
     # Filtro por estado
     estado = request.GET.get('estado', '')
@@ -641,7 +641,7 @@ def procesar_solicitud(request, pk):
             'orden_servicio',
             'orden_servicio__detalle_equipo',  # Cargar detalle_equipo para acceder a orden_cliente
             'tecnico_asignado'  # Cargar técnico asignado
-        ),
+        ).prefetch_related('unidades_seleccionadas'),
         pk=pk, 
         estado='pendiente'
     )

@@ -79,20 +79,39 @@
                                 </a>
                                 <br>
                                 <small class="text-muted">{{ sol.producto.nombre|truncatechars:30 }}</small>
-                                {% if sol.unidad_inventario %}
-                                <div class="mt-1 p-1 border-start border-primary border-3 ps-2 bg-light">
-                                    <small class="text-primary">
-                                        <i class="bi bi-cpu me-1"></i>
-                                        <strong>
-                                            {% if sol.unidad_inventario.marca %}{{ sol.unidad_inventario.marca }}{% endif %}
-                                            {% if sol.unidad_inventario.modelo %}{{ sol.unidad_inventario.modelo }}{% endif %}
-                                        </strong>
-                                        {% if sol.unidad_inventario.numero_serie %}
-                                        <br>S/N: {{ sol.unidad_inventario.numero_serie }}
-                                        {% endif %}
-                                    </small>
-                                </div>
-                                {% endif %}
+                                {% comment %} Mostrar unidades seleccionadas (nuevo campo ManyToMany) {% endcomment %}
+                                {% with unidades=sol.unidades_seleccionadas.all %}
+                                    {% if unidades %}
+                                        {% for unidad in unidades %}
+                                        <div class="mt-1 p-1 border-start border-primary border-3 ps-2 bg-light">
+                                            <small class="text-primary">
+                                                <i class="bi bi-cpu me-1"></i>
+                                                <strong>
+                                                    {% if unidad.marca %}{{ unidad.marca }}{% endif %}
+                                                    {% if unidad.modelo %}{{ unidad.modelo }}{% endif %}
+                                                </strong>
+                                                {% if unidad.numero_serie %}
+                                                <br>S/N: {{ unidad.numero_serie }}
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                        {% endfor %}
+                                    {% elif sol.unidad_inventario %}
+                                        {% comment %} Fallback: mostrar unidad antigua para compatibilidad {% endcomment %}
+                                        <div class="mt-1 p-1 border-start border-primary border-3 ps-2 bg-light">
+                                            <small class="text-primary">
+                                                <i class="bi bi-cpu me-1"></i>
+                                                <strong>
+                                                    {% if sol.unidad_inventario.marca %}{{ sol.unidad_inventario.marca }}{% endif %}
+                                                    {% if sol.unidad_inventario.modelo %}{{ sol.unidad_inventario.modelo }}{% endif %}
+                                                </strong>
+                                                {% if sol.unidad_inventario.numero_serie %}
+                                                <br>S/N: {{ sol.unidad_inventario.numero_serie }}
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    {% endif %}
+                                {% endwith %}
                             </td>
                             <td class="text-center">
                                 <span class="badge bg-secondary fs-6">{{ sol.cantidad }}</span>
