@@ -594,9 +594,9 @@ class SolicitudBajaFormHandler {
             html += `
                 <div class="accordion-item">
                     <h2 class="accordion-header" id="heading${index}">
-                        <button class="accordion-button ${index === 0 ? '' : 'collapsed'}" type="button" 
+                        <button class="accordion-button collapsed" type="button" 
                                 data-bs-toggle="collapse" data-bs-target="#collapse${index}" 
-                                aria-expanded="${index === 0 ? 'true' : 'false'}" aria-controls="collapse${index}">
+                                aria-expanded="false" aria-controls="collapse${index}">
                             <div class="d-flex align-items-center justify-content-between w-100 me-3">
                                 <div>
                                     <strong>${grupo.marca}</strong> ${grupo.modelo}
@@ -606,7 +606,7 @@ class SolicitudBajaFormHandler {
                             </div>
                         </button>
                     </h2>
-                    <div id="collapse${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" 
+                    <div id="collapse${index}" class="accordion-collapse collapse" 
                          aria-labelledby="heading${index}" data-bs-parent="#accordionUnidades">
                         <div class="accordion-body">
                             <div class="table-responsive">
