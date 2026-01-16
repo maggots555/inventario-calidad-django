@@ -242,7 +242,7 @@ Contexto esperado:
                                 {% if unidad.orden_servicio_origen %}
                                     <a href="{% url 'servicio_tecnico:detalle_orden' unidad.orden_servicio_origen.pk %}" 
                                        class="text-decoration-none">
-                                        {{ unidad.orden_servicio_origen }}
+                                        {{ unidad.orden_servicio_origen.detalle_equipo.orden_cliente }}
                                     </a>
                                 {% else %}
                                     <span class="text-muted">—</span>
@@ -258,7 +258,7 @@ Contexto esperado:
                         Esta unidad está <strong>asignada</strong> a la orden de servicio:
                         <a href="{% url 'servicio_tecnico:detalle_orden' unidad.orden_servicio_destino.pk %}" 
                            class="alert-link">
-                            {{ unidad.orden_servicio_destino }}
+                            {{ unidad.orden_servicio_destino.detalle_equipo.orden_cliente }}
                         </a>
                     </div>
                     {% endif %}
