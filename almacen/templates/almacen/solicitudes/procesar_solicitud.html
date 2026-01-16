@@ -126,12 +126,26 @@
                         
                         <dt class="col-sm-4">Stock Actual:</dt>
                         <dd class="col-sm-8">
-                            <span class="badge bg-{% if solicitud.producto.stock_actual >= solicitud.cantidad %}success{% else %}danger{% endif %} fs-5">
-                                {{ solicitud.producto.stock_actual }}
-                            </span>
-                            {% if solicitud.producto.stock_actual < solicitud.cantidad %}
-                            <br><small class="text-danger">¡Stock insuficiente!</small>
+                            {% with disponibles=solicitud.producto.cantidad_unidades_disponibles asignadas=solicitud.producto.cantidad_unidades_asignadas %}
+                            <div>
+                                <span class="badge bg-{% if disponibles >= solicitud.cantidad %}success{% else %}danger{% endif %} fs-5">
+                                    {{ disponibles }} disponibles
+                                </span>
+                                {% if asignadas > 0 %}
+                                <span class="badge bg-warning text-dark fs-6 ms-1">
+                                    {{ asignadas }} comprometidas
+                                </span>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted d-block mt-1">
+                                <i class="bi bi-info-circle me-1"></i>Total en almacén: {{ solicitud.producto.stock_actual }}
+                            </small>
+                            {% if disponibles < solicitud.cantidad %}
+                            <small class="text-danger d-block mt-1">
+                                <i class="bi bi-exclamation-triangle me-1"></i>Stock disponible insuficiente para esta solicitud!
+                            </small>
                             {% endif %}
+                            {% endwith %}
                         </dd>
                         
                         <dt class="col-sm-4">Solicitante:</dt>

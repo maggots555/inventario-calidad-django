@@ -273,7 +273,13 @@ Contexto esperado:
                                     <td>
                                         <small>
                                             {% if grupo.origen == 'compra' %}
-                                                <span class="text-primary">🛒 Compra</span>
+                                                {% with primera_unidad=grupo.unidades.0 %}
+                                                    {% if primera_unidad.compra and primera_unidad.compra.tipo == 'cotizacion' %}
+                                                        <span class="text-info">📋 Cotización</span>
+                                                    {% else %}
+                                                        <span class="text-primary">🛒 Compra Directa</span>
+                                                    {% endif %}
+                                                {% endwith %}
                                             {% elif grupo.origen == 'orden_servicio' %}
                                                 <span class="text-success">🔧 O. Servicio</span>
                                             {% elif grupo.origen == 'devolucion_cliente' %}

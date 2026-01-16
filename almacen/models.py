@@ -3044,6 +3044,20 @@ class SolicitudCotizacion(models.Model):
                 registrado_por=usuario,
             )
             
+            # CREAR UnidadCompra para que al recibir se generen las UnidadInventario
+            # Esto permite tracking individual de cada pieza
+            # marca: Nombre del producto genérico (ej: "Memoria RAM DDR4")
+            # modelo: Descripción específica de la pieza (ej: "RAM DDR4 16GB 3200MHz Kingston Fury")
+            UnidadCompra.objects.create(
+                compra=compra,
+                numero_linea=1,
+                marca=linea.producto.nombre,  # Nombre del producto genérico
+                modelo=linea.descripcion_pieza,  # Descripción específica de la pieza
+                cantidad=linea.cantidad,
+                costo_unitario=linea.costo_unitario,
+                estado='pendiente'
+            )
+            
             # Vincular la compra con la línea
             linea.compra_generada = compra
             linea.estado_cliente = 'compra_generada'

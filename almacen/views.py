@@ -2486,11 +2486,18 @@ def recibir_compra(request, pk):
                 messages.error(request, 'No tienes perfil de empleado asociado.')
                 return redirect('almacen:detalle_compra', pk=pk)
             
-            # Obtener orden de servicio si viene de cotización
+            # Obtener orden de servicio SOLO si viene de cotización
+            # Esto hace que las unidades se creen como 'asignadas' (comprometidas)
+            # Las compras directas quedan con orden_servicio=None → unidades 'disponibles'
             orden_servicio = None
-            if hasattr(compra, 'linea_cotizacion_origen') and compra.linea_cotizacion_origen:
-                if compra.linea_cotizacion_origen.solicitud:
-                    orden_servicio = compra.linea_cotizacion_origen.solicitud.orden_servicio
+            if compra.tipo == 'cotizacion':
+                # Intentar obtener de la relación con SolicitudCotizacion
+                if hasattr(compra, 'linea_cotizacion_origen') and compra.linea_cotizacion_origen:
+                    if compra.linea_cotizacion_origen.solicitud:
+                        orden_servicio = compra.linea_cotizacion_origen.solicitud.orden_servicio
+                # Si no se encontró, intentar del campo directo
+                if not orden_servicio:
+                    orden_servicio = compra.orden_servicio
             
             # Recibir la compra
             if compra.recibir(fecha_recepcion=fecha_recepcion, crear_unidades=False):
@@ -2521,11 +2528,25 @@ def recibir_compra(request, pk):
                         )
                         total_unidades_creadas += len(unidades_creadas)
                 
-                messages.success(
-                    request,
-                    f'Compra #{compra.pk} recibida exitosamente. '
-                    f'{total_unidades_creadas} unidades agregadas al inventario.'
-                )
+                # Si es COTIZACIÓN, crear movimiento de SALIDA automático
+                # porque la pieza va directo al servicio (no se queda en almacén)
+                if compra.tipo == 'cotizacion' and orden_servicio:
+                    MovimientoAlmacen.objects.create(
+                        tipo='salida',
+                        producto=compra.producto,
+                        cantidad=compra.cantidad,
+                        costo_unitario=compra.costo_unitario,
+                        empleado=empleado,
+                        compra=compra,
+                        orden_servicio=orden_servicio,
+                        observaciones=f'Asignación automática a servicio (Cotización #{compra.pk}). Orden: {orden_servicio.detalle_equipo.orden_cliente if orden_servicio.detalle_equipo else orden_servicio.pk}',
+                    )
+                
+                mensaje_resultado = f'Compra #{compra.pk} recibida exitosamente. {total_unidades_creadas} unidades agregadas al inventario.'
+                if compra.tipo == 'cotizacion' and orden_servicio:
+                    mensaje_resultado += f' (Asignadas automáticamente a servicio)'
+                
+                messages.success(request, mensaje_resultado)
             else:
                 messages.error(request, 'Error al recibir la compra.')
             
