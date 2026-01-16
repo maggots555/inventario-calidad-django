@@ -427,8 +427,8 @@ class CompraProductoForm(forms.ModelForm):
         labels = {
             'producto': 'Producto',
             'proveedor': 'Proveedor',
-            'cantidad': 'Cantidad',
-            'costo_unitario': 'Costo Unitario ($)',
+            'cantidad': 'Cantidad Total',
+            'costo_unitario': 'Costo Unitario Promedio ($)',
             'fecha_pedido': 'Fecha de Pedido',
             'numero_factura': 'Número de Factura',
             'numero_orden_compra': 'Orden de Compra Interna',
@@ -436,6 +436,8 @@ class CompraProductoForm(forms.ModelForm):
             'observaciones': 'Observaciones',
         }
         help_texts = {
+            'cantidad': 'Cantidad total de piezas a comprar',
+            'costo_unitario': 'Calculado automáticamente del promedio de las unidades',
             'orden_cliente': 'Número de orden de servicio visible para el cliente (ej: OOW-12345)',
         }
     
@@ -481,6 +483,7 @@ class UnidadCompraForm(forms.ModelForm):
         model = UnidadCompra
         fields = [
             'numero_linea',
+            'cantidad',
             'marca',
             'modelo',
             'numero_serie',
@@ -490,63 +493,92 @@ class UnidadCompraForm(forms.ModelForm):
         ]
         widgets = {
             'numero_linea': forms.NumberInput(attrs={
-                'class': 'form-control',
+                'class': 'form-control form-control-sm',
                 'min': 1,
                 'readonly': True,  # Se asigna automáticamente
             }),
+            'cantidad': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm cantidad-input',
+                'min': 1,
+                'placeholder': '1',
+            }),
             'marca': forms.Select(attrs={
-                'class': 'form-control form-select',
+                'class': 'form-control form-select form-select-sm marca-input',
+                'required': True,
             }),
             'modelo': forms.TextInput(attrs={
-                'class': 'form-control',
+                'class': 'form-control form-control-sm',
                 'placeholder': 'Ej: 870 EVO, ROG STRIX B550',
             }),
             'numero_serie': forms.TextInput(attrs={
-                'class': 'form-control',
+                'class': 'form-control form-control-sm',
                 'placeholder': 'S/N del fabricante',
             }),
             'especificaciones': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 2,
+                'class': 'form-control form-control-sm',
+                'rows': 1,
                 'placeholder': 'Detalles técnicos adicionales...',
             }),
             'costo_unitario': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': 0,
+                'class': 'form-control form-control-sm costo-unidad-input',
+                'min': 0.01,
                 'step': '0.01',
-                'placeholder': 'Dejar vacío para usar el costo general',
+                'placeholder': 'Costo $',
+                'required': True,
             }),
             'notas': forms.Textarea(attrs={
-                'class': 'form-control',
+                'class': 'form-control form-control-sm',
                 'rows': 1,
                 'placeholder': 'Notas adicionales...',
             }),
         }
         labels = {
             'numero_linea': '#',
-            'marca': 'Marca',
+            'cantidad': 'Cant.',
+            'marca': 'Marca *',
             'modelo': 'Modelo',
             'numero_serie': 'Número de Serie',
             'especificaciones': 'Especificaciones',
-            'costo_unitario': 'Costo Específico ($)',
+            'costo_unitario': 'Costo ($) *',
             'notas': 'Notas',
         }
         help_texts = {
-            'costo_unitario': 'Solo si difiere del costo general de la compra',
+            'cantidad': 'Cuántas unidades de esta marca/modelo',
+            'marca': 'Obligatorio: selecciona la marca del fabricante',
+            'costo_unitario': 'Obligatorio: costo unitario de esta línea',
         }
+    
+    def clean_marca(self):
+        """Valida que la marca sea obligatoria"""
+        marca = self.cleaned_data.get('marca')
+        if not marca:
+            raise ValidationError('La marca es obligatoria. Selecciona una opción.')
+        return marca
+    
+    def clean_costo_unitario(self):
+        """Valida que el costo unitario sea obligatorio y positivo"""
+        costo = self.cleaned_data.get('costo_unitario')
+        if costo is None:
+            raise ValidationError('El costo unitario es obligatorio.')
+        if costo <= 0:
+            raise ValidationError('El costo debe ser mayor a 0.')
+        return costo
 
 
 # Formset para manejar múltiples UnidadCompra dentro de una CompraProducto
 # EXPLICACIÓN: Un "formset" es un conjunto de formularios iguales que Django
 # maneja como grupo. Esto permite crear/editar múltiples UnidadCompra a la vez.
+#
+# IMPORTANTE: min_num=1 y validate_min=True aseguran que siempre se especifique
+# al menos una línea de detalle con marca y costo.
 UnidadCompraFormSet = inlineformset_factory(
     CompraProducto,          # Modelo padre
     UnidadCompra,            # Modelo hijo
     form=UnidadCompraForm,   # Formulario a usar
     extra=1,                 # Formularios vacíos adicionales (para agregar nuevos)
     can_delete=True,         # Permitir eliminar unidades
-    min_num=0,               # Mínimo de formularios (0 = opcional)
-    validate_min=False,      # No validar mínimo
+    min_num=1,               # Mínimo 1 formulario OBLIGATORIO
+    validate_min=True,       # Validar que haya al menos 1
 )
 
 

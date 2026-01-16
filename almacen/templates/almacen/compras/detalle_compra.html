@@ -1,5 +1,6 @@
 {% extends 'almacen/base_almacen.html' %}
 {% load static %}
+{% load almacen_filters %}
 
 {% comment %}
 Detalle de una Compra o Cotización
@@ -153,10 +154,11 @@ Muestra toda la información y botones de acción según el estado
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
+                                    <th>Cantidad</th>
                                     <th>Marca</th>
                                     <th>Modelo</th>
-                                    <th>N° Serie</th>
-                                    <th class="text-end">Costo</th>
+                                    <th class="text-end">Costo Unitario</th>
+                                    <th class="text-end">Subtotal</th>
                                     <th>Estado</th>
                                     <th class="text-end">Acciones</th>
                                 </tr>
@@ -165,16 +167,15 @@ Muestra toda la información y botones de acción según el estado
                                 {% for unidad in unidades %}
                                 <tr>
                                     <td>{{ unidad.numero_linea }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ unidad.cantidad }}</span> unidad{{ unidad.cantidad|pluralize:"es" }}
+                                    </td>
                                     <td>{{ unidad.marca|default:"-" }}</td>
                                     <td>{{ unidad.modelo|default:"-" }}</td>
-                                    <td>
-                                        {% if unidad.numero_serie %}
-                                            <code>{{ unidad.numero_serie }}</code>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
                                     <td class="text-end">${{ unidad.get_costo|floatformat:2 }}</td>
+                                    <td class="text-end">
+                                        <strong>${{ unidad.cantidad|default:1|mul:unidad.get_costo|floatformat:2 }}</strong>
+                                    </td>
                                     <td>
                                         <span class="badge bg-{{ unidad.get_badge_estado }}">
                                             {{ unidad.get_estado_display }}

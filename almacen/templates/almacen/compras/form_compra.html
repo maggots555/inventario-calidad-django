@@ -3,13 +3,33 @@
 
 {% comment %}
 Formulario para crear/editar COMPRAS DIRECTAS
-Incluye formset para agregar unidades individuales con marca/modelo
+Incluye formset OBLIGATORIO para agregar unidades individuales con marca/modelo/costo
+
+FLUJO:
+1. Usuario define producto y cantidad total
+2. Usuario DEBE especificar al menos 1 línea de detalle
+3. Cada línea tiene: cantidad, marca (obligatorio), modelo, costo (obligatorio)
+4. La suma de cantidades DEBE coincidir con la cantidad total
+5. El costo unitario promedio se calcula automáticamente
 
 NOTA: Las cotizaciones se manejan en el sistema de SolicitudCotizacion
-que permite múltiples proveedores. Este formulario es SOLO para compras.
 {% endcomment %}
 
 {% block title %}{{ titulo }} - Almacén{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Ocultar checkboxes DELETE - se manejan con botones */
+    input[name$="-DELETE"] {
+        display: none;
+    }
+    
+    /* Transiciones suaves para desactivar/activar */
+    .unidad-form {
+        transition: opacity 0.3s ease, background-color 0.3s ease;
+    }
+</style>
+{% endblock extra_css %}
 
 {% block almacen_content %}
 <div class="container-fluid py-4">
@@ -45,21 +65,39 @@ que permite múltiples proveedores. Este formulario es SOLO para compras.
             <div class="card-body">
                 <div class="row g-3">
                     <!-- Producto -->
-                    <div class="col-md-6">
+                    <div class="col-md-5">
                         <label class="form-label">{{ form.producto.label }} <span class="text-danger">*</span></label>
                         {{ form.producto }}
                     </div>
                     
-                    <!-- Cantidad -->
-                    <div class="col-md-3">
+                    <!-- Cantidad Total -->
+                    <div class="col-md-2">
                         <label class="form-label">{{ form.cantidad.label }} <span class="text-danger">*</span></label>
                         {{ form.cantidad }}
+                        <div class="form-text">Total de piezas</div>
                     </div>
                     
-                    <!-- Costo Unitario -->
+                    <!-- Costo Unitario Promedio (READONLY) -->
+                    <div class="col-md-2">
+                        <label class="form-label">{{ form.costo_unitario.label }}</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">$</span>
+                            {{ form.costo_unitario }}
+                        </div>
+                        <div class="form-text text-info">
+                            <i class="bi bi-calculator me-1"></i>Calculado automáticamente
+                        </div>
+                    </div>
+                    
+                    <!-- Costo Total (calculado) -->
                     <div class="col-md-3">
-                        <label class="form-label">{{ form.costo_unitario.label }} <span class="text-danger">*</span></label>
-                        {{ form.costo_unitario }}
+                        <label class="form-label">Costo Total</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">$</span>
+                            <input type="text" id="costoTotalDisplay" class="form-control bg-light" 
+                                   readonly value="0.00" style="font-weight: bold;">
+                        </div>
+                        <div class="form-text">Cantidad × Costo Promedio</div>
                     </div>
                     
                     <!-- Proveedor -->
@@ -116,30 +154,55 @@ que permite múltiples proveedores. Este formulario es SOLO para compras.
             </div>
         </div>
 
-        <!-- Unidades Individuales (Formset) -->
+        <!-- Unidades Individuales (Formset) - OBLIGATORIO -->
         <div class="card shadow-sm mb-4">
-            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    <i class="bi bi-boxes me-2"></i>Detalle por Unidad Individual
-                    <small class="fw-normal">(Opcional)</small>
+                    <i class="bi bi-boxes me-2"></i>Detalle por Unidad 
+                    <span class="badge bg-danger ms-2">OBLIGATORIO</span>
                 </h5>
-                <button type="button" id="addUnidadBtn" class="btn btn-light btn-sm">
-                    <i class="bi bi-plus-lg me-1"></i>Agregar Unidad
+                <button type="button" id="addUnidadBtn" class="btn btn-dark btn-sm">
+                    <i class="bi bi-plus-lg me-1"></i>Agregar Línea
                 </button>
             </div>
             <div class="card-body">
-                <p class="text-muted small mb-3">
+                <!-- Alerta informativa -->
+                <div class="alert alert-info small mb-3">
                     <i class="bi bi-info-circle me-1"></i>
-                    Si cada pieza tiene diferente marca/modelo, puedes especificar los detalles aquí.
-                    Esto es útil para rastrear cada pieza individualmente.
-                </p>
+                    <strong>Obligatorio:</strong> Debes especificar al menos una línea con marca y costo.
+                    La suma de cantidades debe coincidir con la cantidad total de la compra.
+                </div>
+                
+                <!-- Resumen de validación -->
+                <div id="validacionResumen" class="alert alert-secondary mb-3" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Cantidad total:</strong> <span id="cantidadTotalDisplay">0</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Suma unidades:</strong> <span id="sumaUnidadesDisplay">0</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Estado:</strong> <span id="estadoValidacionDisplay">-</span>
+                        </div>
+                    </div>
+                </div>
                 
                 {{ formset.management_form }}
+                
+                <!-- Errores del formset -->
+                {% if formset.non_form_errors %}
+                <div class="alert alert-danger">
+                    {% for error in formset.non_form_errors %}
+                    <p class="mb-0">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 
                 <div id="unidadesContainer">
                     {% for unidad_form in formset %}
                     <div class="unidad-form border rounded p-3 mb-3 {% if unidad_form.instance.pk %}bg-light{% endif %}">
-                        <div class="row g-2">
+                        <div class="row g-2 align-items-end">
                             <!-- Número de línea -->
                             <div class="col-md-1">
                                 <label class="form-label small">#</label>
@@ -149,14 +212,20 @@ que permite múltiples proveedores. Este formulario es SOLO para compras.
                                 {% endif %}
                             </div>
                             
-                            <!-- Marca -->
+                            <!-- Cantidad -->
+                            <div class="col-md-1">
+                                <label class="form-label small">Cant. <span class="text-danger">*</span></label>
+                                {{ unidad_form.cantidad }}
+                            </div>
+                            
+                            <!-- Marca (OBLIGATORIO) -->
                             <div class="col-md-2">
-                                <label class="form-label small">Marca</label>
+                                <label class="form-label small">Marca <span class="text-danger">*</span></label>
                                 {{ unidad_form.marca }}
                             </div>
                             
                             <!-- Modelo -->
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label class="form-label small">Modelo</label>
                                 {{ unidad_form.modelo }}
                             </div>
@@ -167,28 +236,37 @@ que permite múltiples proveedores. Este formulario es SOLO para compras.
                                 {{ unidad_form.numero_serie }}
                             </div>
                             
-                            <!-- Costo específico -->
+                            <!-- Costo (OBLIGATORIO) -->
                             <div class="col-md-2">
-                                <label class="form-label small">Costo ($)</label>
+                                <label class="form-label small">Costo ($) <span class="text-danger">*</span></label>
                                 {{ unidad_form.costo_unitario }}
                             </div>
                             
-                            <!-- Eliminar -->
+                            <!-- Desactivar -->
                             <div class="col-md-2 d-flex align-items-end">
-                                <div class="form-check">
-                                    {{ unidad_form.DELETE }}
-                                    <label class="form-check-label text-danger small">Eliminar</label>
-                                </div>
+                                {{ unidad_form.DELETE }}
+                                <button type="button" class="btn btn-sm btn-outline-secondary remove-unidad-btn">
+                                    <i class="bi bi-eye-slash"></i> Desactivar
+                                </button>
                             </div>
                             
                             <!-- Especificaciones (fila completa) -->
                             <div class="col-md-10">
                                 <label class="form-label small">Especificaciones / Notas</label>
-                                <textarea name="{{ unidad_form.especificaciones.html_name }}" 
-                                          class="form-control form-control-sm" rows="1" 
-                                          placeholder="Detalles técnicos adicionales...">{{ unidad_form.especificaciones.value|default:"" }}</textarea>
+                                {{ unidad_form.especificaciones }}
                             </div>
                         </div>
+                        
+                        <!-- Errores del formulario individual -->
+                        {% if unidad_form.errors %}
+                        <div class="alert alert-danger mt-2 mb-0 py-1 small">
+                            {% for field, errors in unidad_form.errors.items %}
+                                {% for error in errors %}
+                                <span class="me-3"><strong>{{ field }}:</strong> {{ error }}</span>
+                                {% endfor %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -196,15 +274,20 @@ que permite múltiples proveedores. Este formulario es SOLO para compras.
                 <!-- Template para agregar nuevas unidades (oculto) -->
                 <template id="unidadTemplate">
                     <div class="unidad-form border rounded p-3 mb-3">
-                        <div class="row g-2">
+                        <div class="row g-2 align-items-end">
                             <div class="col-md-1">
                                 <label class="form-label small">#</label>
                                 <input type="number" name="unidades-__prefix__-numero_linea" 
                                        class="form-control form-control-sm" min="1" readonly>
                             </div>
+                            <div class="col-md-1">
+                                <label class="form-label small">Cant. <span class="text-danger">*</span></label>
+                                <input type="number" name="unidades-__prefix__-cantidad" 
+                                       class="form-control form-control-sm cantidad-input" min="1" value="1" required>
+                            </div>
                             <div class="col-md-2">
-                                <label class="form-label small">Marca</label>
-                                <select name="unidades-__prefix__-marca" class="form-control form-select form-select-sm">
+                                <label class="form-label small">Marca <span class="text-danger">*</span></label>
+                                <select name="unidades-__prefix__-marca" class="form-control form-select form-select-sm marca-input" required>
                                     <option value="">-- Seleccionar --</option>
                                     {% for value, label in formset.form.base_fields.marca.choices %}
                                     {% if value %}
@@ -213,7 +296,7 @@ que permite múltiples proveedores. Este formulario es SOLO para compras.
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label class="form-label small">Modelo</label>
                                 <input type="text" name="unidades-__prefix__-modelo" 
                                        class="form-control form-control-sm" placeholder="Ej: 870 EVO">
@@ -224,14 +307,14 @@ que permite múltiples proveedores. Este formulario es SOLO para compras.
                                        class="form-control form-control-sm" placeholder="S/N">
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label small">Costo ($)</label>
+                                <label class="form-label small">Costo ($) <span class="text-danger">*</span></label>
                                 <input type="number" name="unidades-__prefix__-costo_unitario" 
-                                       class="form-control form-control-sm" step="0.01" min="0" 
-                                       placeholder="Opcional">
+                                       class="form-control form-control-sm costo-unidad-input" 
+                                       step="0.01" min="0.01" placeholder="$0.00" required>
                             </div>
                             <div class="col-md-2 d-flex align-items-end">
-                                <button type="button" class="btn btn-sm btn-outline-danger remove-unidad-btn">
-                                    <i class="bi bi-trash"></i> Quitar
+                                <button type="button" class="btn btn-sm btn-outline-secondary remove-unidad-btn">
+                                    <i class="bi bi-eye-slash"></i> Desactivar
                                 </button>
                             </div>
                             <div class="col-md-10">
@@ -251,9 +334,9 @@ que permite múltiples proveedores. Este formulario es SOLO para compras.
             <a href="{% url 'almacen:lista_compras' %}" class="btn btn-outline-secondary">
                 <i class="bi bi-x-lg me-1"></i>Cancelar
             </a>
-            <button type="submit" class="btn btn-primary btn-lg">
+            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
                 <i class="bi bi-check-lg me-1"></i>
-                {% if es_creacion %}Crear{% else %}Guardar Cambios{% endif %}
+                {% if es_creacion %}Crear Compra{% else %}Guardar Cambios{% endif %}
             </button>
         </div>
     </form>
@@ -261,60 +344,5 @@ que permite múltiples proveedores. Este formulario es SOLO para compras.
 {% endblock almacen_content %}
 
 {% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const container = document.getElementById('unidadesContainer');
-    const template = document.getElementById('unidadTemplate');
-    const addBtn = document.getElementById('addUnidadBtn');
-    const totalFormsInput = document.querySelector('[name="unidades-TOTAL_FORMS"]');
-    
-    let formCount = parseInt(totalFormsInput.value);
-    
-    // Función para actualizar números de línea
-    function updateLineNumbers() {
-        const forms = container.querySelectorAll('.unidad-form:not([style*="display: none"])');
-        forms.forEach((form, index) => {
-            const lineInput = form.querySelector('input[name$="-numero_linea"]');
-            if (lineInput) {
-                lineInput.value = index + 1;
-            }
-        });
-    }
-    
-    // Agregar nueva unidad
-    addBtn.addEventListener('click', function() {
-        const newForm = template.content.cloneNode(true);
-        const formHtml = newForm.querySelector('.unidad-form');
-        
-        // Reemplazar __prefix__ con el índice actual
-        formHtml.innerHTML = formHtml.innerHTML.replace(/__prefix__/g, formCount);
-        
-        container.appendChild(newForm);
-        formCount++;
-        totalFormsInput.value = formCount;
-        
-        updateLineNumbers();
-        
-        // Agregar event listener al botón de eliminar
-        const removeBtn = container.lastElementChild.querySelector('.remove-unidad-btn');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', function() {
-                this.closest('.unidad-form').remove();
-                updateLineNumbers();
-            });
-        }
-    });
-    
-    // Event listeners para botones de eliminar existentes
-    container.querySelectorAll('.remove-unidad-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            this.closest('.unidad-form').remove();
-            updateLineNumbers();
-        });
-    });
-    
-    // Actualizar números al cargar
-    updateLineNumbers();
-});
-</script>
+<script src="{% static 'js/form_compra.js' %}"></script>
 {% endblock extra_js %}

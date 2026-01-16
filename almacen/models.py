@@ -881,6 +881,66 @@ class CompraProducto(models.Model):
             return delta.days
         return None
     
+    def calcular_costo_promedio(self):
+        """
+        Calcula el costo promedio ponderado según las UnidadCompra.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Cuando compras piezas de diferentes marcas con diferentes precios,
+        este método calcula el costo promedio considerando las cantidades.
+        
+        Ejemplo:
+        - 5 Kingston @ $100 = $500
+        - 5 Samsung @ $120 = $600
+        - Total: 10 piezas, $1100
+        - Costo promedio: $1100 / 10 = $110
+        
+        Returns:
+            Decimal: Costo promedio ponderado, o 0 si no hay unidades
+        """
+        from decimal import Decimal
+        
+        unidades = self.unidades_compra.all()
+        
+        if not unidades.exists():
+            return Decimal('0')
+        
+        # Calcular suma ponderada: (cantidad × costo) para cada línea
+        suma_total = Decimal('0')
+        total_cantidad = 0
+        
+        for unidad in unidades:
+            if unidad.costo_unitario is not None:
+                suma_total += unidad.cantidad * unidad.costo_unitario
+                total_cantidad += unidad.cantidad
+        
+        # Promedio ponderado
+        if total_cantidad > 0:
+            return suma_total / total_cantidad
+        
+        return Decimal('0')
+    
+    def actualizar_costo_desde_unidades(self):
+        """
+        Actualiza el costo_unitario de la compra basándose en las UnidadCompra.
+        
+        Este método se llama después de guardar las UnidadCompra para
+        recalcular el costo promedio ponderado.
+        
+        Returns:
+            bool: True si se actualizó el costo
+        """
+        costo_promedio = self.calcular_costo_promedio()
+        
+        if costo_promedio > 0:
+            self.costo_unitario = costo_promedio
+            self.costo_total = self.cantidad * self.costo_unitario
+            self.save(update_fields=['costo_unitario', 'costo_total'])
+            return True
+        
+        return False
+    
     def save(self, *args, **kwargs):
         """
         Override de save() para cálculos automáticos.
@@ -1246,6 +1306,12 @@ class UnidadCompra(models.Model):
         verbose_name='Número de Línea',
         help_text='Número secuencial dentro de la compra (1, 2, 3...)'
     )
+    cantidad = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+        verbose_name='Cantidad',
+        help_text='Cuántas piezas son de esta marca/modelo (ej: 5 Kingston, 3 Samsung)'
+    )
     numero_serie = models.CharField(
         max_length=100,
         blank=True,
@@ -1362,41 +1428,62 @@ class UnidadCompra(models.Model):
         """Verifica si esta unidad puede marcarse como recibida"""
         return self.estado == 'pendiente'
     
-    def recibir(self, crear_unidad_inventario=True):
+    def recibir(self, crear_unidad_inventario=True, orden_servicio_destino=None, registrado_por=None):
         """
-        Marca esta unidad como recibida y opcionalmente crea UnidadInventario.
+        Marca esta unidad como recibida y crea N UnidadInventario según self.cantidad.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Cuando una línea de compra tiene cantidad=5, este método crea
+        5 UnidadInventario individuales, todas con la misma marca/modelo
+        pero cada una es una pieza física separada.
         
         Args:
-            crear_unidad_inventario: Si True, crea la UnidadInventario
+            crear_unidad_inventario: Si True, crea las UnidadInventario
+            orden_servicio_destino: OrdenServicio a la que asignar las unidades (opcional)
+            registrado_por: Usuario que registra la recepción (opcional)
         
         Returns:
-            UnidadInventario or None: La unidad creada, o None si no se creó
+            list[UnidadInventario]: Lista de unidades creadas, o lista vacía si no se crearon
         """
         if not self.puede_recibir():
-            return None
+            return []
         
         self.estado = 'recibida'
         self.fecha_recepcion = timezone.now()
         
-        unidad = None
+        unidades_creadas = []
+        
         if crear_unidad_inventario:
-            unidad = UnidadInventario.objects.create(
-                producto=self.compra.producto,
-                numero_serie=self.numero_serie,
-                marca=self.marca,
-                modelo=self.modelo,
-                especificaciones=self.especificaciones,
-                estado='nuevo',
-                disponibilidad='disponible',
-                origen='compra',
-                compra=self.compra,
-                costo_unitario=self.get_costo(),
-                notas=f'Creada desde compra #{self.compra.id}, línea {self.numero_linea}'
-            )
-            self.unidad_inventario = unidad
+            # Crear N UnidadInventario según self.cantidad
+            for i in range(self.cantidad):
+                # Determinar disponibilidad
+                disponibilidad = 'asignada' if orden_servicio_destino else 'disponible'
+                
+                # Crear cada unidad individual
+                unidad = UnidadInventario.objects.create(
+                    producto=self.compra.producto,
+                    numero_serie=self.numero_serie if i == 0 else '',  # Solo la primera tiene S/N
+                    marca=self.marca,
+                    modelo=self.modelo,
+                    especificaciones=self.especificaciones,
+                    estado='nuevo',
+                    disponibilidad=disponibilidad,
+                    origen='compra',
+                    compra=self.compra,
+                    costo_unitario=self.costo_unitario,  # Costo específico de esta línea
+                    orden_servicio_destino=orden_servicio_destino,
+                    registrado_por=registrado_por,
+                    notas=f'Creada desde compra #{self.compra.id}, línea {self.numero_linea} ({i+1}/{self.cantidad})'
+                )
+                unidades_creadas.append(unidad)
+            
+            # Vincular la primera unidad creada (para referencia)
+            if unidades_creadas:
+                self.unidad_inventario = unidades_creadas[0]
         
         self.save()
-        return unidad
+        return unidades_creadas
     
     def marcar_wpb(self, motivo=''):
         """

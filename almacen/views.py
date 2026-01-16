@@ -2059,12 +2059,98 @@ def crear_compra(request):
             compra.tipo = 'compra'
             compra.estado = 'pendiente_llegada'
             
+            # Costo unitario inicial en 0 (se calculará después)
+            compra.costo_unitario = 0
+            
             compra.save()
             
             # Ahora procesar el formset de unidades
             formset = UnidadCompraFormSet(request.POST, prefix='unidades', instance=compra)
             
             if formset.is_valid():
+                # VALIDACIÓN 1: Verificar que haya al menos una unidad
+                unidades_validas = [
+                    f for f in formset 
+                    if f.cleaned_data and not f.cleaned_data.get('DELETE', False)
+                ]
+                
+                if not unidades_validas:
+                    compra.delete()
+                    messages.error(
+                        request,
+                        'Error: Debes especificar al menos una línea de detalle con marca y costo.'
+                    )
+                    form = CompraProductoForm(request.POST)
+                    formset = UnidadCompraFormSet(request.POST, prefix='unidades')
+                    context = {
+                        'form': form,
+                        'formset': formset,
+                        'titulo': 'Nueva Compra Directa',
+                        'es_creacion': True,
+                    }
+                    return render(request, 'almacen/compras/form_compra.html', context)
+                
+                # VALIDACIÓN 2: Verificar que la suma de cantidades = cantidad total
+                suma_cantidades = sum(
+                    f.cleaned_data.get('cantidad', 0) for f in unidades_validas
+                )
+                
+                if suma_cantidades != compra.cantidad:
+                    compra.delete()
+                    messages.error(
+                        request,
+                        f'Error: La suma de cantidades ({suma_cantidades}) '
+                        f'no coincide con la cantidad total ({compra.cantidad}). '
+                        f'Ajusta las cantidades para que sumen exactamente {compra.cantidad}.'
+                    )
+                    form = CompraProductoForm(request.POST)
+                    formset = UnidadCompraFormSet(request.POST, prefix='unidades')
+                    context = {
+                        'form': form,
+                        'formset': formset,
+                        'titulo': 'Nueva Compra Directa',
+                        'es_creacion': True,
+                    }
+                    return render(request, 'almacen/compras/form_compra.html', context)
+                
+                # VALIDACIÓN 3: Verificar que todas las unidades tengan marca y costo
+                for i, unidad_form in enumerate(unidades_validas, start=1):
+                    marca = unidad_form.cleaned_data.get('marca')
+                    costo = unidad_form.cleaned_data.get('costo_unitario')
+                    
+                    if not marca:
+                        compra.delete()
+                        messages.error(
+                            request,
+                            f'Error en línea {i}: La marca es obligatoria.'
+                        )
+                        form = CompraProductoForm(request.POST)
+                        formset = UnidadCompraFormSet(request.POST, prefix='unidades')
+                        context = {
+                            'form': form,
+                            'formset': formset,
+                            'titulo': 'Nueva Compra Directa',
+                            'es_creacion': True,
+                        }
+                        return render(request, 'almacen/compras/form_compra.html', context)
+                    
+                    if not costo or costo <= 0:
+                        compra.delete()
+                        messages.error(
+                            request,
+                            f'Error en línea {i}: El costo unitario es obligatorio y debe ser mayor a 0.'
+                        )
+                        form = CompraProductoForm(request.POST)
+                        formset = UnidadCompraFormSet(request.POST, prefix='unidades')
+                        context = {
+                            'form': form,
+                            'formset': formset,
+                            'titulo': 'Nueva Compra Directa',
+                            'es_creacion': True,
+                        }
+                        return render(request, 'almacen/compras/form_compra.html', context)
+                
+                # Guardar las unidades
                 unidades = formset.save(commit=False)
                 
                 # Asignar número de línea secuencial
@@ -2076,56 +2162,26 @@ def crear_compra(request):
                 for obj in formset.deleted_objects:
                     obj.delete()
                 
-                # CORRECCIÓN: Crear UnidadCompra genéricas si faltan para completar la cantidad
-                # Esto asegura que siempre haya tantas UnidadCompra como unidades se compraron
-                unidades_existentes = compra.unidades_compra.count()
-                if unidades_existentes < compra.cantidad:
-                    # MEJORA: Buscar la primera unidad con datos para copiar marca/modelo
-                    # Si el usuario especificó "Kingston A400" en la primera, las demás heredan esos datos
-                    primera_unidad = compra.unidades_compra.first()
-                    
-                    # Valores por defecto (si no hay ninguna unidad especificada)
-                    marca_base = 'Genérico/Sin marca'
-                    modelo_base = ''
-                    especificaciones_base = ''
-                    costo_base = None
-                    
-                    # Si existe una unidad especificada, copiar sus datos
-                    if primera_unidad:
-                        marca_base = primera_unidad.marca or marca_base
-                        modelo_base = primera_unidad.modelo or modelo_base
-                        especificaciones_base = primera_unidad.especificaciones or especificaciones_base
-                        costo_base = primera_unidad.costo_unitario
-                    
-                    # Crear las unidades faltantes heredando los datos de la primera
-                    for i in range(unidades_existentes + 1, compra.cantidad + 1):
-                        from almacen.models import UnidadCompra
-                        UnidadCompra.objects.create(
-                            compra=compra,
-                            numero_linea=i,
-                            marca=marca_base,
-                            modelo=modelo_base,
-                            especificaciones=especificaciones_base,
-                            costo_unitario=costo_base,
-                            estado='pendiente',
-                            notas='Unidad creada automáticamente (datos heredados de primera unidad)'
-                        )
+                # CALCULAR Y ACTUALIZAR COSTO PROMEDIO
+                compra.actualizar_costo_desde_unidades()
                 
                 messages.success(
                     request,
-                    f'Compra #{compra.pk} creada exitosamente para {compra.producto.nombre} ({compra.cantidad} unidades)'
+                    f'Compra #{compra.pk} creada exitosamente para {compra.producto.nombre} '
+                    f'({compra.cantidad} unidades @ ${compra.costo_unitario:.2f} promedio)'
                 )
                 return redirect('almacen:detalle_compra', pk=compra.pk)
             else:
                 # Si el formset tiene errores, eliminar la compra creada
                 compra.delete()
-                messages.error(request, 'Error en los detalles de unidades. Verifica los datos.')
+                messages.error(request, 'Error en los detalles de unidades. Verifica que todas las líneas tengan marca y costo.')
         else:
             messages.error(request, 'Error en el formulario. Verifica los datos.')
             formset = UnidadCompraFormSet(request.POST, prefix='unidades')
     else:
         form = CompraProductoForm(initial={
             'fecha_pedido': timezone.now().date(),
+            'costo_unitario': 0,  # Se calculará automáticamente
         })
         formset = UnidadCompraFormSet(prefix='unidades')
     
@@ -2186,7 +2242,15 @@ def editar_compra(request, pk):
     """
     Editar una compra o cotización existente.
     
-    NOTA: Solo se puede editar si no ha sido recibida o está en estado final.
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Permite modificar una compra antes de que sea recibida.
+    
+    VALIDACIONES:
+    1. La compra no debe estar en estado final (recibida, devuelta, cancelada)
+    2. Debe haber al menos una línea de detalle con marca y costo
+    3. La suma de cantidades debe coincidir con la cantidad total
+    4. El costo promedio se recalcula automáticamente
     """
     compra = get_object_or_404(CompraProducto, pk=pk)
     
@@ -2200,8 +2264,80 @@ def editar_compra(request, pk):
         formset = UnidadCompraFormSet(request.POST, prefix='unidades', instance=compra)
         
         if form.is_valid() and formset.is_valid():
-            form.save()
+            compra_actualizada = form.save(commit=False)
             
+            # VALIDACIÓN 1: Verificar que haya al menos una unidad
+            unidades_validas = [
+                f for f in formset 
+                if f.cleaned_data and not f.cleaned_data.get('DELETE', False)
+            ]
+            
+            if not unidades_validas:
+                messages.error(
+                    request,
+                    'Error: Debes especificar al menos una línea de detalle con marca y costo.'
+                )
+                context = {
+                    'form': form,
+                    'formset': formset,
+                    'compra': compra,
+                    'titulo': f'Editar Compra #{compra.pk}',
+                    'es_creacion': False,
+                }
+                return render(request, 'almacen/compras/form_compra.html', context)
+            
+            # VALIDACIÓN 2: Verificar que la suma de cantidades = cantidad total
+            suma_cantidades = sum(
+                f.cleaned_data.get('cantidad', 0) for f in unidades_validas
+            )
+            
+            if suma_cantidades != compra_actualizada.cantidad:
+                messages.error(
+                    request,
+                    f'Error: La suma de cantidades ({suma_cantidades}) '
+                    f'no coincide con la cantidad total ({compra_actualizada.cantidad}). '
+                    f'Ajusta las cantidades para que sumen exactamente {compra_actualizada.cantidad}.'
+                )
+                context = {
+                    'form': form,
+                    'formset': formset,
+                    'compra': compra,
+                    'titulo': f'Editar Compra #{compra.pk}',
+                    'es_creacion': False,
+                }
+                return render(request, 'almacen/compras/form_compra.html', context)
+            
+            # VALIDACIÓN 3: Verificar que todas las unidades tengan marca y costo
+            for i, unidad_form in enumerate(unidades_validas, start=1):
+                marca = unidad_form.cleaned_data.get('marca')
+                costo = unidad_form.cleaned_data.get('costo_unitario')
+                
+                if not marca:
+                    messages.error(request, f'Error en línea {i}: La marca es obligatoria.')
+                    context = {
+                        'form': form,
+                        'formset': formset,
+                        'compra': compra,
+                        'titulo': f'Editar Compra #{compra.pk}',
+                        'es_creacion': False,
+                    }
+                    return render(request, 'almacen/compras/form_compra.html', context)
+                
+                if not costo or costo <= 0:
+                    messages.error(request, f'Error en línea {i}: El costo unitario es obligatorio y debe ser mayor a 0.')
+                    context = {
+                        'form': form,
+                        'formset': formset,
+                        'compra': compra,
+                        'titulo': f'Editar Compra #{compra.pk}',
+                        'es_creacion': False,
+                    }
+                    return render(request, 'almacen/compras/form_compra.html', context)
+            
+            # Guardar la compra
+            compra_actualizada.save()
+            
+            # Guardar unidades
             unidades = formset.save(commit=False)
             
             # Reasignar números de línea
@@ -2212,7 +2348,13 @@ def editar_compra(request, pk):
             for obj in formset.deleted_objects:
                 obj.delete()
             
-            messages.success(request, 'Compra actualizada exitosamente.')
+            # RECALCULAR COSTO PROMEDIO
+            compra_actualizada.actualizar_costo_desde_unidades()
+            
+            messages.success(
+                request, 
+                f'Compra actualizada exitosamente. Costo promedio: ${compra_actualizada.costo_unitario:.2f}'
+            )
             return redirect('almacen:detalle_compra', pk=pk)
     else:
         form = CompraProductoForm(instance=compra)
@@ -2307,11 +2449,22 @@ def recibir_compra(request, pk):
     Cuando llega la compra al almacén:
     1. Se registra la fecha de recepción
     2. Se crean MovimientoAlmacen de entrada (actualiza stock)
-    3. Se pueden crear UnidadInventario automáticamente
+    3. Se crean UnidadInventario automáticamente desde las UnidadCompra
     4. El estado cambia a 'recibida'
+    
+    FLUJO SIMPLIFICADO:
+    -------------------
+    Cada UnidadCompra tiene un campo 'cantidad' que indica cuántas piezas
+    son de esa marca/modelo. El método UnidadCompra.recibir() crea
+    N UnidadInventario según esa cantidad.
+    
+    Ejemplo:
+    - UnidadCompra #1: cantidad=5, marca=Kingston → crea 5 UnidadInventario
+    - UnidadCompra #2: cantidad=5, marca=Samsung → crea 5 UnidadInventario
+    - Total: 10 UnidadInventario
     """
     compra = get_object_or_404(
-        CompraProducto.objects.select_related('producto'),
+        CompraProducto.objects.select_related('producto').prefetch_related('unidades_compra'),
         pk=pk
     )
     
@@ -2333,6 +2486,12 @@ def recibir_compra(request, pk):
                 messages.error(request, 'No tienes perfil de empleado asociado.')
                 return redirect('almacen:detalle_compra', pk=pk)
             
+            # Obtener orden de servicio si viene de cotización
+            orden_servicio = None
+            if hasattr(compra, 'linea_cotizacion_origen') and compra.linea_cotizacion_origen:
+                if compra.linea_cotizacion_origen.solicitud:
+                    orden_servicio = compra.linea_cotizacion_origen.solicitud.orden_servicio
+            
             # Recibir la compra
             if compra.recibir(fecha_recepcion=fecha_recepcion, crear_unidades=False):
                 # Crear movimiento de entrada
@@ -2347,74 +2506,25 @@ def recibir_compra(request, pk):
                 )
                 
                 # Crear UnidadInventario si se solicitó
+                total_unidades_creadas = 0
+                
                 if crear_unidades:
                     unidades_compra = compra.unidades_compra.filter(estado='pendiente')
                     
-                    # Obtener descripción de la línea de cotización si existe
-                    # Esta descripción contiene detalles como "RAM DDR4 16GB Kingston Fury"
-                    descripcion_pieza = ''
-                    orden_servicio = None
-                    if hasattr(compra, 'linea_cotizacion_origen') and compra.linea_cotizacion_origen:
-                        descripcion_pieza = compra.linea_cotizacion_origen.descripcion_pieza
-                        # Obtener la orden de servicio desde la solicitud de cotización
-                        if compra.linea_cotizacion_origen.solicitud:
-                            orden_servicio = compra.linea_cotizacion_origen.solicitud.orden_servicio
-                    
-                    # CORRECCIÓN: Procesar unidades existentes Y crear las faltantes
-                    unidades_creadas = 0
-                    
-                    if unidades_compra.exists():
-                        # Procesar las unidades definidas
-                        for unidad_compra in unidades_compra:
-                            unidad_compra.recibir(crear_unidad_inventario=True)
-                            unidades_creadas += 1
-                    
-                    # IMPORTANTE: Si hay menos UnidadCompra que la cantidad total,
-                    # crear las unidades faltantes heredando datos de la primera
-                    if unidades_creadas < compra.cantidad:
-                        # MEJORA: Buscar la primera UnidadCompra para heredar marca/modelo
-                        primera_unidad_compra = compra.unidades_compra.first()
-                        
-                        # Valores por defecto
-                        marca_base = 'Genérico/Sin marca'
-                        modelo_base = descripcion_pieza if descripcion_pieza else ''
-                        especificaciones_base = ''
-                        costo_base = compra.costo_unitario
-                        
-                        # Si existe una UnidadCompra, heredar sus datos
-                        if primera_unidad_compra:
-                            marca_base = primera_unidad_compra.marca or marca_base
-                            modelo_base = primera_unidad_compra.modelo or modelo_base
-                            especificaciones_base = primera_unidad_compra.especificaciones or especificaciones_base
-                            if primera_unidad_compra.costo_unitario:
-                                costo_base = primera_unidad_compra.costo_unitario
-                        
-                        for i in range(unidades_creadas, compra.cantidad):
-                            # Si viene de cotización con orden, ya está asignada
-                            # Si no tiene orden, queda disponible
-                            disponibilidad = 'asignada' if orden_servicio else 'disponible'
-                            
-                            UnidadInventario.objects.create(
-                                producto=compra.producto,
-                                estado='nuevo',
-                                disponibilidad=disponibilidad,
-                                origen='compra',
-                                compra=compra,
-                                costo_unitario=costo_base,
-                                registrado_por=request.user,
-                                # Heredar marca/modelo de la primera unidad especificada
-                                marca=marca_base,
-                                modelo=modelo_base,
-                                especificaciones=especificaciones_base,
-                                # Vincular con la orden de servicio de la cotización
-                                orden_servicio_destino=orden_servicio,
-                                notas=f'Creada desde compra #{compra.pk} (unidad {i+1}/{compra.cantidad}, datos heredados)',
-                            )
-                            unidades_creadas += 1
+                    # NUEVO FLUJO SIMPLIFICADO:
+                    # Cada UnidadCompra.recibir() crea N UnidadInventario según su cantidad
+                    for unidad_compra in unidades_compra:
+                        unidades_creadas = unidad_compra.recibir(
+                            crear_unidad_inventario=True,
+                            orden_servicio_destino=orden_servicio,
+                            registrado_por=request.user
+                        )
+                        total_unidades_creadas += len(unidades_creadas)
                 
                 messages.success(
                     request,
-                    f'Compra #{compra.pk} recibida. {compra.cantidad} unidades agregadas al inventario.'
+                    f'Compra #{compra.pk} recibida exitosamente. '
+                    f'{total_unidades_creadas} unidades agregadas al inventario.'
                 )
             else:
                 messages.error(request, 'Error al recibir la compra.')
