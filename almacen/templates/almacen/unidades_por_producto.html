@@ -319,7 +319,7 @@ Contexto esperado:
                                                 <thead class="table-secondary">
                                                     <tr>
                                                         <th>Código Interno</th>
-                                                        <th>N° Serie</th>
+                                                        <th>Modelo</th>
                                                         <th class="text-center">Disponibilidad</th>
                                                         <th>Ubicación/Asignación</th>
                                                         <th class="text-end">Costo</th>
@@ -337,10 +337,16 @@ Contexto esperado:
                                                             </a>
                                                         </td>
                                                         <td>
-                                                            {% if unidad.numero_serie %}
-                                                                <code class="small">{{ unidad.numero_serie }}</code>
+                                                            {% if unidad.modelo %}
+                                                                <span class="fw-medium">{{ unidad.modelo }}</span>
+                                                                {% if unidad.numero_serie %}
+                                                                    <br><small class="text-muted">S/N: {{ unidad.numero_serie|truncatechars:20 }}</small>
+                                                                {% endif %}
                                                             {% else %}
-                                                                <span class="text-muted">—</span>
+                                                                <span class="text-muted">Sin modelo</span>
+                                                                {% if unidad.numero_serie %}
+                                                                    <br><small class="text-muted">S/N: {{ unidad.numero_serie|truncatechars:20 }}</small>
+                                                                {% endif %}
                                                             {% endif %}
                                                         </td>
                                                         <td class="text-center">
@@ -359,7 +365,7 @@ Contexto esperado:
                                                         <td>
                                                             <small>
                                                                 {% if unidad.orden_servicio_destino %}
-                                                                    🔧 Orden #{{ unidad.orden_servicio_destino.pk }}
+                                                                    🔧 Orden {{ unidad.orden_servicio_destino.detalle_equipo.orden_cliente }}
                                                                 {% elif unidad.tecnico_asignado %}
                                                                     👤 {{ unidad.tecnico_asignado.nombre }}
                                                                 {% else %}

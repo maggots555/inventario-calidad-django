@@ -2373,11 +2373,44 @@ class UnidadInventario(models.Model):
     def save(self, *args, **kwargs):
         """
         Al guardar, genera código interno si no existe.
-        Formato: ALM-{producto_id}-{timestamp}
+        Formato nuevo: {MARCA}-{MODELO}-{FECHA}
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        El código interno ahora incluye información más descriptiva:
+        - MARCA: Nombre del fabricante (ej: SAMSUNG, KINGSTON)
+        - MODELO: Modelo específico (ej: 870EVO, A400)
+        - FECHA: Fecha de registro en formato YYYYMMDD
+        
+        Ejemplos:
+        - SAMSUNG-870EVO-20260116
+        - KINGSTON-A400-20260116
+        - SINMARCA-SINMODELO-20260116 (si no tiene marca/modelo)
+        
+        Formato anterior: ALM-{producto_id}-{timestamp}
+        Formato nuevo: {MARCA}-{MODELO}-{FECHA}
         """
         if not self.codigo_interno:
-            timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
-            self.codigo_interno = f"ALM-{self.producto_id or 0}-{timestamp}"
+            # Obtener marca (limpiar espacios y convertir a mayúsculas)
+            marca = (self.marca or 'SINMARCA').replace(' ', '').upper()
+            
+            # Obtener modelo (limpiar espacios y convertir a mayúsculas)
+            modelo = (self.modelo or 'SINMODELO').replace(' ', '').upper()
+            
+            # Fecha en formato corto YYYYMMDD
+            fecha = timezone.now().strftime('%Y%m%d')
+            
+            # Generar código: MARCA-MODELO-FECHA
+            self.codigo_interno = f"{marca}-{modelo}-{fecha}"
+            
+            # Si ya existe este código, agregar sufijo incremental
+            # Esto maneja el caso de múltiples unidades iguales en el mismo día
+            contador = 1
+            codigo_base = self.codigo_interno
+            while UnidadInventario.objects.filter(codigo_interno=self.codigo_interno).exists():
+                contador += 1
+                self.codigo_interno = f"{codigo_base}-{contador:02d}"
+        
         super().save(*args, **kwargs)
     
     def esta_disponible(self):

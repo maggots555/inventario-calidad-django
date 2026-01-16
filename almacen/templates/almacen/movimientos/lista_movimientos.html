@@ -98,7 +98,7 @@
                             <td>{{ mov.empleado|default:"-" }}</td>
                             <td>
                                 {% if mov.orden_servicio %}
-                                    <span class="badge bg-primary">OS-{{ mov.orden_servicio.pk }}</span>
+                                    <span class="badge bg-primary">{{ mov.orden_servicio.detalle_equipo.orden_cliente }}</span>
                                 {% elif mov.solicitud_baja %}
                                     <span class="badge bg-warning text-dark">Sol #{{ mov.solicitud_baja.pk }}</span>
                                 {% elif mov.compra %}

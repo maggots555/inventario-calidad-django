@@ -124,7 +124,7 @@
                             </td>
                             <td>
                                 {% if sol.orden_servicio %}
-                                    <span class="badge bg-primary">OS-{{ sol.orden_servicio.pk }}</span>
+                                    <span class="badge bg-primary">{{ sol.orden_servicio.detalle_equipo.orden_cliente }}</span>
                                 {% else %}
                                     <span class="text-muted">-</span>
                                 {% endif %}

@@ -149,7 +149,7 @@ Contexto esperado:
                             <th>Código</th>
                             <th>Producto</th>
                             <th>Marca / Modelo</th>
-                            <th>N° Serie</th>
+                            <th>Modelo Específico</th>
                             <th class="text-center">Estado</th>
                             <th class="text-center">Disponibilidad</th>
                             <th>Origen</th>
@@ -185,10 +185,16 @@ Contexto esperado:
                                 {% endif %}
                             </td>
                             <td>
-                                {% if unidad.numero_serie %}
-                                    <code class="small">{{ unidad.numero_serie|truncatechars:15 }}</code>
+                                {% if unidad.modelo %}
+                                    <span class="fw-medium">{{ unidad.modelo }}</span>
+                                    {% if unidad.numero_serie %}
+                                        <br><small class="text-muted">S/N: {{ unidad.numero_serie|truncatechars:15 }}</small>
+                                    {% endif %}
                                 {% else %}
-                                    <span class="text-muted">—</span>
+                                    <span class="text-muted">Sin modelo</span>
+                                    {% if unidad.numero_serie %}
+                                        <br><small class="text-muted">S/N: {{ unidad.numero_serie|truncatechars:15 }}</small>
+                                    {% endif %}
                                 {% endif %}
                             </td>
                             <td class="text-center">
