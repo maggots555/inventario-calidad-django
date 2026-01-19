@@ -23,7 +23,8 @@ from inventario import views as inventario_views
 from config.media_views import serve_media_from_multiple_locations
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Panel de administración (URL personalizada por seguridad)
+    path('sic-gestion-sistema/', admin.site.urls),
     
     # Autenticación
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),

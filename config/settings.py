@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'axes',  # Django-Axes: Protección contra ataques de fuerza bruta
     'inventario',
     'scorecard',  # Nueva app para Score Card de Calidad
     'servicio_tecnico',  # Nueva app para Gestión de Órdenes de Servicio Técnico
@@ -93,6 +94,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Django-Axes: Middleware para detectar y bloquear intentos de fuerza bruta
+    'axes.middleware.AxesMiddleware',
     # Middleware personalizado para forzar cambio de contraseña en primer login
     # DEBE estar después de AuthenticationMiddleware (para tener acceso a request.user)
     'inventario.middleware.ForcePasswordChangeMiddleware',
@@ -450,3 +453,35 @@ LOGGING = {
         'level': 'INFO',
     },
 }
+
+# ============================================================================
+# CONFIGURACIÓN DE DJANGO-AXES (Protección contra Fuerza Bruta)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Django-Axes protege tu aplicación bloqueando intentos repetidos de login
+# desde la misma IP o usuario después de cierto número de intentos fallidos.
+
+# Backend de autenticación - debe incluir AxesBackend
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesBackend',  # Django-Axes backend (DEBE ir primero)
+    'django.contrib.auth.backends.ModelBackend',  # Backend por defecto de Django
+]
+
+# Configuración de bloqueo
+AXES_FAILURE_LIMIT = 5  # Número de intentos fallidos antes de bloquear (5 intentos)
+AXES_COOLOFF_TIME = 1  # Tiempo de bloqueo en horas (1 hora)
+
+# Configuración actualizada (versión 8.1.0)
+# Bloquea por combinación de usuario + IP (más seguro que solo IP o solo usuario)
+AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]
+
+# Configuración de reset y limpieza
+AXES_RESET_ON_SUCCESS = True  # Reinicia contador después de login exitoso
+AXES_LOCKOUT_TEMPLATE = None  # Usa mensaje por defecto de Django (403 Forbidden)
+
+# Logging de intentos
+AXES_VERBOSE = True  # Registra intentos de acceso en logs
+
+# IP Whitelisting (opcional - descomentarlo si necesitas permitir IPs específicas)
+# AXES_NEVER_LOCKOUT_WHITELIST = True
+# AXES_IP_WHITELIST = ['127.0.0.1', '192.168.100.22']  # IPs que nunca se bloquean
