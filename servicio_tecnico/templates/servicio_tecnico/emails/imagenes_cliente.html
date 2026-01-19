@@ -259,6 +259,57 @@
             margin-top: 15px;
         }
         
+        .social-media {
+            margin: 20px 0;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+        
+        .social-title {
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+            text-align: center;
+        }
+        
+        .social-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            text-align: center;
+        }
+        
+        .social-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            text-decoration: none;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .social-link:hover {
+            background-color: rgba(255, 255, 255, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .social-icon {
+            font-size: 18px;
+        }
+        
         @media (max-width: 600px) {
             .container {
                 margin: 10px;
@@ -276,6 +327,27 @@
             .info-label {
                 min-width: auto;
                 margin-bottom: 5px;
+            }
+            
+            .social-media {
+                padding: 15px 5px;
+            }
+            
+            .social-links {
+                gap: 8px;
+                padding: 0 5px;
+            }
+            
+            .social-link {
+                padding: 6px 10px;
+                font-size: 11px;
+                gap: 6px;
+                flex: 0 1 auto;
+                min-width: 0;
+            }
+            
+            .social-icon {
+                font-size: 14px;
             }
         }
     </style>
@@ -344,18 +416,6 @@
                     </div>
                 </div>
                 {% endif %}
-                
-                {% if detalle.equipo_enciende %}
-                <div class="info-row">
-                    <div class="info-label">⚡ Estado al Ingreso:</div>
-                    <div class="info-value" style="color: #28a745;">Equipo enciende ✓</div>
-                </div>
-                {% else %}
-                <div class="info-row">
-                    <div class="info-label">⚡ Estado al Ingreso:</div>
-                    <div class="info-value" style="color: #dc3545;">Equipo no enciende ✗</div>
-                </div>
-                {% endif %}
             </div>
             
             {% if mensaje_personalizado %}
@@ -408,6 +468,24 @@
             
             <div class="company">SIC Comercialización y Servicios</div>
             <div style="font-size: 14px; opacity: 0.9;">México</div>
+            
+            <div class="social-media">
+                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+                <div class="social-links">
+                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
+                        <span class="social-icon">🌐</span>
+                        <span>Sitio Web</span>
+                    </a>
+                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                        <span class="social-icon">📷</span>
+                        <span>Instagram</span>
+                    </a>
+                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                        <span class="social-icon">👍</span>
+                        <span>Facebook</span>
+                    </a>
+                </div>
+            </div>
             
             <div class="timestamp">
                 📅 Enviado el {{ fecha_envio|date:"d/m/Y" }} a las {{ fecha_envio|date:"H:i" }}
