@@ -1,6 +1,12 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Cambiar Contraseña - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/cambiar-password.css' %}">
+    <link rel="stylesheet" href="{% static 'css/password-validation.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -66,7 +72,9 @@
                             <label for="{{ form.contraseña_temporal.id_for_label }}" class="form-label fw-bold">
                                 <i class="bi bi-key"></i> {{ form.contraseña_temporal.label }}
                             </label>
-                            {{ form.contraseña_temporal }}
+                            <div id="temporal-password-wrapper">
+                                {{ form.contraseña_temporal }}
+                            </div>
                             
                             {# Texto de ayuda #}
                             {% if form.contraseña_temporal.help_text %}
@@ -88,18 +96,21 @@
                         <hr class="my-4">
 
                         {# Campo: Nueva Contraseña #}
-                        <div class="mb-4">
+                        <div class="mb-4" id="new-password-container">
                             <label for="{{ form.nueva_contraseña.id_for_label }}" class="form-label fw-bold">
                                 <i class="bi bi-shield-check"></i> {{ form.nueva_contraseña.label }}
+                                <span class="password-tooltip ms-1">
+                                    <i class="bi bi-info-circle text-primary" 
+                                       data-bs-toggle="tooltip" 
+                                       data-bs-placement="top" 
+                                       title="Usa una combinación de letras, números y símbolos. Evita información personal.">
+                                    </i>
+                                </span>
                             </label>
-                            {{ form.nueva_contraseña }}
-                            
-                            {# Texto de ayuda #}
-                            {% if form.nueva_contraseña.help_text %}
-                                <div class="form-text">
-                                    <i class="bi bi-lightbulb"></i> {{ form.nueva_contraseña.help_text }}
-                                </div>
-                            {% endif %}
+                            <div id="new-password-wrapper">
+                                {{ form.nueva_contraseña }}
+                            </div>
+                            {# El indicador de fortaleza y checklist se agregan dinámicamente con TypeScript #}
                             
                             {# Errores del campo #}
                             {% if form.nueva_contraseña.errors %}
@@ -112,18 +123,14 @@
                         </div>
 
                         {# Campo: Confirmar Nueva Contraseña #}
-                        <div class="mb-4">
+                        <div class="mb-4" id="confirm-password-container">
                             <label for="{{ form.confirmar_contraseña.id_for_label }}" class="form-label fw-bold">
                                 <i class="bi bi-shield-check"></i> {{ form.confirmar_contraseña.label }}
                             </label>
-                            {{ form.confirmar_contraseña }}
-                            
-                            {# Texto de ayuda #}
-                            {% if form.confirmar_contraseña.help_text %}
-                                <div class="form-text">
-                                    <i class="bi bi-lightbulb"></i> {{ form.confirmar_contraseña.help_text }}
-                                </div>
-                            {% endif %}
+                            <div id="confirm-password-wrapper">
+                                {{ form.confirmar_contraseña }}
+                            </div>
+                            {# El feedback de coincidencia se agrega dinámicamente con TypeScript #}
                             
                             {# Errores del campo #}
                             {% if form.confirmar_contraseña.errors %}
@@ -164,77 +171,21 @@
                             Tu contraseña será encriptada y almacenada de forma segura.
                             <br>
                             Nunca compartas tu contraseña con nadie.
-                        </p>
-                    </div>
-                </div>
-            </div>
+{% endblock %}
 
-            {# Información adicional (opcional) #}
-            <div class="text-center mt-4">
-                <p class="text-muted">
-                    <i class="bi bi-question-circle"></i>
-                    ¿Problemas para acceder? Contacta al administrador del sistema.
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
-
-{# CSS personalizado para este template #}
-<style>
-    /* Estilo para los campos de contraseña con icono */
-    .form-control:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-    }
+{% block extra_js %}
+    {# Cargar el script TypeScript compilado para validación de contraseñas #}
+    <script src="{% static 'js/password-validator.js' %}"></script>
     
-    /* Animación suave para las alertas */
-    .alert {
-        animation: slideDown 0.3s ease-out;
-    }
-    
-    @keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    /* Estilo para el card */
-    .card {
-        border-radius: 15px;
-        overflow: hidden;
-    }
-    
-    /* Mejora visual de los botones */
-    .btn-primary {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border: none;
-        transition: all 0.3s ease;
-    }
-    
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-    }
-</style>
-
-{# JavaScript para validación del formulario (opcional) #}
-<script>
-    // Validación HTML5 mejorada
-    (function() {
-        'use strict';
-        var forms = document.querySelectorAll('.needs-validation');
-        Array.prototype.slice.call(forms).forEach(function(form) {
-            form.addEventListener('submit', function(event) {
-                if (!form.checkValidity()) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }
+    {# Inicializar tooltips de Bootstrap #}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+                    }
                 form.classList.add('was-validated');
             }, false);
         });

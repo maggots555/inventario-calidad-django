@@ -175,8 +175,9 @@ def enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=Fals
             'contraseña_temporal': contraseña_temporal,
             'usuario': empleado.email,
             'es_reenvio': es_reenvio,
-            'nombre_sistema': 'Sistema Integral de Gestión',
-            'url_login': f'http://{host}:8000/login/',
+            'nombre_sistema': 'Sistema Integral de Gestión SIGMA',
+            'url_login': 'https://sigmasystem.work/login/',
+            'url_sistema': 'https://sigmasystem.work',
         }
         
         # Renderizar template HTML del email
@@ -193,11 +194,14 @@ def enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=Fals
         print(f"  - Usuario SMTP: {settings.EMAIL_HOST_USER}")
         print(f"  - Remitente: {settings.DEFAULT_FROM_EMAIL}")
         
+        # Remitente personalizado para este correo específico
+        from_email_personalizado = f'SIGMA <{settings.EMAIL_HOST_USER}>'
+        
         # Enviar email usando configuración SMTP de settings.py
         send_mail(
             subject=asunto,
             message=plain_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=from_email_personalizado,
             recipient_list=[empleado.email],
             html_message=html_message,
             fail_silently=False,  # Lanza excepción si hay error (para detectarlo)
@@ -266,7 +270,8 @@ def validar_email_empleado(email, empleado_actual=None):
     
     if empleados_con_email.exists():
         empleado_existente = empleados_con_email.first()
-        return False, f"Este email ya está siendo usado por {empleado_existente.nombre_completo}"
+        nombre = empleado_existente.nombre_completo if empleado_existente else "otro empleado"
+        return False, f"Este email ya está siendo usado por {nombre}"
     
     # Verificar si hay un User con ese email (sin Empleado asociado)
     if User.objects.filter(email=email).exists():
