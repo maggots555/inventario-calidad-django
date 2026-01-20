@@ -405,17 +405,19 @@
                     <div class="info-value">{{ orden.fecha_ingreso|date:"d/m/Y H:i" }}</div>
                 </div>
                 
-                {% if detalle.tiene_cargador %}
                 <div class="info-row">
                     <div class="info-label">🔌 Cargador:</div>
                     <div class="info-value">
-                        Incluido
-                        {% if detalle.numero_serie_cargador %}
-                            (S/N: {{ detalle.numero_serie_cargador }})
+                        {% if detalle.tiene_cargador %}
+                            ✅ Incluido
+                            {% if detalle.numero_serie_cargador %}
+                                (S/N: {{ detalle.numero_serie_cargador }})
+                            {% endif %}
+                        {% else %}
+                            ❌ No incluido
                         {% endif %}
                     </div>
                 </div>
-                {% endif %}
             </div>
             
             {% if mensaje_personalizado %}
