@@ -202,6 +202,59 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
           </a>
         </div>
       </div>
+
+      <!-- ============================================================ -->
+      <!-- MÓDULO 4: ALMACÉN CENTRAL                                    -->
+      <!-- ============================================================ -->
+      <div
+        class="module-card almacen"
+        onclick="window.location.href='{% url 'almacen:dashboard' %}'"
+      >
+        <div class="module-content">
+          <!-- Ícono representativo del módulo -->
+          <div class="module-icon">
+            <img
+              src="{% static 'images/utilitys/icon_dashboard_principal_almacen.svg' %}"
+              alt="icono de almacen central"
+              style="width: 100%; height: 100%; object-fit: contain"
+            />
+          </div>
+
+          <!-- Título del módulo -->
+          <h2 class="module-title tiktok-sans-regular">Almacén Central</h2>
+
+          <!-- Descripción breve -->
+          <p class="module-description tiktok-sans-regular">
+            Gestiona el centro de suministros, compras directas y cotizaciones multi-proveedor
+          </p>
+
+          <!-- Estadísticas clave del módulo -->
+          <div class="module-stats">
+            <div class="stat-item">
+              <span class="stat-number">{{ total_almacen }}</span>
+              <span class="stat-label">Modelos</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">{{ compras_pendientes }}</span>
+              <span class="stat-label">Compras/Cotiz.</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">{{ bajas_pendientes }}</span>
+              <span class="stat-label">Bajas Pend.</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">${{ valor_almacen|floatformat:0 }}</span>
+              <span class="stat-label">Valor Stock</span>
+            </div>
+          </div>
+
+          <!-- Botón de acción -->
+          <a href="{% url 'almacen:dashboard' %}" class="module-button">
+            <span>Abrir Almacén Central</span>
+            <i class="fas fa-arrow-right"></i>
+          </a>
+        </div>
+      </div>
     </div>
 
     <!-- ================================================================ -->
@@ -215,7 +268,8 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
           Cada módulo cuenta con su propio dashboard especializado. Puedes
           acceder a la configuración del sistema desde
           <a href="{% url 'lista_sucursales' %}">Sucursales</a>,
-          <a href="{% url 'lista_empleados' %}">Empleados</a> o
+          <a href="{% url 'lista_empleados' %}">Empleados</a>,
+          <a href="{% url 'almacen:lista_proveedores' %}">Proveedores</a> o
           <a href="/admin/">Administración</a>.
         </p>
       </div>
@@ -261,6 +315,12 @@ Este script agrega funcionalidades adicionales:
         e.preventDefault();
         window.location.href = "{% url 'servicio_tecnico:inicio' %}";
       }
+
+      // Tecla "4" = Almacén Central
+      if (e.key === "4") {
+        e.preventDefault();
+        window.location.href = "{% url 'almacen:dashboard' %}";
+      }
     });
 
     // ========================================================================
@@ -297,6 +357,10 @@ Este script agrega funcionalidades adicionales:
     console.log(
       '%c  • Presiona "3" para Servicio Técnico',
       "color: #F59E0B; font-size: 12px;"
+    );
+    console.log(
+      '%c  • Presiona "4" para Almacén Central',
+      "color: #8B5CF6; font-size: 12px;"
     );
   });
 </script>

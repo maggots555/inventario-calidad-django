@@ -51,6 +51,12 @@ try:
 except ImportError:
     SCORECARD_AVAILABLE = False
 
+try:
+    from almacen.models import ProductoAlmacen, CompraProducto, SolicitudBaja
+    ALMACEN_AVAILABLE = True
+except ImportError:
+    ALMACEN_AVAILABLE = False
+
 # Función auxiliar para convertir fechas a zona horaria local
 def fecha_local(fecha_utc):
     """
@@ -137,6 +143,31 @@ def dashboard_principal(request):
         ordenes_completadas = OrdenServicio.objects.filter(
             estado__in=['finalizado', 'entregado']
         ).count()
+
+    # ========== ESTADÍSTICAS DE ALMACÉN CENTRAL ==========
+    total_almacen = 0
+    compras_pendientes = 0
+    bajas_pendientes = 0
+    valor_almacen = 0
+
+    if ALMACEN_AVAILABLE:
+        # Total de productos en catálogo de almacén
+        total_almacen = ProductoAlmacen.objects.filter(activo=True).count()
+        
+        # Compras o cotizaciones que requieren atención
+        compras_pendientes = CompraProducto.objects.filter(
+            estado__in=['cotizacion', 'pendiente_llegada']
+        ).count()
+        
+        # Solicitudes de baja esperando aprobación
+        bajas_pendientes = SolicitudBaja.objects.filter(
+            estado='pendiente_aprobacion'
+        ).count()
+        
+        # Valor total estimado del stock en almacén central
+        valor_almacen = ProductoAlmacen.objects.filter(activo=True).aggregate(
+            total=Sum(F('stock_actual') * F('costo_unitario'))
+        )['total'] or 0
     
     # ========== ACTIVIDADES RECIENTES ==========
     # Últimos 5 movimientos
@@ -174,6 +205,13 @@ def dashboard_principal(request):
         'ordenes_hoy': ordenes_hoy,
         'ordenes_completadas': ordenes_completadas,
         'servicio_tecnico_disponible': SERVICIO_TECNICO_AVAILABLE,
+
+        # Almacén Central
+        'total_almacen': total_almacen,
+        'compras_pendientes': compras_pendientes,
+        'bajas_pendientes': bajas_pendientes,
+        'valor_almacen': valor_almacen,
+        'almacen_disponible': ALMACEN_AVAILABLE,
         
         # General
         'total_sucursales': total_sucursales,

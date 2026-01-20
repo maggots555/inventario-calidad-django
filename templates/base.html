@@ -80,7 +80,12 @@
                     </div>
                     <div class="navbar-brand-text">
                         <h1>Sistema Integral de Gestión</h1>
-                        <span>Inventario • Scorecard • Servicio Técnico • Almacén</span>
+                        <span>
+                            <i class="bi bi-box-seam"></i> Inventario • 
+                            <i class="bi bi-shield-check"></i> Scorecard • 
+                            <i class="bi bi-tools"></i> Servicio Técnico • 
+                            <i class="bi bi-box-seam-fill"></i> Almacén
+                        </span>
                     </div>
                 </a>
             </div>
@@ -720,7 +725,12 @@
                         </div>
                         <div class="footer-brand-text">
                             <h5>Sistema Integral de Gestión</h5>
-                            <p>Inventario • Scorecard • Servicio Técnico</p>
+                            <p>
+                                <i class="bi bi-box-seam"></i> Inventario • 
+                                <i class="bi bi-shield-check"></i> Scorecard • 
+                                <i class="bi bi-tools"></i> Servicio Técnico • 
+                                <i class="bi bi-box-seam-fill"></i> Almacén
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -748,6 +758,11 @@
                             <li>
                                 <a href="{% url 'servicio_tecnico:inicio' %}">
                                     <i class="bi bi-tools"></i> Servicio Técnico
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'almacen:dashboard' %}">
+                                    <i class="bi bi-box-seam-fill"></i> Almacén Central
                                 </a>
                             </li>
                             <li>

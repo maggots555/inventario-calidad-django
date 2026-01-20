@@ -32,6 +32,10 @@ CARACTERÍSTICAS:
     --color-servicio: #F59E0B;          /* Ámbar energético */
     --color-servicio-light: #FBBF24;
     --color-servicio-dark: #D97706;
+
+    --color-almacen: #8B5CF6;           /* Violeta profesional */
+    --color-almacen-light: #A78BFA;
+    --color-almacen-dark: #6D28D9;
     
     /* Colores neutrales */
     --color-bg-light: #F9FAFB;
@@ -87,15 +91,15 @@ CARACTERÍSTICAS:
 }
 
 .hero-title {
-    font-size: 3rem;
+    font-size: 2.5rem;
     font-weight: 800;
     color: var(--color-text-dark);
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
     letter-spacing: -0.02em;
 }
 
 .hero-subtitle {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     color: var(--color-text-gray);
     font-weight: 400;
     max-width: 600px;
@@ -103,12 +107,12 @@ CARACTERÍSTICAS:
 }
 
 /* ============================================================================
-   CONTENEDOR DE MÓDULOS - Grid de 3 columnas
+   CONTENEDOR DE MÓDULOS - Grid adaptativo
    ============================================================================ */
 .modules-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
     margin-bottom: 3rem;
     animation: fadeInUp 0.8s ease-out 0.2s backwards;
 }
@@ -119,7 +123,7 @@ CARACTERÍSTICAS:
 .module-card {
     background: var(--color-bg-white);
     border-radius: 24px;
-    padding: 2.5rem;
+    padding: 1.75rem;
     box-shadow: var(--shadow-md);
     transition: all var(--transition-normal);
     cursor: pointer;
@@ -164,6 +168,10 @@ CARACTERÍSTICAS:
     border-color: var(--color-servicio-light);
 }
 
+.module-card.almacen:hover {
+    border-color: var(--color-almacen-light);
+}
+
 /* ============================================================================
    CONTENIDO DEL MODULE CARD
    ============================================================================ */
@@ -177,10 +185,10 @@ CARACTERÍSTICAS:
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
-    border-radius: 16px;
-    margin-bottom: 1.5rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    margin-bottom: 1.25rem;
     box-shadow: transparent;
     transition: all var(--transition-normal);
 }
@@ -198,6 +206,11 @@ CARACTERÍSTICAS:
 .module-card.servicio .module-icon {
     background: transparent;
     animation: iconSwing 1.5s ease-in-out infinite; /* Balanceo */
+}
+
+.module-card.almacen .module-icon {
+    background: transparent;
+    animation: iconZoom 2.5s ease-in-out infinite; /* Zoom suave */
 }
 
 /* Animaciones al hover - Específicas por módulo */
@@ -224,7 +237,7 @@ CARACTERÍSTICAS:
 
 /* Título del módulo */
 .module-title {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--color-text-dark);
     margin-bottom: 0.75rem;
@@ -232,10 +245,11 @@ CARACTERÍSTICAS:
 
 /* Descripción del módulo */
 .module-description {
-    font-size: 1rem;
+    font-size: 0.9rem;
     color: var(--color-text-gray);
-    line-height: 1.6;
+    line-height: 1.5;
     margin-bottom: 1.5rem;
+    min-height: 3.2em; /* Mantener altura uniforme */
 }
 
 /* ============================================================================
@@ -263,7 +277,7 @@ CARACTERÍSTICAS:
 
 .stat-number {
     display: block;
-    font-size: 1.75rem;
+    font-size: 1.4rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
 }
@@ -280,11 +294,16 @@ CARACTERÍSTICAS:
     color: var(--color-servicio);
 }
 
+.module-card.almacen .stat-number {
+    color: var(--color-almacen);
+}
+
 .stat-label {
     display: block;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: var(--color-text-gray);
-    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
 }
 
 /* ============================================================================
@@ -296,8 +315,8 @@ CARACTERÍSTICAS:
     justify-content: center;
     gap: 0.75rem;
     width: 100%;
-    padding: 1rem 2rem;
-    font-size: 1.125rem;
+    padding: 0.85rem 1.5rem;
+    font-size: 1rem;
     font-weight: 600;
     color: white;
     text-decoration: none;
@@ -317,6 +336,10 @@ CARACTERÍSTICAS:
 
 .module-card.servicio .module-button {
     background: linear-gradient(135deg, var(--color-servicio) 0%, var(--color-servicio-dark) 100%);
+}
+
+.module-card.almacen .module-button {
+    background: linear-gradient(135deg, var(--color-almacen) 0%, var(--color-almacen-dark) 100%);
 }
 
 .module-button:hover {
@@ -512,6 +535,16 @@ CARACTERÍSTICAS:
     }
     50% {
         filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6));
+    }
+}
+
+/* ALMACEN - Zoom */
+@keyframes iconZoom {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
     }
 }
 
