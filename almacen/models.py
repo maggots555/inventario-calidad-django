@@ -1590,10 +1590,10 @@ class MovimientoAlmacen(models.Model):
     
     # ========== TIPO DE MOVIMIENTO ==========
     tipo = models.CharField(
-        max_length=10,
+        max_length=15,  # Incrementado para 'transferencia' (13 chars)
         choices=TIPO_MOVIMIENTO_ALMACEN_CHOICES,
         verbose_name='Tipo de Movimiento',
-        help_text='Entrada: suma al stock. Salida: resta del stock.'
+        help_text='Entrada: suma al stock. Salida: resta del stock. Transferencia: no afecta stock.'
     )
     
     # ========== PRODUCTO ==========
@@ -1688,7 +1688,12 @@ class MovimientoAlmacen(models.Model):
         ]
     
     def __str__(self):
-        tipo_icon = '📥' if self.tipo == 'entrada' else '📤'
+        tipo_icons = {
+            'entrada': '📥',
+            'salida': '📤',
+            'transferencia': '🔄'
+        }
+        tipo_icon = tipo_icons.get(self.tipo, '📦')
         return f"{tipo_icon} {self.producto.codigo_producto} ({self.cantidad}) - {self.fecha.strftime('%d/%m/%Y %H:%M')}"
     
     def costo_total(self):
@@ -1701,23 +1706,27 @@ class MovimientoAlmacen(models.Model):
         
         IMPORTANTE: Solo se actualiza el stock en CREACIÓN (no en edición).
         Si necesitas corregir un movimiento, debes crear uno nuevo.
+        
+        ACTUALIZADO (Enero 2026):
+        - Las transferencias NO afectan el stock total (solo cambian ubicación)
         """
         # Solo actualizar stock en creación (no tiene pk aún)
         if not self.pk:
             # Guardar stock anterior
             self.stock_anterior = self.producto.stock_actual
             
-            # Calcular nuevo stock
-            if self.tipo == 'entrada':
+            # Calcular nuevo stock (SOLO si NO es transferencia)
+            if self.tipo == 'transferencia':
+                # Transferencia: stock se mantiene igual (solo cambia ubicación)
+                self.stock_posterior = self.producto.stock_actual
+            elif self.tipo == 'entrada':
                 self.producto.stock_actual += self.cantidad
+                self.stock_posterior = self.producto.stock_actual
+                self.producto.save(update_fields=['stock_actual', 'fecha_actualizacion'])
             else:  # salida
                 self.producto.stock_actual -= self.cantidad
-            
-            # Guardar stock posterior
-            self.stock_posterior = self.producto.stock_actual
-            
-            # Guardar el producto con el nuevo stock
-            self.producto.save(update_fields=['stock_actual', 'fecha_actualizacion'])
+                self.stock_posterior = self.producto.stock_actual
+                self.producto.save(update_fields=['stock_actual', 'fecha_actualizacion'])
         
         super().save(*args, **kwargs)
 
@@ -1808,6 +1817,17 @@ class SolicitudBaja(models.Model):
         related_name='solicitudes_tecnico_asignado',
         verbose_name='Técnico Asignado',
         help_text='Técnico de laboratorio que utilizará el producto (obligatorio para Servicio Técnico)'
+    )
+    
+    # ========== TRANSFERENCIA ENTRE SUCURSALES ==========
+    sucursal_destino = models.ForeignKey(
+        'inventario.Sucursal',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transferencias_entrantes',
+        verbose_name='Sucursal Destino',
+        help_text='Solo para transferencias: sucursal a donde se enviará el producto'
     )
     
     # ========== SOLICITANTE ==========
@@ -1906,29 +1926,41 @@ class SolicitudBaja(models.Model):
         ACTUALIZADO (Enero 2026):
         - Prioriza unidades_seleccionadas (ManyToMany) para trazabilidad 100%
         - Fallback a lógica antigua si no hay unidades seleccionadas
+        - Transferencias: NO descuentan stock, mantienen disponibilidad
         """
         self.estado = 'aprobada'
         self.agente_almacen = agente
         self.fecha_procesado = timezone.now()
         self.observaciones_agente = observaciones
         
-        # Verificar si requiere reposición después de esta salida
-        stock_futuro = self.producto.stock_actual - self.cantidad
-        if self.producto.tipo_producto == 'resurtible':
-            self.requiere_reposicion = stock_futuro <= self.producto.stock_minimo
+        # ========== LÓGICA DIFERENCIADA: TRANSFERENCIA vs SALIDA NORMAL ==========
+        es_transferencia = (self.tipo_solicitud == 'transferencia')
+        
+        # Verificar si requiere reposición (SOLO para salidas normales)
+        if not es_transferencia:
+            stock_futuro = self.producto.stock_actual - self.cantidad
+            if self.producto.tipo_producto == 'resurtible':
+                self.requiere_reposicion = stock_futuro <= self.producto.stock_minimo
         
         self.save()
         
-        # ========== MARCAR UNIDADES COMO ASIGNADAS ==========
+        # ========== MARCAR UNIDADES ==========
         # PRIORIDAD: Usar unidades_seleccionadas (ManyToMany) - NUEVA LÓGICA
         unidades_a_marcar = list(self.unidades_seleccionadas.all())
         
         if unidades_a_marcar:
             # ✅ Hay unidades seleccionadas específicamente (nuevo flujo)
             for unidad in unidades_a_marcar:
-                unidad.disponibilidad = 'asignada'
-                if self.orden_servicio:
-                    unidad.orden_servicio_destino = self.orden_servicio
+                # TRANSFERENCIA: Mantener disponible y cambiar sucursal
+                # SALIDA NORMAL: Marcar como asignada
+                if es_transferencia:
+                    unidad.disponibilidad = 'disponible'  # Se mantiene disponible
+                    unidad.sucursal_actual = self.sucursal_destino
+                else:
+                    unidad.disponibilidad = 'asignada'
+                    if self.orden_servicio:
+                        unidad.orden_servicio_destino = self.orden_servicio
+                
                 unidad.save()
         else:
             # ⚠️ FALLBACK: Lógica antigua para compatibilidad con solicitudes viejas
@@ -1955,21 +1987,39 @@ class SolicitudBaja(models.Model):
             
             # Marcar todas las unidades seleccionadas como asignadas
             for unidad in unidades_a_marcar:
-                unidad.disponibilidad = 'asignada'
-                if self.orden_servicio:
-                    unidad.orden_servicio_destino = self.orden_servicio
+                # TRANSFERENCIA: Mantener disponible y cambiar sucursal
+                # SALIDA NORMAL: Marcar como asignada
+                if es_transferencia:
+                    unidad.disponibilidad = 'disponible'  # Se mantiene disponible
+                    unidad.sucursal_actual = self.sucursal_destino
+                else:
+                    unidad.disponibilidad = 'asignada'
+                    if self.orden_servicio:
+                        unidad.orden_servicio_destino = self.orden_servicio
+                
                 unidad.save()
         
-        # Crear movimiento de salida
+        # ========== CREAR MOVIMIENTO ==========
+        # TRANSFERENCIA: tipo='transferencia' (no afecta stock)
+        # SALIDA NORMAL: tipo='salida' (descuenta stock)
+        tipo_movimiento = 'transferencia' if es_transferencia else 'salida'
+        
+        # Construir observaciones del movimiento
+        obs_movimiento = observaciones if observaciones else ''
+        if es_transferencia and self.sucursal_destino:
+            obs_movimiento = f"Transferencia a {self.sucursal_destino.nombre}. {obs_movimiento}"
+        else:
+            obs_movimiento = f"Solicitud aprobada: {obs_movimiento}"
+        
         movimiento = MovimientoAlmacen.objects.create(
-            tipo='salida',
+            tipo=tipo_movimiento,
             producto=self.producto,
             cantidad=self.cantidad,
             costo_unitario=self.producto.costo_unitario,
             empleado=agente,
             orden_servicio=self.orden_servicio,
             solicitud_baja=self,
-            observaciones=f"Solicitud aprobada: {observaciones}"
+            observaciones=obs_movimiento
         )
         
         return movimiento
@@ -2397,11 +2447,20 @@ class UnidadInventario(models.Model):
     )
     
     # ========== UBICACIÓN ==========
+    sucursal_actual = models.ForeignKey(
+        'inventario.Sucursal',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='unidades_almacenadas',
+        verbose_name='Sucursal Actual',
+        help_text='Sucursal donde está esta unidad. Vacío = Almacén Central'
+    )
     ubicacion_especifica = models.CharField(
         max_length=50,
         blank=True,
         verbose_name='Ubicación Específica',
-        help_text='Ubicación exacta dentro del almacén (ej: Caja A-3)'
+        help_text='Ubicación exacta dentro del almacén (ej: Caja A-3, Estante 5)'
     )
     
     # ========== NOTAS ==========

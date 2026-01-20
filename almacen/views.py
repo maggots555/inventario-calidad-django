@@ -483,17 +483,56 @@ def detalle_producto(request, pk):
     
     Incluye:
     - Información general
-    - Estado del stock
+    - Estado del stock (total y distribución por sucursal)
     - Historial de movimientos
     - Historial de compras
     - Órdenes de servicio vinculadas
+    
+    ACTUALIZADO (Enero 2026): Agregada distribución por sucursal
     """
+    from inventario.models import Sucursal
+    from django.db.models import Count
+    
     producto = get_object_or_404(
         ProductoAlmacen.objects.select_related(
             'categoria', 'proveedor_principal', 'sucursal', 'creado_por'
         ),
         pk=pk
     )
+    
+    # ========== DISTRIBUCIÓN POR SUCURSAL (NUEVO - Enero 2026) ==========
+    # EXPLICACIÓN: Solo contamos unidades DISPONIBLES (no asignadas ni vendidas)
+    # Cuando se aprueba una solicitud de servicio, la disponibilidad cambia a 'asignada'
+    # y automáticamente se descuenta del conteo de la sucursal
+    distribucion_sucursales = []
+    
+    # Almacén Central (unidades sin sucursal asignada)
+    central_count = producto.unidades.filter(
+        sucursal_actual__isnull=True,
+        disponibilidad='disponible'  # Solo disponibles
+    ).count()
+    
+    if central_count > 0:
+        distribucion_sucursales.append({
+            'nombre': 'Almacén Central',
+            'codigo': 'central',
+            'cantidad': central_count,
+            'es_central': True
+        })
+    
+    # Sucursales activas con unidades disponibles
+    for sucursal in Sucursal.objects.filter(activa=True).annotate(
+        cantidad_unidades=Count('unidades_almacenadas', 
+                                filter=Q(unidades_almacenadas__producto=producto,
+                                       unidades_almacenadas__disponibilidad='disponible'))  # Solo disponibles
+    ):
+        if sucursal.cantidad_unidades > 0:
+            distribucion_sucursales.append({
+                'nombre': sucursal.nombre,
+                'codigo': sucursal.codigo,
+                'cantidad': sucursal.cantidad_unidades,
+                'es_central': False
+            })
     
     # Últimos movimientos
     movimientos = producto.movimientos.select_related(
@@ -524,6 +563,7 @@ def detalle_producto(request, pk):
     
     context = {
         'producto': producto,
+        'distribucion_sucursales': distribucion_sucursales,  # NUEVO
         'movimientos': movimientos,
         'compras': compras,
         'stats_compras': stats_compras,
@@ -582,27 +622,48 @@ def crear_solicitud(request):
     """
     Crea una nueva solicitud de baja.
     
-    ACTUALIZADO (Enero 2026): Procesa unidades seleccionadas del formulario
+    ACTUALIZADO (Enero 2026): 
+    - Procesa unidades seleccionadas del formulario
+    - Valida que el empleado tenga sucursal asignada
+    - Filtra unidades por sucursal (empleados normales) o muestra todas (agentes)
     """
+    # Obtener empleado del usuario actual
+    try:
+        empleado = Empleado.objects.get(user=request.user)
+    except Empleado.DoesNotExist:
+        messages.error(
+            request, 
+            'No tienes un perfil de empleado asociado. Contacta al administrador.'
+        )
+        return redirect('almacen:dashboard_almacen')
+    
+    # ========== VALIDACIÓN: Empleado debe tener sucursal asignada (NUEVO) ==========
+    # Solo se exige para empleados normales, agentes de almacén pueden no tenerla
+    es_agente_almacen = request.user.is_staff
+    
+    if not es_agente_almacen and not empleado.sucursal:
+        messages.error(
+            request,
+            'Tu perfil no tiene una sucursal asignada. '
+            'No puedes crear solicitudes hasta que un administrador te asigne una sucursal. '
+            'Por favor, contacta al departamento de sistemas.'
+        )
+        return redirect('almacen:dashboard_almacen')
+    
     if request.method == 'POST':
-        form = SolicitudBajaForm(request.POST)
+        # Pasar parámetros extras al formulario
+        form = SolicitudBajaForm(
+            request.POST,
+            empleado_actual=empleado,
+            es_agente_almacen=es_agente_almacen
+        )
+        
         if form.is_valid():
             solicitud = form.save(commit=False)
-            
-            # Obtener empleado del usuario actual
-            try:
-                empleado = Empleado.objects.get(user=request.user)
-                solicitud.solicitante = empleado
-            except Empleado.DoesNotExist:
-                messages.error(
-                    request, 
-                    'No tienes un perfil de empleado asociado. Contacta al administrador.'
-                )
-                return redirect('almacen:lista_solicitudes')
-            
+            solicitud.solicitante = empleado
             solicitud.save()
             
-            # ========== GUARDAR UNIDADES SELECCIONADAS (NUEVO) ==========
+            # ========== GUARDAR UNIDADES SELECCIONADAS ==========
             # Obtener IDs de unidades seleccionadas del formulario validado
             unidades_ids = form.cleaned_data.get('unidades_ids', [])
             
@@ -617,11 +678,17 @@ def crear_solicitud(request):
             messages.success(request, 'Solicitud creada correctamente.')
             return redirect('almacen:lista_solicitudes')
     else:
-        form = SolicitudBajaForm()
+        # Pasar parámetros extras al formulario vacío
+        form = SolicitudBajaForm(
+            empleado_actual=empleado,
+            es_agente_almacen=es_agente_almacen
+        )
     
     context = {
         'form': form,
         'titulo': 'Nueva Solicitud de Baja',
+        'empleado': empleado,
+        'es_agente_almacen': es_agente_almacen,
     }
     
     return render(request, 'almacen/solicitudes/form_solicitud.html', context)
@@ -877,6 +944,7 @@ def lista_unidades(request):
         'compra',
         'orden_servicio_origen',
         'orden_servicio_destino',
+        'sucursal_actual',  # NUEVO: Para mostrar ubicación
     ).order_by('-fecha_registro')
     
     # Procesar filtros
@@ -919,6 +987,49 @@ def lista_unidades(request):
                 Q(notas__icontains=buscar)
             )
     
+    # ========== FILTRO POR SUCURSAL (NUEVO) ==========
+    from inventario.models import Sucursal
+    sucursal_filtro = request.GET.get('sucursal', '')
+    
+    if sucursal_filtro == 'central':
+        unidades = unidades.filter(sucursal_actual__isnull=True)
+    elif sucursal_filtro:
+        try:
+            unidades = unidades.filter(sucursal_actual_id=int(sucursal_filtro))
+        except (ValueError, TypeError):
+            pass
+    
+    # Contadores por sucursal (para pestañas)
+    # IMPORTANTE: Solo contamos unidades con disponibilidad='disponible'
+    # Las asignadas, vendidas o descartadas NO deben aparecer en los contadores
+    from django.db.models import Count
+    resumen_sucursales = []
+    
+    # Almacén Central (solo disponibles)
+    central_count = UnidadInventario.objects.filter(
+        sucursal_actual__isnull=True,
+        disponibilidad='disponible'  # Solo unidades disponibles
+    ).count()
+    resumen_sucursales.append({
+        'codigo': 'central',
+        'nombre': 'Almacén Central',
+        'count': central_count
+    })
+    
+    # Sucursales (solo disponibles)
+    for sucursal in Sucursal.objects.filter(activa=True):
+        # Contar solo unidades disponibles en esta sucursal
+        sucursal_count = UnidadInventario.objects.filter(
+            sucursal_actual=sucursal,
+            disponibilidad='disponible'
+        ).count()
+        
+        resumen_sucursales.append({
+            'codigo': str(sucursal.id),
+            'nombre': sucursal.nombre,
+            'count': sucursal_count
+        })
+    
     # Contadores para resumen
     total_unidades = unidades.count()
     unidades_disponibles = unidades.filter(disponibilidad='disponible').count()
@@ -937,6 +1048,8 @@ def lista_unidades(request):
         'unidades_disponibles': unidades_disponibles,
         'unidades_para_revision': unidades_para_revision,
         'unidades_defectuosas': unidades_defectuosas,
+        'resumen_sucursales': resumen_sucursales,  # NUEVO
+        'sucursal_filtro': sucursal_filtro,  # NUEVO
         'titulo': 'Unidades de Inventario',
     }
     
@@ -1390,6 +1503,10 @@ def api_unidades_producto(request):
     Ahora retorna las unidades AGRUPADAS por marca/modelo/estado para
     una mejor visualización en el formulario (similar a unidades_por_producto.html)
     
+    FILTRADO POR SUCURSAL (Enero 2026):
+    - Empleados normales: Solo ven unidades de su sucursal
+    - Agentes de almacén (is_staff): Ven todas las unidades
+    
     Parámetros GET:
     - producto_id: ID del ProductoAlmacen
     
@@ -1410,13 +1527,35 @@ def api_unidades_producto(request):
         })
     
     try:
+        # ========== OBTENER EMPLEADO Y VERIFICAR PERMISOS (NUEVO - Enero 2026) ==========
+        try:
+            empleado = Empleado.objects.get(user=request.user)
+        except Empleado.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'No tienes un perfil de empleado asociado',
+                'unidades': [],
+                'grupos': [],
+                'stock_info': ''
+            })
+        
+        es_agente_almacen = request.user.is_staff
+        
         producto = ProductoAlmacen.objects.get(pk=producto_id)
         
-        # Obtener unidades disponibles
+        # Obtener unidades disponibles (con sucursal_actual para filtrado)
         unidades = UnidadInventario.objects.filter(
             producto_id=producto_id,
             disponibilidad='disponible'
-        ).order_by('marca', 'modelo', 'estado', 'fecha_registro')
+        ).select_related('sucursal_actual')
+        
+        # ========== FILTRADO POR SUCURSAL DEL EMPLEADO (NUEVO - Enero 2026) ==========
+        # Si NO es agente de almacén Y tiene sucursal asignada, filtrar por su sucursal
+        if not es_agente_almacen and empleado.sucursal:
+            unidades = unidades.filter(sucursal_actual=empleado.sucursal)
+        
+        # Ordenar después del filtrado
+        unidades = unidades.order_by('marca', 'modelo', 'estado', 'fecha_registro')
         
         # Construir lista plana de unidades (para compatibilidad)
         unidades_data = []
@@ -1456,6 +1595,11 @@ def api_unidades_producto(request):
                 'costo_unitario': float(u.costo_unitario or 0),
                 'tiene_solicitud_pendiente': tiene_solicitud_pendiente,  # NUEVO
                 'solicitud_pendiente': solicitud_pendiente,  # NUEVO
+                # Información de sucursal (Enero 2026)
+                'sucursal_actual': {
+                    'codigo': u.sucursal_actual.codigo,
+                    'nombre': u.sucursal_actual.nombre,
+                } if u.sucursal_actual else None,
             })
         
         # ========== AGRUPACIÓN DE UNIDADES ==========
@@ -1498,6 +1642,11 @@ def api_unidades_producto(request):
                     'origen_display': u.get_origen_display(),
                     'tiene_solicitud_pendiente': tiene_solicitud_pendiente,  # NUEVO
                     'solicitud_pendiente': solicitud_pendiente,  # NUEVO
+                    # Información de sucursal (Enero 2026)
+                    'sucursal_actual': {
+                        'codigo': u.sucursal_actual.codigo,
+                        'nombre': u.sucursal_actual.nombre,
+                    } if u.sucursal_actual else None,
                 })
             
             grupos_data.append({

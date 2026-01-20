@@ -327,7 +327,7 @@ Contexto esperado:
                                                         <th>Código Interno</th>
                                                         <th>Modelo</th>
                                                         <th class="text-center">Disponibilidad</th>
-                                                        <th>Ubicación/Asignación</th>
+                                                        <th>Ubicación (Sucursal)</th>
                                                         <th class="text-end">Costo</th>
                                                         <th>Fecha Registro</th>
                                                         <th class="text-center">Acciones</th>
@@ -369,15 +369,13 @@ Contexto esperado:
                                                             {% endif %}
                                                         </td>
                                                         <td>
-                                                            <small>
-                                                                {% if unidad.orden_servicio_destino %}
-                                                                    🔧 Orden {{ unidad.orden_servicio_destino.detalle_equipo.orden_cliente }}
-                                                                {% elif unidad.tecnico_asignado %}
-                                                                    👤 {{ unidad.tecnico_asignado.nombre }}
-                                                                {% else %}
-                                                                    <span class="text-muted">En almacén</span>
-                                                                {% endif %}
-                                                            </small>
+                                                            {% if unidad.sucursal_actual %}
+                                                                <i class="bi bi-building text-primary me-1"></i>
+                                                                <span class="fw-medium">{{ unidad.sucursal_actual.nombre }}</span>
+                                                            {% else %}
+                                                                <i class="bi bi-house text-secondary me-1"></i>
+                                                                <span class="text-muted">Almacén Central</span>
+                                                            {% endif %}
                                                         </td>
                                                         <td class="text-end">
                                                             {% if unidad.costo_unitario %}

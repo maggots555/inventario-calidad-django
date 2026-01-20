@@ -32,7 +32,7 @@
                         <option value="">Todos los tipos</option>
                         <option value="entrada" {% if tipo_filtro == 'entrada' %}selected{% endif %}>Entradas</option>
                         <option value="salida" {% if tipo_filtro == 'salida' %}selected{% endif %}>Salidas</option>
-                        <option value="ajuste" {% if tipo_filtro == 'ajuste' %}selected{% endif %}>Ajustes</option>
+                        <option value="transferencia" {% if tipo_filtro == 'transferencia' %}selected{% endif %}>Transferencias</option>
                     </select>
                 </div>
                 <div class="col-md-4">
@@ -71,10 +71,17 @@
                                 <small class="text-muted">{{ mov.fecha|time:"H:i" }}</small>
                             </td>
                             <td>
-                                <span class="badge bg-{% if mov.tipo == 'entrada' %}success{% elif mov.tipo == 'salida' %}danger{% else %}info{% endif %}">
+                                {% if mov.tipo == 'transferencia' %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-arrow-left-right me-1"></i>
+                                    {{ mov.get_tipo_display }}
+                                </span>
+                                {% else %}
+                                <span class="badge bg-{% if mov.tipo == 'entrada' %}success{% elif mov.tipo == 'salida' %}danger{% else %}secondary{% endif %}">
                                     <i class="bi bi-{% if mov.tipo == 'entrada' %}box-arrow-in-down{% elif mov.tipo == 'salida' %}box-arrow-up{% else %}arrow-repeat{% endif %} me-1"></i>
                                     {{ mov.get_tipo_display }}
                                 </span>
+                                {% endif %}
                             </td>
                             <td>
                                 <a href="{% url 'almacen:detalle_producto' mov.producto.pk %}" class="text-decoration-none">
@@ -84,9 +91,15 @@
                                 <small class="text-muted">{{ mov.producto.nombre|truncatechars:25 }}</small>
                             </td>
                             <td class="text-center">
+                                {% if mov.tipo == 'transferencia' %}
+                                <span class="text-info fw-bold">
+                                    <i class="bi bi-arrow-right"></i> {{ mov.cantidad }}
+                                </span>
+                                {% else %}
                                 <span class="{% if mov.tipo == 'entrada' %}text-success{% elif mov.tipo == 'salida' %}text-danger{% endif %} fw-bold">
                                     {% if mov.tipo == 'entrada' %}+{% elif mov.tipo == 'salida' %}-{% endif %}{{ mov.cantidad }}
                                 </span>
+                                {% endif %}
                             </td>
                             <td class="text-end">
                                 {% if mov.costo_unitario %}

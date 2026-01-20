@@ -95,6 +95,28 @@ Contexto esperado:
         </div>
     </div>
     
+    <!-- Pestañas por Sucursal (NUEVO) -->
+    {% if resumen_sucursales %}
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if not sucursal_filtro %}active{% endif %}" href="{% url 'almacen:lista_unidades' %}">
+                <i class="bi bi-grid-3x3-gap me-1"></i>Todas
+                <span class="badge bg-secondary ms-1">{{ total_unidades }}</span>
+            </a>
+        </li>
+        {% for sucursal in resumen_sucursales %}
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if sucursal_filtro == sucursal.codigo %}active{% endif %}" 
+               href="?sucursal={{ sucursal.codigo }}">
+                <i class="bi bi-{% if sucursal.codigo == 'central' %}house{% else %}building{% endif %} me-1"></i>
+                {{ sucursal.nombre }}
+                <span class="badge bg-secondary ms-1">{{ sucursal.count }}</span>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    
     <!-- Filtros -->
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-light">
@@ -149,7 +171,7 @@ Contexto esperado:
                             <th>Código</th>
                             <th>Producto</th>
                             <th>Marca / Modelo</th>
-                            <th>Modelo Específico</th>
+                            <th>Ubicación (Sucursal)</th>
                             <th class="text-center">Estado</th>
                             <th class="text-center">Disponibilidad</th>
                             <th>Origen</th>
@@ -185,16 +207,13 @@ Contexto esperado:
                                 {% endif %}
                             </td>
                             <td>
-                                {% if unidad.modelo %}
-                                    <span class="fw-medium">{{ unidad.modelo }}</span>
-                                    {% if unidad.numero_serie %}
-                                        <br><small class="text-muted">S/N: {{ unidad.numero_serie|truncatechars:15 }}</small>
-                                    {% endif %}
+                                {% if unidad.sucursal_actual %}
+                                    <i class="bi bi-building text-primary me-1"></i>
+                                    <span class="fw-medium">{{ unidad.sucursal_actual.nombre }}</span>
+                                    <br><small class="text-muted">{{ unidad.sucursal_actual.codigo }}</small>
                                 {% else %}
-                                    <span class="text-muted">Sin modelo</span>
-                                    {% if unidad.numero_serie %}
-                                        <br><small class="text-muted">S/N: {{ unidad.numero_serie|truncatechars:15 }}</small>
-                                    {% endif %}
+                                    <i class="bi bi-house text-secondary me-1"></i>
+                                    <span class="text-muted">Almacén Central</span>
                                 {% endif %}
                             </td>
                             <td class="text-center">

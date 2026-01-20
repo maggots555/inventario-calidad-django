@@ -881,6 +881,7 @@ class SolicitudBajaForm(forms.ModelForm):
             'cantidad',
             'orden_servicio',  # Campo oculto - se llenará automáticamente
             'tecnico_asignado',  # Técnico de laboratorio
+            'sucursal_destino',  # Sucursal destino (para transferencias)
             'observaciones',
         ]
         widgets = {
@@ -907,6 +908,10 @@ class SolicitudBajaForm(forms.ModelForm):
                 'class': 'form-control form-select',
                 'id': 'id_tecnico_asignado',
             }),
+            'sucursal_destino': forms.Select(attrs={
+                'class': 'form-control form-select',
+                'id': 'id_sucursal_destino',
+            }),
             'observaciones': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 2,
@@ -920,15 +925,22 @@ class SolicitudBajaForm(forms.ModelForm):
             'cantidad': 'Cantidad Solicitada',
             'orden_servicio': 'Orden de Servicio',
             'tecnico_asignado': 'Técnico de Laboratorio',
+            'sucursal_destino': 'Sucursal Destino',
             'observaciones': 'Observaciones',
         }
         help_texts = {
             'tipo_solicitud': 'Propósito de la salida del producto',
             'unidad_inventario': 'Seleccione una unidad específica o deje vacío para genérico',
             'tecnico_asignado': 'Obligatorio cuando el tipo es Servicio Técnico',
+            'sucursal_destino': 'Obligatorio para transferencias: seleccione la sucursal de destino',
         }
     
     def __init__(self, *args, **kwargs):
+        # Extraer parámetros personalizados antes de llamar a super().__init__()
+        # EXPLICACIÓN: kwargs.pop() remueve y retorna el valor, o None si no existe
+        self.empleado_actual = kwargs.pop('empleado_actual', None)
+        self.es_agente_almacen = kwargs.pop('es_agente_almacen', False)
+        
         super().__init__(*args, **kwargs)
         # Importar Empleado y Sucursal aquí para evitar importación circular
         from inventario.models import Empleado, Sucursal
@@ -950,21 +962,42 @@ class SolicitudBajaForm(forms.ModelForm):
         # No mostramos todas las órdenes, se busca/crea por orden_cliente
         self.fields['orden_servicio'].required = False
         
-        # Si hay datos del formulario (POST) o instancia existente, cargar las unidades del producto
+        # ========== FILTRADO DE UNIDADES POR SUCURSAL (NUEVO - Enero 2026) ==========
+        # EXPLICACIÓN: Los empleados normales solo ven unidades de su sucursal
+        # Los agentes de almacén (is_staff=True) ven todas las unidades
         if 'producto' in self.data:
             try:
                 producto_id = int(self.data.get('producto'))
-                self.fields['unidad_inventario'].queryset = UnidadInventario.objects.filter(
+                
+                # Iniciar queryset con producto y disponibilidad
+                queryset_unidades = UnidadInventario.objects.filter(
                     producto_id=producto_id,
                     disponibilidad='disponible'
-                ).select_related('producto')
+                ).select_related('producto', 'sucursal_actual')
+                
+                # Si NO es agente de almacén, filtrar solo unidades de su sucursal
+                if not self.es_agente_almacen and self.empleado_actual and self.empleado_actual.sucursal:
+                    queryset_unidades = queryset_unidades.filter(
+                        sucursal_actual=self.empleado_actual.sucursal
+                    )
+                
+                self.fields['unidad_inventario'].queryset = queryset_unidades
+                
             except (ValueError, TypeError):
                 pass
         elif self.instance.pk and self.instance.producto:
-            self.fields['unidad_inventario'].queryset = UnidadInventario.objects.filter(
+            # Mismo filtrado para edición de solicitud existente
+            queryset_unidades = UnidadInventario.objects.filter(
                 producto=self.instance.producto,
                 disponibilidad='disponible'
-            ).select_related('producto')
+            ).select_related('producto', 'sucursal_actual')
+            
+            if not self.es_agente_almacen and self.empleado_actual and self.empleado_actual.sucursal:
+                queryset_unidades = queryset_unidades.filter(
+                    sucursal_actual=self.empleado_actual.sucursal
+                )
+            
+            self.fields['unidad_inventario'].queryset = queryset_unidades
         
         # ========== CONFIGURACIÓN TECNICO_ASIGNADO ==========
         # Cargar solo técnicos de laboratorio activos
@@ -976,6 +1009,26 @@ class SolicitudBajaForm(forms.ModelForm):
         
         # Inicialmente no requerido - JavaScript lo hará requerido dinámicamente
         self.fields['tecnico_asignado'].required = False
+        
+        # ========== CONFIGURACIÓN SUCURSAL_DESTINO ==========
+        # Cargar sucursales activas para transferencias
+        self.fields['sucursal_destino'].queryset = Sucursal.objects.filter(
+            activa=True
+        ).order_by('nombre')
+        
+        # Inicialmente no requerido - JavaScript lo hará requerido para transferencias
+        self.fields['sucursal_destino'].required = False
+        
+        # ========== DESHABILITAR TRANSFERENCIA PARA EMPLEADOS NO-AGENTES (NUEVO) ==========
+        # EXPLICACIÓN: Solo agentes de almacén pueden crear transferencias entre sucursales
+        if not self.es_agente_almacen:
+            # Modificar las opciones del campo tipo_solicitud para deshabilitar transferencia
+            tipo_choices = list(TIPO_SOLICITUD_ALMACEN_CHOICES)
+            self.fields['tipo_solicitud'].choices = tipo_choices
+            
+            # Agregar atributo disabled a la opción mediante widget attrs
+            # Nota: Esto se manejará mejor con JavaScript en el template
+            self.fields['tipo_solicitud'].widget.attrs['data-es-agente'] = 'false'
     
     def clean_cantidad(self):
         """Validar que haya stock disponible"""
@@ -1006,6 +1059,7 @@ class SolicitudBajaForm(forms.ModelForm):
         cleaned_data = super().clean()
         tipo_solicitud = cleaned_data.get('tipo_solicitud')
         tecnico_asignado = cleaned_data.get('tecnico_asignado')
+        sucursal_destino = cleaned_data.get('sucursal_destino')
         cantidad = cleaned_data.get('cantidad', 0)
         
         # Tipos que requieren técnico obligatorio: servicio_tecnico y venta_mostrador
@@ -1016,6 +1070,12 @@ class SolicitudBajaForm(forms.ModelForm):
             tipo_display = 'Servicio Técnico' if tipo_solicitud == 'servicio_tecnico' else 'Venta Mostrador'
             raise ValidationError({
                 'tecnico_asignado': f'Debe seleccionar un técnico de laboratorio para solicitudes de {tipo_display}.'
+            })
+        
+        # ========== VALIDACIÓN: Sucursal destino para transferencias ==========
+        if tipo_solicitud == 'transferencia' and not sucursal_destino:
+            raise ValidationError({
+                'sucursal_destino': 'Debe seleccionar la sucursal destino para transferencias.'
             })
         
         # ========== VALIDACIÓN: Unidades seleccionadas (NUEVO) ==========
@@ -1384,6 +1444,7 @@ class UnidadInventarioForm(forms.ModelForm):
             'origen',
             'compra',
             'orden_servicio_origen',
+            'sucursal_actual',  # NUEVO
             'ubicacion_especifica',
             'costo_unitario',
             'notas',
@@ -1438,9 +1499,12 @@ class UnidadInventarioForm(forms.ModelForm):
             'orden_servicio_origen': forms.HiddenInput(attrs={
                 'id': 'orden_servicio_origen_id_fallback',
             }),
+            'sucursal_actual': forms.Select(attrs={
+                'class': 'form-select',
+            }),
             'ubicacion_especifica': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Ubicación específica (ej: Estante A, Caja 3)',
+                'placeholder': 'Ubicación física (ej: Estante A, Caja 3)',
             }),
             'costo_unitario': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -1465,6 +1529,7 @@ class UnidadInventarioForm(forms.ModelForm):
             'origen': 'Origen',
             'compra': 'Compra Asociada',
             'orden_servicio_origen': 'Orden de Servicio (Origen)',
+            'sucursal_actual': 'Sucursal Actual',
             'ubicacion_especifica': 'Ubicación Específica',
             'costo_unitario': 'Costo Unitario',
             'notas': 'Notas',
@@ -1480,7 +1545,8 @@ class UnidadInventarioForm(forms.ModelForm):
             'origen': '¿Cómo llegó esta unidad al inventario?',
             'compra': 'Si vino de una compra, selecciona cuál.',
             'orden_servicio_origen': 'Si se recuperó de un servicio, indica la orden.',
-            'ubicacion_especifica': 'Dónde está físicamente esta unidad.',
+            'sucursal_actual': 'Sucursal donde está actualmente. Vacío = Almacén Central.',
+            'ubicacion_especifica': 'Ubicación física dentro del almacén o sucursal.',
             'costo_unitario': 'Costo de adquisición o valor estimado.',
             'notas': 'Cualquier observación relevante sobre esta unidad.',
         }
@@ -1498,6 +1564,13 @@ class UnidadInventarioForm(forms.ModelForm):
         self.fields['producto'].queryset = ProductoAlmacen.objects.filter(
             activo=True
         ).order_by('nombre')
+        
+        # Cargar sucursales activas
+        from inventario.models import Sucursal
+        self.fields['sucursal_actual'].queryset = Sucursal.objects.filter(
+            activa=True
+        ).order_by('nombre')
+        self.fields['sucursal_actual'].required = False
         
         # Filtrar compras para mostrar solo las recientes (últimos 6 meses) o todas si estamos editando
         from django.utils import timezone

@@ -420,10 +420,11 @@ CATEGORIA_ALMACEN_CHOICES = [
 ]
 
 # TIPOS DE MOVIMIENTO EN ALMACÉN
-# Entrada: incrementa stock, Salida: decrementa stock
+# Entrada: incrementa stock, Salida: decrementa stock, Transferencia: stock neutro
 TIPO_MOVIMIENTO_ALMACEN_CHOICES = [
     ('entrada', 'Entrada'),
     ('salida', 'Salida'),
+    ('transferencia', 'Transferencia'),  # No afecta stock, solo cambia ubicación
 ]
 
 # TIPOS DE SOLICITUD DE BAJA

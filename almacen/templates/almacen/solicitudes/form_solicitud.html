@@ -126,6 +126,21 @@
                                 </small>
                             </div>
                             
+                            <!-- Sucursal Destino (mostrar solo para Transferencias) -->
+                            <div class="col-md-6 mb-3" id="sucursal-destino-container" style="display: none;">
+                                <label class="form-label">
+                                    <i class="bi bi-building me-1"></i>Sucursal Destino *
+                                </label>
+                                {{ form.sucursal_destino }}
+                                {% if form.sucursal_destino.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.sucursal_destino.errors.0 }}</div>
+                                {% endif %}
+                                <small class="text-muted">
+                                    Sucursal a donde se transferirá el producto.
+                                    <strong>Obligatorio para transferencias.</strong>
+                                </small>
+                            </div>
+                            
                             <!-- ============================================= -->
                             <!-- SECCIÓN: ORDEN DE SERVICIO (Servicio Técnico) -->
                             <!-- ============================================= -->

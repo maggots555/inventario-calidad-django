@@ -83,7 +83,7 @@ Muestra información, stock, historial de movimientos y compras.
                     {% endif %}
                     
                     {% if producto.tipo_producto == 'resurtible' %}
-                    <div class="d-flex justify-content-center gap-4">
+                    <div class="d-flex justify-content-center gap-4 mb-3">
                         <div>
                             <small class="text-muted d-block">Mínimo</small>
                             <strong>{{ producto.stock_minimo }}</strong>
@@ -96,6 +96,25 @@ Muestra información, stock, historial de movimientos y compras.
                             <small class="text-muted d-block">Total Almacén</small>
                             <strong>{{ producto.stock_actual }}</strong>
                         </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Distribución por Sucursal (NUEVO) -->
+                    {% if distribucion_sucursales %}
+                    <hr class="my-3">
+                    <h6 class="text-muted mb-2">
+                        <i class="bi bi-geo-alt me-1"></i>Distribución por Ubicación
+                    </h6>
+                    <div class="list-group list-group-flush">
+                        {% for ubicacion in distribucion_sucursales %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                            <span class="small">
+                                <i class="bi bi-{% if ubicacion.es_central %}house{% else %}building{% endif %} me-1"></i>
+                                {{ ubicacion.nombre }}
+                            </span>
+                            <span class="badge bg-primary rounded-pill">{{ ubicacion.cantidad }}</span>
+                        </div>
+                        {% endfor %}
                     </div>
                     {% endif %}
                 </div>

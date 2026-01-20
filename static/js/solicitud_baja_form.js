@@ -62,8 +62,10 @@ class SolicitudBajaFormHandler {
         this.cantidadInput = document.getElementById('id_cantidad');
         this.unidadSelect = document.getElementById('id_unidad_inventario');
         this.tecnicoSelect = document.getElementById('id_tecnico_asignado');
+        this.sucursalDestinoSelect = document.getElementById('id_sucursal_destino');
         this.unidadContainer = document.getElementById('unidad-container');
         this.tecnicoContainer = document.getElementById('tecnico-container');
+        this.sucursalDestinoContainer = document.getElementById('sucursal-destino-container');
         this.stockInfo = document.getElementById('stock-info');
         // Obtener referencias a elementos de unidades agrupadas (NUEVO)
         this.unidadesAgrupadasContainer = document.getElementById('unidades-agrupadas-container');
@@ -77,12 +79,39 @@ class SolicitudBajaFormHandler {
         this.sucursalOrdenSelect = document.getElementById('id_sucursal_orden');
         this.ordenStatusDiv = document.getElementById('orden-status');
         this.sucursalContainer = document.getElementById('sucursal-container');
+        // ========== DESHABILITAR OPCIÓN TRANSFERENCIA PARA NO-AGENTES (NUEVO) ==========
+        // Si el campo tiene el atributo data-es-agente="false", deshabilitar la opción transferencia
+        if (this.tipoSolicitudSelect) {
+            const esAgente = this.tipoSolicitudSelect.getAttribute('data-es-agente');
+            if (esAgente === 'false') {
+                this.deshabilitarOpcionTransferencia();
+            }
+        }
         // Inicializar eventos
         this.initEventListeners();
         // Configuración inicial basada en valores actuales
         this.handleTipoSolicitudChange();
         if ((_a = this.productoSelect) === null || _a === void 0 ? void 0 : _a.value) {
             this.handleProductoChange();
+        }
+    }
+    /**
+     * Deshabilita la opción de transferencia para empleados no-agentes
+     *
+     * NUEVO (Enero 2026): Solo agentes de almacén pueden hacer transferencias
+     */
+    deshabilitarOpcionTransferencia() {
+        if (!this.tipoSolicitudSelect) {
+            return;
+        }
+        // Buscar la opción "transferencia" y deshabilitarla
+        const opciones = this.tipoSolicitudSelect.options;
+        for (let i = 0; i < opciones.length; i++) {
+            if (opciones[i].value === 'transferencia') {
+                opciones[i].disabled = true;
+                opciones[i].text = '🔒 Transferencia entre Sucursales (Solo Agentes de Almacén)';
+                break;
+            }
         }
     }
     /**
@@ -133,45 +162,54 @@ class SolicitudBajaFormHandler {
      *
      * LÓGICA:
      * - Si tipo_solicitud === 'servicio_tecnico' → Mostrar campo técnico y orden
-     * - Cualquier otro valor → Ocultar campo técnico y limpiar selección
+     * - Si tipo_solicitud === 'transferencia' → Mostrar campo sucursal destino
+     * - Cualquier otro valor → Ocultar campos especiales
      */
     handleTipoSolicitudChange() {
-        var _a;
-        if (!this.tipoSolicitudSelect || !this.tecnicoContainer || !this.tecnicoSelect) {
+        var _a, _b;
+        if (!this.tipoSolicitudSelect) {
             return;
         }
         const tipoSolicitud = this.tipoSolicitudSelect.value;
         const ordenContainer = document.getElementById('orden-container');
-        // Mostrar campos de técnico y orden para: servicio_tecnico Y venta_mostrador
-        // Ambos tipos requieren crear una OrdenServicio vinculada
-        if (tipoSolicitud === 'servicio_tecnico' || tipoSolicitud === 'venta_mostrador') {
-            // Mostrar campo de técnico
-            this.tecnicoContainer.style.display = 'block';
-            // Agregar indicador visual de requerido
-            this.tecnicoSelect.setAttribute('required', 'required');
-            // Actualizar label para mostrar que es obligatorio
-            const label = this.tecnicoContainer.querySelector('label');
-            if (label && !((_a = label.textContent) === null || _a === void 0 ? void 0 : _a.includes('*'))) {
-                label.innerHTML = '<i class="bi bi-person-gear me-1"></i>Técnico de Laboratorio *';
+        // ========== TÉCNICO Y ORDEN (servicio_tecnico, venta_mostrador) ==========
+        if (this.tecnicoContainer && this.tecnicoSelect) {
+            if (tipoSolicitud === 'servicio_tecnico' || tipoSolicitud === 'venta_mostrador') {
+                this.tecnicoContainer.style.display = 'block';
+                this.tecnicoSelect.setAttribute('required', 'required');
+                const label = this.tecnicoContainer.querySelector('label');
+                if (label && !((_a = label.textContent) === null || _a === void 0 ? void 0 : _a.includes('*'))) {
+                    label.innerHTML = '<i class="bi bi-person-gear me-1"></i>Técnico de Laboratorio *';
+                }
+                if (ordenContainer) {
+                    ordenContainer.style.display = 'block';
+                }
             }
-            // Mostrar campo de orden
-            if (ordenContainer) {
-                ordenContainer.style.display = 'block';
+            else {
+                this.tecnicoContainer.style.display = 'none';
+                this.tecnicoSelect.value = '';
+                this.tecnicoSelect.removeAttribute('required');
+                if (ordenContainer) {
+                    ordenContainer.style.display = 'none';
+                }
+                this.limpiarCamposOrden();
             }
         }
-        else {
-            // Ocultar campo de técnico
-            this.tecnicoContainer.style.display = 'none';
-            // Limpiar selección
-            this.tecnicoSelect.value = '';
-            // Remover requerido
-            this.tecnicoSelect.removeAttribute('required');
-            // Ocultar campo de orden
-            if (ordenContainer) {
-                ordenContainer.style.display = 'none';
+        // ========== SUCURSAL DESTINO (transferencia) ==========
+        if (this.sucursalDestinoContainer && this.sucursalDestinoSelect) {
+            if (tipoSolicitud === 'transferencia') {
+                this.sucursalDestinoContainer.style.display = 'block';
+                this.sucursalDestinoSelect.setAttribute('required', 'required');
+                const label = this.sucursalDestinoContainer.querySelector('label');
+                if (label && !((_b = label.textContent) === null || _b === void 0 ? void 0 : _b.includes('*'))) {
+                    label.innerHTML = '<i class="bi bi-building me-1"></i>Sucursal Destino *';
+                }
             }
-            // Limpiar campos de orden
-            this.limpiarCamposOrden();
+            else {
+                this.sucursalDestinoContainer.style.display = 'none';
+                this.sucursalDestinoSelect.value = '';
+                this.sucursalDestinoSelect.removeAttribute('required');
+            }
         }
     }
     /**
@@ -615,7 +653,7 @@ class SolicitudBajaFormHandler {
                                         <tr>
                                             <th style="width: 40px;"></th>
                                             <th>Código Interno</th>
-                                            <th>N° Serie</th>
+                                            <th>Ubicación (Sucursal)</th>
                                             <th>Origen</th>
                                             <th class="text-end">Costo</th>
                                             <th>Fecha Registro</th>
@@ -654,7 +692,11 @@ class SolicitudBajaFormHandler {
                                 ` : ''}
                             </label>
                         </td>
-                        <td><code class="small">${unidad.numero_serie || '—'}</code></td>
+                        <td>
+                            ${unidad.sucursal_actual ?
+                    `<i class="bi bi-building text-primary me-1"></i><span class="fw-medium">${unidad.sucursal_actual.nombre}</span>` :
+                    `<i class="bi bi-house text-secondary me-1"></i><span class="text-muted">Almacén Central</span>`}
+                        </td>
                         <td><small>${unidad.origen_display || '—'}</small></td>
                         <td class="text-end">
                             ${unidad.costo_unitario ? '$' + unidad.costo_unitario.toFixed(2) : '—'}
