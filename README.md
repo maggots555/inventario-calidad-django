@@ -17,9 +17,9 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Production-success?style=for-the-badge" alt="Status">
-  <img src="https://img.shields.io/badge/Version-3.0-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-3.5-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Modules-4-orange?style=for-the-badge" alt="Modules">
+  <img src="https://img.shields.io/badge/Modules-5-orange?style=for-the-badge" alt="Modules">
 </p>
 
 ---
@@ -100,6 +100,7 @@ Sistema completo de órdenes de servicio técnico con flujo dual:
 
 - ✅ Gestión completa del ciclo de vida de reparaciones
 - ✅ 21 estados de seguimiento (desde ingreso hasta entrega)
+- ✅ **Autocompletado Inteligente**: Buscador avanzado de modelos de equipos con `ReferenciaGamaEquipo` y `Select2`.
 - ✅ Sistema de cotización con gestión de piezas y proveedores
 - ✅ Seguimiento de piezas solicitadas (WPB, DOA, PNC)
 - ✅ Referencias de gama de equipos para cotización rápida
@@ -202,7 +203,7 @@ REPARADO → ENVIADO RETORNO → RECIBIDO → PROBADO → FINALIZADO
 
 ---
 
-### 4️⃣ **Inventario** - Gestión de Productos
+### 4️⃣ **Inventario** - Gestión de Productos Base
 
 **Módulo**: `inventario`
 
@@ -217,14 +218,53 @@ Módulo base de gestión de productos con control de calidad simple.
 
 ---
 
+### 5️⃣ **Almacén Central** - Gestión Integral de Suministros y Piezas
+
+**Módulo**: `almacen`
+
+Sistema avanzado para el control de inventario de almacén central, compras y trazabilidad de piezas.
+
+**Características principales:**
+
+- ✅ **Gestión de Stock Dual**: Productos resurtibles (consumibles) y unidades únicas (piezas con número de serie).
+- ✅ **Workflow de Compras**: Ciclo completo desde Solicitud de Cotización → Aprobación → Compra → Recepción.
+- ✅ **Cotización Multi-proveedor**: Comparativa de precios y tiempos de entrega entre múltiples proveedores para una misma necesidad.
+- ✅ **Trazabilidad 100%**: Seguimiento individual de piezas desde la compra hasta su asignación a una Orden de Servicio.
+- ✅ **Auditorías de Inventario**: Sistema de conteo físico vs. sistema con registro de diferencias y ajustes.
+- ✅ **Solicitudes de Baja**: Flujo de aprobación para descarte de material dañado o antiguo con registro fotográfico.
+- ✅ **Transferencias**: Movimientos de mercancía controlados entre diferentes sucursales.
+- ✅ **SVG Dinámico**: Visualización interactiva de categorías mediante iconos animados.
+
+**Workflow de Adquisición:**
+```
+SOLICITUD DE COTIZACIÓN → ENVÍO A PROVEEDORES → RECEPCIÓN DE OFERTAS → 
+ELECCIÓN DE MEJOR OPCIÓN → APROBACIÓN GERENCIAL → ORDEN DE COMPRA → 
+SEGUIMIENTO DE ENVÍO → RECEPCIÓN EN ALMACÉN → INGRESO A STOCK
+```
+
+---
+
 ## 🚀 Funcionalidades Destacadas del Sistema
 
-### 🔐 Sistema de Autenticación y Permisos
+### 🔐 Sistema de Autenticación, Permisos y Seguridad
 
 - Login personalizado con usuarios de Django
 - Relación Usuario ↔ Empleado para gestión completa
 - Forzado de cambio de contraseña en primer inicio
 - Permisos granulares por módulo
+- **Protección Brute-Force**: Bloqueo automático ante múltiples intentos fallidos
+- **Validación de Credenciales**: Sistema robusto de validación de fortaleza de contraseñas
+
+---
+
+## 🏗️ Infraestructura y Almacenamiento
+
+### Gestión de Datos y Conectividad
+
+- **Almacenamiento Dual**: Sistema configurado para gestión dinámica entre discos (Soporte hasta 1TB)
+- **Cloudflare Tunnel**: Configuración segura para acceso remoto en producción sin apertura de puertos
+- **Backup Automatizado**: Scripts mensuales/diarios para PostgreSQL y SQLite
+- **Soporte SVG**: Visualización optimizada de gráficos vectoriales en todo el sistema
 
 ---
 
@@ -466,9 +506,19 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **NotificacionIncidencia**: Historial de emails
 - **DestinatarioNotificacion**: Destinatarios de notificaciones
 
+### Almacén Central
+
+- **ProductoAlmacen**: Productos consumibles y piezas únicas
+- **UnidadInventario**: Rastreo individual por número de serie
+- **Proveedor**: Catálogo de proveedores y contactos
+- **CompraProducto**: Registro de adquisiciones
+- **SolicitudCotizacion**: Gestión multi-proveedor
+- **AuditoriaInventario**: Control de stock físico
+- **SolicitudBaja**: Descarte de material con aprobación
+
 ### Inventario (Base)
 
-- **Producto**: Productos en inventario
+- **Producto**: Productos en inventario base
 - **Sucursal**: Sucursales de la empresa
 - **Empleado**: Personal (técnicos, inspectores, etc.)
 
@@ -522,6 +572,14 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - `/scorecard/incidencias/<id>/` - Detalle con acciones
 - `/scorecard/reportes/` - Reportes avanzados (7 tabs)
 - `/scorecard/api/` - APIs REST internas
+
+### Almacén Central
+
+- `/almacen/` - Dashboard de almacén
+- `/almacen/productos/` - Catálogo de productos y stock
+- `/almacen/compras/` - Gestión de órdenes de compra
+- `/almacen/solicitudes-cotizacion/` - Cotizaciones multi-proveedor
+- `/almacen/auditorias/` - Control de inventario físico
 
 ### Sistema
 
@@ -792,10 +850,10 @@ mi_proyecto_django/
 │   ├── urls.py
 │   ├── constants.py       # Constantes del sistema
 │   └── wsgi.py
-├── inventario/            # App de gestión de inventario
+├── almacen/               # App de gestión de Almacén Central
+├── inventario/            # App de gestión de inventario base
 ├── servicio_tecnico/      # App de servicio técnico
 ├── scorecard/             # App de control de calidad
-├── venta_mostrador/       # App de ventas mostrador
 ├── templates/             # Templates base
 ├── static/                # Archivos estáticos
 ├── media/                 # Archivos subidos por usuarios
@@ -905,16 +963,17 @@ Este sistema integra las mejores prácticas de:
 
 ## 📈 Estado del Proyecto
 
-**Versión Actual**: 3.0 (Noviembre 2025)  
-**Estado**: ✅ Producción (4 módulos integrados + ML/Analytics)  
-**Última Actualización**: Noviembre 28, 2025
+**Versión Actual**: 3.5 (Enero 2026)  
+**Estado**: ✅ Producción (5 módulos integrados + ML/Analytics/Almacén)  
+**Última Actualización**: Enero 20, 2026
 
 ### Módulos Completados
 
 - ✅ **Inventario** (v1.0) - Sistema base
-- ✅ **Servicio Técnico** (v2.0) - Con RHITSO y venta mostrador
-- ✅ **Score Card** (v2.0) - Con reportes avanzados y notificaciones
-- ✅ **RHITSO** (v1.1) - Seguimiento externo completo
+- ✅ **Servicio Técnico** (v2.5) - Con RHITSO mejorado y autocompletado inteligente
+- ✅ **Score Card** (v2.2) - Con reportes avanzados y notificaciones optimizadas
+- ✅ **RHITSO** (v1.5) - Seguimiento externo con motivos detallados
+- ✅ **Almacén Central** (v1.0) - Compras, Cotizaciones y Stock único
 
 ### Estadísticas del Sistema
 
@@ -924,12 +983,12 @@ Este sistema integra las mejores prácticas de:
 - **7 tabs** de reportes avanzados
 - **50+ visualizaciones** Plotly interactivas tipo Power BI
 - **8 módulos** TypeScript (160KB)
-- **4 sistemas** ML/IA especializados
-- **42 documentos** técnicos
-- **23 scripts** de utilidades
-- **10,000+ líneas** de código Python
-- **5,000+ líneas** de TypeScript
-- **2,000+ líneas** de templates Django
+- **4 sistemas** ML/IA especializados (con soporte para etiquetas nuevas)
+- **56 documentos** técnicos
+- **25 scripts** de utilidades
+- **69,000+ líneas** de código Python
+- **7,000+ líneas** de TypeScript
+- **3,500+ líneas** de templates Django
 
 ---
 
