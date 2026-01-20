@@ -50,7 +50,6 @@ urlpatterns = [
     # MOVIMIENTOS (ENTRADAS/SALIDAS)
     # ============================================================================
     path('movimientos/', views.lista_movimientos, name='lista_movimientos'),
-    path('movimientos/entrada/', views.registrar_entrada, name='registrar_entrada'),
     
     # ============================================================================
     # COMPRAS Y COTIZACIONES

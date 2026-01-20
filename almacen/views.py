@@ -65,7 +65,6 @@ from .forms import (
     AuditoriaForm,
     DiferenciaAuditoriaForm,
     BusquedaProductoForm,
-    EntradaRapidaForm,
     UnidadInventarioForm,
     UnidadInventarioFiltroForm,
     SolicitudCotizacionForm,
@@ -783,69 +782,6 @@ def lista_movimientos(request):
     }
     
     return render(request, 'almacen/movimientos/lista_movimientos.html', context)
-
-
-@login_required
-def registrar_entrada(request):
-    """
-    Registra una entrada de productos al almacén.
-    """
-    if request.method == 'POST':
-        form = EntradaRapidaForm(request.POST)
-        if form.is_valid():
-            producto = form.cleaned_data['producto']
-            cantidad = form.cleaned_data['cantidad']
-            costo_unitario = form.cleaned_data['costo_unitario']
-            proveedor = form.cleaned_data.get('proveedor')
-            numero_factura = form.cleaned_data.get('numero_factura', '')
-            observaciones = form.cleaned_data.get('observaciones', '')
-            
-            # Obtener empleado
-            try:
-                empleado = Empleado.objects.get(user=request.user)
-            except Empleado.DoesNotExist:
-                messages.error(request, 'No tienes perfil de empleado asociado.')
-                return redirect('almacen:dashboard')
-            
-            # Crear compra si hay proveedor
-            compra = None
-            if proveedor:
-                compra = CompraProducto.objects.create(
-                    producto=producto,
-                    proveedor=proveedor,
-                    cantidad=cantidad,
-                    costo_unitario=costo_unitario,
-                    fecha_pedido=timezone.now().date(),
-                    fecha_recepcion=timezone.now().date(),
-                    numero_factura=numero_factura,
-                    registrado_por=request.user,
-                )
-            
-            # Crear movimiento de entrada
-            MovimientoAlmacen.objects.create(
-                tipo='entrada',
-                producto=producto,
-                cantidad=cantidad,
-                costo_unitario=costo_unitario,
-                empleado=empleado,
-                compra=compra,
-                observaciones=observaciones,
-            )
-            
-            messages.success(
-                request,
-                f'Entrada registrada: {cantidad} unidades de {producto.nombre}'
-            )
-            return redirect('almacen:detalle_producto', pk=producto.pk)
-    else:
-        form = EntradaRapidaForm()
-    
-    context = {
-        'form': form,
-        'titulo': 'Registrar Entrada',
-    }
-    
-    return render(request, 'almacen/movimientos/form_entrada.html', context)
 
 
 # ============================================================================

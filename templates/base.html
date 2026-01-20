@@ -249,49 +249,28 @@
                                 <a href="{% url 'almacen:lista_productos' %}" class="dropdown-item">
                                     <i class="bi bi-list-ul"></i> Lista de Productos
                                 </a>
-                                <a href="{% url 'almacen:crear_producto' %}" class="dropdown-item">
-                                    <i class="bi bi-plus-circle"></i> Nuevo Producto
-                                </a>
                                 <a href="{% url 'almacen:lista_unidades' %}" class="dropdown-item">
                                     <i class="bi bi-collection"></i> Unidades Individuales
                                 </a>
-                                <a href="{% url 'almacen:crear_unidad' %}" class="dropdown-item">
-                                    <i class="bi bi-plus-circle-dotted"></i> Nueva Unidad
-                                </a>
                             </div>
                         </div>
-                        <!-- Columna 2: Movimientos + Solicitudes + Config -->
+                        <!-- Columna 2: Movimientos + Solicitudes de Baja -->
                         <div class="dropdown-column">
                             <div class="dropdown-section">
                                 <h6 class="dropdown-header"><i class="bi bi-arrow-left-right"></i> Movimientos</h6>
                                 <a href="{% url 'almacen:lista_movimientos' %}" class="dropdown-item">
-                                    <i class="bi bi-arrow-down-up"></i> Historial
-                                </a>
-                                <a href="{% url 'almacen:registrar_entrada' %}" class="dropdown-item">
-                                    <i class="bi bi-box-arrow-in-down text-success"></i> Registrar Entrada
+                                    <i class="bi bi-arrow-down-up"></i> Historial de Movimientos
                                 </a>
                             </div>
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-cart-dash"></i> Solicitudes</h6>
+                                <h6 class="dropdown-header"><i class="bi bi-cart-dash"></i> Solicitudes de Baja</h6>
                                 <a href="{% url 'almacen:lista_solicitudes' %}" class="dropdown-item">
-                                    <i class="bi bi-hourglass-split text-warning"></i> Solicitudes de Baja
+                                    <i class="bi bi-list-ul"></i> Lista de Solicitudes
                                 </a>
                                 <a href="{% url 'almacen:crear_solicitud' %}" class="dropdown-item">
-                                    <i class="bi bi-cart-plus"></i> Nueva Solicitud
+                                    <i class="bi bi-plus-circle"></i> Nueva Solicitud de Baja
                                 </a>
                             </div>
-                            <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
-                                <a href="{% url 'almacen:lista_proveedores' %}" class="dropdown-item">
-                                    <i class="bi bi-truck"></i> Proveedores
-                                </a>
-                                <a href="{% url 'almacen:lista_categorias' %}" class="dropdown-item">
-                                    <i class="bi bi-tags"></i> Categorías
-                                </a>
-                            </div>
-                        </div>
-                        <!-- Columna 3: Compras y Cotizaciones -->
-                        <div class="dropdown-column">
                             <div class="dropdown-section">
                                 <h6 class="dropdown-header"><i class="bi bi-cart4"></i> Compras Directas</h6>
                                 <a href="{% url 'almacen:lista_compras' %}" class="dropdown-item">
@@ -301,16 +280,28 @@
                                     <i class="bi bi-cart-plus"></i> Nueva Compra Directa
                                 </a>
                             </div>
+                        </div>
+                        <!-- Columna 3: Cotizaciones + Configuración -->
+                        <div class="dropdown-column">
                             <div class="dropdown-section">
                                 <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Cotizaciones Multi-Proveedor</h6>
                                 <a href="{% url 'almacen:panel_cotizaciones' %}" class="dropdown-item">
-                                    <i class="bi bi-clipboard-data"></i> Panel Cotizaciones
+                                    <i class="bi bi-clipboard-data"></i> Panel de Cotizaciones
                                 </a>
                                 <a href="{% url 'almacen:lista_solicitudes_cotizacion' %}" class="dropdown-item">
-                                    <i class="bi bi-list-ul"></i> Todas las Solicitudes
+                                    <i class="bi bi-list-ul"></i> Lista de Solicitudes
                                 </a>
                                 <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="dropdown-item">
-                                    <i class="bi bi-plus-circle"></i> Nueva Cotización
+                                    <i class="bi bi-plus-circle"></i> Nueva Solicitud de Cotización
+                                </a>
+                            </div>
+                            <div class="dropdown-section">
+                                <h6 class="dropdown-header"><i class="bi bi-gear"></i> Configuración</h6>
+                                <a href="{% url 'almacen:lista_proveedores' %}" class="dropdown-item">
+                                    <i class="bi bi-truck"></i> Proveedores
+                                </a>
+                                <a href="{% url 'almacen:lista_categorias' %}" class="dropdown-item">
+                                    <i class="bi bi-tags"></i> Categorías
                                 </a>
                             </div>
                         </div>
