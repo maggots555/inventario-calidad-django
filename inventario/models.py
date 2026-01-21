@@ -589,6 +589,27 @@ class Empleado(models.Model):
         help_text='Fecha en que el empleado completó su primer cambio de contraseña'
     )
     
+    # === ROL DEL EMPLEADO EN EL SISTEMA ===
+    ROL_CHOICES = [
+        ('supervisor', 'Supervisor'),
+        ('inspector', 'Inspector'),
+        ('dispatcher', 'Dispatcher'),
+        ('compras', 'Compras'),
+        ('recepcionista', 'Recepcionista'),
+        ('gerente_operacional', 'Gerente Operacional'),
+        ('gerente_general', 'Gerente General'),
+        ('tecnico', 'Técnico'),
+        ('almacenista', 'Almacenista'),
+    ]
+    
+    rol = models.CharField(
+        max_length=30,
+        choices=ROL_CHOICES,
+        default='tecnico',
+        verbose_name='Rol en el Sistema',
+        help_text='Define los permisos y accesos del empleado en el sistema'
+    )
+    
     def __str__(self):
         return self.nombre_completo
     

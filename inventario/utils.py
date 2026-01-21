@@ -109,6 +109,30 @@ def crear_usuario_para_empleado(empleado, contraseña_temporal=None):
         is_superuser=False  # No es superusuario
     )
     
+    # Asignar grupo según el rol del empleado
+    from django.contrib.auth.models import Group
+    
+    # Mapeo de roles de empleado a nombres de grupos de Django
+    rol_a_grupo = {
+        'supervisor': 'Supervisor',
+        'inspector': 'Inspector',
+        'dispatcher': 'Dispatcher',
+        'compras': 'Compras',
+        'recepcionista': 'Recepcionista',
+        'gerente_operacional': 'Gerente Operacional',
+        'gerente_general': 'Gerente General',
+        'tecnico': 'Técnico',
+        'almacenista': 'Almacenista',
+    }
+    
+    nombre_grupo = rol_a_grupo.get(empleado.rol)
+    if nombre_grupo:
+        try:
+            grupo = Group.objects.get(name=nombre_grupo)
+            user.groups.add(grupo)
+        except Group.DoesNotExist:
+            print(f"⚠️  Advertencia: No existe el grupo '{nombre_grupo}'. Ejecutar script setup_grupos_permisos.py")
+    
     # Vincular el usuario al empleado y actualizar campos de control
     empleado.user = user
     empleado.tiene_acceso_sistema = True
