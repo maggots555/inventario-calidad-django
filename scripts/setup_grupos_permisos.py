@@ -21,7 +21,8 @@ from inventario.models import Producto, Movimiento, Empleado, Sucursal
 from servicio_tecnico.models import (
     OrdenServicio, DetalleEquipo, Cotizacion, HistorialOrden,
     ImagenOrden, VentaMostrador, SeguimientoPieza, EstadoRHITSO,
-    SeguimientoRHITSO, IncidenciaRHITSO
+    SeguimientoRHITSO, IncidenciaRHITSO, ReferenciaGamaEquipo,
+    PiezaCotizada, PiezaVentaMostrador
 )
 from scorecard.models import Incidencia, ComponenteEquipo, CategoriaIncidencia, ServicioRealizado
 from almacen.models import (
@@ -86,6 +87,9 @@ def setup_grupos_y_permisos():
     permisos_supervisor.extend(obtener_permisos_modelo(SeguimientoRHITSO))
     permisos_supervisor.extend(obtener_permisos_modelo(IncidenciaRHITSO))
     permisos_supervisor.extend(obtener_permisos_modelo(VentaMostrador))
+    permisos_supervisor.extend(obtener_permisos_modelo(ReferenciaGamaEquipo))
+    permisos_supervisor.extend(obtener_permisos_modelo(PiezaCotizada))
+    permisos_supervisor.extend(obtener_permisos_modelo(PiezaVentaMostrador))
     
     # Scorecard - Acceso completo
     permisos_supervisor.extend(obtener_permisos_modelo(Incidencia))
@@ -128,6 +132,9 @@ def setup_grupos_y_permisos():
     permisos_dispatcher.extend(obtener_permisos_modelo(SeguimientoRHITSO, ['view']))
     permisos_dispatcher.extend(obtener_permisos_modelo(IncidenciaRHITSO, ['view']))
     permisos_dispatcher.extend(obtener_permisos_modelo(VentaMostrador, ['view']))
+    permisos_dispatcher.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, ['view']))
+    permisos_dispatcher.extend(obtener_permisos_modelo(PiezaCotizada, ['view']))
+    permisos_dispatcher.extend(obtener_permisos_modelo(PiezaVentaMostrador, ['view']))
     
     grupo_dispatcher.permissions.set(permisos_dispatcher)
     print(f"   ✅ {len(permisos_dispatcher)} permisos asignados\n")
@@ -148,6 +155,9 @@ def setup_grupos_y_permisos():
     permisos_compras.extend(obtener_permisos_modelo(SeguimientoRHITSO))
     permisos_compras.extend(obtener_permisos_modelo(IncidenciaRHITSO))
     permisos_compras.extend(obtener_permisos_modelo(VentaMostrador))
+    permisos_compras.extend(obtener_permisos_modelo(ReferenciaGamaEquipo))
+    permisos_compras.extend(obtener_permisos_modelo(PiezaCotizada))
+    permisos_compras.extend(obtener_permisos_modelo(PiezaVentaMostrador))
     
     # Almacén - Acceso completo
     permisos_compras.extend(obtener_permisos_modelo(ProductoAlmacen))
@@ -177,6 +187,9 @@ def setup_grupos_y_permisos():
     permisos_recepcionista.extend(obtener_permisos_modelo(SeguimientoRHITSO, ['view', 'add']))
     permisos_recepcionista.extend(obtener_permisos_modelo(IncidenciaRHITSO, ['view', 'add']))
     permisos_recepcionista.extend(obtener_permisos_modelo(VentaMostrador))
+    permisos_recepcionista.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, ['view']))  # CRÍTICO: Para autocompletado de modelos
+    permisos_recepcionista.extend(obtener_permisos_modelo(PiezaCotizada, ['view']))  # Solo vista de piezas cotizadas
+    permisos_recepcionista.extend(obtener_permisos_modelo(PiezaVentaMostrador))  # Acceso completo a piezas venta mostrador
     
     # Almacén - Acceso completo
     permisos_recepcionista.extend(obtener_permisos_modelo(ProductoAlmacen))
@@ -220,6 +233,9 @@ def setup_grupos_y_permisos():
     permisos_tecnico.extend(obtener_permisos_modelo(SeguimientoRHITSO, ['view', 'add', 'change']))
     permisos_tecnico.extend(obtener_permisos_modelo(IncidenciaRHITSO, ['view', 'add', 'change']))
     permisos_tecnico.extend(obtener_permisos_modelo(VentaMostrador))
+    permisos_tecnico.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, ['view']))  # Para consultar referencias
+    permisos_tecnico.extend(obtener_permisos_modelo(PiezaCotizada, ['view', 'add', 'change']))  # Para cotizaciones
+    permisos_tecnico.extend(obtener_permisos_modelo(PiezaVentaMostrador, ['view', 'add', 'change']))  # Para ventas
     
     # Almacén - Solo consulta y movimientos
     permisos_tecnico.extend(obtener_permisos_modelo(ProductoAlmacen, ['view']))
@@ -249,6 +265,9 @@ def setup_grupos_y_permisos():
     permisos_almacenista.extend(obtener_permisos_modelo(DetalleEquipo, ['view']))
     permisos_almacenista.extend(obtener_permisos_modelo(Cotizacion, ['view']))
     permisos_almacenista.extend(obtener_permisos_modelo(VentaMostrador, ['view']))
+    permisos_almacenista.extend(obtener_permisos_modelo(ReferenciaGamaEquipo, ['view']))
+    permisos_almacenista.extend(obtener_permisos_modelo(PiezaCotizada, ['view']))
+    permisos_almacenista.extend(obtener_permisos_modelo(PiezaVentaMostrador, ['view']))
     
     grupo_almacenista.permissions.set(permisos_almacenista)
     print(f"   ✅ {len(permisos_almacenista)} permisos asignados\n")

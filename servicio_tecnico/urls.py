@@ -17,6 +17,9 @@ urlpatterns = [
     # Página de inicio del módulo de servicio técnico
     path('', views.inicio, name='inicio'),
     
+    # Acceso denegado (para sistema de permisos)
+    path('acceso-denegado/', views.acceso_denegado, name='acceso_denegado_servicio_tecnico'),
+    
     # Seleccionar tipo de orden (Diagnóstico vs Venta Mostrador)
     path('ordenes/nueva/', views.seleccionar_tipo_orden, name='seleccionar_tipo_orden'),
     

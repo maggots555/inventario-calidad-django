@@ -15,6 +15,8 @@ from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_http_methods
+from django.urls import reverse
+from functools import wraps
 from PIL import Image
 import os
 import json
@@ -66,6 +68,33 @@ from .forms import (
     ResolverIncidenciaRHITSOForm,
     EditarDiagnosticoSICForm,
 )
+
+
+# ===== DECORADORES DE PERMISOS =====
+def permission_required_with_message(perm, message=None):
+    """
+    Decorador personalizado que verifica permisos de Django y redirige a página de acceso denegado
+    
+    Args:
+        perm (str): Permiso requerido en formato 'app.codename' (ej: 'servicio_tecnico.add_ordenservicio')
+        message (str): Mensaje personalizado de error (opcional)
+    
+    Uso:
+        @login_required
+        @permission_required_with_message('servicio_tecnico.add_ordenservicio')
+        def crear_orden(request):
+            # Solo usuarios con permiso add_ordenservicio pueden ejecutar esto
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if not request.user.has_perm(perm):
+                error_msg = message or f'No tienes permisos para realizar esta acción.'
+                # Redirigir a página de acceso denegado con el mensaje
+                return redirect(f"{reverse('servicio_tecnico:acceso_denegado_servicio_tecnico')}?mensaje={error_msg}&permiso={perm}")
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def registrar_historial(orden, tipo_evento, usuario, comentario='', es_sistema=False):
@@ -199,6 +228,7 @@ def obtener_top_productos_vendidos(ordenes, limite=5):
 #              - Venta Mostrador (FL-)
 # ============================================================================
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def seleccionar_tipo_orden(request):
     """
     Vista de selección de tipo de orden de servicio.
@@ -216,6 +246,7 @@ def seleccionar_tipo_orden(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def inicio(request):
     """
     Vista principal de Servicio Técnico - Dashboard Completo
@@ -505,6 +536,7 @@ def inicio(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.add_ordenservicio')
 def crear_orden(request):
     """
     Vista para crear una nueva orden de servicio técnico.
@@ -569,6 +601,7 @@ def crear_orden(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.add_ordenservicio')
 def crear_orden_venta_mostrador(request):
     """
     Vista para crear una nueva orden de Venta Mostrador (sin diagnóstico).
@@ -625,6 +658,7 @@ def crear_orden_venta_mostrador(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def lista_ordenes_activas(request):
     """
     Vista para listar órdenes activas (no entregadas ni canceladas).
@@ -1046,6 +1080,7 @@ def lista_ordenes_activas(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def lista_ordenes_finalizadas(request):
     """
     Vista para listar órdenes finalizadas (entregadas o canceladas).
@@ -1088,6 +1123,7 @@ def lista_ordenes_finalizadas(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_ordenservicio')
 def cerrar_orden(request, orden_id):
     """
     Vista para cambiar el estado de una orden a 'entregado'.
@@ -1128,6 +1164,7 @@ def cerrar_orden(request, orden_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_ordenservicio')
 def cerrar_todas_finalizadas(request):
     """
     Vista para cerrar todas las órdenes en estado 'finalizado'.
@@ -1171,6 +1208,7 @@ def cerrar_todas_finalizadas(request):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def detalle_orden(request, orden_id):
     """
     Vista completa de detalles de una orden de servicio.
@@ -2308,6 +2346,7 @@ def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_imagenorden')
 def descargar_imagen_original(request, imagen_id):
     """
     Descarga la imagen original (alta resolución) de una orden.
@@ -2400,6 +2439,7 @@ def descargar_imagen_original(request, imagen_id):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.delete_imagenorden')
 @require_http_methods(["POST"])
 def eliminar_imagen(request, imagen_id):
     """
@@ -2537,6 +2577,7 @@ def eliminar_imagen(request, imagen_id):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_referenciagamaequipo')
 def lista_referencias_gama(request):
     """
     Lista todas las referencias de gama de equipos con filtros de búsqueda.
@@ -2596,6 +2637,7 @@ def lista_referencias_gama(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.add_referenciagamaequipo')
 def crear_referencia_gama(request):
     """
     Crea una nueva referencia de gama de equipo.
@@ -2631,6 +2673,7 @@ def crear_referencia_gama(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_referenciagamaequipo')
 def editar_referencia_gama(request, referencia_id):
     """
     Edita una referencia de gama existente.
@@ -2668,6 +2711,7 @@ def editar_referencia_gama(request, referencia_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.delete_referenciagamaequipo')
 def eliminar_referencia_gama(request, referencia_id):
     """
     Desactiva (soft delete) una referencia de gama.
@@ -2702,6 +2746,7 @@ def eliminar_referencia_gama(request, referencia_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_referenciagamaequipo')
 def reactivar_referencia_gama(request, referencia_id):
     """
     Reactiva una referencia previamente desactivada.
@@ -2730,6 +2775,7 @@ def reactivar_referencia_gama(request, referencia_id):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.add_piezacotizada')
 @require_http_methods(["POST"])
 def agregar_pieza_cotizada(request, orden_id):
     """
@@ -2794,6 +2840,7 @@ def agregar_pieza_cotizada(request, orden_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_piezacotizada')
 @require_http_methods(["GET"])
 def obtener_pieza_cotizada(request, pieza_id):
     """
@@ -2835,6 +2882,7 @@ def obtener_pieza_cotizada(request, pieza_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_piezacotizada')
 @require_http_methods(["POST"])
 def editar_pieza_cotizada(request, pieza_id):
     """
@@ -2888,6 +2936,7 @@ def editar_pieza_cotizada(request, pieza_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.delete_piezacotizada')
 @require_http_methods(["POST"])
 def eliminar_pieza_cotizada(request, pieza_id):
     """
@@ -2942,6 +2991,7 @@ def eliminar_pieza_cotizada(request, pieza_id):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_seguimientopieza')
 @require_http_methods(["GET"])
 def obtener_seguimiento_pieza(request, seguimiento_id):
     """
@@ -2982,6 +3032,7 @@ def obtener_seguimiento_pieza(request, seguimiento_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.add_seguimientopieza')
 @require_http_methods(["POST"])
 def agregar_seguimiento_pieza(request, orden_id):
     """
@@ -3068,6 +3119,7 @@ def agregar_seguimiento_pieza(request, orden_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_seguimientopieza')
 @require_http_methods(["POST"])
 def editar_seguimiento_pieza(request, seguimiento_id):
     """
@@ -3126,6 +3178,7 @@ def editar_seguimiento_pieza(request, seguimiento_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.delete_seguimientopieza')
 @require_http_methods(["POST"])
 def eliminar_seguimiento_pieza(request, seguimiento_id):
     """
@@ -3169,6 +3222,7 @@ def eliminar_seguimiento_pieza(request, seguimiento_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_seguimientopieza')
 @require_http_methods(["POST"])
 def marcar_pieza_recibida(request, seguimiento_id):
     """
@@ -3290,6 +3344,7 @@ def marcar_pieza_recibida(request, seguimiento_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_seguimientopieza')
 @require_http_methods(["POST"])
 def reenviar_notificacion_pieza(request, seguimiento_id):
     """
@@ -3401,6 +3456,7 @@ def reenviar_notificacion_pieza(request, seguimiento_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_seguimientopieza')
 @require_http_methods(["POST"])
 def marcar_pieza_incorrecta(request, seguimiento_id):
     """
@@ -3475,6 +3531,7 @@ def marcar_pieza_incorrecta(request, seguimiento_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_seguimientopieza')
 @require_http_methods(["POST"])
 def marcar_pieza_danada(request, seguimiento_id):
     """
@@ -3544,6 +3601,7 @@ def marcar_pieza_danada(request, seguimiento_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_seguimientopieza')
 def cambiar_estado_seguimiento(request, seguimiento_id):
     """
     Cambia el estado de un seguimiento de pieza de forma rápida.
@@ -4000,6 +4058,7 @@ Hecho por Jorge Magos todos los derechos reservados.
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.add_ventamostrador')
 @require_http_methods(["POST"])
 def crear_venta_mostrador(request, orden_id):
     """
@@ -4073,6 +4132,7 @@ def crear_venta_mostrador(request, orden_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.add_piezaventamostrador')
 @require_http_methods(["POST"])
 def agregar_pieza_venta_mostrador(request, orden_id):
     """
@@ -4148,6 +4208,7 @@ def agregar_pieza_venta_mostrador(request, orden_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_piezaventamostrador')
 @require_http_methods(["POST"])
 def editar_pieza_venta_mostrador(request, pieza_id):
     """
@@ -4214,6 +4275,7 @@ def editar_pieza_venta_mostrador(request, pieza_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.delete_piezaventamostrador')
 @require_http_methods(["POST"])
 def eliminar_pieza_venta_mostrador(request, pieza_id):
     """
@@ -4270,6 +4332,7 @@ def eliminar_pieza_venta_mostrador(request, pieza_id):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def gestion_rhitso(request, orden_id):
     """
     Vista principal del módulo RHITSO - Panel de gestión completo.
@@ -4628,6 +4691,7 @@ Saludos cordiales."""
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_ordenservicio')
 @require_http_methods(["POST"])
 def actualizar_estado_rhitso(request, orden_id):
     """
@@ -4773,6 +4837,7 @@ def actualizar_estado_rhitso(request, orden_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.add_incidenciarhitso')
 @require_http_methods(["POST"])
 def registrar_incidencia(request, orden_id):
     """
@@ -4874,6 +4939,7 @@ def registrar_incidencia(request, orden_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_incidenciarhitso')
 @require_http_methods(["POST"])
 def resolver_incidencia(request, incidencia_id):
     """
@@ -4967,6 +5033,7 @@ def resolver_incidencia(request, incidencia_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_ordenservicio')
 @require_http_methods(["POST"])
 def editar_diagnostico_sic(request, orden_id):
     """
@@ -5087,6 +5154,7 @@ def editar_diagnostico_sic(request, orden_id):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.change_ordenservicio')
 @require_http_methods(["POST"])
 def agregar_comentario_rhitso(request, orden_id):
     """
@@ -5173,6 +5241,7 @@ def agregar_comentario_rhitso(request, orden_id):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 @require_http_methods(["POST"])
 def enviar_correo_rhitso(request, orden_id):
     """
@@ -5507,6 +5576,7 @@ def enviar_correo_rhitso(request, orden_id):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def generar_pdf_rhitso_prueba(request, orden_id):
     """
     Vista de prueba para generar el PDF RHITSO.
@@ -5595,6 +5665,7 @@ def generar_pdf_rhitso_prueba(request, orden_id):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 @require_http_methods(["POST"])
 def enviar_imagenes_cliente(request, orden_id):
     """
@@ -5958,6 +6029,7 @@ def enviar_imagenes_cliente(request, orden_id):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def dashboard_rhitso(request):
     """
     Dashboard consolidado de todos los candidatos RHITSO.
@@ -6251,6 +6323,7 @@ def dashboard_rhitso(request):
 # =============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def exportar_excel_rhitso(request):
     """
     Genera y descarga un reporte Excel profesional de candidatos RHITSO.
@@ -6603,6 +6676,7 @@ def exportar_excel_rhitso(request):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def dashboard_seguimiento_oow_fl(request):
     """
     Dashboard especializado para seguimiento de órdenes con prefijo OOW- y FL-.
@@ -7245,6 +7319,8 @@ def dashboard_seguimiento_oow_fl(request):
     return render(request, 'servicio_tecnico/dashboard_seguimiento_oow_fl.html', context)
 
 
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def exportar_excel_dashboard_oow_fl(request):
     """
     Exporta el dashboard OOW-/FL- a Excel con múltiples hojas de análisis
@@ -7978,6 +8054,7 @@ def exportar_excel_dashboard_oow_fl(request):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def dashboard_cotizaciones(request):
     """
     Dashboard analítico completo de cotizaciones tipo Power BI.
@@ -8702,6 +8779,7 @@ def dashboard_cotizaciones(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def exportar_dashboard_cotizaciones(request):
     """
     Exporta el dashboard de cotizaciones a Excel con múltiples hojas.
@@ -8996,6 +9074,7 @@ def exportar_dashboard_cotizaciones(request):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 @require_http_methods(["GET"])
 def api_buscar_orden_por_serie(request):
     """
@@ -9151,6 +9230,7 @@ def api_buscar_orden_por_serie(request):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_referenciagamaequipo')
 @require_http_methods(["GET"])
 def api_buscar_modelos_por_marca(request):
     """
@@ -9254,6 +9334,7 @@ def api_buscar_modelos_por_marca(request):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def dashboard_seguimiento_piezas(request):
     """
     Dashboard dedicado para seguimiento de piezas en tránsito.
@@ -9655,6 +9736,7 @@ def dashboard_seguimiento_piezas(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
 def exportar_dashboard_seguimiento_piezas(request):
     """
     Exporta el dashboard de seguimiento de piezas a Excel.
@@ -9962,8 +10044,44 @@ def exportar_dashboard_seguimiento_piezas(request):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
     response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
-    
     wb.save(response)
     
     return response
+
+
+# ==========================================
+# VISTA DE ACCESO DENEGADO
+# ==========================================
+
+@login_required
+def acceso_denegado(request):
+    """
+    Vista para mostrar página de acceso denegado cuando el usuario no tiene permisos.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista se muestra cuando un usuario intenta acceder a una funcionalidad
+    para la cual no tiene los permisos necesarios según su grupo/rol.
+    
+    Args:
+        request: Objeto HttpRequest con los parámetros GET
+            - mensaje: Mensaje personalizado de error
+            - permiso: Nombre del permiso requerido
+    
+    Returns:
+        HttpResponse: Renderiza el template acceso_denegado.html
+    """
+    mensaje = request.GET.get('mensaje', 'No tienes permisos para acceder a esta sección.')
+    permiso = request.GET.get('permiso', 'N/A')
+    
+    # Obtener grupos del usuario para mostrarle sus roles actuales
+    grupos = request.user.groups.all()
+    
+    context = {
+        'mensaje': mensaje,
+        'permiso_requerido': permiso,
+        'grupos_usuario': grupos,
+    }
+    
+    return render(request, 'servicio_tecnico/acceso_denegado.html', context)
+
 
