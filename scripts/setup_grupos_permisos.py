@@ -26,8 +26,9 @@ from servicio_tecnico.models import (
 )
 from scorecard.models import Incidencia, ComponenteEquipo, CategoriaIncidencia, ServicioRealizado
 from almacen.models import (
-    ProductoAlmacen, Proveedor, CompraProducto, MovimientoAlmacen,
-    SolicitudBaja, SolicitudCotizacion, Auditoria
+    Proveedor, CategoriaAlmacen, ProductoAlmacen, CompraProducto, UnidadCompra,
+    MovimientoAlmacen, SolicitudBaja, Auditoria, DiferenciaAuditoria,
+    UnidadInventario, SolicitudCotizacion, LineaCotizacion, ImagenLineaCotizacion
 )
 
 
@@ -65,6 +66,26 @@ def setup_grupos_y_permisos():
     print("CONFIGURACIÓN DE GRUPOS Y PERMISOS DEL SISTEMA")
     print("="*70 + "\n")
     
+    # ========== PERMISOS PERSONALIZADOS ==========
+    # Obtener permisos personalizados de dashboards
+    from django.contrib.contenttypes.models import ContentType
+    ct_ordenservicio = ContentType.objects.get_for_model(OrdenServicio)
+    
+    try:
+        permiso_dashboard_gerencial = Permission.objects.get(
+            codename='view_dashboard_gerencial',
+            content_type=ct_ordenservicio
+        )
+        permiso_dashboard_seguimiento = Permission.objects.get(
+            codename='view_dashboard_seguimiento',
+            content_type=ct_ordenservicio
+        )
+        print("✅ Permisos personalizados encontrados")
+    except Permission.DoesNotExist:
+        print("⚠️  Permisos personalizados no encontrados. Ejecuta las migraciones primero.")
+        permiso_dashboard_gerencial = None
+        permiso_dashboard_seguimiento = None
+    
     # ========== SUPERVISOR ==========
     print("📋 Configurando grupo: SUPERVISOR")
     grupo_supervisor = crear_grupo("Supervisor", "Acceso general al sistema excepto configuraciones")
@@ -91,6 +112,12 @@ def setup_grupos_y_permisos():
     permisos_supervisor.extend(obtener_permisos_modelo(PiezaCotizada))
     permisos_supervisor.extend(obtener_permisos_modelo(PiezaVentaMostrador))
     
+    # Permisos personalizados de dashboards (solo gerenciales)
+    if permiso_dashboard_gerencial:
+        permisos_supervisor.append(permiso_dashboard_gerencial)
+    if permiso_dashboard_seguimiento:
+        permisos_supervisor.append(permiso_dashboard_seguimiento)
+    
     # Scorecard - Acceso completo
     permisos_supervisor.extend(obtener_permisos_modelo(Incidencia))
     permisos_supervisor.extend(obtener_permisos_modelo(ComponenteEquipo))
@@ -98,13 +125,19 @@ def setup_grupos_y_permisos():
     permisos_supervisor.extend(obtener_permisos_modelo(ServicioRealizado))
     
     # Almacén - Acceso completo
-    permisos_supervisor.extend(obtener_permisos_modelo(ProductoAlmacen))
     permisos_supervisor.extend(obtener_permisos_modelo(Proveedor))
+    permisos_supervisor.extend(obtener_permisos_modelo(CategoriaAlmacen))
+    permisos_supervisor.extend(obtener_permisos_modelo(ProductoAlmacen))
     permisos_supervisor.extend(obtener_permisos_modelo(CompraProducto))
+    permisos_supervisor.extend(obtener_permisos_modelo(UnidadCompra))
     permisos_supervisor.extend(obtener_permisos_modelo(MovimientoAlmacen))
     permisos_supervisor.extend(obtener_permisos_modelo(SolicitudBaja))
-    permisos_supervisor.extend(obtener_permisos_modelo(SolicitudCotizacion))
     permisos_supervisor.extend(obtener_permisos_modelo(Auditoria))
+    permisos_supervisor.extend(obtener_permisos_modelo(DiferenciaAuditoria))
+    permisos_supervisor.extend(obtener_permisos_modelo(UnidadInventario))
+    permisos_supervisor.extend(obtener_permisos_modelo(SolicitudCotizacion))
+    permisos_supervisor.extend(obtener_permisos_modelo(LineaCotizacion))
+    permisos_supervisor.extend(obtener_permisos_modelo(ImagenLineaCotizacion))
     
     grupo_supervisor.permissions.set(permisos_supervisor)
     print(f"   ✅ {len(permisos_supervisor)} permisos asignados\n")
@@ -136,6 +169,9 @@ def setup_grupos_y_permisos():
     permisos_dispatcher.extend(obtener_permisos_modelo(PiezaCotizada, ['view']))
     permisos_dispatcher.extend(obtener_permisos_modelo(PiezaVentaMostrador, ['view']))
     
+    # Almacén - SIN ACCESO (Dispatcher no necesita ver módulo de almacén)
+    # El Dispatcher solo gestiona órdenes de servicio, no inventario
+    
     grupo_dispatcher.permissions.set(permisos_dispatcher)
     print(f"   ✅ {len(permisos_dispatcher)} permisos asignados\n")
     
@@ -160,13 +196,19 @@ def setup_grupos_y_permisos():
     permisos_compras.extend(obtener_permisos_modelo(PiezaVentaMostrador))
     
     # Almacén - Acceso completo
-    permisos_compras.extend(obtener_permisos_modelo(ProductoAlmacen))
     permisos_compras.extend(obtener_permisos_modelo(Proveedor))
+    permisos_compras.extend(obtener_permisos_modelo(CategoriaAlmacen))
+    permisos_compras.extend(obtener_permisos_modelo(ProductoAlmacen))
     permisos_compras.extend(obtener_permisos_modelo(CompraProducto))
+    permisos_compras.extend(obtener_permisos_modelo(UnidadCompra))
     permisos_compras.extend(obtener_permisos_modelo(MovimientoAlmacen))
     permisos_compras.extend(obtener_permisos_modelo(SolicitudBaja))
-    permisos_compras.extend(obtener_permisos_modelo(SolicitudCotizacion))
     permisos_compras.extend(obtener_permisos_modelo(Auditoria))
+    permisos_compras.extend(obtener_permisos_modelo(DiferenciaAuditoria))
+    permisos_compras.extend(obtener_permisos_modelo(UnidadInventario))
+    permisos_compras.extend(obtener_permisos_modelo(SolicitudCotizacion))
+    permisos_compras.extend(obtener_permisos_modelo(LineaCotizacion))
+    permisos_compras.extend(obtener_permisos_modelo(ImagenLineaCotizacion))
     
     grupo_compras.permissions.set(permisos_compras)
     print(f"   ✅ {len(permisos_compras)} permisos asignados\n")
@@ -191,14 +233,20 @@ def setup_grupos_y_permisos():
     permisos_recepcionista.extend(obtener_permisos_modelo(PiezaCotizada, ['view']))  # Solo vista de piezas cotizadas
     permisos_recepcionista.extend(obtener_permisos_modelo(PiezaVentaMostrador))  # Acceso completo a piezas venta mostrador
     
-    # Almacén - Acceso completo
-    permisos_recepcionista.extend(obtener_permisos_modelo(ProductoAlmacen))
-    permisos_recepcionista.extend(obtener_permisos_modelo(Proveedor, ['view']))
-    permisos_recepcionista.extend(obtener_permisos_modelo(CompraProducto, ['view']))
-    permisos_recepcionista.extend(obtener_permisos_modelo(MovimientoAlmacen))
-    permisos_recepcionista.extend(obtener_permisos_modelo(SolicitudBaja, ['view', 'add']))
-    permisos_recepcionista.extend(obtener_permisos_modelo(SolicitudCotizacion, ['view', 'add']))
-    permisos_recepcionista.extend(obtener_permisos_modelo(Auditoria, ['view']))
+    # Almacén - Acceso limitado
+    permisos_recepcionista.extend(obtener_permisos_modelo(ProductoAlmacen, ['view', 'add', 'change']))  # Casi completo
+    permisos_recepcionista.extend(obtener_permisos_modelo(Proveedor, ['view']))  # Solo consulta
+    permisos_recepcionista.extend(obtener_permisos_modelo(CategoriaAlmacen, ['view']))  # Solo consulta
+    permisos_recepcionista.extend(obtener_permisos_modelo(CompraProducto, ['view']))  # Solo consulta
+    permisos_recepcionista.extend(obtener_permisos_modelo(UnidadCompra, ['view']))  # Solo consulta
+    permisos_recepcionista.extend(obtener_permisos_modelo(MovimientoAlmacen, ['view', 'add']))  # Puede registrar movimientos
+    permisos_recepcionista.extend(obtener_permisos_modelo(SolicitudBaja, ['view', 'add', 'change']))  # Gestiona solicitudes
+    permisos_recepcionista.extend(obtener_permisos_modelo(Auditoria, ['view']))  # Solo consulta
+    permisos_recepcionista.extend(obtener_permisos_modelo(DiferenciaAuditoria, ['view']))  # Solo consulta
+    permisos_recepcionista.extend(obtener_permisos_modelo(UnidadInventario, ['view', 'add', 'change']))  # Gestiona unidades
+    permisos_recepcionista.extend(obtener_permisos_modelo(SolicitudCotizacion, ['view', 'add', 'change']))  # Gestiona cotizaciones
+    permisos_recepcionista.extend(obtener_permisos_modelo(LineaCotizacion, ['view', 'add', 'change']))  # Gestiona líneas
+    permisos_recepcionista.extend(obtener_permisos_modelo(ImagenLineaCotizacion, ['view', 'add']))  # Sube imágenes
     
     grupo_recepcionista.permissions.set(permisos_recepcionista)
     print(f"   ✅ {len(permisos_recepcionista)} permisos asignados\n")
@@ -237,11 +285,13 @@ def setup_grupos_y_permisos():
     permisos_tecnico.extend(obtener_permisos_modelo(PiezaCotizada, ['view', 'add', 'change']))  # Para cotizaciones
     permisos_tecnico.extend(obtener_permisos_modelo(PiezaVentaMostrador, ['view', 'add', 'change']))  # Para ventas
     
-    # Almacén - Solo consulta y movimientos
-    permisos_tecnico.extend(obtener_permisos_modelo(ProductoAlmacen, ['view']))
-    permisos_tecnico.extend(obtener_permisos_modelo(MovimientoAlmacen, ['view', 'add']))
-    permisos_tecnico.extend(obtener_permisos_modelo(SolicitudBaja, ['view', 'add']))
-    permisos_tecnico.extend(obtener_permisos_modelo(SolicitudCotizacion, ['view', 'add']))
+    # Almacén - Solo consulta y solicitudes
+    permisos_tecnico.extend(obtener_permisos_modelo(ProductoAlmacen, ['view']))  # Consultar productos
+    permisos_tecnico.extend(obtener_permisos_modelo(CategoriaAlmacen, ['view']))  # Consultar categorías
+    permisos_tecnico.extend(obtener_permisos_modelo(UnidadInventario, ['view']))  # Consultar unidades disponibles
+    permisos_tecnico.extend(obtener_permisos_modelo(MovimientoAlmacen, ['view', 'add']))  # Registrar movimientos
+    permisos_tecnico.extend(obtener_permisos_modelo(SolicitudBaja, ['view', 'add', 'change']))  # Crear solicitudes
+    permisos_tecnico.extend(obtener_permisos_modelo(SolicitudCotizacion, ['view']))  # Consultar cotizaciones
     
     grupo_tecnico.permissions.set(permisos_tecnico)
     print(f"   ✅ {len(permisos_tecnico)} permisos asignados\n")
@@ -251,14 +301,20 @@ def setup_grupos_y_permisos():
     grupo_almacenista = crear_grupo("Almacenista", "Acceso a almacén y servicio técnico")
     permisos_almacenista = []
     
-    # Almacén - Acceso completo
-    permisos_almacenista.extend(obtener_permisos_modelo(ProductoAlmacen))
+    # Almacén - Acceso completo a TODOS los modelos
     permisos_almacenista.extend(obtener_permisos_modelo(Proveedor))
+    permisos_almacenista.extend(obtener_permisos_modelo(CategoriaAlmacen))
+    permisos_almacenista.extend(obtener_permisos_modelo(ProductoAlmacen))
     permisos_almacenista.extend(obtener_permisos_modelo(CompraProducto))
+    permisos_almacenista.extend(obtener_permisos_modelo(UnidadCompra))
     permisos_almacenista.extend(obtener_permisos_modelo(MovimientoAlmacen))
     permisos_almacenista.extend(obtener_permisos_modelo(SolicitudBaja))
-    permisos_almacenista.extend(obtener_permisos_modelo(SolicitudCotizacion))
     permisos_almacenista.extend(obtener_permisos_modelo(Auditoria))
+    permisos_almacenista.extend(obtener_permisos_modelo(DiferenciaAuditoria))
+    permisos_almacenista.extend(obtener_permisos_modelo(UnidadInventario))
+    permisos_almacenista.extend(obtener_permisos_modelo(SolicitudCotizacion))
+    permisos_almacenista.extend(obtener_permisos_modelo(LineaCotizacion))
+    permisos_almacenista.extend(obtener_permisos_modelo(ImagenLineaCotizacion))
     
     # Servicio Técnico - Solo consulta
     permisos_almacenista.extend(obtener_permisos_modelo(OrdenServicio, ['view']))

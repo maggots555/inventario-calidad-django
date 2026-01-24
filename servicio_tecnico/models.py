@@ -753,6 +753,10 @@ class OrdenServicio(models.Model):
             models.Index(fields=['sucursal']),
             models.Index(fields=['año', 'mes']),
         ]
+        permissions = [
+            ("view_dashboard_gerencial", "Puede ver dashboards gerenciales (OOW/FL, Cotizaciones)"),
+            ("view_dashboard_seguimiento", "Puede ver dashboard de seguimiento de piezas"),
+        ]
 
 
 # ============================================================================

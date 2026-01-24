@@ -24,6 +24,11 @@ urlpatterns = [
     path('', views.dashboard_almacen, name='dashboard'),
     
     # ============================================================================
+    # VISTA DE ACCESO DENEGADO
+    # ============================================================================
+    path('acceso-denegado/', views.acceso_denegado, name='acceso_denegado_almacen'),
+    
+    # ============================================================================
     # GESTIÓN DE PRODUCTOS
     # ============================================================================
     path('productos/', views.lista_productos, name='lista_productos'),

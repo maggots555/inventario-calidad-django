@@ -6676,7 +6676,7 @@ def exportar_excel_rhitso(request):
 # ============================================================================
 
 @login_required
-@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def dashboard_seguimiento_oow_fl(request):
     """
     Dashboard especializado para seguimiento de órdenes con prefijo OOW- y FL-.
@@ -7320,7 +7320,7 @@ def dashboard_seguimiento_oow_fl(request):
 
 
 @login_required
-@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def exportar_excel_dashboard_oow_fl(request):
     """
     Exporta el dashboard OOW-/FL- a Excel con múltiples hojas de análisis
@@ -8054,7 +8054,7 @@ def exportar_excel_dashboard_oow_fl(request):
 # ============================================================================
 
 @login_required
-@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def dashboard_cotizaciones(request):
     """
     Dashboard analítico completo de cotizaciones tipo Power BI.
@@ -8779,7 +8779,7 @@ def dashboard_cotizaciones(request):
 
 
 @login_required
-@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def exportar_dashboard_cotizaciones(request):
     """
     Exporta el dashboard de cotizaciones a Excel con múltiples hojas.

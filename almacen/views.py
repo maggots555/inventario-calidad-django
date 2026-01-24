@@ -32,6 +32,8 @@ from django.db.models import Q, Sum, Count, F, DecimalField
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.utils import timezone
+from django.urls import reverse
+from functools import wraps
 
 from .models import (
     Proveedor,
@@ -78,9 +80,52 @@ from inventario.models import Empleado
 
 
 # ============================================================================
+# DECORADOR PERSONALIZADO PARA PERMISOS
+# ============================================================================
+def permission_required_with_message(perm, message=None):
+    """
+    Decorador personalizado para verificar permisos con redirección a página de acceso denegado.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este decorador verifica que el usuario tenga el permiso requerido.
+    Si NO lo tiene, redirige a una página amigable explicando el problema.
+    
+    Args:
+        perm (str): Permiso requerido en formato 'app.permiso_modelo'
+                   Ejemplo: 'almacen.view_productoalmacen'
+        message (str, opcional): Mensaje personalizado de error
+    
+    Uso:
+        @login_required
+        @permission_required_with_message('almacen.view_productoalmacen')
+        def lista_productos(request):
+            ...
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            # Verificar si el usuario tiene el permiso
+            if not request.user.has_perm(perm):
+                # Mensaje personalizado o genérico
+                error_msg = message or 'No tienes permisos para realizar esta acción.'
+                
+                # Redirigir a la página de acceso denegado con parámetros
+                return redirect(
+                    f"{reverse('almacen:acceso_denegado_almacen')}?mensaje={error_msg}&permiso={perm}"
+                )
+            
+            # Si tiene permiso, ejecutar la vista normalmente
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# ============================================================================
 # DASHBOARD PRINCIPAL
 # ============================================================================
 @login_required
+@permission_required_with_message('almacen.view_productoalmacen')
 def dashboard_almacen(request):
     """
     Dashboard principal del módulo Almacén.
@@ -168,6 +213,7 @@ def dashboard_almacen(request):
 # CRUD: PROVEEDORES
 # ============================================================================
 @login_required
+@permission_required_with_message('almacen.view_proveedor')
 def lista_proveedores(request):
     """
     Lista todos los proveedores con búsqueda y paginación.
@@ -205,6 +251,7 @@ def lista_proveedores(request):
 
 
 @login_required
+@permission_required_with_message('almacen.add_proveedor')
 def crear_proveedor(request):
     """
     Crea un nuevo proveedor.
@@ -228,6 +275,7 @@ def crear_proveedor(request):
 
 
 @login_required
+@permission_required_with_message('almacen.change_proveedor')
 def editar_proveedor(request, pk):
     """
     Edita un proveedor existente.
@@ -254,6 +302,7 @@ def editar_proveedor(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.delete_proveedor')
 def eliminar_proveedor(request, pk):
     """
     Elimina un proveedor (o lo desactiva si tiene productos asociados).
@@ -290,6 +339,7 @@ def eliminar_proveedor(request, pk):
 # CRUD: CATEGORÍAS
 # ============================================================================
 @login_required
+@permission_required_with_message('almacen.view_categoriaalmacen')
 def lista_categorias(request):
     """
     Lista todas las categorías con conteo de productos.
@@ -306,6 +356,7 @@ def lista_categorias(request):
 
 
 @login_required
+@permission_required_with_message('almacen.add_categoriaalmacen')
 def crear_categoria(request):
     """
     Crea una nueva categoría.
@@ -329,6 +380,7 @@ def crear_categoria(request):
 
 
 @login_required
+@permission_required_with_message('almacen.change_categoriaalmacen')
 def editar_categoria(request, pk):
     """
     Edita una categoría existente.
@@ -358,6 +410,7 @@ def editar_categoria(request, pk):
 # CRUD: PRODUCTOS DE ALMACÉN
 # ============================================================================
 @login_required
+@permission_required_with_message('almacen.view_productoalmacen')
 def lista_productos(request):
     """
     Lista productos con búsqueda, filtros y paginación.
@@ -422,6 +475,7 @@ def lista_productos(request):
 
 
 @login_required
+@permission_required_with_message('almacen.add_productoalmacen')
 def crear_producto(request):
     """
     Crea un nuevo producto de almacén.
@@ -450,6 +504,7 @@ def crear_producto(request):
 
 
 @login_required
+@permission_required_with_message('almacen.change_productoalmacen')
 def editar_producto(request, pk):
     """
     Edita un producto existente.
@@ -476,6 +531,7 @@ def editar_producto(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.view_productoalmacen')
 def detalle_producto(request, pk):
     """
     Muestra el detalle completo de un producto.
@@ -576,6 +632,7 @@ def detalle_producto(request, pk):
 # SOLICITUDES DE BAJA
 # ============================================================================
 @login_required
+@permission_required_with_message('almacen.view_solicitudbaja')
 def lista_solicitudes(request):
     """
     Lista de solicitudes de baja con filtros por estado.
@@ -617,6 +674,7 @@ def lista_solicitudes(request):
 
 
 @login_required
+@permission_required_with_message('almacen.add_solicitudbaja')
 def crear_solicitud(request):
     """
     Crea una nueva solicitud de baja.
@@ -694,6 +752,7 @@ def crear_solicitud(request):
 
 
 @login_required
+@permission_required_with_message('almacen.change_solicitudbaja')
 def procesar_solicitud(request, pk):
     """
     Procesa (aprueba o rechaza) una solicitud de baja.
@@ -751,6 +810,7 @@ def procesar_solicitud(request, pk):
 # MOVIMIENTOS (ENTRADAS/SALIDAS)
 # ============================================================================
 @login_required
+@permission_required_with_message('almacen.view_movimientoalmacen')
 def lista_movimientos(request):
     """
     Lista de movimientos de almacén (entradas y salidas).
@@ -788,6 +848,7 @@ def lista_movimientos(request):
 # API / AJAX ENDPOINTS
 # ============================================================================
 @login_required
+@permission_required_with_message('almacen.view_productoalmacen')
 def api_buscar_productos(request):
     """
     API para búsqueda de productos (autocompletado).
@@ -822,7 +883,8 @@ def api_buscar_productos(request):
     return JsonResponse(data)
 
 
-@login_required  
+@login_required
+@permission_required_with_message('almacen.view_productoalmacen')
 def api_info_producto(request, pk):
     """
     API para obtener información de un producto específico.
@@ -853,6 +915,7 @@ def api_info_producto(request, pk):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('almacen.view_unidadinventario')
 def lista_unidades(request):
     """
     Lista de todas las unidades individuales de inventario.
@@ -993,6 +1056,7 @@ def lista_unidades(request):
 
 
 @login_required
+@permission_required_with_message('almacen.add_unidadinventario')
 def crear_unidad(request, producto_id=None):
     """
     Crear una nueva unidad de inventario.
@@ -1058,6 +1122,7 @@ def crear_unidad(request, producto_id=None):
 
 
 @login_required
+@permission_required_with_message('almacen.view_unidadinventario')
 def detalle_unidad(request, pk):
     """
     Detalle de una unidad específica de inventario.
@@ -1124,6 +1189,7 @@ def detalle_unidad(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_unidadinventario')
 def editar_unidad(request, pk):
     """
     Editar una unidad de inventario existente.
@@ -1172,6 +1238,7 @@ def editar_unidad(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.delete_unidadinventario')
 def eliminar_unidad(request, pk):
     """
     Eliminar una unidad de inventario.
@@ -1226,6 +1293,7 @@ def eliminar_unidad(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_unidadinventario')
 def cambiar_estado_unidad(request, pk):
     """
     Cambiar rápidamente el estado de una unidad (AJAX).
@@ -1282,6 +1350,7 @@ def cambiar_estado_unidad(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.view_unidadinventario')
 def unidades_por_producto(request, producto_id):
     """
     Lista de unidades para un producto específico.
@@ -1379,6 +1448,7 @@ def unidades_por_producto(request, producto_id):
 
 
 @login_required
+@permission_required_with_message('almacen.view_unidadinventario')
 def api_unidad_info(request, pk):
     """
     API para obtener información de una unidad específica (JSON).
@@ -1425,6 +1495,7 @@ def api_unidad_info(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.view_unidadinventario')
 def api_unidades_producto(request):
     """
     API para obtener las unidades disponibles de un producto (JSON).
@@ -1622,6 +1693,7 @@ def api_unidades_producto(request):
 
 
 @login_required
+@permission_required_with_message('almacen.view_solicitudbaja')
 def api_tecnicos_disponibles(request):
     """
     API para obtener la lista de técnicos de laboratorio disponibles (JSON).
@@ -1690,6 +1762,7 @@ def api_tecnicos_disponibles(request):
 # API: BUSCAR O CREAR ORDEN DE SERVICIO POR ORDEN_CLIENTE
 # ============================================================================
 @login_required
+@permission_required_with_message('almacen.add_solicitudbaja')
 def api_buscar_crear_orden_cliente(request):
     """
     API para buscar una orden de servicio por orden_cliente o crearla si no existe.
@@ -1957,6 +2030,7 @@ def api_buscar_crear_orden_cliente(request):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('almacen.view_compraproducto')
 def lista_compras(request):
     """
     Lista de todas las compras y cotizaciones.
@@ -2028,6 +2102,7 @@ def lista_compras(request):
 
 
 @login_required
+@permission_required_with_message('almacen.view_solicitudcotizacion')
 def panel_cotizaciones(request):
     """
     Panel de cotizaciones pendientes de aprobación.
@@ -2107,6 +2182,7 @@ def panel_cotizaciones(request):
 
 
 @login_required
+@permission_required_with_message('almacen.add_compraproducto')
 def crear_compra(request):
     """
     Crear nueva COMPRA DIRECTA con unidades individuales.
@@ -2281,6 +2357,7 @@ def crear_compra(request):
 
 
 @login_required
+@permission_required_with_message('almacen.view_compraproducto')
 def detalle_compra(request, pk):
     """
     Detalle de una compra o cotización.
@@ -2323,6 +2400,7 @@ def detalle_compra(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_compraproducto')
 def editar_compra(request, pk):
     """
     Editar una compra o cotización existente.
@@ -2457,6 +2535,7 @@ def editar_compra(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_compraproducto')
 def aprobar_cotizacion(request, pk):
     """
     Aprobar una cotización y convertirla en compra.
@@ -2487,6 +2566,7 @@ def aprobar_cotizacion(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_compraproducto')
 def rechazar_cotizacion(request, pk):
     """
     Rechazar una cotización.
@@ -2525,6 +2605,7 @@ def rechazar_cotizacion(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_compraproducto')
 def recibir_compra(request, pk):
     """
     Confirmar la recepción de una compra.
@@ -2651,6 +2732,7 @@ def recibir_compra(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_compraproducto')
 def reportar_problema_compra(request, pk):
     """
     Reportar problema con una compra recibida (WPB o DOA).
@@ -2698,6 +2780,7 @@ def reportar_problema_compra(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_compraproducto')
 def iniciar_devolucion(request, pk):
     """
     Iniciar proceso de devolución al proveedor.
@@ -2729,6 +2812,7 @@ def iniciar_devolucion(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_compraproducto')
 def confirmar_devolucion(request, pk):
     """
     Confirmar que la devolución fue completada.
@@ -2784,6 +2868,7 @@ def confirmar_devolucion(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.delete_compraproducto')
 def cancelar_compra(request, pk):
     """
     Cancelar una compra o cotización.
@@ -2807,6 +2892,7 @@ def cancelar_compra(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_unidadcompra')
 def recibir_unidad_compra(request, compra_pk, pk):
     """
     Recibir una unidad individual de una compra.
@@ -2841,6 +2927,7 @@ def recibir_unidad_compra(request, compra_pk, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_unidadcompra')
 def problema_unidad_compra(request, compra_pk, pk):
     """
     Reportar problema con una unidad específica de una compra.
@@ -2867,6 +2954,7 @@ def problema_unidad_compra(request, compra_pk, pk):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('almacen.view_solicitudcotizacion')
 def lista_solicitudes_cotizacion(request):
     """
     Lista todas las solicitudes de cotización con filtros.
@@ -2934,6 +3022,7 @@ def lista_solicitudes_cotizacion(request):
 
 
 @login_required
+@permission_required_with_message('almacen.add_solicitudcotizacion')
 def crear_solicitud_cotizacion(request):
     """
     Crear una nueva solicitud de cotización con múltiples líneas.
@@ -2993,6 +3082,7 @@ def crear_solicitud_cotizacion(request):
 
 
 @login_required
+@permission_required_with_message('almacen.change_solicitudcotizacion')
 def editar_solicitud_cotizacion(request, pk):
     """
     Editar una solicitud de cotización existente.
@@ -3042,6 +3132,7 @@ def editar_solicitud_cotizacion(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.view_solicitudcotizacion')
 def detalle_solicitud_cotizacion(request, pk):
     """
     Ver detalle completo de una solicitud de cotización.
@@ -3132,6 +3223,7 @@ def detalle_solicitud_cotizacion(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_solicitudcotizacion')
 def enviar_solicitud_cliente(request, pk):
     """
     Cambiar estado de la solicitud a 'enviada_cliente'.
@@ -3165,6 +3257,7 @@ def enviar_solicitud_cliente(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_lineacotizacion')
 def responder_linea_cotizacion(request, solicitud_pk, linea_pk):
     """
     Registrar la respuesta del cliente para una línea específica.
@@ -3221,6 +3314,7 @@ def responder_linea_cotizacion(request, solicitud_pk, linea_pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_lineacotizacion')
 def aprobar_todas_lineas(request, pk):
     """
     Aprobar todas las líneas pendientes de una solicitud.
@@ -3252,6 +3346,7 @@ def aprobar_todas_lineas(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_lineacotizacion')
 def rechazar_todas_lineas(request, pk):
     """
     Rechazar todas las líneas pendientes de una solicitud.
@@ -3283,6 +3378,7 @@ def rechazar_todas_lineas(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.add_compraproducto')
 def generar_compras_solicitud(request, pk):
     """
     Genera CompraProducto para las líneas aprobadas.
@@ -3326,6 +3422,7 @@ def generar_compras_solicitud(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_solicitudcotizacion')
 def cancelar_solicitud_cotizacion(request, pk):
     """
     Cancelar una solicitud de cotización.
@@ -3355,6 +3452,7 @@ def cancelar_solicitud_cotizacion(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.delete_solicitudcotizacion')
 def eliminar_solicitud_cotizacion(request, pk):
     """
     Eliminar una solicitud de cotización.
@@ -3387,6 +3485,7 @@ def eliminar_solicitud_cotizacion(request, pk):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('almacen.change_lineacotizacion')
 def gestionar_imagenes_linea(request, solicitud_pk, linea_pk):
     """
     Gestionar imágenes de referencia de una línea de cotización.
@@ -3492,6 +3591,7 @@ def gestionar_imagenes_linea(request, solicitud_pk, linea_pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_lineacotizacion')
 def eliminar_imagen_linea(request, solicitud_pk, linea_pk, imagen_pk):
     """
     Eliminar una imagen de una línea de cotización.
@@ -3548,6 +3648,7 @@ def eliminar_imagen_linea(request, solicitud_pk, linea_pk, imagen_pk):
 
 
 @login_required
+@permission_required_with_message('almacen.view_lineacotizacion')
 def api_imagenes_linea(request, linea_pk):
     """
     API para obtener las imágenes de una línea en formato JSON.
@@ -3598,4 +3699,48 @@ def api_imagenes_linea(request, linea_pk):
         'puede_editar': linea.solicitud.estado == 'borrador',
     })
 
+
+# ============================================================================
+# VISTA DE ACCESO DENEGADO
+# ============================================================================
+@login_required
+def acceso_denegado(request):
+    """
+    Vista para mostrar página de acceso denegado con información del error.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista se ejecuta cuando un usuario intenta acceder a una funcionalidad
+    del módulo Almacén pero NO tiene el permiso necesario.
+    
+    Muestra información útil:
+    - Mensaje de error personalizado
+    - Permiso específico que se requería
+    - Grupos/roles a los que pertenece el usuario
+    - Sugerencia de contactar al administrador
+    
+    Parámetros GET:
+        - mensaje: Descripción del error
+        - permiso: Permiso que se requería (formato: 'app.permiso_modelo')
+    
+    Returns:
+        Renderiza template almacen/acceso_denegado.html
+    """
+    # Obtener parámetros de la URL
+    mensaje = request.GET.get(
+        'mensaje', 
+        'No tienes permisos para acceder a esta sección del módulo Almacén.'
+    )
+    permiso = request.GET.get('permiso', 'N/A')
+    
+    # Obtener grupos del usuario para mostrar información útil
+    grupos = request.user.groups.all()
+    
+    context = {
+        'mensaje': mensaje,
+        'permiso_requerido': permiso,
+        'grupos_usuario': grupos,
+    }
+    
+    return render(request, 'almacen/acceso_denegado.html', context)
 
