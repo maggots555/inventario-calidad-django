@@ -304,3 +304,51 @@ def validar_email_empleado(email, empleado_actual=None):
             return False, f"Este email ya está registrado en el sistema"
     
     return True, ""
+
+
+def sincronizar_grupo_empleado(empleado):
+    """
+    Sincroniza el grupo del usuario de Django con el rol del empleado
+    
+    Args:
+        empleado (Empleado): Instancia del empleado a sincronizar
+    
+    Proceso:
+        1. Valida que el empleado tenga usuario asignado
+        2. Obtiene el nombre del grupo según el rol
+        3. Limpia todos los grupos actuales del usuario
+        4. Asigna el nuevo grupo correspondiente al rol
+    """
+    from django.contrib.auth.models import Group
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    if not empleado.user:
+        return
+    
+    rol_a_grupo = {
+        'supervisor': 'Supervisor',
+        'inspector': 'Inspector',
+        'dispatcher': 'Dispatcher',
+        'compras': 'Compras',
+        'recepcionista': 'Recepcionista',
+        'gerente_operacional': 'Gerente Operacional',
+        'gerente_general': 'Gerente General',
+        'tecnico': 'Técnico',
+        'almacenista': 'Almacenista',
+    }
+    
+    nombre_grupo = rol_a_grupo.get(empleado.rol)
+    
+    if nombre_grupo:
+        try:
+            grupo = Group.objects.get(name=nombre_grupo)
+            empleado.user.groups.clear()
+            empleado.user.groups.add(grupo)
+            logger.info(f"✅ Grupo sincronizado: {empleado.nombre_completo} → {nombre_grupo}")
+        except Group.DoesNotExist:
+            logger.warning(f"⚠️ No existe el grupo '{nombre_grupo}'. Ejecutar: python scripts/setup_grupos_permisos.py")
+    else:
+        empleado.user.groups.clear()
+        logger.warning(f"⚠️ Rol '{empleado.rol}' sin grupo mapeado para {empleado.nombre_completo}")

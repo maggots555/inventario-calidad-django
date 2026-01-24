@@ -6,6 +6,9 @@ urlpatterns = [
     path('', views.dashboard_inventario, name='dashboard'),
     path('dashboard/', views.dashboard_inventario, name='dashboard_inventario'),
     
+    # Acceso denegado
+    path('acceso-denegado/', views.acceso_denegado, name='acceso_denegado'),
+    
     # Gestión de productos
     path('productos/', views.lista_productos, name='lista_productos'),
     path('productos/crear/', views.crear_producto, name='crear_producto'),

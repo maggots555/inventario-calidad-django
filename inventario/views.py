@@ -17,6 +17,32 @@ from openpyxl.utils import get_column_letter
 
 
 # ===== DECORADORES DE PERMISOS =====
+def permission_required_with_message(perm, message=None):
+    """
+    Decorador personalizado que verifica permisos de Django y redirige a página de acceso denegado
+    
+    Args:
+        perm (str): Permiso requerido en formato 'app.codename' (ej: 'inventario.add_producto')
+        message (str): Mensaje personalizado de error (opcional)
+    
+    Uso:
+        @login_required
+        @permission_required_with_message('inventario.add_producto')
+        def crear_producto(request):
+            # Solo usuarios con permiso add_producto pueden ejecutar esto
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if not request.user.has_perm(perm):
+                error_msg = message or f'No tienes permisos para realizar esta acción.'
+                # Redirigir a página de acceso denegado con el mensaje
+                return redirect(f"{reverse('acceso_denegado')}?mensaje={error_msg}&permiso={perm}")
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
 def staff_required(view_func):
     """
     Decorador que requiere que el usuario sea staff o superusuario
@@ -226,6 +252,7 @@ def dashboard_principal(request):
 
 # ===== DASHBOARD DE INVENTARIO =====
 @login_required
+@permission_required_with_message('inventario.view_producto', message='No tienes permisos para acceder al dashboard de inventario.')
 def dashboard_inventario(request):
     """
     Vista del dashboard de inventario con métricas e información resumida
@@ -295,6 +322,7 @@ def dashboard_inventario(request):
 
 # ===== GESTIÓN DE PRODUCTOS =====
 @login_required
+@permission_required_with_message('inventario.view_producto', message='No tienes permisos para ver la lista de productos del inventario.')
 def lista_productos(request):
     """
     Lista de productos con filtros y búsqueda
@@ -354,6 +382,7 @@ def lista_productos(request):
     return render(request, 'inventario/lista_productos.html', context)
 
 @login_required
+@permission_required_with_message('inventario.view_producto', message='No tienes permisos para ver los detalles de productos.')
 def detalle_producto(request, producto_id):
     """
     Vista detallada de un producto con su historial de movimientos
@@ -372,6 +401,7 @@ def detalle_producto(request, producto_id):
     return render(request, 'inventario/detalle_producto.html', context)
 
 @login_required
+@permission_required_with_message('inventario.add_producto', message='No tienes permisos para crear nuevos productos en el inventario.')
 def crear_producto(request):
     """
     Crear un nuevo producto
@@ -392,6 +422,7 @@ def crear_producto(request):
     })
 
 @login_required
+@permission_required_with_message('inventario.change_producto', message='No tienes permisos para modificar productos existentes.')
 def editar_producto(request, producto_id):
     """
     Editar un producto existente
@@ -414,6 +445,7 @@ def editar_producto(request, producto_id):
     })
 
 @login_required
+@permission_required_with_message('inventario.delete_producto', message='No tienes permisos para eliminar productos del inventario.')
 def eliminar_producto(request, producto_id):
     """
     Eliminar un producto (con confirmación)
@@ -433,6 +465,7 @@ def eliminar_producto(request, producto_id):
 
 # ===== GESTIÓN DE MOVIMIENTOS =====
 @login_required
+@permission_required_with_message('inventario.view_movimiento', message='No tienes permisos para ver el historial de movimientos.')
 def lista_movimientos(request):
     """
     Lista de todos los movimientos con filtros
@@ -488,6 +521,7 @@ def lista_movimientos(request):
     return render(request, 'inventario/lista_movimientos.html', context)
 
 @login_required
+@permission_required_with_message('inventario.add_movimiento', message='No tienes permisos para registrar movimientos de inventario.')
 def crear_movimiento(request):
     """
     Crear un nuevo movimiento de inventario
@@ -508,6 +542,7 @@ def crear_movimiento(request):
     })
 
 @login_required
+@permission_required_with_message('inventario.add_movimiento', message='No tienes permisos para registrar movimientos rápidos (Scanner QR).')
 def movimiento_rapido(request):
     """
     Formulario rápido para movimientos usando código QR
@@ -528,6 +563,7 @@ def movimiento_rapido(request):
     })
 
 @login_required
+@permission_required_with_message('inventario.add_movimiento', message='No tienes permisos para registrar movimientos fraccionarios.')
 def movimiento_fraccionario(request):
     """
     Vista para movimientos fraccionarios (consumo parcial de productos)
@@ -562,6 +598,7 @@ def movimiento_fraccionario(request):
 
 # ===== GESTIÓN DE SUCURSALES =====
 @login_required
+@permission_required_with_message('inventario.view_sucursal', message='No tienes permisos para ver la lista de sucursales.')
 def lista_sucursales(request):
     """
     Lista de todas las sucursales
@@ -570,6 +607,7 @@ def lista_sucursales(request):
     return render(request, 'inventario/lista_sucursales.html', {'sucursales': sucursales})
 
 @login_required
+@permission_required_with_message('inventario.add_sucursal', message='No tienes permisos para crear nuevas sucursales.')
 def crear_sucursal(request):
     """
     Crear una nueva sucursal
@@ -590,6 +628,7 @@ def crear_sucursal(request):
     })
 
 @login_required
+@permission_required_with_message('inventario.change_sucursal', message='No tienes permisos para modificar sucursales existentes.')
 def editar_sucursal(request, sucursal_id):
     """
     Editar una sucursal existente
@@ -612,6 +651,7 @@ def editar_sucursal(request, sucursal_id):
     })
 
 @login_required
+@permission_required_with_message('inventario.delete_sucursal', message='No tienes permisos para eliminar sucursales.')
 def eliminar_sucursal(request, sucursal_id):
     """
     Eliminar una sucursal (con validaciones de seguridad)
@@ -825,6 +865,7 @@ def generar_qr_producto(request, producto_id):
 
 # ===== GESTIÓN DE EMPLEADOS =====
 @login_required
+@permission_required_with_message('inventario.view_empleado', message='No tienes permisos para ver la lista de empleados.')
 def lista_empleados(request):
     """
     Lista de empleados con filtros
@@ -1836,3 +1877,24 @@ def admin_storage_monitor(request):
     }
     
     return render(request, 'admin_storage_monitor.html', context)
+
+
+@login_required
+def acceso_denegado(request):
+    """
+    Página de acceso denegado cuando el usuario no tiene permisos
+    
+    Parámetros GET:
+        - mensaje: Mensaje descriptivo del error
+        - permiso: Permiso que se requería (formato: app.codename)
+    """
+    mensaje = request.GET.get('mensaje', 'No tienes permisos para acceder a esta sección.')
+    permiso = request.GET.get('permiso', '')
+    
+    context = {
+        'mensaje': mensaje,
+        'permiso': permiso,
+        'user_groups': request.user.groups.all(),
+    }
+    
+    return render(request, 'inventario/acceso_denegado.html', context)
