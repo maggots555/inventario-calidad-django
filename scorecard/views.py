@@ -8,6 +8,8 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
+from django.urls import reverse
+from functools import wraps
 from .models import Incidencia, CategoriaIncidencia, ComponenteEquipo, EvidenciaIncidencia
 from .forms import IncidenciaForm, EvidenciaIncidenciaForm
 from .emails import enviar_notificacion_incidencia, obtener_destinatarios_disponibles
@@ -17,7 +19,35 @@ from collections import defaultdict
 import json
 
 
+# ===== DECORADORES DE PERMISOS =====
+def permission_required_with_message(perm, message=None):
+    """
+    Decorador personalizado que verifica permisos de Django y redirige a página de acceso denegado
+    
+    Args:
+        perm (str): Permiso requerido en formato 'app.codename' (ej: 'scorecard.add_incidencia')
+        message (str): Mensaje personalizado de error (opcional)
+    
+    Uso:
+        @login_required
+        @permission_required_with_message('scorecard.add_incidencia')
+        def crear_incidencia(request):
+            # Solo usuarios con permiso add_incidencia pueden ejecutar esto
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if not request.user.has_perm(perm):
+                error_msg = message or f'No tienes permisos para realizar esta acción.'
+                # Redirigir a página de acceso denegado con el mensaje
+                return redirect(f"{reverse('scorecard:acceso_denegado_scorecard')}?mensaje={error_msg}&permiso={perm}")
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def dashboard(request):
     """
     Dashboard principal con KPIs y gráficos
@@ -38,6 +68,7 @@ def dashboard(request):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def lista_incidencias(request):
     """
     Lista todas las incidencias organizadas por pestañas según estado
@@ -79,6 +110,7 @@ def lista_incidencias(request):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def detalle_incidencia(request, incidencia_id):
     """
     Detalle completo de una incidencia
@@ -113,6 +145,7 @@ def detalle_incidencia(request, incidencia_id):
 
 
 @login_required
+@permission_required_with_message('scorecard.add_incidencia')
 def crear_incidencia(request):
     """
     Crear una nueva incidencia con formulario completo
@@ -174,6 +207,7 @@ def crear_incidencia(request):
 
 
 @login_required
+@permission_required_with_message('scorecard.change_incidencia')
 def editar_incidencia(request, incidencia_id):
     """
     Editar una incidencia existente
@@ -240,6 +274,7 @@ def editar_incidencia(request, incidencia_id):
 
 
 @login_required
+@permission_required_with_message('scorecard.delete_incidencia')
 def eliminar_incidencia(request, incidencia_id):
     """
     Eliminar una incidencia
@@ -256,6 +291,7 @@ def eliminar_incidencia(request, incidencia_id):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def reportes(request):
     """
     Página de reportes y análisis
@@ -264,6 +300,7 @@ def reportes(request):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_categoriaincidencia')
 def lista_categorias(request):
     """
     Lista de categorías de incidencias
@@ -273,6 +310,7 @@ def lista_categorias(request):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_componenteequipo')
 def lista_componentes(request):
     """
     Lista de componentes de equipos
@@ -374,6 +412,7 @@ def api_componentes_por_tipo(request):
 # === APIs para Gráficos y Reportes (Fase 3) ===
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def api_datos_dashboard(request):
     """
     API que proporciona todos los datos para gráficos del dashboard
@@ -527,6 +566,7 @@ def api_datos_dashboard(request):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def api_exportar_excel(request):
     """
     API para exportar incidencias a Excel con múltiples hojas de análisis
@@ -1138,6 +1178,7 @@ def api_enviar_notificacion(request, incidencia_id):
 
 
 @login_required
+@permission_required_with_message('scorecard.change_incidencia')
 def cambiar_estado_incidencia(request, incidencia_id):
     """
     Vista para cambiar el estado de una incidencia manualmente
@@ -1198,6 +1239,7 @@ def cambiar_estado_incidencia(request, incidencia_id):
 
 
 @login_required
+@permission_required_with_message('scorecard.change_incidencia')
 def marcar_no_atribuible(request, incidencia_id):
     """
     Vista para marcar una incidencia como NO atribuible al técnico
@@ -1266,6 +1308,7 @@ def marcar_no_atribuible(request, incidencia_id):
 
 
 @login_required
+@permission_required_with_message('scorecard.change_incidencia')
 def cerrar_incidencia(request, incidencia_id):
     """
     Vista para cerrar una incidencia con formulario de cierre
@@ -1385,6 +1428,7 @@ def aplicar_filtros_reporte(queryset, request):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def api_analisis_atribuibilidad(request):
     """
     API: Análisis completo de atribuibilidad de incidencias
@@ -1539,6 +1583,7 @@ def api_analisis_atribuibilidad(request):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def api_analisis_tecnicos(request):
     """
     API: Análisis detallado por técnico con múltiples métricas
@@ -1659,6 +1704,7 @@ def api_analisis_tecnicos(request):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def api_analisis_reincidencias(request):
     """
     API: Análisis profundo de reincidencias con cadenas de relaciones
@@ -1817,6 +1863,7 @@ def api_analisis_reincidencias(request):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def api_analisis_tiempos(request):
     """
     API: Análisis de tiempos de resolución por estados
@@ -2017,6 +2064,7 @@ def api_analisis_tiempos(request):
 # ==========================================
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def api_analisis_componentes(request):
     """
     API: Análisis detallado de componentes afectados
@@ -2197,6 +2245,7 @@ def api_analisis_componentes(request):
 
 
 @login_required
+@permission_required_with_message('scorecard.view_incidencia')
 def api_analisis_notificaciones(request):
     """
     API: Análisis del historial de notificaciones enviadas
@@ -2391,3 +2440,27 @@ def api_analisis_notificaciones(request):
     }
     
     return JsonResponse(data)
+
+
+# ==========================================
+# VISTA DE ACCESO DENEGADO
+# ==========================================
+
+@login_required
+def acceso_denegado(request):
+    """
+    Vista para mostrar página de acceso denegado cuando el usuario no tiene permisos
+    """
+    mensaje = request.GET.get('mensaje', 'No tienes permisos para acceder a esta sección.')
+    permiso = request.GET.get('permiso', 'N/A')
+    
+    # Obtener grupos del usuario
+    grupos = request.user.groups.all()
+    
+    context = {
+        'mensaje': mensaje,
+        'permiso_requerido': permiso,
+        'grupos_usuario': grupos,
+    }
+    
+    return render(request, 'scorecard/acceso_denegado.html', context)

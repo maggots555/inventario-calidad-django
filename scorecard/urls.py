@@ -11,6 +11,9 @@ urlpatterns = [
     # Dashboard principal
     path('', views.dashboard, name='dashboard'),
     
+    # Página de acceso denegado
+    path('acceso-denegado/', views.acceso_denegado, name='acceso_denegado_scorecard'),
+    
     # CRUD de Incidencias
     path('incidencias/', views.lista_incidencias, name='lista_incidencias'),
     path('incidencias/crear/', views.crear_incidencia, name='crear_incidencia'),
