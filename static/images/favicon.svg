@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <defs>
+    <!-- Gradiente principal: Azul profundo a Cyan brillante -->
+    <linearGradient id="mainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1f6391;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#46a5e5;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradiente de resplandor -->
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#46a5e5;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#1f6391;stop-opacity:0" />
+    </radialGradient>
+
+    <!-- Filtro de resplandor suave -->
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Animaciones CSS integradas -->
+    <style>
+      /* Rotación continua del hexágono con efecto de flujo en el trazo */
+      .sigma-hex {
+        transform-origin: 40px 40px;
+        animation: spin 12s linear infinite, dashFlow 3s linear infinite;
+      }
+      
+      /* Pulsación suave del punto central */
+      .sigma-dot {
+        transform-origin: 40px 40px;
+        animation: pulse 2.5s ease-in-out infinite;
+      }
+      
+      /* Flotación del símbolo Sigma */
+      .sigma-infinity {
+        animation: float 3s ease-in-out infinite;
+      }
+      
+      /* Resplandor pulsante de fondo */
+      .background-glow {
+        animation: bgPulse 4s ease-in-out infinite;
+      }
+      
+      /* Rotación */
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      /* Flujo del trazo discontinuo */
+      @keyframes dashFlow {
+        to { stroke-dashoffset: -60; }
+      }
+      
+      /* Pulsación del punto */
+      @keyframes pulse {
+        0%, 100% { 
+          transform: scale(1); 
+          opacity: 1; 
+        }
+        50% { 
+          transform: scale(1.3); 
+          opacity: 0.8; 
+        }
+      }
+
+      /* Flotación suave */
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-2px); }
+      }
+
+      /* Pulsación de resplandor de fondo */
+      @keyframes bgPulse {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 0.6; }
+      }
+    </style>
+  </defs>
+
+  <!-- Resplandor de fondo animado -->
+  <circle class="background-glow" cx="40" cy="40" r="35" fill="url(#glowGrad)" />
+
+  <!-- Hexágono exterior con trazo discontinuo animado -->
+  <path class="sigma-hex" 
+        d="M40 5 L70 22.5 L70 57.5 L40 75 L10 57.5 L10 22.5 Z" 
+        fill="none" 
+        stroke="url(#mainGrad)" 
+        stroke-width="3.5" 
+        stroke-dasharray="20, 10" 
+        stroke-linecap="round" />
+        
+  <!-- Símbolo Sigma estilizado (forma de "Σ" simplificada) -->
+  <path class="sigma-infinity" 
+        d="M25 28 L55 28 L40 40 L55 52 L25 52" 
+        stroke="#ffffff" 
+        stroke-width="6" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        fill="none" 
+        filter="url(#softGlow)" />
+        
+  <!-- Punto central brillante con pulsación -->
+  <circle class="sigma-dot" cx="40" cy="40" r="4" fill="#46a5e5" filter="url(#softGlow)" />
+  
+  <!-- Puntos decorativos en las esquinas del hexágono (opcional) -->
+  <circle class="sigma-dot" cx="40" cy="5" r="2" fill="#46a5e5" opacity="0.7" />
+  <circle class="sigma-dot" cx="70" cy="57.5" r="2" fill="#46a5e5" opacity="0.7" />
+</svg>

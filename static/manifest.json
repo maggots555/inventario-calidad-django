@@ -1,0 +1,26 @@
+{
+  "name": "Sistema Integral de Gestión",
+  "short_name": "SIGMA",
+  "description": "Sistema de gestión técnica y control de calidad",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1f6391",
+  "theme_color": "#1f6391",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/images/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/images/favicon-32x32.svg",
+      "type": "image/svg+xml",
+      "sizes": "32x32"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "es-MX",
+  "dir": "ltr"
+}
