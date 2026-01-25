@@ -1,0 +1,429 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% comment %}
+Dashboard de Distribución Multi-Sucursal
+Muestra cómo está distribuido el inventario entre las diferentes sucursales.
+Para cada producto muestra el stock actual disponible en cada ubicación.
+{% endcomment %}
+
+{% block title %}Distribución Multi-Sucursal - Almacén{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Estilos para la tabla de distribución */
+    .table-distribucion {
+        font-size: 0.875rem;
+    }
+    
+    .table-distribucion thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        z-index: 10;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .sucursal-col {
+        min-width: 150px;
+        text-align: center;
+    }
+    
+    .stock-cell {
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 1rem;
+        display: inline-block;
+        min-width: 50px;
+        text-align: center;
+    }
+    
+    /* Colores según nivel de stock */
+    .stock-cero {
+        background-color: #ff6b6b;
+        color: white;
+    }
+    
+    .stock-bajo {
+        background-color: #ffd93d;
+        color: #333;
+    }
+    
+    .stock-normal {
+        background-color: #6bcf7f;
+        color: white;
+    }
+    
+    /* Hover en filas */
+    .table-distribucion tbody tr:hover {
+        background-color: #f1f3f5;
+    }
+    
+    /* Scroll horizontal para pantallas pequeñas */
+    .table-responsive-custom {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Tooltip personalizado */
+    .tooltip-movimiento {
+        cursor: help;
+    }
+    
+    /* Badge de totales */
+    .badge-total {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">
+                <i class="bi bi-diagram-3 me-2"></i>Distribución Multi-Sucursal
+            </h1>
+            <p class="text-muted mb-0">Vista consolidada del inventario por ubicación</p>
+        </div>
+        <div>
+            <a href="{% url 'almacen:dashboard_almacen' %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left me-1"></i>Regresar
+            </a>
+            <button class="btn btn-success" id="exportar-excel">
+                <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+            </button>
+        </div>
+    </div>
+
+    <!-- KPIs Row -->
+    <div class="row g-3 mb-4">
+        <!-- Total Productos con Stock -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small">Productos con Stock</p>
+                            <h3 class="mb-0 text-primary">{{ total_productos_con_stock }}</h3>
+                        </div>
+                        <div class="bg-primary bg-opacity-10 rounded-3 p-2">
+                            <i class="bi bi-boxes text-primary fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Unidades Sistema -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small">Total Unidades</p>
+                            <h3 class="mb-0 text-success">{{ total_unidades_sistema|default:0 }}</h3>
+                        </div>
+                        <div class="bg-success bg-opacity-10 rounded-3 p-2">
+                            <i class="bi bi-stack text-success fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Productos Sin Stock -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small">Productos Sin Stock</p>
+                            <h3 class="mb-0 text-danger">{{ productos_sin_stock|default:0 }}</h3>
+                        </div>
+                        <div class="bg-danger bg-opacity-10 rounded-3 p-2">
+                            <i class="bi bi-exclamation-triangle text-danger fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sucursales Activas -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-muted mb-1 small">Sucursales Activas</p>
+                            <h3 class="mb-0 text-info">{{ sucursales.count|add:1 }}</h3>
+                            <small class="text-muted">+ Almacén Central</small>
+                        </div>
+                        <div class="bg-info bg-opacity-10 rounded-3 p-2">
+                            <i class="bi bi-buildings text-info fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" id="form-filtros" class="row g-3">
+                <!-- Búsqueda -->
+                <div class="col-12 col-md-4">
+                    <label class="form-label small text-muted mb-1">
+                        <i class="bi bi-search me-1"></i>Buscar Producto
+                    </label>
+                    <input 
+                        type="text" 
+                        class="form-control" 
+                        name="q" 
+                        id="buscar-producto"
+                        value="{{ q }}" 
+                        placeholder="Código, nombre, descripción..."
+                    >
+                </div>
+
+                <!-- Categoría -->
+                <div class="col-12 col-md-3">
+                    <label class="form-label small text-muted mb-1">
+                        <i class="bi bi-folder me-1"></i>Categoría
+                    </label>
+                    <select class="form-select" name="categoria" id="filtro-categoria">
+                        <option value="">Todas las categorías</option>
+                        {% for cat in categorias %}
+                        <option value="{{ cat.pk }}" {% if categoria_filtro == cat.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ cat.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Sucursal -->
+                <div class="col-12 col-md-3">
+                    <label class="form-label small text-muted mb-1">
+                        <i class="bi bi-building me-1"></i>Sucursal
+                    </label>
+                    <select class="form-select" name="sucursal" id="filtro-sucursal">
+                        <option value="">Todas las sucursales</option>
+                        <option value="central" {% if sucursal_filtro == "central" %}selected{% endif %}>
+                            Almacén Central
+                        </option>
+                        {% for suc in sucursales %}
+                        <option value="{{ suc.pk }}" {% if sucursal_filtro == suc.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ suc.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Botones -->
+                <div class="col-12 col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-funnel me-1"></i>Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Resumen por Sucursal -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">
+                <i class="bi bi-bar-chart me-2"></i>Resumen por Ubicación
+            </h5>
+            <div class="row g-2">
+                {% for nombre_suc, total in stock_por_sucursal.items %}
+                <div class="col-6 col-md-4 col-lg-3">
+                    <div class="p-2 bg-light rounded">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small text-muted">{{ nombre_suc }}</span>
+                            <span class="badge bg-primary">{{ total }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Distribución -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-table me-2"></i>Distribución de Productos
+                </h5>
+                <span class="badge bg-secondary">{{ productos.paginator.count }} productos</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive-custom">
+                <table class="table table-hover table-distribucion mb-0" id="tabla-distribucion">
+                    <thead>
+                        <tr>
+                            <th class="text-start" style="min-width: 120px;">Código</th>
+                            <th class="text-start" style="min-width: 200px;">Producto</th>
+                            <th class="text-start" style="min-width: 150px;">Categoría</th>
+                            
+                            <!-- Almacén Central -->
+                            <th class="sucursal-col">
+                                <div>Almacén Central</div>
+                                <small class="text-muted">Stock Actual</small>
+                            </th>
+                            
+                            <!-- Sucursales -->
+                            {% for sucursal in sucursales %}
+                            <th class="sucursal-col">
+                                <div>{{ sucursal.nombre }}</div>
+                                <small class="text-muted">Stock Actual</small>
+                            </th>
+                            {% endfor %}
+                            
+                            <!-- Total General -->
+                            <th class="text-center" style="min-width: 100px;">
+                                <div>TOTAL</div>
+                                <small class="text-muted">General</small>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-productos">
+                        {% for producto in productos %}
+                        <tr data-producto-id="{{ producto.id }}">
+                            <!-- Código -->
+                            <td class="text-start">
+                                <code class="small">{{ producto.codigo }}</code>
+                            </td>
+                            
+                            <!-- Nombre -->
+                            <td class="text-start">
+                                <a href="{% url 'almacen:detalle_producto' producto.id %}" 
+                                   class="text-decoration-none">
+                                    {{ producto.nombre|truncatewords:8 }}
+                                </a>
+                                {% if producto.dias_sin_movimiento %}
+                                <i class="bi bi-info-circle text-muted ms-1 tooltip-movimiento" 
+                                   data-bs-toggle="tooltip" 
+                                   title="Último movimiento hace {{ producto.dias_sin_movimiento }} días"></i>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Categoría -->
+                            <td class="text-start">
+                                <span class="badge bg-secondary bg-opacity-25 text-dark">
+                                    {{ producto.categoria }}
+                                </span>
+                            </td>
+                            
+                            <!-- Almacén Central -->
+                            <td class="text-center">
+                                {% with central=producto.inventario.central %}
+                                <span class="stock-cell {% if central.total == 0 %}stock-cero{% elif central.total <= 10 %}stock-bajo{% else %}stock-normal{% endif %}">
+                                    {{ central.total }}
+                                </span>
+                                {% endwith %}
+                            </td>
+                            
+                            <!-- Sucursales (renderizadas por Python) -->
+                            {% for sucursal in sucursales %}
+                            <td class="text-center">
+                                {% for codigo, inv in producto.inventario.items %}
+                                    {% if codigo == sucursal.codigo %}
+                                        <span class="stock-cell {% if inv.total == 0 %}stock-cero{% elif inv.total <= 10 %}stock-bajo{% else %}stock-normal{% endif %}">
+                                            {{ inv.total }}
+                                        </span>
+                                    {% endif %}
+                                {% endfor %}
+                                {# Si no se encontró la sucursal en el inventario, mostrar 0 #}
+                                {% if sucursal.codigo not in producto.inventario.keys %}
+                                    <span class="stock-cell stock-cero">0</span>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                            
+                            <!-- Total General -->
+                            <td class="text-center">
+                                <span class="badge badge-total {% if producto.total_general == 0 %}bg-danger{% elif producto.total_general <= 10 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                    {{ producto.total_general }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{{ sucursales.count|add:4 }}" class="text-center py-5">
+                                <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                                <p class="text-muted">No se encontraron productos con los filtros aplicados.</p>
+                                <a href="{% url 'almacen:dashboard_distribucion_sucursales' %}" class="btn btn-sm btn-outline-primary">
+                                    Limpiar filtros
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Paginación -->
+        {% if productos.has_other_pages %}
+        <div class="card-footer bg-white border-top">
+            <nav aria-label="Navegación de productos">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if productos.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if q %}&q={{ q }}{% endif %}{% if categoria_filtro %}&categoria={{ categoria_filtro }}{% endif %}{% if sucursal_filtro %}&sucursal={{ sucursal_filtro }}{% endif %}">
+                            <i class="bi bi-chevron-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ productos.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if categoria_filtro %}&categoria={{ categoria_filtro }}{% endif %}{% if sucursal_filtro %}&sucursal={{ sucursal_filtro }}{% endif %}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            Página {{ productos.number }} de {{ productos.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if productos.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ productos.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if categoria_filtro %}&categoria={{ categoria_filtro }}{% endif %}{% if sucursal_filtro %}&sucursal={{ sucursal_filtro }}{% endif %}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ productos.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if categoria_filtro %}&categoria={{ categoria_filtro }}{% endif %}{% if sucursal_filtro %}&sucursal={{ sucursal_filtro }}{% endif %}">
+                            <i class="bi bi-chevron-double-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/dashboard-distribucion-sucursales.js' %}"></script>
+<script>
+    // Inicializar tooltips de Bootstrap
+    document.addEventListener('DOMContentLoaded', function() {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}

@@ -22,6 +22,8 @@ urlpatterns = [
     # DASHBOARD Y VISTAS PRINCIPALES
     # ============================================================================
     path('', views.dashboard_almacen, name='dashboard'),
+    path('dashboard/almacen/', views.dashboard_almacen, name='dashboard_almacen'),
+    path('dashboard/distribucion-sucursales/', views.dashboard_distribucion_sucursales, name='dashboard_distribucion_sucursales'),
     
     # ============================================================================
     # VISTA DE ACCESO DENEGADO
