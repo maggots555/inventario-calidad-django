@@ -351,17 +351,17 @@
             <!-- Sección de Usuario y Controles -->
             <div class="navbar-user-section">
                 {% if user.is_authenticated %}
+                {% load permission_tags %}
                 <!-- Información del usuario -->
                 <div class="navbar-user-info">
                     {% if user.empleado %}
                     <!-- Si el usuario tiene un perfil de empleado asociado -->
                     <span class="user-name">{{ user.empleado.nombre_completo }}</span>
-                    <span class="user-role">{{ user.empleado.cargo }}</span>
+                    <span class="user-role"><span class="user-cargo">{{ user.empleado.cargo }}</span> • <strong>{{ user|user_roles_display }}</strong></span>
                     {% else %}
                     <!-- Si no tiene empleado asociado, usar info básica del User -->
                     <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
-                    <span class="user-role">{% if user.is_superuser %}Superusuario{% elif user.is_staff
-                        %}Administrador{% else %}Usuario{% endif %}</span>
+                    <span class="user-role"><span class="user-cargo">{% if user.is_superuser %}Superusuario{% elif user.is_staff %}Administrador{% else %}Usuario{% endif %}</span> • <strong>{{ user|user_roles_display }}</strong></span>
                     {% endif %}
                 </div>
 
