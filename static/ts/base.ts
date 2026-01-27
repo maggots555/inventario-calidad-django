@@ -622,8 +622,28 @@ function crearParticulaTrail(x: number, y: number): void {
 
 /**
  * Inicializa el comportamiento del cursor personalizado
+ * Solo se activa en dispositivos no táctiles (desktop con mouse)
  */
 function inicializarCursorPersonalizado() {
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Detectamos si el dispositivo es táctil (móvil/tablet) para NO mostrar el cursor personalizado
+    // En dispositivos táctiles no tiene sentido tener un cursor personalizado ya que no hay mouse
+    
+    // Detectar si es un dispositivo táctil
+    const isTouchDevice = (
+        ('ontouchstart' in window) ||
+        (navigator.maxTouchPoints > 0) ||
+        (window.matchMedia('(hover: none)').matches) ||
+        (window.matchMedia('(pointer: coarse)').matches) ||
+        (window.innerWidth <= 1024) // Tablets y móviles
+    );
+    
+    // Si es un dispositivo táctil, no inicializar el cursor personalizado
+    if (isTouchDevice) {
+        console.log('Dispositivo táctil detectado - Cursor personalizado deshabilitado');
+        return;
+    }
+    
     const cursor = document.getElementById('tech-cursor');
     if (!cursor) return;
 

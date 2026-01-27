@@ -1830,7 +1830,7 @@
     <!-- ============================================================ -->
     
     <div class="row">
-        <div class="col-12">
+        <div class="col-12" id="galeria-imagenes">
             <div class="card section-card">
                 <div class="section-header" style="background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%); color: #333;">
                     <i class="bi bi-images"></i>
@@ -3220,6 +3220,11 @@
         </div>
     </div>
 </div>
+
+<!-- Botón flotante para ir a galería de imágenes -->
+<button id="btnIrGaleria" class="btn-ir-galeria" aria-label="Ir a Galería de Imágenes" title="Ver galería de imágenes">
+    <i class="bi bi-camera"></i>
+</button>
 
 {% endblock %}
 
@@ -5163,5 +5168,65 @@ document.addEventListener('DOMContentLoaded', function() {
     COMPILADO DESDE: static/ts/modelo_autocomplete_modal.ts
 -->
 <script src="{% static 'js/modelo_autocomplete_modal.js' %}"></script>
+
+<!-- ============================================================
+    CONTROL DEL BOTÓN FLOTANTE "IR A GALERÍA DE IMÁGENES"
+    ============================================================
+    FUNCIONALIDAD:
+    - Botón flotante FAB que permite navegar rápidamente a la galería
+    - Aparece después de 300px de scroll
+    - Se oculta automáticamente cuando la galería está visible
+    - Scroll suave animado con efecto de highlight en destino
+    - No interfiere con el botón "scroll to top" existente
+    ============================================================ -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnIrGaleria = document.getElementById('btnIrGaleria');
+    const seccionGaleria = document.getElementById('galeria-imagenes');
+    
+    if (!btnIrGaleria || !seccionGaleria) return;
+    
+    // Función para verificar si la galería está visible en viewport
+    function verificarVisibilidadGaleria() {
+        const galeriaRect = seccionGaleria.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        
+        // Si la galería está visible en viewport, ocultar botón
+        const galeriaVisible = galeriaRect.top < windowHeight && galeriaRect.bottom > 0;
+        
+        if (galeriaVisible) {
+            btnIrGaleria.classList.remove('visible');
+        } else if (window.scrollY > 300) {
+            // Solo mostrar si hemos scrolleado al menos 300px
+            btnIrGaleria.classList.add('visible');
+        } else {
+            btnIrGaleria.classList.remove('visible');
+        }
+    }
+    
+    // Verificar al hacer scroll
+    window.addEventListener('scroll', verificarVisibilidadGaleria);
+    
+    // Verificar al cargar la página
+    setTimeout(verificarVisibilidadGaleria, 100);
+    
+    // Acción al hacer click: scroll suave a la galería
+    btnIrGaleria.addEventListener('click', function() {
+        seccionGaleria.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start',
+            inline: 'nearest'
+        });
+        
+        // Efecto visual: resaltar brevemente la galería al llegar
+        setTimeout(function() {
+            seccionGaleria.classList.add('highlight-section');
+            setTimeout(() => {
+                seccionGaleria.classList.remove('highlight-section');
+            }, 2000);
+        }, 500); // Esperar a que termine el scroll
+    });
+});
+</script>
 
 {% endblock %}

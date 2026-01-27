@@ -2136,3 +2136,131 @@ thead.sticky-top {
 .collapsing {
     transition: height 0.35s ease;
 }
+
+/* =============================================================================
+   BOTÓN FLOTANTE "IR A GALERÍA DE IMÁGENES"
+   Matching con el estilo del botón scroll-to-top (azul grisáceo)
+   ============================================================================= */
+
+.btn-ir-galeria {
+    position: fixed;
+    bottom: 95px; /* Justo arriba del botón scroll-to-top (30px + 50px + 15px gap) */
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #2d3e50 0%, #34495e 100%);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: #ffffff;
+    font-size: 1.25rem;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(100px);
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    z-index: 998; /* Uno menos que scroll-to-top (999) */
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                0 0 0 0 rgba(52, 152, 219, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Estado visible */
+.btn-ir-galeria.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* Efecto hover */
+.btn-ir-galeria:hover {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    transform: translateY(-5px) scale(1.1);
+    box-shadow: 0 8px 25px rgba(45, 62, 80, 0.7),
+                0 0 20px rgba(52, 152, 219, 0.6);
+    border-color: rgba(52, 152, 219, 0.5);
+}
+
+/* Efecto activo (click) */
+.btn-ir-galeria:active {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5);
+}
+
+/* Animación del ícono al hover - efecto de cámara sacudiendo */
+.btn-ir-galeria:hover i {
+    animation: cameraShake 0.6s ease-in-out infinite;
+}
+
+@keyframes cameraShake {
+    0%, 100% { 
+        transform: rotate(0deg) scale(1); 
+    }
+    25% { 
+        transform: rotate(-8deg) scale(1.05); 
+    }
+    75% { 
+        transform: rotate(8deg) scale(1.05); 
+    }
+}
+
+/* Efecto de pulso sutil cuando aparece - matching con scroll-to-top */
+.btn-ir-galeria.visible {
+    animation: pulseGlowGaleria 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlowGaleria {
+    0%, 100% {
+        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                    0 0 0 0 rgba(52, 152, 219, 0.4);
+    }
+    50% {
+        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                    0 0 15px rgba(52, 152, 219, 0.6);
+    }
+}
+
+/* Animación de highlight cuando llegas a la galería */
+@keyframes highlightPulse {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 0 10px rgba(52, 152, 219, 0.3);
+        transform: scale(1.005);
+    }
+}
+
+.highlight-section {
+    animation: highlightPulse 1s ease-in-out 2;
+}
+
+/* Responsive - Ajustes para móviles */
+@media (max-width: 768px) {
+    .btn-ir-galeria {
+        width: 45px;
+        height: 45px;
+        bottom: 80px; /* Ajustar proporcionalmente (20px + 45px + 15px gap) */
+        right: 20px;
+        font-size: 1.1rem;
+    }
+}
+
+/* Para pantallas muy pequeñas */
+@media (max-width: 480px) {
+    .btn-ir-galeria {
+        width: 40px;
+        height: 40px;
+        bottom: 70px; /* Ajustar proporcionalmente (15px + 40px + 15px gap) */
+        right: 15px;
+        font-size: 1rem;
+    }
+}
+
+/* Efecto focus para accesibilidad */
+.btn-ir-galeria:focus {
+    outline: 3px solid rgba(52, 152, 219, 0.5);
+    outline-offset: 3px;
+}
