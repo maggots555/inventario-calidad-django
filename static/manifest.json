@@ -4,7 +4,7 @@
   "description": "Sistema de gestión técnica y control de calidad",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1f6391",
+  "background_color": "#000000",
   "theme_color": "#1f6391",
   "orientation": "portrait-primary",
   "icons": [

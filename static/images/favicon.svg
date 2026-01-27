@@ -79,6 +79,9 @@
     </style>
   </defs>
 
+  <!-- Fondo negro circular para la app (con bordes redondeados) -->
+  <rect x="0" y="0" width="80" height="80" rx="16" ry="16" fill="#000000" />
+  
   <!-- Resplandor de fondo animado -->
   <circle class="background-glow" cx="40" cy="40" r="35" fill="url(#glowGrad)" />
 
