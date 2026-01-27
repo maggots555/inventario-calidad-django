@@ -5,7 +5,7 @@
 {% block title %}Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=4.5">
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=4.9">
 <link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}?v=1.0">
 {% endblock %}
 
@@ -1843,7 +1843,6 @@
                     <div class="border rounded p-3 mb-4 bg-light">
                         <h6 class="mb-3">
                             <i class="bi bi-cloud-upload"></i> Subir Nuevas Imágenes
-                            <span id="archivosSeleccionados" class="badge bg-info ms-2" style="display: none;">0 archivos</span>
                         </h6>
                         
                         <form method="post" enctype="multipart/form-data" id="formSubirImagenes">
@@ -1859,25 +1858,73 @@
                                     {{ form_imagenes.tipo }}
                                 </div>
                                 
-                                <div class="col-md-6 mb-3">
+                                <div class="col-md-9 mb-3">
                                     {{ form_imagenes.imagenes.errors }}
-                                    <label for="{{ form_imagenes.imagenes.id_for_label }}" class="form-label">
-                                        {{ form_imagenes.imagenes.label }}
+                                    <label class="form-label">
+                                        Seleccionar Imágenes
                                     </label>
+                                    
+                                    <!-- Contenedor de botones dual: Galería y Cámara -->
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <label for="inputGaleria" class="btn btn-outline-primary w-100 btn-upload-dual" style="height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; padding: 0.5rem;">
+                                                <i class="bi bi-folder2-open" style="font-size: 1.8rem; line-height: 1;"></i>
+                                                <span style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.2;">Seleccionar de<br>Galería</span>
+                                            </label>
+                                            <input type="file" 
+                                                   name="imagenes_galeria" 
+                                                   class="d-none" 
+                                                   id="inputGaleria"
+                                                   accept="image/jpeg,image/jpg,image/png,image/gif"
+                                                   multiple>
+                                        </div>
+                                        <div class="col-6">
+                                            <label for="inputCamara" class="btn btn-outline-success w-100 btn-upload-dual" style="height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; padding: 0.5rem;">
+                                                <i class="bi bi-camera-fill" style="font-size: 1.8rem; line-height: 1;"></i>
+                                                <span style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.2;">Capturar con<br>Cámara</span>
+                                            </label>
+                                            <input type="file" 
+                                                   name="imagenes_camara" 
+                                                   class="d-none" 
+                                                   id="inputCamara"
+                                                   accept="image/*"
+                                                   capture="environment"
+                                                   multiple>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Input oculto unificado que se enviará al servidor -->
                                     <input type="file" 
                                            name="imagenes" 
-                                           class="form-control" 
-                                           id="{{ form_imagenes.imagenes.id_for_label }}"
+                                           class="d-none" 
+                                           id="imagenesUnificadas"
                                            accept="image/jpeg,image/jpg,image/png,image/gif"
                                            multiple>
-                                    <small class="text-muted d-block">
+                                    
+                                    <!-- Preview de imágenes seleccionadas -->
+                                    <div id="previewImagenes" class="preview-container" style="display: none;">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <small class="text-muted">
+                                                <i class="bi bi-images"></i> <span id="cantidadImagenes">0</span> imagen(es) seleccionada(s)
+                                            </small>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnLimpiarTodo">
+                                                <i class="bi bi-x-circle"></i> Limpiar todo
+                                            </button>
+                                        </div>
+                                        <div id="contenedorMiniaturas" class="row g-2">
+                                            <!-- Miniaturas se insertarán aquí dinámicamente -->
+                                        </div>
+                                    </div>
+                                    
+                                    <small class="text-muted d-block mt-2">
                                         <i class="bi bi-info-circle"></i> Máximo 30 imágenes por carga, 50MB cada una. Formatos: JPG, PNG, GIF
                                     </small>
                                 </div>
                                 
-                                <div class="col-md-3 mb-3 d-flex align-items-end">
-                                    <button type="submit" class="btn btn-success w-100" id="btnSubirImagenes">
-                                        <i class="bi bi-upload"></i> Subir
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label d-block">&nbsp;</label>
+                                    <button type="submit" class="btn btn-success w-100" id="btnSubirImagenes" style="height: 45px; font-size: 0.95rem;" disabled>
+                                        <i class="bi bi-cloud-upload"></i> Subir Imágenes
                                     </button>
                                 </div>
                             </div>
@@ -3221,6 +3268,65 @@
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- MODAL: VISOR DE CÁMARA INTEGRADO -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalCamaraIntegrada" tabindex="-1" aria-labelledby="modalCamaraIntegradaLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content bg-dark">
+            <div class="modal-header bg-dark text-white border-bottom border-secondary">
+                <h5 class="modal-title" id="modalCamaraIntegradaLabel">
+                    <i class="bi bi-camera-fill"></i> Capturar Imágenes
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar" id="btnCerrarCamara"></button>
+            </div>
+            <div class="modal-body bg-dark p-0 position-relative">
+                <!-- Visor de video de la cámara -->
+                <div class="camera-viewer-container">
+                    <video id="videoPreview" autoplay playsinline class="camera-video"></video>
+                    
+                    <!-- Canvas oculto para capturar frames -->
+                    <canvas id="canvasCaptura" class="d-none"></canvas>
+                    
+                    <!-- Overlay con información -->
+                    <div class="camera-overlay">
+                        <div class="camera-info">
+                            <span class="badge bg-success" id="badgeCamaraActiva">
+                                <i class="bi bi-camera-video-fill"></i> Cámara activa
+                            </span>
+                            <span class="badge bg-primary ms-2" id="badgeFotosTomadas">
+                                <i class="bi bi-images"></i> <span id="contadorFotos">0</span> foto(s)
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Mensaje de error (oculto por defecto) -->
+                    <div class="camera-error" id="cameraError" style="display: none;">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <p id="mensajeError">No se pudo acceder a la cámara</p>
+                        <small id="detalleError">Verifica los permisos del navegador</small>
+                    </div>
+                </div>
+                
+                <!-- Controles de la cámara -->
+                <div class="camera-controls">
+                    <button type="button" class="btn btn-lg btn-outline-light" id="btnCambiarCamara" title="Cambiar cámara">
+                        <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                    
+                    <button type="button" class="btn btn-capture" id="btnCapturar" title="Capturar foto">
+                        <i class="bi bi-circle"></i>
+                    </button>
+                    
+                    <button type="button" class="btn btn-lg btn-success" data-bs-dismiss="modal" id="btnFinalizarCaptura" title="Finalizar">
+                        <i class="bi bi-check-lg"></i> Listo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Botón flotante para ir a galería de imágenes -->
 <button id="btnIrGaleria" class="btn-ir-galeria" aria-label="Ir a Galería de Imágenes" title="Ver galería de imágenes">
     <i class="bi bi-camera"></i>
@@ -3231,6 +3337,12 @@
 {% block extra_js %}
 <!-- Lightbox personalizado para galería -->
 <script src="{% static 'js/lightbox_galeria.js' %}?v=1.0"></script>
+
+<!-- Sistema dual de subida de imágenes (galería + cámara) -->
+<script src="{% static 'js/upload_imagenes_dual.js' %}?v=1.2"></script>
+
+<!-- Cámara integrada con Media Capture API -->
+<script src="{% static 'js/camara_integrada.js' %}?v=1.2"></script>
 
 <script>
 // ============================================================================
