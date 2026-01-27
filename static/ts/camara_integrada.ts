@@ -21,6 +21,13 @@ interface FotoCapturada {
     timestamp: number;
 }
 
+interface DispositivoCamara {
+    deviceId: string;
+    label: string;
+    tipo: 'frontal' | 'trasera';
+    facingMode?: 'user' | 'environment';
+}
+
 class CamaraIntegrada {
     // Elementos del DOM
     private modal: HTMLElement | null;
@@ -34,10 +41,17 @@ class CamaraIntegrada {
     private cameraError: HTMLElement | null;
     private mensajeError: HTMLElement | null;
     private detalleError: HTMLElement | null;
+    private selectorLentes: HTMLElement | null;
     
     // Stream de video
     private mediaStream: MediaStream | null = null;
     private facingMode: 'user' | 'environment' = 'environment'; // Trasera por defecto
+    
+    // Gestión de dispositivos de cámara
+    private dispositivosCamara: DispositivoCamara[] = [];
+    private dispositivoActualId: string | null = null;
+    private camarasTraseras: DispositivoCamara[] = [];
+    private camarasFrontales: DispositivoCamara[] = [];
     
     // Fotos capturadas
     private fotosCapturadas: FotoCapturada[] = [];
@@ -57,6 +71,7 @@ class CamaraIntegrada {
         this.cameraError = document.getElementById('cameraError');
         this.mensajeError = document.getElementById('mensajeError');
         this.detalleError = document.getElementById('detalleError');
+        this.selectorLentes = document.getElementById('selectorLentes');
         
         this.init();
     }
@@ -93,6 +108,10 @@ class CamaraIntegrada {
     
     /**
      * Abre la cámara usando getUserMedia
+     * EXPLICACIÓN: Ahora detecta primero todos los dispositivos disponibles
+     * y permite seleccionar entre diferentes lentes (gran angular, normal, teleobjetivo)
+     * 
+     * BUG FIX: Detiene streams ANTES de detectar dispositivos para evitar conflictos
      */
     private async abrirCamara(): Promise<void> {
         console.log('📷 Intentando abrir cámara...');
@@ -103,20 +122,23 @@ class CamaraIntegrada {
         }
         
         try {
-            // Detener stream anterior si existe
+            // CRÍTICO: Detener stream anterior PRIMERO (antes de detectar dispositivos)
             if (this.mediaStream) {
                 this.detenerStream();
+                // Esperar un momento para asegurar liberación completa
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
             
-            // Solicitar acceso a la cámara
+            // PASO 1: Detectar todos los dispositivos de cámara disponibles
+            await this.detectarDispositivosCamara();
+            
+            // PASO 2: Construir constraints según dispositivo seleccionado
             const constraints: MediaStreamConstraints = {
-                video: {
-                    facingMode: this.facingMode,
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
-                },
+                video: this.construirConstraintsCamara(),
                 audio: false
             };
+            
+            console.log('🎥 Solicitando stream con constraints:', constraints);
             
             this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
             
@@ -129,12 +151,186 @@ class CamaraIntegrada {
                 this.configurarTapToFocus();
                 
                 console.log('✅ Cámara iniciada correctamente');
+                
+                // PASO 3: Actualizar UI del selector de lentes
+                this.actualizarSelectorLentes();
             }
             
         } catch (error) {
             console.error('❌ Error al acceder a la cámara:', error);
             this.mostrarError(error as Error);
         }
+    }
+    
+    /**
+     * Detecta todos los dispositivos de cámara disponibles en el dispositivo
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * - enumerateDevices() lista todas las cámaras del dispositivo
+     * - Separamos frontales de traseras
+     * - Identificamos lentes específicos (gran angular, normal, teleobjetivo)
+     * 
+     * BUG FIX: Ahora liberamos correctamente el stream temporal usado para permisos
+     */
+    private async detectarDispositivosCamara(): Promise<void> {
+        let streamTemporal: MediaStream | null = null;
+        
+        try {
+            // Primero solicitar permisos si aún no los tiene
+            // IMPORTANTE: Guardamos el stream temporal para liberarlo después
+            streamTemporal = await navigator.mediaDevices.getUserMedia({ video: true });
+            
+            // Obtener lista de todos los dispositivos multimedia
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            
+            // Filtrar solo dispositivos de video (cámaras)
+            const camaras = devices.filter(device => device.kind === 'videoinput');
+            
+            console.log(`🔍 Detectadas ${camaras.length} cámara(s)`);
+            
+            // Limpiar arrays
+            this.dispositivosCamara = [];
+            this.camarasTraseras = [];
+            this.camarasFrontales = [];
+            
+            // Clasificar cámaras por tipo
+            for (const camara of camaras) {
+                const label = camara.label.toLowerCase();
+                
+                // Determinar si es frontal o trasera
+                const esFrontal = label.includes('front') || label.includes('user') || label.includes('facing front');
+                const esTrasera = label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('facing back');
+                
+                const dispositivo: DispositivoCamara = {
+                    deviceId: camara.deviceId,
+                    label: camara.label,
+                    tipo: esFrontal ? 'frontal' : 'trasera',
+                    facingMode: esFrontal ? 'user' : 'environment'
+                };
+                
+                this.dispositivosCamara.push(dispositivo);
+                
+                if (esFrontal) {
+                    this.camarasFrontales.push(dispositivo);
+                } else {
+                    this.camarasTraseras.push(dispositivo);
+                }
+                
+                console.log(`  📹 ${dispositivo.label} (${dispositivo.tipo})`);
+            }
+            
+            // Si no hay dispositivo seleccionado, elegir la primera cámara trasera
+            if (!this.dispositivoActualId && this.camarasTraseras.length > 0) {
+                this.dispositivoActualId = this.camarasTraseras[0].deviceId;
+            } else if (!this.dispositivoActualId && this.camarasFrontales.length > 0) {
+                this.dispositivoActualId = this.camarasFrontales[0].deviceId;
+            }
+            
+        } catch (error) {
+            console.error('❌ Error al detectar dispositivos de cámara:', error);
+        } finally {
+            // CRÍTICO: Liberar el stream temporal SIEMPRE (incluso si hay error)
+            if (streamTemporal) {
+                streamTemporal.getTracks().forEach(track => {
+                    track.stop();
+                    console.log('🛑 Stream temporal liberado');
+                });
+                streamTemporal = null;
+            }
+        }
+    }
+    
+    /**
+     * Construye las constraints para getUserMedia según el dispositivo seleccionado
+     */
+    private construirConstraintsCamara(): MediaTrackConstraints {
+        const constraints: MediaTrackConstraints = {
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        };
+        
+        // Si hay un dispositivo específico seleccionado, usarlo
+        if (this.dispositivoActualId) {
+            constraints.deviceId = { exact: this.dispositivoActualId };
+        } else {
+            // Fallback: usar facingMode
+            constraints.facingMode = this.facingMode;
+        }
+        
+        return constraints;
+    }
+    
+    /**
+     * Actualiza la UI del selector de lentes
+     */
+    private actualizarSelectorLentes(): void {
+        if (!this.selectorLentes) return;
+        
+        // Limpiar selector
+        this.selectorLentes.innerHTML = '';
+        
+        // Solo mostrar selector si hay múltiples cámaras traseras
+        const camarasActivas = this.facingMode === 'environment' ? this.camarasTraseras : this.camarasFrontales;
+        
+        if (camarasActivas.length <= 1) {
+            this.selectorLentes.style.display = 'none';
+            return;
+        }
+        
+        this.selectorLentes.style.display = 'flex';
+        
+        // Crear botones para cada cámara
+        camarasActivas.forEach((camara, index) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-lente';
+            
+            // Marcar como activo si es el dispositivo actual
+            if (camara.deviceId === this.dispositivoActualId) {
+                btn.classList.add('active');
+            }
+            
+            // Determinar icono y texto según el tipo de lente
+            const { icono, texto } = this.obtenerInfoLente(camara.label, index);
+            
+            btn.innerHTML = `<i class="bi ${icono}"></i> ${texto}`;
+            btn.title = camara.label;
+            
+            // Event listener para cambiar a esta cámara
+            btn.addEventListener('click', () => this.cambiarADispositivo(camara.deviceId));
+            
+            if (this.selectorLentes) {
+                this.selectorLentes.appendChild(btn);
+            }
+        });
+    }
+    
+    /**
+     * Obtiene icono y texto para un lente según su label
+     */
+    private obtenerInfoLente(label: string, index: number): { icono: string; texto: string } {
+        const labelLower = label.toLowerCase();
+        
+        // Intentar identificar el tipo de lente por el label
+        if (labelLower.includes('ultra') || labelLower.includes('wide') || labelLower.includes('0.5')) {
+            return { icono: 'bi-arrows-angle-expand', texto: '0.5x' };
+        } else if (labelLower.includes('tele') || labelLower.includes('zoom') || labelLower.includes('2x') || labelLower.includes('3x')) {
+            return { icono: 'bi-zoom-in', texto: '2x' };
+        } else if (labelLower.includes('macro')) {
+            return { icono: 'bi-flower1', texto: 'Macro' };
+        } else {
+            // Por defecto, asignar nombres genéricos
+            return { icono: 'bi-camera', texto: `Lente ${index + 1}` };
+        }
+    }
+    
+    /**
+     * Cambia a un dispositivo de cámara específico
+     */
+    private async cambiarADispositivo(deviceId: string): Promise<void> {
+        console.log(`🔄 Cambiando a dispositivo: ${deviceId}`);
+        
+        this.dispositivoActualId = deviceId;
+        await this.abrirCamara();
     }
     
     /**
@@ -252,27 +448,50 @@ class CamaraIntegrada {
     }
     
     /**
-     * Detiene el stream de video
+     * Detiene el stream de video y libera todos los recursos
+     * EXPLICACIÓN: Es CRÍTICO detener todos los tracks antes de abrir un nuevo stream
+     * para evitar el error "cámara en uso por otra aplicación"
      */
     private detenerStream(): void {
         if (this.mediaStream) {
-            this.mediaStream.getTracks().forEach(track => track.stop());
+            console.log('🛑 Deteniendo stream de cámara...');
+            
+            // Detener TODOS los tracks (video y audio si los hay)
+            this.mediaStream.getTracks().forEach(track => {
+                track.stop();
+                console.log(`  ✓ Track detenido: ${track.kind} (${track.label})`);
+            });
+            
             this.mediaStream = null;
         }
         
+        // Limpiar el srcObject del video
         if (this.videoElement) {
             this.videoElement.srcObject = null;
+            this.videoElement.load(); // Forzar limpieza del elemento video
         }
+        
+        console.log('✅ Stream completamente liberado');
     }
     
     /**
      * Cambia entre cámara frontal y trasera
      */
     private async cambiarCamara(): Promise<void> {
-        console.log('🔄 Cambiando cámara...');
+        console.log('🔄 Cambiando entre frontal/trasera...');
         
         // Alternar entre frontal y trasera
         this.facingMode = this.facingMode === 'environment' ? 'user' : 'environment';
+        
+        // Seleccionar el primer dispositivo del tipo nuevo
+        const camarasDisponibles = this.facingMode === 'environment' ? this.camarasTraseras : this.camarasFrontales;
+        
+        if (camarasDisponibles.length > 0) {
+            this.dispositivoActualId = camarasDisponibles[0].deviceId;
+        } else {
+            // Fallback si no hay cámaras del tipo deseado
+            this.dispositivoActualId = null;
+        }
         
         // Reiniciar cámara con nueva orientación
         await this.abrirCamara();

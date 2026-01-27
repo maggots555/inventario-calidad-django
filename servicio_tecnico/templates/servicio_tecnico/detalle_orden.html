@@ -5,7 +5,7 @@
 {% block title %}Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=4.9">
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=5.1">
 <link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}?v=1.0">
 {% endblock %}
 
@@ -3298,6 +3298,11 @@
                                 <i class="bi bi-images"></i> <span id="contadorFotos">0</span> foto(s)
                             </span>
                         </div>
+                        
+                        <!-- Selector de lentes (múltiples cámaras traseras) -->
+                        <div class="camera-lens-selector" id="selectorLentes" style="display: none;">
+                            <!-- Los botones se generan dinámicamente desde TypeScript -->
+                        </div>
                     </div>
                     
                     <!-- Mensaje de error (oculto por defecto) -->
@@ -3339,10 +3344,10 @@
 <script src="{% static 'js/lightbox_galeria.js' %}?v=1.0"></script>
 
 <!-- Sistema dual de subida de imágenes (galería + cámara) -->
-<script src="{% static 'js/upload_imagenes_dual.js' %}?v=1.2"></script>
+<script src="{% static 'js/upload_imagenes_dual.js' %}?v=2.0"></script>
 
-<!-- Cámara integrada con Media Capture API -->
-<script src="{% static 'js/camara_integrada.js' %}?v=1.2"></script>
+<!-- Cámara integrada con Media Capture API (con selección de lentes) - BUG FIX: Liberación correcta de streams -->
+<script src="{% static 'js/camara_integrada.js' %}?v=2.2"></script>
 
 <script>
 // ============================================================================
