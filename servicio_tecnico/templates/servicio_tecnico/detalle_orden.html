@@ -5,7 +5,7 @@
 {% block title %}Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=5.1">
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=6.6">
 <link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}?v=1.0">
 {% endblock %}
 
@@ -3273,14 +3273,14 @@
 <!-- ============================================================ -->
 <div class="modal fade" id="modalCamaraIntegrada" tabindex="-1" aria-labelledby="modalCamaraIntegradaLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-fullscreen">
-        <div class="modal-content bg-dark">
-            <div class="modal-header bg-dark text-white border-bottom border-secondary">
+        <div class="modal-content">
+            <div class="modal-header text-white">
                 <h5 class="modal-title" id="modalCamaraIntegradaLabel">
                     <i class="bi bi-camera-fill"></i> Capturar Imágenes
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar" id="btnCerrarCamara"></button>
             </div>
-            <div class="modal-body bg-dark p-0 position-relative">
+            <div class="modal-body p-0 position-relative">
                 <!-- Visor de video de la cámara -->
                 <div class="camera-viewer-container">
                     <video id="videoPreview" autoplay playsinline class="camera-video"></video>
@@ -3291,12 +3291,17 @@
                     <!-- Overlay con información -->
                     <div class="camera-overlay">
                         <div class="camera-info">
-                            <span class="badge bg-success" id="badgeCamaraActiva">
-                                <i class="bi bi-camera-video-fill"></i> Cámara activa
-                            </span>
-                            <span class="badge bg-primary ms-2" id="badgeFotosTomadas">
-                                <i class="bi bi-images"></i> <span id="contadorFotos">0</span> foto(s)
-                            </span>
+                            <!-- Badge circular: Cámara activa (F/T) estilo WhatsApp -->
+                            <div class="camera-badge-circle" id="badgeCamaraActiva">
+                                <i class="bi bi-camera-fill"></i>
+                                <span id="infoCamaras">T</span>
+                            </div>
+                            
+                            <!-- Badge circular: Contador de fotos estilo WhatsApp -->
+                            <div class="camera-badge-circle" id="badgeFotosTomadas">
+                                <i class="bi bi-check-lg"></i>
+                                <span id="contadorFotos">0</span>
+                            </div>
                         </div>
                         
                         <!-- Selector de lentes (múltiples cámaras traseras) -->
@@ -3323,8 +3328,8 @@
                         <i class="bi bi-circle"></i>
                     </button>
                     
-                    <button type="button" class="btn btn-lg btn-success" data-bs-dismiss="modal" id="btnFinalizarCaptura" title="Finalizar">
-                        <i class="bi bi-check-lg"></i> Listo
+                    <button type="button" class="btn btn-lg btn-success" data-bs-dismiss="modal" id="btnFinalizarCaptura" title="Finalizar captura">
+                        <i class="bi bi-check-lg"></i>
                     </button>
                 </div>
             </div>
@@ -3346,8 +3351,8 @@
 <!-- Sistema dual de subida de imágenes (galería + cámara) -->
 <script src="{% static 'js/upload_imagenes_dual.js' %}?v=2.0"></script>
 
-<!-- Cámara integrada con Media Capture API (con selección de lentes) - BUG FIX: Liberación correcta de streams -->
-<script src="{% static 'js/camara_integrada.js' %}?v=2.2"></script>
+<!-- Cámara integrada - v3.4: Badges circulares estilo WhatsApp (F/T) -->
+<script src="{% static 'js/camara_integrada.js' %}?v=3.4"></script>
 
 <script>
 // ============================================================================

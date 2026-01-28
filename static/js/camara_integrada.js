@@ -4,6 +4,7 @@
 // ============================================================================
 class CamaraIntegrada {
     constructor() {
+        this.infoCamaras = null; // NUEVO: Para mostrar info de cámaras detectadas
         // Stream de video
         this.mediaStream = null;
         this.facingMode = 'environment'; // Trasera por defecto
@@ -12,8 +13,12 @@ class CamaraIntegrada {
         this.dispositivoActualId = null;
         this.camarasTraseras = [];
         this.camarasFrontales = [];
+        // Cache de botones del selector de lentes (BUG FIX: evitar recrear DOM)
+        this.botonesLenteCache = new Map();
         // Fotos capturadas
         this.fotosCapturadas = [];
+        // Flag para prevenir capturas simultáneas (BUG FIX)
+        this.estáCapturando = false;
         // Callback para integración con sistema de subida
         this.onFotosCapturadas = null;
         this.modal = document.getElementById('modalCamaraIntegrada');
@@ -28,6 +33,7 @@ class CamaraIntegrada {
         this.mensajeError = document.getElementById('mensajeError');
         this.detalleError = document.getElementById('detalleError');
         this.selectorLentes = document.getElementById('selectorLentes');
+        this.infoCamaras = document.getElementById('infoCamaras'); // NUEVO
         this.init();
     }
     init() {
@@ -70,8 +76,8 @@ class CamaraIntegrada {
             // CRÍTICO: Detener stream anterior PRIMERO (antes de detectar dispositivos)
             if (this.mediaStream) {
                 this.detenerStream();
-                // Esperar un momento para asegurar liberación completa
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // Esperar 150ms para asegurar liberación completa (incrementado de 100ms)
+                await new Promise(resolve => setTimeout(resolve, 150));
             }
             // PASO 1: Detectar todos los dispositivos de cámara disponibles
             await this.detectarDispositivosCamara();
@@ -106,6 +112,9 @@ class CamaraIntegrada {
      * - Identificamos lentes específicos (gran angular, normal, teleobjetivo)
      *
      * BUG FIX: Ahora liberamos correctamente el stream temporal usado para permisos
+     *
+     * NOTA IMPORTANTE: En Android, algunos fabricantes no exponen todas las cámaras
+     * a través de la API web. Esto depende del navegador y el modelo del celular.
      */
     async detectarDispositivosCamara() {
         let streamTemporal = null;
@@ -117,7 +126,8 @@ class CamaraIntegrada {
             const devices = await navigator.mediaDevices.enumerateDevices();
             // Filtrar solo dispositivos de video (cámaras)
             const camaras = devices.filter(device => device.kind === 'videoinput');
-            console.log(`🔍 Detectadas ${camaras.length} cámara(s)`);
+            console.log(`🔍 Detectadas ${camaras.length} cámara(s) disponibles`);
+            console.log('📱 Dispositivo:', navigator.userAgent.includes('Android') ? 'Android' : 'iOS/Otro');
             // Limpiar arrays
             this.dispositivosCamara = [];
             this.camarasTraseras = [];
@@ -126,8 +136,16 @@ class CamaraIntegrada {
             for (const camara of camaras) {
                 const label = camara.label.toLowerCase();
                 // Determinar si es frontal o trasera
-                const esFrontal = label.includes('front') || label.includes('user') || label.includes('facing front');
-                const esTrasera = label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('facing back');
+                // NOTA: Android puede usar diferentes convenciones de nombres
+                const esFrontal = label.includes('front') ||
+                    label.includes('user') ||
+                    label.includes('facing front') ||
+                    label.includes('selfie');
+                const esTrasera = label.includes('back') ||
+                    label.includes('rear') ||
+                    label.includes('environment') ||
+                    label.includes('facing back') ||
+                    label.includes('camera 0'); // Algunos Android usan camera 0, 1, 2
                 const dispositivo = {
                     deviceId: camara.deviceId,
                     label: camara.label,
@@ -141,8 +159,11 @@ class CamaraIntegrada {
                 else {
                     this.camarasTraseras.push(dispositivo);
                 }
-                console.log(`  📹 ${dispositivo.label} (${dispositivo.tipo})`);
+                console.log(`  📹 ${dispositivo.label} (${dispositivo.tipo}) [${camara.deviceId.substring(0, 20)}...]`);
             }
+            console.log(`✅ Cámaras traseras: ${this.camarasTraseras.length}, Frontales: ${this.camarasFrontales.length}`);
+            // NUEVO: Actualizar badge con info elegante de cámaras
+            this.actualizarInfoCamaras();
             // Si no hay dispositivo seleccionado, elegir la primera cámara trasera
             if (!this.dispositivoActualId && this.camarasTraseras.length > 0) {
                 this.dispositivoActualId = this.camarasTraseras[0].deviceId;
@@ -185,19 +206,36 @@ class CamaraIntegrada {
     }
     /**
      * Actualiza la UI del selector de lentes
+     * BUG FIX: Ahora cachea botones en lugar de recrear DOM completo
+     * Esto mejora rendimiento y evita pérdida de estado hover
      */
     actualizarSelectorLentes() {
         if (!this.selectorLentes)
             return;
-        // Limpiar selector
-        this.selectorLentes.innerHTML = '';
-        // Solo mostrar selector si hay múltiples cámaras traseras
+        // Solo mostrar selector si hay múltiples cámaras del tipo activo
         const camarasActivas = this.facingMode === 'environment' ? this.camarasTraseras : this.camarasFrontales;
         if (camarasActivas.length <= 1) {
             this.selectorLentes.style.display = 'none';
             return;
         }
         this.selectorLentes.style.display = 'flex';
+        // Si los botones ya existen, solo actualizar clase 'active'
+        if (this.botonesLenteCache.size === camarasActivas.length) {
+            this.botonesLenteCache.forEach((btn, deviceId) => {
+                if (deviceId === this.dispositivoActualId) {
+                    btn.classList.add('active');
+                }
+                else {
+                    btn.classList.remove('active');
+                }
+            });
+            return;
+        }
+        // Primera vez o cambio de cantidad de cámaras: construir desde cero
+        this.selectorLentes.innerHTML = '';
+        this.botonesLenteCache.clear();
+        // Usar DocumentFragment para construcción eficiente
+        const fragment = document.createDocumentFragment();
         // Crear botones para cada cámara
         camarasActivas.forEach((camara, index) => {
             const btn = document.createElement('button');
@@ -213,10 +251,11 @@ class CamaraIntegrada {
             btn.title = camara.label;
             // Event listener para cambiar a esta cámara
             btn.addEventListener('click', () => this.cambiarADispositivo(camara.deviceId));
-            if (this.selectorLentes) {
-                this.selectorLentes.appendChild(btn);
-            }
+            // Cachear botón
+            this.botonesLenteCache.set(camara.deviceId, btn);
+            fragment.appendChild(btn);
         });
+        this.selectorLentes.appendChild(fragment);
     }
     /**
      * Obtiene icono y texto para un lente según su label
@@ -239,12 +278,50 @@ class CamaraIntegrada {
         }
     }
     /**
+     * Actualiza el badge de información de cámaras detectadas
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Muestra solo la letra según el modo: "T" para Trasera, "F" para Frontal
+     * Estilo minimalista como WhatsApp
+     */
+    actualizarInfoCamaras() {
+        if (!this.infoCamaras)
+            return;
+        const total = this.dispositivosCamara.length;
+        const traseras = this.camarasTraseras.length;
+        const frontales = this.camarasFrontales.length;
+        // Mostrar solo la letra: T o F
+        let texto = '';
+        if (this.facingMode === 'environment') {
+            // Modo trasera: mostrar "T" + cantidad si hay múltiples
+            texto = traseras > 1 ? `T${traseras}` : 'T';
+        }
+        else {
+            // Modo frontal: mostrar "F" + cantidad si hay múltiples
+            texto = frontales > 1 ? `F${frontales}` : 'F';
+        }
+        this.infoCamaras.textContent = texto;
+        console.log(`📊 Info actualizada: ${texto} (Total: ${total})`);
+    }
+    /**
      * Cambia a un dispositivo de cámara específico
+     * BUG FIX: Ahora valida disponibilidad y captura errores
      */
     async cambiarADispositivo(deviceId) {
         console.log(`🔄 Cambiando a dispositivo: ${deviceId}`);
-        this.dispositivoActualId = deviceId;
-        await this.abrirCamara();
+        try {
+            // Validar que el dispositivo existe
+            const dispositivoExiste = this.dispositivosCamara.some(d => d.deviceId === deviceId);
+            if (!dispositivoExiste) {
+                console.error(`❌ Dispositivo ${deviceId} no encontrado`);
+                return;
+            }
+            this.dispositivoActualId = deviceId;
+            await this.abrirCamara();
+        }
+        catch (error) {
+            console.error('❌ Error al cambiar dispositivo de cámara:', error);
+            this.mostrarError(error);
+        }
     }
     /**
      * Configura tap-to-focus en el video
@@ -373,6 +450,8 @@ class CamaraIntegrada {
         console.log('🔄 Cambiando entre frontal/trasera...');
         // Alternar entre frontal y trasera
         this.facingMode = this.facingMode === 'environment' ? 'user' : 'environment';
+        // Limpiar cache de botones (BUG FIX: forzar reconstrucción con nuevo tipo)
+        this.botonesLenteCache.clear();
         // Seleccionar el primer dispositivo del tipo nuevo
         const camarasDisponibles = this.facingMode === 'environment' ? this.camarasTraseras : this.camarasFrontales;
         if (camarasDisponibles.length > 0) {
@@ -382,13 +461,21 @@ class CamaraIntegrada {
             // Fallback si no hay cámaras del tipo deseado
             this.dispositivoActualId = null;
         }
+        // Actualizar badge de info ANTES de abrir la cámara
+        this.actualizarInfoCamaras();
         // Reiniciar cámara con nueva orientación
         await this.abrirCamara();
     }
     /**
      * Captura una foto del stream de video
+     * BUG FIX: Ahora es async y previene capturas simultáneas con debouncing de 300ms
      */
-    capturarFoto() {
+    async capturarFoto() {
+        // CRÍTICO: Prevenir capturas dobles/múltiples
+        if (this.estáCapturando) {
+            console.warn('⚠️ Captura en progreso, ignorando clic...');
+            return;
+        }
         if (!this.videoElement || !this.canvas) {
             console.error('❌ Elementos no disponibles para captura');
             return;
@@ -398,25 +485,38 @@ class CamaraIntegrada {
             console.warn('⚠️ Video no listo para captura');
             return;
         }
-        console.log('📸 Capturando foto...');
-        // Configurar canvas con dimensiones del video
-        const videoWidth = this.videoElement.videoWidth;
-        const videoHeight = this.videoElement.videoHeight;
-        this.canvas.width = videoWidth;
-        this.canvas.height = videoHeight;
-        // Dibujar frame actual del video en el canvas
-        const context = this.canvas.getContext('2d');
-        if (!context) {
-            console.error('❌ No se pudo obtener contexto del canvas');
-            return;
+        // Marcar como capturando
+        this.estáCapturando = true;
+        // Deshabilitar botón visualmente
+        if (this.btnCapturar) {
+            this.btnCapturar.disabled = true;
+            this.btnCapturar.classList.add('capturing');
         }
-        context.drawImage(this.videoElement, 0, 0, videoWidth, videoHeight);
-        // Convertir canvas a Blob
-        this.canvas.toBlob((blob) => {
-            if (!blob) {
-                console.error('❌ Error al crear blob de la foto');
+        try {
+            console.log('📸 Capturando foto...');
+            // Configurar canvas con dimensiones del video
+            const videoWidth = this.videoElement.videoWidth;
+            const videoHeight = this.videoElement.videoHeight;
+            this.canvas.width = videoWidth;
+            this.canvas.height = videoHeight;
+            // Dibujar frame actual del video en el canvas
+            const context = this.canvas.getContext('2d');
+            if (!context) {
+                console.error('❌ No se pudo obtener contexto del canvas');
                 return;
             }
+            context.drawImage(this.videoElement, 0, 0, videoWidth, videoHeight);
+            // Convertir canvas a Blob (ahora usando Promise para evitar race conditions)
+            const blob = await new Promise((resolve, reject) => {
+                this.canvas.toBlob((b) => {
+                    if (b) {
+                        resolve(b);
+                    }
+                    else {
+                        reject(new Error('Error al crear blob de la foto'));
+                    }
+                }, 'image/jpeg', 0.95);
+            });
             // Obtener dataURL para preview
             const dataUrl = this.canvas.toDataURL('image/jpeg', 0.95);
             // Agregar a lista de fotos capturadas
@@ -430,7 +530,20 @@ class CamaraIntegrada {
             // Feedback visual
             this.mostrarFeedbackCaptura();
             console.log(`✅ Foto capturada. Total: ${this.fotosCapturadas.length}`);
-        }, 'image/jpeg', 0.95);
+        }
+        catch (error) {
+            console.error('❌ Error al capturar foto:', error);
+        }
+        finally {
+            // DEBOUNCING: Esperar 300ms antes de permitir otra captura
+            setTimeout(() => {
+                this.estáCapturando = false;
+                if (this.btnCapturar) {
+                    this.btnCapturar.disabled = false;
+                    this.btnCapturar.classList.remove('capturing');
+                }
+            }, 300);
+        }
     }
     /**
      * Actualiza el contador de fotos tomadas
