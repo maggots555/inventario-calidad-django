@@ -2648,6 +2648,22 @@ thead.sticky-top {
     border-color: rgba(255, 255, 255, 0.5);
 }
 
+/* Badge clickeable para toggle de orientación manual */
+.camera-badge-clickable {
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.camera-badge-clickable:hover {
+    transform: scale(1.15) !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.camera-badge-clickable:active {
+    transform: scale(1.05) !important;
+    background: rgba(255, 255, 255, 0.3) !important;
+}
+
 /* Selector de lentes (múltiples cámaras) */
 /* MEJORA: Estilo iOS translúcido y minimalista */
 .camera-lens-selector {

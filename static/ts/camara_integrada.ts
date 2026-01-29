@@ -43,6 +43,14 @@ class CamaraIntegrada {
     private detalleError: HTMLElement | null;
     private selectorLentes: HTMLElement | null;
     private infoCamaras: HTMLElement | null = null;  // NUEVO: Para mostrar info de cámaras detectadas
+    private infoOrientacion: HTMLElement | null = null; // NUEVO: Para mostrar orientación detectada
+    private infoModoOrientacion: HTMLElement | null = null; // NUEVO: Indicador de modo (auto/manual)
+    private badgeToggleOrientacion: HTMLElement | null = null; // NUEVO: Badge clickeable para toggle
+    
+    // Modal de confirmación de salida (NUEVO)
+    private modalConfirmacion: HTMLElement | null;
+    private btnConfirmarSalida: HTMLButtonElement | null;
+    private cantidadFotosPendientesSpan: HTMLElement | null;
     
     // Stream de video
     private mediaStream: MediaStream | null = null;
@@ -66,6 +74,15 @@ class CamaraIntegrada {
     // Callback para integración con sistema de subida
     private onFotosCapturadas: ((fotos: Blob[]) => void) | null = null;
     
+    // Control de navegación del botón "Atrás" en Android (NUEVO)
+    private modalAbierto: boolean = false;
+    private historyStateKey: string = 'camaraIntegrada';
+    private popstateHandler: ((event: PopStateEvent) => void) | null = null;
+    
+    // Sistema híbrido de detección de orientación (NUEVO v5.2)
+    private orientacionManual: number | null = null; // null = auto, 0/90/180/270 = manual
+    private modoDeteccion: 'auto' | 'manual' = 'auto'; // Modo actual
+    
     constructor() {
         this.modal = document.getElementById('modalCamaraIntegrada');
         this.videoElement = document.getElementById('videoPreview') as HTMLVideoElement;
@@ -79,7 +96,15 @@ class CamaraIntegrada {
         this.mensajeError = document.getElementById('mensajeError');
         this.detalleError = document.getElementById('detalleError');
         this.selectorLentes = document.getElementById('selectorLentes');
-        this.infoCamaras = document.getElementById('infoCamaras');  // NUEVO
+        this.infoCamaras = document.getElementById('infoCamaras');
+        this.infoOrientacion = document.getElementById('infoOrientacion'); // Badge de orientación
+        this.infoModoOrientacion = document.getElementById('infoModoOrientacion'); // Indicador modo (auto/manual)
+        this.badgeToggleOrientacion = document.getElementById('badgeToggleOrientacion'); // Badge clickeable
+        
+        // Modal de confirmación de salida
+        this.modalConfirmacion = document.getElementById('modalConfirmacionSalidaCamara');
+        this.btnConfirmarSalida = document.getElementById('btnConfirmarSalida') as HTMLButtonElement;
+        this.cantidadFotosPendientesSpan = document.getElementById('cantidadFotosPendientes');
         
         this.init();
     }
@@ -91,8 +116,8 @@ class CamaraIntegrada {
         }
         
         // Event listeners del modal
-        this.modal.addEventListener('shown.bs.modal', () => this.abrirCamara());
-        this.modal.addEventListener('hidden.bs.modal', () => this.cerrarCamara());
+        this.modal.addEventListener('shown.bs.modal', () => this.onModalAbierto());
+        this.modal.addEventListener('hidden.bs.modal', () => this.onModalCerrado());
         
         // Event listeners de botones
         if (this.btnCapturar) {
@@ -104,14 +129,256 @@ class CamaraIntegrada {
         }
         
         if (this.btnCerrar) {
-            this.btnCerrar.addEventListener('click', () => this.cerrarModal());
+            this.btnCerrar.addEventListener('click', () => this.cerrarConConfirmacion());
         }
         
         if (this.btnFinalizar) {
             this.btnFinalizar.addEventListener('click', () => this.finalizarCaptura());
         }
         
+        // Event listener para el botón de confirmación de salida (NUEVO)
+        if (this.btnConfirmarSalida) {
+            this.btnConfirmarSalida.addEventListener('click', () => {
+                this.confirmarSalidaConDescarte();
+            });
+        }
+        
+        // Event listener para el badge de toggle de orientación (NUEVO v5.2)
+        if (this.badgeToggleOrientacion) {
+            this.badgeToggleOrientacion.addEventListener('click', () => {
+                this.toggleOrientacionManual();
+            });
+        }
+        
         console.log('✅ Cámara integrada inicializada');
+    }
+    
+    /**
+     * Se ejecuta cuando el modal se abre
+     * NUEVO: Maneja la protección del botón "Atrás" en Android
+     */
+    private onModalAbierto(): void {
+        this.modalAbierto = true;
+        this.agregarProteccionBotonAtras();
+        this.iniciarMonitoreoOrientacion(); // NUEVO: Monitorear cambios de orientación
+        this.abrirCamara();
+    }
+    
+    /**
+     * Se ejecuta cuando el modal se cierra
+     * NUEVO: Limpia la protección del botón "Atrás"
+     */
+    private onModalCerrado(): void {
+        this.modalAbierto = false;
+        this.removerProteccionBotonAtras();
+        this.detenerMonitoreoOrientacion(); // NUEVO: Detener monitoreo
+        this.cerrarCamara();
+    }
+    
+    /**
+     * Inicia el monitoreo de cambios de orientación
+     * NUEVO: Actualiza el badge en tiempo real cuando el usuario rota el dispositivo
+     */
+    private iniciarMonitoreoOrientacion(): void {
+        // Actualizar badge inicial
+        this.actualizarBadgeOrientacion();
+        
+        // Escuchar cambios de orientación
+        if (window.screen && (window.screen as any).orientation) {
+            (window.screen as any).orientation.addEventListener('change', () => {
+                this.actualizarBadgeOrientacion();
+            });
+        }
+        
+        // Fallback: escuchar evento orientationchange (deprecated pero funcional)
+        window.addEventListener('orientationchange', () => {
+            this.actualizarBadgeOrientacion();
+        });
+        
+        // Fallback adicional: escuchar resize (cuando cambia orientación cambia tamaño)
+        window.addEventListener('resize', () => {
+            this.actualizarBadgeOrientacion();
+        });
+        
+        console.log('👂 Monitoreo de orientación iniciado');
+    }
+    
+    /**
+     * Detiene el monitoreo de cambios de orientación
+     */
+    private detenerMonitoreoOrientacion(): void {
+        // Remover listeners (simplificado, los listeners persistirán pero no afectarán)
+        console.log('🛑 Monitoreo de orientación detenido');
+    }
+    
+    /**
+     * Actualiza el badge visual con la orientación actual
+     * NUEVO: Muestra el ángulo detectado y un ícono visual
+     */
+    private actualizarBadgeOrientacion(): void {
+        const orientacion = this.obtenerOrientacionFinal();
+        
+        if (this.infoOrientacion) {
+            // Actualizar texto con el ángulo
+            this.infoOrientacion.textContent = `${orientacion}°`;
+            
+            // Cambiar color del badge según orientación para mejor feedback visual
+            const badge = document.getElementById('badgeOrientacion');
+            if (badge) {
+                // Remover clases anteriores
+                badge.classList.remove('orientation-0', 'orientation-90', 'orientation-180', 'orientation-270');
+                
+                // Agregar clase según orientación
+                badge.classList.add(`orientation-${orientacion}`);
+            }
+        }
+        
+        // NUEVO: Actualizar indicador de modo (automático/manual)
+        if (this.infoModoOrientacion) {
+            this.infoModoOrientacion.textContent = this.modoDeteccion === 'manual' ? '👤' : '🤖';
+        }
+        
+        const modo = this.modoDeteccion === 'manual' ? 'MANUAL' : 'AUTO';
+        console.log(`📐 Badge actualizado: ${orientacion}° | ${this.obtenerDescripcionOrientacion(orientacion)} | Modo: ${modo}`);
+    }
+    
+    /**
+     * Obtiene una descripción legible de la orientación
+     */
+    private obtenerDescripcionOrientacion(orientacion: number): string {
+        switch (orientacion) {
+            case 0: return 'Portrait (vertical, normal)';
+            case 90: return 'Landscape (horizontal, botón derecha)';
+            case 180: return 'Portrait invertido (vertical, cabeza abajo)';
+            case 270: return 'Landscape (horizontal, botón izquierda)';
+            default: return `Desconocido (${orientacion}°)`;
+        }
+    }
+    
+    /**
+     * Agrega protección contra el botón "Atrás" de Android
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * - Cuando el modal se abre, agregamos una entrada al historial del navegador
+     * - Si el usuario presiona "Atrás", interceptamos el evento
+     * - Si hay fotos capturadas, mostramos confirmación
+     * - Si no hay fotos, cerramos el modal normalmente
+     */
+    private agregarProteccionBotonAtras(): void {
+        // Agregar estado al historial para poder interceptar el botón "Atrás"
+        const currentState = history.state || {};
+        const newState = { ...currentState, [this.historyStateKey]: true };
+        
+        // Pushear nuevo estado al historial
+        history.pushState(newState, '');
+        
+        console.log('🛡️ Protección de botón "Atrás" activada');
+        
+        // Crear handler para el evento popstate (botón atrás)
+        this.popstateHandler = (event: PopStateEvent) => {
+            console.log('⬅️ Botón "Atrás" presionado');
+            
+            // Verificar si el modal sigue abierto
+            if (this.modalAbierto) {
+                // Prevenir la navegación hacia atrás por ahora
+                event.preventDefault();
+                
+                // Verificar si hay fotos capturadas sin finalizar
+                if (this.fotosCapturadas.length > 0) {
+                    // Restaurar estado para que el modal permanezca
+                    history.pushState(newState, '');
+                    
+                    // Mostrar confirmación
+                    this.mostrarConfirmacionSalida();
+                } else {
+                    // No hay fotos, cerrar modal normalmente
+                    this.cerrarModal();
+                }
+            }
+        };
+        
+        // Agregar listener
+        window.addEventListener('popstate', this.popstateHandler);
+    }
+    
+    /**
+     * Remueve la protección del botón "Atrás"
+     */
+    private removerProteccionBotonAtras(): void {
+        // Remover listener si existe
+        if (this.popstateHandler) {
+            window.removeEventListener('popstate', this.popstateHandler);
+            this.popstateHandler = null;
+        }
+        
+        // Retroceder en el historial si el estado de cámara sigue ahí
+        if (history.state && history.state[this.historyStateKey]) {
+            history.back();
+        }
+        
+        console.log('🛡️ Protección de botón "Atrás" desactivada');
+    }
+    
+    /**
+     * Muestra diálogo de confirmación antes de salir con fotos sin finalizar
+     * NUEVO: Usa modal Bootstrap en lugar de confirm() nativo para mejor UX
+     */
+    private mostrarConfirmacionSalida(): void {
+        if (!this.modalConfirmacion || !this.cantidadFotosPendientesSpan) {
+            // Fallback a confirm() nativo si el modal no está disponible
+            const mensaje = `Tienes ${this.fotosCapturadas.length} foto(s) capturada(s) sin finalizar.\n\n¿Deseas salir y descartar las fotos?`;
+            if (confirm(mensaje)) {
+                console.log('✅ Usuario confirmó salida, descartando fotos');
+                this.fotosCapturadas = [];
+                this.cerrarModal();
+            } else {
+                console.log('❌ Usuario canceló salida, manteniendo modal abierto');
+            }
+            return;
+        }
+        
+        console.log(`⚠️ Mostrando confirmación de salida: ${this.fotosCapturadas.length} foto(s) pendientes`);
+        
+        // Actualizar cantidad de fotos en el modal de confirmación
+        this.cantidadFotosPendientesSpan.textContent = String(this.fotosCapturadas.length);
+        
+        // Mostrar modal de confirmación usando Bootstrap
+        const bsModalConfirmacion = new bootstrap.Modal(this.modalConfirmacion);
+        bsModalConfirmacion.show();
+    }
+    
+    /**
+     * Ejecuta el descarte de fotos y cierre del modal
+     * NUEVO: Llamado desde el botón de confirmación
+     */
+    private confirmarSalidaConDescarte(): void {
+        console.log('✅ Usuario confirmó salida, descartando fotos');
+        
+        // Descartar fotos capturadas
+        this.fotosCapturadas = [];
+        this.actualizarContador();
+        
+        // Cerrar modal de confirmación
+        if (this.modalConfirmacion) {
+            const bsModalConfirmacion = bootstrap.Modal.getInstance(this.modalConfirmacion);
+            if (bsModalConfirmacion) {
+                bsModalConfirmacion.hide();
+            }
+        }
+        
+        // Cerrar modal de cámara
+        this.cerrarModal();
+    }
+    
+    /**
+     * Cierra el modal con confirmación si hay fotos
+     * MODIFICADO: Ahora verifica si hay fotos antes de cerrar
+     */
+    private cerrarConConfirmacion(): void {
+        if (this.fotosCapturadas.length > 0) {
+            this.mostrarConfirmacionSalida();
+        } else {
+            this.cerrarModal();
+        }
     }
     
     /**
@@ -596,6 +863,7 @@ class CamaraIntegrada {
     /**
      * Captura una foto del stream de video
      * BUG FIX: Ahora es async y previene capturas simultáneas con debouncing de 300ms
+     * NUEVO: Detecta y respeta la orientación del dispositivo (landscape/portrait)
      */
     private async capturarFoto(): Promise<void> {
         // CRÍTICO: Prevenir capturas dobles/múltiples
@@ -627,21 +895,39 @@ class CamaraIntegrada {
         try {
             console.log('📸 Capturando foto...');
             
-            // Configurar canvas con dimensiones del video
+            // NUEVO: Obtener orientación del dispositivo
+            const orientacion = this.obtenerOrientacionFinal();
+            console.log(`📐 Orientación detectada: ${orientacion}°`);
+            
+            // Dimensiones originales del video
             const videoWidth = this.videoElement.videoWidth;
             const videoHeight = this.videoElement.videoHeight;
             
-            this.canvas.width = videoWidth;
-            this.canvas.height = videoHeight;
+            // NUEVO: Calcular dimensiones del canvas según orientación
+            // Si la orientación es 90° o 270°, intercambiamos ancho y alto
+            const necesitaRotacion = orientacion === 90 || orientacion === 270;
+            const canvasWidth = necesitaRotacion ? videoHeight : videoWidth;
+            const canvasHeight = necesitaRotacion ? videoWidth : videoHeight;
             
-            // Dibujar frame actual del video en el canvas
+            // Configurar canvas con dimensiones correctas
+            this.canvas.width = canvasWidth;
+            this.canvas.height = canvasHeight;
+            
+            // Obtener contexto del canvas
             const context = this.canvas.getContext('2d');
             if (!context) {
                 console.error('❌ No se pudo obtener contexto del canvas');
                 return;
             }
             
+            // NUEVO: Aplicar transformación según orientación
+            this.aplicarTransformacionCanvas(context, orientacion, canvasWidth, canvasHeight);
+            
+            // Dibujar frame actual del video en el canvas (ya con rotación aplicada)
             context.drawImage(this.videoElement, 0, 0, videoWidth, videoHeight);
+            
+            // Restaurar transformación del canvas para futuras capturas
+            context.setTransform(1, 0, 0, 1, 0, 0);
             
             // Convertir canvas a Blob (ahora usando Promise para evitar race conditions)
             const blob = await new Promise<Blob>((resolve, reject) => {
@@ -670,7 +956,15 @@ class CamaraIntegrada {
             // Feedback visual
             this.mostrarFeedbackCaptura();
             
-            console.log(`✅ Foto capturada. Total: ${this.fotosCapturadas.length}`);
+            // LOGS DETALLADOS PARA DEBUG
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log(`✅ FOTO CAPTURADA #${this.fotosCapturadas.length}`);
+            console.log(`  📐 Orientación aplicada: ${orientacion}° (${this.obtenerDescripcionOrientacion(orientacion)})`);
+            console.log(`  📏 Video original: ${videoWidth}x${videoHeight}`);
+            console.log(`  📏 Canvas final: ${canvasWidth}x${canvasHeight}`);
+            console.log(`  🔄 Rotación aplicada: ${necesitaRotacion ? 'SÍ' : 'NO'}`);
+            console.log(`  💾 Tamaño blob: ${(blob.size / 1024).toFixed(2)} KB`);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             
         } catch (error) {
             console.error('❌ Error al capturar foto:', error);
@@ -683,6 +977,175 @@ class CamaraIntegrada {
                     this.btnCapturar.classList.remove('capturing');
                 }
             }, 300);
+        }
+    }
+    
+    /**
+     * Toggle manual de orientación
+     * NUEVO v5.2: Permite al usuario cambiar manualmente entre portrait/landscape
+     */
+    private toggleOrientacionManual(): void {
+        console.log('🔄 Toggle manual de orientación activado');
+        
+        if (this.modoDeteccion === 'auto') {
+            // Cambiar a modo manual
+            this.modoDeteccion = 'manual';
+            
+            // Obtener orientación actual y alternar
+            const orientacionActual = this.obtenerOrientacionFinal();
+            // CORREGIDO: Usar 270° para landscape (mano derecha) en lugar de 90°
+            this.orientacionManual = orientacionActual === 0 ? 270 : 0; // Alternar entre portrait y landscape
+            
+            console.log(`  ✅ Modo MANUAL activado. Orientación fijada en: ${this.orientacionManual}°`);
+        } else {
+            // Ya está en modo manual, alternar orientación
+            // CORREGIDO: Usar 270° para landscape (mano derecha) en lugar de 90°
+            this.orientacionManual = this.orientacionManual === 0 ? 270 : 0;
+            
+            console.log(`  🔄 Orientación manual cambiada a: ${this.orientacionManual}°`);
+        }
+        
+        // Actualizar badge
+        this.actualizarBadgeOrientacion();
+    }
+    
+    /**
+     * Obtiene la orientación final usando lógica híbrida
+     * NUEVO v5.2: Prioriza orientación manual sobre auto-detección
+     * 
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Este es el método principal que decide qué orientación usar.
+     * Primero revisa si el usuario configuró algo manual, si no, usa auto-detección.
+     * 
+     * @returns Ángulo de rotación en grados (0, 90, 180, 270)
+     */
+    private obtenerOrientacionFinal(): number {
+        // PRIORIDAD 1: Si hay orientación manual, usarla
+        if (this.modoDeteccion === 'manual' && this.orientacionManual !== null) {
+            console.log(`📐 Usando orientación MANUAL: ${this.orientacionManual}°`);
+            return this.orientacionManual;
+        }
+        
+        // PRIORIDAD 2: Detección automática por dimensiones de video
+        const orientacionAuto = this.detectarOrientacionPorVideo();
+        console.log(`📐 Usando orientación AUTO: ${orientacionAuto}°`);
+        return orientacionAuto;
+    }
+    
+    /**
+     * Detecta orientación analizando las dimensiones del stream de video
+     * NUEVO v5.2: Método principal de auto-detección que SÍ funciona
+     * 
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * En lugar de preguntarle al sistema operativo la orientación del celular,
+     * miramos directamente las dimensiones del video que viene de la cámara.
+     * 
+     * - Si el video es más ancho que alto (1920x1080) → Landscape (horizontal)
+     * - Si el video es más alto que ancho (1080x1920) → Portrait (vertical)
+     * 
+     * Esto funciona porque las cámaras modernas adaptan su resolución según
+     * cómo sostienes el celular.
+     * 
+     * @returns 0 para portrait, 90 para landscape
+     */
+    private detectarOrientacionPorVideo(): number {
+        if (!this.videoElement) {
+            console.warn('⚠️ Video no disponible, asumiendo portrait 0°');
+            return 0;
+        }
+        
+        const videoWidth = this.videoElement.videoWidth;
+        const videoHeight = this.videoElement.videoHeight;
+        
+        console.group('🎥 Analizando dimensiones del stream de video');
+        console.log(`  📊 Resolución del video: ${videoWidth}x${videoHeight}`);
+        
+        // Calcular aspect ratio
+        const aspectRatio = videoWidth / videoHeight;
+        console.log(`  📐 Aspect ratio: ${aspectRatio.toFixed(2)}`);
+        
+        let orientacion: number;
+        
+        if (videoWidth > videoHeight) {
+            // Video horizontal = Landscape (mano derecha)
+            // CORREGIDO: Usar 270° en lugar de 90° para orientación correcta
+            orientacion = 270;
+            console.log(`  ✅ Detección: LANDSCAPE (ancho > alto) → 270°`);
+        } else if (videoWidth < videoHeight) {
+            // Video vertical = Portrait
+            orientacion = 0;
+            console.log(`  ✅ Detección: PORTRAIT (alto > ancho)`);
+        } else {
+            // Cuadrado (raro) - asumir portrait
+            orientacion = 0;
+            console.log(`  ⚠️ Video cuadrado, asumiendo PORTRAIT`);
+        }
+        
+        console.groupEnd();
+        return orientacion;
+    }
+    
+    /**
+     * Aplica transformación al canvas según la orientación del dispositivo
+     * NUEVO: Rota y traslada el canvas para que la imagen quede correcta
+     * 
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * El canvas tiene un sistema de coordenadas que podemos transformar.
+     * Según la orientación, necesitamos:
+     * 1. Trasladar el origen del canvas
+     * 2. Rotar el canvas
+     * 3. Esto hace que cuando dibujemos la imagen, quede en la orientación correcta
+     * 
+     * @param context Contexto 2D del canvas
+     * @param orientacion Ángulo de rotación (0, 90, 180, 270)
+     * @param canvasWidth Ancho del canvas
+     * @param canvasHeight Alto del canvas
+     */
+    private aplicarTransformacionCanvas(
+        context: CanvasRenderingContext2D, 
+        orientacion: number, 
+        canvasWidth: number, 
+        canvasHeight: number
+    ): void {
+        // Limpiar cualquier transformación previa
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        
+        switch (orientacion) {
+            case 0:
+                // Portrait normal - no requiere transformación
+                // La imagen ya está en la orientación correcta
+                break;
+                
+            case 90:
+                // Landscape derecha (botón del celular a la derecha)
+                // 1. Trasladar al borde derecho
+                // 2. Rotar 90° en sentido horario
+                context.translate(canvasWidth, 0);
+                context.rotate(90 * Math.PI / 180);
+                console.log('🔄 Aplicando rotación 90° (landscape derecha)');
+                break;
+                
+            case 180:
+                // Portrait invertido (poco común)
+                // 1. Trasladar a la esquina inferior derecha
+                // 2. Rotar 180°
+                context.translate(canvasWidth, canvasHeight);
+                context.rotate(180 * Math.PI / 180);
+                console.log('🔄 Aplicando rotación 180° (portrait invertido)');
+                break;
+                
+            case 270:
+                // Landscape izquierda (botón del celular a la izquierda)
+                // 1. Trasladar al borde inferior
+                // 2. Rotar 270° (equivalente a -90°)
+                context.translate(0, canvasHeight);
+                context.rotate(270 * Math.PI / 180);
+                console.log('🔄 Aplicando rotación 270° (landscape izquierda)');
+                break;
+                
+            default:
+                console.warn(`⚠️ Orientación no reconocida: ${orientacion}°`);
+                break;
         }
     }
     

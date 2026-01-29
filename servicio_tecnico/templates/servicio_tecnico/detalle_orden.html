@@ -3302,6 +3302,18 @@
                                 <i class="bi bi-check-lg"></i>
                                 <span id="contadorFotos">0</span>
                             </div>
+                            
+                            <!-- Badge circular: Orientación detectada (DEBUG) -->
+                            <div class="camera-badge-circle" id="badgeOrientacion" title="Orientación del dispositivo">
+                                <i class="bi bi-phone"></i>
+                                <span id="infoOrientacion">0°</span>
+                            </div>
+                            
+                            <!-- Badge circular: Toggle manual de orientación (NUEVO) -->
+                            <div class="camera-badge-circle camera-badge-clickable" id="badgeToggleOrientacion" title="Cambiar orientación manualmente">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                <span id="infoModoOrientacion">🤖</span>
+                            </div>
                         </div>
                         
                         <!-- Selector de lentes (múltiples cámaras traseras) -->
@@ -3342,6 +3354,37 @@
     <i class="bi bi-camera"></i>
 </button>
 
+<!-- ============================================================ -->
+<!-- MODAL: CONFIRMACIÓN DE SALIDA DE CÁMARA CON FOTOS PENDIENTES -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalConfirmacionSalidaCamara" tabindex="-1" aria-labelledby="modalConfirmacionSalidaCamaraLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="modalConfirmacionSalidaCamaraLabel">
+                    <i class="bi bi-exclamation-triangle-fill"></i> ¿Salir sin guardar?
+                </h5>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">
+                    <strong>Tienes <span id="cantidadFotosPendientes">0</span> foto(s) capturada(s) sin finalizar.</strong>
+                </p>
+                <p class="text-muted mt-2 mb-0">
+                    Si sales ahora, las fotos capturadas se descartarán y tendrás que volver a tomarlas.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-arrow-left"></i> Volver a la cámara
+                </button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarSalida">
+                    <i class="bi bi-trash"></i> Salir y descartar fotos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -3351,8 +3394,8 @@
 <!-- Sistema dual de subida de imágenes (galería + cámara) -->
 <script src="{% static 'js/upload_imagenes_dual.js' %}?v=2.0"></script>
 
-<!-- Cámara integrada - v3.4: Badges circulares estilo WhatsApp (F/T) -->
-<script src="{% static 'js/camara_integrada.js' %}?v=3.4"></script>
+<!-- Cámara integrada - v5.3: Corrección orientación landscape a 270° (mano derecha) -->
+<script src="{% static 'js/camara_integrada.js' %}?v=5.3"></script>
 
 <script>
 // ============================================================================

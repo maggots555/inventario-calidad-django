@@ -10,6 +10,9 @@ class UploadImagenesDual {
         this.MAX_IMAGENES = 30;
         this.MAX_SIZE_MB = 50;
         this.MAX_SIZE_BYTES = this.MAX_SIZE_MB * 1024 * 1024;
+        // Control de estado de procesamiento (NUEVO - FIX para archivos grandes)
+        this.estaProcesando = false; // Indica si está procesando archivos
+        this.archivosListos = false; // Indica si los archivos están 100% listos para subir
         this.inputGaleria = document.getElementById('inputGaleria');
         this.inputCamara = document.getElementById('inputCamara');
         this.inputUnificado = document.getElementById('imagenesUnificadas');
@@ -105,11 +108,17 @@ class UploadImagenesDual {
     }
     /**
      * Agrega archivos al array de imágenes seleccionadas
+     * MODIFICADO: Ahora es asíncrono y espera a que los archivos estén 100% listos
      */
-    agregarArchivos(archivos) {
+    async agregarArchivos(archivos) {
+        // CRÍTICO: Marcar como procesando y deshabilitar botón de subir
+        this.estaProcesando = true;
+        this.archivosListos = false;
+        this.actualizarEstadoBotonSubir(); // Deshabilitar inmediatamente
         let agregados = 0;
         let omitidos = 0;
         const errores = [];
+        console.log(`🔄 Iniciando procesamiento de ${archivos.length} archivo(s)...`);
         for (const archivo of archivos) {
             // Validar que sea una imagen
             if (!archivo.type.startsWith('image/')) {
@@ -132,7 +141,7 @@ class UploadImagenesDual {
             }
             // Generar ID único
             const id = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            // Crear URL de preview
+            // Crear URL de preview (operación síncrona pero puede ser pesada)
             const previewUrl = URL.createObjectURL(archivo);
             // Agregar a la lista
             this.imagenesSeleccionadas.push({
@@ -141,6 +150,10 @@ class UploadImagenesDual {
                 previewUrl: previewUrl
             });
             agregados++;
+            // NUEVO: Yield al event loop cada 3 archivos para mantener UI responsive
+            if (agregados % 3 === 0) {
+                await this.delay(10); // 10ms para que el navegador respire
+            }
         }
         // Mostrar errores si los hay
         if (errores.length > 0) {
@@ -150,12 +163,25 @@ class UploadImagenesDual {
         if (agregados > 0) {
             console.log(`✅ ${agregados} imagen(es) agregada(s). Total: ${this.imagenesSeleccionadas.length}`);
         }
-        // Actualizar UI
+        // Actualizar UI (pero aún sin habilitar el botón)
         this.actualizarPreview();
-        this.transferirArchivosAInputUnificado();
+        // CRÍTICO: Transferir archivos al input y ESPERAR a que termine
+        await this.transferirArchivosAInputUnificado();
+        // CRÍTICO: Marcar como listo SOLO después de que todo esté completo
+        this.estaProcesando = false;
+        this.archivosListos = this.imagenesSeleccionadas.length > 0;
+        this.actualizarEstadoBotonSubir(); // Habilitar si hay archivos
+        console.log(`✅ Procesamiento completado. Archivos listos: ${this.archivosListos}`);
+    }
+    /**
+     * Utilidad: Delay para yield al event loop
+     */
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
     /**
      * Actualiza el preview de miniaturas
+     * MODIFICADO: Ya no habilita/deshabilita el botón directamente
      */
     actualizarPreview() {
         if (!this.previewContainer || !this.contenedorMiniaturas || !this.cantidadSpan) {
@@ -175,18 +201,34 @@ class UploadImagenesDual {
                     this.contenedorMiniaturas.appendChild(miniatura);
                 }
             });
-            // Habilitar botón de subir
-            if (this.btnSubir) {
-                this.btnSubir.disabled = false;
-            }
         }
         else {
             this.previewContainer.style.display = 'none';
-            // Deshabilitar botón de subir
-            if (this.btnSubir) {
-                this.btnSubir.disabled = true;
-            }
         }
+        // NOTA: El estado del botón se maneja en actualizarEstadoBotonSubir()
+    }
+    /**
+     * Actualiza el estado del botón de subir según el estado de procesamiento
+     * NUEVO: Controla el botón basándose en archivosListos y estaProcesando
+     */
+    actualizarEstadoBotonSubir() {
+        if (!this.btnSubir) {
+            return;
+        }
+        // Deshabilitar si está procesando o no hay imágenes listas
+        const debeEstarDeshabilitado = this.estaProcesando || !this.archivosListos || this.imagenesSeleccionadas.length === 0;
+        this.btnSubir.disabled = debeEstarDeshabilitado;
+        // Cambiar texto del botón si está procesando
+        if (this.estaProcesando) {
+            this.btnSubir.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+        }
+        else if (this.imagenesSeleccionadas.length > 0) {
+            this.btnSubir.innerHTML = '<i class="bi bi-cloud-upload"></i> Subir Imágenes';
+        }
+        else {
+            this.btnSubir.innerHTML = '<i class="bi bi-cloud-upload"></i> Subir Imágenes';
+        }
+        console.log(`🔘 Botón actualizado: ${debeEstarDeshabilitado ? 'DESHABILITADO' : 'HABILITADO'} | Procesando: ${this.estaProcesando} | Listos: ${this.archivosListos}`);
     }
     /**
      * Crea un elemento de miniatura para una imagen
@@ -216,8 +258,9 @@ class UploadImagenesDual {
     }
     /**
      * Elimina una imagen del array de seleccionadas
+     * MODIFICADO: Ahora actualiza el estado de archivosListos
      */
-    eliminarImagen(id) {
+    async eliminarImagen(id) {
         const index = this.imagenesSeleccionadas.findIndex(img => img.id === id);
         if (index !== -1) {
             // Liberar memoria del ObjectURL
@@ -227,7 +270,14 @@ class UploadImagenesDual {
             console.log(`🗑️ Imagen eliminada. Total: ${this.imagenesSeleccionadas.length}`);
             // Actualizar UI
             this.actualizarPreview();
-            this.transferirArchivosAInputUnificado();
+            // Re-transferir archivos (ahora sin el eliminado)
+            this.estaProcesando = true;
+            this.archivosListos = false;
+            this.actualizarEstadoBotonSubir();
+            await this.transferirArchivosAInputUnificado();
+            this.estaProcesando = false;
+            this.archivosListos = this.imagenesSeleccionadas.length > 0;
+            this.actualizarEstadoBotonSubir();
         }
     }
     /**
@@ -247,26 +297,39 @@ class UploadImagenesDual {
             this.inputCamara.value = '';
         if (this.inputUnificado)
             this.inputUnificado.value = '';
+        // Resetear estados
+        this.estaProcesando = false;
+        this.archivosListos = false;
         console.log('🧹 Todas las imágenes eliminadas');
         // Actualizar UI
         this.actualizarPreview();
+        this.actualizarEstadoBotonSubir();
     }
     /**
      * Transfiere archivos del array al input unificado para envío al servidor
+     * MODIFICADO: Ahora es asíncrono y retorna Promise para garantizar sincronización
      */
-    transferirArchivosAInputUnificado() {
+    async transferirArchivosAInputUnificado() {
         if (!this.inputUnificado) {
             return;
         }
+        console.log(`📦 Transfiriendo ${this.imagenesSeleccionadas.length} archivo(s) al input unificado...`);
         // Crear un nuevo DataTransfer para manipular los archivos del input
         const dataTransfer = new DataTransfer();
         // Agregar todos los archivos seleccionados
-        this.imagenesSeleccionadas.forEach(imagen => {
+        // NOTA: DataTransfer.items.add() es síncrono, pero puede ser lento con muchos archivos
+        for (const imagen of this.imagenesSeleccionadas) {
             dataTransfer.items.add(imagen.file);
-        });
+            // Yield al event loop cada 5 archivos para mantener UI responsive
+            if (dataTransfer.files.length % 5 === 0) {
+                await this.delay(5);
+            }
+        }
         // Asignar al input unificado
         this.inputUnificado.files = dataTransfer.files;
-        console.log(`📦 ${dataTransfer.files.length} archivo(s) transferido(s) al input unificado`);
+        // Pequeño delay para asegurar que el navegador termine de asignar los archivos
+        await this.delay(20);
+        console.log(`✅ ${dataTransfer.files.length} archivo(s) transferido(s) y listos para enviar`);
     }
     /**
      * Muestra una alerta al usuario
