@@ -80,8 +80,8 @@ class CamaraIntegrada {
     private popstateHandler: ((event: PopStateEvent) => void) | null = null;
     
     // Sistema híbrido de detección de orientación (NUEVO v5.2)
-    private orientacionManual: number | null = null; // null = auto, 0/90/180/270 = manual
-    private modoDeteccion: 'auto' | 'manual' = 'auto'; // Modo actual
+    private orientacionManual: number | null = 270; // null = auto, 0/90/180/270 = manual - DEFAULT: 270° landscape
+    private modoDeteccion: 'auto' | 'manual' = 'manual'; // Modo actual - DEFAULT: manual
     
     constructor() {
         this.modal = document.getElementById('modalCamaraIntegrada');

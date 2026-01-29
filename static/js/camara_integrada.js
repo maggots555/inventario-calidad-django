@@ -29,8 +29,8 @@ class CamaraIntegrada {
         this.historyStateKey = 'camaraIntegrada';
         this.popstateHandler = null;
         // Sistema híbrido de detección de orientación (NUEVO v5.2)
-        this.orientacionManual = null; // null = auto, 0/90/180/270 = manual
-        this.modoDeteccion = 'auto'; // Modo actual
+        this.orientacionManual = 270; // null = auto, 0/90/180/270 = manual - DEFAULT: 270° landscape
+        this.modoDeteccion = 'manual'; // Modo actual - DEFAULT: manual
         this.modal = document.getElementById('modalCamaraIntegrada');
         this.videoElement = document.getElementById('videoPreview');
         this.canvas = document.getElementById('canvasCaptura');
