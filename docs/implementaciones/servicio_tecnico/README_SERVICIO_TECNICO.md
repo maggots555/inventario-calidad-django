@@ -687,6 +687,7 @@ print(incidencia)  # Debe mostrar el objeto Incidencia
 - `SCORECARD_README.md` - Integración con calidad
 - `SOLUCION_ERROR_IMAGENES_CELULAR.md` - Fix subida desde cámara móvil
 - `CORRECCION_UPLOADS_IMAGENES_PESADAS.md` - Fix uploads grandes desde galería (200MB)
+- `SOLUCION_DEFINITIVA_UPLOADS_PRIMER_INTENTO.md` - Solución definitiva error primer intento (6 feb 2026)
 
 ---
 
