@@ -692,187 +692,15 @@ def lista_ordenes_activas(request):
         )
     
     # ========================================================================
-    # ESTADÍSTICAS: EQUIPOS "NO ENCIENDE" POR TÉCNICO (ACTIVOS + HISTÓRICO)
+    # ESTADÍSTICAS UNIFICADAS POR TÉCNICO (AGRUPADAS POR SUCURSAL)
     # ========================================================================
-    # ACTUALIZACIÓN: Se divide en dos consultas para mostrar:
-    # 1. ACTIVOS: Solo equipos "No Enciende" actualmente en proceso (carga específica)
-    # 2. HISTÓRICO: Desglose de equipos por si encendían o no (experiencia detallada)
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Esta sección calcula todas las estadísticas por técnico en una sola consulta optimizada.
+    # Se agrupan por sucursal del técnico para facilitar la asignación equitativa por ubicación.
     
-    # --- CONSULTA 1: Equipos "No Enciende" ACTIVOS (carga actual específica) ---
-    equipos_no_enciende_activos_raw = OrdenServicio.objects.exclude(
-        estado__in=['entregado', 'cancelado']
-    ).filter(
-        detalle_equipo__equipo_enciende=False,
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
-    ).values(
-        'tecnico_asignado_actual__nombre_completo',
-        'tecnico_asignado_actual__id'
-    ).annotate(
-        total_no_enciende=Count('numero_orden_interno')
-    ).order_by('-total_no_enciende', 'tecnico_asignado_actual__nombre_completo')
-    
-    # --- CONSULTA 2: Equipos HISTÓRICOS con desglose por "equipo_enciende" ---
-    # Esta consulta agrupa por técnico y por si el equipo enciende o no
-    equipos_historico_desglose_raw = OrdenServicio.objects.filter(
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
-    ).values(
-        'tecnico_asignado_actual__nombre_completo',
-        'tecnico_asignado_actual__id',
-        'detalle_equipo__equipo_enciende'
-    ).annotate(
-        total_equipos=Count('numero_orden_interno')
-    ).order_by('tecnico_asignado_actual__nombre_completo', 'detalle_equipo__equipo_enciende')
-    
-    # --- PROCESAR DATOS ACTIVOS ---
-    equipos_no_enciende_activos_dict = {}
-    for item in equipos_no_enciende_activos_raw:
-        tecnico_id = item['tecnico_asignado_actual__id']
-        equipos_no_enciende_activos_dict[tecnico_id] = item['total_no_enciende']
-    
-    # --- PROCESAR DATOS HISTÓRICOS CON DESGLOSE ---
-    equipos_historico_dict = {}
-    for item in equipos_historico_desglose_raw:
-        tecnico_id = item['tecnico_asignado_actual__id']
-        equipo_enciende = item['detalle_equipo__equipo_enciende']
-        total = item['total_equipos']
-        
-        if tecnico_id not in equipos_historico_dict:
-            equipos_historico_dict[tecnico_id] = {
-                'nombre': item['tecnico_asignado_actual__nombre_completo'],
-                'si_enciende': 0,
-                'no_enciende': 0,
-                'total': 0
-            }
-        
-        if equipo_enciende:
-            equipos_historico_dict[tecnico_id]['si_enciende'] = total
-        else:
-            equipos_historico_dict[tecnico_id]['no_enciende'] = total
-        
-        equipos_historico_dict[tecnico_id]['total'] += total
-    
-    # --- COMBINAR ACTIVOS Y HISTÓRICOS ---
-    equipos_no_enciende_por_tecnico = []
-    for tecnico_id, historico_data in equipos_historico_dict.items():
-        tecnico_obj = Empleado.objects.get(id=tecnico_id)
-        
-        equipos_no_enciende_por_tecnico.append({
-            'tecnico_id': tecnico_id,
-            'nombre': historico_data['nombre'],
-            'foto_url': tecnico_obj.get_foto_perfil_url(),
-            'iniciales': tecnico_obj.get_iniciales(),
-            # Datos ACTIVOS (solo "No Enciende" en proceso)
-            'activos': equipos_no_enciende_activos_dict.get(tecnico_id, 0),
-            # Datos HISTÓRICOS (desglose por si enciende o no)
-            'historico': {
-                'si_enciende': historico_data['si_enciende'],
-                'no_enciende': historico_data['no_enciende'],
-                'total': historico_data['total']
-            }
-        })
-    
-    # Ordenar por total histórico descendente
-    equipos_no_enciende_por_tecnico.sort(key=lambda x: x['historico']['total'], reverse=True)
-    
-    # ========================================================================
-    # ESTADÍSTICAS: EQUIPOS POR GAMA POR TÉCNICO (ACTIVOS + HISTÓRICO)
-    # ========================================================================
-    # ACTUALIZACIÓN: Se divide en dos consultas para mostrar:
-    # 1. ACTIVOS: Carga de trabajo actual (solo órdenes en proceso)
-    # 2. HISTÓRICO: Total de equipos manejados (incluyendo cerrados)
-    
-    # --- CONSULTA 1: EQUIPOS ACTIVOS (Carga actual) ---
-    equipos_por_gama_activos_raw = OrdenServicio.objects.exclude(
-        estado__in=['entregado', 'cancelado']
-    ).filter(
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
-    ).values(
-        'tecnico_asignado_actual__nombre_completo',
-        'tecnico_asignado_actual__id',
-        'detalle_equipo__gama'
-    ).annotate(
-        total_equipos=Count('numero_orden_interno')
-    ).order_by('tecnico_asignado_actual__nombre_completo', 'detalle_equipo__gama')
-    
-    # --- CONSULTA 2: EQUIPOS HISTÓRICO TOTAL (Todas las órdenes) ---
-    equipos_por_gama_historico_raw = OrdenServicio.objects.filter(
-        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO'
-    ).values(
-        'tecnico_asignado_actual__nombre_completo',
-        'tecnico_asignado_actual__id',
-        'detalle_equipo__gama'
-    ).annotate(
-        total_equipos=Count('numero_orden_interno')
-    ).order_by('tecnico_asignado_actual__nombre_completo', 'detalle_equipo__gama')
-    
-    # --- PROCESAR DATOS ACTIVOS ---
-    equipos_activos_dict = {}
-    for item in equipos_por_gama_activos_raw:
-        tecnico_id = item['tecnico_asignado_actual__id']
-        gama = item['detalle_equipo__gama']
-        total = item['total_equipos']
-        
-        if tecnico_id not in equipos_activos_dict:
-            equipos_activos_dict[tecnico_id] = {
-                'alta': 0, 'media': 0, 'baja': 0, 'total': 0
-            }
-        
-        equipos_activos_dict[tecnico_id][gama] = total
-        equipos_activos_dict[tecnico_id]['total'] += total
-    
-    # --- PROCESAR DATOS HISTÓRICOS ---
-    equipos_por_gama_por_tecnico = {}
-    for item in equipos_por_gama_historico_raw:
-        tecnico_id = item['tecnico_asignado_actual__id']
-        tecnico_nombre = item['tecnico_asignado_actual__nombre_completo']
-        gama = item['detalle_equipo__gama']
-        total = item['total_equipos']
-        
-        if tecnico_id not in equipos_por_gama_por_tecnico:
-            # Obtener información adicional del técnico
-            tecnico_obj = Empleado.objects.get(id=tecnico_id)
-            
-            # Obtener datos activos para este técnico (si existen)
-            activos_data = equipos_activos_dict.get(tecnico_id, {
-                'alta': 0, 'media': 0, 'baja': 0, 'total': 0
-            })
-            
-            equipos_por_gama_por_tecnico[tecnico_id] = {
-                'nombre': tecnico_nombre,
-                'foto_url': tecnico_obj.get_foto_perfil_url(),
-                'iniciales': tecnico_obj.get_iniciales(),
-                # Datos ACTIVOS
-                'activos': {
-                    'alta': activos_data.get('alta', 0),
-                    'media': activos_data.get('media', 0),
-                    'baja': activos_data.get('baja', 0),
-                    'total': activos_data.get('total', 0)
-                },
-                # Datos HISTÓRICOS
-                'historico': {
-                    'alta': 0,
-                    'media': 0,
-                    'baja': 0,
-                    'total': 0
-                }
-            }
-        
-        # Agregar datos históricos
-        equipos_por_gama_por_tecnico[tecnico_id]['historico'][gama] = total
-        equipos_por_gama_por_tecnico[tecnico_id]['historico']['total'] += total
-    
-    # Convertir a lista ordenada por total histórico descendente
-    equipos_por_gama_por_tecnico = sorted(
-        equipos_por_gama_por_tecnico.values(),
-        key=lambda x: x['historico']['total'],
-        reverse=True
-    )
-    
-    # ========================================================================
-    # CARGA DE TRABAJO POR TÉCNICO CON TRACKING TEMPORAL Y ROTACIÓN
-    # ========================================================================
     from datetime import timedelta
-    from django.db.models import Max, F
+    from django.db.models import Max, F, Q as QueryQ
+    from collections import defaultdict
     
     # Obtener filtro temporal (por defecto: esta semana)
     filtro_temporal = request.GET.get('filtro_temporal', 'semana')
@@ -889,61 +717,153 @@ def lista_ordenes_activas(request):
     else:  # 'historico'
         fecha_inicio_filtro = None
     
-    # CONSULTA BASE: Órdenes activas por técnico
-    ordenes_por_tecnico = OrdenServicio.objects.filter(
+    # ========================================================================
+    # PASO 1: Consultar órdenes activas por técnico con todos los datos
+    # ========================================================================
+    ordenes_activas_por_tecnico = OrdenServicio.objects.filter(
         tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
         tecnico_asignado_actual__activo=True
     ).exclude(
         estado__in=['entregado', 'cancelado']
     ).values(
-        'tecnico_asignado_actual__nombre_completo',
         'tecnico_asignado_actual__id'
     ).annotate(
-        total_ordenes=Count('numero_orden_interno')
-    ).order_by('-total_ordenes')
+        total_ordenes=Count('id')
+    )
+    ordenes_activas_dict = {item['tecnico_asignado_actual__id']: item['total_ordenes'] for item in ordenes_activas_por_tecnico}
     
-    # CONSULTA: Asignaciones del día (desde HistorialOrden)
-    # IMPORTANTE: Filtrar solo registros manuales (es_sistema=False) para evitar duplicación
-    # Cuando se cambia técnico manualmente, se crean 2 registros: uno manual y uno automático del modelo
-    asignaciones_hoy = HistorialOrden.objects.filter(
+    # ========================================================================
+    # PASO 2: Equipos "No Enciende" activos por técnico
+    # ========================================================================
+    equipos_no_encienden_raw = OrdenServicio.objects.filter(
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
+        tecnico_asignado_actual__activo=True,
+        detalle_equipo__equipo_enciende=False
+    ).exclude(
+        estado__in=['entregado', 'cancelado']
+    ).values('tecnico_asignado_actual__id').annotate(
+        total=Count('id')
+    )
+    equipos_no_encienden_dict = {item['tecnico_asignado_actual__id']: item['total'] for item in equipos_no_encienden_raw}
+    
+    # ========================================================================
+    # PASO 3: Equipos por gama activos por técnico
+    # ========================================================================
+    equipos_por_gama_raw = OrdenServicio.objects.filter(
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
+        tecnico_asignado_actual__activo=True
+    ).exclude(
+        estado__in=['entregado', 'cancelado']
+    ).values(
+        'tecnico_asignado_actual__id',
+        'detalle_equipo__gama'
+    ).annotate(
+        total=Count('id')
+    )
+    
+    # Procesar en diccionario por técnico
+    equipos_gama_dict = defaultdict(lambda: {'alta': 0, 'media': 0, 'baja': 0})
+    for item in equipos_por_gama_raw:
+        tecnico_id = item['tecnico_asignado_actual__id']
+        gama = item['detalle_equipo__gama']
+        total = item['total']
+        equipos_gama_dict[tecnico_id][gama] = total
+    
+    # ========================================================================
+    # PASO 4: Folios (FL-) activos por técnico
+    # ========================================================================
+    folios_fl_raw = OrdenServicio.objects.filter(
+        tecnico_asignado_actual__cargo='TECNICO DE LABORATORIO',
+        tecnico_asignado_actual__activo=True,
+        detalle_equipo__orden_cliente__istartswith='FL-'
+    ).exclude(
+        estado__in=['entregado', 'cancelado']
+    ).values('tecnico_asignado_actual__id').annotate(
+        total=Count('id')
+    )
+    folios_fl_dict = {item['tecnico_asignado_actual__id']: item['total'] for item in folios_fl_raw}
+    
+    # ========================================================================
+    # PASO 5: Asignaciones NETAS (corrigiendo el bug)
+    # ========================================================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # El bug estaba en que solo contábamos las asignaciones ENTRANTES (tecnico_nuevo)
+    # pero no restábamos las SALIENTES (cuando se reasignaba a otro técnico).
+    # Ahora calculamos: NETAS = ENTRANTES - SALIENTES
+    
+    # IMPORTANTE: Usamos rango de fechas en lugar de __date para evitar problemas de timezone
+    inicio_hoy = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    fin_hoy = inicio_hoy + timedelta(days=1)
+    
+    # --- Asignaciones HOY ---
+    # Entrantes: veces que el técnico fue asignado como tecnico_nuevo hoy
+    asignaciones_hoy_entrantes = HistorialOrden.objects.filter(
         tipo_evento='cambio_tecnico',
-        es_sistema=False,  # Solo registros creados por usuarios, no por el sistema
-        fecha_evento__date=hoy
+        es_sistema=False,
+        fecha_evento__gte=inicio_hoy,
+        fecha_evento__lt=fin_hoy
     ).values('tecnico_nuevo__id').annotate(
         total=Count('id')
     )
-    asignaciones_hoy_dict = {item['tecnico_nuevo__id']: item['total'] for item in asignaciones_hoy if item['tecnico_nuevo__id']}
+    asignaciones_hoy_entrantes_dict = {item['tecnico_nuevo__id']: item['total'] for item in asignaciones_hoy_entrantes if item['tecnico_nuevo__id']}
     
-    # CONSULTA: Asignaciones de la semana o históricas (según filtro)
-    # IMPORTANTE: Filtrar solo registros manuales (es_sistema=False) para evitar duplicación
+    # Salientes: veces que el técnico perdió una orden (fue tecnico_anterior) hoy
+    asignaciones_hoy_salientes = HistorialOrden.objects.filter(
+        tipo_evento='cambio_tecnico',
+        es_sistema=False,
+        fecha_evento__gte=inicio_hoy,
+        fecha_evento__lt=fin_hoy
+    ).values('tecnico_anterior__id').annotate(
+        total=Count('id')
+    )
+    asignaciones_hoy_salientes_dict = {item['tecnico_anterior__id']: item['total'] for item in asignaciones_hoy_salientes if item['tecnico_anterior__id']}
+    
+    # --- Asignaciones SEMANA / HISTÓRICO ---
     if filtro_temporal == 'historico':
-        # Histórico: todas las asignaciones sin filtro de fecha
-        asignaciones_semana = HistorialOrden.objects.filter(
+        # Entrantes históricas
+        asignaciones_semana_entrantes = HistorialOrden.objects.filter(
             tipo_evento='cambio_tecnico',
-            es_sistema=False  # Solo registros manuales
+            es_sistema=False
         ).values('tecnico_nuevo__id').annotate(
             total=Count('id')
         )
-        asignaciones_semana_dict = {item['tecnico_nuevo__id']: item['total'] for item in asignaciones_semana if item['tecnico_nuevo__id']}
-    elif filtro_temporal == 'semana':
-        # Semana: desde inicio de semana
-        asignaciones_semana = HistorialOrden.objects.filter(
+        # Salientes históricas
+        asignaciones_semana_salientes = HistorialOrden.objects.filter(
             tipo_evento='cambio_tecnico',
-            es_sistema=False,  # Solo registros manuales
+            es_sistema=False
+        ).values('tecnico_anterior__id').annotate(
+            total=Count('id')
+        )
+    elif filtro_temporal == 'semana':
+        # Entrantes esta semana
+        asignaciones_semana_entrantes = HistorialOrden.objects.filter(
+            tipo_evento='cambio_tecnico',
+            es_sistema=False,
             fecha_evento__gte=fecha_inicio_filtro
         ).values('tecnico_nuevo__id').annotate(
             total=Count('id')
         )
-        asignaciones_semana_dict = {item['tecnico_nuevo__id']: item['total'] for item in asignaciones_semana if item['tecnico_nuevo__id']}
-    else:
-        # Hoy: no se muestra columna de semana
-        asignaciones_semana_dict = {}
+        # Salientes esta semana
+        asignaciones_semana_salientes = HistorialOrden.objects.filter(
+            tipo_evento='cambio_tecnico',
+            es_sistema=False,
+            fecha_evento__gte=fecha_inicio_filtro
+        ).values('tecnico_anterior__id').annotate(
+            total=Count('id')
+        )
+    else:  # 'hoy'
+        asignaciones_semana_entrantes = []
+        asignaciones_semana_salientes = []
     
-    # CONSULTA: Última asignación por técnico (para rotación)
-    # IMPORTANTE: Filtrar solo registros manuales (es_sistema=False)
+    asignaciones_semana_entrantes_dict = {item['tecnico_nuevo__id']: item['total'] for item in asignaciones_semana_entrantes if item['tecnico_nuevo__id']}
+    asignaciones_semana_salientes_dict = {item['tecnico_anterior__id']: item['total'] for item in asignaciones_semana_salientes if item['tecnico_anterior__id']}
+    
+    # ========================================================================
+    # PASO 6: Última asignación por técnico (para rotación y "Última" columna)
+    # ========================================================================
     ultimas_asignaciones = HistorialOrden.objects.filter(
         tipo_evento='cambio_tecnico',
-        es_sistema=False,  # Solo registros manuales
+        es_sistema=False,
         tecnico_nuevo__cargo='TECNICO DE LABORATORIO',
         tecnico_nuevo__activo=True
     ).values('tecnico_nuevo__id').annotate(
@@ -951,24 +871,36 @@ def lista_ordenes_activas(request):
     )
     ultimas_asignaciones_dict = {item['tecnico_nuevo__id']: item['ultima_fecha'] for item in ultimas_asignaciones}
     
-    # Obtener todos los técnicos de laboratorio activos
+    # ========================================================================
+    # PASO 7: Enriquecer datos por técnico y agrupar por sucursal → área
+    # ========================================================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Ahora agrupamos por sucursal Y área (ej: Satélite → LABORATORIO DELL).
+    # Esto permite asignaciones más precisas según la especialización del técnico.
+    
+    # Obtener todos los técnicos de laboratorio activos con su sucursal
     tecnicos_laboratorio = Empleado.objects.filter(
         cargo='TECNICO DE LABORATORIO',
         activo=True
-    )
+    ).select_related('sucursal').order_by('sucursal__nombre', 'area', 'nombre_completo')
     
-    # Enriquecer con información detallada
-    ordenes_por_tecnico_enriquecido = []
-    ordenes_por_tecnico_dict = {item['tecnico_asignado_actual__id']: item['total_ordenes'] for item in ordenes_por_tecnico}
+    # Agrupar técnicos por (sucursal_id, area) - usamos una tupla como clave
+    tecnicos_por_sucursal_area = defaultdict(list)
     
     for tecnico in tecnicos_laboratorio:
-        ordenes_actuales = ordenes_por_tecnico_dict.get(tecnico.id, 0)
-        asignaciones_hoy_count = asignaciones_hoy_dict.get(tecnico.id, 0)
-        asignaciones_semana_count = asignaciones_semana_dict.get(tecnico.id, 0)
-        ultima_asignacion = ultimas_asignaciones_dict.get(tecnico.id)
+        # Calcular asignaciones NETAS
+        asignaciones_hoy_netas = (
+            asignaciones_hoy_entrantes_dict.get(tecnico.id, 0) - 
+            asignaciones_hoy_salientes_dict.get(tecnico.id, 0)
+        )
+        
+        asignaciones_semana_netas = (
+            asignaciones_semana_entrantes_dict.get(tecnico.id, 0) - 
+            asignaciones_semana_salientes_dict.get(tecnico.id, 0)
+        )
         
         # Calcular tiempo desde última asignación
-        tiempo_sin_asignar = None
+        ultima_asignacion = ultimas_asignaciones_dict.get(tecnico.id)
         if ultima_asignacion:
             delta = timezone.now() - ultima_asignacion
             horas = delta.total_seconds() / 3600
@@ -980,83 +912,148 @@ def lista_ordenes_activas(request):
         else:
             tiempo_sin_asignar = "Nunca"
         
-        # Obtener estadísticas de "No Enciende" usando método del modelo
-        stats = tecnico.obtener_estadisticas_ordenes_activas()
+        # Obtener datos de gama
+        gama_data = equipos_gama_dict[tecnico.id]
         
-        ordenes_por_tecnico_enriquecido.append({
+        # Construir dict del técnico
+        tecnico_data = {
             'tecnico_id': tecnico.id,
             'tecnico_nombre': tecnico.nombre_completo,
             'foto_url': tecnico.get_foto_perfil_url(),
             'iniciales': tecnico.get_iniciales(),
-            'ordenes_actuales': ordenes_actuales,
-            'asignaciones_hoy': asignaciones_hoy_count,
-            'asignaciones_semana': asignaciones_semana_count,
+            'sucursal_id': tecnico.sucursal.id if tecnico.sucursal else None,
+            'sucursal_nombre': tecnico.sucursal.nombre if tecnico.sucursal else 'Sin sucursal',
+            'area': tecnico.area or 'Sin área',
+            # Datos de carga
+            'ordenes_actuales': ordenes_activas_dict.get(tecnico.id, 0),
+            'equipos_no_encienden': equipos_no_encienden_dict.get(tecnico.id, 0),
+            'gama_alta': gama_data['alta'],
+            'gama_media': gama_data['media'],
+            'gama_baja': gama_data['baja'],
+            'folios_fl': folios_fl_dict.get(tecnico.id, 0),
+            # Asignaciones NETAS (corregidas)
+            'asignaciones_hoy_netas': asignaciones_hoy_netas,
+            'asignaciones_semana_netas': asignaciones_semana_netas,
+            # Tiempo
             'ultima_asignacion': ultima_asignacion,
             'tiempo_sin_asignar': tiempo_sin_asignar,
-            'tiene_sobrecarga': stats['tiene_sobrecarga'],
-            'equipos_no_encienden': stats['equipos_no_encienden'],
-        })
+        }
+        
+        # Agrupar por (sucursal_id, area)
+        sucursal_key = tecnico.sucursal.id if tecnico.sucursal else 'sin_sucursal'
+        area_key = tecnico.area or 'sin_area'
+        grupo_key = (sucursal_key, area_key)
+        tecnicos_por_sucursal_area[grupo_key].append(tecnico_data)
     
-    # ALGORITMO DE ROTACIÓN: Calcular "siguiente sugerido"
-    # Criterios (en orden de prioridad):
-    # 1. Menor carga actual (ordenes_actuales)
-    # 2. Tiempo desde última asignación (más tiempo = mayor prioridad)
-    # 3. Menos asignaciones en el día (distribuir equitativamente)
+    # ========================================================================
+    # PASO 8: Calcular rotación SOLO para Satélite > Laboratorio OOW
+    # ========================================================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # El badge "SIGUIENTE" solo se muestra para técnicos de Satélite en el área LABORATORIO OOW.
+    # Otras sucursales/áreas no mostrarán este indicador.
     
-    # Ordenar técnicos por prioridad de asignación
-    tecnicos_ordenados_rotacion = sorted(
-        ordenes_por_tecnico_enriquecido,
-        key=lambda x: (
-            x['ordenes_actuales'],  # Primero: menor carga actual
-            -(x['ultima_asignacion'].timestamp() if x['ultima_asignacion'] else 0),  # Segundo: más tiempo sin asignar (negativo para invertir)
-            x['asignaciones_hoy']  # Tercero: menos asignaciones hoy
-        )
-    )
-    
-    # Marcar el primero como "siguiente en rotación"
-    if tecnicos_ordenados_rotacion:
-        siguiente_id = tecnicos_ordenados_rotacion[0]['tecnico_id']
-        for item in ordenes_por_tecnico_enriquecido:
-            item['es_siguiente_rotacion'] = (item['tecnico_id'] == siguiente_id)
-    
-    # Calcular promedio de carga para determinar "balanceado"
-    if ordenes_por_tecnico_enriquecido:
-        promedio_carga = sum(t['ordenes_actuales'] for t in ordenes_por_tecnico_enriquecido) / len(ordenes_por_tecnico_enriquecido)
-        for item in ordenes_por_tecnico_enriquecido:
-            diferencia = abs(item['ordenes_actuales'] - promedio_carga)
-            item['esta_balanceado'] = diferencia <= 1
-            item['necesita_alerta_sin_asignaciones'] = (
-                item['asignaciones_hoy'] == 0 and 
-                item['ultima_asignacion'] and 
-                (timezone.now() - item['ultima_asignacion']).total_seconds() > 28800  # 8 horas
+    for grupo_key, tecnicos_list in tecnicos_por_sucursal_area.items():
+        sucursal_key, area_key = grupo_key
+        
+        # Verificar si es Satélite y Laboratorio OOW
+        # Obtenemos el nombre de la sucursal del primer técnico del grupo
+        if tecnicos_list:
+            sucursal_nombre = tecnicos_list[0]['sucursal_nombre']
+            es_satelite = 'SATELITE' in sucursal_nombre.upper() or 'SATÉLITE' in sucursal_nombre.upper()
+            es_lab_oow = 'OOW' in area_key.upper()
+            
+            # Solo calcular rotación si es Satélite > Lab OOW
+            if es_satelite and es_lab_oow:
+                # Ordenar técnicos de este grupo por prioridad de asignación
+                tecnicos_ordenados = sorted(
+                    tecnicos_list,
+                    key=lambda x: (
+                        x['ordenes_actuales'],  # Primero: menor carga actual
+                        -(x['ultima_asignacion'].timestamp() if x['ultima_asignacion'] else 0),  # Segundo: más tiempo sin asignar
+                        x['asignaciones_hoy_netas']  # Tercero: menos asignaciones netas hoy
+                    )
+                )
+                
+                # Marcar el primero como "siguiente en rotación"
+                if tecnicos_ordenados:
+                    siguiente_id = tecnicos_ordenados[0]['tecnico_id']
+                    for tecnico_data in tecnicos_list:
+                        tecnico_data['es_siguiente_rotacion'] = (tecnico_data['tecnico_id'] == siguiente_id)
+            else:
+                # Otras áreas/sucursales: no marcar a nadie como siguiente
+                for tecnico_data in tecnicos_list:
+                    tecnico_data['es_siguiente_rotacion'] = False
+        
+        # Ordenar lista final de este grupo: "Siguiente" primero (si aplica), luego por carga descendente
+        tecnicos_list.sort(
+            key=lambda x: (
+                not x.get('es_siguiente_rotacion', False),  # False (siguiente) va primero
+                -x['ordenes_actuales'],  # Luego por carga descendente
+                x['tecnico_nombre']  # Desempate por nombre
             )
-    
-    # ORDENAR LISTA FINAL: "Siguiente en rotación" primero, luego por carga descendente
-    ordenes_por_tecnico_enriquecido.sort(
-        key=lambda x: (
-            not x.get('es_siguiente_rotacion', False),  # False (siguiente) va primero
-            -x['ordenes_actuales'],  # Luego ordenar por carga descendente (negativo para invertir)
-            x['tecnico_nombre']  # Desempate por nombre alfabético
         )
+    
+    # ========================================================================
+    # PASO 9: Organizar en estructura para el template (sucursal → áreas → técnicos)
+    # ========================================================================
+    # Agrupar por sucursal con sub-grupos por área
+    sucursales_dict = defaultdict(lambda: defaultdict(list))
+    
+    for (sucursal_key, area_key), tecnicos_list in tecnicos_por_sucursal_area.items():
+        for tecnico_data in tecnicos_list:
+            sucursales_dict[sucursal_key][area_key].append(tecnico_data)
+    
+    # Convertir a lista ordenada de sucursales con sus áreas
+    tecnicos_por_sucursal_ordenado = []
+    
+    # Ordenar sucursales alfabéticamente (sin_sucursal al final)
+    sucursales_ordenadas = sorted(
+        sucursales_dict.keys(),
+        key=lambda k: ('zzz' if k == 'sin_sucursal' else sucursales_dict[k][list(sucursales_dict[k].keys())[0]][0]['sucursal_nombre'])
     )
+    
+    for sucursal_key in sucursales_ordenadas:
+        areas_dict = sucursales_dict[sucursal_key]
+        
+        # Obtener nombre de sucursal del primer técnico
+        primer_area = list(areas_dict.keys())[0]
+        sucursal_nombre = areas_dict[primer_area][0]['sucursal_nombre']
+        
+        # Ordenar áreas alfabéticamente (sin_area al final)
+        areas_ordenadas = sorted(
+            areas_dict.keys(),
+            key=lambda k: 'zzz' if k == 'sin_area' else k
+        )
+        
+        # Construir sub-grupos de áreas
+        areas_grupos = []
+        for area_key in areas_ordenadas:
+            areas_grupos.append({
+                'area_nombre': area_key,
+                'tecnicos': areas_dict[area_key]
+            })
+        
+        tecnicos_por_sucursal_ordenado.append({
+            'sucursal_nombre': sucursal_nombre,
+            'areas': areas_grupos  # Nueva estructura con sub-grupos por área
+        })
     
     # ========================================================================
     # HISTORIAL DE REASIGNACIONES DEL DÍA
     # ========================================================================
-    # IMPORTANTE: Filtrar solo registros manuales (es_sistema=False) para evitar duplicados
-    # Los cambios automáticos del modelo se excluyen para mostrar solo reasignaciones reales
     reasignaciones_hoy = HistorialOrden.objects.filter(
         tipo_evento='cambio_tecnico',
-        es_sistema=False,  # Solo registros creados por usuarios
-        fecha_evento__date=hoy
+        es_sistema=False,
+        fecha_evento__gte=inicio_hoy,
+        fecha_evento__lt=fin_hoy
     ).select_related(
         'orden',
         'tecnico_anterior',
         'tecnico_nuevo',
         'usuario'
-    ).order_by('-fecha_evento')[:20]  # Limitar a últimas 20
+    ).order_by('-fecha_evento')[:20]
     
-    # Calcular total de órdenes activas (sin filtro de búsqueda) para las estadísticas
+    # Calcular total de órdenes activas
     total_ordenes_activas = OrdenServicio.objects.exclude(
         estado__in=['entregado', 'cancelado']
     ).count()
@@ -1067,13 +1064,11 @@ def lista_ordenes_activas(request):
         'titulo': 'Órdenes Activas',
         'total': ordenes.count(),
         'busqueda': busqueda,
-        'equipos_no_enciende_por_tecnico': equipos_no_enciende_por_tecnico,
-        'equipos_por_gama_por_tecnico': equipos_por_gama_por_tecnico,
-        'ordenes_por_tecnico': ordenes_por_tecnico_enriquecido,  # Datos enriquecidos con tracking temporal
-        'reasignaciones_hoy': reasignaciones_hoy,  # Historial de reasignaciones del día
-        'filtro_temporal': filtro_temporal,  # Filtro activo (hoy/semana/historico)
-        'total_ordenes_activas': total_ordenes_activas,  # Para mostrar en estadísticas
-        'mostrar_estadisticas': True,  # Siempre mostrar en vista activas
+        'tecnicos_por_sucursal': tecnicos_por_sucursal_ordenado,  # NUEVA ESTRUCTURA UNIFICADA
+        'reasignaciones_hoy': reasignaciones_hoy,
+        'filtro_temporal': filtro_temporal,
+        'total_ordenes_activas': total_ordenes_activas,
+        'mostrar_estadisticas': True,
     }
     
     return render(request, 'servicio_tecnico/lista_ordenes.html', context)

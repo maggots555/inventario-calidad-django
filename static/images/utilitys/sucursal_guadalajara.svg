@@ -1,0 +1,128 @@
+<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradiente para el sombrero -->
+    <linearGradient id="sombreroGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#212121;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#424242;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#212121;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradiente dorado para detalles -->
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffd700;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ffed4e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ffd700;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradiente para la botella de tequila -->
+    <linearGradient id="bottleGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a5d6a7;stop-opacity:0.7" />
+      <stop offset="30%" style="stop-color:#c8e6c9;stop-opacity:0.8" />
+      <stop offset="70%" style="stop-color:#c8e6c9;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#a5d6a7;stop-opacity:0.7" />
+    </linearGradient>
+    
+    <!-- Gradiente para el líquido -->
+    <linearGradient id="liquidGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fff9c4;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#f9a825;stop-opacity:0.9" />
+    </linearGradient>
+    
+    <!-- Patrón de rayas del sombrero -->
+    <pattern id="sombreroPattern" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="4" fill="url(#goldGradient)" opacity="0.3"/>
+      <line x1="0" y1="0" x2="4" y2="4" stroke="#ffd700" stroke-width="0.5" opacity="0.5"/>
+    </pattern>
+  </defs>
+  
+  <!-- Sombra del sombrero -->
+  <ellipse cx="24" cy="18" rx="18" ry="3" fill="#000000" opacity="0.1">
+    <animate attributeName="opacity" values="0.1;0.15;0.1" dur="3s" repeatCount="indefinite"/>
+  </ellipse>
+  
+  <!-- Ala del sombrero -->
+  <ellipse cx="24" cy="16" rx="18" ry="3.5" fill="url(#sombreroGradient)" stroke="#000000" stroke-width="0.5">
+    <animate attributeName="ry" values="3.5;4;3.5" dur="4s" repeatCount="indefinite"/>
+  </ellipse>
+  
+  <!-- Detalles dorados en el ala -->
+  <ellipse cx="24" cy="15.5" rx="17" ry="2" fill="none" stroke="url(#goldGradient)" stroke-width="1" opacity="0.8">
+    <animate attributeName="opacity" values="0.6;0.9;0.6" dur="2s" repeatCount="indefinite"/>
+  </ellipse>
+  
+  <!-- Patrón decorativo del ala -->
+  <ellipse cx="24" cy="16" rx="16" ry="2.5" fill="url(#sombreroPattern)" opacity="0.4"/>
+  
+  <!-- Copa del sombrero -->
+  <path d="M 16 16 Q 16 8 24 8 Q 32 8 32 16" fill="url(#sombreroGradient)" stroke="#000000" stroke-width="0.5"/>
+  
+  <!-- Banda dorada del sombrero -->
+  <ellipse cx="24" cy="16" rx="8.5" ry="1.5" fill="url(#goldGradient)">
+    <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>
+  </ellipse>
+  
+  <!-- Detalles de la copa -->
+  <path d="M 18 12 Q 24 10 30 12" fill="none" stroke="#424242" stroke-width="0.3"/>
+  <circle cx="24" cy="10" r="1" fill="url(#goldGradient)"/>
+  
+  <!-- Botella de tequila -->
+  <!-- Cuello de la botella -->
+  <rect x="22" y="24" width="4" height="6" rx="0.5" fill="url(#bottleGradient)" stroke="#66bb6a" stroke-width="0.5"/>
+  
+  <!-- Tapa dorada -->
+  <rect x="21.5" y="23" width="5" height="2" rx="0.5" fill="url(#goldGradient)" stroke="#ffd700" stroke-width="0.3">
+    <animate attributeName="y" values="23;22.8;23" dur="2s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Cuerpo de la botella -->
+  <path d="M 20 30 L 19 42 Q 19 44 21 44 L 27 44 Q 29 44 29 42 L 28 30 Z" 
+        fill="url(#bottleGradient)" 
+        stroke="#66bb6a" 
+        stroke-width="0.5"/>
+  
+  <!-- Líquido dentro de la botella -->
+  <path d="M 20.5 32 L 19.5 42 Q 19.5 43.5 21 43.5 L 27 43.5 Q 28.5 43.5 28.5 42 L 27.5 32 Z" 
+        fill="url(#liquidGradient)">
+    <animate attributeName="d" 
+             values="M 20.5 32 L 19.5 42 Q 19.5 43.5 21 43.5 L 27 43.5 Q 28.5 43.5 28.5 42 L 27.5 32 Z;
+                     M 20.5 33 L 19.5 42 Q 19.5 43.5 21 43.5 L 27 43.5 Q 28.5 43.5 28.5 42 L 27.5 33 Z;
+                     M 20.5 32 L 19.5 42 Q 19.5 43.5 21 43.5 L 27 43.5 Q 28.5 43.5 28.5 42 L 27.5 32 Z" 
+             dur="4s" 
+             repeatCount="indefinite"/>
+  </path>
+  
+  <!-- Brillo en la botella -->
+  <path d="M 21 31 Q 22 35 21 39" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+  <path d="M 22 32 Q 22.5 34 22 36" fill="none" stroke="#ffffff" stroke-width="0.8" opacity="0.6" stroke-linecap="round"/>
+  
+  <!-- Etiqueta de la botella -->
+  <rect x="20.5" y="35" width="7" height="5" rx="0.5" fill="#ffffff" opacity="0.7" stroke="#81c784" stroke-width="0.3"/>
+  <text x="24" y="38.5" font-family="Arial, sans-serif" font-size="2.5" font-weight="bold" fill="#2e7d32" text-anchor="middle">100%</text>
+  <text x="24" y="40" font-family="Arial, sans-serif" font-size="1.5" fill="#43a047" text-anchor="middle">AGAVE</text>
+  
+  <!-- Detalles decorativos adicionales del sombrero -->
+  <circle cx="18" cy="14" r="0.8" fill="url(#goldGradient)">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="30" cy="14" r="0.8" fill="url(#goldGradient)">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Cactus pequeño decorativo (opcional, a un lado) -->
+  <g opacity="0.6">
+    <ellipse cx="38" cy="42" rx="2" ry="1" fill="#558b2f"/>
+    <rect x="37.5" y="38" width="1" height="4" rx="0.3" fill="#689f38"/>
+    <rect x="36.5" y="39" width="1.5" height="1.5" rx="0.3" fill="#689f38"/>
+    <rect x="38.5" y="40" width="1.2" height="1.2" rx="0.3" fill="#689f38"/>
+  </g>
+  
+  <!-- Burbujas animadas en el tequila -->
+  <circle cx="23" cy="40" r="0.5" fill="#ffffff" opacity="0.6">
+    <animate attributeName="cy" values="40;34;40" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.6;0;0.6" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="25.5" cy="38" r="0.4" fill="#ffffff" opacity="0.5">
+    <animate attributeName="cy" values="38;32;38" dur="4s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.5;0;0.5" dur="4s" repeatCount="indefinite"/>
+  </circle>
+</svg>

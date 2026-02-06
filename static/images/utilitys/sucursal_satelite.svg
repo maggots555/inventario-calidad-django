@@ -1,0 +1,109 @@
+<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradiente para el cuerpo del satélite -->
+    <linearGradient id="satelliteBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8eaf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#9fa8da;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradiente para los paneles solares -->
+    <linearGradient id="solarPanel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a237e;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#3949ab;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a237e;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Animación de rotación del satélite -->
+    <animateTransform
+      id="satelliteRotation"
+      attributeName="transform"
+      attributeType="XML"
+      type="rotate"
+      from="0 24 24"
+      to="360 24 24"
+      dur="20s"
+      repeatCount="indefinite"/>
+    
+    <!-- Animación del brillo rojo pulsante -->
+    <animate
+      id="redGlow"
+      attributeName="opacity"
+      values="0.3;1;0.3"
+      dur="1.5s"
+      repeatCount="indefinite"/>
+  </defs>
+  
+  <!-- Grupo principal del satélite con rotación -->
+  <g>
+    <animateTransform
+      attributeName="transform"
+      attributeType="XML"
+      type="rotate"
+      from="0 24 24"
+      to="360 24 24"
+      dur="20s"
+      repeatCount="indefinite"/>
+    
+    <!-- Panel solar izquierdo -->
+    <rect x="4" y="18" width="12" height="12" rx="1" fill="url(#solarPanel)" stroke="#1a237e" stroke-width="0.5">
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="3s" repeatCount="indefinite"/>
+    </rect>
+    <line x1="6" y1="20" x2="6" y2="28" stroke="#5c6bc0" stroke-width="0.3"/>
+    <line x1="8" y1="20" x2="8" y2="28" stroke="#5c6bc0" stroke-width="0.3"/>
+    <line x1="10" y1="20" x2="10" y2="28" stroke="#5c6bc0" stroke-width="0.3"/>
+    <line x1="12" y1="20" x2="12" y2="28" stroke="#5c6bc0" stroke-width="0.3"/>
+    <line x1="14" y1="20" x2="14" y2="28" stroke="#5c6bc0" stroke-width="0.3"/>
+    
+    <!-- Panel solar derecho -->
+    <rect x="32" y="18" width="12" height="12" rx="1" fill="url(#solarPanel)" stroke="#1a237e" stroke-width="0.5">
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="3s" repeatCount="indefinite"/>
+    </rect>
+    <line x1="34" y1="20" x2="34" y2="28" stroke="#5c6bc0" stroke-width="0.3"/>
+    <line x1="36" y1="20" x2="36" y2="28" stroke="#5c6bc0" stroke-width="0.3"/>
+    <line x1="38" y1="20" x2="38" y2="28" stroke="#5c6bc0" stroke-width="0.3"/>
+    <line x1="40" y1="20" x2="40" y2="28" stroke="#5c6bc0" stroke-width="0.3"/>
+    <line x1="42" y1="20" x2="42" y2="28" stroke="#5c6bc0" stroke-width="0.3"/>
+    
+    <!-- Cuerpo principal del satélite -->
+    <rect x="18" y="16" width="12" height="16" rx="2" fill="url(#satelliteBody)" stroke="#5c6bc0" stroke-width="1"/>
+    
+    <!-- Detalles del cuerpo -->
+    <rect x="20" y="18" width="8" height="3" rx="0.5" fill="#7986cb" opacity="0.6"/>
+    <rect x="20" y="23" width="8" height="3" rx="0.5" fill="#7986cb" opacity="0.6"/>
+    <rect x="20" y="28" width="8" height="2" rx="0.5" fill="#7986cb" opacity="0.6"/>
+    
+    <!-- Antena parabólica (receptora principal) -->
+    <ellipse cx="24" cy="12" rx="6" ry="3" fill="#c5cae9" stroke="#5c6bc0" stroke-width="1"/>
+    <ellipse cx="24" cy="12" rx="4" ry="2" fill="#9fa8da"/>
+    
+    <!-- Punto central de la antena con brillo rojo pulsante -->
+    <circle cx="24" cy="12" r="2" fill="#ff1744">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="24" cy="12" r="3" fill="none" stroke="#ff1744" stroke-width="0.5" opacity="0.4">
+      <animate attributeName="r" values="3;5;3" dur="1.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.4;0;0.4" dur="1.5s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Conector de antena -->
+    <line x1="24" y1="14" x2="24" y2="16" stroke="#5c6bc0" stroke-width="1.5"/>
+    
+    <!-- Antena lateral -->
+    <line x1="30" y1="20" x2="35" y2="15" stroke="#7986cb" stroke-width="1"/>
+    <circle cx="35" cy="15" r="1.5" fill="#9fa8da" stroke="#5c6bc0" stroke-width="0.5"/>
+  </g>
+  
+  <!-- Estrellas de fondo -->
+  <circle cx="8" cy="8" r="0.5" fill="#ffffff">
+    <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="40" cy="10" r="0.5" fill="#ffffff">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="42" cy="40" r="0.5" fill="#ffffff">
+    <animate attributeName="opacity" values="0.4;1;0.4" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="10" cy="42" r="0.5" fill="#ffffff">
+    <animate attributeName="opacity" values="0.6;1;0.6" dur="3.5s" repeatCount="indefinite"/>
+  </circle>
+</svg>

@@ -6,6 +6,88 @@
 {% block extra_css %}
 <!-- Cargar estilos específicos de servicio técnico -->
 <link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=6.6">
+<style>
+    /* Estilos mejorados para la tabla de estadísticas */
+    .table-hover tbody tr:hover {
+        background-color: rgba(103, 126, 234, 0.05);
+        transition: background-color 0.2s ease;
+    }
+    
+    .area-grupo {
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .area-grupo:last-child {
+        border-bottom: none;
+    }
+    
+    /* Mejoras responsive para móviles */
+    @media (max-width: 768px) {
+        .sucursal-header h5 {
+            font-size: 1rem !important;
+        }
+        
+        .area-header h6 {
+            font-size: 0.85rem !important;
+        }
+        
+        .table {
+            font-size: 0.8rem !important;
+        }
+        
+        .badge {
+            font-size: 0.7rem !important;
+            padding: 0.25rem 0.4rem !important;
+        }
+        
+        .tecnico-avatar-wrapper img,
+        .tecnico-avatar-wrapper div {
+            width: 38px !important;
+            height: 38px !important;
+            font-size: 0.8rem !important;
+        }
+        
+        /* Hacer el scroll horizontal más visible en móvil */
+        .table-responsive {
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+        }
+        
+        /* Alerta de deslizar en móvil */
+        .table-responsive::after {
+            content: "← Desliza para ver más →";
+            display: block;
+            text-align: center;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            color: #6c757d;
+            font-size: 0.75rem;
+            border-top: 1px solid #dee2e6;
+        }
+    }
+    
+    @media (min-width: 769px) {
+        .table-responsive::after {
+            display: none;
+        }
+    }
+    
+    /* Animación suave para badges */
+    .badge {
+        transition: all 0.2s ease;
+    }
+    
+    .badge:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Estilos para las filas de "siguiente en rotación" */
+    .table-success {
+        background-color: rgba(40, 167, 69, 0.08) !important;
+        border-left: 3px solid #28a745;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -84,18 +166,17 @@
 
     <!-- Cuadro informativo: Estadísticas por técnico (solo en vista activas) -->
     {% if mostrar_estadisticas %}
-        <!-- Banner informativo sobre las estadísticas -->
+        <!-- Banner informativo simplificado -->
         <div class="alert alert-info mt-4 mb-3" role="alert">
             <div class="d-flex align-items-center">
                 <i class="bi bi-info-circle-fill me-2" style="font-size: 1.5rem;"></i>
                 <div>
                     <h6 class="alert-heading mb-1">
-                        <i class="bi bi-bar-chart-line"></i> Vista General de Estadísticas por Técnico
+                        <i class="bi bi-bar-chart-line"></i> Estadísticas de Carga de Trabajo por Técnico
                     </h6>
                     <p class="mb-0">
-                        <strong>"Equipos No Enciende":</strong> <span class="badge bg-warning text-dark">Activos</span> (solo "No Enciende" en proceso) vs <span class="badge bg-info">Histórico</span> (desglose: sí enciende / no enciende / total).
-                        <br>
-                        <strong>"Equipos por Gama":</strong> <span class="badge bg-warning text-dark">Activos</span> (carga actual por gama) vs <span class="badge bg-info">Histórico Total</span> (desempeño acumulado por gama).
+                        Vista unificada con toda la información de carga actual agrupada por sucursal. 
+                        Las columnas "Hoy" y "Semana" muestran asignaciones <strong>netas</strong> (entradas - reasignaciones salientes).
                         {% if busqueda %}
                             <br><small class="text-muted">(Estadísticas independientes de la búsqueda activa)</small>
                         {% endif %}
@@ -107,18 +188,18 @@
         <div class="row mt-4 g-4 estadisticas-tecnico-row">
         
         <!-- ========================================================================
-             CARGA DE TRABAJO POR TÉCNICO CON TRACKING TEMPORAL Y ROTACIÓN
+             TABLA UNIFICADA DE ESTADÍSTICAS POR TÉCNICO (AGRUPADA POR SUCURSAL)
              ======================================================================== -->
-        {% if ordenes_por_tecnico %}
+        {% if tecnicos_por_sucursal %}
         <div class="col-lg-12">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header text-white d-flex justify-content-between align-items-center flex-wrap gap-3" 
                      style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 1rem 1.5rem;">
                     <div>
                         <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
-                            <i class="bi bi-people-fill" style="font-size: 1.3rem;"></i> Carga de Trabajo por Técnico - Tracking Temporal
+                            <i class="bi bi-people-fill" style="font-size: 1.3rem;"></i> Estadísticas Unificadas por Técnico
                         </h6>
-                        <small class="text-white opacity-90">Monitoreo en tiempo real con sugerencia de rotación equitativa</small>
+                        <small class="text-white opacity-90">Vista completa de carga de trabajo agrupada por sucursal</small>
                     </div>
                     <div class="d-flex gap-2 align-items-center flex-wrap">
                         <!-- Filtro temporal -->
@@ -132,193 +213,282 @@
                                 <option value="historico" {% if filtro_temporal == 'historico' %}selected{% endif %}>📜 Histórico Total</option>
                             </select>
                         </form>
-                        
-                        <span class="badge bg-white text-dark" style="padding: 0.5rem 1rem; font-weight: 600;">
-                            {{ ordenes_por_tecnico|length }} técnico{{ ordenes_por_tecnico|length|pluralize }}
-                        </span>
                     </div>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light sticky-top">
-                                <tr>
-                                    <th style="width: 25%;">
-                                        <i class="bi bi-person-badge"></i> Técnico
-                                    </th>
-                                    <th class="text-center" style="width: 12%;">
-                                        <i class="bi bi-hourglass-split"></i><br>
-                                        <small>Activas</small>
-                                    </th>
-                                    <th class="text-center" style="width: 12%;">
-                                        <i class="bi bi-calendar-day"></i><br>
-                                        <small>Hoy</small>
-                                    </th>
-                                    <th class="text-center" style="width: 12%;">
-                                        <i class="bi bi-calendar-week"></i><br>
-                                        <small>Semana</small>
-                                    </th>
-                                    <th class="text-center" style="width: 15%;">
-                                        <i class="bi bi-clock-history"></i><br>
-                                        <small>Última</small>
-                                    </th>
-                                    <th class="text-center" style="width: 24%;">
-                                        <i class="bi bi-speedometer2"></i><br>
-                                        <small>Estado</small>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for tecnico in ordenes_por_tecnico %}
-                                <tr class="{% if tecnico.es_siguiente_rotacion %}table-success bg-success bg-opacity-10{% endif %}">
-                                    <!-- Columna: Técnico -->
-                                    <td>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="tecnico-avatar-wrapper position-relative">
-                                                {% if tecnico.foto_url %}
-                                                    <img src="{{ tecnico.foto_url }}" 
-                                                         alt="{{ tecnico.tecnico_nombre }}"
-                                                         class="rounded-circle"
-                                                         style="width: 46px; height: 46px; object-fit: cover; border: 2px solid #e5e7eb;">
-                                                {% else %}
-                                                    <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                                                         style="width: 46px; height: 46px; background-color: #6b7280; font-size: 0.9rem; border: 2px solid #e5e7eb;">
-                                                        {{ tecnico.iniciales }}
-                                                    </div>
-                                                {% endif %}
-                                                
-                                                <!-- Badge de rotación sugerida -->
-                                                {% if tecnico.es_siguiente_rotacion %}
-                                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success" 
-                                                          style="font-size: 0.6rem; padding: 0.25rem 0.4rem;"
-                                                          title="Siguiente en rotación sugerida">
-                                                        <i class="bi bi-arrow-right-circle-fill"></i>
-                                                    </span>
-                                                {% endif %}
-                                            </div>
-                                            <div>
-                                                <div class="fw-bold" style="font-size: 0.9rem;">
-                                                    {{ tecnico.tecnico_nombre }}
+                    <!-- Iterar por cada sucursal -->
+                    {% for sucursal_grupo in tecnicos_por_sucursal %}
+                    <div class="sucursal-grupo">
+                        <!-- Encabezado de sucursal mejorado con SVG personalizado -->
+                        <div class="sucursal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.2rem 2rem; border-bottom: 4px solid #5a67d8; box-shadow: 0 3px 8px rgba(102,126,234,0.25);">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                <h5 class="mb-0 text-white d-flex align-items-center gap-3" style="font-weight: 800; font-size: 1.4rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                                    <!-- SVG personalizado según sucursal -->
+                                    {% if 'SATELITE' in sucursal_grupo.sucursal_nombre|upper or 'SATÉLITE' in sucursal_grupo.sucursal_nombre|upper %}
+                                        <img src="{% static 'images/utilitys/sucursal_satelite.svg' %}" alt="Satélite" style="width: 48px; height: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+                                    {% elif 'MONTERREY' in sucursal_grupo.sucursal_nombre|upper or 'MTY' in sucursal_grupo.sucursal_nombre|upper %}
+                                        <img src="{% static 'images/utilitys/sucursal_monterrey.svg' %}" alt="Monterrey" style="width: 48px; height: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+                                    {% elif 'GUADALAJARA' in sucursal_grupo.sucursal_nombre|upper or 'GDL' in sucursal_grupo.sucursal_nombre|upper %}
+                                        <img src="{% static 'images/utilitys/sucursal_guadalajara.svg' %}" alt="Guadalajara" style="width: 48px; height: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+                                    {% else %}
+                                        <!-- Icono genérico para otras sucursales -->
+                                        <i class="bi bi-geo-alt-fill" style="font-size: 1.5rem;"></i>
+                                    {% endif %}
+                                    <span style="letter-spacing: 0.5px;">{{ sucursal_grupo.sucursal_nombre|upper }}</span>
+                                </h5>
+                                <span class="badge bg-white text-primary px-3 py-2" style="font-size: 0.85rem; font-weight: 700;">
+                                    <i class="bi bi-people-fill me-1"></i>
+                                    {{ sucursal_grupo.areas|length }} área{{ sucursal_grupo.areas|length|pluralize }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Iterar por cada área dentro de la sucursal -->
+                        {% for area_grupo in sucursal_grupo.areas %}
+                        <div class="area-grupo">
+                            <!-- Sub-encabezado de área con colores corporativos -->
+                            {% if 'DELL' in area_grupo.area_nombre %}
+                                <!-- DELL: Azul y amarillo -->
+                                <div class="area-header" style="background: linear-gradient(135deg, #0076CE 0%, #FFD200 100%); padding: 0.75rem 1.5rem 0.75rem 2.5rem; border-bottom: 3px solid #0076CE; box-shadow: 0 2px 4px rgba(0,118,206,0.15);">
+                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
+                                        <i class="bi bi-laptop me-2"></i>{{ area_grupo.area_nombre }}
+                                        <span class="badge bg-white text-primary ms-2" style="font-size: 0.75rem; font-weight: 600;">
+                                            {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
+                                        </span>
+                                    </h6>
+                                </div>
+                            {% elif 'LENOVO' in area_grupo.area_nombre %}
+                                <!-- LENOVO: Naranja y verde -->
+                                <div class="area-header" style="background: linear-gradient(135deg, #E2231A 0%, #00B140 100%); padding: 0.75rem 1.5rem 0.75rem 2.5rem; border-bottom: 3px solid #E2231A; box-shadow: 0 2px 4px rgba(226,35,26,0.15);">
+                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
+                                        <i class="bi bi-laptop me-2"></i>{{ area_grupo.area_nombre }}
+                                        <span class="badge bg-white text-danger ms-2" style="font-size: 0.75rem; font-weight: 600;">
+                                            {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
+                                        </span>
+                                    </h6>
+                                </div>
+                            {% elif 'OOW' in area_grupo.area_nombre %}
+                                <!-- OOW: Rosa/Magenta -->
+                                <div class="area-header" style="background: linear-gradient(135deg, #E91E63 0%, #FF6090 100%); padding: 0.75rem 1.5rem 0.75rem 2.5rem; border-bottom: 3px solid #C2185B; box-shadow: 0 2px 4px rgba(233,30,99,0.15);">
+                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
+                                        <i class="bi bi-tools me-2"></i>{{ area_grupo.area_nombre }}
+                                        <span class="badge bg-white text-danger ms-2" style="font-size: 0.75rem; font-weight: 600;">
+                                            {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
+                                        </span>
+                                    </h6>
+                                </div>
+                            {% else %}
+                                <!-- Otras áreas: Gris por defecto -->
+                                <div class="area-header" style="background: linear-gradient(90deg, #6c757d 0%, #95a5a6 100%); padding: 0.75rem 1.5rem 0.75rem 2.5rem; border-bottom: 3px solid #6c757d;">
+                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem;">
+                                        <i class="bi bi-tag-fill me-2"></i>{{ area_grupo.area_nombre }}
+                                        <span class="badge bg-white text-dark ms-2" style="font-size: 0.75rem; font-weight: 600;">
+                                            {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
+                                        </span>
+                                    </h6>
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Tabla de técnicos de esta área -->
+                            <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                                <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem; min-width: 700px;">
+                                    <thead class="table-light" style="font-size: 0.8rem; position: sticky; top: 0; z-index: 10;">
+                                        <tr>
+                                            <th style="min-width: 160px; width: 25%;">
+                                                <i class="bi bi-person-badge"></i> 
+                                                <span class="d-none d-md-inline">Técnico</span>
+                                            </th>
+                                            <th class="text-center" style="min-width: 80px; width: 10%;" title="Órdenes activas totales">
+                                                <i class="bi bi-hourglass-split"></i><br>
+                                                <small class="d-none d-sm-inline">Activas</small>
+                                            </th>
+                                            <th class="text-center" style="min-width: 80px; width: 10%;" title="Equipos que no encienden (activos)">
+                                                <i class="bi bi-exclamation-triangle"></i><br>
+                                                <small class="d-none d-sm-inline">No Enc.</small>
+                                            </th>
+                                            <th class="text-center" style="min-width: 90px; width: 10%;" title="Gama Alta (activos) - Se pagan mejor">
+                                                <i class="bi bi-star-fill text-success"></i><br>
+                                                <small class="d-none d-sm-inline">Gama Alta</small>
+                                            </th>
+                                            <th class="text-center" style="min-width: 80px; width: 10%;" title="Folios FL- (activos)">
+                                                <i class="bi bi-receipt"></i><br>
+                                                <small class="d-none d-sm-inline">FL</small>
+                                            </th>
+                                            <th class="text-center" style="min-width: 80px; width: 10%;" title="Asignaciones netas de hoy">
+                                                <i class="bi bi-calendar-day"></i><br>
+                                                <small class="d-none d-sm-inline">Hoy</small>
+                                            </th>
+                                            <th class="text-center" style="min-width: 90px; width: 12%;" title="Asignaciones netas del período">
+                                                <i class="bi bi-calendar-week"></i><br>
+                                                <small class="d-none d-sm-inline">{% if filtro_temporal == 'hoy' %}N/A{% elif filtro_temporal == 'semana' %}Semana{% else %}Hist.{% endif %}</small>
+                                            </th>
+                                            <th class="text-center" style="min-width: 110px; width: 13%;" title="Tiempo desde última asignación">
+                                                <i class="bi bi-clock-history"></i><br>
+                                                <small class="d-none d-sm-inline">Última</small>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for tecnico in area_grupo.tecnicos %}
+                                    <tr class="{% if tecnico.es_siguiente_rotacion %}table-success bg-success bg-opacity-10{% endif %}">
+                                        <!-- Columna: Técnico -->
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="tecnico-avatar-wrapper position-relative">
+                                                    {% if tecnico.foto_url %}
+                                                        <img src="{{ tecnico.foto_url }}" 
+                                                             alt="{{ tecnico.tecnico_nombre }}"
+                                                             class="rounded-circle"
+                                                             style="width: 48px; height: 48px; object-fit: cover; border: 2px solid #e5e7eb;">
+                                                    {% else %}
+                                                        <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                                                             style="width: 48px; height: 48px; background-color: #6b7280; font-size: 1rem; border: 2px solid #e5e7eb;">
+                                                            {{ tecnico.iniciales }}
+                                                        </div>
+                                                    {% endif %}
+                                                    
+                                                    <!-- Badge de rotación sugerida -->
                                                     {% if tecnico.es_siguiente_rotacion %}
-                                                        <span class="badge bg-success ms-1" style="font-size: 0.65rem;">
-                                                            <i class="bi bi-star-fill"></i> SIGUIENTE
+                                                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success" 
+                                                              style="font-size: 0.6rem; padding: 0.25rem 0.4rem;"
+                                                              title="Siguiente en rotación para {{ tecnico.area }}">
+                                                            ★
                                                         </span>
                                                     {% endif %}
                                                 </div>
-                                                {% if tecnico.equipos_no_encienden > 0 %}
-                                                    <small class="text-muted">
-                                                        <i class="bi bi-exclamation-triangle text-warning"></i> 
-                                                        {{ tecnico.equipos_no_encienden }} no enciende{{ tecnico.equipos_no_encienden|pluralize }}
-                                                    </small>
-                                                {% endif %}
+                                                <div style="flex: 1; min-width: 0;">
+                                                    <div class="fw-bold" style="font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                        {{ tecnico.tecnico_nombre }}
+                                                    </div>
+                                                    {% if tecnico.es_siguiente_rotacion %}
+                                                        <small class="badge bg-success mt-1" style="font-size: 0.65rem;">
+                                                            ★ SIGUIENTE
+                                                        </small>
+                                                    {% endif %}
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                    
-                                    <!-- Columna: Órdenes Activas -->
-                                    <td class="text-center">
-                                        {% if tecnico.ordenes_actuales > 0 %}
-                                            <span class="badge bg-primary fs-6 px-3 py-2">
-                                                {{ tecnico.ordenes_actuales }}
-                                            </span>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    
-                                    <!-- Columna: Asignaciones Hoy -->
-                                    <td class="text-center">
-                                        {% if tecnico.asignaciones_hoy > 0 %}
-                                            <span class="badge bg-info text-dark px-2 py-1">
-                                                +{{ tecnico.asignaciones_hoy }}
-                                            </span>
-                                        {% else %}
-                                            <span class="text-muted" style="font-size: 0.85rem;">0</span>
-                                        {% endif %}
-                                    </td>
-                                    
-                                    <!-- Columna: Asignaciones Semana -->
-                                    <td class="text-center">
-                                        {% if filtro_temporal != 'hoy' %}
-                                            {% if tecnico.asignaciones_semana > 0 %}
-                                                <span class="badge bg-secondary px-2 py-1">
-                                                    {{ tecnico.asignaciones_semana }}
+                                        </td>
+                                        
+                                        <!-- Columna: Órdenes Activas -->
+                                        <td class="text-center">
+                                            {% if tecnico.ordenes_actuales > 0 %}
+                                                <span class="badge rounded-pill bg-primary px-3 py-2" style="font-size: 0.95rem; font-weight: 600; min-width: 45px;">
+                                                    {{ tecnico.ordenes_actuales }}
                                                 </span>
                                             {% else %}
-                                                <span class="text-muted" style="font-size: 0.85rem;">0</span>
+                                                <span class="text-muted" style="font-size: 0.9rem;">-</span>
                                             {% endif %}
-                                        {% else %}
-                                            <span class="text-muted" style="font-size: 0.75rem;">N/A</span>
-                                        {% endif %}
-                                    </td>
-                                    
-                                    <!-- Columna: Última Asignación -->
-                                    <td class="text-center">
-                                        <span class="badge bg-light text-dark border">
-                                            <i class="bi bi-clock"></i> {{ tecnico.tiempo_sin_asignar }}
-                                        </span>
-                                    </td>
-                                    
-                                    <!-- Columna: Estado / Alertas -->
-                                    <td class="text-center">
-                                        <div class="d-flex flex-wrap gap-1 justify-content-center">
-                                            {% if tecnico.tiene_sobrecarga %}
-                                                <span class="badge bg-danger" title="Tiene 3+ equipos que no encienden">
-                                                    <i class="bi bi-exclamation-triangle-fill"></i> SOBRECARGA
-                                                </span>
-                                            {% elif tecnico.necesita_alerta_sin_asignaciones %}
-                                                <span class="badge bg-warning text-dark" title="Más de 8 horas sin asignaciones">
-                                                    <i class="bi bi-clock"></i> SIN ASIGNACIONES
-                                                </span>
-                                            {% elif tecnico.esta_balanceado %}
-                                                <span class="badge bg-success" title="Carga equilibrada (±1 del promedio)">
-                                                    <i class="bi bi-check-circle-fill"></i> BALANCEADO
+                                        </td>
+                                        
+                                        <!-- Columna: No Enciende -->
+                                        <td class="text-center">
+                                            {% if tecnico.equipos_no_encienden > 0 %}
+                                                <span class="badge rounded-pill bg-danger px-3 py-2" style="font-size: 0.9rem; font-weight: 600; min-width: 40px;">
+                                                    {{ tecnico.equipos_no_encienden }}
                                                 </span>
                                             {% else %}
-                                                <span class="badge bg-secondary">
-                                                    <i class="bi bi-dash-circle"></i> NORMAL
-                                                </span>
+                                                <span class="text-muted" style="font-size: 0.9rem;">-</span>
                                             {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                                        </td>
+                                        
+                                        <!-- Columna: Gama Alta -->
+                                        <td class="text-center">
+                                            {% if tecnico.gama_alta > 0 %}
+                                                <span class="badge rounded-pill bg-success px-3 py-2" style="font-size: 0.9rem; font-weight: 600; min-width: 40px;">{{ tecnico.gama_alta }}</span>
+                                            {% else %}
+                                                <span class="text-muted" style="font-size: 0.85rem;">-</span>
+                                            {% endif %}
+                                        </td>
+                                        
+                                        <!-- Columna: Folios FL -->
+                                        <td class="text-center">
+                                            {% if tecnico.folios_fl > 0 %}
+                                                <span class="badge rounded-pill bg-info text-white px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 35px;">{{ tecnico.folios_fl }}</span>
+                                            {% else %}
+                                                <span class="text-muted" style="font-size: 0.85rem;">-</span>
+                                            {% endif %}
+                                        </td>
+                                        
+                                        <!-- Columna: Asignaciones Hoy (netas) -->
+                                        <td class="text-center">
+                                            {% if tecnico.asignaciones_hoy_netas > 0 %}
+                                                <span class="badge rounded-pill bg-success px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
+                                                    +{{ tecnico.asignaciones_hoy_netas }}
+                                                </span>
+                                            {% elif tecnico.asignaciones_hoy_netas < 0 %}
+                                                <span class="badge rounded-pill bg-danger px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
+                                                    {{ tecnico.asignaciones_hoy_netas }}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge rounded-pill bg-light text-dark border px-2 py-1" style="font-size: 0.85rem; min-width: 40px;">0</span>
+                                            {% endif %}
+                                        </td>
+                                        
+                                        <!-- Columna: Asignaciones Semana/Histórico (netas) -->
+                                        <td class="text-center">
+                                            {% if filtro_temporal != 'hoy' %}
+                                                {% if tecnico.asignaciones_semana_netas > 0 %}
+                                                    <span class="badge rounded-pill bg-primary px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
+                                                        +{{ tecnico.asignaciones_semana_netas }}
+                                                    </span>
+                                                {% elif tecnico.asignaciones_semana_netas < 0 %}
+                                                    <span class="badge rounded-pill bg-danger px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
+                                                        {{ tecnico.asignaciones_semana_netas }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge rounded-pill bg-light text-dark border px-2 py-1" style="font-size: 0.85rem; min-width: 40px;">0</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted" style="font-size: 0.75rem;">-</span>
+                                            {% endif %}
+                                        </td>
+                                        
+                                        <!-- Columna: Última Asignación -->
+                                        <td class="text-center">
+                                            <span class="badge rounded-pill bg-light text-dark border" style="font-size: 0.75rem; padding: 0.35rem 0.6rem;">
+                                                <i class="bi bi-clock"></i> {{ tecnico.tiempo_sin_asignar }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <!-- Fin de iteración de áreas -->
                     </div>
+                    {% if not forloop.last %}
+                        <hr class="m-0" style="border-color: #5a67d8; border-width: 2px;">
+                    {% endif %}
+                    {% endfor %}
                     
                     <!-- Leyenda explicativa -->
-                    <div class="alert alert-light border-top border-0 rounded-0 mb-0 mt-3" role="alert" style="background-color: #f8f9fa;">
-                        <div class="row g-2">
-                            <div class="col-md-3">
-                                <strong><i class="bi bi-info-circle text-primary"></i> Columnas:</strong>
-                                <ul class="mb-0" style="font-size: 0.8rem;">
-                                    <li><strong>Activas:</strong> Órdenes actualmente asignadas</li>
-                                    <li><strong>Hoy:</strong> Asignaciones recibidas hoy</li>
-                                    <li><strong>Semana:</strong> Total de asignaciones esta semana</li>
+                    <div class="alert alert-light border-top border-0 rounded-0 mb-0 mt-0" role="alert" style="background-color: #f8f9fa; font-size: 0.85rem;">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <strong><i class="bi bi-info-circle text-primary"></i> Columnas de carga:</strong>
+                                <ul class="mb-0" style="font-size: 0.8rem; line-height: 1.6;">
+                                    <li><strong>Activas:</strong> Total órdenes asignadas actualmente</li>
+                                    <li><strong>No Enc.:</strong> Equipos "No Enciende" activos</li>
+                                    <li><strong>Gama Alta:</strong> Equipos de gama alta (mejor remunerados)</li>
+                                    <li><strong>Folios FL:</strong> Órdenes FL- activas</li>
                                 </ul>
                             </div>
-                            <div class="col-md-3">
-                                <strong><i class="bi bi-speedometer2 text-success"></i> Rotación:</strong>
-                                <ul class="mb-0" style="font-size: 0.8rem;">
-                                    <li><span class="badge bg-success" style="font-size: 0.7rem;">SIGUIENTE</span> Técnico sugerido para próxima asignación</li>
-                                    <li><em>Criterio:</em> Menor carga + Tiempo sin asignar + Asignaciones del día</li>
+                            <div class="col-md-4">
+                                <strong><i class="bi bi-calendar-check text-success"></i> Asignaciones netas:</strong>
+                                <ul class="mb-0" style="font-size: 0.8rem; line-height: 1.6;">
+                                    <li><strong>Hoy (netas):</strong> Asignaciones recibidas - reasignadas salientes hoy</li>
+                                    <li><strong>Semana/Histórico (netas):</strong> Balance neto del período seleccionado</li>
+                                    <li><em>Valores negativos indican más reasignaciones salientes que entrantes</em></li>
                                 </ul>
                             </div>
-                            <div class="col-md-3">
-                                <strong><i class="bi bi-shield-check text-info"></i> Estados:</strong>
-                                <ul class="mb-0" style="font-size: 0.8rem;">
-                                    <li><span class="badge bg-danger" style="font-size: 0.7rem;">SOBRECARGA</span> 3+ equipos "No Enciende"</li>
-                                    <li><span class="badge bg-warning text-dark" style="font-size: 0.7rem;">SIN ASIGNACIONES</span> +8h sin recibir</li>
-                                    <li><span class="badge bg-success" style="font-size: 0.7rem;">BALANCEADO</span> Carga equilibrada</li>
-                                </ul>
-                            </div>
-                            <div class="col-md-3">
-                                <strong><i class="bi bi-funnel text-warning"></i> Filtro Temporal:</strong>
-                                <ul class="mb-0" style="font-size: 0.8rem;">
-                                    <li><strong>Hoy:</strong> Solo asignaciones de hoy</li>
-                                    <li><strong>Esta Semana:</strong> Desde el lunes</li>
-                                    <li><strong>Histórico:</strong> Todas las asignaciones</li>
+                            <div class="col-md-4">
+                                <strong><i class="bi bi-star text-warning"></i> Rotación (solo Satélite > OOW):</strong>
+                                <ul class="mb-0" style="font-size: 0.8rem; line-height: 1.6;">
+                                    <li><span class="badge bg-success" style="font-size: 0.7rem;">★ SIGUIENTE</span> Técnico sugerido para próxima asignación</li>
+                                    <li><em>Solo visible en Laboratorio OOW de Satélite</em></li>
+                                    <li><em>Criterio:</em> Menor carga + Más tiempo sin asignar + Menos asignaciones hoy</li>
                                 </ul>
                             </div>
                         </div>
@@ -327,7 +497,7 @@
             </div>
         </div>
         {% endif %}
-        
+
         <!-- ========================================================================
              HISTORIAL DE REASIGNACIONES DEL DÍA
              ======================================================================== -->
@@ -450,274 +620,6 @@
                 </div>
             </div>
         </div>
-        {% endif %}
-        
-        <!-- Equipos "No enciende" por técnico (ACTIVOS + HISTÓRICO) -->
-        {% if equipos_no_enciende_por_tecnico %}
-            <div class="col-lg-12">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-header text-white d-flex justify-content-between align-items-center clickable-header" 
-                         data-bs-toggle="collapse" 
-                         data-bs-target="#collapseNoEnciende" 
-                         aria-expanded="false" 
-                         aria-controls="collapseNoEnciende"
-                         role="button"
-                         style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border: none; padding: 1rem 1.5rem; cursor: pointer;">
-                        <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
-                            <i class="bi bi-exclamation-triangle" style="font-size: 1.3rem;"></i> Equipos "No Enciende" por Técnico - Activos vs Histórico
-                        </h6>
-                        <div class="toggle-collapse-icon">
-                            <i class="bi bi-chevron-down collapse-icon" style="font-size: 1.3rem;"></i>
-                        </div>
-                    </div>
-                    <div class="collapse" id="collapseNoEnciende">
-                        <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover table-sm align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th style="width: 30%;">Técnico</th>
-                                        <th class="text-center" style="background-color: #fff3cd; width: 35%;">
-                                            <i class="bi bi-hourglass-split"></i> Activos (Carga Actual)
-                                        </th>
-                                        <th class="text-center" style="background-color: #d1ecf1; width: 35%;">
-                                            <i class="bi bi-clock-history"></i> Histórico Total
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for tecnico in equipos_no_enciende_por_tecnico %}
-                                        <tr>
-                                            <!-- Columna: Técnico con foto/iniciales -->
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    <div class="tecnico-avatar me-2">
-                                                        {% if tecnico.foto_url %}
-                                                            <img src="{{ tecnico.foto_url }}" 
-                                                                 alt="Foto de {{ tecnico.nombre }}"
-                                                                 class="tecnico-foto"
-                                                                 style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover;">
-                                                        {% else %}
-                                                            <div class="tecnico-iniciales" 
-                                                                 style="width: 46px; height: 46px; border-radius: 50%; background-color: #6c757d; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: bold;">
-                                                                {{ tecnico.iniciales }}
-                                                            </div>
-                                                        {% endif %}
-                                                    </div>
-                                                    <div>
-                                                        <div class="fw-bold" style="font-size: 0.9rem;">{{ tecnico.nombre }}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            
-                                            <!-- SECCIÓN: ACTIVOS -->
-                                            <td class="text-center" style="background-color: #fffbf0;">
-                                                {% if tecnico.activos > 0 %}
-                                                    <span class="badge bg-danger fs-6 px-3 py-2">
-                                                        <i class="bi bi-exclamation-triangle-fill"></i> {{ tecnico.activos }}
-                                                    </span>
-                                                    <br>
-                                                    <small class="text-muted">equipo(s) en proceso</small>
-                                                {% else %}
-                                                    <span class="text-muted">Sin equipos activos</span>
-                                                {% endif %}
-                                            </td>
-                                            
-                                            <!-- SECCIÓN: HISTÓRICO CON DESGLOSE -->
-                                            <td class="text-center" style="background-color: #f0f8ff;">
-                                                <div class="d-flex justify-content-around align-items-center">
-                                                    <!-- Sí Enciende -->
-                                                    <div class="text-center">
-                                                        <span class="badge bg-success fs-6 px-2 py-1">
-                                                            <i class="bi bi-power"></i> {{ tecnico.historico.si_enciende }}
-                                                        </span>
-                                                        <br>
-                                                        <small class="text-muted" style="font-size: 0.75rem;">Sí enciende</small>
-                                                    </div>
-                                                    
-                                                    <!-- No Enciende -->
-                                                    <div class="text-center">
-                                                        <span class="badge bg-danger fs-6 px-2 py-1">
-                                                            <i class="bi bi-x-circle"></i> {{ tecnico.historico.no_enciende }}
-                                                        </span>
-                                                        <br>
-                                                        <small class="text-muted" style="font-size: 0.75rem;">No enciende</small>
-                                                    </div>
-                                                    
-                                                    <!-- Total -->
-                                                    <div class="text-center">
-                                                        <span class="badge bg-secondary fs-6 px-2 py-1">
-                                                            <i class="bi bi-archive-fill"></i> {{ tecnico.historico.total }}
-                                                        </span>
-                                                        <br>
-                                                        <small class="text-muted" style="font-size: 0.75rem;">Total</small>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <!-- Leyenda explicativa -->
-                        <div class="alert alert-light border mt-3 mb-0" role="alert">
-                            <small>
-                                <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
-                                <ul class="mb-0 mt-1" style="font-size: 0.85rem;">
-                                    <li><strong>Activos:</strong> Equipos "No Enciende" actualmente en reparación (carga crítica específica)</li>
-                                    <li><strong>Histórico Total:</strong> Desglose completo de todos los equipos manejados - <span class="badge bg-success">Sí enciende</span>, <span class="badge bg-danger">No enciende</span> y <span class="badge bg-secondary">Total</span></li>
-                                </ul>
-                            </small>
-                        </div>
-                    </div>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- Equipos por gama por técnico (HISTÓRICO COMPLETO) -->
-        {% if equipos_por_gama_por_tecnico %}
-            <div class="col-lg-12">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-header text-white d-flex justify-content-between align-items-center clickable-header" 
-                         data-bs-toggle="collapse" 
-                         data-bs-target="#collapseGama" 
-                         aria-expanded="false" 
-                         aria-controls="collapseGama"
-                         role="button"
-                         style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border: none; padding: 1rem 1.5rem; cursor: pointer;">
-                        <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
-                            <i class="bi bi-bar-chart-line" style="font-size: 1.3rem;"></i> Equipos por Gama por Técnico - Activos vs Histórico
-                        </h6>
-                        <div class="toggle-collapse-icon">
-                            <i class="bi bi-chevron-down collapse-icon" style="font-size: 1.3rem;"></i>
-                        </div>
-                    </div>
-                    <div class="collapse" id="collapseGama">
-                        <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover table-sm align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th style="width: 20%;">Técnico</th>
-                                        <th class="text-center" colspan="4" style="background-color: #fff3cd;">
-                                            <i class="bi bi-hourglass-split"></i> Activos (Carga Actual)
-                                        </th>
-                                        <th class="text-center" colspan="4" style="background-color: #d1ecf1;">
-                                            <i class="bi bi-clock-history"></i> Histórico Total
-                                        </th>
-                                    </tr>
-                                    <tr>
-                                        <th></th>
-                                        <!-- Columnas ACTIVOS -->
-                                        <th class="text-center" style="background-color: #fff3cd;"><i class="bi bi-star-fill text-success"></i> Alta</th>
-                                        <th class="text-center" style="background-color: #fff3cd;"><i class="bi bi-dash-circle-fill text-warning"></i> Media</th>
-                                        <th class="text-center" style="background-color: #fff3cd;"><i class="bi bi-circle-fill text-secondary"></i> Baja</th>
-                                        <th class="text-center" style="background-color: #fff3cd;"><strong>Total</strong></th>
-                                        <!-- Columnas HISTÓRICO -->
-                                        <th class="text-center" style="background-color: #d1ecf1;"><i class="bi bi-star-fill text-success"></i> Alta</th>
-                                        <th class="text-center" style="background-color: #d1ecf1;"><i class="bi bi-dash-circle-fill text-warning"></i> Media</th>
-                                        <th class="text-center" style="background-color: #d1ecf1;"><i class="bi bi-circle-fill text-secondary"></i> Baja</th>
-                                        <th class="text-center" style="background-color: #d1ecf1;"><strong>Total</strong></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for tecnico in equipos_por_gama_por_tecnico %}
-                                        <tr>
-                                            <!-- Columna: Técnico con foto/iniciales -->
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    <div class="tecnico-avatar me-2">
-                                                        {% if tecnico.foto_url %}
-                                                            <img src="{{ tecnico.foto_url }}" 
-                                                                 alt="Foto de {{ tecnico.nombre }}"
-                                                                 class="tecnico-foto"
-                                                                 style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover;">
-                                                        {% else %}
-                                                            <div class="tecnico-iniciales" 
-                                                                 style="width: 46px; height: 46px; border-radius: 50%; background-color: #6c757d; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: bold;">
-                                                                {{ tecnico.iniciales }}
-                                                            </div>
-                                                        {% endif %}
-                                                    </div>
-                                                    <div>
-                                                        <div class="fw-bold" style="font-size: 0.9rem;">{{ tecnico.nombre }}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-
-                                            <!-- SECCIÓN: ACTIVOS -->
-                                            <td class="text-center" style="background-color: #fffbf0;">
-                                                {% if tecnico.activos.alta > 0 %}
-                                                    <span class="badge bg-success">{{ tecnico.activos.alta }}</span>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center" style="background-color: #fffbf0;">
-                                                {% if tecnico.activos.media > 0 %}
-                                                    <span class="badge bg-warning">{{ tecnico.activos.media }}</span>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center" style="background-color: #fffbf0;">
-                                                {% if tecnico.activos.baja > 0 %}
-                                                    <span class="badge bg-secondary">{{ tecnico.activos.baja }}</span>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center fw-bold" style="background-color: #fff3cd;">
-                                                {{ tecnico.activos.total }}
-                                            </td>
-                                            
-                                            <!-- SECCIÓN: HISTÓRICO -->
-                                            <td class="text-center" style="background-color: #f0f8ff;">
-                                                {% if tecnico.historico.alta > 0 %}
-                                                    <span class="badge bg-success">{{ tecnico.historico.alta }}</span>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center" style="background-color: #f0f8ff;">
-                                                {% if tecnico.historico.media > 0 %}
-                                                    <span class="badge bg-warning">{{ tecnico.historico.media }}</span>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center" style="background-color: #f0f8ff;">
-                                                {% if tecnico.historico.baja > 0 %}
-                                                    <span class="badge bg-secondary">{{ tecnico.historico.baja }}</span>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center fw-bold" style="background-color: #d1ecf1;">
-                                                {{ tecnico.historico.total }}
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <!-- Leyenda explicativa -->
-                        <div class="alert alert-light border mt-3 mb-0" role="alert">
-                            <small>
-                                <strong><i class="bi bi-info-circle"></i> Interpretación:</strong>
-                                <ul class="mb-0 mt-1" style="font-size: 0.85rem;">
-                                    <li><strong>Activos:</strong> Equipos actualmente en proceso (carga de trabajo presente)</li>
-                                    <li><strong>Histórico:</strong> Total de equipos manejados incluyendo cerrados (desempeño acumulado)</li>
-                                </ul>
-                            </small>
-                        </div>
-                    </div>
-                    </div>
-                </div>
-            </div>
         {% endif %}
     </div>
     {% endif %}  <!-- Fin de mostrar_estadisticas -->
@@ -994,40 +896,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ============================================
-    // MANEJO DE COLLAPSE/EXPAND DE TABLAS
+    // MANEJO DE COLLAPSE/EXPAND DE TABLA DE REASIGNACIONES
     // ============================================
     
     const collapseReasignaciones = document.getElementById('collapseReasignaciones');
-    const collapseNoEnciende = document.getElementById('collapseNoEnciende');
-    const collapseGama = document.getElementById('collapseGama');
     
     // Verificar el estado guardado en localStorage
-    // Si el usuario expandió manualmente, mantener expandido
     if (collapseReasignaciones) {
         const savedStateReasignaciones = localStorage.getItem('collapseReasignaciones');
         if (savedStateReasignaciones === 'visible') {
             const bsCollapse = new bootstrap.Collapse(collapseReasignaciones, { toggle: false });
             bsCollapse.show();
         }
-        // Por defecto permanece colapsado (no se hace nada)
-    }
-    
-    if (collapseNoEnciende) {
-        const savedStateNoEnciende = localStorage.getItem('collapseNoEnciende');
-        if (savedStateNoEnciende === 'visible') {
-            const bsCollapse = new bootstrap.Collapse(collapseNoEnciende, { toggle: false });
-            bsCollapse.show();
-        }
-        // Por defecto permanece colapsado (no se hace nada)
-    }
-    
-    if (collapseGama) {
-        const savedStateGama = localStorage.getItem('collapseGama');
-        if (savedStateGama === 'visible') {
-            const bsCollapse = new bootstrap.Collapse(collapseGama, { toggle: false });
-            bsCollapse.show();
-        }
-        // Por defecto permanece colapsado (no se hace nada)
     }
     
     // Manejar cambio de iconos y guardar estado
@@ -1044,7 +924,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 icon.classList.remove('bi-chevron-down');
                 icon.classList.add('bi-chevron-up');
             }
-            // Actualizar aria-expanded en el header
             header.setAttribute('aria-expanded', 'true');
             localStorage.setItem(storageKey, 'visible');
         });
@@ -1054,7 +933,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 icon.classList.remove('bi-chevron-up');
                 icon.classList.add('bi-chevron-down');
             }
-            // Actualizar aria-expanded en el header
             header.setAttribute('aria-expanded', 'false');
             localStorage.setItem(storageKey, 'hidden');
         });
@@ -1076,8 +954,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     setupCollapseToggle(collapseReasignaciones, 'collapseReasignaciones');
-    setupCollapseToggle(collapseNoEnciende, 'collapseNoEnciende');
-    setupCollapseToggle(collapseGama, 'collapseGama');
 });
 </script>
 {% endblock %}
