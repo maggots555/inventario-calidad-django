@@ -685,6 +685,8 @@ print(incidencia)  # Debe mostrar el objeto Incidencia
 **Documentación adicional:**
 - `GUIA_COLORES_BADGES.md` - Colores estandarizados
 - `SCORECARD_README.md` - Integración con calidad
+- `SOLUCION_ERROR_IMAGENES_CELULAR.md` - Fix subida desde cámara móvil
+- `CORRECCION_UPLOADS_IMAGENES_PESADAS.md` - Fix uploads grandes desde galería (200MB)
 
 ---
 
