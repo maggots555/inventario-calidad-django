@@ -1,14 +1,49 @@
 # Plan de Implementación: Sistema Multi-País con Subdominios
 
 **Fecha de creación:** 9 de Febrero 2026  
-**Versión:** 2.0 (Corregido y Complementado)  
-**Estado:** Planificación  
+**Versión:** 3.0 (Con Progreso de Implementación)  
+**Estado:** En Implementación — Desarrollo completado, pendiente producción  
 **Tiempo estimado:** 12-16 días laborales  
+**Última actualización:** 10 de Febrero 2026  
+
+---
+
+## Resumen de Progreso (v3.0)
+
+> **Actualizado: 10 de Febrero 2026**
+
+| Fase | Descripción | Estado | Commit | Fecha |
+|------|-------------|--------|--------|-------|
+| **Fase 0** | Entorno de Desarrollo Local | ✅ **COMPLETADA** | `f16dbe6` | 9 Feb 2026 |
+| **Fase 1** | Cloudflare DNS + SSL | ⏳ Pendiente (producción) | — | — |
+| **Fase 2** | PostgreSQL Multi-Base | ⏳ Pendiente (producción) | — | — |
+| **Fase 3** | Django Multi-Tenancy (Grupos/Permisos) | ✅ **COMPLETADA** | `f16dbe6` | 9 Feb 2026 |
+| **Fase 4** | Nginx Subdominios | ⏳ Pendiente (producción) | — | — |
+| **Fase 5** | Media Files por País | ⏳ Pendiente (producción) | — | — |
+| **Fase 6** | Adaptación de Código Hardcoded | ✅ **COMPLETADA** (alcance reducido) | `88016f8` | 10 Feb 2026 |
+| **Fase 7** | Migraciones y Datos Iniciales | ⏳ Pendiente (producción) | — | — |
+| **Fase 8** | Pruebas y Lanzamiento | ⏳ Pendiente (producción) | — | — |
+
+### Decisiones Clave Tomadas Durante Implementación
+
+1. **Fase 0+3 se fusionaron**: Todo el código Django multi-tenant (archivos nuevos, settings, scripts de grupos/permisos) se implementó junto en un solo commit (`f16dbe6`), no en fases separadas.
+
+2. **Fase 6 — Alcance reducido por decisión del usuario**:
+   - **NO se cambiaron los `$` de moneda** — El símbolo `$` es correcto para todos los pesos latinoamericanos (MXN, ARS, CLP, COP). Solo se removieron las etiquetas explícitas `(MXN)` de help_texts.
+   - **NO se tocó código RHITSO** — RHITSO (laboratorio externo) es exclusivo de México. Los archivos `pdf_generator.py`, `rhitso_envio.html`, formularios y vistas de RHITSO mantienen datos hardcodeados de México intencionalmente.
+   - **Sub-tareas C, E, G, H, I de Fase 6 se difirieron** — PDFs, formato moneda masivo, precios de paquetes, RHITSO condicional y sucursales/proveedores quedan para cuando se necesiten.
+
+3. **Entorno de desarrollo 100% funcional** — Ambas BDs SQLite (México y Argentina) migradas, datos aislados verificados, superusuario de Argentina creado, flujo end-to-end probado incluyendo subida de fotos.
+
+### Lo que Queda — Todo en Servidor de Producción
+
+Las fases pendientes (1, 2, 4, 5, 7, 8) son **exclusivamente tareas de infraestructura en el servidor de producción**: DNS en Cloudflare, PostgreSQL, Nginx, migración de media files y pruebas finales. No requieren cambios de código en Django.
 
 ---
 
 ## Índice
 
+0. [Resumen de Progreso](#resumen-de-progreso-v30)
 1. [Resumen Ejecutivo](#1-resumen-ejecutivo)
 2. [Análisis del Sistema Actual](#2-análisis-del-sistema-actual)
 3. [Arquitectura Propuesta](#3-arquitectura-propuesta)
@@ -69,6 +104,17 @@ peru.sigmasystem.work      → BD: inventario_peru      → Media: /mnt/django_s
 | ForcePasswordChange | `request.user.empleado` sin especificar BD | Middleware con awareness de país |
 | Hardcoded | Solo 5 valores identificados | **178 ocurrencias** en 24 archivos auditados |
 | Desarrollo | Sin sección de entorno local | Nueva Fase 0 completa para desarrollo |
+
+### Cambios en v3.0 (Progreso de implementación)
+
+| Área | Cambio |
+|------|--------|
+| Fase 0+3 | Implementadas en desarrollo — commit `f16dbe6` |
+| Fase 6 | Implementada con alcance reducido — commit `88016f8` |
+| Decisión: `$` | No se cambia — correcto para todos los pesos latinoamericanos |
+| Decisión: RHITSO | Se mantiene hardcodeado — exclusivo de México |
+| Scripts | 4 scripts de grupos/permisos actualizados con soporte `db_alias` |
+| Estado | Desarrollo 100% completo, pendiente solo infraestructura de producción |
 
 ---
 
@@ -1261,7 +1307,10 @@ config/storage_utils.py          ← Depende de middleware_pais.py + paises_conf
 
 ## 4. Fases de Implementación
 
-### Fase 0: Entorno de Desarrollo Local (Día 1-2)
+### Fase 0: Entorno de Desarrollo Local (Día 1-2) ✅ COMPLETADA
+
+> **COMPLETADA** — Commit `f16dbe6` (9 Feb 2026)  
+> Todos los archivos creados, settings configurados, ambas BDs migradas, aislamiento verificado.
 
 > **NUEVA EN v2.0** — La v1.0 no tenía una fase de desarrollo local. Esto causaría que el primer día de pruebas fuera directamente en producción, algo muy riesgoso.
 
@@ -1365,16 +1414,16 @@ python manage.py shell
 
 #### 4.0.8 Checklist Fase 0
 
-- [ ] Crear `config/paises_config.py`
-- [ ] Crear `config/middleware_pais.py`
-- [ ] Crear `config/db_router.py`
-- [ ] Crear `config/context_processors.py`
-- [ ] Modificar `config/settings.py` (DATABASES, MIDDLEWARE, TEMPLATES, DATABASE_ROUTERS)
-- [ ] Agregar entradas a `/etc/hosts` para subdominios locales
-- [ ] Ejecutar `migrate --database=argentina`
-- [ ] Crear superusuario en Argentina
-- [ ] Pasar tests básicos de aislamiento (shell)
-- [ ] Probar navegación web con `?pais=argentina`
+- [x] Crear `config/paises_config.py`
+- [x] Crear `config/middleware_pais.py`
+- [x] Crear `config/db_router.py`
+- [x] Crear `config/context_processors.py`
+- [x] Modificar `config/settings.py` (DATABASES, MIDDLEWARE, TEMPLATES, DATABASE_ROUTERS)
+- [x] ~~Agregar entradas a `/etc/hosts` para subdominios locales~~ (Se usó `?pais=` en su lugar)
+- [x] Ejecutar `migrate --database=argentina`
+- [x] Crear superusuario en Argentina
+- [x] Pasar tests básicos de aislamiento (shell)
+- [x] Probar navegación web con `?pais=argentina`
 
 ---
 
@@ -1562,7 +1611,11 @@ pg_restore --list backup_pre_multi_pais_*.sql 2>/dev/null && echo "OK" || echo "
 
 ---
 
-### Fase 3: Django Multi-Tenancy (Día 5-8)
+### Fase 3: Django Multi-Tenancy (Día 5-8) ✅ COMPLETADA
+
+> **COMPLETADA** — Commit `f16dbe6` (9 Feb 2026)  
+> Se implementó junto con Fase 0. Los 4 archivos nuevos, cambios en settings.py, storage_utils.py, y scripts de grupos/permisos para ambas BDs quedaron listos.  
+> **Nota**: Los scripts de grupos/permisos (`setup_grupos_permisos.py`, `asignar_grupos_empleados.py`, `manage_grupos.py`, `deploy_permisos_produccion.sh`) se actualizaron con soporte `db_alias`. Ambas BDs tienen 9 grupos con permisos correctos.
 
 > Esta es la fase más crítica. Se modifica `settings.py` y se crean los 4 archivos nuevos de la Sección 3.
 
@@ -1852,22 +1905,24 @@ python manage.py runserver
 
 #### 4.3.7 Checklist Fase 3
 
-- [ ] Actualizar `DATABASES` en `settings.py` con aliases por país
-- [ ] Agregar `DATABASE_ROUTERS` en `settings.py`
-- [ ] Insertar `PaisMiddleware` en `MIDDLEWARE` (después de Auth, antes de ForcePassword)
-- [ ] Agregar `pais_context` a `TEMPLATES` context_processors
-- [ ] Configurar `SESSION_COOKIE_DOMAIN` y nombres de cookies
-- [ ] Cambiar `TIME_ZONE` de `'America/Mexico_City'` a `'UTC'`
-- [ ] Crear `config/paises_config.py`
-- [ ] Crear `config/middleware_pais.py`
-- [ ] Crear `config/db_router.py`
-- [ ] Crear `config/context_processors.py`
-- [ ] Modificar `config/storage_utils.py`
-- [ ] Agregar variables a `.env` (`DB_NAME_AR`, etc.)
-- [ ] Verificar imports desde `manage.py shell`
-- [ ] Pasar prueba de aislamiento de datos
-- [ ] Verificar que Django arranca sin errores (`manage.py check`)
-- [ ] Probar navegación web con ambos países
+- [x] Actualizar `DATABASES` en `settings.py` con aliases por país
+- [x] Agregar `DATABASE_ROUTERS` en `settings.py`
+- [x] Insertar `PaisMiddleware` en `MIDDLEWARE` (después de Auth, antes de ForcePassword)
+- [x] Agregar `pais_context` a `TEMPLATES` context_processors
+- [x] Configurar `SESSION_COOKIE_DOMAIN` y nombres de cookies
+- [x] Cambiar `TIME_ZONE` de `'America/Mexico_City'` a `'UTC'`
+- [x] Crear `config/paises_config.py`
+- [x] Crear `config/middleware_pais.py`
+- [x] Crear `config/db_router.py`
+- [x] Crear `config/context_processors.py`
+- [x] Modificar `config/storage_utils.py`
+- [x] Agregar variables a `.env` (`DB_NAME_AR`, etc.)
+- [x] Verificar imports desde `manage.py shell`
+- [x] Pasar prueba de aislamiento de datos
+- [x] Verificar que Django arranca sin errores (`manage.py check`)
+- [x] Probar navegación web con ambos países
+- [x] **Adicional**: Actualizar scripts de grupos/permisos con soporte `db_alias`
+- [x] **Adicional**: Ejecutar scripts de permisos en ambas BDs (9 grupos cada una)
 
 ---
 
@@ -2304,7 +2359,15 @@ mv /mnt/django_storage/media/mexico/empleados /mnt/django_storage/media/empleado
 
 ---
 
-### Fase 6: Adaptación de Código Hardcoded (Día 11-12)
+### Fase 6: Adaptación de Código Hardcoded (Día 11-12) ✅ COMPLETADA (alcance reducido)
+
+> **COMPLETADA** — Commit `88016f8` (10 Feb 2026)  
+> Se adaptaron los valores críticos. El alcance se redujo por decisión del usuario:
+> - **`$` NO se cambió** — Es el símbolo correcto para todos los pesos latinoamericanos.
+> - **RHITSO NO se tocó** — Es exclusivo de México. `pdf_generator.py` y templates RHITSO mantienen datos hardcodeados intencionalmente.
+> - **Sub-tareas C, E, G, H, I diferidas** — Se implementarán cuando se necesiten para otros países.
+>
+> **Archivos cambiados**: `inventario/views.py` (zona horaria), `inventario/utils.py` (URLs email), `servicio_tecnico/templates/.../imagenes_cliente.html` (empresa en footer), `servicio_tecnico/views.py` (contexto de email), `almacen/models.py` (removidas etiquetas MXN), `almacen/migrations/0013_*` (migración auto-generada).
 
 > **NUEVA EN v2.0** — La v1.0 no contemplaba esta fase. Sin ella, Argentina tendría moneda MXN, zona horaria de CDMX, nombre de empresa de México, etc.
 
@@ -2619,16 +2682,18 @@ Estos valores son de lógica de negocio México-específica. No bloquean a Argen
 
 #### 4.6.13 Checklist Fase 6
 
-- [ ] Corregir zona horaria en `inventario/views.py`
-- [ ] Corregir URLs en `inventario/utils.py`
-- [ ] Corregir datos de empresa en `pdf_generator.py`
-- [ ] Corregir templates de email HTML
-- [ ] Corregir formato moneda en vistas principales (`servicio_tecnico/views.py`, `inventario/views.py`, `almacen/views.py`, `utils_cotizaciones.py`)
-- [ ] Remover etiquetas `(MXN)` de help_texts o hacerlas dinámicas
-- [ ] Mover precios de paquetes a `paises_config.py`
-- [ ] Configurar RHITSO condicional por país
-- [ ] Corregir formato moneda en admin y ML (prioridad menor)
-- [ ] Verificar que México sigue funcionando idénticamente después de cada cambio
+- [x] Corregir zona horaria en `inventario/views.py` — Usa `get_pais_actual()` + `fecha_local_pais()`
+- [x] Corregir URLs en `inventario/utils.py` — Usa `pais['url_base']` dinámico
+- [ ] ~~Corregir datos de empresa en `pdf_generator.py`~~ — **DIFERIDO**: RHITSO es exclusivo de México
+- [x] Corregir templates de email HTML — `imagenes_cliente.html` usa `{{ empresa_nombre }}` y `{{ pais_nombre }}`
+- [ ] ~~Corregir formato moneda en vistas principales~~ — **DIFERIDO**: `$` es correcto para todos los pesos
+- [x] Remover etiquetas `(MXN)` de help_texts — 3 campos en `almacen/models.py` + migración aplicada
+- [ ] ~~Mover precios de paquetes a `paises_config.py`~~ — **DIFERIDO**
+- [ ] ~~Configurar RHITSO condicional por país~~ — **DIFERIDO**: RHITSO solo opera en México
+- [ ] ~~Corregir formato moneda en admin y ML~~ — **DIFERIDO**: `$` es correcto
+- [x] Verificar que México sigue funcionando idénticamente después de cada cambio
+
+> **Nota v3.0**: Los items marcados como "DIFERIDO" no son bugs — son optimizaciones para cuando se expanda a países con moneda diferente a pesos o se necesite RHITSO fuera de México.
 
 ---
 
@@ -3382,40 +3447,58 @@ echo "✅ Rollback completado. Verificar manualmente."
 
 ## Apéndice: Resumen de Archivos Afectados
 
-### Archivos Nuevos (4)
+### Archivos Nuevos Creados (4) — ✅ Completados
 
-| Archivo | Líneas aprox | Descripción |
-|---------|-------------|-------------|
-| `config/paises_config.py` | ~200 | Configuración centralizada de países |
-| `config/middleware_pais.py` | ~150 | Middleware de detección de país |
-| `config/db_router.py` | ~100 | Enrutamiento de queries por país |
-| `config/context_processors.py` | ~50 | Variables de país en templates |
+| Archivo | Líneas aprox | Descripción | Commit |
+|---------|-------------|-------------|--------|
+| `config/paises_config.py` | ~200 | Configuración centralizada de países | `f16dbe6` |
+| `config/middleware_pais.py` | ~150 | Middleware de detección de país | `f16dbe6` |
+| `config/db_router.py` | ~100 | Enrutamiento de queries por país | `f16dbe6` |
+| `config/context_processors.py` | ~50 | Variables de país en templates | `f16dbe6` |
 
 ### Archivos Modificados (8+)
 
-| Archivo | Cambio |
-|---------|--------|
-| `config/settings.py` | DATABASES, MIDDLEWARE, TEMPLATES, TIME_ZONE, DATABASE_ROUTERS, SESSION |
-| `config/storage_utils.py` | DynamicFileSystemStorage con prefijo de país |
-| `inventario/views.py` | `fecha_local()` dinámico |
-| `inventario/utils.py` | URLs dinámicas por país |
-| `servicio_tecnico/utils/pdf_generator.py` | Datos de empresa dinámicos |
-| `servicio_tecnico/views.py` | Formato de moneda dinámico |
-| `config/constants.py` | Precios de paquetes por país |
-| 2 templates HTML de email | Variables de empresa |
+| Archivo | Cambio | Estado |
+|---------|--------|--------|
+| `config/settings.py` | DATABASES, MIDDLEWARE, TEMPLATES, TIME_ZONE, DATABASE_ROUTERS, SESSION | ✅ `f16dbe6` |
+| `config/storage_utils.py` | DynamicFileSystemStorage con prefijo de país | ✅ `f16dbe6` |
+| `inventario/views.py` | `fecha_local()` dinámico | ✅ `88016f8` |
+| `inventario/utils.py` | URLs dinámicas por país | ✅ `88016f8` |
+| `servicio_tecnico/views.py` | Contexto de email con empresa_nombre/pais_nombre | ✅ `88016f8` |
+| `servicio_tecnico/templates/.../imagenes_cliente.html` | Variables de empresa dinámicas | ✅ `88016f8` |
+| `almacen/models.py` | Removidas etiquetas (MXN) de 3 help_texts | ✅ `88016f8` |
+| `.env` | DB_NAME_AR, ALLOWED_HOSTS | ✅ `f16dbe6` |
+| `servicio_tecnico/utils/pdf_generator.py` | Datos de empresa dinámicos | ⏳ Diferido (RHITSO solo México) |
+| `config/constants.py` | Precios de paquetes por país | ⏳ Diferido |
 
-### Scripts Nuevos (4)
+### Scripts Actualizados con Soporte Multi-BD (4) — ✅ Completados
 
-| Script | Descripción |
-|--------|-------------|
-| `scripts/migracion/migrar_media_mexico.sh` | Migra media a estructura multi-país |
-| `scripts/poblado/poblar_argentina.py` | Datos iniciales para Argentina |
-| `scripts/testing/test_multi_pais.py` | Pruebas automatizadas |
-| `scripts/backup_multi_pais.sh` | Backup independiente por país |
+| Script | Cambio | Commit |
+|--------|--------|--------|
+| `scripts/setup_grupos_permisos.py` | Parámetro `db_alias`, `ContentType.objects.db_manager()` | `f16dbe6` |
+| `scripts/asignar_grupos_empleados.py` | Parámetro `db_alias`, `.using(db_alias)` | `f16dbe6` |
+| `scripts/manage_grupos.py` | Reescritura completa con CLI args y menú interactivo | `f16dbe6` |
+| `scripts/deploy_permisos_produccion.sh` | Soporte multi-país con `--database=` | `f16dbe6` |
+
+### Migración Generada (1) — ✅ Aplicada a ambas BDs
+
+| Archivo | Descripción |
+|---------|-------------|
+| `almacen/migrations/0013_alter_compraproducto_costo_unitario_and_more.py` | Cambio de help_text en 3 campos |
+
+### Scripts Pendientes de Crear (producción)
+
+| Script | Descripción | Fase |
+|--------|-------------|------|
+| `scripts/migracion/migrar_media_mexico.sh` | Migra media a estructura multi-país | Fase 5 |
+| `scripts/poblado/poblar_argentina.py` | Datos iniciales para Argentina | Fase 7 |
+| `scripts/testing/test_multi_pais.py` | Pruebas automatizadas | Fase 8 |
+| `scripts/backup_multi_pais.sh` | Backup independiente por país | Fase 8 |
 
 ---
 
-**Fin del Plan v2.0**
+**Fin del Plan v3.0**
 
 *Documento generado el 9 de Febrero 2026*  
-*Última actualización: 9 de Febrero 2026*
+*Última actualización: 10 de Febrero 2026*  
+*Versión 3.0: Con progreso de implementación (Fases 0, 3, 6 completadas)*
