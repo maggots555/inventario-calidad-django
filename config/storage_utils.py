@@ -200,26 +200,25 @@ def get_storage_info() -> dict:
 
 class DynamicFileSystemStorage(FileSystemStorage):
     """
-    Sistema de almacenamiento de archivos con soporte para disco alterno.
+    Sistema de almacenamiento con soporte para disco alterno Y multi-país.
     
     EXPLICACIÓN:
-    Esta clase extiende FileSystemStorage de Django para agregar la funcionalidad
-    de cambiar automáticamente al disco alterno cuando el principal está lleno.
+    v1.0: Solo manejaba failover entre disco principal y alterno.
+    v2.0: También organiza archivos por país usando subcarpetas.
     
-    Cada vez que Django va a guardar un archivo, este storage verifica el espacio
-    disponible y decide dónde guardarlo.
-    
-    Uso en modelos:
-        foto = models.ImageField(storage=DynamicFileSystemStorage())
+    Ejemplo de rutas generadas:
+    - México:    /mnt/django_storage/media/mexico/servicio_tecnico/imagenes/123/foto.jpg
+    - Argentina: /mnt/django_storage/media/argentina/servicio_tecnico/imagenes/123/foto.jpg
     """
     
     def __init__(self, **kwargs):
         """
-        Inicializa el storage con la ruta activa (principal o alterno).
+        Inicializa el storage con la ruta activa.
         
-        EXPLICACIÓN:
-        El constructor (__init__) se llama cuando se crea una instancia de la clase.
-        Aquí determinamos qué disco usar y configuramos el storage de Django.
+        NOTA IMPORTANTE (BUG CORREGIDO v2.0):
+        Este __init__ se ejecuta UNA SOLA VEZ cuando Django arranca.
+        NO ponemos lógica de país aquí porque el país cambia con cada request.
+        La detección de país se hace en _save(), url() y path().
         """
         # Obtener la ruta activa basada en espacio disponible
         active_path = get_active_storage_path()
@@ -230,15 +229,39 @@ class DynamicFileSystemStorage(FileSystemStorage):
         # Llamar al constructor de la clase padre (FileSystemStorage)
         super().__init__(**kwargs)
         
-        print(f"[DYNAMIC STORAGE] Inicializado con ruta: {active_path}")
+        print(f"[DYNAMIC STORAGE] Inicializado con ruta base: {active_path}")
+    
+    def _get_country_prefix(self) -> str:
+        """
+        Obtiene el prefijo de carpeta del país activo.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Esta función consulta el middleware (thread-locals) para saber
+        qué país está activo y retorna su subcarpeta de media.
+        
+        Si no hay país activo (ej: manage.py, migrations), retorna
+        el país por defecto para no romper nada.
+        
+        Returns:
+            str: Subcarpeta del país (ej: 'mexico', 'argentina')
+        """
+        from config.middleware_pais import get_current_pais_config
+        from config.paises_config import PAIS_DEFAULT, PAISES_CONFIG
+        
+        pais_config = get_current_pais_config()
+        if pais_config:
+            return pais_config.get('media_subdir', PAIS_DEFAULT)
+        
+        # Fallback: país por defecto
+        return PAISES_CONFIG.get(PAIS_DEFAULT, {}).get('media_subdir', PAIS_DEFAULT)
     
     def _save(self, name, content):
         """
-        Guarda un archivo verificando el espacio disponible.
+        Guarda un archivo con prefijo de país.
         
-        EXPLICACIÓN:
-        Este método se llama cuando Django guarda un archivo.
-        Verificamos el espacio antes de guardar y actualizamos la ruta si es necesario.
+        CAMBIO v2.0:
+        Antes: guardaba en /media/servicio_tecnico/imagenes/123/foto.jpg
+        Ahora: guarda en /media/mexico/servicio_tecnico/imagenes/123/foto.jpg
         
         Args:
             name: Nombre del archivo a guardar
@@ -247,7 +270,7 @@ class DynamicFileSystemStorage(FileSystemStorage):
         Returns:
             str: Nombre del archivo guardado
         """
-        # Verificar espacio antes de guardar
+        # Verificar espacio y actualizar ruta si es necesario
         active_path = get_active_storage_path()
         
         # Si la ruta activa cambió, actualizar location
@@ -255,8 +278,39 @@ class DynamicFileSystemStorage(FileSystemStorage):
             print(f"[DYNAMIC STORAGE] Cambiando ubicación de {self.location} a {active_path}")
             self.location = active_path
         
+        # Agregar prefijo de país al nombre del archivo
+        country_prefix = self._get_country_prefix()
+        if not name.startswith(country_prefix + '/'):
+            name = os.path.join(country_prefix, name)
+        
         # Guardar el archivo usando el método del padre
         return super()._save(name, content)
+    
+    def url(self, name):
+        """
+        Genera la URL del archivo con prefijo de país.
+        
+        CAMBIO v2.0:
+        Antes: /media/servicio_tecnico/imagenes/123/foto.jpg
+        Ahora: /media/mexico/servicio_tecnico/imagenes/123/foto.jpg
+        """
+        country_prefix = self._get_country_prefix()
+        if not name.startswith(country_prefix + '/'):
+            name = os.path.join(country_prefix, name)
+        return super().url(name)
+    
+    def path(self, name):
+        """
+        Genera la ruta absoluta del archivo con prefijo de país.
+        
+        CAMBIO v2.0:
+        Antes: /mnt/django_storage/media/servicio_tecnico/imagenes/123/foto.jpg
+        Ahora: /mnt/django_storage/media/mexico/servicio_tecnico/imagenes/123/foto.jpg
+        """
+        country_prefix = self._get_country_prefix()
+        if not name.startswith(country_prefix + '/'):
+            name = os.path.join(country_prefix, name)
+        return super().path(name)
 
 
 # ============================================================================

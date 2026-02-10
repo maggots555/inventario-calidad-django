@@ -69,6 +69,16 @@ if not DEBUG:
     # Nota: NO activamos SECURE_SSL_REDIRECT porque Cloudflare maneja la redirección
     # El tráfico entre Cloudflare y Nginx es HTTP, pero el usuario siempre ve HTTPS
     # SECURE_SSL_REDIRECT = False  # Cloudflare ya redirige HTTP → HTTPS
+    
+    # ── NUEVO (Multi-País): Aislamiento de cookies por subdominio ──
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Sin esto, tu sesión de Mexico funcionaría en Argentina (inseguro).
+    # SESSION_COOKIE_DOMAIN = None → Django usa el Host header del request,
+    # así cada subdominio (mexico.sigmasystem.work, argentina.sigmasystem.work)
+    # tiene su propia cookie independiente.
+    SESSION_COOKIE_DOMAIN = None  # Django usa el Host header del request
+    SESSION_COOKIE_NAME = 'sigma_sessionid'
+    CSRF_COOKIE_NAME = 'sigma_csrftoken'
 
 # Application definition
 
@@ -96,8 +106,19 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # Django-Axes: Middleware para detectar y bloquear intentos de fuerza bruta
     'axes.middleware.AxesMiddleware',
-    # Middleware personalizado para forzar cambio de contraseña en primer login
-    # DEBE estar después de AuthenticationMiddleware (para tener acceso a request.user)
+    # ┌─────────────────────────────────────────────────────────────┐
+    # │ NUEVO (Multi-País): Detecta el país por subdominio          │
+    # │ DEBE ir DESPUÉS de AuthenticationMiddleware                  │
+    # │ DEBE ir ANTES de ForcePasswordChangeMiddleware               │
+    # │                                                              │
+    # │ ¿POR QUÉ este orden?                                        │
+    # │ 1. AuthenticationMiddleware pone request.user                │
+    # │ 2. PaisMiddleware configura la BD del país                   │
+    # │ 3. ForcePasswordChangeMiddleware consulta request.user.empleado │
+    # │    (necesita que el router ya sepa la BD correcta)           │
+    # └─────────────────────────────────────────────────────────────┘
+    'config.middleware_pais.PaisMiddleware',
+    # Forzar cambio de contraseña en primer login
     'inventario.middleware.ForcePasswordChangeMiddleware',
 ]
 
@@ -113,6 +134,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # NUEVO (Multi-País): Variables de país en todos los templates
+                'config.context_processors.pais_context',
             ],
         },
     },
@@ -125,48 +148,89 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # ============================================================================
-# CONFIGURACIÓN DE BASE DE DATOS (Compatible SQLite y PostgreSQL)
+# CONFIGURACIÓN DE BASE DE DATOS (Multi-País)
 # ============================================================================
+# 
 # EXPLICACIÓN PARA PRINCIPIANTES:
-# Esta configuración detecta automáticamente qué base de datos estás usando:
-# 
-# - SQLite: Base de datos de archivo único, ideal para desarrollo local
-#   * No requiere servidor separado
-#   * Archivo db.sqlite3 en el directorio del proyecto
-#   * Perfecto para Windows durante desarrollo
-# 
-# - PostgreSQL: Base de datos profesional, ideal para producción
-#   * Requiere servidor PostgreSQL corriendo
-#   * Mejor para múltiples usuarios simultáneos
-#   * Usa en servidor Linux para pruebas/producción
+# Antes teníamos UNA sola base de datos ('default').
+# Ahora tenemos una BD por país, pero Django necesita saber
+# cómo conectarse a cada una.
 #
-# Las optimizaciones de conexión (CONN_MAX_AGE, connect_timeout) solo se
-# aplican a PostgreSQL, ya que SQLite no las necesita y pueden causar
-# problemas de bloqueo ("database is locked").
+# 'default' siempre apunta a México (el país principal).
+# 'mexico' es un ALIAS que apunta a la misma BD que 'default'.
+# 'argentina' apunta a la BD de Argentina.
+#
+# ¿POR QUÉ 'default' y 'mexico' apuntan a lo mismo?
+# Porque manage.py y migrations siempre usan 'default'.
+# Si 'default' no existiera, Django fallaría al iniciar.
 
-# Obtener el motor de base de datos desde variables de entorno
 DB_ENGINE = config('DB_ENGINE', default='django.db.backends.postgresql')
 
-# Configuración base de la base de datos
-DATABASES = {
-    'default': {
-        'ENGINE': DB_ENGINE,
-        'NAME': config('DB_NAME', default='inventario_django'),
-        'USER': config('DB_USER', default='django_user'),
-        'PASSWORD': config('DB_PASSWORD', default=''),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
-    }
-}
+# Determinar si estamos en SQLite (desarrollo) o PostgreSQL (producción)
+_is_sqlite = 'sqlite3' in DB_ENGINE
 
-# Aplicar optimizaciones SOLO si estamos usando PostgreSQL
-# Esto previene problemas de "database is locked" en SQLite
-if DB_ENGINE == 'django.db.backends.postgresql':
-    DATABASES['default']['CONN_MAX_AGE'] = 600  # Mantener conexiones 10 min
-    DATABASES['default']['OPTIONS'] = {
-        'connect_timeout': 10,  # Timeout de conexión 10 segundos
+# --- Configuración para producción (PostgreSQL) ---
+if not _is_sqlite:
+    DATABASES = {
+        'default': {
+            'ENGINE': DB_ENGINE,
+            'NAME': config('DB_NAME', default='inventario_mexico'),
+            'USER': config('DB_USER', default='django_user'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {'connect_timeout': 10},
+        },
+        'mexico': {
+            'ENGINE': DB_ENGINE,
+            'NAME': config('DB_NAME', default='inventario_mexico'),
+            'USER': config('DB_USER', default='django_user'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {'connect_timeout': 10},
+        },
+        'argentina': {
+            'ENGINE': DB_ENGINE,
+            'NAME': config('DB_NAME_AR', default='inventario_argentina'),
+            'USER': config('DB_USER', default='django_user'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {'connect_timeout': 10},
+        },
     }
-    # Nota: Estas optimizaciones solucionan errores 500 por timeout en PostgreSQL
+
+# --- Configuración para desarrollo (SQLite) ---
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': DB_ENGINE,
+            'NAME': BASE_DIR / config('DB_NAME', default='db.sqlite3'),
+        },
+        'mexico': {
+            'ENGINE': DB_ENGINE,
+            'NAME': BASE_DIR / config('DB_NAME', default='db.sqlite3'),
+        },
+        'argentina': {
+            'ENGINE': DB_ENGINE,
+            'NAME': BASE_DIR / config('DB_NAME_AR', default='db_argentina.sqlite3'),
+        },
+    }
+
+# ============================================================================
+# DATABASE ROUTER (Multi-País)
+# ============================================================================
+# 
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Django consulta estos routers para cada query de base de datos.
+# Nuestro router redirige las queries a la BD del país activo.
+# Si no hay país activo (manage.py, shell), usa 'default' (México).
+
+DATABASE_ROUTERS = ['config.db_router.PaisDBRouter']
 
 
 # Password validation
@@ -191,13 +255,23 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'es-mx'
+# ============================================================================
+# INTERNACIONALIZACIÓN (Multi-País)
+# ============================================================================
+#
+# NOTA: TIME_ZONE y LANGUAGE_CODE aquí son los DEFAULTS del servidor.
+# La zona horaria real se aplica por request usando pais_config['timezone'].
+# Ver: config/paises_config.py → fecha_local_pais()
 
-TIME_ZONE = 'America/Mexico_City'
+LANGUAGE_CODE = 'es-mx'  # Default del servidor (se puede override por país)
+
+TIME_ZONE = 'UTC'  # CAMBIO v2.0: Usar UTC como zona del servidor
+                    # Las fechas se convierten a local en las vistas
+                    # usando fecha_local_pais() de paises_config.py
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = True  # IMPORTANTE: Mantener True para que Django guarde en UTC
 
 
 # Static files (CSS, JavaScript, Images)
