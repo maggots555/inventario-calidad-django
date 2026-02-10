@@ -7,7 +7,6 @@ from django.db.models import Q, Sum, Count, F
 from django.db import models
 from django.utils import timezone
 from datetime import datetime, timedelta, date
-from zoneinfo import ZoneInfo
 from functools import wraps
 from .models import Producto, Movimiento, Sucursal, Empleado
 from .forms import ProductoForm, MovimientoForm, SucursalForm, MovimientoRapidoForm, EmpleadoForm, MovimientoFraccionarioForm
@@ -86,15 +85,17 @@ except ImportError:
 # Función auxiliar para convertir fechas a zona horaria local
 def fecha_local(fecha_utc):
     """
-    Convierte una fecha UTC a la zona horaria local de Ciudad de México.
+    Convierte una fecha UTC a la hora local del país activo.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Antes esta función siempre convertía a hora de México (America/Mexico_City).
+    Ahora usa get_pais_actual() para detectar el país del request actual
+    y convierte a la zona horaria correcta (ej: Buenos Aires para Argentina).
+    Si no hay request activo (manage.py shell, cron), usa México como fallback.
     """
-    tz_local = ZoneInfo('America/Mexico_City')
-    if timezone.is_aware(fecha_utc):
-        return fecha_utc.astimezone(tz_local)
-    else:
-        # Si la fecha no tiene timezone, asumir UTC y convertir
-        fecha_utc = timezone.make_aware(fecha_utc, timezone.utc)
-        return fecha_utc.astimezone(tz_local)
+    from config.paises_config import get_pais_actual, fecha_local_pais
+    pais = get_pais_actual()
+    return fecha_local_pais(fecha_utc, pais)
 
 # ===== DASHBOARD PRINCIPAL UNIFICADO =====
 @login_required

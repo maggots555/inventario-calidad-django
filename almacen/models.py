@@ -436,7 +436,7 @@ class ProductoAlmacen(models.Model):
         default=0,
         validators=[MinValueValidator(0)],
         verbose_name='Costo Unitario',
-        help_text='Último costo de compra por unidad (MXN)'
+        help_text='Último costo de compra por unidad'
     )
     
     # ========== PROVEEDOR ==========
@@ -738,7 +738,7 @@ class CompraProducto(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(0)],
         verbose_name='Costo Unitario',
-        help_text='Precio por unidad en esta compra (MXN)'
+        help_text='Precio por unidad en esta compra'
     )
     costo_total = models.DecimalField(
         max_digits=12,
@@ -3278,7 +3278,7 @@ class LineaCotizacion(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(0)],
         verbose_name='Costo Unitario',
-        help_text='Precio por unidad (MXN)'
+        help_text='Precio por unidad'
     )
     
     # ========== ESTADO DEL CLIENTE ==========

@@ -185,13 +185,12 @@ def enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=Fals
             print(mensaje_error)
             return False, mensaje_error
         
-        # Construir URL de login basada en ALLOWED_HOSTS configurado
-        # Buscar una IP válida en ALLOWED_HOSTS que no sea '*'
-        host = 'localhost'
-        for allowed_host in settings.ALLOWED_HOSTS:
-            if allowed_host not in ['*', 'localhost', '127.0.0.1'] and '.' in allowed_host:
-                host = allowed_host
-                break
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Usamos get_pais_actual() para obtener la URL correcta del país activo.
+        # Antes estaba hardcodeado 'https://sigmasystem.work' para todos.
+        # Ahora cada país tiene su propia url_base (ej: mexico.sigmasystem.work).
+        from config.paises_config import get_pais_actual
+        _pais = get_pais_actual()
         
         # Contexto para el template del email
         context = {
@@ -200,8 +199,8 @@ def enviar_credenciales_empleado(empleado, contraseña_temporal, es_reenvio=Fals
             'usuario': empleado.email,
             'es_reenvio': es_reenvio,
             'nombre_sistema': 'Sistema Integral de Gestión SIGMA',
-            'url_login': 'https://sigmasystem.work/login/',
-            'url_sistema': 'https://sigmasystem.work',
+            'url_login': f"{_pais['url_base']}/login/",
+            'url_sistema': _pais['url_base'],
         }
         
         # Renderizar template HTML del email

@@ -5853,12 +5853,20 @@ def enviar_imagenes_cliente(request, orden_id):
         
         ahora = timezone.now()
         
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # render_to_string() NO ejecuta context_processors, así que debemos
+        # pasar manualmente las variables del país al template del email.
+        from config.paises_config import get_pais_actual
+        _pais_email = get_pais_actual()
+        
         context = {
             'orden': orden,
             'detalle': orden.detalle_equipo,
             'mensaje_personalizado': mensaje_personalizado,
             'fecha_envio': ahora,
             'cantidad_imagenes': len(imagenes_comprimidas),
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
         }
         
         # Renderizar plantilla HTML
