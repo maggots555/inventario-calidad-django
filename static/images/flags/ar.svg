@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 24" width="32" height="24">
+  <defs>
+    <style>
+      /* Animación de ondulación */
+      @keyframes wave-float {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(-0.5px); }
+        100% { transform: translateY(0); }
+      }
+      
+      @keyframes sun-rotate {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      @keyframes sun-pulse {
+        0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        50% { transform: scale(1.08) rotate(180deg); opacity: 0.9; }
+      }
+      
+      @keyframes ray-glow {
+        0%, 100% { opacity: 0.8; }
+        50% { opacity: 1; }
+      }
+      
+      .stripe-top {
+        animation: wave-float 2.8s ease-in-out infinite;
+      }
+      
+      .stripe-bottom {
+        animation: wave-float 2.8s ease-in-out infinite 0.2s;
+      }
+      
+      .sun-core {
+        animation: sun-pulse 4s ease-in-out infinite;
+        transform-origin: 16px 12px;
+      }
+      
+      .sun-rays {
+        animation: sun-rotate 20s linear infinite;
+        transform-origin: 16px 12px;
+      }
+      
+      .ray {
+        animation: ray-glow 2s ease-in-out infinite;
+      }
+    </style>
+    
+    <!-- Degradados para profundidad -->
+    <linearGradient id="celesteGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#85b7df;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#74acdf;stop-opacity:1" />
+    </linearGradient>
+    
+    <radialGradient id="sunGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ffd700;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#f6b40e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ed8f03;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Franja Celeste Superior -->
+  <rect class="stripe-top" x="0" y="0" width="32" height="8" fill="url(#celesteGrad)"/>
+  
+  <!-- Franja Blanca Central -->
+  <rect x="0" y="8" width="32" height="8" fill="#FFFFFF"/>
+  
+  <!-- Franja Celeste Inferior -->
+  <rect class="stripe-bottom" x="0" y="16" width="32" height="8" fill="url(#celesteGrad)"/>
+  
+  <!-- Sol de Mayo -->
+  <g class="sun-core">
+    <!-- Círculo central del sol -->
+    <circle cx="16" cy="12" r="3" fill="url(#sunGrad)" stroke="#ed8f03" stroke-width="0.4"/>
+    
+    <!-- Cara del sol -->
+    <circle cx="15" cy="11.5" r="0.4" fill="#cd7f32" opacity="0.6"/>
+    <circle cx="17" cy="11.5" r="0.4" fill="#cd7f32" opacity="0.6"/>
+    <path d="M15.2,13 Q16,13.5 16.8,13" stroke="#cd7f32" stroke-width="0.3" fill="none" opacity="0.6"/>
+  </g>
+  
+  <!-- Rayos del sol con animación de rotación -->
+  <g class="sun-rays">
+    <!-- 16 rayos distribuidos uniformemente -->
+    <!-- Rayos largos -->
+    <path class="ray" d="M16,8.5 L16.15,9.8 L15.85,9.8 Z" fill="#f6b40e"/>
+    <path class="ray" d="M18.5,9 L17.8,10.2 L17.5,9.8 Z" fill="#f6b40e" style="animation-delay: 0.1s"/>
+    <path class="ray" d="M20,11 L18.7,11.3 L18.8,10.9 Z" fill="#f6b40e" style="animation-delay: 0.2s"/>
+    <path class="ray" d="M20.2,13 L18.9,12.7 L19,13.1 Z" fill="#f6b40e" style="animation-delay: 0.3s"/>
+    <path class="ray" d="M19,15 L18,14 L18.2,13.7 Z" fill="#f6b40e" style="animation-delay: 0.4s"/>
+    <path class="ray" d="M17,16 L16.5,14.8 L16.3,15.1 Z" fill="#f6b40e" style="animation-delay: 0.5s"/>
+    <path class="ray" d="M15,16 L15.5,14.8 L15.7,15.1 Z" fill="#f6b40e" style="animation-delay: 0.6s"/>
+    <path class="ray" d="M13,15 L14,14 L13.8,13.7 Z" fill="#f6b40e" style="animation-delay: 0.7s"/>
+    
+    <!-- Rayos cortos (intercalados) -->
+    <line class="ray" x1="16" y1="9" x2="16" y2="9.5" stroke="#ed8f03" stroke-width="0.4" opacity="0.8"/>
+    <line class="ray" x1="18.2" y1="9.5" x2="17.9" y2="10" stroke="#ed8f03" stroke-width="0.4" opacity="0.8" style="animation-delay: 0.15s"/>
+    <line class="ray" x1="19.5" y1="11.5" x2="19" y2="11.7" stroke="#ed8f03" stroke-width="0.4" opacity="0.8" style="animation-delay: 0.25s"/>
+    <line class="ray" x1="19.5" y1="12.5" x2="19" y2="12.3" stroke="#ed8f03" stroke-width="0.4" opacity="0.8" style="animation-delay: 0.35s"/>
+    <line class="ray" x1="18.2" y1="14.5" x2="17.9" y2="14" stroke="#ed8f03" stroke-width="0.4" opacity="0.8" style="animation-delay: 0.45s"/>
+    <line class="ray" x1="16" y1="15" x2="16" y2="14.5" stroke="#ed8f03" stroke-width="0.4" opacity="0.8" style="animation-delay: 0.55s"/>
+    <line class="ray" x1="13.8" y1="14.5" x2="14.1" y2="14" stroke="#ed8f03" stroke-width="0.4" opacity="0.8" style="animation-delay: 0.65s"/>
+    <line class="ray" x1="12.5" y1="12.5" x2="13" y2="12.3" stroke="#ed8f03" stroke-width="0.4" opacity="0.8" style="animation-delay: 0.75s"/>
+  </g>
+  
+  <!-- Brillo sutil sobre la franja blanca -->
+  <rect x="0" y="8" width="32" height="8" fill="white" opacity="0.1"/>
+</svg>

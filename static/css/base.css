@@ -2319,11 +2319,18 @@ footer::after {
     /* Para permitir truncar texto si es necesario */
 }
 
+/* Wrapper para nombre + bandera */
+.user-name-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    line-height: 1.2;
+}
+
 .user-name {
     font-size: 0.95rem;
     font-weight: 600;
     color: #ffffff;
-    line-height: 1.2;
     white-space: nowrap;
     /* Evitar saltos de línea */
     overflow: hidden;
@@ -2382,79 +2389,57 @@ footer::after {
 }
 
 /* ===== COUNTRY BADGE ===== */
-/* Badge de país en desktop (inline con nombre) */
+/* Badge de país (visible en todos los tamaños) */
 .country-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.2rem 0.4rem;
-    margin-left: 0.5rem;
+    padding: 0.25rem 0.5rem;
     background: rgba(255, 255, 255, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 8px;
     backdrop-filter: blur(10px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    flex-shrink: 0; /* Evitar que se comprima */
 }
 
-/* Icono de bandera en desktop */
+/* Icono de bandera */
 .country-flag-icon {
     width: 28px;
     height: 20px;
     display: block;
     border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .country-badge:hover {
-    transform: translateY(-2px) scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px) scale(1.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Wrapper para avatar + badge móvil */
-.navbar-user-avatar-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.country-badge:hover .country-flag-icon {
+    transform: scale(1.05);
 }
 
-/* Badge de país móvil (al lado del avatar) */
-.country-badge-mobile {
-    display: none; /* Oculto por defecto en desktop */
-    position: absolute;
-    bottom: -2px;
-    right: -4px;
-    width: 28px;
-    height: 28px;
-    background: rgba(255, 255, 255, 0.95);
-    border: 2px solid #2d3e50;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    z-index: 1;
-    overflow: hidden;
-}
-
-/* Icono de bandera en móvil */
-.country-flag-mobile-icon {
-    width: 22px;
-    height: 16px;
-    display: block;
-    border-radius: 2px;
-}
-
-/* RESPONSIVE: Ocultar badge desktop en móvil */
+/* Ajustes para móvil */
 @media (max-width: 768px) {
-    .country-badge {
-        display: none; /* Ocultar badge inline en móvil */
+    /* Bandera más pequeña en móvil */
+    .country-flag-icon {
+        width: 20px;
+        height: 14px;
     }
     
-    .country-badge-mobile {
-        display: flex; /* Mostrar badge circular en móvil */
+    .country-badge {
+        padding: 0.15rem 0.35rem;
+    }
+    
+    .user-name-wrapper {
+        gap: 0.35rem;
     }
 }
 
@@ -2556,9 +2541,22 @@ footer::after {
         padding: 0 1.5rem;
     }
 
-    /* Ocultar información de usuario en tablets */
+    /* Ajustar información de usuario en móviles */
     .navbar-user-info {
-        display: none;
+        /* Mantener visible pero más compacto */
+        gap: 0.05rem;
+    }
+    
+    .user-name {
+        font-size: 0.8rem;
+        max-width: 120px; /* Limitar ancho para evitar overflow */
+    }
+    
+    .user-role {
+        font-size: 0.65rem;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     /* Menú desplegable móvil */
@@ -2728,6 +2726,38 @@ footer::after {
 
     .navbar-user-avatar span {
         font-size: 0.85rem;
+    }
+    
+    /* Sección de usuario más compacta en móvil */
+    .navbar-user-section {
+        gap: 0.5rem;
+        flex-shrink: 1; /* Permitir compresión si es necesario */
+    }
+    
+    /* Info de usuario optimizada para móvil */
+    .navbar-user-info {
+        gap: 0.05rem;
+        min-width: 80px; /* Mínimo espacio para el nombre */
+    }
+    
+    .user-name {
+        font-size: 0.75rem;
+        max-width: 100px;
+    }
+    
+    .user-role {
+        font-size: 0.6rem;
+        max-width: 120px;
+    }
+    
+    /* Cargo más compacto */
+    .user-cargo::before {
+        width: 4px;
+        height: 4px;
+    }
+    
+    .user-cargo {
+        padding-left: 0.5rem;
     }
 
     /* Asegurar que navbar no cause overflow */

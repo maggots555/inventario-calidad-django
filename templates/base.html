@@ -372,48 +372,41 @@
                 <div class="navbar-user-info">
                     {% if user.empleado %}
                     <!-- Si el usuario tiene un perfil de empleado asociado -->
-                    <span class="user-name">
-                        {{ user.empleado.nombre_completo }}
+                    <div class="user-name-wrapper">
+                        <span class="user-name">{{ user.empleado.nombre_completo }}</span>
                         <span class="country-badge" title="País: {{ pais_nombre }}">
                             {% load static %}
                             <img src="{% static 'images/flags/' %}{{ pais_codigo|lower }}.svg" alt="{{ pais_nombre }}" class="country-flag-icon">
                         </span>
-                    </span>
+                    </div>
                     <span class="user-role"><span class="user-cargo">{{ user.empleado.cargo }}</span> • <strong>{{ user|user_roles_display }}</strong></span>
                     {% else %}
                     <!-- Si no tiene empleado asociado, usar info básica del User -->
-                    <span class="user-name">
-                        {{ user.get_full_name|default:user.username }}
+                    <div class="user-name-wrapper">
+                        <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
                         <span class="country-badge" title="País: {{ pais_nombre }}">
                             {% load static %}
                             <img src="{% static 'images/flags/' %}{{ pais_codigo|lower }}.svg" alt="{{ pais_nombre }}" class="country-flag-icon">
                         </span>
-                    </span>
+                    </div>
                     <span class="user-role"><span class="user-cargo">{% if user.is_superuser %}Superusuario{% elif user.is_staff %}Administrador{% else %}Usuario{% endif %}</span> • <strong>{{ user|user_roles_display }}</strong></span>
                     {% endif %}
                 </div>
 
-                <!-- Avatar del usuario con indicador de país -->
-                <div class="navbar-user-avatar-wrapper">
-                    <div class="navbar-user-avatar" title="{{ user.empleado.nombre_completo|default:user.username }}">
-                        {% if user.empleado and user.empleado.foto_perfil %}
-                        <!-- Mostrar foto de perfil si existe -->
-                        <img src="{{ user.empleado.foto_perfil.url }}" alt="{{ user.empleado.nombre_completo }}"
-                            style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
-                        {% else %}
-                        <!-- Mostrar iniciales si no hay foto -->
-                        {% if user.empleado %}
-                        <span>{{ user.empleado.get_iniciales }}</span>
-                        {% else %}
-                        <span>{{ user.first_name.0|default:"U" }}{{ user.last_name.0|default:"S" }}</span>
-                        {% endif %}
-                        {% endif %}
-                    </div>
-                    <!-- Badge de país para móvil (visible solo en pantallas pequeñas) -->
-                    <span class="country-badge-mobile" title="{{ pais_nombre }}">
-                        {% load static %}
-                        <img src="{% static 'images/flags/' %}{{ pais_codigo|lower }}.svg" alt="{{ pais_nombre }}" class="country-flag-mobile-icon">
-                    </span>
+                <!-- Avatar del usuario -->
+                <div class="navbar-user-avatar" title="{{ user.empleado.nombre_completo|default:user.username }}">
+                    {% if user.empleado and user.empleado.foto_perfil %}
+                    <!-- Mostrar foto de perfil si existe -->
+                    <img src="{{ user.empleado.foto_perfil.url }}" alt="{{ user.empleado.nombre_completo }}"
+                        style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                    {% else %}
+                    <!-- Mostrar iniciales si no hay foto -->
+                    {% if user.empleado %}
+                    <span>{{ user.empleado.get_iniciales }}</span>
+                    {% else %}
+                    <span>{{ user.first_name.0|default:"U" }}{{ user.last_name.0|default:"S" }}</span>
+                    {% endif %}
+                    {% endif %}
                 </div>
 
                 <!-- Botones de acción -->
