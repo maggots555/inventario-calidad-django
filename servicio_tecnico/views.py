@@ -2355,7 +2355,6 @@ def descargar_imagen_original(request, imagen_id):
     """
     from django.http import FileResponse, Http404, HttpResponseForbidden
     from pathlib import Path
-    from config.storage_utils import ALTERNATE_STORAGE_PATH, PRIMARY_STORAGE_PATH
     
     # Obtener la imagen o retornar 404
     imagen = get_object_or_404(ImagenOrden, pk=imagen_id)
@@ -2383,32 +2382,25 @@ def descargar_imagen_original(request, imagen_id):
     if not archivo_imagen:
         raise Http404("No hay archivo de imagen asociado.")
     
-    # BUSCAR ARCHIVO EN MÚLTIPLES UBICACIONES (disco alterno y principal)
-    # Esta es la corrección principal: buscar en ambos discos
-    nombre_relativo = archivo_imagen.name  # Ruta relativa (ej: 'servicio_tecnico/imagenes/2025/11/foto.jpg')
-    
-    # Lista de ubicaciones donde buscar (en orden de prioridad)
-    search_locations = [
-        ALTERNATE_STORAGE_PATH,  # Disco alterno (D:) - Buscar primero aquí
-        PRIMARY_STORAGE_PATH,    # Disco principal (C:) - Buscar aquí si no está en D:
-    ]
-    
-    # Buscar el archivo en cada ubicación
-    archivo_path = None
-    for location in search_locations:
-        full_path = Path(location) / nombre_relativo
-        if full_path.exists() and full_path.is_file():
-            archivo_path = full_path
-            print(f"[DESCARGA] ✅ Imagen encontrada en: {archivo_path}")
-            break
-    
-    # Si no se encontró el archivo en ninguna ubicación
-    if not archivo_path:
-        print(f"[DESCARGA] ❌ Imagen NO encontrada: {nombre_relativo}")
-        print(f"[DESCARGA]    Buscado en:")
-        for location in search_locations:
-            print(f"[DESCARGA]      - {Path(location) / nombre_relativo}")
-        raise Http404("El archivo de imagen no existe en ninguna ubicación de almacenamiento.")
+    # EXPLICACIÓN: Usar imagen.path que incluye automáticamente el prefijo del país
+    # Esto funciona tanto para imágenes antiguas como nuevas (compatibilidad multi-país)
+    try:
+        archivo_path = Path(archivo_imagen.path)
+        
+        # Verificar que el archivo existe físicamente
+        if not archivo_path.exists():
+            print(f"[DESCARGA] ❌ Archivo no existe: {archivo_path}")
+            raise Http404("El archivo de imagen no existe en el sistema de almacenamiento.")
+        
+        if not archivo_path.is_file():
+            print(f"[DESCARGA] ❌ La ruta no es un archivo: {archivo_path}")
+            raise Http404("La ruta de imagen no corresponde a un archivo válido.")
+        
+        print(f"[DESCARGA] ✅ Imagen encontrada: {archivo_path}")
+        
+    except Exception as e:
+        print(f"[DESCARGA] ❌ Error al acceder a la imagen: {e}")
+        raise Http404(f"Error al acceder a la imagen: {str(e)}")
     
     # Obtener el nombre del archivo original
     nombre_archivo = os.path.basename(archivo_imagen.name)
@@ -2477,61 +2469,40 @@ def eliminar_imagen(request, imagen_id):
         descripcion_imagen = imagen.descripcion or imagen.nombre_archivo
         
         # Eliminar archivos físicos del sistema de archivos
-        # IMPORTANTE: Buscar en ambas ubicaciones (disco principal y alterno)
+        # EXPLICACIÓN: Usar imagen.path que incluye el prefijo del país automáticamente
         from pathlib import Path
-        from config.storage_utils import ALTERNATE_STORAGE_PATH, PRIMARY_STORAGE_PATH
         
         archivos_eliminados = []
-        
-        # Lista de ubicaciones donde buscar archivos
-        search_locations = [
-            ALTERNATE_STORAGE_PATH,  # Disco alterno (D:)
-            PRIMARY_STORAGE_PATH,    # Disco principal (C:)
-        ]
         
         # Eliminar imagen comprimida
         if imagen.imagen:
             try:
-                nombre_relativo = imagen.imagen.name
-                archivo_eliminado = False
+                archivo_path = Path(imagen.imagen.path)
                 
-                # Buscar y eliminar en todas las ubicaciones
-                for location in search_locations:
-                    full_path = Path(location) / nombre_relativo
-                    if full_path.exists() and full_path.is_file():
-                        os.remove(str(full_path))
-                        archivos_eliminados.append('imagen comprimida')
-                        archivo_eliminado = True
-                        print(f"[ELIMINAR] ✅ Imagen comprimida eliminada de: {full_path}")
-                        break
-                
-                if not archivo_eliminado:
-                    print(f"[ELIMINAR] ⚠️ Imagen comprimida no encontrada: {nombre_relativo}")
+                if archivo_path.exists() and archivo_path.is_file():
+                    os.remove(str(archivo_path))
+                    archivos_eliminados.append('imagen comprimida')
+                    print(f"[ELIMINAR] ✅ Imagen comprimida eliminada: {archivo_path.name}")
+                else:
+                    print(f"[ELIMINAR] ⚠️ Imagen comprimida no encontrada: {archivo_path}")
                     
             except Exception as e:
-                print(f"⚠️ Error al eliminar archivo comprimido: {str(e)}")
+                print(f"[ELIMINAR] ⚠️ Error al eliminar archivo comprimido: {str(e)}")
         
         # Eliminar imagen original
         if imagen.imagen_original:
             try:
-                nombre_relativo = imagen.imagen_original.name
-                archivo_eliminado = False
+                archivo_path = Path(imagen.imagen_original.path)
                 
-                # Buscar y eliminar en todas las ubicaciones
-                for location in search_locations:
-                    full_path = Path(location) / nombre_relativo
-                    if full_path.exists() and full_path.is_file():
-                        os.remove(str(full_path))
-                        archivos_eliminados.append('imagen original')
-                        archivo_eliminado = True
-                        print(f"[ELIMINAR] ✅ Imagen original eliminada de: {full_path}")
-                        break
-                
-                if not archivo_eliminado:
-                    print(f"[ELIMINAR] ⚠️ Imagen original no encontrada: {nombre_relativo}")
+                if archivo_path.exists() and archivo_path.is_file():
+                    os.remove(str(archivo_path))
+                    archivos_eliminados.append('imagen original')
+                    print(f"[ELIMINAR] ✅ Imagen original eliminada: {archivo_path.name}")
+                else:
+                    print(f"[ELIMINAR] ⚠️ Imagen original no encontrada: {archivo_path}")
                     
             except Exception as e:
-                print(f"⚠️ Error al eliminar archivo original: {str(e)}")
+                print(f"[ELIMINAR] ⚠️ Error al eliminar archivo original: {str(e)}")
         
         # Eliminar registro de la base de datos
         imagen.delete()
@@ -5738,35 +5709,28 @@ def enviar_imagenes_cliente(request, orden_id):
         # =======================================================================
         print(f"🔄 Comprimiendo imágenes...")
         
+        from pathlib import Path
+        
         imagenes_comprimidas = []
         tamaño_total_original = 0
         tamaño_total_comprimido = 0
         
         for imagen in imagenes:
             try:
-                # BUSCAR IMAGEN EN MÚLTIPLES UBICACIONES (disco alterno y principal)
-                from pathlib import Path
-                from config.storage_utils import ALTERNATE_STORAGE_PATH, PRIMARY_STORAGE_PATH
+                # EXPLICACIÓN: Usar imagen.path que incluye la ruta física completa con prefijo de país
+                # Esto funciona tanto con imágenes antiguas como nuevas
+                img_path = imagen.imagen.path
                 
-                nombre_relativo = imagen.imagen.name
-                search_locations = [
-                    ALTERNATE_STORAGE_PATH,  # Disco alterno (D:)
-                    PRIMARY_STORAGE_PATH,    # Disco principal (C:)
-                ]
-                
-                # Buscar el archivo en cada ubicación
-                img_path = None
-                for location in search_locations:
-                    full_path = Path(location) / nombre_relativo
-                    if full_path.exists() and full_path.is_file():
-                        img_path = str(full_path)
-                        print(f"   📂 Imagen encontrada en: {img_path}")
-                        break
-                
-                # Si no se encontró el archivo
-                if not img_path:
-                    print(f"   ⚠️ Imagen no encontrada: {nombre_relativo}")
+                # Verificar que el archivo existe
+                if not Path(img_path).exists():
+                    print(f"   ⚠️ Imagen no encontrada: {img_path}")
                     continue
+                
+                if not Path(img_path).is_file():
+                    print(f"   ⚠️ La ruta no es un archivo: {img_path}")
+                    continue
+                
+                print(f"   ✅ Imagen encontrada: {os.path.basename(img_path)}")
                 
                 # Abrir imagen con PIL
                 img = Image.open(img_path)
