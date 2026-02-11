@@ -18,11 +18,16 @@ Características:
 """
 
 import os
+import time
 import shutil
+import logging
 from pathlib import Path
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 from decouple import config
+
+# Logger para este módulo (reemplaza los print() que bloqueaban I/O en producción)
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -67,6 +72,23 @@ ALTERNATE_STORAGE_PATH = Path(ALTERNATE_STORAGE_PATH)
 # Si queda menos de este espacio, usa el disco alterno
 MIN_FREE_SPACE_GB = config('MIN_FREE_SPACE_GB', default=50, cast=int)
 
+# ============================================================================
+# CACHE DE VERIFICACIÓN DE DISCO
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Antes, cada vez que se guardaba un archivo (incluyendo cada imagen individual),
+# el sistema verificaba el espacio libre del disco llamando al sistema operativo.
+# Con 10 imágenes × 2 archivos (original + comprimida) = 20 llamadas innecesarias.
+#
+# Ahora usamos un "cache" que recuerda el resultado por 60 segundos.
+# Así solo se verifica el disco una vez por minuto, no en cada archivo.
+_disk_check_cache = {
+    'result': None,          # Resultado de should_use_alternate_storage()
+    'timestamp': 0,          # Momento de la última verificación (epoch)
+    'active_path': None,     # Ruta activa cacheada
+}
+_DISK_CHECK_TTL = 60  # Segundos entre verificaciones de disco
+
 
 # ============================================================================
 # FUNCIONES AUXILIARES
@@ -105,7 +127,7 @@ def get_disk_usage(path: Path) -> dict:
             'path': str(path)
         }
     except Exception as e:
-        print(f"Error al obtener uso del disco para {path}: {e}")
+        logger.error(f"Error al obtener uso del disco para {path}: {e}")
         return {
             'total': 0,
             'used': 0,
@@ -130,14 +152,14 @@ def should_use_alternate_storage() -> bool:
     primary_usage = get_disk_usage(PRIMARY_STORAGE_PATH)
     free_gb = primary_usage['free_gb']
     
-    print(f"[STORAGE CHECK] Espacio libre en disco principal: {free_gb:.2f} GB")
-    print(f"[STORAGE CHECK] Umbral mínimo: {MIN_FREE_SPACE_GB} GB")
+    logger.info(f"[STORAGE CHECK] Espacio libre en disco principal: {free_gb:.2f} GB")
+    logger.info(f"[STORAGE CHECK] Umbral mínimo: {MIN_FREE_SPACE_GB} GB")
     
     if free_gb < MIN_FREE_SPACE_GB:
-        print(f"[STORAGE CHECK] ⚠️ Espacio insuficiente! Usando disco alterno.")
+        logger.warning(f"[STORAGE CHECK] Espacio insuficiente! Usando disco alterno.")
         return True
     
-    print(f"[STORAGE CHECK] ✅ Espacio suficiente. Usando disco principal.")
+    logger.info(f"[STORAGE CHECK] Espacio suficiente. Usando disco principal.")
     return False
 
 
@@ -149,14 +171,36 @@ def get_active_storage_path() -> Path:
     Esta función decide qué disco usar basándose en el espacio disponible.
     Es el punto central para determinar dónde se guardarán los nuevos archivos.
     
+    OPTIMIZACIÓN v3.0:
+    Usa un cache con TTL de 60 segundos para evitar llamar a shutil.disk_usage()
+    en cada archivo guardado. Cuando se suben 10 imágenes (20 archivos con originales),
+    solo se verifica el disco 1 vez en lugar de 20.
+    
     Returns:
         Path: Ruta del directorio de almacenamiento activo
     """
+    global _disk_check_cache
+    
+    now = time.time()
+    
+    # Si el cache es válido (menos de 60 segundos), retornar resultado cacheado
+    if (_disk_check_cache['active_path'] is not None 
+            and (now - _disk_check_cache['timestamp']) < _DISK_CHECK_TTL):
+        return _disk_check_cache['active_path']
+    
+    # Cache expirado o primera ejecución: verificar disco
     if should_use_alternate_storage():
         # Asegurar que el disco alterno existe
         ALTERNATE_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
-        return ALTERNATE_STORAGE_PATH
-    return PRIMARY_STORAGE_PATH
+        active = ALTERNATE_STORAGE_PATH
+    else:
+        active = PRIMARY_STORAGE_PATH
+    
+    # Actualizar cache
+    _disk_check_cache['active_path'] = active
+    _disk_check_cache['timestamp'] = now
+    
+    return active
 
 
 def get_storage_info() -> dict:
@@ -229,7 +273,7 @@ class DynamicFileSystemStorage(FileSystemStorage):
         # Llamar al constructor de la clase padre (FileSystemStorage)
         super().__init__(**kwargs)
         
-        print(f"[DYNAMIC STORAGE] Inicializado con ruta base: {active_path}")
+        logger.info(f"[DYNAMIC STORAGE] Inicializado con ruta base: {active_path}")
     
     def _get_country_prefix(self) -> str:
         """
@@ -275,7 +319,7 @@ class DynamicFileSystemStorage(FileSystemStorage):
         
         # Si la ruta activa cambió, actualizar location
         if Path(self.location) != active_path:
-            print(f"[DYNAMIC STORAGE] Cambiando ubicación de {self.location} a {active_path}")
+            logger.info(f"[DYNAMIC STORAGE] Cambiando ubicación de {self.location} a {active_path}")
             self.location = active_path
         
         # Agregar prefijo de país al nombre del archivo
