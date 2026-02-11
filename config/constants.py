@@ -101,7 +101,7 @@ PAQUETES_CHOICES = [
 PRECIOS_PAQUETES = {
     'premium': 5500.00,  # RAM 16GB DDR5 + SSD 1TB + Kit Limpieza
     'oro': 3850.00,      # RAM 8GB DDR5 + SSD 1TB
-    'plata': 2900.00,    # SSD 1TB
+    'plata': 3870.00,    # SSD 1TB
     'ninguno': 0.00,
 }
 
