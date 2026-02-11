@@ -323,25 +323,16 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 200 * 1024 * 1024  # 200MB total por request (múl
 FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024   # 50MB por archivo individual
 
 # Directorio temporal para uploads
-# EXPLICACIÓN PARA PRINCIPIANTES:
-# Django necesita un lugar donde guardar archivos temporales durante la subida.
-# Por defecto usa /tmp, pero en producción con Gunicorn+systemd esto causa problemas
-# porque cada worker tiene su propio namespace /tmp privado que puede corromperse.
-#
-# Solución: Usar un directorio dedicado (/var/www/django_temp) configurado vía .env
-# 
-# PRODUCCIÓN: USE_CUSTOM_TEMP_DIR=True  → usa /var/www/django_temp
-# DESARROLLO: USE_CUSTOM_TEMP_DIR=False → usa /tmp del sistema (None = auto)
-USE_CUSTOM_TEMP_DIR = config('USE_CUSTOM_TEMP_DIR', default=False, cast=bool)
-
-if USE_CUSTOM_TEMP_DIR:
-    # Producción: Directorio dedicado en /var/www con 430GB de espacio
+# DESARROLLO: Usa /tmp del sistema
+# PRODUCCIÓN: Usa /var/www/django_temp (evita problemas con systemd PrivateTmp)
+if DEBUG:
+    # En desarrollo usa el directorio temporal del sistema (/tmp)
+    FILE_UPLOAD_TEMP_DIR = None  # Django usará tempfile.gettempdir() automáticamente
+else:
+    # En producción usa directorio dedicado en /var/www con 430GB de espacio
     # Esto evita problemas de "FileNotFoundError" cuando los workers de Gunicorn
     # intentan acceder a archivos temporales en namespaces corruptos por systemd
     FILE_UPLOAD_TEMP_DIR = '/var/www/django_temp'
-else:
-    # Desarrollo: Usa el directorio temporal del sistema (/tmp en Linux, %TEMP% en Windows)
-    FILE_UPLOAD_TEMP_DIR = None  # Django usará tempfile.gettempdir() automáticamente
 
 # Límite de campos por request (incluye archivos múltiples)
 # Configurado para soportar hasta 50 archivos simultáneos + campos del formulario
