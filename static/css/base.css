@@ -2381,6 +2381,73 @@ footer::after {
     letter-spacing: 0.3px;
 }
 
+/* ===== COUNTRY BADGE ===== */
+/* Badge de país en desktop (inline con nombre) */
+.country-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    margin-left: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #ffffff;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.country-badge i {
+    font-size: 0.85rem;
+}
+
+.country-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
+/* Wrapper para avatar + badge móvil */
+.navbar-user-avatar-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Badge de país móvil (al lado del avatar) */
+.country-badge-mobile {
+    display: none; /* Oculto por defecto en desktop */
+    position: absolute;
+    bottom: -2px;
+    right: -4px;
+    width: 24px;
+    height: 24px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 2px solid #2d3e50;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    z-index: 1;
+}
+
+/* RESPONSIVE: Ocultar badge desktop en móvil */
+@media (max-width: 768px) {
+    .country-badge {
+        display: none; /* Ocultar badge inline en móvil */
+    }
+    
+    .country-badge-mobile {
+        display: flex; /* Mostrar badge circular en móvil */
+    }
+}
+
 .navbar-user-avatar {
     width: 45px;
     height: 45px;
