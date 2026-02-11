@@ -539,6 +539,7 @@ class Empleado(models.Model):
     # Foto de perfil del empleado
     foto_perfil = models.ImageField(
         upload_to='empleados/fotos/',
+        max_length=255,  # Límite ampliado para soportar rutas largas
         blank=True,
         null=True,
         verbose_name='Foto de Perfil',

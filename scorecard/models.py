@@ -479,6 +479,7 @@ class EvidenciaIncidencia(models.Model):
     )
     imagen = models.ImageField(
         upload_to='scorecard/evidencias/%Y/%m/',
+        max_length=255,  # Límite ampliado para soportar rutas largas
         validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif'])],
         help_text="Imagen de evidencia (JPG, PNG, GIF)"
     )

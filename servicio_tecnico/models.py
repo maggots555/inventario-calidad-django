@@ -1811,11 +1811,13 @@ class ImagenOrden(models.Model):
     # Imágenes antiguas permanecen en su ubicación original y siguen funcionando
     imagen = models.ImageField(
         upload_to=imagen_upload_path,  # ← Función que genera ruta por orden
+        max_length=255,  # Límite ampliado para soportar rutas largas
         validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif'])],
         help_text="Archivo de imagen comprimida para galería (JPG, PNG, GIF)"
     )
     imagen_original = models.ImageField(
         upload_to=imagen_original_upload_path,  # ← Función que genera ruta por orden
+        max_length=255,  # Límite ampliado para soportar rutas largas
         validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif'])],
         null=True,
         blank=True,

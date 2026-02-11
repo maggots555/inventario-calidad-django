@@ -459,6 +459,7 @@ class ProductoAlmacen(models.Model):
     # ========== MULTIMEDIA ==========
     imagen = models.ImageField(
         upload_to='almacen/productos/',
+        max_length=255,  # Límite ampliado para soportar rutas largas
         blank=True,
         null=True,
         verbose_name='Imagen del Producto',
@@ -466,6 +467,7 @@ class ProductoAlmacen(models.Model):
     )
     qr_code = models.ImageField(
         upload_to='almacen/qr_codes/',
+        max_length=255,  # Límite ampliado para soportar rutas largas
         blank=True,
         null=True,
         verbose_name='Código QR',
@@ -2219,6 +2221,7 @@ class DiferenciaAuditoria(models.Model):
     )
     evidencia = models.ImageField(
         upload_to='almacen/auditorias/evidencias/',
+        max_length=255,  # Límite ampliado para soportar rutas largas
         blank=True,
         null=True,
         verbose_name='Evidencia Fotográfica',
@@ -3572,6 +3575,7 @@ class ImagenLineaCotizacion(models.Model):
     # ========== IMAGEN ==========
     imagen = models.ImageField(
         upload_to=imagen_linea_cotizacion_upload_path,
+        max_length=255,  # Límite ampliado para soportar rutas largas
         validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif', 'webp'])],
         verbose_name='Imagen',
         help_text='Imagen de referencia de la pieza (JPG, PNG, GIF, WebP). Máx 10MB.'
