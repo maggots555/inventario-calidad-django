@@ -1,6 +1,6 @@
 // ============================================================================
 // SISTEMA DUAL DE SUBIDA DE IMÁGENES - GALERÍA Y CÁMARA
-// Versión 3.0 - Validación límite total del servidor + mejoras UX
+// Versión 3.1 - Fix estado corrupto tras error de red + API getArchivos()
 // ============================================================================
 
 /**
@@ -18,6 +18,12 @@
  * - Transfiere archivos al input oculto para envío al servidor
  * 
  * CHANGELOG:
+ * 
+ * v3.1 (Febrero 2026):
+ * - ✅ API pública getArchivos(): devuelve archivos desde array interno
+ * - ✅ API pública resincronizarInput(): restaura input oculto tras error
+ * - ✅ FIX: Elimina dependencia frágil del input oculto como intermediario
+ *   para construir FormData (el template ahora usa getArchivos() directamente)
  * 
  * v3.0 (Febrero 2026):
  * - ✅ Validación de límite total del request (95MB)
@@ -540,6 +546,38 @@ class UploadImagenesDual {
         return this.enviando;
     }
     
+    /**
+     * API PÚBLICA: Obtener los archivos seleccionados como array de File.
+     * 
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Este método devuelve los archivos directamente desde el array interno
+     * del sistema TypeScript. Es más confiable que leer el input oculto del DOM,
+     * porque el array interno es la "fuente de verdad" y no puede ser modificado
+     * accidentalmente por otros scripts.
+     * 
+     * Se usa en el submit handler del template para construir el FormData
+     * sin depender del input oculto como intermediario.
+     */
+    public getArchivos(): File[] {
+        return this.imagenesSeleccionadas.map(img => img.file);
+    }
+    
+    /**
+     * API PÚBLICA: Re-sincronizar el input oculto con el array interno.
+     * 
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Si algo externo limpió el input oculto (por ejemplo, un handler de error),
+     * este método vuelve a transferir los archivos desde el array interno al input,
+     * restaurando la consistencia entre ambos.
+     */
+    public async resincronizarInput(): Promise<void> {
+        if (this.imagenesSeleccionadas.length > 0) {
+            console.log('🔄 Re-sincronizando input oculto con archivos internos...');
+            await this.transferirArchivosAInputUnificado();
+            console.log('✅ Input oculto re-sincronizado');
+        }
+    }
+    
     // =========================================================================
     // Métodos de cámara integrada (sin cambios)
     // =========================================================================
@@ -748,9 +786,11 @@ class UploadImagenesDual {
     }
     
     /**
-     * Actualiza el estado del botón de subir según el contexto
+     * Actualiza el estado del botón de subir según el contexto.
+     * NOTA: Público desde v3.1 para que el template pueda restaurar
+     * el estado correcto del botón después de un error de red.
      */
-    private actualizarEstadoBotonSubir(): void {
+    public actualizarEstadoBotonSubir(): void {
         if (!this.btnSubir) {
             return;
         }
