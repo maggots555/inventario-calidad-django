@@ -318,8 +318,9 @@ STORAGES = {
 # CONFIGURACIÓN DE LÍMITES DE CARGA DE ARCHIVOS
 # ============================================================================
 # Configurado para soportar múltiples imágenes de alta resolución desde celulares
-# Ejemplo: 30 imágenes de 5MB c/u = 150MB total
-DATA_UPLOAD_MAX_MEMORY_SIZE = 200 * 1024 * 1024  # 200MB total por request (múltiples archivos)
+# Límite alineado con Cloudflare Free (100MB max por request)
+# Ejemplo: 30 imágenes de 3MB c/u = 90MB total
+DATA_UPLOAD_MAX_MEMORY_SIZE = 95 * 1024 * 1024  # 95MB total por request (múltiples archivos)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024   # 50MB por archivo individual
 
 # Directorio temporal para uploads

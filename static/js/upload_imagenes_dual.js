@@ -16,10 +16,10 @@ class UploadImagenesDual {
         this.MAX_SIZE_MB = 50;
         this.MAX_SIZE_BYTES = this.MAX_SIZE_MB * 1024 * 1024;
         this.ADVERTENCIA_SIZE_MB = 40; // Advertir si > 40MB
-        // NUEVO: Límite total del request (configurado en Django settings.py)
-        this.MAX_REQUEST_SIZE_MB = 200; // DATA_UPLOAD_MAX_MEMORY_SIZE
+        // NUEVO: Límite total del request (alineado con Cloudflare Free: 100MB max)
+        this.MAX_REQUEST_SIZE_MB = 95; // DATA_UPLOAD_MAX_MEMORY_SIZE
         this.MAX_REQUEST_SIZE_BYTES = this.MAX_REQUEST_SIZE_MB * 1024 * 1024;
-        this.ADVERTENCIA_REQUEST_MB = 160; // Advertir al 80% del límite
+        this.ADVERTENCIA_REQUEST_MB = 76; // Advertir al 80% del límite
         // Control de estado de procesamiento
         this.estaProcesando = false;
         this.archivosListos = false;
@@ -395,7 +395,7 @@ class UploadImagenesDual {
                 archivosAdvertencia.push(`${img.file.name} (${sizeMB.toFixed(1)}MB)`);
             }
         });
-        // NUEVO: Validar límite total del request (200MB)
+        // NUEVO: Validar límite total del request (95MB - alineado con Cloudflare Free)
         const excedeLimiteTotal = tamanioTotal > this.MAX_REQUEST_SIZE_BYTES;
         const cercaDelLimite = tamanioTotal > (this.ADVERTENCIA_REQUEST_MB * 1024 * 1024);
         return {

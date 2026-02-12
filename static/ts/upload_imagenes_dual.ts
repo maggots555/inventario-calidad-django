@@ -14,17 +14,17 @@
  * - Unifica archivos de ambos inputs en un solo array
  * - Muestra preview con miniaturas
  * - Permite eliminar imágenes individuales
- * - Valida límites (30 imágenes, 50MB cada una, 200MB total)
+ * - Valida límites (30 imágenes, 50MB cada una, 95MB total)
  * - Transfiere archivos al input oculto para envío al servidor
  * 
  * CHANGELOG:
  * 
  * v3.0 (Febrero 2026):
- * - ✅ Validación de límite total del request (200MB)
+ * - ✅ Validación de límite total del request (95MB)
  * - ✅ Barra de progreso visual del límite del servidor
- * - ✅ Bloqueo automático del botón si excede 200MB
- * - ✅ Sistema de colores (verde < 160MB, amarillo 160-200MB, rojo > 200MB)
- * - ✅ Panel de resumen con "X MB / 200 MB permitidos"
+ * - ✅ Bloqueo automático del botón si excede 95MB
+ * - ✅ Sistema de colores (verde < 76MB, amarillo 76-95MB, rojo > 95MB)
+ * - ✅ Panel de resumen con "X MB / 95 MB permitidos"
  * 
  * v2.0 (Enero 2026):
  * - Validación de doble-click unificada con el template
@@ -48,8 +48,8 @@ interface ResumenSubida {
     archivosGrandes: string[];
     archivosAdvertencia: string[];
     listoParaSubir: boolean;
-    excedeLimiteTotal: boolean;    // Si excede 200MB del request
-    cercaDelLimite: boolean;       // Si está cerca del límite (>160MB)
+    excedeLimiteTotal: boolean;    // Si excede 95MB del request
+    cercaDelLimite: boolean;       // Si está cerca del límite (>76MB)
 }
 
 class UploadImagenesDual {
@@ -78,10 +78,10 @@ class UploadImagenesDual {
     private readonly MAX_SIZE_BYTES = this.MAX_SIZE_MB * 1024 * 1024;
     private readonly ADVERTENCIA_SIZE_MB = 40; // Advertir si > 40MB
     
-    // NUEVO: Límite total del request (configurado en Django settings.py)
-    private readonly MAX_REQUEST_SIZE_MB = 200;  // DATA_UPLOAD_MAX_MEMORY_SIZE
+    // NUEVO: Límite total del request (alineado con Cloudflare Free: 100MB max)
+    private readonly MAX_REQUEST_SIZE_MB = 95;  // DATA_UPLOAD_MAX_MEMORY_SIZE
     private readonly MAX_REQUEST_SIZE_BYTES = this.MAX_REQUEST_SIZE_MB * 1024 * 1024;
-    private readonly ADVERTENCIA_REQUEST_MB = 160; // Advertir al 80% del límite
+    private readonly ADVERTENCIA_REQUEST_MB = 76; // Advertir al 80% del límite
     
     // Control de estado de procesamiento
     private estaProcesando: boolean = false;
@@ -503,7 +503,7 @@ class UploadImagenesDual {
             }
         });
         
-        // NUEVO: Validar límite total del request (200MB)
+        // NUEVO: Validar límite total del request (95MB - alineado con Cloudflare Free)
         const excedeLimiteTotal = tamanioTotal > this.MAX_REQUEST_SIZE_BYTES;
         const cercaDelLimite = tamanioTotal > (this.ADVERTENCIA_REQUEST_MB * 1024 * 1024);
         

@@ -1,89 +1,152 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 24" width="32" height="24">
   <defs>
     <style>
-      /* Animación de ondulación usando clip-path */
       @keyframes wave-motion {
         0% { transform: translateY(0) scaleY(1); }
         50% { transform: translateY(-1px) scaleY(1.02); }
         100% { transform: translateY(0) scaleY(1); }
       }
-      
-      @keyframes shimmer {
-        0% { opacity: 1; }
-        50% { opacity: 0.85; }
-        100% { opacity: 1; }
+
+      @keyframes eagle-breathe {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-0.3px) scale(1.02); }
       }
-      
-      @keyframes emblem-pulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.05); }
+
+      @keyframes wing-flap {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-3deg); }
+        75% { transform: rotate(3deg); }
       }
-      
+
       .flag-stripe {
         animation: wave-motion 3s ease-in-out infinite;
         transform-origin: center;
       }
-      
-      .stripe-green {
-        animation-delay: 0s;
-      }
-      
-      .stripe-white {
-        animation-delay: 0.1s;
-      }
-      
-      .stripe-red {
-        animation-delay: 0.2s;
-      }
-      
+
+      .stripe-green { animation-delay: 0s; }
+      .stripe-white { animation-delay: 0.1s; }
+      .stripe-red { animation-delay: 0.2s; }
+
       .emblem {
-        animation: emblem-pulse 2s ease-in-out infinite;
-        transform-origin: center;
+        animation: eagle-breathe 2.5s ease-in-out infinite;
+        transform-origin: 16px 12px;
       }
-      
-      .shimmer-overlay {
-        animation: shimmer 2.5s ease-in-out infinite;
+
+      .wing-left {
+        animation: wing-flap 2s ease-in-out infinite;
+        transform-origin: 16px 11px;
+      }
+
+      .wing-right {
+        animation: wing-flap 2s ease-in-out infinite reverse;
+        transform-origin: 16px 11px;
       }
     </style>
-    
-    <!-- Degradado para dar profundidad -->
+
     <linearGradient id="greenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" style="stop-color:#007a3d;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#006847;stop-opacity:1" />
     </linearGradient>
-    
+
     <linearGradient id="redGrad" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" style="stop-color:#e61b23;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#ce1126;stop-opacity:1" />
     </linearGradient>
   </defs>
-  
+
   <!-- Fondo base -->
   <rect width="32" height="24" fill="#006847"/>
-  
+
   <!-- Franja Verde -->
   <rect class="flag-stripe stripe-green" x="0" y="0" width="10.67" height="24" fill="url(#greenGrad)"/>
-  
+
   <!-- Franja Blanca -->
   <rect class="flag-stripe stripe-white" x="10.67" y="0" width="10.66" height="24" fill="#FFFFFF"/>
-  
+
   <!-- Franja Roja -->
   <rect class="flag-stripe stripe-red" x="21.33" y="0" width="10.67" height="24" fill="url(#redGrad)"/>
-  
-  <!-- Escudo simplificado en el centro -->
+
+  <!-- ====== ESCUDO NACIONAL ====== -->
   <g class="emblem">
-    <!-- Águila estilizada -->
-    <ellipse cx="16" cy="12" rx="3" ry="3.5" fill="#8B4513" opacity="0.7"/>
-    
-    <!-- Corona/penacho dorado -->
-    <circle cx="16" cy="10" r="1.2" fill="#FFD700" opacity="0.9"/>
-    <circle cx="15" cy="10.5" r="0.7" fill="#FFD700" opacity="0.8"/>
-    <circle cx="17" cy="10.5" r="0.7" fill="#FFD700" opacity="0.8"/>
-    
-    <!-- Serpiente en el pico -->
-    <path d="M16,12.5 Q17,13 17.5,13.5" stroke="#2d5016" stroke-width="0.5" fill="none" opacity="0.6"/>
+
+    <!-- Nopal (cactus) sobre roca en el lago -->
+    <!-- Lago / base de agua -->
+    <ellipse cx="16" cy="16.5" rx="3.5" ry="0.8" fill="#5ba3d9" opacity="0.5"/>
+    <!-- Roca -->
+    <ellipse cx="16" cy="16" rx="2.5" ry="1" fill="#8B7355"/>
+    <ellipse cx="16" cy="15.8" rx="2.2" ry="0.7" fill="#A0896C"/>
+
+    <!-- Tronco del nopal -->
+    <rect x="15.5" y="13" width="1" height="3" rx="0.4" fill="#2d6b1e"/>
+    <!-- Pala central del nopal -->
+    <ellipse cx="16" cy="12.8" rx="1.2" ry="1.8" fill="#3a8c2a"/>
+    <!-- Pala izquierda -->
+    <ellipse cx="14.8" cy="13.5" rx="0.7" ry="1.2" fill="#338425" transform="rotate(20, 14.8, 13.5)"/>
+    <!-- Pala derecha -->
+    <ellipse cx="17.2" cy="13.5" rx="0.7" ry="1.2" fill="#338425" transform="rotate(-20, 17.2, 13.5)"/>
+    <!-- Espinas del nopal (puntos) -->
+    <circle cx="15.5" cy="12.5" r="0.15" fill="#1a5c10"/>
+    <circle cx="16.5" cy="13" r="0.15" fill="#1a5c10"/>
+    <circle cx="16" cy="12" r="0.15" fill="#1a5c10"/>
+    <circle cx="14.9" cy="14" r="0.15" fill="#1a5c10"/>
+    <circle cx="17.1" cy="14" r="0.15" fill="#1a5c10"/>
+
+    <!-- ====== ÁGUILA ====== -->
+    <!-- Cuerpo del águila -->
+    <ellipse cx="16" cy="11" rx="1.5" ry="2" fill="#4a2a0a"/>
+
+    <!-- Pecho (más claro) -->
+    <ellipse cx="16" cy="11.5" rx="1" ry="1.2" fill="#6b3a1a"/>
+
+    <!-- Ala izquierda -->
+    <g class="wing-left">
+      <path d="M14.5,11 Q12.5,9.5 11.5,10 Q12,10.8 13,11.5 Q12,11 11,11.5 Q12.5,12 14,11.8 Z" fill="#4a2a0a"/>
+      <!-- Plumas del ala izquierda -->
+      <path d="M13,11 Q12,10.5 11.5,10.2" stroke="#3a1f08" stroke-width="0.25" fill="none"/>
+      <path d="M13.5,11.3 Q12.5,11 11.2,11.3" stroke="#3a1f08" stroke-width="0.25" fill="none"/>
+    </g>
+
+    <!-- Ala derecha -->
+    <g class="wing-right">
+      <path d="M17.5,11 Q19.5,9.5 20.5,10 Q20,10.8 19,11.5 Q20,11 21,11.5 Q19.5,12 18,11.8 Z" fill="#4a2a0a"/>
+      <!-- Plumas del ala derecha -->
+      <path d="M19,11 Q20,10.5 20.5,10.2" stroke="#3a1f08" stroke-width="0.25" fill="none"/>
+      <path d="M18.5,11.3 Q19.5,11 20.8,11.3" stroke="#3a1f08" stroke-width="0.25" fill="none"/>
+    </g>
+
+    <!-- Cabeza del águila -->
+    <circle cx="16" cy="9.3" r="1" fill="#4a2a0a"/>
+    <!-- Ojo -->
+    <circle cx="16.3" cy="9.1" r="0.25" fill="#FFD700"/>
+    <circle cx="16.3" cy="9.1" r="0.12" fill="#000"/>
+    <!-- Pico (curvo, agarrando serpiente) -->
+    <path d="M16.8,9.5 Q17.5,9.8 17.8,10.2 Q17.5,10 17.2,9.8" fill="#FFD700" stroke="#cc9900" stroke-width="0.15"/>
+
+    <!-- Cola del águila (plumas hacia abajo) -->
+    <path d="M15.5,13 Q15,14.5 14.5,15.5" stroke="#4a2a0a" stroke-width="0.6" fill="none"/>
+    <path d="M16,13 Q16,14.5 16,15.5" stroke="#4a2a0a" stroke-width="0.5" fill="none"/>
+    <path d="M16.5,13 Q17,14.5 17.5,15.5" stroke="#4a2a0a" stroke-width="0.6" fill="none"/>
+
+    <!-- Patas del águila -->
+    <path d="M15.5,12.8 L15.2,13.5 L14.8,13.8" stroke="#FFD700" stroke-width="0.3" fill="none"/>
+    <path d="M16.5,12.8 L16.8,13.5 L17.2,13.8" stroke="#FFD700" stroke-width="0.3" fill="none"/>
+
+    <!-- ====== SERPIENTE ====== -->
+    <path d="M17.8,10.2 Q18.5,11 18,12 Q17.5,12.5 17,12 Q16.5,11.5 17,11 Q17.5,10.5 17.8,10.2"
+          stroke="#4a8c3a" stroke-width="0.5" fill="none"/>
+    <!-- Cabeza de la serpiente (en el pico) -->
+    <circle cx="17.8" cy="10.2" r="0.3" fill="#4a8c3a"/>
+    <!-- Ojo de la serpiente -->
+    <circle cx="17.9" cy="10.1" r="0.1" fill="#ff0000"/>
+
+    <!-- Ramitas de laurel y encino (base del escudo) -->
+    <!-- Rama izquierda -->
+    <path d="M13.5,16 Q14,15 15,15.5" stroke="#2d6b1e" stroke-width="0.4" fill="none"/>
+    <ellipse cx="13.8" cy="15.5" rx="0.5" ry="0.25" fill="#3a8c2a" transform="rotate(-30, 13.8, 15.5)"/>
+    <ellipse cx="14.3" cy="15.2" rx="0.5" ry="0.25" fill="#3a8c2a" transform="rotate(-15, 14.3, 15.2)"/>
+    <!-- Rama derecha -->
+    <path d="M18.5,16 Q18,15 17,15.5" stroke="#2d6b1e" stroke-width="0.4" fill="none"/>
+    <ellipse cx="18.2" cy="15.5" rx="0.5" ry="0.25" fill="#8B6914" transform="rotate(30, 18.2, 15.5)"/>
+    <ellipse cx="17.7" cy="15.2" rx="0.5" ry="0.25" fill="#8B6914" transform="rotate(15, 17.7, 15.2)"/>
   </g>
-  
-  <!-- Overlay de brillo sutil -->
-  <rect class="shimmer-overlay" x="10.67" y="0" width="10.66" height="24" fill="white" opacity="0.1"/>
 </svg>
