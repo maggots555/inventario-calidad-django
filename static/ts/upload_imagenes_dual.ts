@@ -1,6 +1,6 @@
 // ============================================================================
 // SISTEMA DUAL DE SUBIDA DE IMÁGENES - GALERÍA Y CÁMARA
-// Versión 3.1 - Fix estado corrupto tras error de red + API getArchivos()
+// Versión 5.0 - Migración completa: toda la lógica de subida en TypeScript
 // ============================================================================
 
 /**
@@ -11,26 +11,36 @@
  * 2. Captura con cámara (acceso directo en móviles)
  * 
  * Funcionalidades:
- * - Unifica archivos de ambos inputs en un solo array
+ * - Unifica archivos de ambos inputs en un solo array interno (fuente de verdad)
  * - Muestra preview con miniaturas
  * - Permite eliminar imágenes individuales
  * - Valida límites (30 imágenes, 50MB cada una, 95MB total)
- * - Transfiere archivos al input oculto para envío al servidor
+ * - Construye FormData y envía via XHR con barra de progreso
+ * - Diagnóstico avanzado de errores de red (sin internet, Cloudflare, timeout)
+ * - Protección beforeunload durante subida activa
  * 
  * CHANGELOG:
  * 
+ * v5.0 (Febrero 2026):
+ * - ✅ MIGRACIÓN COMPLETA: Toda la lógica de subida (submit, FormData, XHR,
+ *   progreso, errores, beforeunload) movida desde el JS inline del template
+ *   a este módulo TypeScript. Un solo punto de control con tipado fuerte.
+ * - ✅ ELIMINADO: Input oculto #imagenesUnificadas y transferirArchivosAInputUnificado()
+ * - ✅ ELIMINADO: resincronizarInput() (ya no hay input que sincronizar)
+ * - ✅ Los IDs de los campos tipo/descripción se leen desde data-* attributes del <form>
+ * - ✅ Sin fallback: si el TypeScript no carga, el botón queda disabled
+ * 
  * v3.1 (Febrero 2026):
- * - ✅ API pública getArchivos(): devuelve archivos desde array interno
- * - ✅ API pública resincronizarInput(): restaura input oculto tras error
- * - ✅ FIX: Elimina dependencia frágil del input oculto como intermediario
- *   para construir FormData (el template ahora usa getArchivos() directamente)
+ * - API pública getArchivos(): devuelve archivos desde array interno
+ * - API pública resincronizarInput(): restaura input oculto tras error
+ * - FIX: Elimina dependencia frágil del input oculto como intermediario
  * 
  * v3.0 (Febrero 2026):
- * - ✅ Validación de límite total del request (95MB)
- * - ✅ Barra de progreso visual del límite del servidor
- * - ✅ Bloqueo automático del botón si excede 95MB
- * - ✅ Sistema de colores (verde < 76MB, amarillo 76-95MB, rojo > 95MB)
- * - ✅ Panel de resumen con "X MB / 95 MB permitidos"
+ * - Validación de límite total del request (95MB)
+ * - Barra de progreso visual del límite del servidor
+ * - Bloqueo automático del botón si excede 95MB
+ * - Sistema de colores (verde < 76MB, amarillo 76-95MB, rojo > 95MB)
+ * - Panel de resumen con "X MB / 95 MB permitidos"
  * 
  * v2.0 (Enero 2026):
  * - Validación de doble-click unificada con el template
@@ -59,23 +69,34 @@ interface ResumenSubida {
 }
 
 class UploadImagenesDual {
-    // Elementos del DOM
+    // Elementos del DOM - Selección de archivos
     private inputGaleria: HTMLInputElement | null;
     private inputCamara: HTMLInputElement | null;
-    private inputUnificado: HTMLInputElement | null;
     private previewContainer: HTMLElement | null;
     private contenedorMiniaturas: HTMLElement | null;
     private btnSubir: HTMLButtonElement | null;
     private btnLimpiarTodo: HTMLButtonElement | null;
     private cantidadSpan: HTMLElement | null;
     
-    // NUEVO v2.0: Panel de resumen
+    // NUEVO v5.0: Elementos del DOM - Formulario y subida
+    private formElement: HTMLFormElement | null;
+    private progresoDiv: HTMLElement | null;
+    private barraProgreso: HTMLElement | null;
+    private textoProgreso: HTMLElement | null;
+    private porcentajeProgreso: HTMLElement | null;
+    private infoArchivos: HTMLElement | null;
+    
+    // NUEVO v5.0: IDs de campos Django (leídos desde data-* attributes del form)
+    private tipoSelectId: string = '';
+    private descripcionInputId: string = '';
+    
+    // Panel de resumen
     private panelResumen: HTMLElement | null = null;
     
-    // NUEVO v2.0: Contenedor de toasts
+    // Contenedor de toasts
     private toastContainer: HTMLElement | null = null;
     
-    // Array de imágenes seleccionadas
+    // Array de imágenes seleccionadas (FUENTE DE VERDAD)
     private imagenesSeleccionadas: ImagenPreview[] = [];
     
     // Límites de validación
@@ -84,29 +105,49 @@ class UploadImagenesDual {
     private readonly MAX_SIZE_BYTES = this.MAX_SIZE_MB * 1024 * 1024;
     private readonly ADVERTENCIA_SIZE_MB = 40; // Advertir si > 40MB
     
-    // NUEVO: Límite total del request (alineado con Cloudflare Free: 100MB max)
+    // Límite total del request (alineado con Cloudflare Free: 100MB max)
     private readonly MAX_REQUEST_SIZE_MB = 95;  // DATA_UPLOAD_MAX_MEMORY_SIZE
     private readonly MAX_REQUEST_SIZE_BYTES = this.MAX_REQUEST_SIZE_MB * 1024 * 1024;
     private readonly ADVERTENCIA_REQUEST_MB = 76; // Advertir al 80% del límite
+    
+    // NUEVO v5.0: Timeout de XHR (10 minutos, alineado con Gunicorn y Nginx)
+    private readonly XHR_TIMEOUT_MS = 600000;
     
     // Control de estado de procesamiento
     private estaProcesando: boolean = false;
     private archivosListos: boolean = false;
     
-    // NUEVO v2.0: Control de envío (para evitar doble-click)
+    // Control de envío (para evitar doble-click)
     private enviando: boolean = false;
     private ultimoClickSubir: number = 0;
     private readonly DEBOUNCE_MS = 1500; // 1.5 segundos entre clicks
     
+    // NUEVO v5.0: Flag para protección beforeunload
+    private subiendoImagenes: boolean = false;
+    
     constructor() {
+        // Elementos de selección de archivos
         this.inputGaleria = document.getElementById('inputGaleria') as HTMLInputElement;
         this.inputCamara = document.getElementById('inputCamara') as HTMLInputElement;
-        this.inputUnificado = document.getElementById('imagenesUnificadas') as HTMLInputElement;
         this.previewContainer = document.getElementById('previewImagenes');
         this.contenedorMiniaturas = document.getElementById('contenedorMiniaturas');
         this.btnSubir = document.getElementById('btnSubirImagenes') as HTMLButtonElement;
         this.btnLimpiarTodo = document.getElementById('btnLimpiarTodo') as HTMLButtonElement;
         this.cantidadSpan = document.getElementById('cantidadImagenes');
+        
+        // NUEVO v5.0: Elementos del formulario y progreso
+        this.formElement = document.getElementById('formSubirImagenes') as HTMLFormElement;
+        this.progresoDiv = document.getElementById('progresoUpload');
+        this.barraProgreso = document.getElementById('barraProgreso');
+        this.textoProgreso = document.getElementById('textoProgreso');
+        this.porcentajeProgreso = document.getElementById('porcentajeProgreso');
+        this.infoArchivos = document.getElementById('infoArchivos');
+        
+        // NUEVO v5.0: Leer IDs de campos Django desde data-* attributes
+        if (this.formElement) {
+            this.tipoSelectId = this.formElement.dataset.tipoId || '';
+            this.descripcionInputId = this.formElement.dataset.descripcionId || '';
+        }
         
         this.init();
     }
@@ -141,11 +182,498 @@ class UploadImagenesDual {
         // Configurar callback de la cámara integrada
         this.configurarCamaraIntegrada();
         
-        console.log('✅ Sistema dual de subida de imágenes v2.0 inicializado');
+        // NUEVO v5.0: Inicializar formulario de subida (submit handler + beforeunload)
+        this.inicializarFormularioSubida();
+        
+        console.log('✅ Sistema dual de subida de imágenes v5.0 inicializado');
     }
     
     // =========================================================================
-    // NUEVO v2.0: Sistema de Toasts Bootstrap
+    // NUEVO v5.0: Formulario de subida (migrado desde JS inline del template)
+    // =========================================================================
+    
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Configura el formulario de subida de imágenes:
+     * 1. Intercepta el submit del formulario HTML
+     * 2. Construye un FormData con los archivos del array interno
+     * 3. Envía via XHR con monitoreo de progreso
+     * 4. Registra protección beforeunload para evitar cierre accidental
+     */
+    private inicializarFormularioSubida(): void {
+        if (!this.formElement) {
+            console.warn('⚠️ Formulario #formSubirImagenes no encontrado');
+            return;
+        }
+        
+        // Interceptar el submit del formulario
+        this.formElement.addEventListener('submit', (e) => this.handleSubmit(e));
+        
+        // Registrar protección beforeunload
+        window.addEventListener('beforeunload', (e) => this.advertenciaBeforeUnload(e));
+        
+        console.log('✅ Formulario de subida inicializado (submit handler + beforeunload)');
+    }
+    
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Este es el handler principal del submit. Cuando el usuario hace clic en
+     * "Subir Imágenes", esta función:
+     * 1. Previene el envío normal del formulario (lo haremos nosotros con XHR)
+     * 2. Valida que haya archivos y que el sistema esté listo
+     * 3. Construye un FormData con los archivos del array interno
+     * 4. Envía con XHR para poder mostrar barra de progreso
+     */
+    private handleSubmit(e: Event): void {
+        e.preventDefault(); // Prevenir envío normal del formulario
+        
+        // Verificar si puede enviar (no procesando, no enviando, hay archivos)
+        if (!this.puedeEnviar()) {
+            console.warn('⚠️ El sistema está procesando o no está listo. Ignorando submit.');
+            
+            if (this.getEstaEnviando()) {
+                this.mostrarToast('Ya hay una subida en progreso. Por favor espera.', 'warning');
+            } else if (this.getEstaProcesando()) {
+                this.mostrarToast('Los archivos aún se están procesando. Espera un momento.', 'info');
+            } else {
+                this.mostrarToast('Selecciona al menos una imagen antes de subir.', 'warning');
+            }
+            return;
+        }
+        
+        // Marcar como enviando para bloquear el botón
+        this.marcarEnviando();
+        
+        // Obtener archivos desde el array interno (fuente de verdad)
+        const archivosParaSubir = this.getArchivos();
+        
+        // Validar que haya archivos
+        if (archivosParaSubir.length === 0) {
+            this.mostrarToast('Por favor selecciona al menos una imagen para subir.', 'warning');
+            this.marcarFinEnvio();
+            return;
+        }
+        
+        // Construir FormData
+        const formData = this.construirFormData(archivosParaSubir);
+        
+        // Calcular tamaño total para progreso
+        let tamanioTotalBytes = 0;
+        archivosParaSubir.forEach(archivo => {
+            tamanioTotalBytes += archivo.size;
+        });
+        const tamanioTotalMB = (tamanioTotalBytes / (1024 * 1024)).toFixed(2);
+        const cantidadArchivos = archivosParaSubir.length;
+        
+        // Deshabilitar formulario durante la subida
+        this.deshabilitarFormulario();
+        
+        // Mostrar barra de progreso
+        if (this.progresoDiv) this.progresoDiv.style.display = 'block';
+        if (this.barraProgreso) this.barraProgreso.style.width = '0%';
+        if (this.textoProgreso) this.textoProgreso.textContent = 'Iniciando subida...';
+        if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '0%';
+        
+        // Mostrar información de la subida
+        if (this.infoArchivos) {
+            this.infoArchivos.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between flex-wrap">
+                    <span><i class="bi bi-cloud-arrow-up"></i> Subiendo <strong>${cantidadArchivos}</strong> imagen${cantidadArchivos !== 1 ? 'es' : ''}</span>
+                    <span class="badge bg-secondary">${tamanioTotalMB} MB total</span>
+                </div>
+            `;
+        }
+        
+        // Crear XMLHttpRequest para monitorear progreso
+        const xhr = new XMLHttpRequest();
+        
+        // Monitorear progreso de subida
+        xhr.upload.addEventListener('progress', (e) => {
+            this.handleUploadProgress(e, cantidadArchivos, tamanioTotalMB);
+        });
+        
+        // Manejar respuesta del servidor
+        xhr.addEventListener('load', () => {
+            this.handleUploadSuccess(xhr);
+        });
+        
+        // Manejar errores de red
+        xhr.addEventListener('error', () => {
+            this.handleUploadError(cantidadArchivos, tamanioTotalBytes, tamanioTotalMB);
+        });
+        
+        // Manejar timeout
+        xhr.addEventListener('timeout', () => {
+            this.handleUploadTimeout(cantidadArchivos, tamanioTotalBytes, tamanioTotalMB);
+        });
+        
+        // Configurar y enviar la petición
+        const url = this.formElement?.action || window.location.href;
+        xhr.open('POST', url);
+        xhr.timeout = this.XHR_TIMEOUT_MS;
+        
+        // Activar protección beforeunload
+        this.subiendoImagenes = true;
+        
+        xhr.send(formData);
+    }
+    
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Construye el FormData con todos los datos necesarios para el servidor:
+     * - Token CSRF (seguridad de Django)
+     * - Tipo de formulario ('subir_imagenes')
+     * - Tipo de imagen seleccionado (ingreso, proceso, etc.)
+     * - Descripción opcional
+     * - Los archivos de imagen (con nombre 'imagenes' que espera Django)
+     */
+    private construirFormData(archivos: File[]): FormData {
+        const formData = new FormData();
+        
+        // Agregar token CSRF
+        if (this.formElement) {
+            const csrfInput = this.formElement.querySelector('input[name="csrfmiddlewaretoken"]') as HTMLInputElement;
+            if (csrfInput) {
+                formData.append('csrfmiddlewaretoken', csrfInput.value);
+            }
+        }
+        
+        // Agregar tipo de formulario
+        formData.append('form_type', 'subir_imagenes');
+        
+        // Agregar tipo de imagen desde el select de Django
+        if (this.tipoSelectId) {
+            const tipoSelect = document.getElementById(this.tipoSelectId) as HTMLSelectElement;
+            if (tipoSelect) {
+                formData.append('tipo', tipoSelect.value);
+            }
+        }
+        
+        // Agregar descripción desde el input de Django
+        if (this.descripcionInputId) {
+            const descripcionInput = document.getElementById(this.descripcionInputId) as HTMLInputElement;
+            if (descripcionInput) {
+                formData.append('descripcion', descripcionInput.value || '');
+            }
+        }
+        
+        // Agregar cada archivo con el nombre 'imagenes'
+        // (Django los recibe con request.FILES.getlist('imagenes'))
+        archivos.forEach(archivo => {
+            formData.append('imagenes', archivo, archivo.name);
+        });
+        
+        return formData;
+    }
+    
+    /**
+     * Maneja el evento de progreso de la subida XHR.
+     * Actualiza la barra de progreso y la información visual.
+     */
+    private handleUploadProgress(e: ProgressEvent, cantidadArchivos: number, tamanioTotalMB: string): void {
+        if (!e.lengthComputable) return;
+        
+        const porcentaje = Math.round((e.loaded / e.total) * 100);
+        const mbSubidos = (e.loaded / (1024 * 1024)).toFixed(2);
+        
+        if (this.barraProgreso) this.barraProgreso.style.width = porcentaje + '%';
+        if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = porcentaje + '%';
+        
+        if (porcentaje < 100) {
+            if (this.textoProgreso) this.textoProgreso.textContent = `Subiendo... ${porcentaje}%`;
+            if (this.infoArchivos) {
+                this.infoArchivos.innerHTML = `
+                    <div class="d-flex align-items-center justify-content-between flex-wrap">
+                        <span><i class="bi bi-cloud-arrow-up text-primary"></i> Subiendo <strong>${cantidadArchivos}</strong> imagen${cantidadArchivos !== 1 ? 'es' : ''}...</span>
+                        <span class="badge bg-primary">${mbSubidos} / ${tamanioTotalMB} MB</span>
+                    </div>
+                `;
+            }
+        } else {
+            if (this.textoProgreso) this.textoProgreso.textContent = 'Procesando en servidor...';
+            if (this.barraProgreso) this.barraProgreso.classList.add('progress-bar-striped');
+            if (this.infoArchivos) {
+                this.infoArchivos.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <span class="spinner-border spinner-border-sm text-info me-2"></span>
+                        <span><i class="bi bi-cpu text-info"></i> Comprimiendo y guardando ${cantidadArchivos} imagen${cantidadArchivos !== 1 ? 'es' : ''}, por favor espere...</span>
+                    </div>
+                `;
+            }
+        }
+    }
+    
+    /**
+     * Maneja la respuesta exitosa del servidor (status 200 o 500).
+     * Parsea el JSON y muestra el resultado al usuario.
+     */
+    private handleUploadSuccess(xhr: XMLHttpRequest): void {
+        // Desactivar protección beforeunload
+        this.subiendoImagenes = false;
+        
+        // Marcar fin de envío
+        this.marcarFinEnvio();
+        
+        if (xhr.status === 200 || xhr.status === 500) {
+            try {
+                const data = JSON.parse(xhr.responseText);
+                
+                if (data.success) {
+                    // Éxito - mostrar mensaje final
+                    if (this.barraProgreso) {
+                        this.barraProgreso.classList.remove('progress-bar-animated', 'progress-bar-striped');
+                        this.barraProgreso.classList.add('bg-success');
+                    }
+                    if (this.textoProgreso) this.textoProgreso.textContent = '¡Completado!';
+                    if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '✓';
+                    
+                    // Construir mensaje detallado
+                    let mensajeDetalle = `
+                        <div class="d-flex align-items-center text-success">
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            <span>${data.message}</span>
+                        </div>
+                    `;
+                    
+                    // Agregar advertencias si hay imágenes omitidas
+                    if (data.imagenes_omitidas && data.imagenes_omitidas.length > 0) {
+                        mensajeDetalle += `
+                            <div class="mt-1">
+                                <small class="text-warning">
+                                    <i class="bi bi-exclamation-triangle"></i> 
+                                    ${data.imagenes_omitidas.length} imagen(es) omitida(s) por exceder 50MB
+                                </small>
+                            </div>
+                        `;
+                    }
+                    
+                    // Agregar errores si los hay
+                    if (data.errores && data.errores.length > 0) {
+                        mensajeDetalle += `
+                            <div class="mt-1">
+                                <small class="text-danger">
+                                    <i class="bi bi-x-circle"></i> 
+                                    ${data.errores.length} error(es) al procesar
+                                </small>
+                            </div>
+                        `;
+                    }
+                    
+                    if (this.infoArchivos) this.infoArchivos.innerHTML = mensajeDetalle;
+                    
+                    // Limpiar el sistema
+                    this.limpiarDespuesDeExito();
+                    
+                    // Recargar página después de 1.5 segundos
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    // Error reportado por el servidor
+                    let mensajeError = data.error || 'Error desconocido al subir imágenes';
+                    
+                    if (data.error_type) {
+                        console.error(`Error tipo: ${data.error_type}`);
+                        mensajeError += `<br><small class="text-muted">Tipo: ${data.error_type}</small>`;
+                    }
+                    
+                    // Si se guardaron algunas imágenes antes del error
+                    if (data.imagenes_guardadas > 0) {
+                        mensajeError += `<br><small class="text-info"><i class="bi bi-info-circle"></i> Se guardaron ${data.imagenes_guardadas} imagen(es) antes del error. Recarga para verlas.</small>`;
+                    }
+                    
+                    this.mostrarErrorCarga(mensajeError);
+                    this.mostrarToast(data.error || 'Error al subir imágenes', 'error');
+                }
+            } catch (e) {
+                console.error('Error al parsear respuesta:', e);
+                console.error('Respuesta del servidor:', xhr.responseText);
+                this.mostrarErrorCarga('Error al procesar la respuesta del servidor. Revisa la consola para más detalles.');
+            }
+        } else {
+            this.mostrarErrorCarga(`Error del servidor (código ${xhr.status}). Por favor intenta nuevamente.`);
+        }
+    }
+    
+    /**
+     * DIAGNÓSTICO AVANZADO DE ERRORES v3.2 (migrado a v5.0)
+     * Analiza el tipo de fallo para dar información útil al usuario y logs
+     * detallados para depuración.
+     */
+    private handleUploadError(cantidadArchivos: number, tamanioTotalBytes: number, tamanioTotalMB: string): void {
+        this.subiendoImagenes = false;
+        this.marcarFinEnvio();
+        
+        // Diagnóstico: ¿Qué tipo de error de red ocurrió?
+        let diagnostico = '';
+        let mensajeUsuario = '';
+        let tipoError = 'desconocido';
+        
+        if (!navigator.onLine) {
+            tipoError = 'sin_internet';
+            mensajeUsuario = 'Sin conexión a internet. Verifica tu WiFi o datos móviles y reintenta.';
+            diagnostico = 'navigator.onLine=false';
+        } else if (tamanioTotalBytes > 100 * 1024 * 1024) {
+            tipoError = 'cloudflare_limite';
+            mensajeUsuario = `El tamaño total (${tamanioTotalMB} MB) excede el límite de Cloudflare (100 MB). Sube menos imágenes por lote.`;
+            diagnostico = `tamaño=${tamanioTotalMB}MB, excede límite Cloudflare free=100MB`;
+        } else {
+            tipoError = 'conexion_servidor';
+            mensajeUsuario = 'Error de conexión con el servidor. El servidor puede estar reiniciándose o hay un problema de red. Reintenta en unos segundos.';
+            diagnostico = 'navigator.onLine=true, posible: servidor caído, CORS, firewall, o Cloudflare timeout';
+        }
+        
+        // Log detallado para depuración
+        const url = this.formElement?.action || window.location.href;
+        console.error(`[UPLOAD ERROR] Tipo: ${tipoError}`);
+        console.error(`[UPLOAD ERROR] Diagnóstico: ${diagnostico}`);
+        console.error(`[UPLOAD ERROR] Archivos: ${cantidadArchivos}, Tamaño: ${tamanioTotalMB} MB`);
+        console.error(`[UPLOAD ERROR] URL: ${url}`);
+        console.error(`[UPLOAD ERROR] Hora: ${new Date().toISOString()}`);
+        
+        this.mostrarErrorCarga(mensajeUsuario, tipoError, diagnostico);
+        this.mostrarToast(mensajeUsuario, 'error', undefined, 8000);
+    }
+    
+    /**
+     * Maneja el timeout de la petición XHR.
+     * Da feedback diferenciado según el tamaño del lote.
+     */
+    private handleUploadTimeout(cantidadArchivos: number, tamanioTotalBytes: number, tamanioTotalMB: string): void {
+        this.subiendoImagenes = false;
+        this.marcarFinEnvio();
+        
+        let mensajeUsuario = '';
+        let diagnostico = '';
+        
+        if (tamanioTotalBytes > 50 * 1024 * 1024) {
+            mensajeUsuario = `Tiempo agotado (10 min). El lote de ${tamanioTotalMB} MB es muy grande. Intenta con menos imágenes o archivos más pequeños.`;
+            diagnostico = `timeout=600s, tamaño=${tamanioTotalMB}MB (grande)`;
+        } else {
+            mensajeUsuario = 'Tiempo de espera agotado (10 min). El servidor puede estar sobrecargado. Reintenta en unos minutos.';
+            diagnostico = `timeout=600s, tamaño=${tamanioTotalMB}MB (normal), posible: servidor lento o sobrecargado`;
+        }
+        
+        console.error(`[UPLOAD TIMEOUT] Diagnóstico: ${diagnostico}`);
+        console.error(`[UPLOAD TIMEOUT] Archivos: ${cantidadArchivos}, Tamaño: ${tamanioTotalMB} MB`);
+        console.error(`[UPLOAD TIMEOUT] Hora: ${new Date().toISOString()}`);
+        
+        this.mostrarErrorCarga(mensajeUsuario, 'timeout', diagnostico);
+        this.mostrarToast(mensajeUsuario, 'error', undefined, 8000);
+    }
+    
+    /**
+     * Muestra un error en la barra de progreso con información de diagnóstico.
+     * NO limpia los archivos del array interno (preserva para reintento).
+     * Rehabilita el formulario después de 4 segundos.
+     */
+    private mostrarErrorCarga(mensaje: string, tipoError?: string, diagnostico?: string): void {
+        if (this.barraProgreso) {
+            this.barraProgreso.classList.remove('bg-success', 'progress-bar-animated', 'progress-bar-striped');
+            this.barraProgreso.classList.add('bg-danger');
+            this.barraProgreso.style.width = '100%';
+        }
+        if (this.textoProgreso) this.textoProgreso.textContent = 'Error';
+        if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '✗';
+        
+        // Construir mensaje con diagnóstico si está disponible
+        let htmlError = `
+            <div class="text-danger">
+                <i class="bi bi-x-circle-fill me-1"></i> ${mensaje}
+            </div>
+        `;
+        
+        // Agregar información de diagnóstico expandible
+        if (tipoError && diagnostico) {
+            htmlError += `
+                <details class="mt-2">
+                    <summary class="text-muted" style="cursor: pointer; font-size: 0.8rem;">
+                        <i class="bi bi-bug"></i> Info técnica para soporte
+                    </summary>
+                    <div class="mt-1 p-2 bg-light rounded" style="font-size: 0.75rem; font-family: monospace;">
+                        <div><strong>Tipo:</strong> ${tipoError}</div>
+                        <div><strong>Detalle:</strong> ${diagnostico}</div>
+                        <div><strong>Hora:</strong> ${new Date().toLocaleString('es-MX')}</div>
+                        <div><strong>Navegador:</strong> ${navigator.userAgent.substring(0, 80)}...</div>
+                        <div><strong>Online:</strong> ${navigator.onLine ? 'Sí' : 'No'}</div>
+                    </div>
+                </details>
+            `;
+        }
+        
+        if (this.infoArchivos) this.infoArchivos.innerHTML = htmlError;
+        
+        // Rehabilitar formulario después de 4 segundos para permitir reintento
+        setTimeout(() => {
+            this.rehabilitarFormulario();
+            
+            // Ocultar barra de progreso y resetear estado visual
+            if (this.progresoDiv) this.progresoDiv.style.display = 'none';
+            if (this.barraProgreso) {
+                this.barraProgreso.classList.remove('bg-danger');
+                this.barraProgreso.classList.add('progress-bar-animated', 'bg-success');
+                this.barraProgreso.style.width = '0%';
+            }
+            
+            // Restaurar texto del botón según el estado real de los archivos
+            this.actualizarEstadoBotonSubir();
+        }, 4000);
+    }
+    
+    /**
+     * Deshabilita el formulario durante la subida.
+     * Previene interacción con los controles mientras se sube.
+     */
+    private deshabilitarFormulario(): void {
+        if (this.btnSubir) {
+            this.btnSubir.disabled = true;
+            this.btnSubir.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Subiendo...';
+        }
+        
+        // Deshabilitar select de tipo y input de descripción
+        if (this.tipoSelectId) {
+            const tipoSelect = document.getElementById(this.tipoSelectId) as HTMLSelectElement;
+            if (tipoSelect) tipoSelect.disabled = true;
+        }
+        if (this.descripcionInputId) {
+            const descripcionInput = document.getElementById(this.descripcionInputId) as HTMLInputElement;
+            if (descripcionInput) descripcionInput.disabled = true;
+        }
+    }
+    
+    /**
+     * Rehabilita el formulario después de un error.
+     * Permite al usuario reintentar la subida.
+     */
+    private rehabilitarFormulario(): void {
+        if (this.btnSubir) this.btnSubir.disabled = false;
+        
+        // Rehabilitar select de tipo y input de descripción
+        if (this.tipoSelectId) {
+            const tipoSelect = document.getElementById(this.tipoSelectId) as HTMLSelectElement;
+            if (tipoSelect) tipoSelect.disabled = false;
+        }
+        if (this.descripcionInputId) {
+            const descripcionInput = document.getElementById(this.descripcionInputId) as HTMLInputElement;
+            if (descripcionInput) descripcionInput.disabled = false;
+        }
+    }
+    
+    /**
+     * Protección beforeunload: advierte al usuario si intenta cerrar/navegar
+     * durante una subida activa. Se activa al iniciar el XHR y se desactiva
+     * al completar (éxito o error).
+     */
+    private advertenciaBeforeUnload(e: BeforeUnloadEvent): void {
+        if (this.subiendoImagenes) {
+            e.preventDefault();
+            // Chrome ignora mensajes personalizados, pero otros navegadores lo muestran
+            e.returnValue = 'Hay una subida de imágenes en progreso. Si sales, se perderán.';
+        }
+    }
+    
+    // =========================================================================
+    // Sistema de Toasts Bootstrap
     // =========================================================================
     
     /**
@@ -167,7 +695,6 @@ class UploadImagenesDual {
     
     /**
      * Muestra un toast con el mensaje especificado
-     * MEJORADO: Más descriptivo y con detalles
      */
     public mostrarToast(
         mensaje: string, 
@@ -260,7 +787,7 @@ class UploadImagenesDual {
     }
     
     // =========================================================================
-    // NUEVO v2.0: Panel de Resumen Pre-Subida
+    // Panel de Resumen Pre-Subida
     // =========================================================================
     
     /**
@@ -289,7 +816,7 @@ class UploadImagenesDual {
                 </div>
             </div>
             
-            <!-- NUEVO: Barra de progreso del límite total del servidor -->
+            <!-- Barra de progreso del límite total del servidor -->
             <div class="mb-2">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <small class="text-muted">
@@ -350,7 +877,7 @@ class UploadImagenesDual {
             tamanioSpan.textContent = resumen.tamanioMB;
         }
         
-        // NUEVO: Actualizar barra de progreso del límite del servidor
+        // Actualizar barra de progreso del límite del servidor
         const barraLimite = this.panelResumen.querySelector('#barraLimiteServidor') as HTMLElement;
         const textoLimite = this.panelResumen.querySelector('#textoLimiteServidor');
         
@@ -389,7 +916,6 @@ class UploadImagenesDual {
                 estadoBadge.className = 'badge bg-warning';
                 estadoBadge.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Procesando...';
             } else if (resumen.excedeLimiteTotal) {
-                // NUEVO: Estado de error si excede el límite del servidor
                 estadoBadge.className = 'badge bg-danger';
                 estadoBadge.innerHTML = '<i class="bi bi-x-circle me-1"></i>Excede límite del servidor';
             } else if (resumen.listoParaSubir) {
@@ -406,10 +932,8 @@ class UploadImagenesDual {
         const textoAdvertencias = this.panelResumen.querySelector('#textoAdvertencias');
         
         if (advertenciasDiv && textoAdvertencias) {
-            const advertencias = [...resumen.archivosGrandes, ...resumen.archivosAdvertencia];
             const mensajes: string[] = [];
             
-            // NUEVO: Advertencia si excede el límite total del servidor
             if (resumen.excedeLimiteTotal) {
                 const exceso = ((resumen.tamanioTotal / (1024 * 1024)) - this.MAX_REQUEST_SIZE_MB).toFixed(1);
                 mensajes.push(`⚠️ El tamaño total excede el límite del servidor en ${exceso}MB. Elimina algunas imágenes.`);
@@ -445,12 +969,11 @@ class UploadImagenesDual {
     }
     
     // =========================================================================
-    // API PÚBLICA v2.0: Para integración con scripts externos
+    // API PÚBLICA: Para integración con scripts externos
     // =========================================================================
     
     /**
      * API PÚBLICA: Consultar si el sistema está listo para subir
-     * Usada por el script del template para evitar doble submit
      */
     public puedeEnviar(): boolean {
         const ahora = Date.now();
@@ -464,7 +987,7 @@ class UploadImagenesDual {
     }
     
     /**
-     * API PÚBLICA: Marcar que se inició el envío (llamado desde el template)
+     * API PÚBLICA: Marcar que se inició el envío
      */
     public marcarEnviando(): void {
         this.enviando = true;
@@ -509,7 +1032,6 @@ class UploadImagenesDual {
             }
         });
         
-        // NUEVO: Validar límite total del request (95MB - alineado con Cloudflare Free)
         const excedeLimiteTotal = tamanioTotal > this.MAX_REQUEST_SIZE_BYTES;
         const cercaDelLimite = tamanioTotal > (this.ADVERTENCIA_REQUEST_MB * 1024 * 1024);
         
@@ -550,36 +1072,15 @@ class UploadImagenesDual {
      * API PÚBLICA: Obtener los archivos seleccionados como array de File.
      * 
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Este método devuelve los archivos directamente desde el array interno
-     * del sistema TypeScript. Es más confiable que leer el input oculto del DOM,
-     * porque el array interno es la "fuente de verdad" y no puede ser modificado
-     * accidentalmente por otros scripts.
-     * 
-     * Se usa en el submit handler del template para construir el FormData
-     * sin depender del input oculto como intermediario.
+     * Este método devuelve los archivos directamente desde el array interno.
+     * Es la fuente de verdad del sistema, inmune a modificaciones del DOM.
      */
     public getArchivos(): File[] {
         return this.imagenesSeleccionadas.map(img => img.file);
     }
     
-    /**
-     * API PÚBLICA: Re-sincronizar el input oculto con el array interno.
-     * 
-     * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Si algo externo limpió el input oculto (por ejemplo, un handler de error),
-     * este método vuelve a transferir los archivos desde el array interno al input,
-     * restaurando la consistencia entre ambos.
-     */
-    public async resincronizarInput(): Promise<void> {
-        if (this.imagenesSeleccionadas.length > 0) {
-            console.log('🔄 Re-sincronizando input oculto con archivos internos...');
-            await this.transferirArchivosAInputUnificado();
-            console.log('✅ Input oculto re-sincronizado');
-        }
-    }
-    
     // =========================================================================
-    // Métodos de cámara integrada (sin cambios)
+    // Métodos de cámara integrada
     // =========================================================================
     
     /**
@@ -623,7 +1124,6 @@ class UploadImagenesDual {
     
     /**
      * Agrega fotos capturadas desde la cámara integrada
-     * NOTA: Este método NO se modifica para mantener compatibilidad con cámara
      */
     private agregarFotosDeCamara(fotos: Blob[]): void {
         console.log(`📸 Recibidas ${fotos.length} foto(s) desde cámara integrada`);
@@ -671,8 +1171,8 @@ class UploadImagenesDual {
     }
     
     /**
-     * Agrega archivos al array de imágenes seleccionadas
-     * MODIFICADO v2.0: Mejor feedback con toasts
+     * Agrega archivos al array de imágenes seleccionadas.
+     * v5.0: Ya no transfiere a input oculto, el array es la fuente de verdad.
      */
     private async agregarArchivos(archivos: File[]): Promise<void> {
         // CRÍTICO: Marcar como procesando y deshabilitar botón de subir
@@ -766,8 +1266,8 @@ class UploadImagenesDual {
         // Actualizar UI
         this.actualizarPreview();
         
-        // Transferir archivos al input
-        await this.transferirArchivosAInputUnificado();
+        // v5.0: Ya no se llama a transferirArchivosAInputUnificado()
+        // El array interno es la fuente de verdad, FormData se construye desde él
         
         // Marcar como listo
         this.estaProcesando = false;
@@ -787,8 +1287,6 @@ class UploadImagenesDual {
     
     /**
      * Actualiza el estado del botón de subir según el contexto.
-     * NOTA: Público desde v3.1 para que el template pueda restaurar
-     * el estado correcto del botón después de un error de red.
      */
     public actualizarEstadoBotonSubir(): void {
         if (!this.btnSubir) {
@@ -855,7 +1353,6 @@ class UploadImagenesDual {
     
     /**
      * Crea un elemento de miniatura para una imagen
-     * MEJORADO v2.0: Indicador de tamaño con color
      */
     private crearMiniatura(imagen: ImagenPreview, index: number): HTMLElement {
         const col = document.createElement('div');
@@ -895,9 +1392,10 @@ class UploadImagenesDual {
     }
     
     /**
-     * Elimina una imagen del array de seleccionadas
+     * Elimina una imagen del array de seleccionadas.
+     * v5.0: Simplificado, ya no transfiere a input oculto.
      */
-    private async eliminarImagen(id: string): Promise<void> {
+    private eliminarImagen(id: string): void {
         const index = this.imagenesSeleccionadas.findIndex(img => img.id === id);
         
         if (index !== -1) {
@@ -913,16 +1411,6 @@ class UploadImagenesDual {
             
             // Actualizar UI
             this.actualizarPreview();
-            this.actualizarPanelResumen();
-            
-            // Re-transferir archivos
-            this.estaProcesando = true;
-            this.archivosListos = false;
-            this.actualizarEstadoBotonSubir();
-            
-            await this.transferirArchivosAInputUnificado();
-            
-            this.estaProcesando = false;
             this.archivosListos = this.imagenesSeleccionadas.length > 0;
             this.actualizarEstadoBotonSubir();
             this.actualizarPanelResumen();
@@ -930,7 +1418,8 @@ class UploadImagenesDual {
     }
     
     /**
-     * Limpia todas las imágenes seleccionadas
+     * Limpia todas las imágenes seleccionadas.
+     * v5.0: Simplificado, ya no limpia input oculto.
      */
     private limpiarTodo(): void {
         // Liberar memoria de todos los ObjectURLs
@@ -941,10 +1430,9 @@ class UploadImagenesDual {
         // Limpiar array
         this.imagenesSeleccionadas = [];
         
-        // Limpiar inputs
+        // Limpiar inputs de selección
         if (this.inputGaleria) this.inputGaleria.value = '';
         if (this.inputCamara) this.inputCamara.value = '';
-        if (this.inputUnificado) this.inputUnificado.value = '';
         
         // Resetear estados
         this.estaProcesando = false;
@@ -957,38 +1445,6 @@ class UploadImagenesDual {
         this.actualizarPreview();
         this.actualizarEstadoBotonSubir();
         this.actualizarPanelResumen();
-    }
-    
-    /**
-     * Transfiere archivos del array al input unificado para envío al servidor
-     */
-    private async transferirArchivosAInputUnificado(): Promise<void> {
-        if (!this.inputUnificado) {
-            return;
-        }
-        
-        console.log(`📦 Transfiriendo ${this.imagenesSeleccionadas.length} archivo(s) al input unificado...`);
-        
-        // Crear un nuevo DataTransfer para manipular los archivos del input
-        const dataTransfer = new DataTransfer();
-        
-        // Agregar todos los archivos seleccionados
-        for (const imagen of this.imagenesSeleccionadas) {
-            dataTransfer.items.add(imagen.file);
-            
-            // Yield al event loop cada 5 archivos para mantener UI responsive
-            if (dataTransfer.files.length % 5 === 0) {
-                await this.delay(5);
-            }
-        }
-        
-        // Asignar al input unificado
-        this.inputUnificado.files = dataTransfer.files;
-        
-        // Pequeño delay para asegurar que el navegador termine de asignar los archivos
-        await this.delay(20);
-        
-        console.log(`✅ ${dataTransfer.files.length} archivo(s) transferido(s) y listos para enviar`);
     }
     
     /**
@@ -1007,6 +1463,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Verificar que estamos en la página correcta
     if (document.getElementById('formSubirImagenes')) {
         (window as any).uploadImagenesDual = new UploadImagenesDual();
-        console.log('✅ Sistema de subida dual v2.0 inicializado');
+        console.log('✅ Sistema de subida dual v5.0 inicializado');
     }
 });
