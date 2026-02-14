@@ -1,6 +1,6 @@
 // ============================================================================
 // SISTEMA DUAL DE SUBIDA DE IMÁGENES - GALERÍA Y CÁMARA
-// Versión 5.0 - Migración completa: toda la lógica de subida en TypeScript
+// Versión 6.0 - Subida por lotes con reintentos automáticos (anti-Cloudflare)
 // ============================================================================
 
 /**
@@ -21,6 +21,16 @@
  * 
  * CHANGELOG:
  * 
+ * v6.0 (Febrero 2026):
+ * - ✅ SUBIDA POR LOTES: Las imágenes se envían en lotes de 5 (configurable)
+ *   para evitar que Cloudflare Tunnel corte conexiones grandes.
+ * - ✅ REINTENTOS AUTOMÁTICOS: Cada lote fallido se reintenta hasta 2 veces
+ *   con backoff exponencial (3s, 6s) — nueva conexión HTTP cada reintento.
+ * - ✅ ÉXITO PARCIAL: Si un lote falla, los anteriores ya están guardados.
+ *   Las imágenes pendientes quedan seleccionadas para reintento manual.
+ * - ✅ PROGRESO DE DOS NIVELES: Barra global + info por lote.
+ * - ✅ SIN CAMBIOS EN SERVIDOR: Django procesa lo que recibe, igual que antes.
+ *
  * v5.0 (Febrero 2026):
  * - ✅ MIGRACIÓN COMPLETA: Toda la lógica de subida (submit, FormData, XHR,
  *   progreso, errores, beforeunload) movida desde el JS inline del template
@@ -68,6 +78,18 @@ interface ResumenSubida {
     cercaDelLimite: boolean;       // Si está cerca del límite (>76MB)
 }
 
+// Interface para resultado de un lote de subida (v6.0)
+interface BatchResult {
+    batchIndex: number;          // Índice del lote (0-based)
+    success: boolean;            // Si el lote se subió correctamente
+    imagenesGuardadas: number;   // Cantidad guardadas en el servidor
+    imagenesOmitidas: string[];  // Nombres de imágenes omitidas
+    errores: string[];           // Errores de procesamiento individual
+    cambioEstado: boolean;       // Si cambió el estado de la orden
+    message: string;             // Mensaje del servidor
+    archivosEnviados: number;    // Cantidad de archivos enviados en el lote
+}
+
 class UploadImagenesDual {
     // Elementos del DOM - Selección de archivos
     private inputGaleria: HTMLInputElement | null;
@@ -112,6 +134,16 @@ class UploadImagenesDual {
     
     // NUEVO v5.0: Timeout de XHR (10 minutos, alineado con Gunicorn y Nginx)
     private readonly XHR_TIMEOUT_MS = 600000;
+    
+    // v6.0: Configuración de subida por lotes (anti-Cloudflare disconnect)
+    // Cada lote genera un request HTTP independiente, nueva conexión cada vez
+    private readonly BATCH_SIZE = 5;        // Imágenes por lote (~15-25MB typ.)
+    private readonly MAX_RETRIES = 2;       // Reintentos por lote fallido
+    private readonly RETRY_DELAY_MS = 3000; // Delay base entre reintentos (×intento)
+    
+    // v6.0: Estado de progreso por lotes
+    private loteActual: number = 0;
+    private totalLotes: number = 0;
     
     // Control de estado de procesamiento
     private estaProcesando: boolean = false;
@@ -254,16 +286,15 @@ class UploadImagenesDual {
             return;
         }
         
-        // Construir FormData
-        const formData = this.construirFormData(archivosParaSubir);
+        // v6.0: Dividir archivos en lotes de BATCH_SIZE
+        // Cada lote se envía como un request HTTP independiente,
+        // lo que evita que Cloudflare Tunnel corte la conexión.
+        const lotes: File[][] = [];
+        for (let i = 0; i < archivosParaSubir.length; i += this.BATCH_SIZE) {
+            lotes.push(archivosParaSubir.slice(i, i + this.BATCH_SIZE));
+        }
         
-        // Calcular tamaño total para progreso
-        let tamanioTotalBytes = 0;
-        archivosParaSubir.forEach(archivo => {
-            tamanioTotalBytes += archivo.size;
-        });
-        const tamanioTotalMB = (tamanioTotalBytes / (1024 * 1024)).toFixed(2);
-        const cantidadArchivos = archivosParaSubir.length;
+        console.log(`📦 Dividiendo ${archivosParaSubir.length} imagen(es) en ${lotes.length} lote(s) de hasta ${this.BATCH_SIZE}`);
         
         // Deshabilitar formulario durante la subida
         this.deshabilitarFormulario();
@@ -274,48 +305,11 @@ class UploadImagenesDual {
         if (this.textoProgreso) this.textoProgreso.textContent = 'Iniciando subida...';
         if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '0%';
         
-        // Mostrar información de la subida
-        if (this.infoArchivos) {
-            this.infoArchivos.innerHTML = `
-                <div class="d-flex align-items-center justify-content-between flex-wrap">
-                    <span><i class="bi bi-cloud-arrow-up"></i> Subiendo <strong>${cantidadArchivos}</strong> imagen${cantidadArchivos !== 1 ? 'es' : ''}</span>
-                    <span class="badge bg-secondary">${tamanioTotalMB} MB total</span>
-                </div>
-            `;
-        }
-        
-        // Crear XMLHttpRequest para monitorear progreso
-        const xhr = new XMLHttpRequest();
-        
-        // Monitorear progreso de subida
-        xhr.upload.addEventListener('progress', (e) => {
-            this.handleUploadProgress(e, cantidadArchivos, tamanioTotalMB);
-        });
-        
-        // Manejar respuesta del servidor
-        xhr.addEventListener('load', () => {
-            this.handleUploadSuccess(xhr);
-        });
-        
-        // Manejar errores de red
-        xhr.addEventListener('error', () => {
-            this.handleUploadError(cantidadArchivos, tamanioTotalBytes, tamanioTotalMB);
-        });
-        
-        // Manejar timeout
-        xhr.addEventListener('timeout', () => {
-            this.handleUploadTimeout(cantidadArchivos, tamanioTotalBytes, tamanioTotalMB);
-        });
-        
-        // Configurar y enviar la petición
-        const url = this.formElement?.action || window.location.href;
-        xhr.open('POST', url);
-        xhr.timeout = this.XHR_TIMEOUT_MS;
-        
         // Activar protección beforeunload
         this.subiendoImagenes = true;
         
-        xhr.send(formData);
+        // Iniciar subida por lotes (async)
+        this.enviarPorLotes(lotes);
     }
     
     /**
@@ -366,258 +360,487 @@ class UploadImagenesDual {
         return formData;
     }
     
-    /**
-     * Maneja el evento de progreso de la subida XHR.
-     * Actualiza la barra de progreso y la información visual.
-     */
-    private handleUploadProgress(e: ProgressEvent, cantidadArchivos: number, tamanioTotalMB: string): void {
-        if (!e.lengthComputable) return;
-        
-        const porcentaje = Math.round((e.loaded / e.total) * 100);
-        const mbSubidos = (e.loaded / (1024 * 1024)).toFixed(2);
-        
-        if (this.barraProgreso) this.barraProgreso.style.width = porcentaje + '%';
-        if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = porcentaje + '%';
-        
-        if (porcentaje < 100) {
-            if (this.textoProgreso) this.textoProgreso.textContent = `Subiendo... ${porcentaje}%`;
-            if (this.infoArchivos) {
-                this.infoArchivos.innerHTML = `
-                    <div class="d-flex align-items-center justify-content-between flex-wrap">
-                        <span><i class="bi bi-cloud-arrow-up text-primary"></i> Subiendo <strong>${cantidadArchivos}</strong> imagen${cantidadArchivos !== 1 ? 'es' : ''}...</span>
-                        <span class="badge bg-primary">${mbSubidos} / ${tamanioTotalMB} MB</span>
-                    </div>
-                `;
-            }
-        } else {
-            if (this.textoProgreso) this.textoProgreso.textContent = 'Procesando en servidor...';
-            if (this.barraProgreso) this.barraProgreso.classList.add('progress-bar-striped');
-            if (this.infoArchivos) {
-                this.infoArchivos.innerHTML = `
-                    <div class="d-flex align-items-center">
-                        <span class="spinner-border spinner-border-sm text-info me-2"></span>
-                        <span><i class="bi bi-cpu text-info"></i> Comprimiendo y guardando ${cantidadArchivos} imagen${cantidadArchivos !== 1 ? 'es' : ''}, por favor espere...</span>
-                    </div>
-                `;
-            }
-        }
-    }
+    // =========================================================================
+    // v6.0: SISTEMA DE SUBIDA POR LOTES CON REINTENTOS AUTOMÁTICOS
+    // =========================================================================
     
     /**
-     * Maneja la respuesta exitosa del servidor (status 200 o 500).
-     * Parsea el JSON y muestra el resultado al usuario.
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Envía las imágenes divididas en lotes pequeños (5 imágenes cada uno).
+     * 
+     * ¿Por qué lotes? Cloudflare Tunnel (el proxy que protege tu servidor)
+     * a veces corta conexiones grandes de forma aleatoria. Al dividir en
+     * lotes pequeños (~15-25MB cada uno), cada request es rápido y tiene
+     * mucha menos probabilidad de ser cortado.
+     * 
+     * Si un lote falla, se reintenta automáticamente hasta 2 veces con
+     * espera creciente (3s, 6s). Cada reintento crea una nueva conexión
+     * HTTP, evitando el problema de la conexión anterior.
+     * 
+     * Los lotes anteriores exitosos Ya están guardados en el servidor,
+     * así que si el lote 3 falla, las imágenes de los lotes 1 y 2 no se pierden.
      */
-    private handleUploadSuccess(xhr: XMLHttpRequest): void {
-        // Desactivar protección beforeunload
-        this.subiendoImagenes = false;
+    private async enviarPorLotes(lotes: File[][]): Promise<void> {
+        this.totalLotes = lotes.length;
+        const resultados: BatchResult[] = [];
+        let totalImagenesGuardadas = 0;
+        let totalErrores: string[] = [];
+        let lotesExitosos = 0;
+        let lotesReintentados = 0;
+        let huboFalloDefinitivo = false;
         
-        // Marcar fin de envío
-        this.marcarFinEnvio();
+        // Calcular totales para info
+        const totalArchivos = lotes.reduce((sum, l) => sum + l.length, 0);
+        const totalBytes = lotes.reduce((sum, l) => sum + l.reduce((s, f) => s + f.size, 0), 0);
+        const totalMB = (totalBytes / (1024 * 1024)).toFixed(2);
         
-        if (xhr.status === 200 || xhr.status === 500) {
-            try {
-                const data = JSON.parse(xhr.responseText);
-                
-                if (data.success) {
-                    // Éxito - mostrar mensaje final
-                    if (this.barraProgreso) {
-                        this.barraProgreso.classList.remove('progress-bar-animated', 'progress-bar-striped');
-                        this.barraProgreso.classList.add('bg-success');
-                    }
-                    if (this.textoProgreso) this.textoProgreso.textContent = '¡Completado!';
-                    if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '✓';
-                    
-                    // Construir mensaje detallado
-                    let mensajeDetalle = `
-                        <div class="d-flex align-items-center text-success">
-                            <i class="bi bi-check-circle-fill me-2"></i>
-                            <span>${data.message}</span>
-                        </div>
-                    `;
-                    
-                    // Agregar advertencias si hay imágenes omitidas
-                    if (data.imagenes_omitidas && data.imagenes_omitidas.length > 0) {
-                        mensajeDetalle += `
-                            <div class="mt-1">
-                                <small class="text-warning">
-                                    <i class="bi bi-exclamation-triangle"></i> 
-                                    ${data.imagenes_omitidas.length} imagen(es) omitida(s) por exceder 50MB
-                                </small>
-                            </div>
-                        `;
-                    }
-                    
-                    // Agregar errores si los hay
-                    if (data.errores && data.errores.length > 0) {
-                        mensajeDetalle += `
-                            <div class="mt-1">
-                                <small class="text-danger">
-                                    <i class="bi bi-x-circle"></i> 
-                                    ${data.errores.length} error(es) al procesar
-                                </small>
-                            </div>
-                        `;
-                    }
-                    
-                    if (this.infoArchivos) this.infoArchivos.innerHTML = mensajeDetalle;
-                    
-                    // Limpiar el sistema
-                    this.limpiarDespuesDeExito();
-                    
-                    // Recargar página después de 1.5 segundos
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                } else {
-                    // Error reportado por el servidor
-                    let mensajeError = data.error || 'Error desconocido al subir imágenes';
-                    
-                    if (data.error_type) {
-                        console.error(`Error tipo: ${data.error_type}`);
-                        mensajeError += `<br><small class="text-muted">Tipo: ${data.error_type}</small>`;
-                    }
-                    
-                    // Si se guardaron algunas imágenes antes del error
-                    if (data.imagenes_guardadas > 0) {
-                        mensajeError += `<br><small class="text-info"><i class="bi bi-info-circle"></i> Se guardaron ${data.imagenes_guardadas} imagen(es) antes del error. Recarga para verlas.</small>`;
-                    }
-                    
-                    this.mostrarErrorCarga(mensajeError);
-                    this.mostrarToast(data.error || 'Error al subir imágenes', 'error');
-                }
-            } catch (e) {
-                console.error('Error al parsear respuesta:', e);
-                console.error('Respuesta del servidor:', xhr.responseText);
-                this.mostrarErrorCarga('Error al procesar la respuesta del servidor. Revisa la consola para más detalles.');
-            }
-        } else {
-            this.mostrarErrorCarga(`Error del servidor (código ${xhr.status}). Por favor intenta nuevamente.`);
-        }
-    }
-    
-    /**
-     * DIAGNÓSTICO AVANZADO DE ERRORES v3.2 (migrado a v5.0)
-     * Analiza el tipo de fallo para dar información útil al usuario y logs
-     * detallados para depuración.
-     */
-    private handleUploadError(cantidadArchivos: number, tamanioTotalBytes: number, tamanioTotalMB: string): void {
-        this.subiendoImagenes = false;
-        this.marcarFinEnvio();
-        
-        // Diagnóstico: ¿Qué tipo de error de red ocurrió?
-        let diagnostico = '';
-        let mensajeUsuario = '';
-        let tipoError = 'desconocido';
-        
-        if (!navigator.onLine) {
-            tipoError = 'sin_internet';
-            mensajeUsuario = 'Sin conexión a internet. Verifica tu WiFi o datos móviles y reintenta.';
-            diagnostico = 'navigator.onLine=false';
-        } else if (tamanioTotalBytes > 100 * 1024 * 1024) {
-            tipoError = 'cloudflare_limite';
-            mensajeUsuario = `El tamaño total (${tamanioTotalMB} MB) excede el límite de Cloudflare (100 MB). Sube menos imágenes por lote.`;
-            diagnostico = `tamaño=${tamanioTotalMB}MB, excede límite Cloudflare free=100MB`;
-        } else {
-            tipoError = 'conexion_servidor';
-            mensajeUsuario = 'Error de conexión con el servidor. El servidor puede estar reiniciándose o hay un problema de red. Reintenta en unos segundos.';
-            diagnostico = 'navigator.onLine=true, posible: servidor caído, CORS, firewall, o Cloudflare timeout';
-        }
-        
-        // Log detallado para depuración
-        const url = this.formElement?.action || window.location.href;
-        console.error(`[UPLOAD ERROR] Tipo: ${tipoError}`);
-        console.error(`[UPLOAD ERROR] Diagnóstico: ${diagnostico}`);
-        console.error(`[UPLOAD ERROR] Archivos: ${cantidadArchivos}, Tamaño: ${tamanioTotalMB} MB`);
-        console.error(`[UPLOAD ERROR] URL: ${url}`);
-        console.error(`[UPLOAD ERROR] Hora: ${new Date().toISOString()}`);
-        
-        this.mostrarErrorCarga(mensajeUsuario, tipoError, diagnostico);
-        this.mostrarToast(mensajeUsuario, 'error', undefined, 8000);
-    }
-    
-    /**
-     * Maneja el timeout de la petición XHR.
-     * Da feedback diferenciado según el tamaño del lote.
-     */
-    private handleUploadTimeout(cantidadArchivos: number, tamanioTotalBytes: number, tamanioTotalMB: string): void {
-        this.subiendoImagenes = false;
-        this.marcarFinEnvio();
-        
-        let mensajeUsuario = '';
-        let diagnostico = '';
-        
-        if (tamanioTotalBytes > 50 * 1024 * 1024) {
-            mensajeUsuario = `Tiempo agotado (10 min). El lote de ${tamanioTotalMB} MB es muy grande. Intenta con menos imágenes o archivos más pequeños.`;
-            diagnostico = `timeout=600s, tamaño=${tamanioTotalMB}MB (grande)`;
-        } else {
-            mensajeUsuario = 'Tiempo de espera agotado (10 min). El servidor puede estar sobrecargado. Reintenta en unos minutos.';
-            diagnostico = `timeout=600s, tamaño=${tamanioTotalMB}MB (normal), posible: servidor lento o sobrecargado`;
-        }
-        
-        console.error(`[UPLOAD TIMEOUT] Diagnóstico: ${diagnostico}`);
-        console.error(`[UPLOAD TIMEOUT] Archivos: ${cantidadArchivos}, Tamaño: ${tamanioTotalMB} MB`);
-        console.error(`[UPLOAD TIMEOUT] Hora: ${new Date().toISOString()}`);
-        
-        this.mostrarErrorCarga(mensajeUsuario, 'timeout', diagnostico);
-        this.mostrarToast(mensajeUsuario, 'error', undefined, 8000);
-    }
-    
-    /**
-     * Muestra un error en la barra de progreso con información de diagnóstico.
-     * NO limpia los archivos del array interno (preserva para reintento).
-     * Rehabilita el formulario después de 4 segundos.
-     */
-    private mostrarErrorCarga(mensaje: string, tipoError?: string, diagnostico?: string): void {
-        if (this.barraProgreso) {
-            this.barraProgreso.classList.remove('bg-success', 'progress-bar-animated', 'progress-bar-striped');
-            this.barraProgreso.classList.add('bg-danger');
-            this.barraProgreso.style.width = '100%';
-        }
-        if (this.textoProgreso) this.textoProgreso.textContent = 'Error';
-        if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '✗';
-        
-        // Construir mensaje con diagnóstico si está disponible
-        let htmlError = `
-            <div class="text-danger">
-                <i class="bi bi-x-circle-fill me-1"></i> ${mensaje}
-            </div>
-        `;
-        
-        // Agregar información de diagnóstico expandible
-        if (tipoError && diagnostico) {
-            htmlError += `
-                <details class="mt-2">
-                    <summary class="text-muted" style="cursor: pointer; font-size: 0.8rem;">
-                        <i class="bi bi-bug"></i> Info técnica para soporte
-                    </summary>
-                    <div class="mt-1 p-2 bg-light rounded" style="font-size: 0.75rem; font-family: monospace;">
-                        <div><strong>Tipo:</strong> ${tipoError}</div>
-                        <div><strong>Detalle:</strong> ${diagnostico}</div>
-                        <div><strong>Hora:</strong> ${new Date().toLocaleString('es-MX')}</div>
-                        <div><strong>Navegador:</strong> ${navigator.userAgent.substring(0, 80)}...</div>
-                        <div><strong>Online:</strong> ${navigator.onLine ? 'Sí' : 'No'}</div>
-                    </div>
-                </details>
+        // Mostrar info inicial
+        if (this.infoArchivos) {
+            this.infoArchivos.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between flex-wrap">
+                    <span><i class="bi bi-collection"></i> <strong>${totalArchivos}</strong> imagen${totalArchivos !== 1 ? 'es' : ''} en <strong>${lotes.length}</strong> lote${lotes.length !== 1 ? 's' : ''}</span>
+                    <span class="badge bg-secondary">${totalMB} MB total</span>
+                </div>
             `;
         }
         
-        if (this.infoArchivos) this.infoArchivos.innerHTML = htmlError;
-        
-        // Rehabilitar formulario después de 4 segundos para permitir reintento
-        setTimeout(() => {
-            this.rehabilitarFormulario();
+        // Procesar cada lote secuencialmente
+        for (let i = 0; i < lotes.length; i++) {
+            this.loteActual = i + 1;
+            const lote = lotes[i];
+            let intentos = 0;
+            let exito = false;
+            let resultado: BatchResult | null = null;
             
-            // Ocultar barra de progreso y resetear estado visual
-            if (this.progresoDiv) this.progresoDiv.style.display = 'none';
+            // Intentar enviar el lote (con reintentos automáticos)
+            while (intentos <= this.MAX_RETRIES && !exito) {
+                if (intentos > 0) {
+                    // Es un reintento — nueva conexión HTTP
+                    lotesReintentados++;
+                    const delayMs = this.RETRY_DELAY_MS * intentos;
+                    console.warn(`🔄 Reintento ${intentos}/${this.MAX_RETRIES} del lote ${i + 1} en ${delayMs / 1000}s...`);
+                    
+                    this.mostrarReintento(i + 1, lotes.length, intentos, delayMs);
+                    await this.delay(delayMs);
+                }
+                
+                try {
+                    resultado = await this.enviarLote(lote, i, lotes.length);
+                    
+                    if (resultado.success) {
+                        exito = true;
+                        lotesExitosos++;
+                        totalImagenesGuardadas += resultado.imagenesGuardadas;
+                        if (resultado.errores.length > 0) {
+                            totalErrores = totalErrores.concat(resultado.errores);
+                        }
+                        resultados.push(resultado);
+                        
+                        console.log(`✅ Lote ${i + 1}/${lotes.length}: ${resultado.imagenesGuardadas} imagen(es) guardadas`);
+                        
+                        // Remover las imágenes exitosas del array interno
+                        this.removerImagenesSubidas(lote);
+                    } else {
+                        // El servidor respondió con error (no error de red)
+                        console.error(`❌ Lote ${i + 1}: Error del servidor — ${resultado.message}`);
+                        
+                        if (resultado.imagenesGuardadas > 0) {
+                            // Éxito parcial: guardó algunas antes del error
+                            totalImagenesGuardadas += resultado.imagenesGuardadas;
+                            resultados.push(resultado);
+                            // No reintentar: el servidor ya procesó parcialmente
+                        }
+                        
+                        totalErrores.push(`Lote ${i + 1}: ${resultado.message}`);
+                        break; // No reintentar errores del servidor (validación, etc.)
+                    }
+                } catch (errorInfo: unknown) {
+                    // Error de red (XHR error/timeout) — SÍ reintentar
+                    intentos++;
+                    const info = errorInfo as { tipo: string; diagnostico: string };
+                    console.error(`❌ Lote ${i + 1}: Error de red (intento ${intentos}/${this.MAX_RETRIES + 1}) — ${info.tipo}`);
+                    
+                    if (intentos > this.MAX_RETRIES) {
+                        // Agotados los reintentos para este lote
+                        huboFalloDefinitivo = true;
+                        resultados.push({
+                            batchIndex: i,
+                            success: false,
+                            imagenesGuardadas: 0,
+                            imagenesOmitidas: [],
+                            errores: [`Lote ${i + 1}: Fallo después de ${this.MAX_RETRIES + 1} intentos (${info.tipo})`],
+                            cambioEstado: false,
+                            message: info.diagnostico,
+                            archivosEnviados: lote.length
+                        });
+                        totalErrores.push(`Lote ${i + 1} (${lote.length} imgs): ${info.diagnostico}`);
+                    }
+                }
+            }
+        }
+        
+        // Desactivar protección beforeunload
+        this.subiendoImagenes = false;
+        this.marcarFinEnvio();
+        
+        // Mostrar resumen final consolidado
+        this.mostrarResumenFinal(
+            totalImagenesGuardadas, totalErrores,
+            lotesExitosos, lotes.length,
+            lotesReintentados, huboFalloDefinitivo
+        );
+    }
+    
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Envía UN solo lote de imágenes al servidor usando XMLHttpRequest (XHR).
+     * Retorna una Promise (promesa) que se resuelve cuando el servidor responde,
+     * o se rechaza si hay un error de red (Cloudflare cortó la conexión, etc.)
+     * 
+     * Cada llamada a este método crea un XHR NUEVO = una conexión HTTP nueva.
+     * Esto es clave: si la conexión anterior se cortó, la nueva es independiente.
+     */
+    private enviarLote(archivos: File[], batchIndex: number, totalBatches: number): Promise<BatchResult> {
+        return new Promise((resolve, reject) => {
+            const formData = this.construirFormData(archivos);
+            
+            const tamanioLote = archivos.reduce((sum, f) => sum + f.size, 0);
+            const tamanioMB = (tamanioLote / (1024 * 1024)).toFixed(2);
+            
+            console.log(`📤 Enviando lote ${batchIndex + 1}/${totalBatches}: ${archivos.length} archivo(s), ${tamanioMB} MB`);
+            
+            const xhr = new XMLHttpRequest();
+            
+            // Progreso: calcular posición global dentro de todos los lotes
+            xhr.upload.addEventListener('progress', (e) => {
+                if (!e.lengthComputable) return;
+                
+                const porcentajeLote = Math.round((e.loaded / e.total) * 100);
+                // Progreso global: cada lote contribuye una fracción igual
+                const porcentajeBase = (batchIndex / totalBatches) * 100;
+                const porcentajeContribucion = (1 / totalBatches) * 100;
+                const porcentajeGlobal = Math.round(porcentajeBase + (porcentajeLote / 100) * porcentajeContribucion);
+                
+                if (this.barraProgreso) this.barraProgreso.style.width = porcentajeGlobal + '%';
+                if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = porcentajeGlobal + '%';
+                
+                if (porcentajeLote < 100) {
+                    // Subiendo datos al servidor
+                    if (this.textoProgreso) {
+                        this.textoProgreso.textContent = totalBatches > 1
+                            ? `Lote ${batchIndex + 1}/${totalBatches} — Subiendo... ${porcentajeLote}%`
+                            : `Subiendo... ${porcentajeLote}%`;
+                    }
+                    if (this.infoArchivos) {
+                        const mbSubidos = (e.loaded / (1024 * 1024)).toFixed(2);
+                        this.infoArchivos.innerHTML = `
+                            <div class="d-flex align-items-center justify-content-between flex-wrap">
+                                <span><i class="bi bi-cloud-arrow-up text-primary"></i> ${totalBatches > 1 ? `Lote ${batchIndex + 1}/${totalBatches}: ` : ''}Subiendo <strong>${archivos.length}</strong> imagen${archivos.length !== 1 ? 'es' : ''}...</span>
+                                <span class="badge bg-primary">${mbSubidos} / ${tamanioMB} MB</span>
+                            </div>
+                            ${totalBatches > 1 ? `<div class="mt-1"><small class="text-muted">Progreso global: ${porcentajeGlobal}%</small></div>` : ''}
+                        `;
+                    }
+                } else {
+                    // Datos enviados, servidor procesando
+                    if (this.textoProgreso) {
+                        this.textoProgreso.textContent = totalBatches > 1
+                            ? `Lote ${batchIndex + 1}/${totalBatches} — Procesando en servidor...`
+                            : 'Procesando en servidor...';
+                    }
+                    if (this.barraProgreso) this.barraProgreso.classList.add('progress-bar-striped');
+                    if (this.infoArchivos) {
+                        this.infoArchivos.innerHTML = `
+                            <div class="d-flex align-items-center">
+                                <span class="spinner-border spinner-border-sm text-info me-2"></span>
+                                <span>${totalBatches > 1 ? `Lote ${batchIndex + 1}/${totalBatches}: ` : ''}Comprimiendo y guardando ${archivos.length} imagen${archivos.length !== 1 ? 'es' : ''}...</span>
+                            </div>
+                        `;
+                    }
+                }
+            });
+            
+            // Respuesta del servidor
+            xhr.addEventListener('load', () => {
+                if (this.barraProgreso) this.barraProgreso.classList.remove('progress-bar-striped');
+                
+                if (xhr.status === 200 || xhr.status === 500) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        resolve({
+                            batchIndex: batchIndex,
+                            success: data.success,
+                            imagenesGuardadas: data.imagenes_guardadas || 0,
+                            imagenesOmitidas: data.imagenes_omitidas || [],
+                            errores: data.errores || [],
+                            cambioEstado: data.cambio_estado || false,
+                            message: data.message || data.error || '',
+                            archivosEnviados: archivos.length
+                        });
+                    } catch (e) {
+                        console.error('Error al parsear respuesta del lote:', e);
+                        reject({ tipo: 'parse_error', diagnostico: 'Respuesta del servidor no válida' });
+                    }
+                } else {
+                    reject({ tipo: `http_${xhr.status}`, diagnostico: `Error HTTP ${xhr.status}` });
+                }
+            });
+            
+            // Error de red — esto es lo que dispara Cloudflare al cortar
+            xhr.addEventListener('error', () => {
+                let tipo = 'desconocido';
+                let diagnostico = '';
+                
+                if (!navigator.onLine) {
+                    tipo = 'sin_internet';
+                    diagnostico = 'Sin conexión a internet';
+                } else if (tamanioLote > 100 * 1024 * 1024) {
+                    tipo = 'cloudflare_limite';
+                    diagnostico = `Lote de ${tamanioMB}MB excede límite Cloudflare`;
+                } else {
+                    tipo = 'conexion_cortada';
+                    diagnostico = 'Conexión cortada (Cloudflare Tunnel, red inestable)';
+                }
+                
+                console.error(`[LOTE ${batchIndex + 1} ERROR] Tipo: ${tipo} | ${diagnostico}`);
+                console.error(`[LOTE ${batchIndex + 1} ERROR] Archivos: ${archivos.length}, Tamaño: ${tamanioMB} MB, Hora: ${new Date().toISOString()}`);
+                reject({ tipo, diagnostico });
+            });
+            
+            // Timeout
+            xhr.addEventListener('timeout', () => {
+                console.error(`[LOTE ${batchIndex + 1} TIMEOUT] ${tamanioMB}MB, timeout=${this.XHR_TIMEOUT_MS / 1000}s`);
+                reject({ tipo: 'timeout', diagnostico: `Timeout después de ${this.XHR_TIMEOUT_MS / 60000} minutos` });
+            });
+            
+            // Abrir y enviar (nueva conexión HTTP cada vez)
+            const url = this.formElement?.action || window.location.href;
+            xhr.open('POST', url);
+            xhr.timeout = this.XHR_TIMEOUT_MS;
+            xhr.send(formData);
+        });
+    }
+    
+    /**
+     * Muestra la UI de reintento: barra amarilla con countdown.
+     */
+    private mostrarReintento(loteNum: number, totalLotes: number, intento: number, delayMs: number): void {
+        if (this.textoProgreso) {
+            this.textoProgreso.textContent = `Reintentando lote ${loteNum}/${totalLotes}...`;
+        }
+        if (this.barraProgreso) {
+            this.barraProgreso.classList.add('progress-bar-striped', 'progress-bar-animated');
+            this.barraProgreso.classList.remove('bg-success', 'bg-danger');
+            this.barraProgreso.classList.add('bg-warning');
+        }
+        if (this.infoArchivos) {
+            this.infoArchivos.innerHTML = `
+                <div class="d-flex align-items-center text-warning">
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <span>
+                        <i class="bi bi-arrow-repeat"></i>
+                        Reintento ${intento}/${this.MAX_RETRIES} del lote ${loteNum} — esperando ${delayMs / 1000}s...
+                        <br><small class="text-muted">Los lotes anteriores se guardaron correctamente.</small>
+                    </span>
+                </div>
+            `;
+        }
+    }
+    
+    /**
+     * Remueve del array interno las imágenes que ya se subieron exitosamente.
+     * Usa nombre+tamaño como clave para identificar cada archivo.
+     */
+    private removerImagenesSubidas(archivosSubidos: File[]): void {
+        const clavesSubidas = new Set(
+            archivosSubidos.map(f => `${f.name}_${f.size}_${f.lastModified}`)
+        );
+        
+        this.imagenesSeleccionadas = this.imagenesSeleccionadas.filter(img => {
+            const clave = `${img.file.name}_${img.file.size}_${img.file.lastModified}`;
+            if (clavesSubidas.has(clave)) {
+                URL.revokeObjectURL(img.previewUrl); // Liberar memoria
+                return false; // Remover del array
+            }
+            return true; // Mantener
+        });
+    }
+    
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Muestra el resumen final después de que todos los lotes terminaron.
+     * Hay 3 escenarios posibles:
+     * 1. Todo exitoso → mensaje verde, recarga la página
+     * 2. Éxito parcial → mensaje amarillo, las imágenes pendientes quedan seleccionadas
+     * 3. Todo falló → mensaje rojo, todas las imágenes quedan seleccionadas para reintento
+     */
+    private mostrarResumenFinal(
+        totalGuardadas: number,
+        errores: string[],
+        lotesExitosos: number,
+        totalLotes: number,
+        lotesReintentados: number,
+        huboFalloDefinitivo: boolean
+    ): void {
+        if (totalGuardadas > 0 && !huboFalloDefinitivo) {
+            // ═══════════════════════════════════════════════════════════
+            // ESCENARIO 1: TODO EXITOSO
+            // ═══════════════════════════════════════════════════════════
             if (this.barraProgreso) {
-                this.barraProgreso.classList.remove('bg-danger');
-                this.barraProgreso.classList.add('progress-bar-animated', 'bg-success');
-                this.barraProgreso.style.width = '0%';
+                this.barraProgreso.classList.remove('progress-bar-animated', 'progress-bar-striped', 'bg-warning');
+                this.barraProgreso.classList.add('bg-success');
+                this.barraProgreso.style.width = '100%';
+            }
+            if (this.textoProgreso) this.textoProgreso.textContent = '¡Completado!';
+            if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '✓';
+            
+            let mensaje = `✅ ${totalGuardadas} imagen(es) subida(s) correctamente.`;
+            if (totalLotes > 1) {
+                mensaje += ` (${lotesExitosos} lote${lotesExitosos !== 1 ? 's' : ''})`;
+            }
+            if (lotesReintentados > 0) {
+                mensaje += ` — ${lotesReintentados} reintento(s) exitoso(s)`;
             }
             
-            // Restaurar texto del botón según el estado real de los archivos
+            let html = `
+                <div class="d-flex align-items-center text-success">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    <span>${mensaje}</span>
+                </div>
+            `;
+            
+            if (errores.length > 0) {
+                html += `
+                    <div class="mt-1">
+                        <small class="text-danger">
+                            <i class="bi bi-x-circle"></i> ${errores.length} error(es) menores al procesar
+                        </small>
+                    </div>
+                `;
+            }
+            
+            if (this.infoArchivos) this.infoArchivos.innerHTML = html;
+            
+            this.limpiarDespuesDeExito();
+            
+            // Recargar para mostrar las imágenes guardadas
+            setTimeout(() => { window.location.reload(); }, 1500);
+            
+        } else if (totalGuardadas > 0 && huboFalloDefinitivo) {
+            // ═══════════════════════════════════════════════════════════
+            // ESCENARIO 2: ÉXITO PARCIAL (algunas subidas, otras fallaron)
+            // ═══════════════════════════════════════════════════════════
+            if (this.barraProgreso) {
+                this.barraProgreso.classList.remove('progress-bar-animated', 'progress-bar-striped', 'bg-success', 'bg-danger');
+                this.barraProgreso.classList.add('bg-warning');
+                this.barraProgreso.style.width = '100%';
+            }
+            if (this.textoProgreso) this.textoProgreso.textContent = 'Parcialmente completado';
+            if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '⚠';
+            
+            const restantes = this.imagenesSeleccionadas.length;
+            let html = `
+                <div class="text-warning">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    Se subieron <strong>${totalGuardadas}</strong> imagen(es), pero <strong>${restantes}</strong> no pudieron enviarse.
+                </div>
+                <div class="mt-1">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i> Las imágenes pendientes siguen seleccionadas.
+                        Puedes presionar <strong>Subir</strong> de nuevo para reintentarlas.
+                    </small>
+                </div>
+            `;
+            
+            if (errores.length > 0) {
+                html += `
+                    <details class="mt-2">
+                        <summary class="text-muted" style="cursor: pointer; font-size: 0.8rem;">
+                            <i class="bi bi-bug"></i> Detalles técnicos (${errores.length})
+                        </summary>
+                        <div class="mt-1 p-2 bg-light rounded" style="font-size: 0.75rem; font-family: monospace;">
+                            ${errores.map(e => `<div>• ${e}</div>`).join('')}
+                        </div>
+                    </details>
+                `;
+            }
+            
+            if (this.infoArchivos) this.infoArchivos.innerHTML = html;
+            
+            // Actualizar preview y botón para las imágenes restantes
+            this.actualizarPreview();
+            this.archivosListos = this.imagenesSeleccionadas.length > 0;
             this.actualizarEstadoBotonSubir();
-        }, 4000);
+            this.actualizarPanelResumen();
+            
+            // Rehabilitar formulario para reintento manual
+            setTimeout(() => { this.rehabilitarFormulario(); }, 2000);
+            
+            this.mostrarToast(
+                `${totalGuardadas} imagen(es) subida(s). ${restantes} pendiente(s) — presiona Subir para reintentar.`,
+                'warning', undefined, 10000
+            );
+            
+        } else {
+            // ═══════════════════════════════════════════════════════════
+            // ESCENARIO 3: TODO FALLÓ
+            // ═══════════════════════════════════════════════════════════
+            if (this.barraProgreso) {
+                this.barraProgreso.classList.remove('bg-success', 'progress-bar-animated', 'progress-bar-striped', 'bg-warning');
+                this.barraProgreso.classList.add('bg-danger');
+                this.barraProgreso.style.width = '100%';
+            }
+            if (this.textoProgreso) this.textoProgreso.textContent = 'Error';
+            if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '✗';
+            
+            let html = `
+                <div class="text-danger">
+                    <i class="bi bi-x-circle-fill me-1"></i>
+                    No se pudo subir ninguna imagen después de múltiples intentos.
+                </div>
+                <div class="mt-1">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i> Tus imágenes siguen seleccionadas.
+                        Espera unos segundos y presiona <strong>Subir</strong> para reintentar.
+                    </small>
+                </div>
+            `;
+            
+            if (errores.length > 0) {
+                html += `
+                    <details class="mt-2">
+                        <summary class="text-muted" style="cursor: pointer; font-size: 0.8rem;">
+                            <i class="bi bi-bug"></i> Info técnica para soporte
+                        </summary>
+                        <div class="mt-1 p-2 bg-light rounded" style="font-size: 0.75rem; font-family: monospace;">
+                            ${errores.map(e => `<div>• ${e}</div>`).join('')}
+                            <div><strong>Hora:</strong> ${new Date().toLocaleString('es-MX')}</div>
+                            <div><strong>Navegador:</strong> ${navigator.userAgent.substring(0, 80)}...</div>
+                            <div><strong>Online:</strong> ${navigator.onLine ? 'Sí' : 'No'}</div>
+                        </div>
+                    </details>
+                `;
+            }
+            
+            if (this.infoArchivos) this.infoArchivos.innerHTML = html;
+            
+            this.mostrarToast(
+                'No se pudo completar la subida. Presiona Subir para reintentar.',
+                'error', undefined, 10000
+            );
+            
+            // Rehabilitar formulario y resetear barra después de 4 segundos
+            setTimeout(() => {
+                this.rehabilitarFormulario();
+                if (this.progresoDiv) this.progresoDiv.style.display = 'none';
+                if (this.barraProgreso) {
+                    this.barraProgreso.classList.remove('bg-danger');
+                    this.barraProgreso.classList.add('progress-bar-animated', 'bg-success');
+                    this.barraProgreso.style.width = '0%';
+                }
+                this.actualizarEstadoBotonSubir();
+            }, 4000);
+        }
     }
     
     /**
