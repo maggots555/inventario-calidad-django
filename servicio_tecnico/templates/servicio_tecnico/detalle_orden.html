@@ -496,6 +496,39 @@
                             </button>
                         </div>
                     </form>
+                    
+                    <!-- BOTÓN: Enviar Diagnóstico al Cliente -->
+                    {% if orden.detalle_equipo.falla_principal and orden.detalle_equipo.diagnostico_sic %}
+                    <div class="d-grid mt-3">
+                        <button type="button" 
+                                class="btn btn-success btn-lg"
+                                data-bs-toggle="modal" 
+                                data-bs-target="#modalEnviarDiagnostico"
+                                {% if not orden.detalle_equipo.email_cliente or orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}
+                                    disabled
+                                    title="⚠️ Configura un email válido del cliente antes de enviar"
+                                {% else %}
+                                    title="Enviar diagnóstico al cliente con PDF adjunto"
+                                {% endif %}>
+                            <i class="bi bi-file-earmark-medical"></i> 📋 Enviar Diagnóstico al Cliente
+                        </button>
+                        {% if not orden.detalle_equipo.email_cliente or orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}
+                        <small class="text-danger text-center mt-1">
+                            <i class="bi bi-exclamation-triangle"></i> Email del cliente no configurado
+                        </small>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="d-grid mt-3">
+                        <button type="button" class="btn btn-outline-secondary" disabled
+                                title="Completa la falla principal y el diagnóstico SIC para habilitar">
+                            <i class="bi bi-file-earmark-medical"></i> 📋 Enviar Diagnóstico al Cliente
+                        </button>
+                        <small class="text-muted text-center mt-1">
+                            <i class="bi bi-info-circle"></i> Completa "Falla principal" y "Diagnóstico SIC" para habilitar
+                        </small>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -684,10 +717,22 @@
                                             </div>
                                         </div>
                                         
-                                        <!-- Fechas -->
+                                        <!-- Fecha de Envío (editable) -->
                                         <div class="mb-3">
                                             <label class="text-muted small">Fecha de Envío:</label>
-                                            <p class="mb-0"><strong>{{ cotizacion.fecha_envio|date:"d/m/Y H:i" }}</strong></p>
+                                            <form method="post" class="d-flex align-items-center gap-2" id="formEditarFechaEnvio">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="form_type" value="editar_fecha_envio">
+                                                <input type="datetime-local" 
+                                                       name="fecha_envio" 
+                                                       class="form-control form-control-sm" 
+                                                       style="max-width: 220px;"
+                                                       value="{{ cotizacion.fecha_envio|date:'Y-m-d\TH:i' }}">
+                                                <button type="submit" class="btn btn-outline-primary btn-sm" title="Guardar fecha">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            </form>
+                                            <small class="text-muted">Editable para ajustar métricas</small>
                                         </div>
                                         
                                         {% if cotizacion.fecha_respuesta %}
@@ -824,7 +869,21 @@
                                             <tr>
                                                 <td class="text-muted">Mano de Obra:</td>
                                                 <td class="text-end">
-                                                    <strong>${{ cotizacion.costo_mano_obra|floatformat:2 }}</strong>
+                                                    <form method="post" class="d-inline-flex align-items-center gap-1" id="formEditarManoObra">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="form_type" value="editar_mano_obra">
+                                                        <span class="text-muted">$</span>
+                                                        <input type="number" 
+                                                               name="costo_mano_obra" 
+                                                               class="form-control form-control-sm text-end" 
+                                                               style="max-width: 110px;"
+                                                               step="0.01"
+                                                               min="0"
+                                                               value="{{ cotizacion.costo_mano_obra|floatformat:2 }}">
+                                                        <button type="submit" class="btn btn-outline-primary btn-sm" title="Guardar mano de obra">
+                                                            <i class="bi bi-check-lg"></i>
+                                                        </button>
+                                                    </form>
                                                     {% if cotizacion.descontar_mano_obra and cotizacion.usuario_acepto %}
                                                         <span class="badge bg-success ms-1" title="Descuento aplicado">
                                                             🎁 GRATIS
@@ -2819,6 +2878,387 @@
 <!-- ============================================================================ -->
 
 <!-- ============================================================================ -->
+<!-- MODAL: ENVIAR DIAGNÓSTICO AL CLIENTE -->
+<!-- ============================================================================ -->
+<div class="modal fade" id="modalEnviarDiagnostico" tabindex="-1" aria-labelledby="modalEnviarDiagnosticoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <!-- Encabezado del Modal -->
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);">
+                <h5 class="modal-title" id="modalEnviarDiagnosticoLabel">
+                    <i class="bi bi-file-earmark-medical"></i> 📋 Enviar Diagnóstico al Cliente
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <!-- Cuerpo del Modal -->
+            <div class="modal-body" style="padding: 1.5rem;">
+                <form id="formEnviarDiagnostico" method="post" action="{% url 'servicio_tecnico:enviar_diagnostico_cliente' orden.id %}">
+                    {% csrf_token %}
+                    
+                    <!-- SECCIÓN 1: FOLIO PERSONALIZADO -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-hash text-success fs-5 me-2"></i>
+                            <h6 class="mb-0 text-success fw-bold">Folio del Diagnóstico</h6>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="inputFolioDiagnostico" class="form-label fw-bold">
+                                <i class="bi bi-upc-scan"></i> Folio personalizado <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   id="inputFolioDiagnostico" 
+                                   name="folio"
+                                   placeholder="Ej: MX_CIS_MX_MONTERREY1_02690"
+                                   required>
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i> 
+                                Escribe el folio completo tal como debe aparecer en el PDF y en el asunto del correo.
+                            </small>
+                        </div>
+                        
+                        <!-- Vista previa del asunto -->
+                        <div class="alert alert-light border-start border-4 border-success py-2">
+                            <small class="text-muted"><strong>Asunto del correo:</strong></small>
+                            <div class="fw-bold text-success" id="previewAsuntoDiagnostico">
+                                DIAGNOSTICO FOLIO <span id="spanFolioPreview" class="text-primary">___</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- SECCIÓN 2: DESTINATARIO PRINCIPAL -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-person-fill text-primary fs-5 me-2"></i>
+                            <h6 class="mb-0 text-primary fw-bold">Para: (Destinatario principal)</h6>
+                        </div>
+                        
+                        {% if orden.detalle_equipo.email_cliente and orden.detalle_equipo.email_cliente != 'cliente@ejemplo.com' %}
+                        <div class="destinatario-card p-3 border rounded shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); border: 2px solid #4caf50 !important;">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-person-check-fill text-success fs-2 me-3 flex-shrink-0"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold text-success">
+                                        <i class="bi bi-laptop"></i> Cliente del Equipo
+                                        <span class="badge bg-success ms-2">
+                                            <i class="bi bi-check-circle-fill"></i> VÁLIDO
+                                        </span>
+                                    </div>
+                                    <small class="text-dark d-block mt-1">
+                                        <i class="bi bi-envelope-fill"></i> <strong>{{ orden.detalle_equipo.email_cliente }}</strong>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning border-warning border-2">
+                            <i class="bi bi-exclamation-triangle-fill fs-3 me-3"></i>
+                            <strong>⚠️ Email del cliente no configurado.</strong>
+                            Cierra este modal y edita la información del equipo primero.
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- SECCIÓN 3: CON COPIA A -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-file-earmark-text-fill text-info fs-5 me-2"></i>
+                            <h6 class="mb-0 text-info fw-bold">Con copia a: (Opcional)</h6>
+                        </div>
+                        
+                        <div class="row g-3">
+                            <!-- Técnico asignado -->
+                            <div class="col-12">
+                                <h6 class="mb-2"><i class="bi bi-tools text-success"></i> Técnico Asignado</h6>
+                                {% if orden.tecnico_asignado_actual and orden.tecnico_asignado_actual.email %}
+                                <label class="destinatario-card p-3 border rounded bg-light d-block mb-0 cursor-pointer" for="diag_tecnico_asignado">
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-3 flex-shrink-0" 
+                                               type="checkbox" name="copia_tecnico" 
+                                               value="{{ orden.tecnico_asignado_actual.email }}" 
+                                               id="diag_tecnico_asignado">
+                                        <i class="bi bi-person-badge-fill text-success fs-3 me-2 flex-shrink-0"></i>
+                                        <div class="flex-grow-1">
+                                            <div class="fw-bold">{{ orden.tecnico_asignado_actual.nombre_completo }}</div>
+                                            <small class="text-muted">
+                                                <span class="badge bg-success me-1">TÉCNICO</span>
+                                                {{ orden.tecnico_asignado_actual.email }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </label>
+                                {% else %}
+                                <div class="alert alert-info mb-0">
+                                    <i class="bi bi-info-circle"></i> Sin técnico asignado o sin email configurado.
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-12"><hr class="my-2"></div>
+                            
+                            <!-- Empleados internos -->
+                            <div class="col-12">
+                                <h6 class="mb-2"><i class="bi bi-people-fill text-info"></i> Empleados Internos</h6>
+                                {% if empleados_copia_imagenes %}
+                                <div class="row g-2">
+                                    {% for empleado in empleados_copia_imagenes %}
+                                    <div class="col-lg-6 col-md-12">
+                                        <label class="destinatario-card p-3 border rounded bg-light d-block mb-0 cursor-pointer" for="diag_emp_{{ empleado.id }}">
+                                            <div class="d-flex align-items-center">
+                                                <input class="form-check-input me-3 flex-shrink-0" 
+                                                       type="checkbox" name="copia_empleados" 
+                                                       value="{{ empleado.email }}" 
+                                                       id="diag_emp_{{ empleado.id }}">
+                                                <i class="bi bi-person-badge text-info fs-3 me-2 flex-shrink-0"></i>
+                                                <div class="flex-grow-1" style="min-width: 0;">
+                                                    <div class="fw-bold text-truncate">{{ empleado.nombre_completo }}</div>
+                                                    <small class="text-muted">
+                                                        <span class="badge bg-secondary me-1">{{ empleado.area }}</span>
+                                                        <span class="text-truncate d-inline-block" style="max-width: 180px; vertical-align: middle;">{{ empleado.email }}</span>
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info mb-0">
+                                    <i class="bi bi-info-circle"></i> Sin empleados disponibles con email.
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- SECCIÓN 4: CHECKLIST DE COMPONENTES -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-list-check text-warning fs-5 me-2"></i>
+                                <h6 class="mb-0 text-warning fw-bold">
+                                    Observaciones Adicionales (Componentes)
+                                    <span class="badge bg-warning text-dark ms-2" id="contadorComponentesSeleccionados">0 seleccionados</span>
+                                </h6>
+                            </div>
+                            <!-- Botón para agregar componentes adicionales -->
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-success dropdown-toggle" 
+                                        type="button" 
+                                        id="btnAgregarComponente" 
+                                        data-bs-toggle="dropdown" 
+                                        aria-expanded="false"
+                                        data-componentes='{{ componentes_adicionales_json }}'>
+                                    <i class="bi bi-plus-circle"></i> Agregar Componente
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" 
+                                    aria-labelledby="btnAgregarComponente" 
+                                    id="dropdownComponentesAdicionales"
+                                    style="max-height: 300px; overflow-y: auto;">
+                                    <!-- Los componentes se cargarán dinámicamente via JavaScript -->
+                                    <li><span class="dropdown-item text-muted small"><i class="bi bi-hourglass-split"></i> Cargando...</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered table-hover mb-0" id="tablaComponentesDiagnostico">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th style="width: 40px;" class="text-center">✓</th>
+                                        <th>Componente</th>
+                                        <th style="width: 280px;">DPN / Número de parte</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for comp in componentes_diagnostico_orden %}
+                                    <tr>
+                                        <td class="text-center align-middle">
+                                            <input class="form-check-input checkbox-componente" 
+                                                   type="checkbox" 
+                                                   data-componente-db="{{ comp.componente_db }}"
+                                                   id="comp_{{ forloop.counter }}">
+                                        </td>
+                                        <td class="align-middle fw-semibold">
+                                            <label for="comp_{{ forloop.counter }}" class="mb-0 cursor-pointer d-block">
+                                                {{ comp.label_pdf }}
+                                            </label>
+                                        </td>
+                                        <td class="align-middle">
+                                            <input type="text" 
+                                                   class="form-control form-control-sm input-dpn"
+                                                   data-componente-db="{{ comp.componente_db }}"
+                                                   placeholder="Ej: DPN: 0XPJWG">
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <!-- Sección para componentes adicionales dinámicos -->
+                                <tbody id="componentesAdicionales">
+                                    <!-- Las filas de componentes adicionales se insertarán aquí via JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <small class="text-muted d-block mt-2">
+                            <i class="bi bi-lightbulb"></i> 
+                            Marca los componentes afectados y opcionalmente ingresa el DPN o número de parte.
+                            Los componentes marcados se pre-crearán como piezas cotizadas.
+                        </small>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- SECCIÓN 5: IMÁGENES DE DIAGNÓSTICO -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-images text-primary fs-5 me-2"></i>
+                            <h6 class="mb-0 text-primary fw-bold">
+                                Imágenes de diagnóstico (Opcional)
+                                <span class="badge bg-primary ms-2" id="contadorImagenesDiagSeleccionadas">0 seleccionadas</span>
+                            </h6>
+                        </div>
+                        
+                        {% if imagenes_por_tipo.diagnostico %}
+                        <div class="mb-3">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="seleccionarTodasImagenesDiag">
+                                <label class="form-check-label fw-bold" for="seleccionarTodasImagenesDiag">
+                                    <i class="bi bi-check-all"></i> Seleccionar todas las imágenes
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="row g-3" id="galeriaImagenesDiagnosticoModal">
+                            {% for imagen in imagenes_por_tipo.diagnostico %}
+                            <div class="col-lg-3 col-md-4 col-sm-6">
+                                <label class="card h-100 hover-shadow cursor-pointer imagen-selectable" for="diag_img_{{ imagen.id }}">
+                                    <div class="position-relative">
+                                        <img src="{{ imagen.imagen.url }}" 
+                                             class="card-img-top" 
+                                             alt="Imagen {{ forloop.counter }}"
+                                             style="height: 200px; object-fit: cover;">
+                                        <div class="position-absolute top-0 start-0 m-2">
+                                            <input class="form-check-input checkbox-imagen-diag" 
+                                                   type="checkbox" 
+                                                   name="imagenes_seleccionadas" 
+                                                   value="{{ imagen.id }}" 
+                                                   id="diag_img_{{ imagen.id }}"
+                                                   style="width: 1.5rem; height: 1.5rem;">
+                                        </div>
+                                        <div class="position-absolute bottom-0 end-0 m-2">
+                                            <span class="badge bg-dark bg-opacity-75">
+                                                <i class="bi bi-calendar3"></i> {{ imagen.fecha_subida|date:"d/m/Y" }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <small class="text-muted d-block text-truncate">
+                                            {% if imagen.descripcion %}{{ imagen.descripcion }}{% else %}Imagen de diagnóstico{% endif %}
+                                        </small>
+                                    </div>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle"></i>
+                            <small>
+                                <strong>Nota:</strong> Las imágenes se enviarán comprimidas automáticamente. Son opcionales.
+                            </small>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-secondary">
+                            <i class="bi bi-camera"></i>
+                            <strong>Sin imágenes de diagnóstico.</strong> No hay imágenes tipo "Diagnóstico" para esta orden.
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- SECCIÓN 6: MENSAJE PERSONALIZADO -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-chat-left-text text-success fs-5 me-2"></i>
+                            <h6 class="mb-0 text-success fw-bold">Mensaje personalizado (Opcional)</h6>
+                        </div>
+                        
+                        <div class="form-floating">
+                            <textarea class="form-control" 
+                                      placeholder="Mensaje adicional" 
+                                      id="diagMensajePersonalizado"
+                                      name="mensaje_personalizado"
+                                      style="height: 100px;"></textarea>
+                            <label for="diagMensajePersonalizado">
+                                <i class="bi bi-pencil"></i> Mensaje adicional para el cliente
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- SECCIÓN 7: VISTA PREVIA DEL PDF -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-eye-fill text-info fs-5 me-2"></i>
+                            <h6 class="mb-0 text-info fw-bold">Vista previa del PDF</h6>
+                        </div>
+                        
+                        <div class="d-flex justify-content-end mb-2">
+                            <button type="button" class="btn btn-outline-info btn-sm" id="btnRefrescarPreviewDiag">
+                                <i class="bi bi-arrow-clockwise"></i> Actualizar Vista Previa
+                            </button>
+                        </div>
+                        
+                        <div class="border rounded overflow-hidden shadow-sm" style="height: 500px;">
+                            <iframe id="iframePreviewDiagnostico" 
+                                    src="about:blank" 
+                                    style="width: 100%; height: 100%; border: none;"
+                                    title="Vista previa del PDF de diagnóstico"></iframe>
+                        </div>
+                        
+                        <small class="text-muted d-block mt-2">
+                            <i class="bi bi-info-circle"></i> 
+                            Haz clic en "Actualizar Vista Previa" para ver cómo se verá el PDF con los datos actuales.
+                        </small>
+                    </div>
+                    
+                    <!-- Campo oculto para componentes (se llena via JS) -->
+                    <input type="hidden" name="componentes" id="inputComponentesJSON" value="[]">
+                    
+                </form>
+            </div>
+            
+            <!-- Footer del Modal -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="button" 
+                        class="btn btn-success btn-lg"
+                        id="btnEnviarDiagnostico"
+                        {% if not orden.detalle_equipo.email_cliente or orden.detalle_equipo.email_cliente == 'cliente@ejemplo.com' %}
+                            disabled
+                        {% endif %}
+                        title="Enviar diagnóstico al cliente por correo electrónico">
+                    <i class="bi bi-send-fill"></i> Enviar Diagnóstico
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================================ -->
 <!-- MODAL: ENVIAR IMÁGENES AL CLIENTE -->
 <!-- ============================================================================ -->
 <div class="modal fade" id="modalEnviarImagenesCliente" tabindex="-1" aria-labelledby="modalEnviarImagenesClienteLabel" aria-hidden="true">
@@ -3391,6 +3831,9 @@
 
 <!-- Cámara integrada - v5.4: Modo manual + 270° por defecto -->
 <script src="{% static 'js/camara_integrada.js' %}?v=6.0"></script>
+
+<!-- Modal de envío de diagnóstico al cliente -->
+<script src="{% static 'js/diagnostico_modal.js' %}?v=1.0"></script>
 
 <script>
 // ============================================================================

@@ -144,6 +144,16 @@ urlpatterns = [
          views.enviar_imagenes_cliente, 
          name='enviar_imagenes_cliente'),
     
+    # Enviar diagnóstico al cliente con PDF adjunto
+    path('orden/<int:orden_id>/enviar-diagnostico-cliente/', 
+         views.enviar_diagnostico_cliente, 
+         name='enviar_diagnostico_cliente'),
+    
+    # Preview del PDF de diagnóstico (para iframe en modal)
+    path('orden/<int:orden_id>/preview-pdf-diagnostico/', 
+         views.preview_pdf_diagnostico, 
+         name='preview_pdf_diagnostico'),
+    
     # Vista de prueba: GENERACIÓN DE PDF RHITSO (FASE 10.2)
     # ========================================================================
     # Esta vista es temporal para probar la generación de PDF

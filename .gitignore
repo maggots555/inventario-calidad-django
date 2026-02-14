@@ -111,3 +111,4 @@ logs/
 # Archivos CSV con datos sensibles (productos, precios, inventario)
 scripts/poblado/*.csv
 scripts/poblado/*.xlsx
+.github/prompts/

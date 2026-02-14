@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico - {{ folio }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(180deg, #ffffff 0%, #e3f2fd 50%, #90caf9 100%);
+            color: #051d63;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .header::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231976d2' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        
+        .logo-container {
+            position: relative;
+            z-index: 1;
+            margin-bottom: 15px;
+        }
+        
+        .logo-image {
+            max-width: 180px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+        }
+        
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .intro-text {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 25px;
+            line-height: 1.8;
+        }
+        
+        .equipment-info {
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .info-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1565c0;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1565c0;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            min-width: 180px;
+            flex-shrink: 0;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            font-size: 15px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        
+        .info-value.highlight {
+            color: #1565c0;
+            font-weight: 700;
+            font-size: 16px;
+        }
+        
+        .message-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .message-title {
+            font-weight: 700;
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+        
+        .message-content {
+            color: #664d03;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .attachments-box {
+            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            text-align: center;
+            border: 1px solid #a5d6a7;
+        }
+        
+        .attachments-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+        
+        .attachments-count {
+            font-size: 36px;
+            font-weight: 800;
+            color: #1b5e20;
+            margin: 5px 0;
+        }
+        
+        .attachments-text {
+            font-size: 14px;
+            color: #388e3c;
+        }
+        
+        .attachments-detail {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #2e7d32;
+            text-align: left;
+            padding: 10px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 8px;
+        }
+        
+        .help-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+            border-left: 4px solid #1565c0;
+        }
+        
+        .help-title {
+            font-weight: 700;
+            color: #1565c0;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+        
+        .help-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.8;
+        }
+        
+        .footer {
+            background: linear-gradient(180deg, #0d47a1, #051d63);
+            color: #ffffff;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .signature {
+            margin-bottom: 20px;
+        }
+        
+        .signature-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .signature-role {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .company {
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+        
+        .social-media {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .social-title {
+            font-size: 13px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+        
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .social-link {
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            transition: background 0.3s ease;
+        }
+        
+        .social-link:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .social-icon {
+            font-size: 16px;
+        }
+        
+        .timestamp {
+            margin-top: 20px;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        
+        @media only screen and (max-width: 600px) {
+            .container { margin: 10px; }
+            .content { padding: 20px; }
+            .info-row { flex-direction: column; }
+            .info-label { min-width: unset; margin-bottom: 3px; }
+            .header { padding: 20px; }
+            .logo { font-size: 22px; }
+            .subtitle { font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-container">
+                <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
+            </div>
+            <div class="logo">📋 DIAGNÓSTICO DE EQUIPO</div>
+            <div class="subtitle">Folio: {{ folio }}</div>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Buen día estimado usuario
+            </div>
+            
+            <div class="intro-text">
+                Me dirijo de <strong>{{ empresa_nombre }}</strong>, para hacer de su conocimiento el diagnóstico
+                realizado por nuestro Ingeniero a su equipo de cómputo (documento adjunto); así mismo,
+                notificando que su cotización está en proceso y se la haremos llegar a la brevedad.
+            </div>
+            
+            <div class="intro-text">
+                Le recordamos que no contamos localmente con un stock de piezas, revisaremos existencia,
+                tiempo de entrega y costo con nuestros proveedores logísticos; en cuanto tengamos esta
+                información se la proporcionaremos a usted por este mismo medio (de 1 a 6 días hábiles
+                después de la recepción de este correo).
+            </div>
+            
+            <div class="intro-text">
+                Agradecemos su preferencia y nos ponemos a sus órdenes para esta y futuras ocasiones.
+            </div>
+            
+            <div class="equipment-info">
+                <div class="info-title">📋 INFORMACIÓN DE SU EQUIPO</div>
+                
+                <div class="info-row">
+                    <div class="info-label">📑 Folio Diagnóstico:</div>
+                    <div class="info-value highlight">{{ folio }}</div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">🎯 Número de Orden:</div>
+                    <div class="info-value highlight">
+                        {% if detalle.orden_cliente %}
+                            {{ detalle.orden_cliente }}
+                        {% else %}
+                            {{ orden.numero_orden_interno }}
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">💻 Equipo:</div>
+                    <div class="info-value">
+                        {{ detalle.tipo_equipo }} {{ detalle.marca }} 
+                        {% if detalle.modelo %}{{ detalle.modelo }}{% endif %}
+                    </div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">🔢 Número de Serie:</div>
+                    <div class="info-value">{{ detalle.numero_serie }}</div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">📅 Fecha de Ingreso:</div>
+                    <div class="info-value">{{ orden.fecha_ingreso|date:"d/m/Y H:i" }}</div>
+                </div>
+            </div>
+            
+            {% if mensaje_personalizado %}
+            <div class="message-box">
+                <div class="message-title">💬 Mensaje Adicional</div>
+                <div class="message-content">
+                    {{ mensaje_personalizado|linebreaks }}
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="attachments-box">
+                <div class="attachments-title">📎 ARCHIVOS ADJUNTOS</div>
+                <div class="attachments-count">{{ cantidad_imagenes|add:1 }}</div>
+                <div class="attachments-text">
+                    archivo{{ cantidad_imagenes|add:1|pluralize }} adjunto{{ cantidad_imagenes|add:1|pluralize }} a este correo
+                </div>
+                <div class="attachments-detail">
+                    <strong>📄 1 PDF</strong> — Diagnóstico completo con observaciones técnicas<br>
+                    {% if cantidad_imagenes > 0 %}
+                    <strong>📸 {{ cantidad_imagenes }} imagen{{ cantidad_imagenes|pluralize:"es" }}</strong> — Fotografías del diagnóstico
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="help-section">
+                <div class="help-title">ℹ️ Información Importante</div>
+                <div class="help-text">
+                    <strong>•</strong> El documento PDF adjunto contiene el diagnóstico detallado de su equipo.<br>
+                    <strong>•</strong> La cotización de las piezas necesarias será enviada a la brevedad por este mismo medio.<br>
+                    <strong>•</strong> El tiempo estimado de respuesta con cotización es de 1 a 6 días hábiles.<br>
+                    <strong>•</strong> Si tiene alguna pregunta, no dude en contactarnos.
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
+                <p style="margin: 0; font-size: 14px;">
+                    Gracias por confiar en nuestros servicios.
+                </p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-name">
+                    Sistema de Servicio Técnico
+                </div>
+                {% if email_empleado %}
+                <div class="signature-role" style="margin-top: 10px; font-size: 14px;">
+                    ✉️ Contacto: {{ email_empleado }}
+                </div>
+                {% endif %}
+                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 18.2px;">
+                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                </div>
+                <div class="signature-area" style="margin-top: 10px; font-size: 16.9px; line-height: 1.5;">
+                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                    Para seguimiento de su orden, contacte directamente a 
+                    {% if nombre_empleado %}
+                        <strong>{{ nombre_empleado }}</strong>
+                        {% if email_empleado %}
+                            (<a href="mailto:{{ email_empleado }}" style="color: #ffffff;">{{ email_empleado }}</a>)
+                        {% endif %}
+                    {% else %}
+                        su responsable de seguimiento
+                    {% endif %}.
+                </div>
+            </div>
+            
+            <div class="company">{{ empresa_nombre }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
+            
+            <div class="social-media">
+                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+                <div class="social-links">
+                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
+                        <span class="social-icon">🌐</span>
+                        <span>Sitio Web</span>
+                    </a>
+                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                        <span class="social-icon">📷</span>
+                        <span>Instagram</span>
+                    </a>
+                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                        <span class="social-icon">👍</span>
+                        <span>Facebook</span>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="timestamp">
+                📅 Enviado el {{ fecha_envio|date:"d/m/Y" }} a las {{ fecha_envio|date:"H:i" }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -37,12 +37,14 @@ from .models import (
     ConfiguracionRHITSO,
 )
 from inventario.models import Empleado, Sucursal
+from scorecard.models import ComponenteEquipo
 from config.constants import (
     ESTADO_ORDEN_CHOICES,
     ESTADO_PIEZA_CHOICES,
     ESTADOS_PIEZA_RECIBIDOS,
     ESTADOS_PIEZA_PENDIENTES,
-    ESTADOS_PIEZA_PROBLEMATICOS
+    ESTADOS_PIEZA_PROBLEMATICOS,
+    COMPONENTES_DIAGNOSTICO_ORDEN,
 )
 from .utils_rhitso import (
     calcular_dias_habiles,
@@ -1791,6 +1793,82 @@ def detalle_orden(request, orden_id):
                 messages.error(request, '❌ Error al crear la cotización.')
         
         # ------------------------------------------------------------------------
+        # FORMULARIO 8.5: Editar Fecha de Envío de Cotización
+        # ------------------------------------------------------------------------
+        elif form_type == 'editar_fecha_envio':
+            if not hasattr(orden, 'cotizacion'):
+                messages.error(request, '❌ No existe una cotización para esta orden.')
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+            
+            fecha_envio_str = request.POST.get('fecha_envio', '').strip()
+            if fecha_envio_str:
+                try:
+                    from datetime import datetime as dt
+                    nueva_fecha = dt.strptime(fecha_envio_str, '%Y-%m-%dT%H:%M')
+                    from django.utils import timezone
+                    if timezone.is_naive(nueva_fecha):
+                        nueva_fecha = timezone.make_aware(nueva_fecha)
+                    
+                    cotizacion = orden.cotizacion
+                    fecha_anterior = cotizacion.fecha_envio
+                    cotizacion.fecha_envio = nueva_fecha
+                    cotizacion.save(update_fields=['fecha_envio'])
+                    
+                    messages.success(request, f'✅ Fecha de envío actualizada a: {nueva_fecha.strftime("%d/%m/%Y %H:%M")}')
+                    
+                    HistorialOrden.objects.create(
+                        orden=orden,
+                        tipo_evento='cotizacion',
+                        comentario=f'Fecha de envío de cotización editada: {fecha_anterior.strftime("%d/%m/%Y %H:%M") if fecha_anterior else "N/A"} → {nueva_fecha.strftime("%d/%m/%Y %H:%M")}',
+                        usuario=empleado_actual,
+                        es_sistema=False
+                    )
+                except (ValueError, TypeError) as e:
+                    messages.error(request, f'❌ Formato de fecha inválido: {str(e)}')
+            else:
+                messages.error(request, '❌ No se proporcionó una fecha válida.')
+            
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+        
+        # ------------------------------------------------------------------------
+        # FORMULARIO 8.6: Editar Costo de Mano de Obra
+        # ------------------------------------------------------------------------
+        elif form_type == 'editar_mano_obra':
+            if not hasattr(orden, 'cotizacion'):
+                messages.error(request, '❌ No existe una cotización para esta orden.')
+                return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+            
+            costo_mano_obra_str = request.POST.get('costo_mano_obra', '').strip()
+            if costo_mano_obra_str:
+                try:
+                    from decimal import Decimal, InvalidOperation
+                    nuevo_costo = Decimal(costo_mano_obra_str)
+                    if nuevo_costo < 0:
+                        messages.error(request, '❌ El costo de mano de obra no puede ser negativo.')
+                        return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+                    
+                    cotizacion = orden.cotizacion
+                    costo_anterior = cotizacion.costo_mano_obra
+                    cotizacion.costo_mano_obra = nuevo_costo
+                    cotizacion.save(update_fields=['costo_mano_obra'])
+                    
+                    messages.success(request, f'✅ Mano de obra actualizada: ${costo_anterior} → ${nuevo_costo}')
+                    
+                    HistorialOrden.objects.create(
+                        orden=orden,
+                        tipo_evento='cotizacion',
+                        comentario=f'Costo de mano de obra editado: ${costo_anterior} → ${nuevo_costo}',
+                        usuario=empleado_actual,
+                        es_sistema=False
+                    )
+                except (InvalidOperation, ValueError, TypeError) as e:
+                    messages.error(request, f'❌ Valor de mano de obra inválido: {str(e)}')
+            else:
+                messages.error(request, '❌ No se proporcionó un valor válido para mano de obra.')
+            
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+        
+        # ------------------------------------------------------------------------
         # FORMULARIO 9: Gestionar Cotización (Aceptar/Rechazar)
         # ------------------------------------------------------------------------
         elif form_type == 'gestionar_cotizacion':
@@ -2187,6 +2265,27 @@ def detalle_orden(request, orden_id):
     )
     form_pieza_venta_mostrador = PiezaVentaMostradorForm()
     
+    # ========================================================================
+    # COMPONENTES ADICIONALES PARA EL MODAL DE DIAGNÓSTICO
+    # ========================================================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Obtenemos todos los ComponenteEquipo activos de la base de datos,
+    # EXCLUYENDO los que ya están en COMPONENTES_DIAGNOSTICO_ORDEN.
+    # Esto permite al usuario agregar componentes adicionales no predefinidos.
+    
+    # Nombres de componentes ya predefinidos
+    componentes_predefinidos = [comp['componente_db'] for comp in COMPONENTES_DIAGNOSTICO_ORDEN]
+    
+    # Obtener ComponenteEquipo que NO están en la lista predefinida
+    componentes_adicionales_disponibles = ComponenteEquipo.objects.filter(
+        activo=True
+    ).exclude(
+        nombre__in=componentes_predefinidos
+    ).values('nombre').order_by('nombre')
+    
+    # Convertir a lista simple de nombres para JavaScript
+    componentes_adicionales_list = [comp['nombre'] for comp in componentes_adicionales_disponibles]
+    
     context = {
         'orden': orden,
         'detalle': orden.detalle_equipo,
@@ -2230,6 +2329,10 @@ def detalle_orden(request, orden_id):
         
         # Empleados para copia en envío de imágenes
         'empleados_copia_imagenes': empleados_copia_imagenes,
+        
+        # Componentes para el modal de diagnóstico
+        'componentes_diagnostico_orden': COMPONENTES_DIAGNOSTICO_ORDEN,
+        'componentes_adicionales_json': mark_safe(json.dumps(componentes_adicionales_list)),
         
         # Información adicional
         'dias_en_servicio': orden.dias_en_servicio,  # Días naturales (mantener por compatibilidad)
@@ -5981,6 +6084,544 @@ def enviar_imagenes_cliente(request, orden_id):
             from django.contrib import messages
             messages.error(request, f'❌ Error al enviar el correo: {str(e)}')
             return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
+
+
+# ============================================================================
+# ENVIAR DIAGNÓSTICO AL CLIENTE CON PDF ADJUNTO
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@require_http_methods(["POST"])
+def enviar_diagnostico_cliente(request, orden_id):
+    """
+    Vista para enviar el diagnóstico técnico al cliente por correo electrónico.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista genera un PDF con el formato de diagnóstico SIC, adjunta imágenes
+    de diagnóstico seleccionadas, pre-crea las piezas cotizadas basándose en los
+    componentes marcados, y envía todo por correo al cliente.
+    
+    Flujo:
+    1. Valida datos (email, diagnóstico, folio)
+    2. Genera PDF con PDFGeneratorDiagnostico
+    3. Comprime imágenes de diagnóstico seleccionadas
+    4. Crea/obtiene Cotización y pre-crea PiezaCotizada
+    5. Envía correo con PDF + imágenes adjuntas
+    6. Cambia estado a 'diagnostico_enviado_cliente'
+    7. Registra en historial
+    
+    Args:
+        request: HttpRequest con datos POST del formulario del modal
+        orden_id: ID de la orden de servicio
+    
+    Returns:
+        JsonResponse con resultado del envío
+    """
+    import io
+    import re
+    from decimal import Decimal
+    from pathlib import Path
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.conf import settings
+    from scorecard.models import ComponenteEquipo
+    from .models import Cotizacion, PiezaCotizada
+    from .utils.pdf_diagnostico import PDFGeneratorDiagnostico
+    
+    try:
+        # =======================================================================
+        # PASO 1: OBTENER Y VALIDAR LA ORDEN
+        # =======================================================================
+        orden = get_object_or_404(
+            OrdenServicio.objects.select_related('detalle_equipo'),
+            pk=orden_id
+        )
+        detalle = orden.detalle_equipo
+        
+        # Validar que el cliente tenga email configurado
+        email_cliente = detalle.email_cliente
+        if not email_cliente or email_cliente == 'cliente@ejemplo.com':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ El email del cliente no está configurado o es el valor por defecto. '
+                        'Por favor, actualiza el email del cliente antes de enviar.'
+            }, status=400)
+        
+        # Validar que tenga diagnóstico SIC
+        if not detalle.diagnostico_sic or not detalle.diagnostico_sic.strip():
+            return JsonResponse({
+                'success': False,
+                'error': '❌ El diagnóstico SIC está vacío. Debes completar el diagnóstico antes de enviar.'
+            }, status=400)
+        
+        # Validar que tenga falla principal
+        if not detalle.falla_principal or not detalle.falla_principal.strip():
+            return JsonResponse({
+                'success': False,
+                'error': '❌ La falla principal está vacía. Debes registrar la falla antes de enviar.'
+            }, status=400)
+        
+        # =======================================================================
+        # PASO 2: OBTENER DATOS DEL FORMULARIO
+        # =======================================================================
+        folio = request.POST.get('folio', '').strip()
+        if not folio:
+            return JsonResponse({
+                'success': False,
+                'error': '❌ El folio es obligatorio. Ingresa un folio para el diagnóstico.'
+            }, status=400)
+        
+        # Obtener componentes seleccionados del formulario
+        # Se envían como JSON array desde el frontend
+        componentes_json = request.POST.get('componentes', '[]')
+        try:
+            componentes_data = json.loads(componentes_json)
+        except (json.JSONDecodeError, ValueError):
+            componentes_data = []
+        
+        # Imágenes seleccionadas (IDs de ImagenOrden tipo 'diagnostico')
+        imagenes_ids = request.POST.getlist('imagenes_seleccionadas')
+        
+        # Destinatarios en copia
+        copia_empleados = request.POST.getlist('copia_empleados', [])
+        copia_tecnico = request.POST.getlist('copia_tecnico', [])
+        destinatarios_copia = list(set(copia_empleados + copia_tecnico))
+        
+        # Mensaje personalizado
+        mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
+        
+        # Email del empleado actual (para footer del PDF)
+        email_empleado = ''
+        nombre_empleado = ''
+        if hasattr(request.user, 'empleado') and request.user.empleado:
+            email_empleado = request.user.empleado.email or ''
+            nombre_empleado = request.user.empleado.nombre_completo or ''
+        
+        print(f"📋 Preparando envío de diagnóstico - Folio: {folio}")
+        print(f"   Componentes recibidos: {len(componentes_data)}")
+        print(f"   Imágenes seleccionadas: {len(imagenes_ids)}")
+        
+        # =======================================================================
+        # PASO 3: GENERAR PDF DE DIAGNÓSTICO
+        # =======================================================================
+        print(f"📄 Generando PDF de diagnóstico...")
+        
+        # Preparar lista de componentes para el PDF
+        componentes_para_pdf = []
+        for comp in componentes_data:
+            componentes_para_pdf.append({
+                'componente_db': comp.get('componente_db', ''),
+                'dpn': comp.get('dpn', ''),
+                'seleccionado': comp.get('seleccionado', False)
+            })
+        
+        # Obtener config del país para que el PDF muestre el nombre correcto
+        from config.paises_config import get_pais_actual
+        _pais_pdf = get_pais_actual()
+        
+        generador_pdf = PDFGeneratorDiagnostico(
+            orden=orden,
+            folio=folio,
+            componentes_seleccionados=componentes_para_pdf,
+            email_empleado=email_empleado,
+            pais_config=_pais_pdf
+        )
+        resultado_pdf = generador_pdf.generar_pdf()
+        
+        if not resultado_pdf['success']:
+            return JsonResponse({
+                'success': False,
+                'error': f'❌ Error al generar el PDF: {resultado_pdf.get("error", "Error desconocido")}'
+            }, status=500)
+        
+        print(f"   ✅ PDF generado: {resultado_pdf['archivo']} ({resultado_pdf['size']/1024:.1f} KB)")
+        
+        # =======================================================================
+        # PASO 4: COMPRIMIR IMÁGENES DE DIAGNÓSTICO
+        # =======================================================================
+        imagenes_comprimidas = []
+        tamaño_total_comprimido = 0
+        
+        if imagenes_ids:
+            print(f"🔄 Comprimiendo {len(imagenes_ids)} imagen(es) de diagnóstico...")
+            
+            imagenes = ImagenOrden.objects.filter(
+                id__in=imagenes_ids,
+                orden=orden,
+                tipo='diagnostico'
+            )
+            
+            for imagen in imagenes:
+                try:
+                    img_path = imagen.imagen.path
+                    
+                    if not Path(img_path).exists() or not Path(img_path).is_file():
+                        print(f"   ⚠️ Imagen no encontrada: {img_path}")
+                        continue
+                    
+                    img = Image.open(img_path)
+                    tamaño_original = os.path.getsize(img_path)
+                    
+                    # Convertir RGBA a RGB si es necesario
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                        img = background
+                    
+                    # Redimensionar si es muy grande
+                    max_dimension = 1920
+                    if max(img.size) > max_dimension:
+                        ratio = max_dimension / max(img.size)
+                        new_size = tuple([int(dim * ratio) for dim in img.size])
+                        img = img.resize(new_size, Image.Resampling.LANCZOS)
+                    
+                    # Comprimir a JPEG calidad 85
+                    output = io.BytesIO()
+                    img.save(output, format='JPEG', quality=85, optimize=True)
+                    output.seek(0)
+                    
+                    tamaño_comprimido = len(output.getvalue())
+                    tamaño_total_comprimido += tamaño_comprimido
+                    
+                    nombre_archivo = f"diagnostico_{imagen.id}_{os.path.basename(imagen.imagen.name)}"
+                    if not nombre_archivo.lower().endswith('.jpg'):
+                        nombre_archivo = os.path.splitext(nombre_archivo)[0] + '.jpg'
+                    
+                    imagenes_comprimidas.append({
+                        'nombre': nombre_archivo,
+                        'contenido': output.getvalue(),
+                        'tamaño_comprimido': tamaño_comprimido
+                    })
+                    
+                    print(f"   ✅ {nombre_archivo}: {tamaño_original/1024:.1f}KB → {tamaño_comprimido/1024:.1f}KB")
+                    
+                except Exception as e:
+                    print(f"   ⚠️ Error procesando imagen {imagen.id}: {str(e)}")
+                    continue
+        
+        # Verificar límite de 25MB (PDF + imágenes)
+        tamaño_pdf = resultado_pdf['size']
+        tamaño_total = tamaño_pdf + tamaño_total_comprimido
+        if tamaño_total > 25 * 1024 * 1024:
+            return JsonResponse({
+                'success': False,
+                'error': f'❌ El tamaño total ({tamaño_total/1024/1024:.1f} MB) '
+                        f'excede el límite de Gmail (25 MB). Selecciona menos imágenes.'
+            }, status=400)
+        
+        # =======================================================================
+        # PASO 5: CREAR/OBTENER COTIZACIÓN Y PRE-CREAR PIEZAS
+        # =======================================================================
+        print(f"💾 Procesando cotización y piezas...")
+        
+        # Obtener o crear la cotización
+        cotizacion, cotizacion_creada = Cotizacion.objects.get_or_create(
+            orden=orden,
+            defaults={
+                'fecha_envio': timezone.now(),
+                'costo_mano_obra': Decimal('0.00'),
+            }
+        )
+        
+        if cotizacion_creada:
+            print(f"   ✅ Cotización creada automáticamente")
+        else:
+            print(f"   ℹ️ Cotización existente encontrada")
+        
+        # Pre-crear PiezaCotizada para cada componente seleccionado
+        piezas_creadas = 0
+        componentes_seleccionados_nombres = []
+        
+        for comp in componentes_data:
+            if comp.get('seleccionado', False):
+                componente_nombre = comp.get('componente_db', '')
+                dpn = comp.get('dpn', '')
+                
+                if not componente_nombre:
+                    continue
+                
+                # Buscar ComponenteEquipo en la base de datos
+                try:
+                    componente_obj = ComponenteEquipo.objects.get(nombre=componente_nombre)
+                except ComponenteEquipo.DoesNotExist:
+                    print(f"   ⚠️ Componente no encontrado en catálogo: {componente_nombre}")
+                    continue
+                
+                # Verificar que no exista ya una pieza para este componente en esta cotización
+                pieza_existente = PiezaCotizada.objects.filter(
+                    cotizacion=cotizacion,
+                    componente=componente_obj
+                ).exists()
+                
+                if not pieza_existente:
+                    PiezaCotizada.objects.create(
+                        cotizacion=cotizacion,
+                        componente=componente_obj,
+                        descripcion_adicional=dpn,
+                        costo_unitario=Decimal('0.00'),
+                        proveedor='',
+                        cantidad=1,
+                        sugerida_por_tecnico=True,
+                        es_necesaria=True,
+                        orden_prioridad=piezas_creadas + 1
+                    )
+                    piezas_creadas += 1
+                    componentes_seleccionados_nombres.append(componente_nombre)
+                    print(f"   ✅ PiezaCotizada creada: {componente_nombre} (DPN: {dpn})")
+                else:
+                    print(f"   ℹ️ Pieza ya existe para: {componente_nombre}")
+        
+        print(f"   📊 Total piezas pre-creadas: {piezas_creadas}")
+        
+        # =======================================================================
+        # PASO 6: PREPARAR Y ENVIAR CORREO ELECTRÓNICO
+        # =======================================================================
+        print(f"📧 Preparando correo electrónico...")
+        
+        # Contexto para el template de email
+        from config.paises_config import get_pais_actual
+        _pais_email = get_pais_actual()
+        
+        context_email = {
+            'orden': orden,
+            'detalle': detalle,
+            'folio': folio,
+            'mensaje_personalizado': mensaje_personalizado,
+            'fecha_envio': timezone.now(),
+            'cantidad_imagenes': len(imagenes_comprimidas),
+            'componentes_seleccionados': componentes_seleccionados_nombres,
+            'piezas_creadas': piezas_creadas,
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
+            'email_empleado': email_empleado,
+            'nombre_empleado': nombre_empleado,
+        }
+        
+        # Renderizar plantilla HTML del email
+        html_content = render_to_string(
+            'servicio_tecnico/emails/diagnostico_cliente.html',
+            context_email
+        )
+        
+        # Construir asunto
+        asunto = f'DIAGNOSTICO FOLIO {folio}'
+        
+        # Configurar remitente
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente = f"Servicio Técnico System <{email_solo}>"
+        
+        # Crear mensaje
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=[email_cliente],
+            cc=destinatarios_copia if destinatarios_copia else None,
+        )
+        email_msg.content_subtype = 'html'
+        
+        # Adjuntar logo SIC como imagen embebida (CID)
+        try:
+            from django.contrib.staticfiles import finders
+            from email.mime.image import MIMEImage
+            
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as logo_file:
+                    logo_data = logo_file.read()
+                    logo_mime = MIMEImage(logo_data, _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+                    print(f"   🖼️ Logo SIC adjuntado")
+        except Exception as e:
+            print(f"   ⚠️ Error al adjuntar logo: {e}")
+        
+        # Adjuntar PDF de diagnóstico
+        with open(resultado_pdf['ruta'], 'rb') as pdf_file:
+            email_msg.attach(
+                resultado_pdf['archivo'],
+                pdf_file.read(),
+                'application/pdf'
+            )
+        print(f"   📄 PDF adjuntado: {resultado_pdf['archivo']}")
+        
+        # Adjuntar imágenes comprimidas
+        for img_data in imagenes_comprimidas:
+            email_msg.attach(
+                img_data['nombre'],
+                img_data['contenido'],
+                'image/jpeg'
+            )
+        
+        # Enviar correo
+        email_msg.send(fail_silently=False)
+        print(f"   ✅ Correo enviado exitosamente a {email_cliente}")
+        
+        # =======================================================================
+        # PASO 7: CAMBIAR ESTADO A 'diagnostico_enviado_cliente'
+        # =======================================================================
+        estado_anterior = orden.estado
+        orden.estado = 'diagnostico_enviado_cliente'
+        orden.save(update_fields=['estado'])
+        
+        print(f"   🔄 Estado cambiado: {estado_anterior} → diagnostico_enviado_cliente")
+        
+        # =======================================================================
+        # PASO 8: REGISTRAR EN HISTORIAL
+        # =======================================================================
+        empleado_actual = request.user.empleado if hasattr(request.user, 'empleado') else None
+        
+        comentario_historial = (
+            f"📧 Diagnóstico enviado al cliente ({email_cliente})\n"
+            f"📋 Folio: {folio}\n"
+            f"📄 PDF adjunto: {resultado_pdf['archivo']}\n"
+            f"🔧 Componentes marcados: {piezas_creadas}\n"
+            f"📸 Imágenes adjuntas: {len(imagenes_comprimidas)}"
+        )
+        
+        if destinatarios_copia:
+            comentario_historial += f"\n👥 Copia a: {', '.join(destinatarios_copia)}"
+        
+        if componentes_seleccionados_nombres:
+            comentario_historial += f"\n🔧 Piezas: {', '.join(componentes_seleccionados_nombres)}"
+        
+        registrar_historial(
+            orden=orden,
+            tipo_evento='email',
+            usuario=empleado_actual,
+            comentario=comentario_historial,
+            es_sistema=False
+        )
+        
+        # Limpiar archivo temporal del PDF
+        try:
+            os.unlink(resultado_pdf['ruta'])
+        except:
+            pass
+        
+        # =======================================================================
+        # PASO 9: RETORNAR RESPUESTA EXITOSA
+        # =======================================================================
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Diagnóstico enviado exitosamente a {email_cliente}',
+            'data': {
+                'destinatario': email_cliente,
+                'folio': folio,
+                'pdf_generado': resultado_pdf['archivo'],
+                'piezas_creadas': piezas_creadas,
+                'imagenes_enviadas': len(imagenes_comprimidas),
+                'estado_nuevo': 'diagnostico_enviado_cliente',
+                'cotizacion_creada': cotizacion_creada,
+                'copia_count': len(destinatarios_copia)
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ Error al enviar diagnóstico al cliente: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error al enviar el diagnóstico: {str(e)}'
+        }, status=500)
+
+
+# ============================================================================
+# PREVIEW PDF DIAGNÓSTICO (para iframe en el modal)
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@require_http_methods(["GET"])
+def preview_pdf_diagnostico(request, orden_id):
+    """
+    Genera el PDF de diagnóstico y lo retorna inline para vista previa en iframe.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista genera el mismo PDF que se enviará al cliente, pero en lugar de
+    enviarlo por correo, lo muestra directamente en el navegador dentro de un
+    iframe. Esto permite al usuario verificar el contenido antes de enviar.
+    
+    Args:
+        request: HttpRequest con parámetros GET (folio, componentes)
+        orden_id: ID de la orden de servicio
+    
+    Returns:
+        HttpResponse con el PDF inline (Content-Disposition: inline)
+    """
+    from django.http import FileResponse
+    from .utils.pdf_diagnostico import PDFGeneratorDiagnostico
+    
+    try:
+        orden = get_object_or_404(
+            OrdenServicio.objects.select_related('detalle_equipo'),
+            pk=orden_id
+        )
+        
+        # Obtener parámetros de query
+        folio = request.GET.get('folio', 'PREVIEW')
+        componentes_json = request.GET.get('componentes', '[]')
+        
+        try:
+            componentes_data = json.loads(componentes_json)
+        except (json.JSONDecodeError, ValueError):
+            componentes_data = []
+        
+        # Email del empleado actual
+        email_empleado = ''
+        if hasattr(request.user, 'empleado') and request.user.empleado:
+            email_empleado = request.user.empleado.email or ''
+        
+        # Preparar componentes para el PDF
+        componentes_para_pdf = []
+        for comp in componentes_data:
+            componentes_para_pdf.append({
+                'componente_db': comp.get('componente_db', ''),
+                'dpn': comp.get('dpn', ''),
+                'seleccionado': comp.get('seleccionado', False)
+            })
+        
+        # Obtener config del país para que el PDF muestre el nombre correcto
+        from config.paises_config import get_pais_actual
+        _pais_pdf = get_pais_actual()
+        
+        # Generar PDF
+        generador = PDFGeneratorDiagnostico(
+            orden=orden,
+            folio=folio,
+            componentes_seleccionados=componentes_para_pdf,
+            email_empleado=email_empleado,
+            pais_config=_pais_pdf
+        )
+        resultado = generador.generar_pdf()
+        
+        if not resultado['success']:
+            return HttpResponse(
+                f'Error al generar PDF: {resultado.get("error", "Desconocido")}',
+                status=500
+            )
+        
+        # Retornar PDF inline
+        response = FileResponse(
+            open(resultado['ruta'], 'rb'),
+            content_type='application/pdf'
+        )
+        response['Content-Disposition'] = f'inline; filename="{resultado["archivo"]}"'
+        
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error generando preview PDF diagnóstico: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return HttpResponse(f'Error: {str(e)}', status=500)
 
 
 # ============================================================================

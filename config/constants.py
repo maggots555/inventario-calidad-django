@@ -153,6 +153,39 @@ COMPONENTES_PAQUETES = {
 }
 
 # ============================================================================
+# COMPONENTES PARA DIAGNÓSTICO - Orden del formato PDF de diagnóstico SIC
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Esta lista define los componentes que aparecen en el PDF de diagnóstico y en
+# el modal de envío de diagnóstico al cliente. Cada tupla tiene:
+#   - 'componente_db': Nombre del componente como está en ComponenteEquipo (BD)
+#   - 'label_pdf': Nombre que se muestra en el PDF (formato oficial SIC)
+#   - 'orden': Número de orden para la tabla del PDF
+#
+# El mapeo permite reutilizar el catálogo de ComponenteEquipo que ya existe
+# pero mostrando los nombres en el formato oficial que el cliente espera.
+COMPONENTES_DIAGNOSTICO_ORDEN = [
+    {'componente_db': 'Motherboard',          'label_pdf': 'TARJETA (MOTHERBOARD)',  'orden': 1},
+    {'componente_db': 'Pantalla',             'label_pdf': 'LCD Ó DISPLAY',          'orden': 2},
+    {'componente_db': 'Disco Duro / SSD',     'label_pdf': 'DISCO DURO Ó SSD',       'orden': 3},
+    {'componente_db': 'Teclado',              'label_pdf': 'TECLADO/PALMREST',       'orden': 4},
+    {'componente_db': 'Cargador',             'label_pdf': 'ELIMINADOR(CARGADOR)',   'orden': 5},
+    {'componente_db': 'Batería',              'label_pdf': 'BATERIA',                'orden': 6},
+    {'componente_db': 'DC-IN',                'label_pdf': 'DC-IN',                  'orden': 7},
+    {'componente_db': 'Botón',                'label_pdf': 'BOTÓN',                  'orden': 8},
+    {'componente_db': 'WiFi / Bluetooth',     'label_pdf': 'ANTENAS',                'orden': 9},
+    {'componente_db': 'Touchpad',             'label_pdf': 'TOUCH PAD',              'orden': 10},
+    {'componente_db': 'Sistema Operativo',    'label_pdf': 'SISTEMA OPERATIVO',      'orden': 11},
+    {'componente_db': 'Bisagras',             'label_pdf': 'BISAGRAS',               'orden': 12},
+    {'componente_db': 'RAM',                  'label_pdf': 'MEMORIA RAM',            'orden': 13},
+    {'componente_db': 'Ventilador / Cooling', 'label_pdf': 'VENTILADOR',             'orden': 14},
+    {'componente_db': 'Carcasa / Chasis',     'label_pdf': 'PLASTICOS / BISEL',      'orden': 15},
+    {'componente_db': 'Cable',                'label_pdf': 'CABLE',                  'orden': 16},
+    {'componente_db': 'Webcam',               'label_pdf': 'CAMARA',                 'orden': 17},
+    {'componente_db': 'Limpieza y mantenimiento', 'label_pdf': 'LIMPIEZA Y MANTENIMIENTO', 'orden': 18},
+]
+
+# ============================================================================
 # TIPO DE IMÁGENES - Para clasificación de evidencias
 # ============================================================================
 TIPO_IMAGEN_CHOICES = [
