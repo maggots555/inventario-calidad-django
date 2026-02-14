@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.urls import reverse
 from functools import wraps
 from PIL import Image
@@ -6540,6 +6541,7 @@ def enviar_diagnostico_cliente(request, orden_id):
 @login_required
 @permission_required_with_message('servicio_tecnico.view_ordenservicio')
 @require_http_methods(["GET"])
+@xframe_options_exempt
 def preview_pdf_diagnostico(request, orden_id):
     """
     Genera el PDF de diagnóstico y lo retorna inline para vista previa en iframe.
