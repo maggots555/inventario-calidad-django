@@ -213,6 +213,14 @@ urlpatterns = [
          views.api_buscar_modelos_por_marca, 
          name='api_buscar_modelos_por_marca'),
     
+    # API: ACTUALIZAR EMAIL DEL CLIENTE (Febrero 2026)
+    # ========================================================================
+    # API endpoint para actualizar el email del cliente desde el modal de diagnóstico
+    # Permite edición inline sin cerrar el modal
+    path('api/detalle-equipo/<int:detalle_id>/actualizar-email/', 
+         views.actualizar_email_cliente, 
+         name='actualizar_email_cliente'),
+    
     # ========================================================================
     # DASHBOARD DE SEGUIMIENTO DE PIEZAS EN TRÁNSITO (Noviembre 2025)
     # ========================================================================

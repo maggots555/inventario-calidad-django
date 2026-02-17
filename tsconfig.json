@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     /* Opciones Base */
-    "target": "ES2018", // Compila a JavaScript ES2018 (compatible con navegadores modernos)
-    "lib": ["ES2018", "DOM"], // Incluye librerías ES2018 y DOM
+    "target": "ES2019", // Compila a JavaScript ES2019 (compatible con navegadores modernos, incluye flatMap)
+    "lib": ["ES2019", "DOM"], // Incluye librerías ES2019 y DOM
     "strict": true, // ¡La magia de TypeScript! Activa todos los chequeos estrictos.
     "esModuleInterop": true,
     "skipLibCheck": true,

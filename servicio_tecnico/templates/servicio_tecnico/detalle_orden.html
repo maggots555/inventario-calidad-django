@@ -2893,7 +2893,11 @@
             
             <!-- Cuerpo del Modal -->
             <div class="modal-body" style="padding: 1.5rem;">
-                <form id="formEnviarDiagnostico" method="post" action="{% url 'servicio_tecnico:enviar_diagnostico_cliente' orden.id %}">
+                <form id="formEnviarDiagnostico" method="post" action="{% url 'servicio_tecnico:enviar_diagnostico_cliente' orden.id %}"
+                      data-current-user-empleado-id="{{ request.user.empleado.id|default:'' }}"
+                      data-current-user-email="{{ request.user.empleado.email|default:'' }}"
+                      data-current-user-nombre="{{ request.user.empleado.nombre_completo|default:'' }}"
+                      data-detalle-equipo-id="{{ orden.detalle_equipo.pk }}">
                     {% csrf_token %}
                     
                     <!-- SECCIÓN 1: FOLIO PERSONALIZADO -->
@@ -2938,27 +2942,122 @@
                         </div>
                         
                         {% if orden.detalle_equipo.email_cliente and orden.detalle_equipo.email_cliente != 'cliente@ejemplo.com' %}
-                        <div class="destinatario-card p-3 border rounded shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); border: 2px solid #4caf50 !important;">
+                        <div class="destinatario-card p-3 border rounded shadow-sm" 
+                             id="cardDestinatarioEmail"
+                             style="background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); border: 2px solid #4caf50 !important;">
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-person-check-fill text-success fs-2 me-3 flex-shrink-0"></i>
                                 <div class="flex-grow-1">
                                     <div class="fw-bold text-success">
                                         <i class="bi bi-laptop"></i> Cliente del Equipo
-                                        <span class="badge bg-success ms-2">
+                                        <span class="badge bg-success ms-2" id="badgeEmailValido">
                                             <i class="bi bi-check-circle-fill"></i> VÁLIDO
                                         </span>
                                     </div>
-                                    <small class="text-dark d-block mt-1">
-                                        <i class="bi bi-envelope-fill"></i> <strong>{{ orden.detalle_equipo.email_cliente }}</strong>
-                                    </small>
+                                    
+                                    {# === MODO LECTURA: Muestra el email + botón editar === #}
+                                    <div id="emailClienteVistaLectura" class="d-flex align-items-center mt-1">
+                                        <small class="text-dark">
+                                            <i class="bi bi-envelope-fill"></i> 
+                                            <strong id="spanEmailCliente">{{ orden.detalle_equipo.email_cliente }}</strong>
+                                        </small>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-primary ms-2 py-0 px-2"
+                                                id="btnEditarEmailCliente"
+                                                title="Editar email del cliente"
+                                                style="font-size: 0.75rem; line-height: 1.5;">
+                                            <i class="bi bi-pencil-fill"></i> Editar
+                                        </button>
+                                    </div>
+                                    
+                                    {# === MODO EDICIÓN: Input + Guardar/Cancelar === #}
+                                    <div id="emailClienteVistaEdicion" class="mt-2" style="display: none;">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white">
+                                                <i class="bi bi-envelope-fill text-primary"></i>
+                                            </span>
+                                            <input type="email" 
+                                                   class="form-control form-control-sm" 
+                                                   id="inputEditarEmailCliente"
+                                                   value="{{ orden.detalle_equipo.email_cliente }}"
+                                                   placeholder="correo@ejemplo.com"
+                                                   style="font-weight: 600;">
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-success"
+                                                    id="btnGuardarEmailCliente"
+                                                    title="Guardar cambio">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    id="btnCancelarEmailCliente"
+                                                    title="Cancelar edición">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                        <small class="text-muted mt-1 d-block" id="feedbackEmailCliente"></small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         {% else %}
-                        <div class="alert alert-warning border-warning border-2">
-                            <i class="bi bi-exclamation-triangle-fill fs-3 me-3"></i>
-                            <strong>⚠️ Email del cliente no configurado.</strong>
-                            Cierra este modal y edita la información del equipo primero.
+                        <div class="destinatario-card p-3 border rounded shadow-sm" 
+                             id="cardDestinatarioEmail"
+                             style="background: linear-gradient(135deg, #fff3e0 0%, #fce4ec 100%); border: 2px solid #ff9800 !important;">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-exclamation-triangle-fill text-warning fs-2 me-3 flex-shrink-0"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold text-warning">
+                                        <i class="bi bi-laptop"></i> Cliente del Equipo
+                                        <span class="badge bg-warning text-dark ms-2" id="badgeEmailValido">
+                                            <i class="bi bi-exclamation-triangle-fill"></i> SIN EMAIL
+                                        </span>
+                                    </div>
+                                    
+                                    {# === MODO LECTURA: Muestra advertencia + botón agregar === #}
+                                    <div id="emailClienteVistaLectura" class="d-flex align-items-center mt-1">
+                                        <small class="text-dark">
+                                            <i class="bi bi-envelope-fill"></i> 
+                                            <strong id="spanEmailCliente" class="text-danger">No configurado</strong>
+                                        </small>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-primary ms-2 py-0 px-2"
+                                                id="btnEditarEmailCliente"
+                                                title="Agregar email del cliente"
+                                                style="font-size: 0.75rem; line-height: 1.5;">
+                                            <i class="bi bi-plus-circle-fill"></i> Agregar
+                                        </button>
+                                    </div>
+                                    
+                                    {# === MODO EDICIÓN: Input + Guardar/Cancelar === #}
+                                    <div id="emailClienteVistaEdicion" class="mt-2" style="display: none;">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white">
+                                                <i class="bi bi-envelope-fill text-primary"></i>
+                                            </span>
+                                            <input type="email" 
+                                                   class="form-control form-control-sm" 
+                                                   id="inputEditarEmailCliente"
+                                                   value=""
+                                                   placeholder="correo@ejemplo.com"
+                                                   style="font-weight: 600;">
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-success"
+                                                    id="btnGuardarEmailCliente"
+                                                    title="Guardar cambio">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    id="btnCancelarEmailCliente"
+                                                    title="Cancelar edición">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                        <small class="text-muted mt-1 d-block" id="feedbackEmailCliente"></small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         {% endif %}
                     </div>
@@ -3020,23 +3119,39 @@
                                 <div class="row g-2">
                                     {% for empleado in empleados_copia_imagenes %}
                                     <div class="col-lg-6 col-md-12">
-                                        <label class="destinatario-card p-3 border rounded bg-light hover-shadow d-block mb-0 cursor-pointer" for="diag_emp_{{ empleado.id }}">
+                                        <label class="destinatario-card p-3 border rounded bg-light hover-shadow d-block mb-0 cursor-pointer {% if empleado.id == request.user.empleado.id %}border-primary border-2{% endif %}" 
+                                               for="diag_emp_{{ empleado.id }}"
+                                               id="label_emp_{{ empleado.id }}">
                                             <div class="d-flex align-items-center">
-                                                <input class="form-check-input me-3 flex-shrink-0" 
+                                                <input class="form-check-input me-3 flex-shrink-0 checkbox-cc-empleado" 
                                                        type="checkbox" name="copia_empleados" 
                                                        value="{{ empleado.email }}" 
-                                                       id="diag_emp_{{ empleado.id }}">
+                                                       data-empleado-id="{{ empleado.id }}"
+                                                       id="diag_emp_{{ empleado.id }}"
+                                                       {% if empleado.id == request.user.empleado.id %}checked disabled{% endif %}>
+                                                
+                                                {# Input oculto para que el valor se envíe aunque esté disabled #}
+                                                {% if empleado.id == request.user.empleado.id %}
+                                                <input type="hidden" name="copia_empleados" value="{{ empleado.email }}">
+                                                {% endif %}
                                                 
                                                 {% if empleado.foto_perfil %}
                                                     <img src="{{ empleado.foto_perfil.url }}" 
                                                          alt="{{ empleado.nombre_completo }}" 
                                                          class="rounded-circle me-2 flex-shrink-0"
-                                                         style="width: 48px; height: 48px; object-fit: cover; border: 2px solid #17a2b8;">
+                                                         style="width: 48px; height: 48px; object-fit: cover; border: 2px solid {% if empleado.id == request.user.empleado.id %}#0d6efd{% else %}#17a2b8{% endif %};">
                                                 {% else %}
-                                                    <i class="bi bi-person-badge text-info fs-3 me-2 flex-shrink-0"></i>
+                                                    <i class="bi bi-person-badge {% if empleado.id == request.user.empleado.id %}text-primary{% else %}text-info{% endif %} fs-3 me-2 flex-shrink-0"></i>
                                                 {% endif %}
                                                 <div class="flex-grow-1" style="min-width: 0;">
-                                                    <div class="fw-bold text-truncate">{{ empleado.nombre_completo }}</div>
+                                                    <div class="fw-bold text-truncate">
+                                                        {{ empleado.nombre_completo }}
+                                                        {% if empleado.id == request.user.empleado.id %}
+                                                        <span class="badge bg-primary ms-1" style="font-size: 0.65rem;">
+                                                            <i class="bi bi-person-fill"></i> TÚ
+                                                        </span>
+                                                        {% endif %}
+                                                    </div>
                                                     <small class="text-muted">
                                                         <span class="badge bg-secondary me-1">{{ empleado.area }}</span>
                                                         <span class="text-truncate d-inline-block" style="max-width: 180px; vertical-align: middle;">{{ empleado.email }}</span>
@@ -3050,6 +3165,47 @@
                                 {% else %}
                                 <div class="alert alert-info mb-0">
                                     <i class="bi bi-info-circle"></i> Sin empleados disponibles con email.
+                                </div>
+                                {% endif %}
+                                
+                                {# Si el usuario logueado NO está en la lista de CC, agregar su checkbox automáticamente #}
+                                {% if not usuario_en_lista_cc and request.user.empleado and request.user.empleado.email %}
+                                <div class="mt-2">
+                                    <label class="destinatario-card p-3 border rounded border-primary border-2 d-block mb-0 cursor-pointer" 
+                                           for="diag_emp_current_user"
+                                           id="label_emp_{{ request.user.empleado.id }}"
+                                           style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 50%, #e8f5e9 100%);">
+                                        <div class="d-flex align-items-center">
+                                            <input class="form-check-input me-3 flex-shrink-0 checkbox-cc-empleado" 
+                                                   type="checkbox" name="copia_empleados" 
+                                                   value="{{ request.user.empleado.email }}" 
+                                                   data-empleado-id="{{ request.user.empleado.id }}"
+                                                   id="diag_emp_current_user"
+                                                   checked disabled>
+                                            <input type="hidden" name="copia_empleados" value="{{ request.user.empleado.email }}">
+                                            
+                                            {% if request.user.empleado.foto_perfil %}
+                                                <img src="{{ request.user.empleado.foto_perfil.url }}" 
+                                                     alt="{{ request.user.empleado.nombre_completo }}" 
+                                                     class="rounded-circle me-2 flex-shrink-0"
+                                                     style="width: 48px; height: 48px; object-fit: cover; border: 2px solid #0d6efd;">
+                                            {% else %}
+                                                <i class="bi bi-person-badge text-primary fs-3 me-2 flex-shrink-0"></i>
+                                            {% endif %}
+                                            <div class="flex-grow-1" style="min-width: 0;">
+                                                <div class="fw-bold text-truncate">
+                                                    {{ request.user.empleado.nombre_completo }}
+                                                    <span class="badge bg-primary ms-1" style="font-size: 0.65rem;">
+                                                        <i class="bi bi-person-fill"></i> TÚ
+                                                    </span>
+                                                </div>
+                                                <small class="text-muted">
+                                                    <span class="badge bg-secondary me-1">{{ request.user.empleado.area }}</span>
+                                                    <span class="text-truncate d-inline-block" style="max-width: 180px; vertical-align: middle;">{{ request.user.empleado.email }}</span>
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </label>
                                 </div>
                                 {% endif %}
                             </div>
@@ -3068,23 +3224,64 @@
                                     <span class="badge bg-warning text-dark ms-2" id="contadorComponentesSeleccionados">0 seleccionados</span>
                                 </h6>
                             </div>
-                            <!-- Botón para agregar componentes adicionales -->
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-success dropdown-toggle" 
-                                        type="button" 
-                                        id="btnAgregarComponente" 
-                                        data-bs-toggle="dropdown" 
-                                        aria-expanded="false"
-                                        data-componentes='{{ componentes_adicionales_json }}'>
-                                    <i class="bi bi-plus-circle"></i> Agregar Componente
+                            <div class="d-flex align-items-center gap-2">
+                                <!-- Botón para detectar piezas automáticamente del diagnóstico -->
+                                {% if orden.detalle_equipo.diagnostico_sic %}
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-info"
+                                        id="btnDetectarPiezas"
+                                        data-diagnostico="{{ orden.detalle_equipo.diagnostico_sic }}"
+                                        title="Analizar el diagnóstico para detectar números de parte automáticamente">
+                                    <i class="bi bi-cpu"></i> Detectar Piezas
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end" 
-                                    aria-labelledby="btnAgregarComponente" 
-                                    id="dropdownComponentesAdicionales"
-                                    style="max-height: 300px; overflow-y: auto;">
-                                    <!-- Los componentes se cargarán dinámicamente via JavaScript -->
-                                    <li><span class="dropdown-item text-muted small"><i class="bi bi-hourglass-split"></i> Cargando...</span></li>
-                                </ul>
+                                {% endif %}
+                                <!-- Botón para agregar componentes adicionales -->
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-success dropdown-toggle" 
+                                            type="button" 
+                                            id="btnAgregarComponente" 
+                                            data-bs-toggle="dropdown" 
+                                            aria-expanded="false"
+                                            data-componentes='{{ componentes_adicionales_json }}'>
+                                        <i class="bi bi-plus-circle"></i> Agregar Componente
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end" 
+                                        aria-labelledby="btnAgregarComponente" 
+                                        id="dropdownComponentesAdicionales"
+                                        style="max-height: 300px; overflow-y: auto;">
+                                        <!-- Los componentes se cargarán dinámicamente via JavaScript -->
+                                        <li><span class="dropdown-item text-muted small"><i class="bi bi-hourglass-split"></i> Cargando...</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Panel de piezas detectadas (oculto por defecto, se muestra al presionar "Detectar Piezas") -->
+                        <div id="panelPiezasDetectadas" style="display: none;" class="mb-3">
+                            <div class="card border-info">
+                                <div class="card-header bg-info bg-opacity-10 d-flex align-items-center justify-content-between py-2">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-cpu text-info me-2"></i>
+                                        <span class="fw-bold text-info">Piezas detectadas en el diagnóstico</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-primary" 
+                                                id="btnAplicarTodasPiezas"
+                                                style="display: none;">
+                                            <i class="bi bi-check-all"></i> Aplicar todas
+                                        </button>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-secondary" 
+                                                id="btnCerrarPanelPiezas"
+                                                title="Cerrar panel">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body p-0" id="contenedorPiezasDetectadas">
+                                    <!-- El contenido se genera dinámicamente via JavaScript -->
+                                </div>
                             </div>
                         </div>
                         
@@ -3852,7 +4049,7 @@
 <script src="{% static 'js/camara_integrada.js' %}?v=6.0"></script>
 
 <!-- Modal de envío de diagnóstico al cliente -->
-<script src="{% static 'js/diagnostico_modal.js' %}?v=1.0"></script>
+<script src="{% static 'js/diagnostico_modal.js' %}?v=3.1"></script>
 
 <script>
 // ============================================================================
