@@ -204,6 +204,15 @@ urlpatterns = [
          views.api_buscar_orden_por_serie, 
          name='api_buscar_orden_por_serie'),
     
+    # API: AUTOCOMPLETADO DE BÚSQUEDA DE ÓRDENES (Febrero 2026)
+    # ========================================================================
+    # API endpoint para búsqueda inteligente con autocompletado en lista de órdenes
+    # Devuelve coincidencias en tiempo real mientras el usuario escribe
+    # Busca por: orden_cliente, numero_serie (service tag) y numero_orden_interno
+    path('api/buscar-ordenes-autocomplete/',
+         views.api_buscar_ordenes_autocomplete,
+         name='api_buscar_ordenes_autocomplete'),
+    
     # API: BÚSQUEDA DE MODELOS POR MARCA (Diciembre 2025)
     # ========================================================================
     # API endpoint para autocompletado del campo "Modelo" en formularios

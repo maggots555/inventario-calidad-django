@@ -2990,3 +2990,243 @@ thead.sticky-top {
 }
 
 
+/* =============================================================================
+   AUTOCOMPLETADO DE BÚSQUEDA DE ÓRDENES
+   Descripción: Estilos para el dropdown de sugerencias que aparece mientras
+   el usuario escribe en el buscador de órdenes.
+   ============================================================================= */
+
+/* Contenedor principal del dropdown */
+.autocomplete-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-top: 2px solid #2563eb;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    max-height: 420px;
+    overflow-y: auto;
+    margin-top: 2px;
+}
+
+/* Lista de resultados */
+.autocomplete-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Cada resultado individual */
+.autocomplete-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background-color 0.15s ease;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item-activo {
+    background-color: #eff6ff;
+}
+
+.autocomplete-item-activo {
+    border-left: 3px solid #2563eb;
+    padding-left: 13px;
+}
+
+/* Línea principal: orden del cliente + marca */
+.autocomplete-item-principal {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.autocomplete-orden {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #1e293b;
+}
+
+.autocomplete-marca {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* Línea secundaria: service tag + orden interna + estado */
+.autocomplete-item-secundario {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.autocomplete-service-tag {
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+    color: #4b5563;
+}
+
+.autocomplete-orden-interna {
+    color: #9ca3af;
+    font-size: 0.75rem;
+}
+
+.autocomplete-estado {
+    font-size: 0.65rem !important;
+    padding: 2px 6px !important;
+}
+
+/* Resaltado de coincidencias */
+.autocomplete-item mark {
+    background-color: #fef08a;
+    color: inherit;
+    padding: 0 1px;
+    border-radius: 2px;
+    font-weight: 700;
+}
+
+/* Estado de carga */
+.autocomplete-cargando {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+/* Sin resultados */
+.autocomplete-sin-resultados {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 20px 16px;
+    color: #9ca3af;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.autocomplete-sin-resultados i {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+}
+
+.autocomplete-sin-resultados small {
+    font-size: 0.75rem;
+    color: #d1d5db;
+}
+
+/* Responsive: en móvil, el dropdown ocupa todo el ancho */
+@media (max-width: 768px) {
+    .autocomplete-dropdown {
+        max-height: 300px;
+    }
+
+    .autocomplete-item {
+        padding: 8px 12px;
+    }
+
+    .autocomplete-item-secundario {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+}
+
+
+/* =============================================================================
+   PAGINACIÓN DE ÓRDENES FINALIZADAS
+   Descripción: Estilos para los controles de paginación en la vista de 
+   órdenes finalizadas, con diseño consistente con el resto del módulo.
+   ============================================================================= */
+
+.paginacion-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 24px 0;
+}
+
+.paginacion-info {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.paginacion-info strong {
+    color: #1e293b;
+}
+
+/* Personalización de la paginación de Bootstrap */
+.paginacion-container .pagination {
+    margin: 0;
+    gap: 4px;
+}
+
+.paginacion-container .page-link {
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border: 1px solid #e5e7eb;
+    color: #4b5563;
+    transition: all 0.2s ease;
+}
+
+.paginacion-container .page-link:hover {
+    background-color: #eff6ff;
+    border-color: #2563eb;
+    color: #2563eb;
+}
+
+.paginacion-container .page-item.active .page-link {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: transparent;
+    font-weight: 600;
+}
+
+.paginacion-container .page-item.disabled .page-link {
+    background-color: #f9fafb;
+    border-color: #e5e7eb;
+    color: #d1d5db;
+}
+
+/* Botones Anterior/Siguiente más prominentes */
+.paginacion-container .page-item:first-child .page-link,
+.paginacion-container .page-item:last-child .page-link {
+    font-weight: 500;
+    padding: 6px 16px;
+}
+
+/* Ellipsis */
+.paginacion-container .page-item.disabled .page-link.paginacion-ellipsis {
+    border: none;
+    background: transparent;
+    color: #9ca3af;
+}
+
+@media (max-width: 768px) {
+    .paginacion-container .pagination {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .paginacion-container .page-link {
+        padding: 4px 8px;
+        font-size: 0.8rem;
+    }
+}

@@ -10,6 +10,7 @@ EXPLICACIÓN PARA PRINCIPIANTES:
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Count, Q, Prefetch
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
@@ -787,6 +788,83 @@ def lista_ordenes_activas(request):
     folios_fl_dict = {item['tecnico_asignado_actual__id']: item['total'] for item in folios_fl_raw}
     
     # ========================================================================
+    # PASO 4.5: Asignaciones NETAS de Folios FL específicamente
+    # ========================================================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Igual que las asignaciones netas generales (PASO 5), pero filtrando SOLO
+    # las órdenes cuyo orden_cliente empieza con "FL-". Esto permite ver cuántos
+    # folios FL le entraron/salieron a cada técnico hoy y en la semana/histórico.
+    # El filtro extra es: orden__detalle_equipo__orden_cliente__istartswith='FL-'
+    
+    # Nota: inicio_hoy y fin_hoy se calculan en PASO 5, pero los necesitamos aquí.
+    # Los calculamos una vez aquí y los reutilizamos en PASO 5.
+    inicio_hoy = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    fin_hoy = inicio_hoy + timedelta(days=1)
+    
+    # --- FL netas HOY ---
+    fl_hoy_entrantes = HistorialOrden.objects.filter(
+        tipo_evento='cambio_tecnico',
+        es_sistema=False,
+        fecha_evento__gte=inicio_hoy,
+        fecha_evento__lt=fin_hoy,
+        orden__detalle_equipo__orden_cliente__istartswith='FL-'
+    ).values('tecnico_nuevo__id').annotate(
+        total=Count('id')
+    )
+    fl_hoy_entrantes_dict = {item['tecnico_nuevo__id']: item['total'] for item in fl_hoy_entrantes if item['tecnico_nuevo__id']}
+    
+    fl_hoy_salientes = HistorialOrden.objects.filter(
+        tipo_evento='cambio_tecnico',
+        es_sistema=False,
+        fecha_evento__gte=inicio_hoy,
+        fecha_evento__lt=fin_hoy,
+        orden__detalle_equipo__orden_cliente__istartswith='FL-'
+    ).values('tecnico_anterior__id').annotate(
+        total=Count('id')
+    )
+    fl_hoy_salientes_dict = {item['tecnico_anterior__id']: item['total'] for item in fl_hoy_salientes if item['tecnico_anterior__id']}
+    
+    # --- FL netas SEMANA / HISTÓRICO ---
+    if filtro_temporal == 'historico':
+        fl_semana_entrantes = HistorialOrden.objects.filter(
+            tipo_evento='cambio_tecnico',
+            es_sistema=False,
+            orden__detalle_equipo__orden_cliente__istartswith='FL-'
+        ).values('tecnico_nuevo__id').annotate(
+            total=Count('id')
+        )
+        fl_semana_salientes = HistorialOrden.objects.filter(
+            tipo_evento='cambio_tecnico',
+            es_sistema=False,
+            orden__detalle_equipo__orden_cliente__istartswith='FL-'
+        ).values('tecnico_anterior__id').annotate(
+            total=Count('id')
+        )
+    elif filtro_temporal == 'semana':
+        fl_semana_entrantes = HistorialOrden.objects.filter(
+            tipo_evento='cambio_tecnico',
+            es_sistema=False,
+            fecha_evento__gte=fecha_inicio_filtro,
+            orden__detalle_equipo__orden_cliente__istartswith='FL-'
+        ).values('tecnico_nuevo__id').annotate(
+            total=Count('id')
+        )
+        fl_semana_salientes = HistorialOrden.objects.filter(
+            tipo_evento='cambio_tecnico',
+            es_sistema=False,
+            fecha_evento__gte=fecha_inicio_filtro,
+            orden__detalle_equipo__orden_cliente__istartswith='FL-'
+        ).values('tecnico_anterior__id').annotate(
+            total=Count('id')
+        )
+    else:  # 'hoy'
+        fl_semana_entrantes = []
+        fl_semana_salientes = []
+    
+    fl_semana_entrantes_dict = {item['tecnico_nuevo__id']: item['total'] for item in fl_semana_entrantes if item['tecnico_nuevo__id']}
+    fl_semana_salientes_dict = {item['tecnico_anterior__id']: item['total'] for item in fl_semana_salientes if item['tecnico_anterior__id']}
+    
+    # ========================================================================
     # PASO 5: Asignaciones NETAS (corrigiendo el bug)
     # ========================================================================
     # EXPLICACIÓN PARA PRINCIPIANTES:
@@ -794,9 +872,7 @@ def lista_ordenes_activas(request):
     # pero no restábamos las SALIENTES (cuando se reasignaba a otro técnico).
     # Ahora calculamos: NETAS = ENTRANTES - SALIENTES
     
-    # IMPORTANTE: Usamos rango de fechas en lugar de __date para evitar problemas de timezone
-    inicio_hoy = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    fin_hoy = inicio_hoy + timedelta(days=1)
+    # IMPORTANTE: inicio_hoy y fin_hoy ya se calcularon en PASO 4.5 (FL netas)
     
     # --- Asignaciones HOY ---
     # Entrantes: veces que el técnico fue asignado como tecnico_nuevo hoy
@@ -902,6 +978,17 @@ def lista_ordenes_activas(request):
             asignaciones_semana_salientes_dict.get(tecnico.id, 0)
         )
         
+        # Calcular asignaciones NETAS de Folios FL
+        folios_fl_hoy_netas = (
+            fl_hoy_entrantes_dict.get(tecnico.id, 0) - 
+            fl_hoy_salientes_dict.get(tecnico.id, 0)
+        )
+        
+        folios_fl_semana_netas = (
+            fl_semana_entrantes_dict.get(tecnico.id, 0) - 
+            fl_semana_salientes_dict.get(tecnico.id, 0)
+        )
+        
         # Calcular tiempo desde última asignación
         ultima_asignacion = ultimas_asignaciones_dict.get(tecnico.id)
         if ultima_asignacion:
@@ -934,6 +1021,8 @@ def lista_ordenes_activas(request):
             'gama_media': gama_data['media'],
             'gama_baja': gama_data['baja'],
             'folios_fl': folios_fl_dict.get(tecnico.id, 0),
+            'folios_fl_hoy_netas': folios_fl_hoy_netas,
+            'folios_fl_semana_netas': folios_fl_semana_netas,
             # Asignaciones NETAS (corregidas)
             'asignaciones_hoy_netas': asignaciones_hoy_netas,
             'asignaciones_semana_netas': asignaciones_semana_netas,
@@ -1061,17 +1150,37 @@ def lista_ordenes_activas(request):
         estado__in=['entregado', 'cancelado']
     ).count()
     
+    # ========================================================================
+    # PAGINACIÓN: 24 órdenes por página (múltiplo de las 5 columnas del grid)
+    # ========================================================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Contamos el total ANTES de paginar para mostrar "Mostrando X-Y de Z órdenes".
+    # Si pagináramos primero, el conteo solo reflejaría la página actual (máx 24).
+    total_ordenes = ordenes.count()
+    
+    paginator = Paginator(ordenes, 24)
+    pagina = request.GET.get('pagina', 1)
+    
+    try:
+        ordenes_paginadas = paginator.page(pagina)
+    except PageNotAnInteger:
+        ordenes_paginadas = paginator.page(1)
+    except EmptyPage:
+        ordenes_paginadas = paginator.page(paginator.num_pages)
+    
     context = {
-        'ordenes': ordenes,
+        'ordenes': ordenes_paginadas,
         'tipo': 'activas',
         'titulo': 'Órdenes Activas',
-        'total': ordenes.count(),
+        'total': total_ordenes,
         'busqueda': busqueda,
         'tecnicos_por_sucursal': tecnicos_por_sucursal_ordenado,  # NUEVA ESTRUCTURA UNIFICADA
         'reasignaciones_hoy': reasignaciones_hoy,
         'filtro_temporal': filtro_temporal,
         'total_ordenes_activas': total_ordenes_activas,
         'mostrar_estadisticas': True,
+        'es_paginado': True,
+        'paginator': paginator,
     }
     
     return render(request, 'servicio_tecnico/lista_ordenes.html', context)
@@ -1084,6 +1193,13 @@ def lista_ordenes_finalizadas(request):
     Vista para listar órdenes finalizadas (entregadas o canceladas).
 
     Incluye búsqueda por número de serie y orden de cliente.
+    Incluye paginación para mejorar rendimiento con muchos registros.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    La paginación divide los resultados en "páginas" de tamaño fijo (24 por defecto).
+    Esto evita cargar cientos o miles de órdenes de una sola vez, lo cual haría
+    que la página fuera muy lenta. El usuario navega entre páginas con controles
+    de "Anterior" y "Siguiente".
     """
     # Obtener parámetro de búsqueda
     busqueda = request.GET.get('busqueda', '').strip()
@@ -1107,14 +1223,30 @@ def lista_ordenes_finalizadas(request):
             Q(numero_orden_interno__icontains=busqueda)
         )
     
+    # Contar total ANTES de paginar para mostrar el conteo real
+    total_ordenes = ordenes.count()
+    
+    # Paginación: 24 órdenes por página (múltiplo de las 5 columnas del grid)
+    paginator = Paginator(ordenes, 24)
+    pagina = request.GET.get('pagina', 1)
+    
+    try:
+        ordenes_paginadas = paginator.page(pagina)
+    except PageNotAnInteger:
+        ordenes_paginadas = paginator.page(1)
+    except EmptyPage:
+        ordenes_paginadas = paginator.page(paginator.num_pages)
+    
     # NO mostrar estadísticas en vista finalizadas (no tiene sentido ver cargas de trabajo de órdenes cerradas)
     context = {
-        'ordenes': ordenes,
+        'ordenes': ordenes_paginadas,
         'tipo': 'finalizadas',
         'titulo': 'Órdenes Finalizadas',
-        'total': ordenes.count(),
+        'total': total_ordenes,
         'busqueda': busqueda,
         'mostrar_estadisticas': False,  # No mostrar estadísticas aquí
+        'es_paginado': True,
+        'paginator': paginator,
     }
     
     return render(request, 'servicio_tecnico/lista_ordenes.html', context)
@@ -9677,6 +9809,74 @@ def exportar_dashboard_cotizaciones(request):
     wb.save(response)
     
     return response
+
+
+# ============================================================================
+# API ENDPOINT: AUTOCOMPLETADO DE ÓRDENES PARA BÚSQUEDA INTELIGENTE
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@require_http_methods(["GET"])
+def api_buscar_ordenes_autocomplete(request):
+    """
+    API endpoint para autocompletado de búsqueda en lista de órdenes.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este endpoint recibe lo que el usuario va tecleando en el buscador
+    y devuelve las órdenes que coinciden, mostrando la orden del cliente
+    y el service tag como complemento. Responde en formato JSON para
+    que el frontend pueda mostrar las sugerencias sin recargar la página.
+    
+    Parámetros GET:
+        q (str): Texto de búsqueda (mínimo 2 caracteres)
+        tipo (str): 'activas' o 'finalizadas' para filtrar según la vista
+    
+    Returns:
+        JsonResponse con lista de coincidencias (máximo 10)
+    """
+    query = request.GET.get('q', '').strip()
+    tipo = request.GET.get('tipo', 'activas').strip()
+    
+    # Requerir mínimo 2 caracteres para buscar
+    if len(query) < 2:
+        return JsonResponse({'resultados': []})
+    
+    # Construir queryset base según el tipo de vista
+    if tipo == 'finalizadas':
+        ordenes = OrdenServicio.objects.filter(
+            estado__in=['entregado', 'cancelado']
+        )
+    else:
+        ordenes = OrdenServicio.objects.exclude(
+            estado__in=['entregado', 'cancelado']
+        )
+    
+    # Aplicar filtro de búsqueda en los 3 campos relevantes
+    ordenes = ordenes.filter(
+        Q(detalle_equipo__orden_cliente__icontains=query) |
+        Q(detalle_equipo__numero_serie__icontains=query) |
+        Q(numero_orden_interno__icontains=query)
+    ).select_related(
+        'detalle_equipo', 'sucursal'
+    ).order_by('-fecha_ingreso')[:10]
+    
+    # Construir respuesta JSON con la información relevante
+    resultados = []
+    for orden in ordenes:
+        detalle = orden.detalle_equipo
+        resultados.append({
+            'id': orden.id,
+            'orden_cliente': detalle.orden_cliente or '',
+            'numero_serie': detalle.numero_serie or '',
+            'numero_orden_interno': orden.numero_orden_interno or '',
+            'marca': detalle.marca or '',
+            'modelo': detalle.modelo or '',
+            'estado': orden.get_estado_display(),
+            'url_detalle': reverse('servicio_tecnico:detalle_orden', args=[orden.id]),
+        })
+    
+    return JsonResponse({'resultados': resultados})
 
 
 # ============================================================================

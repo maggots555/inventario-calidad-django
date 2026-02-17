@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <!-- Cargar estilos específicos de servicio técnico -->
-<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=6.6">
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=6.7">
 <style>
     /* Estilos mejorados para la tabla de estadísticas */
     .table-hover tbody tr:hover {
@@ -139,7 +139,10 @@
                        id="busqueda" 
                        name="busqueda" 
                        value="{{ busqueda }}"
-                       placeholder="Escribe el número de serie o la orden...">
+                       placeholder="Escribe el número de serie o la orden..."
+                       data-api-url="{% url 'servicio_tecnico:api_buscar_ordenes_autocomplete' %}"
+                       data-tipo="{{ tipo }}"
+                       autocomplete="off">
                 <small class="text-muted">Presiona ESC para limpiar la búsqueda</small>
             </div>
             <div class="col-md-3 d-flex flex-column">
@@ -310,7 +313,7 @@
                                                 <i class="bi bi-star-fill text-success"></i><br>
                                                 <small class="d-none d-sm-inline">Gama Alta</small>
                                             </th>
-                                            <th class="text-center" style="min-width: 80px; width: 10%;" title="Folios FL- (activos)">
+                                            <th class="text-center" style="min-width: 80px; width: 10%;" title="Asignaciones netas de Folios FL- hoy">
                                                 <i class="bi bi-receipt"></i><br>
                                                 <small class="d-none d-sm-inline">FL</small>
                                             </th>
@@ -400,12 +403,18 @@
                                             {% endif %}
                                         </td>
                                         
-                                        <!-- Columna: Folios FL -->
-                                        <td class="text-center">
-                                            {% if tecnico.folios_fl > 0 %}
-                                                <span class="badge rounded-pill bg-info text-white px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 35px;">{{ tecnico.folios_fl }}</span>
+                                        <!-- Columna: Folios FL (netas hoy) -->
+                                        <td class="text-center" title="FL semana/hist: {% if tecnico.folios_fl_semana_netas > 0 %}+{{ tecnico.folios_fl_semana_netas }}{% else %}{{ tecnico.folios_fl_semana_netas }}{% endif %} | FL activas: {{ tecnico.folios_fl }}">
+                                            {% if tecnico.folios_fl_hoy_netas > 0 %}
+                                                <span class="badge rounded-pill bg-success px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
+                                                    +{{ tecnico.folios_fl_hoy_netas }}
+                                                </span>
+                                            {% elif tecnico.folios_fl_hoy_netas < 0 %}
+                                                <span class="badge rounded-pill bg-danger px-2 py-1" style="font-size: 0.85rem; font-weight: 600; min-width: 40px;">
+                                                    {{ tecnico.folios_fl_hoy_netas }}
+                                                </span>
                                             {% else %}
-                                                <span class="text-muted" style="font-size: 0.85rem;">-</span>
+                                                <span class="badge rounded-pill bg-light text-dark border px-2 py-1" style="font-size: 0.85rem; min-width: 40px;">0</span>
                                             {% endif %}
                                         </td>
                                         
@@ -472,7 +481,7 @@
                                     <li><strong>Activas:</strong> Total órdenes asignadas actualmente</li>
                                     <li><strong>No Enc.:</strong> Equipos "No Enciende" activos</li>
                                     <li><strong>Gama Alta:</strong> Equipos de gama alta (mejor remunerados)</li>
-                                    <li><strong>Folios FL:</strong> Órdenes FL- activas</li>
+                                    <li><strong>Folios FL:</strong> Asignaciones netas de órdenes FL- hoy (entrantes - salientes)</li>
                                 </ul>
                             </div>
                             <div class="col-md-4">
@@ -859,6 +868,68 @@
                 </div>
             {% endfor %}
         </div>
+
+        <!-- Paginación (solo se muestra en vista finalizadas con paginación activa) -->
+        {% if es_paginado and paginator.num_pages > 1 %}
+        <div class="paginacion-container mt-4">
+            <!-- Información de página actual -->
+            <div class="paginacion-info">
+                Mostrando <strong>{{ ordenes.start_index }}-{{ ordenes.end_index }}</strong> de <strong>{{ total }}</strong> órdenes
+            </div>
+
+            <nav aria-label="Navegación de páginas">
+                <ul class="pagination">
+                    <!-- Botón Anterior -->
+                    {% if ordenes.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" 
+                               href="?pagina={{ ordenes.previous_page_number }}{% if busqueda %}&busqueda={{ busqueda }}{% endif %}"
+                               aria-label="Anterior">
+                                <i class="bi bi-chevron-left"></i> Anterior
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link"><i class="bi bi-chevron-left"></i> Anterior</span>
+                        </li>
+                    {% endif %}
+
+                    <!-- Números de página con elipsis inteligente -->
+                    {% for num in paginator.page_range %}
+                        {% if ordenes.number == num %}
+                            <li class="page-item active" aria-current="page">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num == 1 or num == paginator.num_pages or num >= ordenes.number|add:"-2" and num <= ordenes.number|add:"2" %}
+                            <li class="page-item">
+                                <a class="page-link" href="?pagina={{ num }}{% if busqueda %}&busqueda={{ busqueda }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% elif num == ordenes.number|add:"-3" or num == ordenes.number|add:"3" %}
+                            <li class="page-item disabled">
+                                <span class="page-link paginacion-ellipsis">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    <!-- Botón Siguiente -->
+                    {% if ordenes.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" 
+                               href="?pagina={{ ordenes.next_page_number }}{% if busqueda %}&busqueda={{ busqueda }}{% endif %}"
+                               aria-label="Siguiente">
+                                Siguiente <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">Siguiente <i class="bi bi-chevron-right"></i></span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
     {% else %}
         <!-- Mensaje cuando no hay resultados -->
         <div class="alert alert-info text-center py-5">
@@ -879,81 +950,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-// Limpiar búsqueda con ESC
-document.addEventListener('DOMContentLoaded', function() {
-    const busquedaInput = document.getElementById('busqueda');
-    if (busquedaInput) {
-        busquedaInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                this.value = '';
-                this.form.submit();
-            }
-        });
-        
-        // Auto-focus en el campo de búsqueda
-        busquedaInput.focus();
-    }
-
-    // ============================================
-    // MANEJO DE COLLAPSE/EXPAND DE TABLA DE REASIGNACIONES
-    // ============================================
-    
-    const collapseReasignaciones = document.getElementById('collapseReasignaciones');
-    
-    // Verificar el estado guardado en localStorage
-    if (collapseReasignaciones) {
-        const savedStateReasignaciones = localStorage.getItem('collapseReasignaciones');
-        if (savedStateReasignaciones === 'visible') {
-            const bsCollapse = new bootstrap.Collapse(collapseReasignaciones, { toggle: false });
-            bsCollapse.show();
-        }
-    }
-    
-    // Manejar cambio de iconos y guardar estado
-    function setupCollapseToggle(collapseElement, storageKey) {
-        if (!collapseElement) return;
-        
-        const header = document.querySelector(`[data-bs-target="#${collapseElement.id}"]`);
-        if (!header) return;
-        
-        const icon = header.querySelector('.collapse-icon');
-        
-        collapseElement.addEventListener('show.bs.collapse', function() {
-            if (icon) {
-                icon.classList.remove('bi-chevron-down');
-                icon.classList.add('bi-chevron-up');
-            }
-            header.setAttribute('aria-expanded', 'true');
-            localStorage.setItem(storageKey, 'visible');
-        });
-        
-        collapseElement.addEventListener('hide.bs.collapse', function() {
-            if (icon) {
-                icon.classList.remove('bi-chevron-up');
-                icon.classList.add('bi-chevron-down');
-            }
-            header.setAttribute('aria-expanded', 'false');
-            localStorage.setItem(storageKey, 'hidden');
-        });
-        
-        // Sincronizar icono con estado actual al cargar
-        if (collapseElement.classList.contains('show')) {
-            if (icon) {
-                icon.classList.remove('bi-chevron-down');
-                icon.classList.add('bi-chevron-up');
-            }
-            header.setAttribute('aria-expanded', 'true');
-        } else {
-            if (icon) {
-                icon.classList.remove('bi-chevron-up');
-                icon.classList.add('bi-chevron-down');
-            }
-            header.setAttribute('aria-expanded', 'false');
-        }
-    }
-    
-    setupCollapseToggle(collapseReasignaciones, 'collapseReasignaciones');
-});
-</script>
+<!-- Búsqueda inteligente con autocompletado + manejo de collapse de reasignaciones -->
+<script src="{% static 'js/busqueda_ordenes.js' %}"></script>
 {% endblock %}
