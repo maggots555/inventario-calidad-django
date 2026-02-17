@@ -602,13 +602,85 @@ class PredictorMotivoRechazoMejorado(MLModelBase):
         logger.info(f"   ({len(self.text_feature_names)} features de texto NLP)")
         logger.info(f"   Motivos únicos detectados: {list(self.label_encoder.classes_)}")
         
-        # Dividir en entrenamiento y prueba
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y_encoded,
-            test_size=0.2,
-            random_state=42,
-            stratify=y_encoded
-        )
+        # ========================================
+        # VERIFICAR CLASES CON POCOS EJEMPLOS
+        # ========================================
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si una categoría tiene solo 1 ejemplo, no se puede usar stratify
+        # porque necesita al menos 2 ejemplos (1 para train, 1 para test).
+        # Solución: Filtrar categorías con <2 ejemplos o desactivar stratify.
+        
+        from collections import Counter
+        distribucion_clases = Counter(y_encoded)
+        clases_problematicas = {k: v for k, v in distribucion_clases.items() if v < 2}
+        
+        if clases_problematicas:
+            # Hay clases con <2 ejemplos
+            motivos_problematicos = [
+                self.label_encoder.classes_[clase_id] 
+                for clase_id in clases_problematicas.keys()
+            ]
+            logger.warning(
+                f"⚠️ Clases con <2 ejemplos detectadas: {motivos_problematicos}"
+            )
+            logger.warning(
+                f"   Distribución: {dict(zip(motivos_problematicos, clases_problematicas.values()))}"
+            )
+            logger.warning(
+                f"   Desactivando stratify para evitar error..."
+            )
+            
+            # Opción 1: Filtrar clases con <5 ejemplos (recomendado para ML)
+            # Crear máscara para mantener solo clases con >=5 ejemplos
+            mask_validas = np.isin(y_encoded, [
+                clase_id for clase_id, count in distribucion_clases.items() 
+                if count >= 5
+            ])
+            
+            if mask_validas.sum() >= 20:  # Si quedan suficientes datos
+                logger.info(
+                    f"🔧 Filtrando clases con <5 ejemplos para mejor entrenamiento..."
+                )
+                X_filtrado = X[mask_validas]
+                y_filtrado = y_encoded[mask_validas]
+                y_original_filtrado = y[mask_validas]
+                
+                # Re-entrenar label encoder con clases filtradas
+                self.label_encoder.fit(y_original_filtrado)
+                y_filtrado_encoded = self.label_encoder.transform(y_original_filtrado)
+                
+                logger.info(
+                    f"✅ Dataset filtrado: {len(X_filtrado)} muestras, "
+                    f"{len(self.label_encoder.classes_)} motivos"
+                )
+                
+                # Dividir con stratify (ahora todas las clases tienen >=5 ejemplos)
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X_filtrado, y_filtrado_encoded,
+                    test_size=0.2,
+                    random_state=42,
+                    stratify=y_filtrado_encoded
+                )
+            else:
+                # No hay suficientes datos después de filtrar
+                logger.warning(
+                    f"⚠️ No hay suficientes datos después de filtrar. "
+                    f"Usando todos los datos SIN stratify..."
+                )
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y_encoded,
+                    test_size=0.2,
+                    random_state=42,
+                    stratify=None  # Sin estratificación
+                )
+        else:
+            # Todo bien, todas las clases tienen >=2 ejemplos
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y_encoded,
+                test_size=0.2,
+                random_state=42,
+                stratify=y_encoded
+            )
         
         logger.info(f"📈 Entrenando modelo MEJORADO con {len(X_train)} muestras...")
         
