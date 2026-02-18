@@ -217,14 +217,14 @@
         }
         
         .footer {
-            background: linear-gradient(180deg, #0d47a1, #051d63);
-            color: #ffffff;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
             padding: 30px;
             text-align: center;
         }
         
         .signature {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         
         .signature-name {
@@ -236,58 +236,83 @@
         .signature-role {
             font-size: 14px;
             opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .signature-area {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+        
+        .signature-email {
+            font-size: 13px;
+            opacity: 0.8;
+            margin-top: 10px;
         }
         
         .company {
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            opacity: 0.8;
             margin-top: 15px;
         }
         
         .social-media {
-            margin-top: 20px;
-            padding-top: 20px;
+            margin: 20px 0;
+            padding: 15px 0;
             border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
         }
         
         .social-title {
-            font-size: 13px;
-            opacity: 0.8;
-            margin-bottom: 10px;
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+            text-align: center;
         }
         
         .social-links {
             display: flex;
             justify-content: center;
-            gap: 15px;
+            align-items: center;
+            gap: 20px;
             flex-wrap: wrap;
+            text-align: center;
         }
         
         .social-link {
-            color: #ffffff;
-            text-decoration: none;
-            font-size: 13px;
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 5px;
-            padding: 5px 10px;
-            border-radius: 5px;
-            background: rgba(255, 255, 255, 0.1);
-            transition: background 0.3s ease;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            text-decoration: none;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.5);
         }
         
         .social-link:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background-color: rgba(255, 255, 255, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.8);
         }
         
         .social-icon {
-            font-size: 16px;
-        }
-        
-        .timestamp {
-            margin-top: 20px;
-            font-size: 12px;
-            opacity: 0.7;
+            font-size: 18px;
         }
         
         @media only screen and (max-width: 600px) {
@@ -298,6 +323,27 @@
             .header { padding: 20px; }
             .logo { font-size: 22px; }
             .subtitle { font-size: 14px; }
+            
+            .social-media {
+                padding: 15px 5px;
+            }
+            
+            .social-links {
+                gap: 8px;
+                padding: 0 5px;
+            }
+            
+            .social-link {
+                padding: 6px 10px;
+                font-size: 11px;
+                gap: 6px;
+                flex: 0 1 auto;
+                min-width: 0;
+            }
+            
+            .social-icon {
+                font-size: 14px;
+            }
         }
     </style>
 </head>
@@ -445,15 +491,15 @@
                 <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
                 <div class="social-links">
                     <a href="https://sicfix.mx/" class="social-link" target="_blank">
-                        <span class="social-icon">🌐</span>
+                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
                         <span>Sitio Web</span>
                     </a>
                     <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
-                        <span class="social-icon">📷</span>
+                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
                         <span>Instagram</span>
                     </a>
                     <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
-                        <span class="social-icon">👍</span>
+                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
                         <span>Facebook</span>
                     </a>
                 </div>

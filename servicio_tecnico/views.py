@@ -6133,6 +6133,32 @@ def enviar_imagenes_cliente(request, orden_id):
             print(f"⚠️ Error al adjuntar logo: {e}")
             # Continuar sin el logo, no es crítico
         
+        # =======================================================================
+        # ADJUNTAR ICONOS DE REDES SOCIALES COMO IMÁGENES EMBEBIDAS (CID)
+        # =======================================================================
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Los clientes de correo (Gmail, Outlook) no soportan SVG, así que usamos
+        # PNG convertidos de los SVGs originales. Se embeben igual que el logo,
+        # con Content-ID para referenciarlos en el HTML como src="cid:icon_xxx".
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as icon_file:
+                        icon_data = icon_file.read()
+                        icon_mime = MIMEImage(icon_data, _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email.attach(icon_mime)
+            print(f"🔗 Iconos de redes sociales adjuntados correctamente")
+        except Exception as e:
+            print(f"⚠️ Error al adjuntar iconos sociales: {e}")
+        
         # Adjuntar imágenes comprimidas
         for img_data in imagenes_comprimidas:
             email.attach(
@@ -6581,6 +6607,32 @@ def enviar_diagnostico_cliente(request, orden_id):
                     print(f"   🖼️ Logo SIC adjuntado")
         except Exception as e:
             print(f"   ⚠️ Error al adjuntar logo: {e}")
+        
+        # =======================================================================
+        # ADJUNTAR ICONOS DE REDES SOCIALES COMO IMÁGENES EMBEBIDAS (CID)
+        # =======================================================================
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Los clientes de correo (Gmail, Outlook) no soportan SVG, así que usamos
+        # PNG convertidos de los SVGs originales. Se embeben igual que el logo,
+        # con Content-ID para referenciarlos en el HTML como src="cid:icon_xxx".
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as icon_file:
+                        icon_data = icon_file.read()
+                        icon_mime = MIMEImage(icon_data, _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+            print(f"   🔗 Iconos de redes sociales adjuntados correctamente")
+        except Exception as e:
+            print(f"   ⚠️ Error al adjuntar iconos sociales: {e}")
         
         # Adjuntar PDF de diagnóstico
         with open(resultado_pdf['ruta'], 'rb') as pdf_file:
