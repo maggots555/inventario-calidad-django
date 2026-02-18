@@ -6062,7 +6062,12 @@ def enviar_imagenes_cliente(request, orden_id):
         # fecha_local_pais() la convierte a la zona horaria del país activo
         # (ej: America/Mexico_City para México) para que el cliente vea
         # la hora correcta en el correo.
-        ahora = fecha_local_pais(timezone.now(), _pais_email)
+        # Pasamos la fecha como STRINGS ya formateados porque render_to_string()
+        # no tiene request, y el filtro |date de Django reconvierte datetimes
+        # aware a UTC (settings.TIME_ZONE), ignorando la zona horaria del objeto.
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+        fecha_envio_texto = ahora_local.strftime('%d/%m/%Y')
+        hora_envio_texto = ahora_local.strftime('%H:%M')
         
         # EXPLICACIÓN PARA PRINCIPIANTES:
         # Si el empleado tiene número de WhatsApp empresarial, armamos el link
@@ -6079,7 +6084,8 @@ def enviar_imagenes_cliente(request, orden_id):
             'orden': orden,
             'detalle': orden.detalle_equipo,
             'mensaje_personalizado': mensaje_personalizado,
-            'fecha_envio': ahora,
+            'fecha_envio_texto': fecha_envio_texto,
+            'hora_envio_texto': hora_envio_texto,
             'cantidad_imagenes': len(imagenes_comprimidas),
             'empresa_nombre': _pais_email['empresa_nombre_corto'],
             'pais_nombre': _pais_email['nombre'],
@@ -6581,12 +6587,21 @@ def enviar_diagnostico_cliente(request, orden_id):
                 codigo_tel = _pais_email.get('codigo_telefonico', '')
                 whatsapp_empleado = f"{codigo_tel}{numero_local}"
         
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Convertimos la fecha/hora a strings ANTES de pasarlos al template.
+        # Si pasamos un datetime, Django lo reconvierte a UTC al renderizar
+        # con render_to_string() (que no tiene request/timezone context).
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+        fecha_envio_texto = ahora_local.strftime('%d/%m/%Y')
+        hora_envio_texto = ahora_local.strftime('%H:%M')
+        
         context_email = {
             'orden': orden,
             'detalle': detalle,
             'folio': folio,
             'mensaje_personalizado': mensaje_personalizado,
-            'fecha_envio': fecha_local_pais(timezone.now(), _pais_email),
+            'fecha_envio_texto': fecha_envio_texto,
+            'hora_envio_texto': hora_envio_texto,
             'cantidad_imagenes': len(imagenes_comprimidas),
             'componentes_seleccionados': componentes_seleccionados_nombres,
             'piezas_creadas': piezas_creadas,
