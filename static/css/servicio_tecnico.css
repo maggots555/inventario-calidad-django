@@ -1293,6 +1293,28 @@ form:has(#btnSubirImagenes:disabled) textarea {
     vertical-align: middle;
 }
 
+/* Badges de tipo pieza (Necesaria / Opcional) en columna "Tipo" */
+.badge-tipo-pieza,
+.badge-tipo-dinamico {
+    font-size: 0.72rem;
+    padding: 0.3em 0.6em;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
+}
+
+.badge-tipo-pieza:hover,
+.badge-tipo-dinamico:hover {
+    transform: scale(1.08);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.celda-tipo-pieza,
+.celda-tipo-dinamico {
+    min-width: 100px;
+}
+
 /* =============================================================================
    ESTILOS PARA SECCIÓN DE COTIZACIÓN
    Descripción: Estilos para mejorar la visualización de cotizaciones

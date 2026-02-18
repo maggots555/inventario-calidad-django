@@ -26,6 +26,20 @@ interface ComponenteData {
     componente_db: string;
     dpn: string;
     seleccionado: boolean;
+    es_necesaria: boolean;  // true = necesaria, false = opcional/recomendada
+}
+
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Representa una sección del diagnóstico que contiene piezas.
+ * El texto del diagnóstico puede tener múltiples secciones:
+ * - "PIEZAS NECESARIAS Y/O PRIORITARIAS" → es_necesaria = true
+ * - "PIEZAS OPCIONALES Y/O SECUNDARIAS" → es_necesaria = false
+ * Cada sección se procesa por separado para propagar la categoría.
+ */
+interface SeccionPiezas {
+    texto: string;           // Texto de la sección (después de la frase indicadora)
+    es_necesaria: boolean;   // true = necesaria/prioritaria, false = opcional/secundaria
 }
 
 /** Respuesta del servidor al enviar diagnóstico */
@@ -58,6 +72,7 @@ interface PiezaDetectada {
     numeroParte: string;          // Código/número de parte extraído
     componenteDb: string | null;  // Nombre del componente en la BD (null si no matchea)
     confianza: 'alta' | 'media';  // Qué tan seguro es el emparejamiento
+    es_necesaria: boolean;        // true = necesaria/prioritaria, false = opcional/secundaria
 }
 
 // ========================================================================
@@ -161,28 +176,70 @@ const ALIAS_COMPONENTES: Record<string, string[]> = {
 };
 
 // ========================================================================
-// FRASES INDICADORAS - Señales de que el texto contiene números de parte
+// FRASES INDICADORAS CATEGORIZADAS - Señales de secciones de piezas
 // ========================================================================
 
 /**
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * Los técnicos suelen escribir una frase que indica que a continuación vienen
- * los números de parte. Estas frases nos ayudan a saber dónde empieza 
- * la sección relevante del diagnóstico para extraer piezas.
+ * Los técnicos escriben frases que indican el inicio de una sección de piezas.
+ * Ahora diferenciamos entre 3 tipos de frases:
+ * 
+ * 1. FRASES_NECESARIAS: Indican piezas necesarias/prioritarias para el funcionamiento.
+ *    Ejemplo: "PIEZAS NECESARIAS Y/O PRIORITARIAS.- BATERIA: CP6DF"
+ * 
+ * 2. FRASES_OPCIONALES: Indican piezas opcionales o de mejora.
+ *    Ejemplo: "PIEZAS OPCIONALES Y/O SECUNDARIAS.- RAM DDR4: HMA82GS6"
+ * 
+ * 3. FRASES_GENERICAS: Frases sin categoría explícita (default: necesarias).
+ *    Ejemplo: "SE ANEXAN NÚMEROS DE PARTE PRIORITARIOS.- ..."
+ * 
+ * Esto permite que el sistema marque automáticamente cada pieza como
+ * "Necesaria" u "Opcional" según la sección donde aparece.
  */
-const FRASES_INDICADORAS: string[] = [
+
+/** Frases que indican piezas NECESARIAS / PRIORITARIAS (es_necesaria = true) */
+const FRASES_NECESARIAS: string[] = [
+    'PIEZAS NECESARIAS Y/O PRIORITARIAS',
+    'PIEZAS NECESARIAS Y PRIORITARIAS',
+    'PIEZAS NECESARIAS',
+    'NUMEROS DE PARTE PRIORITARIOS',
+    'NÚMEROS DE PARTE PRIORITARIOS',
+    'PIEZAS PRIORITARIAS',
+    'COTIZAR PIEZAS PRIORITARIAS',
+    'PARTES NECESARIAS',
+    'PARTES PRIORITARIAS',
+    'COMPONENTES NECESARIOS',
+    'COMPONENTES PRIORITARIOS',
+];
+
+/** Frases que indican piezas OPCIONALES / SECUNDARIAS (es_necesaria = false) */
+const FRASES_OPCIONALES: string[] = [
+    'PIEZAS OPCIONALES Y/O SECUNDARIAS',
+    'PIEZAS OPCIONALES Y SECUNDARIAS',
+    'PIEZAS OPCIONALES',
+    'PIEZAS SECUNDARIAS',
+    'PIEZAS RECOMENDADAS',
+    'PIEZAS DE MEJORA',
+    'MEJORAS OPCIONALES',
+    'MEJORAS RECOMENDADAS',
+    'PARTES OPCIONALES',
+    'PARTES SECUNDARIAS',
+    'PARTES RECOMENDADAS',
+    'COMPONENTES OPCIONALES',
+    'COMPONENTES SECUNDARIOS',
+    'COMPONENTES RECOMENDADOS',
+];
+
+/** Frases genéricas sin categoría explícita (default: es_necesaria = true) */
+const FRASES_GENERICAS: string[] = [
     'SE ANEXAN NÚMEROS DE PARTE',
     'SE ANEXAN NUMEROS DE PARTE',
     'SE ANEXA NÚMERO DE PARTE',
     'SE ANEXA NUMERO DE PARTE',
-    'NUMEROS DE PARTE PRIORITARIOS',
-    'NÚMEROS DE PARTE PRIORITARIOS',
     'NUMERO DE PARTE DE PIEZAS',
     'NÚMERO DE PARTE DE PIEZAS',
-    'COTIZAR PIEZAS PRIORITARIAS',
     'COTIZAR PIEZAS',
     'PIEZAS A COTIZAR',
-    'PIEZAS PRIORITARIAS',
     'PARTES A COTIZAR',
     'SE ANEXAN DPN',
     'SE ANEXA DPN',
@@ -199,43 +256,131 @@ const FRASES_INDICADORAS: string[] = [
 
 /**
  * EXPLICACIÓN PARA PRINCIPIANTES:
- * Esta función busca en el texto del diagnóstico la frase que indica
- * dónde empiezan los números de parte (por ejemplo "SE ANEXAN NÚMEROS 
- * DE PARTE PRIORITARIOS.-"). Devuelve solo el texto después de esa frase,
- * que es donde están las piezas reales.
+ * Esta función analiza el texto completo del diagnóstico y lo divide en
+ * secciones categorizadas. Cada sección contiene las piezas que van después
+ * de una frase indicadora, y se clasifica como "necesaria" u "opcional".
  * 
- * Si no encuentra ninguna frase indicadora, devuelve el texto completo
- * para intentar buscar piezas en todo el diagnóstico.
+ * Ejemplo de diagnóstico con 2 secciones:
+ *   "...texto libre del diagnóstico...
+ *    PIEZAS NECESARIAS Y/O PRIORITARIAS.- BATERIA: CP6DF, MOBO: 0XPJWG
+ *    PIEZAS OPCIONALES Y/O SECUNDARIAS.- RAM: HMA82GS6"
+ * 
+ * Resultado: [
+ *   { texto: "BATERIA: CP6DF, MOBO: 0XPJWG", es_necesaria: true },
+ *   { texto: "RAM: HMA82GS6", es_necesaria: false }
+ * ]
+ * 
+ * Si no encuentra ninguna frase categórica, busca frases genéricas
+ * y devuelve todo como "necesaria" (comportamiento backward-compatible).
+ * Si no encuentra NADA, devuelve el texto completo como una sola sección.
  */
-function extraerSeccionPiezas(texto: string): string {
+function extraerSeccionesCategoricas(texto: string): SeccionPiezas[] {
     const textoUpper = texto.toUpperCase();
     
-    let mejorPosicion = -1;
-    let mejorLongitud = 0;
+    // Estructura para almacenar todas las frases encontradas con su posición
+    interface FraseEncontrada {
+        posicion: number;       // Posición en el texto donde se encontró
+        longitud: number;       // Longitud de la frase encontrada
+        es_necesaria: boolean;  // Categoría de la frase
+        frase: string;          // La frase encontrada (para debug)
+    }
     
-    for (const frase of FRASES_INDICADORAS) {
-        const pos = textoUpper.indexOf(frase);
-        if (pos !== -1) {
-            // Preferir la frase más larga encontrada (más específica)
-            if (frase.length > mejorLongitud) {
-                mejorPosicion = pos;
-                mejorLongitud = frase.length;
+    const frasesEncontradas: FraseEncontrada[] = [];
+    
+    // Buscar TODAS las frases de las 3 categorías en el texto
+    // Priorizar las más largas cuando hay solapamiento en la misma posición
+    
+    // Helper: buscar frases de un array y agregarlas con su categoría
+    function buscarFrases(frases: string[], esNecesaria: boolean): void {
+        for (const frase of frases) {
+            let posicion = 0;
+            // Buscar todas las ocurrencias de la frase en el texto
+            while (posicion < textoUpper.length) {
+                const pos = textoUpper.indexOf(frase, posicion);
+                if (pos === -1) break;
+                
+                // Verificar si ya existe una frase que cubre esta posición
+                // y es más larga (más específica)
+                const existeMasEspecifica = frasesEncontradas.some(f =>
+                    f.posicion <= pos && 
+                    (f.posicion + f.longitud) >= (pos + frase.length)
+                );
+                
+                if (!existeMasEspecifica) {
+                    // Remover frases menos específicas que esta nueva cubre
+                    const indicesARemover: number[] = [];
+                    frasesEncontradas.forEach((f, idx) => {
+                        if (pos <= f.posicion && 
+                            (pos + frase.length) >= (f.posicion + f.longitud)) {
+                            indicesARemover.push(idx);
+                        }
+                    });
+                    // Remover de atrás hacia adelante para no afectar índices
+                    for (let i = indicesARemover.length - 1; i >= 0; i--) {
+                        frasesEncontradas.splice(indicesARemover[i], 1);
+                    }
+                    
+                    frasesEncontradas.push({
+                        posicion: pos,
+                        longitud: frase.length,
+                        es_necesaria: esNecesaria,
+                        frase: frase
+                    });
+                }
+                
+                posicion = pos + 1; // Avanzar para buscar más ocurrencias
             }
         }
     }
     
-    if (mejorPosicion !== -1) {
-        // Extraer todo después de la frase indicadora
-        let inicio = mejorPosicion + mejorLongitud;
-        const resto = texto.substring(inicio);
-        
-        // Saltar separadores iniciales como ".-", ":", "-", "."
-        const limpio = resto.replace(/^[\s.\-:]+/, '');
-        return limpio;
+    // Buscar en orden de prioridad: necesarias, opcionales, genéricas
+    buscarFrases(FRASES_NECESARIAS, true);
+    buscarFrases(FRASES_OPCIONALES, false);
+    buscarFrases(FRASES_GENERICAS, true); // Genéricas = necesarias por default
+    
+    // Si no se encontró ninguna frase, devolver todo el texto como una sección necesaria
+    if (frasesEncontradas.length === 0) {
+        return [{ texto: texto, es_necesaria: true }];
     }
     
-    // Si no hay frase indicadora, devolver todo el texto
-    return texto;
+    // Ordenar por posición en el texto (de izquierda a derecha)
+    frasesEncontradas.sort((a, b) => a.posicion - b.posicion);
+    
+    // Construir secciones: cada sección va desde el fin de una frase
+    // hasta el inicio de la siguiente frase (o el final del texto)
+    const secciones: SeccionPiezas[] = [];
+    
+    for (let i = 0; i < frasesEncontradas.length; i++) {
+        const fraseActual = frasesEncontradas[i];
+        const inicioTexto = fraseActual.posicion + fraseActual.longitud;
+        
+        // El fin de la sección es el inicio de la siguiente frase, o el final del texto
+        const finTexto = (i + 1 < frasesEncontradas.length)
+            ? frasesEncontradas[i + 1].posicion
+            : texto.length;
+        
+        // Extraer el texto de la sección
+        let textoSeccion = texto.substring(inicioTexto, finTexto);
+        
+        // Limpiar separadores iniciales como ".-", ":", "-", "."
+        textoSeccion = textoSeccion.replace(/^[\s.\-:]+/, '').trim();
+        
+        // Solo agregar secciones con contenido
+        if (textoSeccion.length > 0) {
+            secciones.push({
+                texto: textoSeccion,
+                es_necesaria: fraseActual.es_necesaria
+            });
+        }
+    }
+    
+    // Si después de procesar no quedó ninguna sección con contenido,
+    // devolver todo el texto como fallback
+    if (secciones.length === 0) {
+        return [{ texto: texto, es_necesaria: true }];
+    }
+    
+    return secciones;
 }
 
 /**
@@ -286,7 +431,7 @@ function dividirEnFragmentos(texto: string): string[] {
  * Para el formato sin dos puntos, busca al final del texto un patrón
  * que parezca un código alfanumérico (como 4Y37V, X5CF4, 1M3M4).
  */
-function extraerParteDeFragmento(fragmento: string): PiezaDetectada | null {
+function extraerParteDeFragmento(fragmento: string, es_necesaria: boolean = true): PiezaDetectada | null {
     const textoLimpio = fragmento.trim();
     
     // Ignorar fragmentos muy cortos o que no tienen sentido
@@ -359,7 +504,8 @@ function extraerParteDeFragmento(fragmento: string): PiezaDetectada | null {
         descripcionPieza: descripcion,
         numeroParte: numeroParte,
         componenteDb: matchComponente.nombre,
-        confianza: matchComponente.confianza
+        confianza: matchComponente.confianza,
+        es_necesaria: es_necesaria
     };
 }
 
@@ -410,35 +556,39 @@ function buscarComponenteDb(descripcion: string): { nombre: string | null; confi
  * EXPLICACIÓN PARA PRINCIPIANTES:
  * Esta es la función principal que coordina todo el proceso de detección.
  * Recibe el texto completo del diagnóstico y devuelve una lista de piezas
- * detectadas con sus números de parte.
+ * detectadas con sus números de parte y su categoría (necesaria/opcional).
  * 
  * Proceso:
- * 1. Busca la sección del texto donde están los números de parte
- * 2. Divide esa sección en fragmentos individuales (uno por pieza)
+ * 1. Divide el texto en secciones categorizadas (necesarias vs opcionales)
+ * 2. Para cada sección, divide en fragmentos individuales (uno por pieza)
  * 3. De cada fragmento extrae la descripción y el número de parte
  * 4. Empareja cada pieza con un componente del sistema
+ * 5. Propaga la categoría (es_necesaria) de la sección a cada pieza
  */
 function extraerPiezasDiagnostico(textoDiagnostico: string): PiezaDetectada[] {
     if (!textoDiagnostico || textoDiagnostico.trim().length === 0) {
         return [];
     }
     
-    // Paso 1: Encontrar la sección relevante del diagnóstico
-    const seccionPiezas = extraerSeccionPiezas(textoDiagnostico);
+    // Paso 1: Dividir en secciones categorizadas (necesarias, opcionales, genéricas)
+    const secciones = extraerSeccionesCategoricas(textoDiagnostico);
     
-    // Paso 2: Dividir en fragmentos individuales
-    const fragmentos = dividirEnFragmentos(seccionPiezas);
-    
-    // Paso 3: Extraer pieza y número de parte de cada fragmento
+    // Paso 2: Procesar cada sección por separado, propagando es_necesaria
     const piezas: PiezaDetectada[] = [];
     
-    for (const fragmento of fragmentos) {
-        const pieza = extraerParteDeFragmento(fragmento);
-        if (pieza) {
-            // Evitar duplicados (mismo número de parte)
-            const yaExiste = piezas.some(p => p.numeroParte === pieza.numeroParte);
-            if (!yaExiste) {
-                piezas.push(pieza);
+    for (const seccion of secciones) {
+        // Dividir la sección en fragmentos individuales
+        const fragmentos = dividirEnFragmentos(seccion.texto);
+        
+        for (const fragmento of fragmentos) {
+            // Extraer pieza pasando la categoría de la sección
+            const pieza = extraerParteDeFragmento(fragmento, seccion.es_necesaria);
+            if (pieza) {
+                // Evitar duplicados (mismo número de parte)
+                const yaExiste = piezas.some(p => p.numeroParte === pieza.numeroParte);
+                if (!yaExiste) {
+                    piezas.push(pieza);
+                }
             }
         }
     }
@@ -499,10 +649,65 @@ function initDiagnosticoModal(): void {
     
     /**
      * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Crea un badge (etiqueta) clickeable que permite al usuario indicar
+     * si una pieza es "Necesaria" (verde) o "Opcional" (amarillo).
+     * Al hacer clic, el badge alterna entre ambos estados.
+     * 
+     * @param componenteDb - Nombre del componente en la BD
+     * @param esDinamico - Si es un componente dinámico (agregado manualmente)
+     * @param esNecesariaInicial - Estado inicial (true = necesaria, false = opcional)
+     */
+    function crearBadgeTipo(componenteDb: string, esDinamico: boolean, esNecesariaInicial: boolean = true): HTMLSpanElement {
+        const badge = document.createElement('span');
+        const claseDpn = esDinamico ? 'badge-tipo-dinamico' : 'badge-tipo-pieza';
+        badge.className = `badge ${claseDpn} cursor-pointer`;
+        badge.setAttribute('data-componente-db', componenteDb);
+        badge.setAttribute('data-es-necesaria', esNecesariaInicial ? 'true' : 'false');
+        badge.title = 'Clic para alternar entre Necesaria y Opcional';
+        
+        // Aplicar estado visual inicial
+        actualizarBadgeTipo(badge, esNecesariaInicial);
+        
+        // Event listener: click para alternar
+        badge.addEventListener('click', () => {
+            const esNecesariaActual = badge.getAttribute('data-es-necesaria') === 'true';
+            const nuevoEstado = !esNecesariaActual;
+            badge.setAttribute('data-es-necesaria', nuevoEstado ? 'true' : 'false');
+            actualizarBadgeTipo(badge, nuevoEstado);
+        });
+        
+        return badge;
+    }
+    
+    /**
+     * Actualiza el aspecto visual de un badge de tipo según su estado.
+     */
+    function actualizarBadgeTipo(badge: HTMLSpanElement, esNecesaria: boolean): void {
+        if (esNecesaria) {
+            badge.className = badge.className
+                .replace(/bg-warning/g, '')
+                .replace(/text-dark/g, '')
+                .replace(/bg-success/g, '');
+            badge.classList.add('bg-success');
+            badge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Necesaria';
+        } else {
+            badge.className = badge.className
+                .replace(/bg-success/g, '')
+                .replace(/bg-warning/g, '')
+                .replace(/text-dark/g, '');
+            badge.classList.add('bg-warning', 'text-dark');
+            badge.innerHTML = '<i class="bi bi-dash-circle me-1"></i>Opcional';
+        }
+    }
+    
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
      * Esta función controla que el campo de texto DPN (número de parte)
      * solo se pueda llenar cuando el checkbox del componente está marcado.
      * Si desmarcas el componente, el campo se deshabilita y se limpia.
-     * Esto evita que se ingresen datos en componentes que no están seleccionados.
+     * También controla la visibilidad del badge de tipo (Necesaria/Opcional):
+     * - Al marcar: muestra el badge en la celda "Tipo"
+     * - Al desmarcar: oculta el badge y resetea a "Necesaria" por default
      */
     function toggleDpnInput(checkbox: HTMLInputElement, esDinamico: boolean = false): void {
         const componenteDb = checkbox.getAttribute('data-componente-db') || '';
@@ -513,6 +718,12 @@ function initDiagnosticoModal(): void {
         
         if (!inputDpn) return;
         
+        // Buscar la celda de tipo para este componente
+        const selectorBadge = esDinamico ? 'badge-tipo-dinamico' : 'badge-tipo-pieza';
+        const celdaTipo = esDinamico
+            ? checkbox.closest('tr')?.querySelector('.celda-tipo-dinamico')
+            : document.querySelector<HTMLElement>(`.celda-tipo-pieza[data-componente-db="${componenteDb}"]`);
+        
         if (checkbox.checked) {
             inputDpn.disabled = false;
             inputDpn.placeholder = 'Ej: DPN: 0XPJWG';
@@ -521,6 +732,18 @@ function initDiagnosticoModal(): void {
             if (fila) {
                 fila.classList.remove('diagnostico-row-disabled');
                 fila.classList.add('diagnostico-row-active');
+            }
+            
+            // Mostrar badge de tipo si no existe aún en la celda
+            if (celdaTipo) {
+                const badgeExistente = celdaTipo.querySelector(`.${selectorBadge}`);
+                if (!badgeExistente) {
+                    const badge = crearBadgeTipo(componenteDb, esDinamico);
+                    celdaTipo.appendChild(badge);
+                } else {
+                    // Si ya existe, hacerlo visible
+                    (badgeExistente as HTMLElement).style.display = '';
+                }
             }
         } else {
             inputDpn.disabled = true;
@@ -531,6 +754,17 @@ function initDiagnosticoModal(): void {
             if (fila) {
                 fila.classList.remove('diagnostico-row-active');
                 fila.classList.add('diagnostico-row-disabled');
+            }
+            
+            // Ocultar y resetear el badge de tipo
+            if (celdaTipo) {
+                const badgeExistente = celdaTipo.querySelector(`.${selectorBadge}`) as HTMLElement | null;
+                if (badgeExistente) {
+                    badgeExistente.style.display = 'none';
+                    // Resetear a "necesaria" por default
+                    badgeExistente.setAttribute('data-es-necesaria', 'true');
+                    actualizarBadgeTipo(badgeExistente as HTMLSpanElement, true);
+                }
             }
         }
     }
@@ -655,6 +889,7 @@ function initDiagnosticoModal(): void {
     
     /**
      * Agrega una fila dinámica para un componente adicional.
+     * Incluye la celda "Tipo" con badge Necesaria/Opcional.
      */
     function agregarComponenteDinamico(nombreComponente: string): void {
         if (!componentesAdicionalesTbody) return;
@@ -697,6 +932,12 @@ function initDiagnosticoModal(): void {
         label.innerHTML = `${nombreComponente} <span class="badge bg-success ms-2">ADICIONAL</span>`;
         tdNombre.appendChild(label);
         
+        // Celda Tipo (badge Necesaria/Opcional) — visible porque viene pre-seleccionado
+        const tdTipo = document.createElement('td');
+        tdTipo.className = 'text-center align-middle celda-tipo-dinamico';
+        const badgeTipo = crearBadgeTipo(nombreComponente, true);
+        tdTipo.appendChild(badgeTipo);
+        
         // Celda DPN
         const tdDpn = document.createElement('td');
         tdDpn.className = 'align-middle';
@@ -716,9 +957,10 @@ function initDiagnosticoModal(): void {
         btnEliminar.addEventListener('click', () => eliminarComponenteDinamico(tr, nombreComponente));
         tdDpn.appendChild(btnEliminar);
         
-        // Ensamblar fila
+        // Ensamblar fila (4 celdas: check, nombre, tipo, dpn)
         tr.appendChild(tdCheck);
         tr.appendChild(tdNombre);
+        tr.appendChild(tdTipo);
         tr.appendChild(tdDpn);
         
         // Insertar en tabla
@@ -1095,8 +1337,20 @@ function initDiagnosticoModal(): void {
                     inputDpn.style.backgroundColor = '';
                 }, 2000);
             }
-            // Actualizar estilo de fila activa
+            // Actualizar estilo de fila activa y mostrar badge
             toggleDpnInput(checkboxPredefinido, false);
+            
+            // Setear es_necesaria en el badge según la pieza detectada
+            const celdaTipoPre = document.querySelector<HTMLElement>(
+                `.celda-tipo-pieza[data-componente-db="${componenteDb}"]`
+            );
+            if (celdaTipoPre) {
+                const badgePre = celdaTipoPre.querySelector('.badge-tipo-pieza') as HTMLSpanElement | null;
+                if (badgePre) {
+                    badgePre.setAttribute('data-es-necesaria', pieza.es_necesaria ? 'true' : 'false');
+                    actualizarBadgeTipo(badgePre, pieza.es_necesaria);
+                }
+            }
         } else {
             // No es predefinido — buscar si ya existe como dinámico
             const checkboxDinamico = document.querySelector<HTMLInputElement>(
@@ -1119,6 +1373,19 @@ function initDiagnosticoModal(): void {
                     }, 2000);
                 }
                 toggleDpnInput(checkboxDinamico, true);
+                
+                // Setear es_necesaria en el badge del componente dinámico
+                const filaDin = checkboxDinamico.closest('tr');
+                if (filaDin) {
+                    const celdaTipoDin = filaDin.querySelector('.celda-tipo-dinamico');
+                    if (celdaTipoDin) {
+                        const badgeDin = celdaTipoDin.querySelector('.badge-tipo-dinamico') as HTMLSpanElement | null;
+                        if (badgeDin) {
+                            badgeDin.setAttribute('data-es-necesaria', pieza.es_necesaria ? 'true' : 'false');
+                            actualizarBadgeTipo(badgeDin, pieza.es_necesaria);
+                        }
+                    }
+                }
             } else {
                 // No existe — agregarlo como componente dinámico
                 agregarComponenteDinamico(componenteDb);
@@ -1135,6 +1402,24 @@ function initDiagnosticoModal(): void {
                         setTimeout(() => {
                             nuevoInputDpn.style.backgroundColor = '';
                         }, 2000);
+                    }
+                    
+                    // Setear es_necesaria en el badge del nuevo componente dinámico
+                    const nuevoCheckbox = document.querySelector<HTMLInputElement>(
+                        `.checkbox-componente-dinamico[data-componente-db="${componenteDb}"]`
+                    );
+                    if (nuevoCheckbox) {
+                        const filaNueva = nuevoCheckbox.closest('tr');
+                        if (filaNueva) {
+                            const celdaTipoNueva = filaNueva.querySelector('.celda-tipo-dinamico');
+                            if (celdaTipoNueva) {
+                                const badgeNuevo = celdaTipoNueva.querySelector('.badge-tipo-dinamico') as HTMLSpanElement | null;
+                                if (badgeNuevo) {
+                                    badgeNuevo.setAttribute('data-es-necesaria', pieza.es_necesaria ? 'true' : 'false');
+                                    actualizarBadgeTipo(badgeNuevo, pieza.es_necesaria);
+                                }
+                            }
+                        }
                     }
                 }, 50);
             }
@@ -1273,6 +1558,19 @@ function initDiagnosticoModal(): void {
             codeSpan.className = 'fs-6 fw-bold text-primary';
             codeSpan.textContent = pieza.numeroParte;
             infoDiv.appendChild(codeSpan);
+            
+            // Badge de tipo: Necesaria (verde) u Opcional (amarillo)
+            const badgeTipoDetectada = document.createElement('span');
+            if (pieza.es_necesaria) {
+                badgeTipoDetectada.className = 'badge bg-success bg-opacity-75';
+                badgeTipoDetectada.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Necesaria';
+                badgeTipoDetectada.title = 'Pieza necesaria / prioritaria';
+            } else {
+                badgeTipoDetectada.className = 'badge bg-warning text-dark';
+                badgeTipoDetectada.innerHTML = '<i class="bi bi-dash-circle me-1"></i>Opcional';
+                badgeTipoDetectada.title = 'Pieza opcional / secundaria';
+            }
+            infoDiv.appendChild(badgeTipoDetectada);
             
             // Si hay match, mostrar a cuál componente apunta
             if (pieza.componenteDb) {
@@ -1506,10 +1804,20 @@ function initDiagnosticoModal(): void {
                 `.input-dpn[data-componente-db="${componenteDb}"]`
             );
             
+            // Leer es_necesaria desde el badge de tipo (default: true)
+            const celdaTipo = document.querySelector<HTMLElement>(
+                `.celda-tipo-pieza[data-componente-db="${componenteDb}"]`
+            );
+            const badgeTipo = celdaTipo?.querySelector('.badge-tipo-pieza') as HTMLElement | null;
+            const esNecesaria = badgeTipo
+                ? badgeTipo.getAttribute('data-es-necesaria') !== 'false'
+                : true;
+            
             componentes.push({
                 componente_db: componenteDb,
                 dpn: inputDpn ? inputDpn.value.trim() : '',
-                seleccionado: cb.checked
+                seleccionado: cb.checked,
+                es_necesaria: esNecesaria
             });
         });
         
@@ -1522,10 +1830,19 @@ function initDiagnosticoModal(): void {
                 `.input-dpn-dinamico[data-componente-db="${componenteDb}"]`
             );
             
+            // Leer es_necesaria desde el badge de tipo dinámico (default: true)
+            const filaDin = cb.closest('tr');
+            const celdaTipoDin = filaDin?.querySelector('.celda-tipo-dinamico');
+            const badgeTipoDin = celdaTipoDin?.querySelector('.badge-tipo-dinamico') as HTMLElement | null;
+            const esNecesariaDin = badgeTipoDin
+                ? badgeTipoDin.getAttribute('data-es-necesaria') !== 'false'
+                : true;
+            
             componentes.push({
                 componente_db: componenteDb,
                 dpn: inputDpn ? inputDpn.value.trim() : '',
-                seleccionado: cb.checked
+                seleccionado: cb.checked,
+                es_necesaria: esNecesariaDin
             });
         });
         

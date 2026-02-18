@@ -6404,7 +6404,8 @@ def enviar_diagnostico_cliente(request, orden_id):
             componentes_para_pdf.append({
                 'componente_db': comp.get('componente_db', ''),
                 'dpn': comp.get('dpn', ''),
-                'seleccionado': comp.get('seleccionado', False)
+                'seleccionado': comp.get('seleccionado', False),
+                'es_necesaria': comp.get('es_necesaria', True)
             })
         
         # Obtener config del país para que el PDF muestre el nombre correcto
@@ -6556,7 +6557,7 @@ def enviar_diagnostico_cliente(request, orden_id):
                         proveedor='',
                         cantidad=1,
                         sugerida_por_tecnico=True,
-                        es_necesaria=True,
+                        es_necesaria=comp.get('es_necesaria', True),
                         orden_prioridad=piezas_creadas + 1
                     )
                     piezas_creadas += 1
@@ -6825,7 +6826,8 @@ def preview_pdf_diagnostico(request, orden_id):
             componentes_para_pdf.append({
                 'componente_db': comp.get('componente_db', ''),
                 'dpn': comp.get('dpn', ''),
-                'seleccionado': comp.get('seleccionado', False)
+                'seleccionado': comp.get('seleccionado', False),
+                'es_necesaria': comp.get('es_necesaria', True)
             })
         
         # Obtener config del país para que el PDF muestre el nombre correcto

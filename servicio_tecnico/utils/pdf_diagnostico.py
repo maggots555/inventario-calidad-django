@@ -83,6 +83,8 @@ class PDFGeneratorDiagnostico:
     COLOR_ROJO_CHECK = colors.HexColor('#FF0000')     # Rojo para las X de componentes
     COLOR_NEGRO = colors.black
     COLOR_BLANCO = colors.white
+    COLOR_VERDE_NECESARIA = colors.HexColor('#C6EFCE')   # Verde claro para piezas necesarias
+    COLOR_AMARILLO_OPCIONAL = colors.HexColor('#FFEB9C')  # Amarillo claro para piezas opcionales
     
     def __init__(self, orden, folio: str, componentes_seleccionados: List[Dict] = None,
                  email_empleado: str = '', pais_config: Dict = None):
@@ -635,7 +637,8 @@ class PDFGeneratorDiagnostico:
             nombre_db = comp.get('componente_db', '')
             componentes_map[nombre_db] = {
                 'seleccionado': comp.get('seleccionado', False),
-                'dpn': comp.get('dpn', '')
+                'dpn': comp.get('dpn', ''),
+                'es_necesaria': comp.get('es_necesaria', True)
             }
             # Si NO está en los predefinidos, es un componente adicional dinámico
             if nombre_db and nombre_db not in nombres_predefinidos:
@@ -651,9 +654,10 @@ class PDFGeneratorDiagnostico:
             label_pdf = comp_config['label_pdf']
             
             # Obtener datos de selección
-            comp_data = componentes_map.get(nombre_db, {'seleccionado': False, 'dpn': ''})
+            comp_data = componentes_map.get(nombre_db, {'seleccionado': False, 'dpn': '', 'es_necesaria': True})
             esta_seleccionado = comp_data.get('seleccionado', False)
             dpn_texto = comp_data.get('dpn', '')
+            es_necesaria = comp_data.get('es_necesaria', True)
             
             # Celda: Nombre del componente
             c.setFillColor(self.COLOR_GRIS_HEADER)
@@ -673,9 +677,14 @@ class PDFGeneratorDiagnostico:
                 c.setFont("Helvetica-Bold", 10)
                 c.drawCentredString(x_check + ancho_check / 2, y_fila + alto_fila / 2 - 4, "X")
             
-            # Celda: DPN/notas
+            # Celda: DPN/notas — fondo coloreado según tipo (necesaria/opcional)
             x_dpn = x_check + ancho_check
-            c.setFillColor(self.COLOR_BLANCO)
+            if esta_seleccionado and dpn_texto:
+                # Color de fondo según si la pieza es necesaria u opcional
+                color_fondo_dpn = self.COLOR_VERDE_NECESARIA if es_necesaria else self.COLOR_AMARILLO_OPCIONAL
+                c.setFillColor(color_fondo_dpn)
+            else:
+                c.setFillColor(self.COLOR_BLANCO)
             c.rect(x_dpn, y_fila, ancho_dpn, alto_fila, fill=1, stroke=1)
             
             if dpn_texto:
@@ -696,6 +705,7 @@ class PDFGeneratorDiagnostico:
             nombre_db = comp_adicional.get('componente_db', '')
             esta_seleccionado = comp_adicional.get('seleccionado', False)
             dpn_texto = comp_adicional.get('dpn', '')
+            es_necesaria_adic = comp_adicional.get('es_necesaria', True)
             # Usar el nombre del componente como etiqueta (en mayúsculas)
             label_pdf = nombre_db.upper() if nombre_db else 'COMPONENTE ADICIONAL'
 
@@ -723,9 +733,13 @@ class PDFGeneratorDiagnostico:
                 c.setFont("Helvetica-Bold", 10)
                 c.drawCentredString(x_check + ancho_check / 2, y_fila + alto_fila / 2 - 4, "X")
 
-            # Celda: DPN/notas
+            # Celda: DPN/notas — fondo coloreado según tipo (necesaria/opcional)
             x_dpn = x_check + ancho_check
-            c.setFillColor(self.COLOR_BLANCO)
+            if esta_seleccionado and dpn_texto:
+                color_fondo_dpn = self.COLOR_VERDE_NECESARIA if es_necesaria_adic else self.COLOR_AMARILLO_OPCIONAL
+                c.setFillColor(color_fondo_dpn)
+            else:
+                c.setFillColor(self.COLOR_BLANCO)
             c.rect(x_dpn, y_fila, ancho_dpn, alto_fila, fill=1, stroke=1)
 
             if dpn_texto:
@@ -735,7 +749,27 @@ class PDFGeneratorDiagnostico:
                 texto_truncado = dpn_texto[:max_chars] if len(dpn_texto) > max_chars else dpn_texto
                 c.drawString(x_dpn + 5, y_fila + alto_fila / 2 - 3, texto_truncado)
         
-        return y_fila - 5
+        # ── Leyenda de colores (Necesaria / Opcional) ──
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Dibujamos dos pequeños rectángulos de color con su etiqueta
+        # para que el cliente entienda qué significa cada color en la columna DPN.
+        y_leyenda = y_fila - 14
+        c.setFont("Helvetica", 6.5)
+        
+        # Rectángulo verde + "Necesaria"
+        c.setFillColor(self.COLOR_VERDE_NECESARIA)
+        c.rect(x_inicio, y_leyenda, 8, 8, fill=1, stroke=1)
+        c.setFillColor(self.COLOR_NEGRO)
+        c.drawString(x_inicio + 10, y_leyenda + 1, "= Pieza necesaria")
+        
+        # Rectángulo amarillo + "Opcional"
+        x_opcional = x_inicio + 90
+        c.setFillColor(self.COLOR_AMARILLO_OPCIONAL)
+        c.rect(x_opcional, y_leyenda, 8, 8, fill=1, stroke=1)
+        c.setFillColor(self.COLOR_NEGRO)
+        c.drawString(x_opcional + 10, y_leyenda + 1, "= Pieza opcional / recomendada")
+        
+        return y_leyenda - 5
     
     def _dibujar_footer(self, c: canvas.Canvas):
         """
