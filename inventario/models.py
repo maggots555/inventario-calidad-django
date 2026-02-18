@@ -526,6 +526,13 @@ class Empleado(models.Model):
         help_text="Sucursal a la que pertenece el empleado"
     )
     email = models.EmailField(blank=True, null=True, help_text="Correo electrónico del empleado (para notificaciones)")
+    numero_whatsapp = models.CharField(
+        max_length=15,
+        blank=True,
+        null=True,
+        verbose_name="WhatsApp empresarial",
+        help_text="Número local sin código de país, solo dígitos (ej: 5535458192). Opcional, solo si tiene línea empresarial."
+    )
     jefe_directo = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,

@@ -38,6 +38,7 @@ PAISES_CONFIG = {
     'mexico': {
         # --- Identificación ---
         'codigo': 'MX',                    # Código ISO 3166-1 alpha-2
+        'codigo_telefonico': '52',         # Código telefónico internacional (para WhatsApp)
         'nombre': 'México',                # Nombre para mostrar al usuario
         'nombre_completo': 'México',
 
@@ -81,6 +82,7 @@ PAISES_CONFIG = {
     'argentina': {
         # --- Identificación ---
         'codigo': 'AR',
+        'codigo_telefonico': '54',         # Código telefónico internacional (para WhatsApp)
         'nombre': 'Argentina',
         'nombre_completo': 'Argentina',
 

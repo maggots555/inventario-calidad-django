@@ -486,6 +486,12 @@
                         <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
                         <span>Facebook</span>
                     </a>
+                    {% if whatsapp_empleado %}
+                    <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
+                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>WhatsApp</span>
+                    </a>
+                    {% endif %}
                 </div>
             </div>
             

@@ -400,7 +400,7 @@ class EmpleadoForm(forms.ModelForm):
     """
     class Meta:
         model = Empleado
-        fields = ['nombre_completo', 'cargo', 'area', 'email', 'foto_perfil', 'sucursal', 'jefe_directo', 'rol', 'activo']
+        fields = ['nombre_completo', 'cargo', 'area', 'email', 'numero_whatsapp', 'foto_perfil', 'sucursal', 'jefe_directo', 'rol', 'activo']
         widgets = {
             'nombre_completo': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -417,6 +417,12 @@ class EmpleadoForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Ej: juan.perez@empresa.com'
+            }),
+            'numero_whatsapp': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 5535458192 (solo dígitos, sin código de país)',
+                'pattern': '[0-9]*',
+                'inputmode': 'numeric'
             }),
             'foto_perfil': forms.FileInput(attrs={
                 'class': 'form-control',
@@ -456,6 +462,7 @@ class EmpleadoForm(forms.ModelForm):
         # Hacer campos opcionales
         self.fields['sucursal'].required = False
         self.fields['email'].required = False
+        self.fields['numero_whatsapp'].required = False
         self.fields['jefe_directo'].required = False
         
         # Agregar texto de ayuda

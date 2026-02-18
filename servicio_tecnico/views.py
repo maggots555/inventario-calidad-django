@@ -6051,13 +6051,29 @@ def enviar_imagenes_cliente(request, orden_id):
         # =======================================================================
         print(f"📧 Preparando contenido del correo...")
         
-        ahora = timezone.now()
-        
         # EXPLICACIÓN PARA PRINCIPIANTES:
         # render_to_string() NO ejecuta context_processors, así que debemos
         # pasar manualmente las variables del país al template del email.
-        from config.paises_config import get_pais_actual
+        from config.paises_config import get_pais_actual, fecha_local_pais
         _pais_email = get_pais_actual()
+        
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # timezone.now() devuelve la hora en UTC (hora del servidor).
+        # fecha_local_pais() la convierte a la zona horaria del país activo
+        # (ej: America/Mexico_City para México) para que el cliente vea
+        # la hora correcta en el correo.
+        ahora = fecha_local_pais(timezone.now(), _pais_email)
+        
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si el empleado tiene número de WhatsApp empresarial, armamos el link
+        # completo con código de país (ej: 52 + 5535458192 = 525535458192).
+        # El número se guarda SIN código de país en la base de datos.
+        whatsapp_empleado = ''
+        if hasattr(request.user, 'empleado') and request.user.empleado:
+            numero_local = request.user.empleado.numero_whatsapp
+            if numero_local:
+                codigo_tel = _pais_email.get('codigo_telefonico', '')
+                whatsapp_empleado = f"{codigo_tel}{numero_local}"
         
         context = {
             'orden': orden,
@@ -6067,6 +6083,7 @@ def enviar_imagenes_cliente(request, orden_id):
             'cantidad_imagenes': len(imagenes_comprimidas),
             'empresa_nombre': _pais_email['empresa_nombre_corto'],
             'pais_nombre': _pais_email['nombre'],
+            'whatsapp_empleado': whatsapp_empleado,
         }
         
         # Renderizar plantilla HTML
@@ -6145,6 +6162,7 @@ def enviar_imagenes_cliente(request, orden_id):
                 'icon_link': 'images/utilitys/link.png',
                 'icon_instagram': 'images/utilitys/instagram.png',
                 'icon_facebook': 'images/utilitys/facebook.png',
+                'icon_whatsapp': 'images/utilitys/whatsapp.png',
             }
             for cid_name, icon_static_path in iconos_sociales.items():
                 icon_path = finders.find(icon_static_path)
@@ -6549,15 +6567,26 @@ def enviar_diagnostico_cliente(request, orden_id):
         print(f"📧 Preparando correo electrónico...")
         
         # Contexto para el template de email
-        from config.paises_config import get_pais_actual
+        from config.paises_config import get_pais_actual, fecha_local_pais
         _pais_email = get_pais_actual()
+        
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Si el empleado tiene número de WhatsApp empresarial, armamos el link
+        # completo con código de país (ej: 52 + 5535458192 = 525535458192).
+        # El número se guarda SIN código de país en la base de datos.
+        whatsapp_empleado = ''
+        if hasattr(request.user, 'empleado') and request.user.empleado:
+            numero_local = request.user.empleado.numero_whatsapp
+            if numero_local:
+                codigo_tel = _pais_email.get('codigo_telefonico', '')
+                whatsapp_empleado = f"{codigo_tel}{numero_local}"
         
         context_email = {
             'orden': orden,
             'detalle': detalle,
             'folio': folio,
             'mensaje_personalizado': mensaje_personalizado,
-            'fecha_envio': timezone.now(),
+            'fecha_envio': fecha_local_pais(timezone.now(), _pais_email),
             'cantidad_imagenes': len(imagenes_comprimidas),
             'componentes_seleccionados': componentes_seleccionados_nombres,
             'piezas_creadas': piezas_creadas,
@@ -6565,6 +6594,7 @@ def enviar_diagnostico_cliente(request, orden_id):
             'pais_nombre': _pais_email['nombre'],
             'email_empleado': email_empleado,
             'nombre_empleado': nombre_empleado,
+            'whatsapp_empleado': whatsapp_empleado,
         }
         
         # Renderizar plantilla HTML del email
@@ -6620,6 +6650,7 @@ def enviar_diagnostico_cliente(request, orden_id):
                 'icon_link': 'images/utilitys/link.png',
                 'icon_instagram': 'images/utilitys/instagram.png',
                 'icon_facebook': 'images/utilitys/facebook.png',
+                'icon_whatsapp': 'images/utilitys/whatsapp.png',
             }
             for cid_name, icon_static_path in iconos_sociales.items():
                 icon_path = finders.find(icon_static_path)

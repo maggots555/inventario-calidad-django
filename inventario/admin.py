@@ -125,7 +125,7 @@ class EmpleadoAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Información Personal', {
-            'fields': ('nombre_completo', 'cargo', 'area', 'email', 'foto_perfil', 'preview_foto')
+            'fields': ('nombre_completo', 'cargo', 'area', 'email', 'numero_whatsapp', 'foto_perfil', 'preview_foto')
         }),
         ('Ubicación y Jerarquía', {
             'fields': ('sucursal', 'jefe_directo', 'rol'),

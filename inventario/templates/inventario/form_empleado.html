@@ -120,6 +120,24 @@
                                 </small>
                             </div>
                             <div class="col-md-6">
+                                <label for="{{ form.numero_whatsapp.id_for_label }}" class="form-label">
+                                    <i class="bi bi-whatsapp"></i> WhatsApp Empresarial
+                                </label>
+                                {{ form.numero_whatsapp }}
+                                {% if form.numero_whatsapp.errors %}
+                                    <div class="text-danger small">
+                                        {{ form.numero_whatsapp.errors.0 }}
+                                    </div>
+                                {% endif %}
+                                <small class="form-text text-muted">
+                                    Opcional. Solo dígitos sin código de país (ej: 5535458192)
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Asignación y Jerarquía Organizacional -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
                                 <label for="{{ form.sucursal.id_for_label }}" class="form-label">
                                     <i class="bi bi-building"></i> Sucursal Asignada
                                 </label>
@@ -133,10 +151,6 @@
                                     Opcional. Sucursal donde trabaja habitualmente
                                 </small>
                             </div>
-                        </div>
-
-                        <!-- Jerarquía Organizacional -->
-                        <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="{{ form.jefe_directo.id_for_label }}" class="form-label">
                                     <i class="bi bi-diagram-3"></i> Jefe Directo
@@ -151,6 +165,10 @@
                                     <i class="bi bi-info-circle"></i> {{ form.jefe_directo.help_text }}
                                 </small>
                             </div>
+                        </div>
+
+                        <!-- Rol y Configuración -->
+                        <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="{{ form.rol.id_for_label }}" class="form-label">
                                     <i class="bi bi-person-badge"></i> Rol en el Sistema *

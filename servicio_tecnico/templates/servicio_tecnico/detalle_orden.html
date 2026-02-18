@@ -5764,9 +5764,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // =========================================================================
     // HOVER EFFECT: Resaltar cards al pasar el mouse
     // =========================================================================
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Las cards de imágenes usan .imagen-selectable, pero el checkbox dentro
+    // puede ser .checkbox-imagen (modal imágenes al cliente) o 
+    // .checkbox-imagen-diag (modal diagnóstico). Buscamos ambos para evitar
+    // un error de null cuando querySelector no encuentra la clase correcta.
     document.querySelectorAll('.imagen-selectable').forEach(card => {
         card.addEventListener('mouseenter', function() {
-            if (!this.querySelector('.checkbox-imagen').checked) {
+            const checkbox = this.querySelector('.checkbox-imagen') || this.querySelector('.checkbox-imagen-diag');
+            if (checkbox && !checkbox.checked) {
                 this.style.transform = 'scale(1.05)';
                 this.style.transition = 'transform 0.2s ease';
             }
