@@ -5,7 +5,7 @@
 {% block title %}Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=7.1">
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=7.2">
 <link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}?v=1.0">
 {% endblock %}
 
@@ -2901,7 +2901,7 @@
                     {% csrf_token %}
                     
                     <!-- SECCIÓN 1: FOLIO PERSONALIZADO -->
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
                             <i class="bi bi-hash text-success fs-5 me-2"></i>
                             <h6 class="mb-0 text-success fw-bold">Folio del Diagnóstico</h6>
@@ -2932,10 +2932,10 @@
                         </div>
                     </div>
                     
-                    <hr class="my-4">
+                    <hr class="my-3">
                     
                     <!-- SECCIÓN 2: DESTINATARIO PRINCIPAL -->
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
                             <i class="bi bi-person-fill text-primary fs-5 me-2"></i>
                             <h6 class="mb-0 text-primary fw-bold">Para: (Destinatario principal)</h6>
@@ -3062,10 +3062,10 @@
                         {% endif %}
                     </div>
                     
-                    <hr class="my-4">
+                    <hr class="my-3">
                     
                     <!-- SECCIÓN 3: CON COPIA A -->
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
                             <i class="bi bi-file-earmark-text-fill text-info fs-5 me-2"></i>
                             <h6 class="mb-0 text-info fw-bold">Con copia a: (Opcional)</h6>
@@ -3212,10 +3212,10 @@
                         </div>
                     </div>
                     
-                    <hr class="my-4">
+                    <hr class="my-3">
                     
                     <!-- SECCIÓN 4: CHECKLIST DE COMPONENTES -->
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-list-check text-warning fs-5 me-2"></i>
@@ -3312,7 +3312,8 @@
                                             <input type="text" 
                                                    class="form-control form-control-sm input-dpn"
                                                    data-componente-db="{{ comp.componente_db }}"
-                                                   placeholder="Ej: DPN: 0XPJWG">
+                                                   placeholder="Ej: DPN: 0XPJWG"
+                                                   disabled>
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -3331,10 +3332,10 @@
                         </small>
                     </div>
                     
-                    <hr class="my-4">
+                    <hr class="my-3">
                     
                     <!-- SECCIÓN 5: IMÁGENES DE DIAGNÓSTICO -->
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
                             <i class="bi bi-images text-primary fs-5 me-2"></i>
                             <h6 class="mb-0 text-primary fw-bold">
@@ -3400,10 +3401,10 @@
                         {% endif %}
                     </div>
                     
-                    <hr class="my-4">
+                    <hr class="my-3">
                     
                     <!-- SECCIÓN 6: MENSAJE PERSONALIZADO -->
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
                             <i class="bi bi-chat-left-text text-success fs-5 me-2"></i>
                             <h6 class="mb-0 text-success fw-bold">Mensaje personalizado (Opcional)</h6>
@@ -3421,10 +3422,10 @@
                         </div>
                     </div>
                     
-                    <hr class="my-4">
+                    <hr class="my-3">
                     
                     <!-- SECCIÓN 7: VISTA PREVIA DEL PDF -->
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
                             <i class="bi bi-eye-fill text-info fs-5 me-2"></i>
                             <h6 class="mb-0 text-info fw-bold">Vista previa del PDF</h6>
@@ -4049,7 +4050,7 @@
 <script src="{% static 'js/camara_integrada.js' %}?v=6.0"></script>
 
 <!-- Modal de envío de diagnóstico al cliente -->
-<script src="{% static 'js/diagnostico_modal.js' %}?v=3.1"></script>
+<script src="{% static 'js/diagnostico_modal.js' %}?v=3.2"></script>
 
 <script>
 // ============================================================================

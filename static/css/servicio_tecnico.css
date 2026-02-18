@@ -1224,6 +1224,76 @@ form:has(#btnSubirImagenes:disabled) textarea {
 }
 
 /* =============================================================================
+   ESTILOS PARA MODAL DE DIAGNÓSTICO AL CLIENTE
+   Descripción: Clases necesarias para tarjetas de destinatarios, hover effects,
+   tabla de componentes y estados visuales de filas
+   ============================================================================= */
+
+/* Clase auxiliar para cursor pointer (labels clickeables) */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Tarjetas de destinatarios (clickeables) */
+.destinatario-card {
+    cursor: pointer;
+    user-select: none;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.destinatario-card:hover {
+    background-color: #f8f9fa !important;
+}
+
+.destinatario-card .form-check-input {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-top: 0;
+}
+
+/* Efecto hover suave en tarjetas */
+.hover-shadow {
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    border-color: #dee2e6 !important;
+}
+
+.hover-shadow:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    border-color: #0d6efd !important;
+}
+
+/* Tabla de componentes del diagnóstico: filas activas e inactivas */
+#tablaComponentesDiagnostico .diagnostico-row-disabled {
+    opacity: 0.55;
+    transition: opacity 0.25s ease;
+}
+
+#tablaComponentesDiagnostico .diagnostico-row-active {
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+/* Input DPN: transición suave al habilitar/deshabilitar */
+#tablaComponentesDiagnostico .input-dpn,
+#tablaComponentesDiagnostico .input-dpn-dinamico {
+    transition: opacity 0.25s ease, background-color 0.3s ease;
+}
+
+#tablaComponentesDiagnostico .input-dpn:disabled,
+#tablaComponentesDiagnostico .input-dpn-dinamico:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background-color: #e9ecef;
+}
+
+/* Compactar la tabla de componentes del diagnóstico */
+#tablaComponentesDiagnostico td,
+#tablaComponentesDiagnostico th {
+    padding: 0.4rem 0.6rem;
+    vertical-align: middle;
+}
+
+/* =============================================================================
    ESTILOS PARA SECCIÓN DE COTIZACIÓN
    Descripción: Estilos para mejorar la visualización de cotizaciones
    ============================================================================= */

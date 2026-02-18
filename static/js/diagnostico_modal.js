@@ -403,7 +403,56 @@ function initDiagnosticoModal() {
         });
     }
     // ====================================================================
-    // 2. Contador de componentes seleccionados
+    // 2. Toggle DPN: habilitar/deshabilitar campo al marcar checkbox
+    // ====================================================================
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Esta función controla que el campo de texto DPN (número de parte)
+     * solo se pueda llenar cuando el checkbox del componente está marcado.
+     * Si desmarcas el componente, el campo se deshabilita y se limpia.
+     * Esto evita que se ingresen datos en componentes que no están seleccionados.
+     */
+    function toggleDpnInput(checkbox, esDinamico = false) {
+        const componenteDb = checkbox.getAttribute('data-componente-db') || '';
+        const selectorDpn = esDinamico
+            ? `.input-dpn-dinamico[data-componente-db="${componenteDb}"]`
+            : `.input-dpn[data-componente-db="${componenteDb}"]`;
+        const inputDpn = document.querySelector(selectorDpn);
+        if (!inputDpn)
+            return;
+        if (checkbox.checked) {
+            inputDpn.disabled = false;
+            inputDpn.placeholder = 'Ej: DPN: 0XPJWG';
+            // Estilo visual: fila activa
+            const fila = checkbox.closest('tr');
+            if (fila) {
+                fila.classList.remove('diagnostico-row-disabled');
+                fila.classList.add('diagnostico-row-active');
+            }
+        }
+        else {
+            inputDpn.disabled = true;
+            inputDpn.value = '';
+            inputDpn.placeholder = 'Selecciona el componente primero';
+            // Estilo visual: fila inactiva
+            const fila = checkbox.closest('tr');
+            if (fila) {
+                fila.classList.remove('diagnostico-row-active');
+                fila.classList.add('diagnostico-row-disabled');
+            }
+        }
+    }
+    /**
+     * Aplica el estado inicial de todos los DPN (deshabilitados porque
+     * ningún checkbox está marcado al abrir el modal).
+     */
+    function inicializarEstadoDpn() {
+        document.querySelectorAll('.checkbox-componente').forEach(cb => {
+            toggleDpnInput(cb, false);
+        });
+    }
+    // ====================================================================
+    // 2b. Contador de componentes seleccionados
     // ====================================================================
     function actualizarContadorComponentes() {
         // Contar componentes predefinidos
@@ -425,8 +474,13 @@ function initDiagnosticoModal() {
     }
     // Event listeners para checkboxes de componentes predefinidos
     document.querySelectorAll('.checkbox-componente').forEach(cb => {
-        cb.addEventListener('change', actualizarContadorComponentes);
+        cb.addEventListener('change', () => {
+            toggleDpnInput(cb, false);
+            actualizarContadorComponentes();
+        });
     });
+    // Aplicar estado inicial de los DPN (deshabilitados)
+    inicializarEstadoDpn();
     // ====================================================================
     // 3. Contador de imágenes seleccionadas
     // ====================================================================
@@ -521,7 +575,10 @@ function initDiagnosticoModal() {
         checkbox.checked = true; // Pre-seleccionado
         checkbox.id = idUnico;
         checkbox.setAttribute('data-componente-db', nombreComponente);
-        checkbox.addEventListener('change', actualizarContadorComponentes);
+        checkbox.addEventListener('change', () => {
+            toggleDpnInput(checkbox, true);
+            actualizarContadorComponentes();
+        });
         tdCheck.appendChild(checkbox);
         // Celda nombre
         const tdNombre = document.createElement('td');
@@ -875,6 +932,7 @@ function initDiagnosticoModal() {
             }
             checkboxPredefinido.checked = true;
             if (inputDpn) {
+                inputDpn.disabled = false;
                 inputDpn.value = pieza.numeroParte;
                 // Efecto visual de "llenado automático"
                 inputDpn.style.transition = 'background-color 0.5s ease';
@@ -883,6 +941,8 @@ function initDiagnosticoModal() {
                     inputDpn.style.backgroundColor = '';
                 }, 2000);
             }
+            // Actualizar estilo de fila activa
+            toggleDpnInput(checkboxPredefinido, false);
         }
         else {
             // No es predefinido — buscar si ya existe como dinámico
@@ -892,6 +952,7 @@ function initDiagnosticoModal() {
                 checkboxDinamico.checked = true;
                 const inputDpnDinamico = document.querySelector(`.input-dpn-dinamico[data-componente-db="${componenteDb}"]`);
                 if (inputDpnDinamico) {
+                    inputDpnDinamico.disabled = false;
                     inputDpnDinamico.value = pieza.numeroParte;
                     inputDpnDinamico.style.transition = 'background-color 0.5s ease';
                     inputDpnDinamico.style.backgroundColor = '#d4edda';
@@ -899,6 +960,7 @@ function initDiagnosticoModal() {
                         inputDpnDinamico.style.backgroundColor = '';
                     }, 2000);
                 }
+                toggleDpnInput(checkboxDinamico, true);
             }
             else {
                 // No existe — agregarlo como componente dinámico
