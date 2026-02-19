@@ -679,8 +679,10 @@ class PDFGeneratorDiagnostico:
             
             # Celda: DPN/notas — fondo coloreado según tipo (necesaria/opcional)
             x_dpn = x_check + ancho_check
-            if esta_seleccionado and dpn_texto:
+            if esta_seleccionado:
                 # Color de fondo según si la pieza es necesaria u opcional
+                # Se aplica aunque el campo DPN esté vacío, ya que el color
+                # representa el TIPO de pieza, no la presencia del número de parte
                 color_fondo_dpn = self.COLOR_VERDE_NECESARIA if es_necesaria else self.COLOR_AMARILLO_OPCIONAL
                 c.setFillColor(color_fondo_dpn)
             else:
@@ -735,7 +737,9 @@ class PDFGeneratorDiagnostico:
 
             # Celda: DPN/notas — fondo coloreado según tipo (necesaria/opcional)
             x_dpn = x_check + ancho_check
-            if esta_seleccionado and dpn_texto:
+            if esta_seleccionado:
+                # Color de fondo según si la pieza es necesaria u opcional
+                # Se aplica aunque el campo DPN esté vacío
                 color_fondo_dpn = self.COLOR_VERDE_NECESARIA if es_necesaria_adic else self.COLOR_AMARILLO_OPCIONAL
                 c.setFillColor(color_fondo_dpn)
             else:
