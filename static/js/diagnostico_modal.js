@@ -31,90 +31,260 @@
  * Los valores (values) son todas las palabras clave que los técnicos podrían usar.
  */
 const ALIAS_COMPONENTES = {
+    // ── Componentes principales ──
     'Motherboard': [
         'MOBO', 'MOTHERBOARD', 'TARJETA MADRE', 'BOARD', 'PLACA', 'PLACA MADRE',
-        'MAINBOARD', 'MAIN BOARD', 'TARJETA PRINCIPAL', 'LOGIC BOARD'
+        'MAINBOARD', 'MAIN BOARD', 'TARJETA PRINCIPAL', 'LOGIC BOARD',
     ],
     'Pantalla': [
         'PANTALLA', 'LCD', 'DISPLAY', 'SCREEN', 'PANEL', 'PANEL LCD',
-        'LED', 'PANEL LED', 'TOUCH SCREEN', 'DIGITALIZADOR'
+        'LED', 'PANEL LED', 'TOUCH SCREEN', 'DIGITALIZADOR',
     ],
     'Disco Duro / SSD': [
-        'DISCO', 'DISCO DURO', 'SSD', 'HDD', 'HARD DRIVE', 'NVME',
-        'M.2', 'SATA', 'UNIDAD DE ESTADO SOLIDO', 'SOLID STATE'
+        'DISCO', 'DISCO DURO', 'SSD', 'HDD', 'HARD DRIVE',
+        'SATA', 'UNIDAD DE ESTADO SOLIDO', 'SOLID STATE',
+    ],
+    'SSD M.2': [
+        'SSD M.2', 'SSD M2', 'M.2 SSD', 'M2 SSD', 'NVME', 'NVME SSD',
+        'M.2', 'UNIDAD M.2', 'UNIDAD M2',
     ],
     'Teclado': [
-        'TECLADO', 'KEYBOARD', 'PALMREST', 'TOP COVER', 'PALM REST',
-        'UPPER CASE', 'REPOSAMANOS'
+        'TECLADO', 'KEYBOARD',
+    ],
+    'Teclado USB': [
+        'TECLADO USB', 'USB KEYBOARD', 'KEYBOARD USB', 'TECLADO EXTERNO',
+    ],
+    'Keyboard with Palmrest Assy': [
+        'KEYBOARD PALMREST', 'KEYBOARD WITH PALMREST', 'TECLADO CON PALMREST',
+        'KEYBOARD PALMREST ASSY', 'TECLADO PALMREST', 'PALMREST ASSY',
     ],
     'Cargador': [
         'CARGADOR', 'ELIMINADOR', 'ADAPTADOR', 'AC ADAPTER', 'POWER ADAPTER',
-        'FUENTE', 'FUENTE DE PODER', 'POWER SUPPLY', 'CABLE DE AC',
-        'ADAPTADOR DE CORRIENTE'
+        'CABLE DE AC', 'ADAPTADOR DE CORRIENTE', 'CHARGER',
+    ],
+    'Fuente de Poder': [
+        'FUENTE DE PODER', 'FUENTE', 'POWER SUPPLY', 'PSU',
+        'FUENTE DE ALIMENTACION', 'FUENTE DE ALIMENTACIÓN',
     ],
     'Batería': [
-        'BATERIA', 'BATTERY', 'PILA', 'ACUMULADOR', 'CELL',
-        'PILA CMOS', 'CMOS', 'BIOS BATTERY', 'COIN CELL'
+        'BATERIA', 'BATERÍA', 'BATTERY', 'ACUMULADOR', 'CELL',
     ],
-    'DC-IN': [
-        'DC-IN', 'DCIN', 'DC IN', 'JACK DC', 'JACK DE CARGA',
+    'Pila CMOS': [
+        'PILA CMOS', 'CMOS', 'BIOS BATTERY', 'COIN CELL', 'PILA BIOS',
+        'PILA', 'CMOS BATTERY',
+    ],
+    'DC-IN cable': [
+        'DC-IN', 'DCIN', 'DC IN', 'DC-IN CABLE', 'JACK DC', 'JACK DE CARGA',
         'POWER JACK', 'CONECTOR DE CARGA', 'PUERTO DE CARGA',
-        'CHARGING PORT'
+        'CHARGING PORT',
     ],
-    'Botón': [
-        'BOTON', 'BOTÓN', 'BUTTON', 'POWER BUTTON', 'BOTON DE ENCENDIDO',
-        'BOTÓN DE ENCENDIDO', 'SWITCH'
+    'Button Power': [
+        'BOTON', 'BOTÓN', 'BUTTON', 'POWER BUTTON', 'BUTTON POWER',
+        'BOTON DE ENCENDIDO', 'BOTÓN DE ENCENDIDO', 'SWITCH',
     ],
     'WiFi / Bluetooth': [
-        'WIFI', 'WI-FI', 'BLUETOOTH', 'ANTENA', 'ANTENAS', 'WIRELESS',
-        'TARJETA WIFI', 'TARJETA INALAMBRICA', 'WLAN', 'BT',
-        'MODULO WIFI', 'WIRELESS CARD'
+        'WIFI', 'WI-FI', 'BLUETOOTH', 'WIRELESS',
+        'TARJETA WIFI', 'TARJETA INALAMBRICA', 'TARJETA INALÁMBRICA',
+        'WLAN', 'BT', 'MODULO WIFI', 'MÓDULO WIFI', 'WIRELESS CARD',
+    ],
+    'Wireless Antennas': [
+        'ANTENA', 'ANTENAS', 'WIRELESS ANTENNAS', 'ANTENAS WIRELESS',
+        'ANTENAS WIFI', 'WIFI ANTENNAS', 'ANTENNA',
     ],
     'Touchpad': [
         'TOUCHPAD', 'TOUCH PAD', 'TRACKPAD', 'TRACK PAD', 'MOUSE PAD',
-        'PAD TACTIL', 'PANEL TACTIL'
+        'PAD TACTIL', 'PAD TÁCTIL', 'PANEL TACTIL', 'PANEL TÁCTIL',
+    ],
+    'Mouse': [
+        'MOUSE', 'RATON', 'RATÓN', 'RATON USB', 'RATÓN USB', 'USB MOUSE',
     ],
     'Sistema Operativo': [
-        'S.O.', 'SO', 'SISTEMA OPERATIVO', 'WINDOWS', 'INSTALACION DE S.O',
-        'INSTALACION S.O', 'INSTALACION SO', 'REINSTALACION', 'FORMATEO',
-        'FORMATO', 'INSTALACION DE SISTEMA', 'OS'
+        'S.O.', 'SISTEMA OPERATIVO', 'WINDOWS', 'INSTALACION DE S.O',
+        'INSTALACION S.O', 'INSTALACION SO', 'REINSTALACION', 'REINSTALACIÓN',
+        'FORMATEO', 'FORMATO', 'INSTALACION DE SISTEMA', 'INSTALACIÓN DE SISTEMA', 'OS',
     ],
     'Bisagras': [
-        'BISAGRA', 'BISAGRAS', 'HINGE', 'HINGES', 'CHARNELA', 'CHARNELAS'
+        'BISAGRA', 'BISAGRAS', 'HINGE', 'HINGES', 'CHARNELA', 'CHARNELAS',
+    ],
+    'Cubre Bisagras': [
+        'CUBRE BISAGRAS', 'COVER HINGE', 'HINGE COVER', 'TAPA BISAGRAS',
+        'HINGE CAP', 'HINGE CAPS',
     ],
     'RAM': [
         'RAM', 'MEMORIA', 'MEMORIA RAM', 'DIMM', 'SODIMM', 'SO-DIMM',
-        'DDR3', 'DDR4', 'DDR5', 'MODULO DE MEMORIA'
+        'MODULO DE MEMORIA', 'MÓDULO DE MEMORIA',
     ],
     'Ventilador / Cooling': [
-        'VENTILADOR', 'FAN', 'COOLER', 'COOLING', 'DISIPADOR',
-        'HEATSINK', 'HEAT SINK', 'THERMAL', 'PASTA TERMICA',
-        'SISTEMA DE ENFRIAMIENTO'
+        'VENTILADOR', 'FAN', 'COOLER', 'COOLING', 'SISTEMA DE ENFRIAMIENTO',
+    ],
+    'Disipador de calor': [
+        'DISIPADOR', 'DISIPADOR DE CALOR', 'HEATSINK', 'HEAT SINK',
+        'THERMAL', 'THERMAL MODULE', 'PASTA TERMICA', 'PASTA TÉRMICA',
+    ],
+    'Refrigeración liquida': [
+        'REFRIGERACION LIQUIDA', 'REFRIGERACIÓN LIQUIDA', 'LIQUID COOLING',
+        'WATER COOLING', 'AIO COOLER', 'ENFRIAMIENTO LIQUIDO',
     ],
     'Carcasa / Chasis': [
-        'CARCASA', 'CHASIS', 'BISEL', 'BEZEL', 'PLASTICO', 'PLASTICOS',
-        'BOTTOM', 'BOTTOM COVER', 'BOTTOM BASE', 'TAPA INFERIOR',
-        'TAPA TRASERA', 'BACK COVER', 'MARCO', 'FRAME', 'HOUSING',
-        'CUBIERTA'
+        'CARCASA', 'CHASIS', 'PLASTICO', 'PLÁSTICO', 'PLASTICOS', 'PLÁSTICOS',
+        'HOUSING', 'CUBIERTA',
     ],
-    'Cable': [
-        'CABLE', 'FLEX', 'CABLE FLEX', 'FLAT CABLE', 'RIBBON',
-        'CABLE LVDS', 'CABLE DE VIDEO', 'CABLE DE PANTALLA',
-        'CONECTOR', 'CABLE DE DATOS'
+    'Bottom Cover/Case': [
+        'BOTTOM', 'BOTTOM COVER', 'BOTTOM CASE', 'BOTTOM BASE',
+        'TAPA INFERIOR', 'BASE INFERIOR', 'LOWER CASE',
     ],
+    'Top Cover': [
+        'TOP COVER', 'LID', 'TAPA SUPERIOR', 'LCD COVER', 'BACK LID',
+        'LCD BACK COVER', 'UPPER COVER',
+    ],
+    'Bisel LCD': [
+        'BISEL', 'BISEL LCD', 'LCD BEZEL', 'BEZEL LCD', 'BEZEL',
+        'MARCO LCD', 'MARCO', 'FRAME', 'LCD FRAME',
+    ],
+    'Base de computadora': [
+        'BASE', 'BASE DE COMPUTADORA', 'DESKTOP BASE', 'COMPUTER BASE',
+        'BASE PC', 'STAND', 'SOPORTE',
+    ],
+    'Palmrest': [
+        'PALMREST', 'PALM REST', 'REPOSA MANOS', 'REPOSAMANOS',
+        'REPOSAMANOS ASSY', 'UPPER CASE',
+    ],
+    // ── Cables ──
+    'Cable Flex': [
+        'CABLE FLEX', 'FLEX CABLE', 'CABLE FLEXIBLE', 'FLAT CABLE', 'RIBBON',
+    ],
+    'Cable de video/LVDS': [
+        'CABLE DE VIDEO', 'CABLE LVDS', 'LVDS', 'VIDEO CABLE',
+        'CABLE DE PANTALLA', 'CABLE LCD', 'EDP CABLE', 'LVDS CABLE',
+    ],
+    'Cable de Batería': [
+        'CABLE DE BATERIA', 'CABLE DE BATERÍA', 'CABLE BATERIA',
+        'CABLE BATERÍA', 'BATTERY CABLE',
+    ],
+    'Cable de I/O Board': [
+        'CABLE DE IO', 'CABLE IO BOARD', 'CABLE DE I/O BOARD',
+        'CABLE I/O', 'I/O CABLE', 'IO CABLE',
+    ],
+    'Cable lector de huellas': [
+        'CABLE LECTOR DE HUELLAS', 'FINGERPRINT CABLE', 'CABLE FINGERPRINT',
+        'CABLE DE HUELLAS',
+    ],
+    // ── Procesamiento ──
+    'Procesador (CPU)': [
+        'PROCESADOR', 'CPU', 'PROCESSOR', 'CHIP', 'MICROPROCESADOR',
+    ],
+    'Tarjeta Gráfica (GPU)': [
+        'GPU', 'TARJETA GRAFICA', 'TARJETA GRÁFICA', 'TARJETA DE VIDEO',
+        'VIDEO CARD', 'GRAPHICS CARD', 'GRAPHICS',
+    ],
+    // ── Puertos ──
+    'Puerto USB': [
+        'PUERTO USB', 'USB PORT', 'CONECTOR USB', 'USB',
+    ],
+    'Puerto HDMI': [
+        'PUERTO HDMI', 'HDMI', 'HDMI PORT', 'CONECTOR HDMI',
+    ],
+    'Puerto de Red (Ethernet)': [
+        'PUERTO DE RED', 'ETHERNET', 'LAN', 'RJ45', 'PUERTO LAN',
+        'ETHERNET PORT', 'CONECTOR RJ45', 'NETWORK PORT',
+    ],
+    // ── Periféricos y multimedia ──
     'Webcam': [
-        'CAMARA', 'WEBCAM', 'CAMERA', 'WEB CAM', 'CAM',
-        'MODULO DE CAMARA'
+        'CAMARA', 'CÁMARA', 'WEBCAM', 'CAMERA', 'WEB CAM', 'CAM',
+        'MODULO DE CAMARA', 'MÓDULO DE CÁMARA',
     ],
+    'Micrófono': [
+        'MICROFONO', 'MICRÓFONO', 'MIC', 'MICROPHONE', 'MICROFONO INTERNO',
+        'MICRÓFONO INTERNO',
+    ],
+    'Bocinas / Audio': [
+        'BOCINA', 'BOCINAS', 'SPEAKER', 'SPEAKERS', 'ALTAVOZ',
+        'ALTAVOCES', 'PARLANTE', 'PARLANTES', 'AUDIO',
+        'BOCINAS / AUDIO',
+    ],
+    'Lector de Tarjetas': [
+        'LECTOR DE TARJETAS', 'CARD READER', 'LECTOR SD', 'SD READER',
+        'LECTOR DE SD', 'MEMORY CARD READER',
+    ],
+    'Lector de huellas': [
+        'LECTOR DE HUELLAS', 'FINGERPRINT', 'HUELLA DIGITAL', 'FINGERPRINT READER',
+        'LECTOR HUELLA', 'FINGERPRINT SENSOR',
+    ],
+    // ── Boards y soportes ──
+    'I/O Board': [
+        'IO BOARD', 'I/O BOARD', 'TARJETA IO', 'BOARD IO',
+        'I/O DAUGHTER BOARD', 'DAUGHTER BOARD', 'TARJETA I/O',
+    ],
+    'Case HDD': [
+        'CASE HDD', 'HDD CASE', 'SOPORTE HDD', 'HDD CADDY', 'CADDY',
+    ],
+    'HDD/SSD Bracket': [
+        'BRACKET HDD', 'HDD BRACKET', 'SSD BRACKET', 'SOPORTE DISCO',
+        'HDD/SSD BRACKET', 'BRACKET SSD', 'BRACKET',
+    ],
+    // ── Accesorios ──
+    'Memoria USB': [
+        'MEMORIA USB', 'USB DRIVE', 'PENDRIVE', 'FLASH DRIVE', 'USB FLASH',
+    ],
+    'Tornillos': [
+        'TORNILLOS', 'TORNILLO', 'SCREWS', 'SCREW KIT', 'SCREW',
+    ],
+    // ── Servicios ──
     'Limpieza y mantenimiento': [
         'LIMPIEZA', 'MANTENIMIENTO', 'LIMPIEZA Y MANTENIMIENTO',
-        'SERVICIO DE LIMPIEZA', 'CLEANING', 'MAINTENANCE'
+        'SERVICIO DE LIMPIEZA', 'CLEANING', 'MAINTENANCE',
     ],
-    'Bocinas': [
-        'BOCINA', 'BOCINAS', 'SPEAKER', 'SPEAKERS', 'ALTAVOZ',
-        'ALTAVOCES', 'PARLANTE', 'PARLANTES', 'AUDIO'
-    ]
+    'Instalación de piezas': [
+        'INSTALACION DE PIEZAS', 'INSTALACIÓN DE PIEZAS',
+        'INSTALACION', 'INSTALACIÓN', 'LABOR', 'MANO DE OBRA',
+    ],
+    'Reparación a nivel componente': [
+        'REPARACION A NIVEL COMPONENTE', 'REPARACIÓN A NIVEL COMPONENTE',
+        'REPARACION COMPONENTE', 'REPARACIÓN COMPONENTE',
+        'COMPONENT REPAIR', 'MICRO SOLDADURA', 'MICROSOLDADURA',
+    ],
+    'Respaldo de información': [
+        'RESPALDO', 'RESPALDO DE INFORMACION', 'RESPALDO DE INFORMACIÓN',
+        'BACKUP', 'DATA BACKUP', 'RESPALDO DE DATOS',
+    ],
+    // ── Paquetes ──
+    'Paquete Oro': [
+        'PAQUETE ORO', 'PAQUETE DE ORO', 'PAQ ORO', 'PAQ. ORO',
+    ],
+    'Paquete Plata': [
+        'PAQUETE PLATA', 'PAQUETE DE PLATA', 'PAQ PLATA', 'PAQ. PLATA',
+    ],
+    'Paquete Premium': [
+        'PAQUETE PREMIUM', 'PAQ PREMIUM', 'PAQ. PREMIUM',
+    ],
+    'Paquete de mejora': [
+        'PAQUETE DE MEJORA', 'PAQUETE MEJORA', 'PAQ MEJORA', 'PAQ. MEJORA',
+        'PAQUETE DE MEJORAS',
+    ],
 };
+// ========================================================================
+// COMPONENTES SIN NÚMERO DE PARTE (Servicios y Paquetes)
+// ========================================================================
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Algunos componentes son servicios o paquetes que NO tienen número de parte.
+ * Por ejemplo, "MANTENIMIENTO" o "PAQUETE PLATA" se mencionan en el diagnóstico
+ * como sugerencias pero no llevan un código alfanumérico.
+ *
+ * Esta lista indica cuáles componentes del mapa de aliases deben buscarse
+ * también como "menciones sueltas" en el texto completo del diagnóstico,
+ * sin necesidad de que tengan un número de parte asociado.
+ */
+const COMPONENTES_SIN_DPN = [
+    'Limpieza y mantenimiento',
+    'Instalación de piezas',
+    'Reparación a nivel componente',
+    'Respaldo de información',
+    'Paquete Oro',
+    'Paquete Plata',
+    'Paquete Premium',
+    'Paquete de mejora',
+];
 // ========================================================================
 // FRASES INDICADORAS CATEGORIZADAS - Señales de secciones de piezas
 // ========================================================================
@@ -184,6 +354,10 @@ const FRASES_GENERICAS = [
     'NÚMEROS DE PARTE A COTIZAR',
     'ANEXO NUMEROS DE PARTE',
     'ANEXO NÚMEROS DE PARTE',
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // "COTIZAR." suelto (sin "PIEZAS") es muy común al final de los diagnósticos
+    // para indicar que lo que sigue son las piezas a cotizar.
+    'COTIZAR',
 ];
 // ========================================================================
 // FUNCIONES DE DETECCIÓN DE PIEZAS
@@ -382,6 +556,52 @@ function extraerParteDeFragmento(fragmento, es_necesaria = true) {
             }
         }
     }
+    // FORMATO 3: Código en cualquier posición del fragmento
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // A veces los técnicos escriben texto DESPUÉS del número de parte, como:
+    //   "PALMREST ASSEMBLY 2DPKM EN ESPAÑOL CON LUZ"
+    // donde "2DPKM" está en medio, no al final. Este formato busca cualquier
+    // token alfanumérico (4-15 chars con letras Y números mezclados) en cualquier
+    // posición del fragmento. Usa la misma lista de exclusiones para evitar
+    // falsos positivos como "DDR4", "i7", etc.
+    if (!numeroParte) {
+        // Buscar TODOS los tokens alfanuméricos en el texto
+        const tokenRegex = /\b([A-Za-z0-9]{4,15})\b/g;
+        let tokenMatch;
+        // Lista extendida de exclusiones para el formato 3 (más agresivo)
+        // ya que busca en cualquier posición, necesitamos ser más estrictos
+        const palabrasExcluidasF3 = [
+            'DELL', 'CORE', 'INTEL', 'NVIDIA', 'QUADRO', 'LENOVO',
+            'ASUS', 'ACER', 'EPSA', 'BIOS', 'HDMI', 'USB3', 'USB2',
+            'CHICO', 'GRANDE', 'CABLE', 'PILA', 'PLUG', 'WIFI',
+            'PARA', 'ESTA', 'ESTE', 'COMO', 'TIENE', 'TIPO', 'SOLO',
+            'NUEVO', 'NUEVA', 'ROTO', 'ROTA', 'TODO', 'TODA', 'AREA',
+            'PART', 'WITH', 'FROM', 'THAT', 'THIS', 'EACH', 'WILL',
+            'DISPLAY', 'ASSEMBLY', 'COVER', 'TOUCH', 'PANEL',
+            'EQUIPO', 'FALLA', 'VIDEO', 'DAÑO', 'REEMPLAZO',
+            'SUGERIDO', 'SUGERIDA', 'PRIORITARIO', 'NECESARIO',
+            'SUSTITUIR', 'COTIZAR', 'VERIFICA', 'PRESENTA',
+            'ARRIBA', 'ABAJO', 'AFECTA', 'REQUIERE', 'INGRESA',
+            'ENCIENDE', 'FUNCIONA', 'EJECUTAN', 'ARROJANDO',
+            'PRUEBAS', 'VALIDAR', 'DEBIDO', 'ENCUENTRA', 'DENTRO',
+            'SISTEMA', 'MARCA', 'TEST', 'REVISION', 'CORRE',
+            'ESPAÑOL', 'ADICIONAL', 'GARANTIA',
+        ];
+        while ((tokenMatch = tokenRegex.exec(textoLimpio)) !== null) {
+            const posibleCodigo = tokenMatch[1];
+            const tieneDigitos = /\d/.test(posibleCodigo);
+            const tieneLetras = /[A-Za-z]/.test(posibleCodigo);
+            if (tieneDigitos && tieneLetras &&
+                !palabrasExcluidasF3.includes(posibleCodigo.toUpperCase())) {
+                // Encontramos un código válido — la descripción es todo lo que
+                // está ANTES de este token en el fragmento
+                const posInicio = tokenMatch.index;
+                descripcion = textoLimpio.substring(0, posInicio).trim();
+                numeroParte = posibleCodigo.toUpperCase();
+                break; // Tomar el primero válido
+            }
+        }
+    }
     // Si no se encontró un número de parte válido, saltar este fragmento
     if (!numeroParte || !descripcion)
         return null;
@@ -446,6 +666,7 @@ function buscarComponenteDb(descripcion) {
  * 3. De cada fragmento extrae la descripción y el número de parte
  * 4. Empareja cada pieza con un componente del sistema
  * 5. Propaga la categoría (es_necesaria) de la sección a cada pieza
+ * 6. Busca menciones de servicios/paquetes sin número de parte
  */
 function extraerPiezasDiagnostico(textoDiagnostico) {
     if (!textoDiagnostico || textoDiagnostico.trim().length === 0) {
@@ -462,15 +683,86 @@ function extraerPiezasDiagnostico(textoDiagnostico) {
             // Extraer pieza pasando la categoría de la sección
             const pieza = extraerParteDeFragmento(fragmento, seccion.es_necesaria);
             if (pieza) {
-                // Evitar duplicados (mismo número de parte)
-                const yaExiste = piezas.some(p => p.numeroParte === pieza.numeroParte);
+                // EXPLICACIÓN PARA PRINCIPIANTES:
+                // Evitar duplicados: si ya tenemos una pieza con el mismo número de parte,
+                // no la agregamos otra vez. Pero solo comparamos si el DPN no está vacío,
+                // porque las piezas sin DPN (servicios) se manejan aparte en el Paso 3.
+                const yaExiste = pieza.numeroParte
+                    ? piezas.some(p => p.numeroParte === pieza.numeroParte)
+                    : false;
                 if (!yaExiste) {
                     piezas.push(pieza);
                 }
             }
         }
     }
+    // Paso 3: Buscar servicios/paquetes mencionados sin número de parte
+    const serviciosSinDPN = detectarServiciosSinDPN(textoDiagnostico, piezas);
+    piezas.push(...serviciosSinDPN);
     return piezas;
+}
+/**
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Esta función busca en el texto completo del diagnóstico menciones de
+ * servicios o paquetes que NO requieren número de parte.
+ *
+ * Por ejemplo, si el técnico escribió "SE RECOMIENDA REALIZAR MANTENIMIENTO"
+ * o "COTIZAR PAQUETE PLATA", esta función detecta esas menciones y las
+ * agrega como piezas detectadas con numeroParte vacío.
+ *
+ * Solo busca componentes listados en COMPONENTES_SIN_DPN (servicios y paquetes).
+ * Evita duplicados si el componente ya fue detectado por la lógica de piezas
+ * con número de parte.
+ */
+function detectarServiciosSinDPN(textoDiagnostico, piezasYaDetectadas) {
+    const textoUpper = textoDiagnostico.toUpperCase();
+    const serviciosDetectados = [];
+    // Set de componentes ya detectados para evitar duplicados
+    const componentesYaDetectados = new Set(piezasYaDetectadas
+        .filter(p => p.componenteDb !== null)
+        .map(p => p.componenteDb));
+    for (const componenteDb of COMPONENTES_SIN_DPN) {
+        // Si ya fue detectado con número de parte, no duplicar
+        if (componentesYaDetectados.has(componenteDb))
+            continue;
+        // Obtener aliases de este componente
+        const aliases = ALIAS_COMPONENTES[componenteDb];
+        if (!aliases)
+            continue;
+        // Buscar si algún alias aparece en el texto completo
+        // Priorizar el alias más largo (más específico)
+        let mejorAlias = null;
+        let mejorPosicion = -1;
+        for (const alias of aliases) {
+            const pos = textoUpper.indexOf(alias);
+            if (pos !== -1) {
+                if (!mejorAlias || alias.length > mejorAlias.length) {
+                    mejorAlias = alias;
+                    mejorPosicion = pos;
+                }
+            }
+        }
+        if (mejorAlias && mejorPosicion !== -1) {
+            // Extraer un fragmento de contexto alrededor de la mención
+            // para mostrarlo al usuario en la UI
+            const inicioContexto = Math.max(0, mejorPosicion - 30);
+            const finContexto = Math.min(textoDiagnostico.length, mejorPosicion + mejorAlias.length + 30);
+            let contexto = textoDiagnostico.substring(inicioContexto, finContexto).trim();
+            if (inicioContexto > 0)
+                contexto = '...' + contexto;
+            if (finContexto < textoDiagnostico.length)
+                contexto = contexto + '...';
+            serviciosDetectados.push({
+                textoOriginal: contexto,
+                descripcionPieza: componenteDb,
+                numeroParte: '', // Sin número de parte
+                componenteDb: componenteDb,
+                confianza: 'alta',
+                es_necesaria: true, // Servicios/paquetes siempre como necesarios
+            });
+        }
+    }
+    return serviciosDetectados;
 }
 // ========================================================================
 // FUNCIONES PRINCIPALES
@@ -702,8 +994,20 @@ function initDiagnosticoModal() {
     // 4. Componentes adicionales dinámicos
     // ====================================================================
     /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
      * Carga el dropdown con componentes adicionales disponibles.
-     * Lee la lista de componentes del data-attribute y los inserta en el dropdown.
+     * Incluye un campo de búsqueda en la parte superior para filtrar
+     * la lista en tiempo real mientras el técnico escribe.
+     *
+     * Estructura resultante del dropdown:
+     * ┌──────────────────────────────────────┐
+     * │  [Buscar componente...              ] │  ← input de búsqueda
+     * ├──────────────────────────────────────┤
+     * │  Batería                             │
+     * │  Bisagras                            │  ← se filtran en vivo
+     * │  ...                                 │
+     * │  (Sin resultados)                    │  ← si nada coincide
+     * └──────────────────────────────────────┘
      */
     function cargarDropdownComponentes() {
         if (!btnAgregarComponente || !dropdownComponentesAdicionales)
@@ -721,9 +1025,36 @@ function initDiagnosticoModal() {
             }
             // Limpiar dropdown
             dropdownComponentesAdicionales.innerHTML = '';
-            // Agregar cada componente como opción
+            // ── Campo de búsqueda al inicio del dropdown ──
+            const liBuscador = document.createElement('li');
+            liBuscador.className = 'px-2 py-1';
+            // Evitar que Bootstrap cierre el dropdown al interactuar con el input
+            liBuscador.addEventListener('click', (e) => e.stopPropagation());
+            const inputBuscar = document.createElement('input');
+            inputBuscar.type = 'text';
+            inputBuscar.className = 'form-control form-control-sm';
+            inputBuscar.placeholder = 'Buscar componente...';
+            inputBuscar.setAttribute('autocomplete', 'off');
+            // Evitar que teclas cierren el dropdown
+            inputBuscar.addEventListener('keydown', (e) => {
+                e.stopPropagation();
+            });
+            liBuscador.appendChild(inputBuscar);
+            dropdownComponentesAdicionales.appendChild(liBuscador);
+            // Separador visual entre buscador y lista
+            const liDivider = document.createElement('li');
+            liDivider.innerHTML = '<hr class="dropdown-divider my-1">';
+            dropdownComponentesAdicionales.appendChild(liDivider);
+            // ── Elemento "Sin resultados" (oculto por defecto) ──
+            const liSinResultados = document.createElement('li');
+            liSinResultados.style.display = 'none';
+            liSinResultados.innerHTML = '<span class="dropdown-item text-muted small fst-italic">Sin resultados</span>';
+            dropdownComponentesAdicionales.appendChild(liSinResultados);
+            // ── Agregar cada componente como opción filtrable ──
+            const itemsComponentes = [];
             componentes.forEach(nombreComponente => {
                 const li = document.createElement('li');
+                li.setAttribute('data-nombre-normalizado', normalizarTexto(nombreComponente));
                 const a = document.createElement('a');
                 a.className = 'dropdown-item cursor-pointer';
                 a.style.color = '#000'; // Forzar color negro para visibilidad
@@ -731,12 +1062,49 @@ function initDiagnosticoModal() {
                 a.addEventListener('click', () => agregarComponenteDinamico(nombreComponente));
                 li.appendChild(a);
                 dropdownComponentesAdicionales.appendChild(li);
+                itemsComponentes.push(li);
             });
+            // ── Lógica de filtrado en tiempo real ──
+            inputBuscar.addEventListener('input', () => {
+                const filtro = normalizarTexto(inputBuscar.value);
+                let hayResultados = false;
+                itemsComponentes.forEach(li => {
+                    const nombreNorm = li.getAttribute('data-nombre-normalizado') || '';
+                    const coincide = filtro === '' || nombreNorm.includes(filtro);
+                    li.style.display = coincide ? '' : 'none';
+                    if (coincide)
+                        hayResultados = true;
+                });
+                // Mostrar/ocultar "Sin resultados"
+                liSinResultados.style.display = hayResultados ? 'none' : '';
+            });
+            // ── Auto-focus y limpiar filtro al abrir el dropdown ──
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // Bootstrap emite el evento "shown.bs.dropdown" cuando el menú
+            // se termina de mostrar. Aprovechamos para enfocar el input
+            // y limpiar cualquier filtro anterior.
+            const dropdownParent = btnAgregarComponente.closest('.dropdown') || btnAgregarComponente.parentElement;
+            if (dropdownParent) {
+                dropdownParent.addEventListener('shown.bs.dropdown', () => {
+                    inputBuscar.value = '';
+                    inputBuscar.dispatchEvent(new Event('input')); // Limpiar filtro
+                    inputBuscar.focus();
+                });
+            }
         }
         catch (error) {
             console.error('Error al cargar componentes disponibles:', error);
             dropdownComponentesAdicionales.innerHTML = '<li><span class="dropdown-item text-danger small">Error cargando componentes</span></li>';
         }
+    }
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Normaliza un texto para búsquedas: lo convierte a minúsculas y quita
+     * acentos/tildes para que "Batería" coincida con "bateria".
+     * Ejemplo: "Café" → "cafe", "Pantalla" → "pantalla"
+     */
+    function normalizarTexto(texto) {
+        return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
     /**
      * Agrega una fila dinámica para un componente adicional.
@@ -1119,8 +1487,12 @@ function initDiagnosticoModal() {
         if (checkboxPredefinido) {
             // Es un componente predefinido — marcar checkbox y llenar DPN
             const inputDpn = document.querySelector(`.input-dpn[data-componente-db="${componenteDb}"]`);
-            // Verificar si ya tiene un DPN diferente escrito
-            if (inputDpn && inputDpn.value.trim() && inputDpn.value.trim() !== pieza.numeroParte) {
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // Si la pieza tiene numeroParte vacío (ej: servicios como "Mantenimiento"),
+            // NO preguntamos si quiere sobreescribir — solo marcamos el checkbox.
+            // Solo mostramos el diálogo de confirmación si la pieza trae un DPN real
+            // y el input ya tiene un DPN diferente.
+            if (pieza.numeroParte && inputDpn && inputDpn.value.trim() && inputDpn.value.trim() !== pieza.numeroParte) {
                 const sobreescribir = confirm(`El componente "${componenteDb}" ya tiene el DPN "${inputDpn.value.trim()}".\n\n` +
                     `¿Deseas reemplazarlo con "${pieza.numeroParte}"?`);
                 if (!sobreescribir)
@@ -1129,13 +1501,16 @@ function initDiagnosticoModal() {
             checkboxPredefinido.checked = true;
             if (inputDpn) {
                 inputDpn.disabled = false;
-                inputDpn.value = pieza.numeroParte;
-                // Efecto visual de "llenado automático"
-                inputDpn.style.transition = 'background-color 0.5s ease';
-                inputDpn.style.backgroundColor = '#d4edda';
-                setTimeout(() => {
-                    inputDpn.style.backgroundColor = '';
-                }, 2000);
+                // Solo llenar el input DPN si la pieza trae un número de parte real
+                if (pieza.numeroParte) {
+                    inputDpn.value = pieza.numeroParte;
+                    // Efecto visual de "llenado automático"
+                    inputDpn.style.transition = 'background-color 0.5s ease';
+                    inputDpn.style.backgroundColor = '#d4edda';
+                    setTimeout(() => {
+                        inputDpn.style.backgroundColor = '';
+                    }, 2000);
+                }
             }
             // Actualizar estilo de fila activa y mostrar badge
             toggleDpnInput(checkboxPredefinido, false);
@@ -1153,17 +1528,20 @@ function initDiagnosticoModal() {
             // No es predefinido — buscar si ya existe como dinámico
             const checkboxDinamico = document.querySelector(`.checkbox-componente-dinamico[data-componente-db="${componenteDb}"]`);
             if (checkboxDinamico) {
-                // Ya existe como dinámico — solo llenar DPN
+                // Ya existe como dinámico — marcar checkbox y llenar DPN si tiene
                 checkboxDinamico.checked = true;
                 const inputDpnDinamico = document.querySelector(`.input-dpn-dinamico[data-componente-db="${componenteDb}"]`);
                 if (inputDpnDinamico) {
                     inputDpnDinamico.disabled = false;
-                    inputDpnDinamico.value = pieza.numeroParte;
-                    inputDpnDinamico.style.transition = 'background-color 0.5s ease';
-                    inputDpnDinamico.style.backgroundColor = '#d4edda';
-                    setTimeout(() => {
-                        inputDpnDinamico.style.backgroundColor = '';
-                    }, 2000);
+                    // Solo llenar el input DPN si la pieza trae un número de parte real
+                    if (pieza.numeroParte) {
+                        inputDpnDinamico.value = pieza.numeroParte;
+                        inputDpnDinamico.style.transition = 'background-color 0.5s ease';
+                        inputDpnDinamico.style.backgroundColor = '#d4edda';
+                        setTimeout(() => {
+                            inputDpnDinamico.style.backgroundColor = '';
+                        }, 2000);
+                    }
                 }
                 toggleDpnInput(checkboxDinamico, true);
                 // Setear es_necesaria en el badge del componente dinámico
@@ -1186,12 +1564,15 @@ function initDiagnosticoModal() {
                 setTimeout(() => {
                     const nuevoInputDpn = document.querySelector(`.input-dpn-dinamico[data-componente-db="${componenteDb}"]`);
                     if (nuevoInputDpn) {
-                        nuevoInputDpn.value = pieza.numeroParte;
-                        nuevoInputDpn.style.transition = 'background-color 0.5s ease';
-                        nuevoInputDpn.style.backgroundColor = '#d4edda';
-                        setTimeout(() => {
-                            nuevoInputDpn.style.backgroundColor = '';
-                        }, 2000);
+                        // Solo llenar el input DPN si la pieza trae un número de parte real
+                        if (pieza.numeroParte) {
+                            nuevoInputDpn.value = pieza.numeroParte;
+                            nuevoInputDpn.style.transition = 'background-color 0.5s ease';
+                            nuevoInputDpn.style.backgroundColor = '#d4edda';
+                            setTimeout(() => {
+                                nuevoInputDpn.style.backgroundColor = '';
+                            }, 2000);
+                        }
                     }
                     // Setear es_necesaria en el badge del nuevo componente dinámico
                     const nuevoCheckbox = document.querySelector(`.checkbox-componente-dinamico[data-componente-db="${componenteDb}"]`);
@@ -1252,9 +1633,10 @@ function initDiagnosticoModal() {
             contenedorPiezas.innerHTML = `
                 <div class="alert alert-info mb-0">
                     <i class="bi bi-info-circle"></i>
-                    <strong>No se detectaron números de parte</strong> en el texto del diagnóstico.
+                    <strong>No se detectaron piezas ni servicios</strong> en el texto del diagnóstico.
                     <br><small class="text-muted">Asegúrate de que el diagnóstico contenga frases como 
-                    "SE ANEXAN NÚMEROS DE PARTE" seguidas de las piezas con sus códigos.</small>
+                    "SE ANEXAN NÚMEROS DE PARTE" seguidas de las piezas con sus códigos, 
+                    o menciones de servicios como "MANTENIMIENTO" o "PAQUETE PLATA".</small>
                 </div>
             `;
             panelPiezasDetectadas.style.display = 'block';
@@ -1325,11 +1707,25 @@ function initDiagnosticoModal() {
             const arrow = document.createElement('i');
             arrow.className = 'bi bi-arrow-right text-muted';
             infoDiv.appendChild(arrow);
-            // Número de parte (destacado)
-            const codeSpan = document.createElement('code');
-            codeSpan.className = 'fs-6 fw-bold text-primary';
-            codeSpan.textContent = pieza.numeroParte;
-            infoDiv.appendChild(codeSpan);
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // Si la pieza tiene número de parte, lo mostramos en un <code> destacado.
+            // Si NO tiene (servicios como "Mantenimiento" o paquetes como "Paquete Plata"),
+            // mostramos un badge de "Servicio" en lugar del número de parte.
+            if (pieza.numeroParte) {
+                // Número de parte (destacado)
+                const codeSpan = document.createElement('code');
+                codeSpan.className = 'fs-6 fw-bold text-primary';
+                codeSpan.textContent = pieza.numeroParte;
+                infoDiv.appendChild(codeSpan);
+            }
+            else {
+                // Sin DPN — mostrar badge de servicio/paquete
+                const servicioBadge = document.createElement('span');
+                servicioBadge.className = 'badge bg-info bg-opacity-75 text-dark';
+                servicioBadge.innerHTML = '<i class="bi bi-wrench me-1"></i>Servicio';
+                servicioBadge.title = 'Este componente no requiere número de parte';
+                infoDiv.appendChild(servicioBadge);
+            }
             // Badge de tipo: Necesaria (verde) u Opcional (amarillo)
             const badgeTipoDetectada = document.createElement('span');
             if (pieza.es_necesaria) {
@@ -1370,7 +1766,9 @@ function initDiagnosticoModal() {
                 btnAplicar.type = 'button';
                 btnAplicar.className = 'btn btn-sm btn-outline-success btn-aplicar-pieza';
                 btnAplicar.innerHTML = '<i class="bi bi-check2-square"></i> Aplicar';
-                btnAplicar.title = `Aplicar ${pieza.numeroParte} a ${pieza.componenteDb}`;
+                btnAplicar.title = pieza.numeroParte
+                    ? `Aplicar ${pieza.numeroParte} a ${pieza.componenteDb}`
+                    : `Aplicar ${pieza.componenteDb}`;
                 btnAplicar.addEventListener('click', () => aplicarPieza(pieza, fila));
                 accionesDiv.appendChild(btnAplicar);
             }

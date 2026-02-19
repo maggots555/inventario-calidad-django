@@ -1398,7 +1398,14 @@ def detalle_orden(request, orden_id):
             )
             
             if form_config.is_valid():
-                # Guardar el formulario
+                # ===============================================================
+                # Guardar configuración adicional
+                # ===============================================================
+                # EXPLICACIÓN PARA PRINCIPIANTES:
+                # El texto del diagnóstico (diagnostico_sic) se guarda tal cual
+                # lo escribió el técnico, sin modificaciones. La detección de
+                # piezas y números de parte la hace el TypeScript en el navegador
+                # cuando el usuario da clic en "Detectar Piezas" en el modal.
                 detalle_actualizado = form_config.save()
                 
                 # ===================================================================
