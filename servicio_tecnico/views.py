@@ -17,6 +17,8 @@ from django.http import JsonResponse, HttpResponse
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.clickjacking import xframe_options_exempt
+from django.views.decorators.cache import cache_page
+from django.conf import settings
 from django.urls import reverse
 from functools import wraps
 from PIL import Image
@@ -72,6 +74,27 @@ from .forms import (
     ResolverIncidenciaRHITSOForm,
     EditarDiagnosticoSICForm,
 )
+
+
+# ===== CACHE DE DASHBOARDS (Redis) =====
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# cache_page() guarda la respuesta HTML completa en Redis durante X segundos.
+# La segunda vez que alguien abre la misma URL, Django la sirve desde Redis
+# sin ejecutar la vista (sin consultar BD, sin generar gráficas Plotly).
+#
+# cache_page cachea POR URL COMPLETA, así que:
+#   /dashboard/?fecha_inicio=2025-01-01  → cache separado
+#   /dashboard/?fecha_inicio=2025-06-01  → otro cache separado
+#
+# IMPORTANTE: cache_page debe ir DESPUÉS de @login_required para que
+# cada usuario autenticado tenga su propio cache (no mezclar datos).
+#
+# CACHE_TTL_DASHBOARD viene de settings.py (10 minutos por defecto).
+# Si necesitas forzar actualización, puedes limpiar cache desde Django shell:
+#   from django.core.cache import cache
+#   cache.clear()  # Limpia TODO el cache
+
+cache_page_dashboard = cache_page(getattr(settings, 'CACHE_TTL_DASHBOARD', 600))
 
 
 # ===== DECORADORES DE PERMISOS =====
@@ -5980,6 +6003,7 @@ def preview_pdf_diagnostico(request, orden_id):
 
 @login_required
 @permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@cache_page_dashboard
 def dashboard_rhitso(request):
     """
     Dashboard consolidado de todos los candidatos RHITSO.
@@ -6627,6 +6651,7 @@ def exportar_excel_rhitso(request):
 
 @login_required
 @permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+@cache_page_dashboard
 def dashboard_seguimiento_oow_fl(request):
     """
     Dashboard especializado para seguimiento de órdenes con prefijo OOW- y FL-.
@@ -8005,6 +8030,7 @@ def exportar_excel_dashboard_oow_fl(request):
 
 @login_required
 @permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+@cache_page_dashboard
 def dashboard_cotizaciones(request):
     """
     Dashboard analítico completo de cotizaciones tipo Power BI.
@@ -9353,6 +9379,7 @@ def api_buscar_modelos_por_marca(request):
 
 @login_required
 @permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@cache_page_dashboard
 def dashboard_seguimiento_piezas(request):
     """
     Dashboard dedicado para seguimiento de piezas en tránsito.

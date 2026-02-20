@@ -469,6 +469,42 @@ CELERY_TASK_MAX_RETRIES = 3
 # Guardar resultados de tareas en la base de datos (para django-celery-beat)
 CELERY_RESULT_EXPIRES = 60 * 60 * 24  # Resultados se eliminan tras 24 horas
 
+# ============================================================================
+# CONFIGURACIÓN DE CACHE CON REDIS
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# El "cache" es una memoria súper rápida donde guardamos resultados que
+# tardan mucho en calcularse (dashboards, gráficas Plotly, estadísticas).
+#
+# Sin cache:  Usuario abre dashboard → consulta BD + genera 20 gráficas → 8-15 seg
+# Con cache:  Usuario abre dashboard → lee de Redis → < 1 seg
+#
+# Redis almacena los datos en RAM, así que la lectura es casi instantánea.
+# Los datos se refrescan automáticamente cada X minutos (configurable).
+#
+# Usamos la base de datos /2 de Redis para separar el cache de las
+# tareas de Celery (que usan /0 y /1).
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': config('REDIS_CACHE_URL', default='redis://127.0.0.1:6379/2'),
+        'TIMEOUT': 60 * 10,  # 10 minutos de cache por defecto
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            # Permitir borrar con patrón "dashboard_*" para invalidar cache selectivo
+            'IGNORE_EXCEPTIONS': True,  # Si Redis cae, Django sigue funcionando sin cache
+        },
+        'KEY_PREFIX': 'sigma',  # Prefijo para evitar colisiones con otras apps
+    }
+}
+
+# Tiempos de cache reutilizables (en segundos)
+# Usa estas constantes en las vistas con @cache_page(CACHE_TTL_DASHBOARD)
+CACHE_TTL_DASHBOARD = 60 * 10   # 10 minutos — dashboards Plotly pesados
+CACHE_TTL_LISTA = 60 * 5        # 5 minutos — listados de órdenes
+CACHE_TTL_ML = 60 * 30          # 30 minutos — predicciones ML (cambian poco)
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
