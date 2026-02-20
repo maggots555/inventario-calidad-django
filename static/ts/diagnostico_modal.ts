@@ -42,20 +42,16 @@ interface SeccionPiezas {
     es_necesaria: boolean;   // true = necesaria/prioritaria, false = opcional/secundaria
 }
 
-/** Respuesta del servidor al enviar diagnóstico */
+/** Respuesta del servidor al enviar diagnóstico (Celery background task) */
 interface DiagnosticoResponse {
     success: boolean;
     message?: string;
     error?: string;
     data?: {
+        task_id: string;
         destinatario: string;
         folio: string;
-        pdf_generado: string;
-        piezas_creadas: number;
-        imagenes_enviadas: number;
-        estado_nuevo: string;
-        cotizacion_creada: boolean;
-        copia_count: number;
+        orden: string;
     };
 }
 
@@ -2374,13 +2370,9 @@ function initDiagnosticoModal(): void {
                 const data: DiagnosticoResponse = await response.json();
                 
                 if (data.success) {
-                    // Éxito - mostrar mensaje y cerrar modal
-                    alert(data.message || '✅ Diagnóstico enviado exitosamente.');
-                    
-                    // Cerrar modal
+                    // Cerrar modal de envío
                     const modalElement = document.getElementById('modalEnviarDiagnostico');
                     if (modalElement) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const bsLib = (window as unknown as Record<string, unknown>)['bootstrap'] as {
                             Modal: { getInstance(el: HTMLElement): { hide(): void } | null };
                         } | undefined;
@@ -2390,8 +2382,59 @@ function initDiagnosticoModal(): void {
                         }
                     }
                     
-                    // Recargar página para ver estado actualizado
-                    window.location.reload();
+                    // Construir modal de confirmación estilizado
+                    const destinatario = data.data?.destinatario || '';
+                    const folio = data.data?.folio || '';
+                    
+                    const modalHTML = `
+                        <div class="modal fade" id="modalConfirmacionDiagnostico" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-success text-white">
+                                        <h5 class="modal-title">
+                                            <i class="bi bi-send-check"></i> Diagnóstico en Proceso
+                                        </h5>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="text-center mb-3">
+                                            <i class="bi bi-gear" style="font-size: 3rem; color: #198754;"></i>
+                                        </div>
+                                        <p class="text-center fs-5 mb-2">
+                                            El diagnóstico se está enviando <strong>en segundo plano</strong>.
+                                        </p>
+                                        <div class="alert alert-info mb-0">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            <strong>Folio:</strong> ${folio}<br>
+                                            <strong>Destinatario:</strong> ${destinatario}<br><br>
+                                            El PDF, imágenes y correo se están procesando.
+                                            Puedes continuar trabajando normalmente.
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-primary" onclick="location.reload()">
+                                            <i class="bi bi-check-lg"></i> Aceptar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Eliminar modal previo si existe y agregar el nuevo
+                    const prevModal = document.getElementById('modalConfirmacionDiagnostico');
+                    if (prevModal) prevModal.remove();
+                    document.body.insertAdjacentHTML('beforeend', modalHTML);
+                    
+                    // Mostrar modal de confirmación
+                    const bsConfirm = (window as unknown as Record<string, unknown>)['bootstrap'] as {
+                        Modal: new (el: HTMLElement) => { show(): void };
+                    } | undefined;
+                    if (bsConfirm) {
+                        const confirmModal = new bsConfirm.Modal(
+                            document.getElementById('modalConfirmacionDiagnostico') as HTMLElement
+                        );
+                        confirmModal.show();
+                    }
                 } else {
                     // Error del servidor
                     alert(data.error || '❌ Error al enviar el diagnóstico.');

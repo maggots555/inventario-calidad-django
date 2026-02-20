@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     'scorecard',  # Nueva app para Score Card de Calidad
     'servicio_tecnico',  # Nueva app para Gestión de Órdenes de Servicio Técnico
     'almacen',  # Nueva app para Inventario de Almacén Central - Dic 2025
+    'django_celery_beat',  # Celery Beat: tareas programadas (cron jobs)
 ]
 
 MIDDLEWARE = [
@@ -417,6 +418,56 @@ JEFE_GENERAL_NOMBRE = config('JEFE_GENERAL_NOMBRE', default='Jefe General')
 # Email del Ayudante de Compras (también recibe copia de todas las notificaciones)
 AYUDANTE_COMPRAS_EMAIL = config('AYUDANTE_COMPRAS_EMAIL', default='')
 AYUDANTE_COMPRAS_NOMBRE = config('AYUDANTE_COMPRAS_NOMBRE', default='Ayudante Compras')
+
+# ============================================================================
+# CONFIGURACIÓN DE CELERY (Tareas en Segundo Plano)
+# ============================================================================
+#
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Celery permite ejecutar tareas pesadas SIN bloquear al usuario.
+# Ejemplos en este proyecto:
+#   - Enviar emails de RHITSO (sin que el usuario espere)
+#   - Generar PDFs/Excels grandes en background
+#   - Pre-calcular datos del dashboard de analytics
+#   - Predicciones de ML al recibir una orden nueva
+#
+# Redis actúa como puente: Django deposita tareas en Redis,
+# el Worker de Celery las lee y las ejecuta.
+
+# URL del broker de mensajes (Redis)
+# En desarrollo: Redis corre localmente en el puerto 6379
+# El '/0' al final significa 'base de datos 0' (Redis tiene 16 BD numeradas)
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+
+# Dónde guardar los RESULTADOS de las tareas (también Redis, BD 1)
+# Útil para saber si una tarea terminó bien o falló
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/1')
+
+# Formato de serialización de datos (JSON es el más seguro y legible)
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+
+# Zona horaria de Celery (usa la misma que Django)
+CELERY_TIMEZONE = TIME_ZONE
+
+# MODO SÍNCRONO EN DESARROLLO (sin Worker activo)
+# EXPLICACIÓN: Si CELERY_TASK_ALWAYS_EAGER=True, las tareas se ejecutan
+# de forma inmediata y síncrona, como si Celery no existiera.
+# Útil para testing o cuando no tienes el Worker corriendo.
+# En este proyecto está en False porque SÍ tenemos Redis instalado.
+CELERY_TASK_ALWAYS_EAGER = config('CELERY_TASK_ALWAYS_EAGER', default=False, cast=bool)
+
+# Tiempo máximo que una tarea puede tardar antes de ser cancelada (segundos)
+# Evita tareas colgadas que bloqueen el Worker indefinidamente
+CELERY_TASK_SOFT_TIME_LIMIT = 300   # 5 minutos: aviso de timeout
+CELERY_TASK_TIME_LIMIT = 600        # 10 minutos: cancelación forzada
+
+# Número de reintentos automáticos si una tarea falla
+CELERY_TASK_MAX_RETRIES = 3
+
+# Guardar resultados de tareas en la base de datos (para django-celery-beat)
+CELERY_RESULT_EXPIRES = 60 * 60 * 24  # Resultados se eliminan tras 24 horas
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

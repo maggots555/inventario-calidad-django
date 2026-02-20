@@ -5620,7 +5620,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // =====================================================================
             const confirmacion = confirm(
                 `📧 ¿Confirmas el envío de ${imagenesSeleccionadas} imagen${imagenesSeleccionadas !== 1 ? 'es' : ''} al cliente?\n\n` +
-                'El correo se enviará inmediatamente.'
+                'El correo se procesará en segundo plano.'
             );
             
             if (!confirmacion) return;
@@ -5662,65 +5662,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Construir mensaje HTML detallado con la información del correo
-                    let mensajeHTML = `
-                        <div class="text-center mb-3">
-                            <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
-                        </div>
-                        <h5 class="text-center mb-3">${data.message}</h5>
-                    `;
-                    
-                    if (data.data) {
-                        mensajeHTML += `
-                            <div class="alert alert-info mb-0">
-                                <h6 class="mb-3"><i class="bi bi-info-circle"></i> 📊 Detalles del envío:</h6>
-                                <div class="row">
-                                    <div class="col-md-6 mb-2">
-                                        <strong>📧 Destinatario:</strong> ${data.data.destinatario}
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <strong>📸 Imágenes:</strong> ${data.data.imagenes_enviadas}
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <strong>📦 Tamaño total:</strong> ${data.data.tamaño_mb} MB
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <strong>💾 Ahorro:</strong> <span class="text-success">${data.data.reduccion_porcentaje}%</span>
-                                    </div>
-                        `;
-                        
-                        if (data.data.copia_count > 0) {
-                            mensajeHTML += `
-                                    <div class="col-12 mb-2">
-                                        <strong>👥 Copias enviadas:</strong> ${data.data.copia_count} persona(s)
-                                    </div>
-                            `;
-                        }
-                        
-                        mensajeHTML += `
-                                </div>
-                            </div>
-                        `;
-                    }
-                    
                     // Cerrar modal de envío
                     const modalEnviar = bootstrap.Modal.getInstance(document.getElementById('modalEnviarImagenesCliente'));
                     if (modalEnviar) {
                         modalEnviar.hide();
                     }
                     
-                    // Crear modal de confirmación
+                    // Construir modal simple de confirmación (segundo plano)
+                    const cantidadImagenes = data.data ? data.data.imagenes_seleccionadas : imagenesSeleccionadas;
+                    const destinatario = data.data ? data.data.destinatario : '';
+                    
                     const modalConfirmacionHTML = `
                         <div class="modal fade" id="modalConfirmacionEnvioImagenes" tabindex="-1" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content">
                                     <div class="modal-header bg-success text-white">
                                         <h5 class="modal-title">
-                                            <i class="bi bi-envelope-check"></i> Correo Enviado al Cliente
+                                            <i class="bi bi-send-check"></i> Imágenes en Proceso
                                         </h5>
                                     </div>
                                     <div class="modal-body">
-                                        ${mensajeHTML}
+                                        <div class="text-center mb-3">
+                                            <i class="bi bi-gear" style="font-size: 3rem; color: #198754;"></i>
+                                        </div>
+                                        <p class="text-center fs-5 mb-2">
+                                            <strong>${cantidadImagenes}</strong> imagen${cantidadImagenes !== 1 ? 'es' : ''} 
+                                            se enviarán <strong>en segundo plano</strong> a <strong>${destinatario}</strong>.
+                                        </p>
+                                        <p class="text-center text-muted mb-0">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            La compresión y envío se están procesando. Puedes continuar trabajando normalmente.
+                                        </p>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-primary" onclick="location.reload()">

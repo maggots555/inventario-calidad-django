@@ -2015,6 +2015,7 @@ function initDiagnosticoModal() {
     // ====================================================================
     if (btnEnviar && form) {
         btnEnviar.addEventListener('click', async () => {
+            var _a, _b;
             // Validaciones client-side
             const folio = inputFolio ? inputFolio.value.trim() : '';
             if (!folio) {
@@ -2059,12 +2060,9 @@ function initDiagnosticoModal() {
                 });
                 const data = await response.json();
                 if (data.success) {
-                    // Éxito - mostrar mensaje y cerrar modal
-                    alert(data.message || '✅ Diagnóstico enviado exitosamente.');
-                    // Cerrar modal
+                    // Cerrar modal de envío
                     const modalElement = document.getElementById('modalEnviarDiagnostico');
                     if (modalElement) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const bsLib = window['bootstrap'];
                         if (bsLib) {
                             const modal = bsLib.Modal.getInstance(modalElement);
@@ -2072,8 +2070,53 @@ function initDiagnosticoModal() {
                                 modal.hide();
                         }
                     }
-                    // Recargar página para ver estado actualizado
-                    window.location.reload();
+                    // Construir modal de confirmación estilizado
+                    const destinatario = ((_a = data.data) === null || _a === void 0 ? void 0 : _a.destinatario) || '';
+                    const folio = ((_b = data.data) === null || _b === void 0 ? void 0 : _b.folio) || '';
+                    const modalHTML = `
+                        <div class="modal fade" id="modalConfirmacionDiagnostico" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-success text-white">
+                                        <h5 class="modal-title">
+                                            <i class="bi bi-send-check"></i> Diagnóstico en Proceso
+                                        </h5>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="text-center mb-3">
+                                            <i class="bi bi-gear" style="font-size: 3rem; color: #198754;"></i>
+                                        </div>
+                                        <p class="text-center fs-5 mb-2">
+                                            El diagnóstico se está enviando <strong>en segundo plano</strong>.
+                                        </p>
+                                        <div class="alert alert-info mb-0">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            <strong>Folio:</strong> ${folio}<br>
+                                            <strong>Destinatario:</strong> ${destinatario}<br><br>
+                                            El PDF, imágenes y correo se están procesando.
+                                            Puedes continuar trabajando normalmente.
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-primary" onclick="location.reload()">
+                                            <i class="bi bi-check-lg"></i> Aceptar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    // Eliminar modal previo si existe y agregar el nuevo
+                    const prevModal = document.getElementById('modalConfirmacionDiagnostico');
+                    if (prevModal)
+                        prevModal.remove();
+                    document.body.insertAdjacentHTML('beforeend', modalHTML);
+                    // Mostrar modal de confirmación
+                    const bsConfirm = window['bootstrap'];
+                    if (bsConfirm) {
+                        const confirmModal = new bsConfirm.Modal(document.getElementById('modalConfirmacionDiagnostico'));
+                        confirmModal.show();
+                    }
                 }
                 else {
                     // Error del servidor

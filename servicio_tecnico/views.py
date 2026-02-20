@@ -5464,319 +5464,87 @@ def enviar_correo_rhitso(request, orden_id):
     """
     Vista para enviar correo electrónico a RHITSO con información del equipo.
 
+    REFACTORIZADO CON CELERY:
+    Esta vista ahora solo hace la validación rápida (< 1 segundo) y delega
+    el trabajo pesado (PDF, imágenes, email.send) a una tarea Celery en
+    segundo plano. El usuario recibe respuesta inmediata sin esperar.
+
+    Flujo:
+        1. Validar que la orden existe y es candidato RHITSO
+        2. Validar que hay al menos un destinatario
+        3. Disparar tarea Celery con .delay() → retorna un ID de tarea
+        4. Responder al usuario inmediatamente con "Enviando en segundo plano..."
+
     Args:
         request: HttpRequest object con datos POST del formulario
         orden_id: ID de la orden de servicio
-    
+
     Returns:
-        JsonResponse con resultado del envío o redirect en caso de error
+        JsonResponse inmediato — el correo se procesa en background
     """
-    import os
-    from django.core.mail import EmailMessage
-    from django.template.loader import render_to_string
-    from django.utils import timezone
-    from django.conf import settings
-    from .utils.pdf_generator import PDFGeneratorRhitso
-    from .utils.image_compressor import ImageCompressor
-    
+    from .tasks import enviar_correo_rhitso_task
+
     try:
         # =======================================================================
-        # PASO 1: OBTENER Y VALIDAR LA ORDEN
+        # PASO 1: OBTENER Y VALIDAR LA ORDEN (rápido, solo consulta a BD)
         # =======================================================================
         orden = get_object_or_404(OrdenServicio, pk=orden_id)
-        
+
         if not orden.es_candidato_rhitso:
             return JsonResponse({
                 'success': False,
                 'mensaje': '❌ Esta orden no está marcada como candidato RHITSO.'
             }, status=400)
-        
+
         # =======================================================================
-        # PASO 2: OBTENER DESTINATARIOS DEL FORMULARIO
+        # PASO 2: OBTENER Y VALIDAR DESTINATARIOS DEL FORMULARIO
         # =======================================================================
         destinatarios_principales = request.POST.getlist('destinatarios_principales')
         copia_empleados = request.POST.getlist('copia_empleados')
-        
-        # Validar que haya al menos un destinatario
+
         if not destinatarios_principales:
             return JsonResponse({
                 'success': False,
                 'mensaje': '❌ Debe seleccionar al menos un destinatario principal.'
             }, status=400)
-        
+
         # =======================================================================
-        # PASO 3: GENERAR PDF CON DATOS DEL EQUIPO E IMÁGENES DE AUTORIZACIÓN
+        # PASO 3: DISPARAR TAREA CELERY EN SEGUNDO PLANO
         # =======================================================================
-        print(f"📄 Generando PDF para Orden {orden.numero_orden_interno}...")
-        
-        # Obtener imágenes de autorización para incluir en el PDF
-        imagenes_autorizacion = list(orden.imagenes.filter(tipo='autorizacion'))
-        
-        # Generar el PDF usando el generador existente
-        generator = PDFGeneratorRhitso(orden, imagenes_autorizacion)
-        resultado_pdf = generator.generar_pdf()
-        
-        if not resultado_pdf.get('success'):
-            error_msg = resultado_pdf.get('error', 'Error desconocido')
-            print(f"❌ Error generando PDF: {error_msg}")
-            return JsonResponse({
-                'success': False,
-                'mensaje': f"❌ Error al generar PDF: {error_msg}"
-            }, status=500)
-        
-        pdf_path = resultado_pdf['ruta']
-        print(f"✅ PDF generado: {pdf_path}")
-        
-        # =======================================================================
-        # PASO 4: COMPRIMIR Y ANALIZAR IMÁGENES DE INGRESO PARA ADJUNTAR
-        # =======================================================================
-        print(f"🖼️ Procesando imágenes de ingreso...")
-        
-        imagenes_ingreso = list(orden.imagenes.filter(tipo='ingreso'))
-        compressor = ImageCompressor()
-        
-        # Preparar lista de imágenes para calcular tamaño
-        # EXPLICACIÓN: Usar imagen.imagen.path que ya incluye el prefijo del país
-        # ej: /mnt/django_storage/media/mexico/servicio_tecnico/imagenes/...
-        from pathlib import Path
-        
-        imagenes_para_correo = []
-        for imagen in imagenes_ingreso:
-            try:
-                # Usar .path que ya incluye toda la ruta física correcta con prefijo de país
-                img_path = imagen.imagen.path
-                
-                # Verificar que el archivo existe
-                if Path(img_path).exists() and Path(img_path).is_file():
-                    imagenes_para_correo.append({
-                        'ruta': img_path,
-                        'nombre': os.path.basename(img_path)
-                    })
-                    print(f"   ✅ Imagen encontrada: {os.path.basename(img_path)}")
-                else:
-                    print(f"   ⚠️ Imagen no encontrada en ruta: {img_path}")
-            except Exception as e:
-                print(f"   ❌ Error al procesar imagen: {e}")
-        
-        # Calcular tamaño total del correo con análisis completo
-        print(f"📊 Analizando tamaño del correo...")
-        analisis = compressor.calcular_tamaño_correo(
-            ruta_pdf=pdf_path,
-            imagenes=imagenes_para_correo,
-            contenido_html=""  # El HTML es pequeño, no afecta mucho
+        # EXPLICACIÓN: .delay() es la forma de enviar una tarea a Celery.
+        # - NO espera a que termine (retorna inmediatamente con un task_id)
+        # - El Worker de Celery la ejecutará en paralelo
+        # - Pasamos solo tipos simples: int, list de strings
+        # - NUNCA pasar objetos Django directamente (no son serializables a JSON)
+        usuario_id = request.user.pk if request.user.is_authenticated else None
+
+        tarea = enviar_correo_rhitso_task.delay(
+            orden_id=orden_id,
+            destinatarios_principales=destinatarios_principales,
+            copia_empleados=copia_empleados,
+            usuario_id=usuario_id,
         )
-        
-        if not analisis['success']:
-            return JsonResponse({
-                'success': False,
-                'mensaje': f"❌ Error al analizar tamaño del correo: {analisis.get('error', 'Error desconocido')}"
-            }, status=500)
-        
-        # Mostrar información detallada del análisis
-        print(f"\n📦 ANÁLISIS DEL CORREO:")
-        print(f"  📄 PDF: {analisis['detalles']['pdf']['tamaño_mb']} MB")
-        print(f"  🖼️ Imágenes:")
-        print(f"     • Original: {analisis['detalles']['imagenes']['tamaño_original_mb']} MB")
-        print(f"     • Comprimido: {analisis['detalles']['imagenes']['tamaño_comprimido_mb']} MB")
-        print(f"     • Reducción: {analisis['detalles']['imagenes']['reduccion_total_mb']} MB")
-        print(f"  📊 TOTAL: {analisis['tamaño_total_mb']} MB / 25 MB")
-        
-        # Verificar si excede el límite
-        if analisis['excede_limite']:
-            print(f"\n⚠️ ADVERTENCIA: El correo excede el límite de Gmail!")
-            for recomendacion in analisis['recomendaciones']:
-                print(f"  {recomendacion}")
-            
-            return JsonResponse({
-                'success': False,
-                'mensaje': f"❌ El correo excede el límite de Gmail ({analisis['tamaño_total_mb']} MB). "
-                          f"Reduce el número de imágenes o usa un servicio de transferencia de archivos.",
-                'data': {
-                    'tamaño_total_mb': analisis['tamaño_total_mb'],
-                    'limite_mb': 25,
-                    'imagenes_validas': analisis['imagenes_validas_count'],
-                    'imagenes_excluidas': analisis['imagenes_excluidas_count']
-                }
-            }, status=400)
-        
-        # Mostrar imágenes excluidas si las hay
-        if analisis['imagenes_excluidas_count'] > 0:
-            print(f"\n⚠️ {analisis['imagenes_excluidas_count']} imagen(es) excluidas:")
-            for img_excluida in analisis['imagenes_excluidas']:
-                print(f"  • {img_excluida['nombre']}: {img_excluida['razon']}")
-        
-        # Mostrar recomendaciones
-        print(f"\n💡 RECOMENDACIONES:")
-        for recomendacion in analisis['recomendaciones']:
-            print(f"  {recomendacion}")
-        
-        # Usar las imágenes comprimidas
-        imagenes_paths = [img['ruta_comprimida'] for img in analisis['imagenes_validas']]
-        print(f"\n✅ {len(imagenes_paths)} imágenes listas para adjuntar")
-        
-        # =======================================================================
-        # PASO 5: PREPARAR CONTENIDO HTML DEL CORREO
-        # =======================================================================
-        print(f"📧 Preparando contenido del correo...")
-        
-        # Obtener fecha y hora actual
-        ahora = timezone.now()
-        fecha_actual = ahora.strftime('%d/%m/%Y')
-        hora_actual = ahora.strftime('%H:%M')
-        
-        # Preparar contexto para la plantilla HTML
-        context = {
-            'orden': orden,
-            'fecha_actual': fecha_actual,
-            'hora_actual': hora_actual,
-            # Datos de contacto (puedes personalizar estos valores)
-            'agente_nombre': 'Equipo de Soporte Técnico',
-            'agente_celular': '55-35-45-81-92',
-            'agente_correo': settings.DEFAULT_FROM_EMAIL,
-        }
-        
-        # Renderizar plantilla HTML
-        html_content = render_to_string(
-            'servicio_tecnico/emails/rhitso_envio.html',
-            context
-        )
-        
-        # =======================================================================
-        # PASO 6: CREAR Y ENVIAR EL CORREO ELECTRÓNICO
-        # =======================================================================
-        print(f"✉️ Enviando correo electrónico...")
-        
-        # Determinar qué orden usar en el asunto (preferir orden del cliente)
-        orden_para_asunto = orden.numero_orden_interno
-        if orden.detalle_equipo and orden.detalle_equipo.orden_cliente:
-            orden_para_asunto = orden.detalle_equipo.orden_cliente
-        
-        # Crear asunto del correo en mayúsculas
-        asunto = f'🔧ENVIO DE EQUIPO RHITSO - {orden_para_asunto}'
-        
-        # Crear lista completa de destinatarios (principal + copias)
-        todos_destinatarios = list(destinatarios_principales)
-        if copia_empleados:
-            todos_destinatarios.extend(copia_empleados)
-        
-        # Personalizar el remitente para RHITSO
-        # Extraer solo el email del DEFAULT_FROM_EMAIL si tiene formato "Nombre <email>"
-        from_email_base = settings.DEFAULT_FROM_EMAIL
-        if '<' in from_email_base and '>' in from_email_base:
-            # Extraer solo el email entre < >
-            email_address = from_email_base.split('<')[1].split('>')[0]
-        else:
-            email_address = from_email_base
-        
-        # Crear remitente personalizado para RHITSO
-        from_email_rhitso = f'RHITSO System <{email_address}>'
-        
-        # Crear mensaje de correo
-        email = EmailMessage(
-            subject=asunto,
-            body=html_content,
-            from_email=from_email_rhitso,  # Remitente personalizado para RHITSO
-            to=destinatarios_principales,
-            cc=copia_empleados if copia_empleados else None,
-        )
-        
-        # Indicar que el contenido es HTML
-        email.content_subtype = 'html'
-        
-        # Adjuntar el PDF
-        if os.path.exists(pdf_path):
-            with open(pdf_path, 'rb') as pdf_file:
-                email.attach(os.path.basename(pdf_path), pdf_file.read(), 'application/pdf')
-            print(f"  📎 PDF adjuntado: {os.path.basename(pdf_path)}")
-        
-        # Adjuntar las imágenes comprimidas
-        for imagen_path in imagenes_paths:
-            if os.path.exists(imagen_path):
-                filename = os.path.basename(imagen_path)
-                with open(imagen_path, 'rb') as img_file:
-                    email.attach(filename, img_file.read(), 'image/jpeg')
-                print(f"  📎 Imagen adjuntada: {filename}")
-        
-        # Enviar el correo
-        email.send()
-        print(f"✅ Correo enviado exitosamente")
-        
-        # =======================================================================
-        # PASO 7: REGISTRAR EN HISTORIAL
-        # =======================================================================
-        comentario = f"📧 Correo RHITSO enviado a: {', '.join(destinatarios_principales[:2])}"
-        if len(destinatarios_principales) > 2:
-            comentario += f" y {len(destinatarios_principales) - 2} más"
-        if copia_empleados:
-            comentario += f" (con {len(copia_empleados)} copia(s))"
-        
-        registrar_historial(
-            orden=orden,
-            tipo_evento='sistema',
-            usuario=request.user.empleado if hasattr(request.user, 'empleado') else None,
-            comentario=comentario,
-            es_sistema=False
-        )
-        
-        # =======================================================================
-        # PASO 8: LIMPIAR ARCHIVOS TEMPORALES
-        # =======================================================================
-        print(f"🧹 Limpiando archivos temporales...")
-        
-        # Eliminar PDF temporal
-        if os.path.exists(pdf_path):
-            try:
-                os.remove(pdf_path)
-                print(f"  🗑️ PDF eliminado: {pdf_path}")
-            except Exception as e:
-                print(f"  ⚠️ No se pudo eliminar PDF: {e}")
-        
-        # Eliminar imágenes comprimidas temporales
-        for imagen_path in imagenes_paths:
-            if 'compressed' in imagen_path and os.path.exists(imagen_path):
-                try:
-                    os.remove(imagen_path)
-                    print(f"  🗑️ Imagen eliminada: {imagen_path}")
-                except Exception as e:
-                    print(f"  ⚠️ No se pudo eliminar imagen: {e}")
-        
-        # =======================================================================
-        # PASO 9: RESPUESTA DE ÉXITO CON INFORMACIÓN DETALLADA
-        # =======================================================================
+
         return JsonResponse({
             'success': True,
-            'mensaje': f'✅ Correo enviado exitosamente a {len(destinatarios_principales)} destinatario(s)',
+            'mensaje': (
+                f'✅ Correo en proceso de envío a {len(destinatarios_principales)} destinatario(s). '
+                f'El PDF y las imágenes se están procesando en segundo plano.'
+            ),
             'data': {
+                'task_id': tarea.id,
                 'destinatarios': len(destinatarios_principales),
                 'copias': len(copia_empleados),
-                'pdf': {
-                    'generado': True,
-                    'tamaño_mb': analisis['detalles']['pdf']['tamaño_mb']
-                },
-                'imagenes': {
-                    'adjuntas': len(imagenes_paths),
-                    'excluidas': analisis['imagenes_excluidas_count'],
-                    'tamaño_original_mb': analisis['detalles']['imagenes']['tamaño_original_mb'],
-                    'tamaño_comprimido_mb': analisis['detalles']['imagenes']['tamaño_comprimido_mb'],
-                    'reduccion_mb': analisis['detalles']['imagenes']['reduccion_total_mb']
-                },
-                'correo': {
-                    'tamaño_total_mb': analisis['tamaño_total_mb'],
-                    'limite_mb': 25,
-                    'porcentaje_usado': round((analisis['tamaño_total_mb'] / 25) * 100, 1)
-                }
+                'orden': orden.numero_orden_interno,
             }
         })
-        
+
     except Exception as e:
-        # Registrar error en consola
-        print(f"❌ Error al enviar correo RHITSO: {str(e)}")
         import traceback
         traceback.print_exc()
-        
         return JsonResponse({
             'success': False,
-            'mensaje': f'❌ Error al enviar el correo: {str(e)}'
+            'mensaje': f'❌ Error al procesar la solicitud: {str(e)}'
         }, status=500)
 
 
@@ -5879,21 +5647,19 @@ def generar_pdf_rhitso_prueba(request, orden_id):
 def enviar_imagenes_cliente(request, orden_id):
     """
     Vista para enviar imágenes de ingreso del equipo al cliente por correo electrónico.
+    
+    REFACTORIZADO CON CELERY:
+    La vista ahora solo valida datos y dispara la tarea Celery.
+    La compresión de imágenes, envío de email e historial se procesan en segundo plano.
 
     Args:
         request: HttpRequest object con datos POST del formulario
         orden_id: ID de la orden de servicio
     
     Returns:
-        JsonResponse con resultado del envío
+        JsonResponse inmediato — el correo se procesa en background
     """
-    import os
-    from django.core.mail import EmailMessage
-    from django.template.loader import render_to_string
-    from django.utils import timezone
-    from django.conf import settings
-    from PIL import Image
-    import io
+    from .tasks import enviar_imagenes_cliente_task
     
     try:
         # =======================================================================
@@ -5911,7 +5677,7 @@ def enviar_imagenes_cliente(request, orden_id):
             }, status=400)
         
         # =======================================================================
-        # PASO 2: OBTENER IMÁGENES SELECCIONADAS
+        # PASO 2: OBTENER Y VALIDAR IMÁGENES SELECCIONADAS
         # =======================================================================
         imagenes_ids = request.POST.getlist('imagenes_seleccionadas')
         
@@ -5921,7 +5687,7 @@ def enviar_imagenes_cliente(request, orden_id):
                 'error': '❌ Debes seleccionar al menos una imagen para enviar.'
             }, status=400)
         
-        # Obtener las imágenes seleccionadas
+        # Verificar que las imágenes existen y son de tipo ingreso
         imagenes = ImagenOrden.objects.filter(
             id__in=imagenes_ids,
             orden=orden,
@@ -5934,354 +5700,53 @@ def enviar_imagenes_cliente(request, orden_id):
                 'error': '❌ Las imágenes seleccionadas no son válidas.'
             }, status=400)
         
-        print(f"📸 Preparando envío de {imagenes.count()} imagen(es) al cliente...")
-        
         # =======================================================================
-        # PASO 3: OBTENER DESTINATARIOS EN COPIA
+        # PASO 3: OBTENER DATOS DEL FORMULARIO
         # =======================================================================
         copia_empleados = request.POST.getlist('copia_empleados', [])
         copia_tecnico = request.POST.getlist('copia_tecnico', [])
-        
-        # Combinar todas las copias (evitando duplicados)
         destinatarios_copia = list(set(copia_empleados + copia_tecnico))
         
-        print(f"📧 Destinatarios:")
-        print(f"   Para: {email_cliente}")
-        if destinatarios_copia:
-            print(f"   CC: {', '.join(destinatarios_copia)}")
-        
-        # =======================================================================
-        # PASO 4: OBTENER MENSAJE PERSONALIZADO (OPCIONAL)
-        # =======================================================================
         mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
         
         # =======================================================================
-        # PASO 5: COMPRIMIR IMÁGENES PARA OPTIMIZAR TAMAÑO
+        # PASO 4: DISPARAR TAREA CELERY EN SEGUNDO PLANO
         # =======================================================================
-        print(f"🔄 Comprimiendo imágenes...")
+        usuario_id = request.user.pk if request.user.is_authenticated else None
         
-        from pathlib import Path
+        # Convertir IDs a lista de strings (JSON serializable)
+        imagenes_ids_str = [str(i) for i in imagenes_ids]
         
-        imagenes_comprimidas = []
-        tamaño_total_original = 0
-        tamaño_total_comprimido = 0
-        
-        for imagen in imagenes:
-            try:
-                # EXPLICACIÓN: Usar imagen.path que incluye la ruta física completa con prefijo de país
-                # Esto funciona tanto con imágenes antiguas como nuevas
-                img_path = imagen.imagen.path
-                
-                # Verificar que el archivo existe
-                if not Path(img_path).exists():
-                    print(f"   ⚠️ Imagen no encontrada: {img_path}")
-                    continue
-                
-                if not Path(img_path).is_file():
-                    print(f"   ⚠️ La ruta no es un archivo: {img_path}")
-                    continue
-                
-                print(f"   ✅ Imagen encontrada: {os.path.basename(img_path)}")
-                
-                # Abrir imagen con PIL
-                img = Image.open(img_path)
-                
-                # Calcular tamaño original
-                tamaño_original = os.path.getsize(img_path)
-                tamaño_total_original += tamaño_original
-                
-                # Convertir RGBA a RGB si es necesario
-                if img.mode in ('RGBA', 'LA', 'P'):
-                    background = Image.new('RGB', img.size, (255, 255, 255))
-                    if img.mode == 'P':
-                        img = img.convert('RGBA')
-                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                    img = background
-                
-                # Redimensionar si es muy grande (máx 1920px en el lado más largo)
-                max_dimension = 1920
-                if max(img.size) > max_dimension:
-                    ratio = max_dimension / max(img.size)
-                    new_size = tuple([int(dim * ratio) for dim in img.size])
-                    img = img.resize(new_size, Image.Resampling.LANCZOS)
-                
-                # Comprimir a JPEG con calidad 85
-                output = io.BytesIO()
-                img.save(output, format='JPEG', quality=85, optimize=True)
-                output.seek(0)
-                
-                tamaño_comprimido = len(output.getvalue())
-                tamaño_total_comprimido += tamaño_comprimido
-                
-                # Generar nombre de archivo único
-                nombre_archivo = f"ingreso_{imagen.id}_{os.path.basename(imagen.imagen.name)}"
-                if not nombre_archivo.lower().endswith('.jpg'):
-                    nombre_archivo = os.path.splitext(nombre_archivo)[0] + '.jpg'
-                
-                imagenes_comprimidas.append({
-                    'nombre': nombre_archivo,
-                    'contenido': output.getvalue(),
-                    'tamaño_original': tamaño_original,
-                    'tamaño_comprimido': tamaño_comprimido
-                })
-                
-                reduccion = ((tamaño_original - tamaño_comprimido) / tamaño_original) * 100
-                print(f"   ✅ {nombre_archivo}: {tamaño_original/1024:.1f}KB → {tamaño_comprimido/1024:.1f}KB (-{reduccion:.1f}%)")
-                
-            except Exception as e:
-                print(f"   ⚠️ Error procesando imagen {imagen.id}: {str(e)}")
-                continue
-        
-        if not imagenes_comprimidas:
-            return JsonResponse({
-                'success': False,
-                'error': '❌ No se pudo procesar ninguna imagen. Intenta nuevamente.'
-            }, status=500)
-        
-        # Mostrar resumen de compresión
-        reduccion_total = ((tamaño_total_original - tamaño_total_comprimido) / tamaño_total_original) * 100
-        print(f"\n📊 Resumen de compresión:")
-        print(f"   Original: {tamaño_total_original/1024/1024:.2f} MB")
-        print(f"   Comprimido: {tamaño_total_comprimido/1024/1024:.2f} MB")
-        print(f"   Reducción: {reduccion_total:.1f}%")
-        
-        # Verificar límite de 25MB
-        if tamaño_total_comprimido > 25 * 1024 * 1024:
-            return JsonResponse({
-                'success': False,
-                'error': f'❌ El tamaño total de las imágenes ({tamaño_total_comprimido/1024/1024:.1f} MB) '
-                        f'excede el límite de Gmail (25 MB). Selecciona menos imágenes.'
-            }, status=400)
-        
-        # =======================================================================
-        # PASO 6: PREPARAR CONTENIDO HTML DEL CORREO
-        # =======================================================================
-        print(f"📧 Preparando contenido del correo...")
-        
-        # EXPLICACIÓN PARA PRINCIPIANTES:
-        # render_to_string() NO ejecuta context_processors, así que debemos
-        # pasar manualmente las variables del país al template del email.
-        from config.paises_config import get_pais_actual, fecha_local_pais
-        _pais_email = get_pais_actual()
-        
-        # EXPLICACIÓN PARA PRINCIPIANTES:
-        # timezone.now() devuelve la hora en UTC (hora del servidor).
-        # fecha_local_pais() la convierte a la zona horaria del país activo
-        # (ej: America/Mexico_City para México) para que el cliente vea
-        # la hora correcta en el correo.
-        # Pasamos la fecha como STRINGS ya formateados porque render_to_string()
-        # no tiene request, y el filtro |date de Django reconvierte datetimes
-        # aware a UTC (settings.TIME_ZONE), ignorando la zona horaria del objeto.
-        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
-        fecha_envio_texto = ahora_local.strftime('%d/%m/%Y')
-        hora_envio_texto = ahora_local.strftime('%H:%M')
-        
-        # EXPLICACIÓN PARA PRINCIPIANTES:
-        # Si el empleado tiene número de WhatsApp empresarial, armamos el link
-        # completo con código de país (ej: 52 + 5535458192 = 525535458192).
-        # El número se guarda SIN código de país en la base de datos.
-        whatsapp_empleado = ''
-        if hasattr(request.user, 'empleado') and request.user.empleado:
-            numero_local = request.user.empleado.numero_whatsapp
-            if numero_local:
-                codigo_tel = _pais_email.get('codigo_telefonico', '')
-                whatsapp_empleado = f"{codigo_tel}{numero_local}"
-        
-        context = {
-            'orden': orden,
-            'detalle': orden.detalle_equipo,
-            'mensaje_personalizado': mensaje_personalizado,
-            'fecha_envio_texto': fecha_envio_texto,
-            'hora_envio_texto': hora_envio_texto,
-            'cantidad_imagenes': len(imagenes_comprimidas),
-            'empresa_nombre': _pais_email['empresa_nombre_corto'],
-            'pais_nombre': _pais_email['nombre'],
-            'whatsapp_empleado': whatsapp_empleado,
-        }
-        
-        # Renderizar plantilla HTML
-        html_content = render_to_string(
-            'servicio_tecnico/emails/imagenes_cliente.html',
-            context
+        tarea = enviar_imagenes_cliente_task.delay(
+            orden_id=orden_id,
+            imagenes_ids=imagenes_ids_str,
+            destinatarios_copia=destinatarios_copia,
+            mensaje_personalizado=mensaje_personalizado,
+            usuario_id=usuario_id,
         )
         
-        # =======================================================================
-        # PASO 7: CREAR Y ENVIAR EL CORREO ELECTRÓNICO
-        # =======================================================================
-        print(f"✉️ Enviando correo electrónico...")
-        
-        # Asunto del correo usando orden_cliente si existe, sino número interno
-        numero_orden_display = orden.detalle_equipo.orden_cliente if orden.detalle_equipo.orden_cliente else orden.numero_orden_interno
-        asunto = f'📸 Fotografías de ingreso - Orden {numero_orden_display}'
-        
-        # Configurar remitente como "Servicio Técnico System"
-        # Extraer solo el email de DEFAULT_FROM_EMAIL (que puede incluir nombre)
-        import re
-        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
-        if email_match:
-            email_solo = email_match.group(1)  # Extraer email entre < >
-        else:
-            email_solo = settings.DEFAULT_FROM_EMAIL  # Si no tiene < >, usar directo
-        
-        remitente = f"Servicio Técnico System <{email_solo}>"
-        
-        # Crear mensaje de correo
-        email = EmailMessage(
-            subject=asunto,
-            body=html_content,
-            from_email=remitente,
-            to=[email_cliente],
-            cc=destinatarios_copia if destinatarios_copia else None,
-        )
-        
-        # Configurar como HTML
-        email.content_subtype = 'html'
-        
-        # =======================================================================
-        # ADJUNTAR LOGO DE SIC COMO IMAGEN EMBEBIDA (CID) - FORMATO PNG
-        # =======================================================================
-        # PNG es más compatible con clientes de correo (Gmail, Outlook, etc.)
-        # SVG no es soportado por la mayoría de clientes de email
-        try:
-            from django.contrib.staticfiles import finders
-            from email.mime.image import MIMEImage
-            
-            logo_path = finders.find('images/logos/logo_sic.png')
-            
-            if logo_path:
-                with open(logo_path, 'rb') as logo_file:
-                    logo_data = logo_file.read()
-                    # Crear MIMEImage para PNG
-                    logo_mime = MIMEImage(logo_data, _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email.attach(logo_mime)
-                    print(f"🖼️ Logo SIC (PNG) adjuntado correctamente")
-            else:
-                print(f"⚠️ Advertencia: No se encontró el logo en static/images/logos/logo_sic.png")
-        except Exception as e:
-            print(f"⚠️ Error al adjuntar logo: {e}")
-            # Continuar sin el logo, no es crítico
-        
-        # =======================================================================
-        # ADJUNTAR ICONOS DE REDES SOCIALES COMO IMÁGENES EMBEBIDAS (CID)
-        # =======================================================================
-        # EXPLICACIÓN PARA PRINCIPIANTES:
-        # Los clientes de correo (Gmail, Outlook) no soportan SVG, así que usamos
-        # PNG convertidos de los SVGs originales. Se embeben igual que el logo,
-        # con Content-ID para referenciarlos en el HTML como src="cid:icon_xxx".
-        try:
-            iconos_sociales = {
-                'icon_link': 'images/utilitys/link.png',
-                'icon_instagram': 'images/utilitys/instagram.png',
-                'icon_facebook': 'images/utilitys/facebook.png',
-                'icon_whatsapp': 'images/utilitys/whatsapp.png',
+        return JsonResponse({
+            'success': True,
+            'message': (
+                f'✅ Imágenes en proceso de envío a {email_cliente}. '
+                f'La compresión y envío se están procesando en segundo plano.'
+            ),
+            'data': {
+                'task_id': tarea.id,
+                'destinatario': email_cliente,
+                'imagenes_seleccionadas': len(imagenes_ids),
+                'orden': orden.numero_orden_interno,
             }
-            for cid_name, icon_static_path in iconos_sociales.items():
-                icon_path = finders.find(icon_static_path)
-                if icon_path:
-                    with open(icon_path, 'rb') as icon_file:
-                        icon_data = icon_file.read()
-                        icon_mime = MIMEImage(icon_data, _subtype='png')
-                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
-                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
-                        email.attach(icon_mime)
-            print(f"🔗 Iconos de redes sociales adjuntados correctamente")
-        except Exception as e:
-            print(f"⚠️ Error al adjuntar iconos sociales: {e}")
-        
-        # Adjuntar imágenes comprimidas
-        for img_data in imagenes_comprimidas:
-            email.attach(
-                img_data['nombre'],
-                img_data['contenido'],
-                'image/jpeg'
-            )
-        
-        # Enviar correo
-        email.send(fail_silently=False)
-        
-        print(f"✅ Correo enviado exitosamente a {email_cliente}")
-        
-        # =======================================================================
-        # PASO 8: REGISTRAR EN HISTORIAL
-        # =======================================================================
-        empleado_actual = request.user.empleado if hasattr(request.user, 'empleado') else None
-        
-        comentario_historial = (
-            f"📧 Imágenes de ingreso enviadas al cliente ({email_cliente})\n"
-            f"📸 Cantidad de imágenes: {len(imagenes_comprimidas)}\n"
-            f"📦 Tamaño total: {tamaño_total_comprimido/1024/1024:.2f} MB"
-        )
-        
-        if destinatarios_copia:
-            comentario_historial += f"\n👥 Copia a: {', '.join(destinatarios_copia)}"
-        
-        if mensaje_personalizado:
-            comentario_historial += f"\n💬 Mensaje: {mensaje_personalizado[:100]}..."
-        
-        HistorialOrden.objects.create(
-            orden=orden,
-            tipo_evento='email',
-            comentario=comentario_historial,
-            usuario=empleado_actual,
-            es_sistema=False
-        )
-        
-        # =======================================================================
-        # PASO 9: RETORNAR RESPUESTA EXITOSA
-        # =======================================================================
-        # Detectar si es petición AJAX (fetch desde JavaScript)
-        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
-                  request.content_type == 'application/json' or \
-                  'application/json' in request.headers.get('Accept', '')
-        
-        if is_ajax:
-            # Respuesta JSON para AJAX (JavaScript fetch)
-            return JsonResponse({
-                'success': True,
-                'message': f'✅ Correo enviado exitosamente a {email_cliente}',
-                'data': {
-                    'destinatario': email_cliente,
-                    'imagenes_enviadas': len(imagenes_comprimidas),
-                    'tamaño_mb': round(tamaño_total_comprimido/1024/1024, 2),
-                    'reduccion_porcentaje': round(reduccion_total, 1),
-                    'copia_count': len(destinatarios_copia)
-                }
-            })
-        else:
-            # Respuesta con redirect y mensaje de Django (fallback si JavaScript falla)
-            from django.contrib import messages
-            messages.success(
-                request,
-                f'✅ Correo enviado exitosamente a {email_cliente}. '
-                f'Se enviaron {len(imagenes_comprimidas)} imagen(es) '
-                f'({round(tamaño_total_comprimido/1024/1024, 2)} MB total).'
-            )
-            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
+        })
         
     except Exception as e:
-        # Registrar error en consola
-        print(f"❌ Error al enviar imágenes al cliente: {str(e)}")
         import traceback
         traceback.print_exc()
         
-        # Detectar si es petición AJAX
-        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
-                  request.content_type == 'application/json' or \
-                  'application/json' in request.headers.get('Accept', '')
-        
-        if is_ajax:
-            # Respuesta JSON para AJAX
-            return JsonResponse({
-                'success': False,
-                'error': f'❌ Error al enviar el correo: {str(e)}'
-            }, status=500)
-        else:
-            # Respuesta con redirect y mensaje de error (fallback)
-            from django.contrib import messages
-            messages.error(request, f'❌ Error al enviar el correo: {str(e)}')
-            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error al procesar la solicitud: {str(e)}'
+        }, status=500)
 
 
 # ============================================================================
@@ -6295,37 +5760,23 @@ def enviar_diagnostico_cliente(request, orden_id):
     """
     Vista para enviar el diagnóstico técnico al cliente por correo electrónico.
     
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista genera un PDF con el formato de diagnóstico SIC, adjunta imágenes
-    de diagnóstico seleccionadas, pre-crea las piezas cotizadas basándose en los
-    componentes marcados, y envía todo por correo al cliente.
+    REFACTORIZADO CON CELERY:
+    La vista ahora solo valida datos del formulario y dispara la tarea Celery.
+    Todo lo pesado (PDF, imágenes, email) se ejecuta en segundo plano.
     
     Flujo:
-    1. Valida datos (email, diagnóstico, folio)
-    2. Genera PDF con PDFGeneratorDiagnostico
-    3. Comprime imágenes de diagnóstico seleccionadas
-    4. Crea/obtiene Cotización y pre-crea PiezaCotizada
-    5. Envía correo con PDF + imágenes adjuntas
-    6. Cambia estado a 'diagnostico_enviado_cliente'
-    7. Registra en historial
-    
+    1. Valida datos (email, diagnóstico, folio, tamaño de imágenes)
+    2. Dispara tarea Celery con .delay()
+    3. Responde inmediatamente al usuario
+
     Args:
         request: HttpRequest con datos POST del formulario del modal
         orden_id: ID de la orden de servicio
     
     Returns:
-        JsonResponse con resultado del envío
+        JsonResponse inmediato — el correo se procesa en background
     """
-    import io
-    import re
-    from decimal import Decimal
-    from pathlib import Path
-    from django.core.mail import EmailMessage
-    from django.template.loader import render_to_string
-    from django.conf import settings
-    from scorecard.models import ComponenteEquipo
-    from .models import Cotizacion, PiezaCotizada
-    from .utils.pdf_diagnostico import PDFGeneratorDiagnostico
+    from .tasks import enviar_diagnostico_cliente_task
     
     try:
         # =======================================================================
@@ -6370,413 +5821,63 @@ def enviar_diagnostico_cliente(request, orden_id):
                 'error': '❌ El folio es obligatorio. Ingresa un folio para el diagnóstico.'
             }, status=400)
         
-        # Obtener componentes seleccionados del formulario
-        # Se envían como JSON array desde el frontend
         componentes_json = request.POST.get('componentes', '[]')
         try:
             componentes_data = json.loads(componentes_json)
         except (json.JSONDecodeError, ValueError):
             componentes_data = []
         
-        # Imágenes seleccionadas (IDs de ImagenOrden tipo 'diagnostico')
         imagenes_ids = request.POST.getlist('imagenes_seleccionadas')
         
-        # Destinatarios en copia
         copia_empleados = request.POST.getlist('copia_empleados', [])
         copia_tecnico = request.POST.getlist('copia_tecnico', [])
         destinatarios_copia = list(set(copia_empleados + copia_tecnico))
         
-        # Mensaje personalizado
         mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
         
-        # Email del empleado actual (para footer del PDF)
         email_empleado = ''
         nombre_empleado = ''
         if hasattr(request.user, 'empleado') and request.user.empleado:
             email_empleado = request.user.empleado.email or ''
             nombre_empleado = request.user.empleado.nombre_completo or ''
         
-        print(f"📋 Preparando envío de diagnóstico - Folio: {folio}")
-        print(f"   Componentes recibidos: {len(componentes_data)}")
-        print(f"   Imágenes seleccionadas: {len(imagenes_ids)}")
-        
         # =======================================================================
-        # PASO 3: GENERAR PDF DE DIAGNÓSTICO
+        # PASO 3: DISPARAR TAREA CELERY EN SEGUNDO PLANO
         # =======================================================================
-        print(f"📄 Generando PDF de diagnóstico...")
+        usuario_id = request.user.pk if request.user.is_authenticated else None
         
-        # Preparar lista de componentes para el PDF
-        componentes_para_pdf = []
-        for comp in componentes_data:
-            componentes_para_pdf.append({
-                'componente_db': comp.get('componente_db', ''),
-                'dpn': comp.get('dpn', ''),
-                'seleccionado': comp.get('seleccionado', False),
-                'es_necesaria': comp.get('es_necesaria', True)
-            })
-        
-        # Obtener config del país para que el PDF muestre el nombre correcto
-        from config.paises_config import get_pais_actual
-        _pais_pdf = get_pais_actual()
-        
-        generador_pdf = PDFGeneratorDiagnostico(
-            orden=orden,
+        tarea = enviar_diagnostico_cliente_task.delay(
+            orden_id=orden_id,
             folio=folio,
-            componentes_seleccionados=componentes_para_pdf,
+            componentes_data=componentes_data,
+            imagenes_ids=imagenes_ids,
+            destinatarios_copia=destinatarios_copia,
+            mensaje_personalizado=mensaje_personalizado,
             email_empleado=email_empleado,
-            pais_config=_pais_pdf
-        )
-        resultado_pdf = generador_pdf.generar_pdf()
-        
-        if not resultado_pdf['success']:
-            return JsonResponse({
-                'success': False,
-                'error': f'❌ Error al generar el PDF: {resultado_pdf.get("error", "Error desconocido")}'
-            }, status=500)
-        
-        print(f"   ✅ PDF generado: {resultado_pdf['archivo']} ({resultado_pdf['size']/1024:.1f} KB)")
-        
-        # =======================================================================
-        # PASO 4: COMPRIMIR IMÁGENES DE DIAGNÓSTICO
-        # =======================================================================
-        imagenes_comprimidas = []
-        tamaño_total_comprimido = 0
-        
-        if imagenes_ids:
-            print(f"🔄 Comprimiendo {len(imagenes_ids)} imagen(es) de diagnóstico...")
-            
-            imagenes = ImagenOrden.objects.filter(
-                id__in=imagenes_ids,
-                orden=orden,
-                tipo='diagnostico'
-            )
-            
-            for imagen in imagenes:
-                try:
-                    img_path = imagen.imagen.path
-                    
-                    if not Path(img_path).exists() or not Path(img_path).is_file():
-                        print(f"   ⚠️ Imagen no encontrada: {img_path}")
-                        continue
-                    
-                    img = Image.open(img_path)
-                    tamaño_original = os.path.getsize(img_path)
-                    
-                    # Convertir RGBA a RGB si es necesario
-                    if img.mode in ('RGBA', 'LA', 'P'):
-                        background = Image.new('RGB', img.size, (255, 255, 255))
-                        if img.mode == 'P':
-                            img = img.convert('RGBA')
-                        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                        img = background
-                    
-                    # Redimensionar si es muy grande
-                    max_dimension = 1920
-                    if max(img.size) > max_dimension:
-                        ratio = max_dimension / max(img.size)
-                        new_size = tuple([int(dim * ratio) for dim in img.size])
-                        img = img.resize(new_size, Image.Resampling.LANCZOS)
-                    
-                    # Comprimir a JPEG calidad 85
-                    output = io.BytesIO()
-                    img.save(output, format='JPEG', quality=85, optimize=True)
-                    output.seek(0)
-                    
-                    tamaño_comprimido = len(output.getvalue())
-                    tamaño_total_comprimido += tamaño_comprimido
-                    
-                    nombre_archivo = f"diagnostico_{imagen.id}_{os.path.basename(imagen.imagen.name)}"
-                    if not nombre_archivo.lower().endswith('.jpg'):
-                        nombre_archivo = os.path.splitext(nombre_archivo)[0] + '.jpg'
-                    
-                    imagenes_comprimidas.append({
-                        'nombre': nombre_archivo,
-                        'contenido': output.getvalue(),
-                        'tamaño_comprimido': tamaño_comprimido
-                    })
-                    
-                    print(f"   ✅ {nombre_archivo}: {tamaño_original/1024:.1f}KB → {tamaño_comprimido/1024:.1f}KB")
-                    
-                except Exception as e:
-                    print(f"   ⚠️ Error procesando imagen {imagen.id}: {str(e)}")
-                    continue
-        
-        # Verificar límite de 25MB (PDF + imágenes)
-        tamaño_pdf = resultado_pdf['size']
-        tamaño_total = tamaño_pdf + tamaño_total_comprimido
-        if tamaño_total > 25 * 1024 * 1024:
-            return JsonResponse({
-                'success': False,
-                'error': f'❌ El tamaño total ({tamaño_total/1024/1024:.1f} MB) '
-                        f'excede el límite de Gmail (25 MB). Selecciona menos imágenes.'
-            }, status=400)
-        
-        # =======================================================================
-        # PASO 5: CREAR/OBTENER COTIZACIÓN Y PRE-CREAR PIEZAS
-        # =======================================================================
-        print(f"💾 Procesando cotización y piezas...")
-        
-        # Obtener o crear la cotización
-        cotizacion, cotizacion_creada = Cotizacion.objects.get_or_create(
-            orden=orden,
-            defaults={
-                'fecha_envio': timezone.now(),
-                'costo_mano_obra': Decimal('0.00'),
-            }
+            nombre_empleado=nombre_empleado,
+            usuario_id=usuario_id,
         )
         
-        if cotizacion_creada:
-            print(f"   ✅ Cotización creada automáticamente")
-        else:
-            print(f"   ℹ️ Cotización existente encontrada")
-        
-        # Pre-crear PiezaCotizada para cada componente seleccionado
-        piezas_creadas = 0
-        componentes_seleccionados_nombres = []
-        
-        for comp in componentes_data:
-            if comp.get('seleccionado', False):
-                componente_nombre = comp.get('componente_db', '')
-                dpn = comp.get('dpn', '')
-                
-                if not componente_nombre:
-                    continue
-                
-                # Buscar ComponenteEquipo en la base de datos
-                try:
-                    componente_obj = ComponenteEquipo.objects.get(nombre=componente_nombre)
-                except ComponenteEquipo.DoesNotExist:
-                    print(f"   ⚠️ Componente no encontrado en catálogo: {componente_nombre}")
-                    continue
-                
-                # Verificar que no exista ya una pieza para este componente en esta cotización
-                pieza_existente = PiezaCotizada.objects.filter(
-                    cotizacion=cotizacion,
-                    componente=componente_obj
-                ).exists()
-                
-                if not pieza_existente:
-                    PiezaCotizada.objects.create(
-                        cotizacion=cotizacion,
-                        componente=componente_obj,
-                        descripcion_adicional=dpn,
-                        costo_unitario=Decimal('0.00'),
-                        proveedor='',
-                        cantidad=1,
-                        sugerida_por_tecnico=True,
-                        es_necesaria=comp.get('es_necesaria', True),
-                        orden_prioridad=piezas_creadas + 1
-                    )
-                    piezas_creadas += 1
-                    componentes_seleccionados_nombres.append(componente_nombre)
-                    print(f"   ✅ PiezaCotizada creada: {componente_nombre} (DPN: {dpn})")
-                else:
-                    print(f"   ℹ️ Pieza ya existe para: {componente_nombre}")
-        
-        print(f"   📊 Total piezas pre-creadas: {piezas_creadas}")
-        
-        # =======================================================================
-        # PASO 6: PREPARAR Y ENVIAR CORREO ELECTRÓNICO
-        # =======================================================================
-        print(f"📧 Preparando correo electrónico...")
-        
-        # Contexto para el template de email
-        from config.paises_config import get_pais_actual, fecha_local_pais
-        _pais_email = get_pais_actual()
-        
-        # EXPLICACIÓN PARA PRINCIPIANTES:
-        # Si el empleado tiene número de WhatsApp empresarial, armamos el link
-        # completo con código de país (ej: 52 + 5535458192 = 525535458192).
-        # El número se guarda SIN código de país en la base de datos.
-        whatsapp_empleado = ''
-        if hasattr(request.user, 'empleado') and request.user.empleado:
-            numero_local = request.user.empleado.numero_whatsapp
-            if numero_local:
-                codigo_tel = _pais_email.get('codigo_telefonico', '')
-                whatsapp_empleado = f"{codigo_tel}{numero_local}"
-        
-        # EXPLICACIÓN PARA PRINCIPIANTES:
-        # Convertimos la fecha/hora a strings ANTES de pasarlos al template.
-        # Si pasamos un datetime, Django lo reconvierte a UTC al renderizar
-        # con render_to_string() (que no tiene request/timezone context).
-        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
-        fecha_envio_texto = ahora_local.strftime('%d/%m/%Y')
-        hora_envio_texto = ahora_local.strftime('%H:%M')
-        
-        context_email = {
-            'orden': orden,
-            'detalle': detalle,
-            'folio': folio,
-            'mensaje_personalizado': mensaje_personalizado,
-            'fecha_envio_texto': fecha_envio_texto,
-            'hora_envio_texto': hora_envio_texto,
-            'cantidad_imagenes': len(imagenes_comprimidas),
-            'componentes_seleccionados': componentes_seleccionados_nombres,
-            'piezas_creadas': piezas_creadas,
-            'empresa_nombre': _pais_email['empresa_nombre_corto'],
-            'pais_nombre': _pais_email['nombre'],
-            'email_empleado': email_empleado,
-            'nombre_empleado': nombre_empleado,
-            'whatsapp_empleado': whatsapp_empleado,
-        }
-        
-        # Renderizar plantilla HTML del email
-        html_content = render_to_string(
-            'servicio_tecnico/emails/diagnostico_cliente.html',
-            context_email
-        )
-        
-        # Construir asunto
-        asunto = f'DIAGNOSTICO FOLIO {folio}'
-        
-        # Configurar remitente
-        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
-        email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
-        remitente = f"Servicio Técnico System <{email_solo}>"
-        
-        # Crear mensaje
-        email_msg = EmailMessage(
-            subject=asunto,
-            body=html_content,
-            from_email=remitente,
-            to=[email_cliente],
-            cc=destinatarios_copia if destinatarios_copia else None,
-        )
-        email_msg.content_subtype = 'html'
-        
-        # Adjuntar logo SIC como imagen embebida (CID)
-        try:
-            from django.contrib.staticfiles import finders
-            from email.mime.image import MIMEImage
-            
-            logo_path = finders.find('images/logos/logo_sic.png')
-            if logo_path:
-                with open(logo_path, 'rb') as logo_file:
-                    logo_data = logo_file.read()
-                    logo_mime = MIMEImage(logo_data, _subtype='png')
-                    logo_mime.add_header('Content-ID', '<logo_sic>')
-                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
-                    email_msg.attach(logo_mime)
-                    print(f"   🖼️ Logo SIC adjuntado")
-        except Exception as e:
-            print(f"   ⚠️ Error al adjuntar logo: {e}")
-        
-        # =======================================================================
-        # ADJUNTAR ICONOS DE REDES SOCIALES COMO IMÁGENES EMBEBIDAS (CID)
-        # =======================================================================
-        # EXPLICACIÓN PARA PRINCIPIANTES:
-        # Los clientes de correo (Gmail, Outlook) no soportan SVG, así que usamos
-        # PNG convertidos de los SVGs originales. Se embeben igual que el logo,
-        # con Content-ID para referenciarlos en el HTML como src="cid:icon_xxx".
-        try:
-            iconos_sociales = {
-                'icon_link': 'images/utilitys/link.png',
-                'icon_instagram': 'images/utilitys/instagram.png',
-                'icon_facebook': 'images/utilitys/facebook.png',
-                'icon_whatsapp': 'images/utilitys/whatsapp.png',
-            }
-            for cid_name, icon_static_path in iconos_sociales.items():
-                icon_path = finders.find(icon_static_path)
-                if icon_path:
-                    with open(icon_path, 'rb') as icon_file:
-                        icon_data = icon_file.read()
-                        icon_mime = MIMEImage(icon_data, _subtype='png')
-                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
-                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
-                        email_msg.attach(icon_mime)
-            print(f"   🔗 Iconos de redes sociales adjuntados correctamente")
-        except Exception as e:
-            print(f"   ⚠️ Error al adjuntar iconos sociales: {e}")
-        
-        # Adjuntar PDF de diagnóstico
-        with open(resultado_pdf['ruta'], 'rb') as pdf_file:
-            email_msg.attach(
-                resultado_pdf['archivo'],
-                pdf_file.read(),
-                'application/pdf'
-            )
-        print(f"   📄 PDF adjuntado: {resultado_pdf['archivo']}")
-        
-        # Adjuntar imágenes comprimidas
-        for img_data in imagenes_comprimidas:
-            email_msg.attach(
-                img_data['nombre'],
-                img_data['contenido'],
-                'image/jpeg'
-            )
-        
-        # Enviar correo
-        email_msg.send(fail_silently=False)
-        print(f"   ✅ Correo enviado exitosamente a {email_cliente}")
-        
-        # =======================================================================
-        # PASO 7: CAMBIAR ESTADO A 'diagnostico_enviado_cliente'
-        # =======================================================================
-        estado_anterior = orden.estado
-        orden.estado = 'diagnostico_enviado_cliente'
-        orden.save(update_fields=['estado'])
-        
-        print(f"   🔄 Estado cambiado: {estado_anterior} → diagnostico_enviado_cliente")
-        
-        # =======================================================================
-        # PASO 8: REGISTRAR EN HISTORIAL
-        # =======================================================================
-        empleado_actual = request.user.empleado if hasattr(request.user, 'empleado') else None
-        
-        comentario_historial = (
-            f"📧 Diagnóstico enviado al cliente ({email_cliente})\n"
-            f"📋 Folio: {folio}\n"
-            f"📄 PDF adjunto: {resultado_pdf['archivo']}\n"
-            f"🔧 Componentes marcados: {piezas_creadas}\n"
-            f"📸 Imágenes adjuntas: {len(imagenes_comprimidas)}"
-        )
-        
-        if destinatarios_copia:
-            comentario_historial += f"\n👥 Copia a: {', '.join(destinatarios_copia)}"
-        
-        if componentes_seleccionados_nombres:
-            comentario_historial += f"\n🔧 Piezas: {', '.join(componentes_seleccionados_nombres)}"
-        
-        registrar_historial(
-            orden=orden,
-            tipo_evento='email',
-            usuario=empleado_actual,
-            comentario=comentario_historial,
-            es_sistema=False
-        )
-        
-        # Limpiar archivo temporal del PDF
-        try:
-            os.unlink(resultado_pdf['ruta'])
-        except:
-            pass
-        
-        # =======================================================================
-        # PASO 9: RETORNAR RESPUESTA EXITOSA
-        # =======================================================================
         return JsonResponse({
             'success': True,
-            'message': f'✅ Diagnóstico enviado exitosamente a {email_cliente}',
+            'message': (
+                f'✅ Diagnóstico en proceso de envío a {email_cliente}. '
+                f'El PDF, imágenes y correo se están procesando en segundo plano.'
+            ),
             'data': {
+                'task_id': tarea.id,
                 'destinatario': email_cliente,
                 'folio': folio,
-                'pdf_generado': resultado_pdf['archivo'],
-                'piezas_creadas': piezas_creadas,
-                'imagenes_enviadas': len(imagenes_comprimidas),
-                'estado_nuevo': 'diagnostico_enviado_cliente',
-                'cotizacion_creada': cotizacion_creada,
-                'copia_count': len(destinatarios_copia)
+                'orden': orden.numero_orden_interno,
             }
         })
         
     except Exception as e:
-        print(f"❌ Error al enviar diagnóstico al cliente: {str(e)}")
         import traceback
         traceback.print_exc()
-        
         return JsonResponse({
             'success': False,
-            'error': f'❌ Error al enviar el diagnóstico: {str(e)}'
+            'error': f'❌ Error al procesar la solicitud: {str(e)}'
         }, status=500)
 
 
