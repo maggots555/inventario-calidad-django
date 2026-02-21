@@ -6003,7 +6003,6 @@ def preview_pdf_diagnostico(request, orden_id):
 
 @login_required
 @permission_required_with_message('servicio_tecnico.view_ordenservicio')
-@cache_page_dashboard
 def dashboard_rhitso(request):
     """
     Dashboard consolidado de todos los candidatos RHITSO.
