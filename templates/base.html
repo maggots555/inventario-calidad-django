@@ -411,15 +411,41 @@
 
                 <!-- Botones de acción -->
                 <div class="navbar-actions">
-                    <a href="{% url 'home' %}" class="navbar-action-btn" title="Dashboard Principal">
-                        <i class="bi bi-speedometer2"></i>
-                    </a>
+                    <!-- Campana de Notificaciones 🔔 -->
+                    <div class="notif-wrapper dropdown" id="notif-dropdown">
+                        <button class="navbar-action-btn" type="button" data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside" aria-expanded="false" title="Notificaciones">
+                            <i class="bi bi-bell-fill"></i>
+                            <span id="notif-badge" class="notif-badge d-none">0</span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end notif-dropdown-menu">
+                            <div class="notif-header">
+                                <h6><i class="bi bi-bell"></i> Notificaciones</h6>
+                                <div class="notif-header-actions">
+                                    <button id="notif-marcar-todas" class="btn btn-link btn-sm p-0 text-decoration-none" title="Marcar como leídas">
+                                        <i class="bi bi-check2-all"></i>
+                                    </button>
+                                    <button id="notif-limpiar-todas" class="btn btn-link btn-sm p-0 text-decoration-none text-danger" title="Eliminar todas">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <ul id="notif-lista" class="notif-lista">
+                                <li class="notif-vacia">
+                                    <i class="bi bi-bell-slash text-muted"></i>
+                                    <span>Cargando...</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
                     <a href="{% url 'movimiento_rapido' %}" class="navbar-action-btn" title="Scanner QR">
                         <i class="bi bi-qr-code-scan"></i>
                     </a>
-                    <a href="/admin/" class="navbar-action-btn" title="Panel Admin">
+                    {% if user.is_superuser %}
+                    <a href="/sic-gestion-sistema/" class="navbar-action-btn" title="Panel Admin">
                         <i class="bi bi-gear-fill"></i>
                     </a>
+                    {% endif %}
                     <!-- Formulario de logout con POST -->
                     <form method="post" action="{% url 'logout' %}" style="display: inline; margin: 0;">
                         {% csrf_token %}
@@ -859,6 +885,11 @@
 
     <!-- JavaScript personalizado -->
     <script src="{% static 'js/base.js' %}?v=5"></script>
+
+    <!-- Panel de Notificaciones Celery 🔔 -->
+    {% if user.is_authenticated %}
+    <script src="{% static 'js/notificaciones.js' %}?v=2"></script>
+    {% endif %}
 
     <!-- JavaScript específico por página (opcional) -->
     {% block extra_js %}

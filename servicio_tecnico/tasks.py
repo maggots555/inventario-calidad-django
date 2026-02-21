@@ -25,6 +25,7 @@ import logging
 import traceback
 
 from celery import shared_task
+from notificaciones.utils import notificar_exito, notificar_error
 
 logger = logging.getLogger('servicio_tecnico')
 
@@ -249,6 +250,37 @@ def enviar_correo_rhitso_task(self, orden_id, destinatarios_principales, copia_e
 
         logger.info(f"[RHITSO] Tarea completada exitosamente para Orden {orden.numero_orden_interno}")
 
+        # ── Notificar al usuario que la tarea terminó exitosamente ──
+        try:
+            _usuario_notif = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _usuario_notif = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            # Identificador legible: orden_cliente si existe, si no numero_orden_interno
+            _oc = (
+                orden.detalle_equipo.orden_cliente
+                if orden.detalle_equipo and orden.detalle_equipo.orden_cliente
+                else orden.numero_orden_interno
+            )
+            notificar_exito(
+                titulo="Correo RHITSO enviado",
+                mensaje=(
+                    f"Orden {_oc}"
+                    f" — Correo enviado a "
+                    f"{len(destinatarios_principales)} destinatario(s). "
+                    f"Se adjuntaron {len(imagenes_paths)} imagen(es) "
+                    f"({analisis['tamaño_total_mb']} MB)."
+                ),
+                usuario=_usuario_notif,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e:
+            logger.warning(f"[RHITSO] No se pudo crear notificación de éxito: {e}")
+
         return {
             'success': True,
             'orden': orden.numero_orden_interno,
@@ -263,6 +295,25 @@ def enviar_correo_rhitso_task(self, orden_id, destinatarios_principales, copia_e
             f"[RHITSO] Error en tarea de correo para Orden ID {orden_id}: {exc}\n"
             f"{traceback.format_exc()}"
         )
+        # ── Notificar error al usuario ──
+        try:
+            _usuario_err = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo="Error al enviar correo RHITSO",
+                mensaje=f"Orden {orden_id} — {str(exc)[:200]}",
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
         # EXPLICACIÓN: self.retry() vuelve a intentar la tarea automáticamente.
         # countdown=60 espera 60 segundos antes de reintentar.
         # Si falla las max_retries veces (3), la tarea queda en estado FAILURE en Redis.
@@ -613,6 +664,38 @@ def enviar_diagnostico_cliente_task(
             pass
 
         logger.info(f"[DIAGNOSTICO] Tarea completada para Orden {orden.numero_orden_interno}")
+
+        # ── Notificar éxito al usuario ──
+        try:
+            _usuario_notif = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _usuario_notif = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            # Identificador legible: orden_cliente si existe, si no numero_orden_interno
+            _oc = (
+                detalle.orden_cliente
+                if detalle and detalle.orden_cliente
+                else orden.numero_orden_interno
+            )
+            notificar_exito(
+                titulo="Diagnóstico enviado al cliente",
+                mensaje=(
+                    f"Orden {_oc}"
+                    f" — Folio {folio}. "
+                    f"Enviado a {email_cliente}. "
+                    f"{piezas_creadas} pieza(s) pre-cotizada(s), "
+                    f"{len(imagenes_comprimidas)} imagen(es) adjunta(s)."
+                ),
+                usuario=_usuario_notif,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e:
+            logger.warning(f"[DIAGNOSTICO] No se pudo crear notificación de éxito: {e}")
+
         return {
             'success': True,
             'orden': orden.numero_orden_interno,
@@ -624,6 +707,25 @@ def enviar_diagnostico_cliente_task(
 
     except Exception as exc:
         logger.error(f"[DIAGNOSTICO] Error para Orden ID {orden_id}: {exc}\n{traceback.format_exc()}")
+        # ── Notificar error al usuario ──
+        try:
+            _usuario_err = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo="Error al enviar diagnóstico",
+                mensaje=f"Orden {orden_id}, Folio {folio} — {str(exc)[:200]}",
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
         raise self.retry(exc=exc, countdown=60)
 
 
@@ -881,6 +983,38 @@ def enviar_imagenes_cliente_task(
             logger.warning(f"[IMAGENES] No se pudo registrar historial: {e}")
 
         logger.info(f"[IMAGENES] Tarea completada para Orden {orden.numero_orden_interno}")
+
+        # ── Notificar éxito al usuario ──
+        try:
+            _usuario_notif = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_notif = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            # Identificador legible: orden_cliente si existe, si no numero_orden_interno
+            _oc = (
+                orden.detalle_equipo.orden_cliente
+                if orden.detalle_equipo and orden.detalle_equipo.orden_cliente
+                else orden.numero_orden_interno
+            )
+            notificar_exito(
+                titulo="Imágenes enviadas al cliente",
+                mensaje=(
+                    f"Orden {_oc}"
+                    f" — "
+                    f"{len(imagenes_comprimidas)} imagen(es) enviada(s) a {email_cliente}. "
+                    f"Tamaño total: {tamaño_total_comprimido/1024/1024:.2f} MB."
+                ),
+                usuario=_usuario_notif,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e:
+            logger.warning(f"[IMAGENES] No se pudo crear notificación de éxito: {e}")
+
         return {
             'success': True,
             'orden': orden.numero_orden_interno,
@@ -891,4 +1025,23 @@ def enviar_imagenes_cliente_task(
 
     except Exception as exc:
         logger.error(f"[IMAGENES] Error para Orden ID {orden_id}: {exc}\n{traceback.format_exc()}")
+        # ── Notificar error al usuario ──
+        try:
+            _usuario_err = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo="Error al enviar imágenes",
+                mensaje=f"Orden {orden_id} — {str(exc)[:200]}",
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
         raise self.retry(exc=exc, countdown=60)

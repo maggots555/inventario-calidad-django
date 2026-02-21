@@ -42,6 +42,7 @@ urlpatterns = [
     path('scorecard/', include('scorecard.urls')),  # URLs del módulo de control de calidad
     path('servicio-tecnico/', include('servicio_tecnico.urls')),  # URLs del módulo de servicio técnico
     path('almacen/', include('almacen.urls')),  # URLs del módulo de almacén central - Dic 2025
+    path('notificaciones/', include('notificaciones.urls')),  # API de notificaciones 🔔
 ]
 
 # ============================================================================

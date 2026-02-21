@@ -2473,3 +2473,358 @@ input[readonly].form-control:focus {
 }
 
 
+/* ============================================================================
+   PANEL DE NOTIFICACIONES — Campanita 🔔
+   Estilos para el dropdown de notificaciones en el navbar.
+   ============================================================================ */
+
+/* ── Contenedor de la campanita ── */
+.notif-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* ── Badge rojo con contador ── */
+.notif-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    pointer-events: none;
+    z-index: 10;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+}
+
+/* Animación de pulso cuando hay notificaciones nuevas */
+.notif-pulse {
+    animation: notifPulse 2s ease-in-out infinite;
+}
+
+@keyframes notifPulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.15); }
+}
+
+/* ── Dropdown panel ── */
+.notif-dropdown-menu {
+    width: 380px;
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 0 !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15),
+                0 2px 10px rgba(0, 0, 0, 0.06) !important;
+    backdrop-filter: blur(10px);
+}
+
+/* Scrollbar personalizado para el dropdown */
+.notif-dropdown-menu::-webkit-scrollbar {
+    width: 5px;
+}
+
+.notif-dropdown-menu::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.notif-dropdown-menu::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 10px;
+}
+
+.notif-dropdown-menu::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+/* ── Encabezado del dropdown ── */
+.notif-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 2;
+    border-radius: 12px 12px 0 0;
+}
+
+.notif-header h6 {
+    margin: 0;
+    font-weight: 700;
+    font-size: 14px;
+    color: #1f2937;
+}
+
+.notif-header .btn-link {
+    font-size: 12px;
+    color: #6366f1;
+    text-decoration: none;
+    padding: 2px 8px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.notif-header .btn-link:hover {
+    background: #eef2ff;
+    color: #4f46e5;
+}
+
+/* Botones del header (marcar leídas + limpiar) */
+.notif-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.notif-header-actions .btn-link {
+    font-size: 16px;
+    padding: 4px 6px !important;
+    border-radius: 6px;
+    line-height: 1;
+    transition: background 0.2s, color 0.2s;
+}
+
+.notif-header-actions .btn-link:hover {
+    background: #eef2ff;
+}
+
+.notif-header-actions .text-danger:hover {
+    background: #fef2f2 !important;
+    color: #dc2626 !important;
+}
+
+/* ── Lista de notificaciones ── */
+.notif-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Cada item de notificación */
+.notif-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f5f5f5;
+    transition: background 0.15s ease, opacity 0.3s ease, max-height 0.3s ease;
+    cursor: default;
+    position: relative;
+    overflow: hidden;
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-item:hover {
+    background: #f8fafc;
+}
+
+/* Notificaciones NO leídas — fondo azul muy suave + borde izquierdo */
+.notif-nueva {
+    background: #eff6ff;
+    border-left: 3px solid #3b82f6;
+}
+
+.notif-nueva:hover {
+    background: #dbeafe;
+}
+
+/* Notificaciones leídas — opacidad reducida */
+.notif-leida {
+    opacity: 0.7;
+}
+
+.notif-leida:hover {
+    opacity: 0.9;
+}
+
+/* ── Icono de la notificación ── */
+.notif-icono {
+    font-size: 20px;
+    flex-shrink: 0;
+    line-height: 1.4;
+    width: 28px;
+    text-align: center;
+}
+
+/* ── Contenido (título + mensaje + meta) ── */
+.notif-contenido {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.notif-titulo {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.notif-mensaje {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ── Metadata (fecha + app de origen) ── */
+.notif-meta {
+    margin-top: 5px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.notif-fecha {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.notif-app {
+    font-size: 10px;
+    padding: 1px 8px;
+    background: #f3f4f6;
+    border-radius: 10px;
+    color: #4b5563;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* ── Estado vacío ── */
+.notif-vacia {
+    padding: 32px 16px;
+    text-align: center;
+    list-style: none;
+    font-size: 13px;
+    color: #9ca3af;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.notif-vacia i {
+    font-size: 28px;
+    opacity: 0.5;
+}
+
+/* ── Botón eliminar por notificación ── */
+.notif-btn-eliminar {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #9ca3af;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.notif-item:hover .notif-btn-eliminar {
+    opacity: 1;
+}
+
+.notif-btn-eliminar:hover {
+    color: #ef4444;
+    background: #fef2f2;
+}
+
+/* ── Animación de remoción ── */
+.notif-removing {
+    opacity: 0;
+    max-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    transition: opacity 0.2s ease, max-height 0.3s ease 0.1s,
+                padding 0.3s ease 0.1s, margin 0.3s ease 0.1s;
+}
+
+/* ── Responsive: tablets y móviles ── */
+/* EXPLICACIÓN: En móvil, el navbar tiene overflow-x: hidden para evitar
+   scroll horizontal. Esto CORTA el dropdown del panel de notificaciones.
+   Solución: usar position: fixed para que el dropdown se posicione
+   respecto al viewport (ventana), no respecto al navbar.
+   Así el panel siempre aparece por encima de todo el contenido. */
+@media (max-width: 992px) {
+    .notif-dropdown-menu {
+        position: fixed !important;
+        top: 60px !important;
+        right: 8px !important;
+        left: auto !important;
+        transform: none !important;
+        width: calc(100vw - 16px);
+        max-width: 380px;
+        max-height: calc(100vh - 80px);
+        z-index: 1060;
+    }
+}
+
+@media (max-width: 576px) {
+    .notif-dropdown-menu {
+        top: 52px !important;
+        right: 4px !important;
+        width: calc(100vw - 8px);
+        max-width: 360px;
+        max-height: calc(100vh - 70px);
+    }
+
+    .notif-header h6 {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .notif-dropdown-menu {
+        top: 48px !important;
+        right: 0 !important;
+        width: 100vw;
+        max-width: 100vw;
+        max-height: calc(100vh - 60px);
+        border-radius: 0 0 12px 12px !important;
+    }
+
+    .notif-item {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+
+    .notif-titulo {
+        font-size: 12px;
+    }
+
+    .notif-mensaje {
+        font-size: 11px;
+    }
+
+    .notif-btn-eliminar {
+        opacity: 1;
+    }
+}
+

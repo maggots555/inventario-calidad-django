@@ -2325,8 +2325,9 @@ function initDiagnosticoModal(): void {
             }
             
             // Verificar que al menos un componente está seleccionado
+            // IMPORTANTE: incluir AMBOS selectores — predefinidos Y dinámicos (piezas adicionales)
             const componentesSeleccionados = document.querySelectorAll<HTMLInputElement>(
-                '.checkbox-componente:checked'
+                '.checkbox-componente:checked, .checkbox-componente-dinamico:checked'
             );
             if (componentesSeleccionados.length === 0) {
                 const continuar = confirm(

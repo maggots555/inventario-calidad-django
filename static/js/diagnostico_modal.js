@@ -2025,7 +2025,8 @@ function initDiagnosticoModal() {
                 return;
             }
             // Verificar que al menos un componente está seleccionado
-            const componentesSeleccionados = document.querySelectorAll('.checkbox-componente:checked');
+            // IMPORTANTE: incluir AMBOS selectores — predefinidos Y dinámicos (piezas adicionales)
+            const componentesSeleccionados = document.querySelectorAll('.checkbox-componente:checked, .checkbox-componente-dinamico:checked');
             if (componentesSeleccionados.length === 0) {
                 const continuar = confirm('⚠️ No has seleccionado ningún componente.\n\n' +
                     '¿Deseas continuar sin marcar componentes?\n' +

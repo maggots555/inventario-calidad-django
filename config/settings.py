@@ -95,6 +95,7 @@ INSTALLED_APPS = [
     'servicio_tecnico',  # Nueva app para Gestión de Órdenes de Servicio Técnico
     'almacen',  # Nueva app para Inventario de Almacén Central - Dic 2025
     'django_celery_beat',  # Celery Beat: tareas programadas (cron jobs)
+    'notificaciones',  # Panel de notificaciones para tareas Celery 🔔
 ]
 
 MIDDLEWARE = [
@@ -468,6 +469,20 @@ CELERY_TASK_MAX_RETRIES = 3
 
 # Guardar resultados de tareas en la base de datos (para django-celery-beat)
 CELERY_RESULT_EXPIRES = 60 * 60 * 24  # Resultados se eliminan tras 24 horas
+
+# ── Tareas programadas con Celery Beat ──
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# CELERY_BEAT_SCHEDULE define tareas que se ejecutan automáticamente.
+# Es como un cron job pero gestionado por Celery Beat.
+# La tarea 'limpiar_notificaciones_antiguas' borra notificaciones con
+# más de 7 días de antigüedad, evitando que la tabla crezca sin control.
+CELERY_BEAT_SCHEDULE = {
+    'limpiar-notificaciones-antiguas': {
+        'task': 'notificaciones.limpiar_antiguas',
+        'schedule': 60 * 60 * 24,  # Cada 24 horas (en segundos)
+        'args': (7,),              # Borrar las de más de 7 días
+    },
+}
 
 # ============================================================================
 # CONFIGURACIÓN DE CACHE CON REDIS
