@@ -83,6 +83,7 @@ interface OrdenData {
     // Información adicional
     falla_principal: string;
     equipo_enciende: boolean;
+    es_mis: boolean;
     es_reingreso: boolean;
     es_candidato_rhitso: boolean;
 }

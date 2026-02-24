@@ -9232,6 +9232,7 @@ def api_buscar_orden_por_serie(request):
                 # Información adicional
                 'falla_principal': detalle.falla_principal,
                 'equipo_enciende': detalle.equipo_enciende,
+                'es_mis': detalle.es_mis,
                 'es_reingreso': orden.es_reingreso,
                 'es_candidato_rhitso': orden.es_candidato_rhitso,
             },

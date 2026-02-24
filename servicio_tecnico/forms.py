@@ -142,6 +142,15 @@ class NuevaOrdenForm(forms.ModelForm):
         label="¿El equipo enciende?",
         help_text="Marca si el equipo enciende al momento del ingreso"
     )
+    es_mis = forms.BooleanField(
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+        }),
+        label="¿Es MIS? (Mail-In Service)",
+        help_text="Marca si el equipo llegó por paquetería (Mail-In Service)"
+    )
     
     # ========================================================================
     # CAMPOS DE ACCESORIOS (con lógica condicional)
@@ -369,6 +378,7 @@ class NuevaOrdenForm(forms.ModelForm):
                 tiene_cargador=self.cleaned_data.get('tiene_cargador', False),
                 numero_serie_cargador=self.cleaned_data.get('numero_serie_cargador', ''),
                 equipo_enciende=self.cleaned_data.get('equipo_enciende', True),
+                es_mis=self.cleaned_data.get('es_mis', False),
                 falla_principal='',  # Se llenará después en el diagnóstico
                 gama='media',  # Valor por defecto, se calculará después si hay referencias
             )
@@ -490,6 +500,15 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
         }),
         label="¿El equipo enciende?",
         help_text="Estado del equipo al momento del ingreso"
+    )
+    es_mis = forms.BooleanField(
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+        }),
+        label="¿Es MIS? (Mail-In Service)",
+        help_text="Marca si el equipo llegó por paquetería (Mail-In Service)"
     )
     
     # ========================================================================
@@ -634,6 +653,7 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
                 orden_cliente=self.cleaned_data['orden_cliente'],
                 email_cliente=self.cleaned_data.get('email_cliente', 'cliente@ejemplo.com'),  # ✅ NUEVO: Email opcional
                 equipo_enciende=self.cleaned_data.get('equipo_enciende', True),
+                es_mis=self.cleaned_data.get('es_mis', False),
                 falla_principal=self.cleaned_data.get('descripcion_servicio', 'Venta Mostrador - Servicio Directo'),
                 gama='media',  # Valor por defecto
                 tiene_cargador=self.cleaned_data.get('tiene_cargador', False),
@@ -1205,6 +1225,7 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'orden_cliente',
             'email_cliente',  # ✅ NUEVO CAMPO (Noviembre 2025)
             'equipo_enciende',
+            'es_mis',
             'tiene_cargador',
             'numero_serie_cargador',
             'gama',
@@ -1247,6 +1268,9 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'equipo_enciende': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
             }),
+            'es_mis': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
             'tiene_cargador': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
                 'id': 'id_tiene_cargador_modal',
@@ -1270,6 +1294,7 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'orden_cliente': 'Orden del Cliente',
             'email_cliente': '📧 Email del Cliente',  # ✅ NUEVO
             'equipo_enciende': '¿El equipo enciende?',
+            'es_mis': '¿Es MIS? (Mail-In Service)',
             'tiene_cargador': '¿Incluye cargador?',
             'numero_serie_cargador': 'Número de Serie del Cargador',
             'gama': 'Gama del Equipo',
@@ -1283,6 +1308,7 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'orden_cliente': 'Número de orden del cliente',
             'email_cliente': 'Email para enviar fotos del ingreso y notificaciones (obligatorio)',  # ✅ NUEVO
             'equipo_enciende': 'Marca si el equipo enciende al momento del ingreso',
+            'es_mis': 'Marca si el equipo llegó por paquetería (Mail-In Service)',
             'tiene_cargador': 'Marca si el equipo incluye cargador',
             'numero_serie_cargador': 'Solo si el cargador tiene número de serie identificable',
             'gama': 'Clasificación de gama del equipo',

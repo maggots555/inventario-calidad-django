@@ -40,6 +40,7 @@ class DetalleEquipoInline(admin.StackedInline):
         ('numero_serie', 'gama'),
         ('tiene_cargador', 'numero_serie_cargador'),
         'equipo_enciende',
+        'es_mis',
         'falla_principal',
         'diagnostico_sic',
         ('fecha_inicio_diagnostico', 'fecha_fin_diagnostico'),
@@ -401,9 +402,10 @@ class DetalleEquipoAdmin(admin.ModelAdmin):
         'modelo',
         'gama',
         'equipo_enciende',
+        'es_mis',
         'tiene_cargador',
     )
-    list_filter = ('tipo_equipo', 'gama', 'marca', 'equipo_enciende')
+    list_filter = ('tipo_equipo', 'gama', 'marca', 'equipo_enciende', 'es_mis')
     search_fields = ('numero_serie', 'marca', 'modelo', 'orden__numero_orden_interno')
     
     fieldsets = (
@@ -424,6 +426,7 @@ class DetalleEquipoAdmin(admin.ModelAdmin):
         ('Estado al Ingreso', {
             'fields': (
                 'equipo_enciende',
+                'es_mis',
                 'falla_principal',
             )
         }),

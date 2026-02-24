@@ -837,6 +837,11 @@ class DetalleEquipo(models.Model):
         default=True,
         help_text="¿El equipo enciende al momento del ingreso?"
     )
+    # MIS: Mail-In Service — identifica equipos que llegaron por paquetería
+    es_mis = models.BooleanField(
+        default=False,
+        help_text="¿El equipo llegó por paquetería (Mail-In Service / MIS)?"
+    )
     falla_principal = models.TextField(
         help_text="Descripción de la falla principal reportada por el cliente"
     )

@@ -317,7 +317,7 @@
                         </div>
                         
                         <!-- Equipo Enciende -->
-                        <div class="col-md-12 mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small">¿El equipo enciende?</label>
                             <p class="mb-0">
                                 {% if detalle.equipo_enciende %}
@@ -327,6 +327,22 @@
                                 {% else %}
                                     <span class="badge bg-danger">
                                         <i class="bi bi-power"></i> NO ENCIENDE
+                                    </span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        
+                        <!-- MIS: Mail-In Service -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">Tipo de Ingreso</label>
+                            <p class="mb-0">
+                                {% if detalle.es_mis %}
+                                    <span class="badge bg-primary">
+                                        <i class="bi bi-box-seam"></i> MIS - PAQUETERÍA
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-shop"></i> PRESENCIAL
                                     </span>
                                 {% endif %}
                             </p>
@@ -2261,6 +2277,19 @@
                             </div>
                             {% if form_editar_info.equipo_enciende.help_text %}
                                 <small class="form-text text-muted">{{ form_editar_info.equipo_enciende.help_text }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- MIS: Mail-In Service -->
+                        <div class="col-md-12 mb-3">
+                            <div class="form-check">
+                                {{ form_editar_info.es_mis }}
+                                <label class="form-check-label" for="{{ form_editar_info.es_mis.id_for_label }}">
+                                    {{ form_editar_info.es_mis.label }}
+                                </label>
+                            </div>
+                            {% if form_editar_info.es_mis.help_text %}
+                                <small class="form-text text-muted">{{ form_editar_info.es_mis.help_text }}</small>
                             {% endif %}
                         </div>
                         
