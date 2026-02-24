@@ -507,39 +507,6 @@ function inicializarNavegacionSemana(): void {
 }
 
 // =============================================================================
-// FUNCIONES: BOTÓN SCROLL TO TOP
-// =============================================================================
-
-/**
- * Inicializa el botón flotante "Volver arriba" del concentrado.
- *
- * EXPLICACIÓN PARA PRINCIPIANTES:
- * El botón aparece cuando el usuario baja más de 300px en la página.
- * Al hacer clic, la página hace scroll suave hasta el inicio.
- * La visibilidad se controla agregando/quitando la clase CSS "visible".
- *
- * Nota: tiene nombre distinto a la función en base.ts para evitar conflicto.
- */
-function inicializarScrollTopConcentrado(): void {
-  const btn = document.getElementById('btn-scroll-top');
-  if (!btn) return;
-
-  // Mostrar/ocultar según posición del scroll
-  window.addEventListener('scroll', (): void => {
-    if (window.scrollY > 300) {
-      btn.classList.add('visible');
-    } else {
-      btn.classList.remove('visible');
-    }
-  }, { passive: true });
-
-  // Al hacer clic, scrollear suavemente al tope
-  btn.addEventListener('click', (): void => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-}
-
-// =============================================================================
 // FUNCIONES: NAVEGACIÓN CON TECLADO
 // =============================================================================
 
@@ -604,10 +571,7 @@ document.addEventListener('DOMContentLoaded', (): void => {
   // 4. Navegación con teclado
   inicializarTeclado();
 
-  // 5. Botón scroll to top
-  inicializarScrollTopConcentrado();
-
-  // 6. Inicializar tooltips de Bootstrap (para los botones de exportar)
+  // 5. Inicializar tooltips de Bootstrap (para los botones de exportar)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bsGlobal = (window as unknown as { bootstrap?: { Tooltip: new (el: Element) => unknown } }).bootstrap;
   if (typeof bsGlobal !== 'undefined' && bsGlobal) {

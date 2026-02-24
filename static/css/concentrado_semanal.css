@@ -649,44 +649,6 @@ tr.fila-sat-oow     td.celda-sitio,
 tr.fila-sat-mis     td.celda-sitio { background-color: rgba(114, 194, 159, 0.40) !important; }
 
 /* ============================================================================
-   BOTÓN FLOTANTE SCROLL TO TOP
-   ============================================================================ */
-
-#btn-scroll-top {
-    position: fixed;
-    bottom: 28px;
-    right: 28px;
-    z-index: 9999;
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    background-color: #0d6efd;
-    color: #fff;
-    border: none;
-    box-shadow: 0 4px 14px rgba(13, 110, 253, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(10px);
-    transition: opacity 0.25s ease, transform 0.25s ease;
-    font-size: 1rem;
-}
-
-#btn-scroll-top.visible {
-    opacity: 1;
-    pointer-events: all;
-    transform: translateY(0);
-}
-
-#btn-scroll-top:hover {
-    background-color: #0a58ca;
-    box-shadow: 0 6px 18px rgba(13, 110, 253, 0.5);
-}
-
-/* ============================================================================
    PRINT: ESTILOS PARA IMPRESIÓN
    ============================================================================ */
 
