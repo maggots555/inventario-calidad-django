@@ -1,0 +1,419 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load concentrado_tags %}
+
+{% block title %}Concentrado Semanal — Semana {{ numero_semana }}, {{ año }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/concentrado_semanal.css' %}">
+<!-- Plotly.js: librería para gráficos interactivos -->
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4" id="concentrado-container">
+
+    <!-- ======================================================================
+         ENCABEZADO: TÍTULO + CONTROLES
+         ====================================================================== -->
+    <div class="row mb-3 align-items-center">
+        <div class="col-lg-7">
+            <h2 class="concentrado-titulo mb-1">
+                <i class="bi bi-table"></i>
+                Concentrado Semanal CIS
+            </h2>
+            <p class="text-muted mb-0 small">
+                Ingresos, asignaciones y egresos de equipos &mdash;
+                Semana <strong>{{ numero_semana }}</strong>
+                del <strong>{{ año }}</strong>
+                &nbsp;&bull;&nbsp;
+                {{ lunes|date:"d/m/Y" }} &mdash; {{ viernes|date:"d/m/Y" }}
+            </p>
+        </div>
+        <div class="col-lg-5 d-flex justify-content-lg-end align-items-center flex-wrap gap-2 mt-2 mt-lg-0">
+            <a href="{% url 'servicio_tecnico:exportar_concentrado_excel' %}?semana={{ semana_actual_iso }}{% if sucursal_id_seleccionada %}&sucursal_id={{ sucursal_id_seleccionada }}{% endif %}"
+               class="btn btn-success btn-sm"
+               title="Exportar a Excel con 4 hojas: Semanal, Q1-Q4, Gráficos">
+                <i class="bi bi-file-earmark-excel-fill"></i>
+                Exportar Excel
+            </a>
+            <a href="{% url 'servicio_tecnico:exportar_concentrado_pdf' %}?semana={{ semana_actual_iso }}{% if sucursal_id_seleccionada %}&sucursal_id={{ sucursal_id_seleccionada }}{% endif %}"
+               class="btn btn-danger btn-sm"
+               title="Exportar a PDF (orientación horizontal)">
+                <i class="bi bi-file-earmark-pdf-fill"></i>
+                Exportar PDF
+            </a>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         BARRA DE FILTROS: SEMANA + SUCURSAL
+         ====================================================================== -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-3">
+            <form method="get" id="formConcentrado" class="row g-3 align-items-end">
+                <div class="col-md-4 col-lg-3">
+                    <label class="form-label fw-semibold small mb-1">
+                        <i class="bi bi-calendar-week"></i> Semana
+                    </label>
+                    <!-- Custom Week Picker: reemplaza <input type="week"> nativo -->
+                    <div class="week-picker-wrapper" id="weekPickerWrapper">
+                        <!-- Botón que muestra la semana actual y abre el calendario -->
+                        <button type="button"
+                                class="week-picker-trigger"
+                                id="weekPickerTrigger"
+                                aria-haspopup="true"
+                                aria-expanded="false">
+                            <i class="bi bi-calendar3 wp-icon"></i>
+                            <span class="wp-label" id="weekPickerLabel">Semana {{ numero_semana }} — {{ lunes|date:"d M" }} al {{ viernes|date:"d M Y" }}</span>
+                            <i class="bi bi-chevron-down wp-chevron"></i>
+                        </button>
+                        <!-- Input oculto que se envía con el form -->
+                        <input type="hidden"
+                               id="semana"
+                               name="semana"
+                               class="week-picker-hidden"
+                               value="{{ semana_actual_iso }}">
+                        <!-- Dropdown del calendario (generado por JS) -->
+                        <div class="week-picker-dropdown" id="weekPickerDropdown" role="dialog" aria-label="Seleccionar semana">
+                            <div class="wp-dropdown-header">
+                                <button type="button" class="wp-nav-btn" id="wpPrevMonth" title="Mes anterior">
+                                    <i class="bi bi-chevron-left"></i>
+                                </button>
+                                <span class="wp-mes-label" id="wpMesLabel"></span>
+                                <button type="button" class="wp-nav-btn" id="wpNextMonth" title="Mes siguiente">
+                                    <i class="bi bi-chevron-right"></i>
+                                </button>
+                            </div>
+                            <div class="wp-grid" id="wpGrid"></div>
+                            <div class="wp-dropdown-footer">
+                                <button type="button" class="wp-btn-hoy" id="wpBtnHoy">
+                                    <i class="bi bi-calendar-check me-1"></i>Semana actual
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-lg-3">
+                    <label for="sucursal_id" class="form-label fw-semibold small mb-1">
+                        <i class="bi bi-building"></i> Sucursal
+                    </label>
+                    <select name="sucursal_id" id="sucursal_id" class="form-select form-select-sm">
+                        <option value="">Todas las sucursales</option>
+
+                        <optgroup label="── Grupos ──">
+                            {% for grupo in grupos_sucursales %}
+                            <option value="{{ grupo.value }}"
+                                {% if sucursal_id_seleccionada == grupo.value %}selected{% endif %}>
+                                {{ grupo.label }}
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+
+                        <optgroup label="── Individual ──">
+                            {% for suc in sucursales %}
+                            <option value="{{ suc.id }}"
+                                {% if sucursal_id_seleccionada == suc.id|stringformat:"s" %}selected{% endif %}>
+                                {{ suc.nombre }}
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2 col-lg-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="bi bi-search"></i> Consultar
+                    </button>
+                </div>
+                <div class="col-6 col-md-2 col-lg-2">
+                    <a href="{% url 'servicio_tecnico:concentrado_semanal' %}"
+                       class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-arrow-clockwise"></i> Hoy
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Navegación rápida de semana -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="?semana={{ semana_anterior_iso }}{% if sucursal_id_seleccionada %}&sucursal_id={{ sucursal_id_seleccionada }}{% endif %}"
+           class="btn btn-outline-secondary btn-sm btn-nav-semana"
+           id="btnSemanaAnterior">
+            <span class="icono-nav"><i class="bi bi-chevron-left"></i></span>
+            <span class="spinner-nav spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            Semana anterior
+        </a>
+        <span class="badge bg-primary px-3 py-2 fs-6-sm">
+            <i class="bi bi-calendar3"></i>
+            Semana {{ numero_semana }} &mdash; {{ lunes|date:"d M" }} al {{ viernes|date:"d M Y" }}
+        </span>
+        <a href="?semana={{ semana_siguiente_iso }}{% if sucursal_id_seleccionada %}&sucursal_id={{ sucursal_id_seleccionada }}{% endif %}"
+           class="btn btn-outline-secondary btn-sm btn-nav-semana"
+           id="btnSemanaSiguiente">
+            Semana siguiente
+            <span class="icono-nav"><i class="bi bi-chevron-right"></i></span>
+            <span class="spinner-nav spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </a>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 1: INGRESO DE EQUIPOS EN CIS
+         ====================================================================== -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header concentrado-header-ingreso d-flex align-items-center gap-2">
+            <i class="bi bi-box-arrow-in-down-right fs-5"></i>
+            <h5 class="mb-0">Ingreso de Equipos en CIS</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered concentrado-tabla mb-0">
+                    <thead>
+                        <tr class="concentrado-thead-ingreso">
+                            <th class="col-sitio text-center">SITIO</th>
+                            <th class="col-equipo text-center">EQUIPO</th>
+                            {% for dia in dias_semana %}
+                            <th class="col-dia text-center">{{ dia|upper }}</th>
+                            {% endfor %}
+                            <th class="col-total text-center">TOTAL</th>
+                            <th class="col-promedio text-center">PROM.<br>DIARIO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sitio in sitios %}
+                            {% with sitio_data=ingreso|get_item:sitio tipos_sitio=tipos_visibles_por_sitio|get_item:sitio %}
+                            {% for tipo in tipos_sitio %}
+                                {% with tipo_data=sitio_data|get_item:tipo %}
+                                <tr{% if sitio == 'DROP OFF' %}{% if tipo == 'LENOVO' %} class="fila-drop-lenovo"{% elif tipo == 'DELL' %} class="fila-drop-dell"{% elif tipo == 'OOW' %} class="fila-drop-oow"{% endif %}{% elif sitio == 'SATELITE' %}{% if tipo == 'LENOVO' %} class="fila-sat-lenovo"{% elif tipo == 'DELL' %} class="fila-sat-dell"{% elif tipo == 'OOW' %} class="fila-sat-oow"{% elif tipo == 'MIS DELL' or tipo == 'MIS LENOVO' %} class="fila-sat-mis"{% endif %}{% endif %}>
+                                    {% if forloop.first %}
+                                    <td class="celda-sitio align-middle text-center fw-bold"
+                                        rowspan="{{ tipos_sitio|length }}">
+                                        {{ sitio }}
+                                    </td>
+                                    {% endif %}
+                                    <td class="celda-tipo">{{ tipo }}</td>
+                                     {% for dia in dias_semana %}
+                                     <td class="celda-numero text-center {{ tipo_data|get_item:dia|celda_clase }}">
+                                         {{ tipo_data|get_item:dia|zero_dash }}
+                                     </td>
+                                     {% endfor %}
+                                     <td class="celda-total text-center fw-bold">
+                                         {{ tipo_data|get_item:"total" }}
+                                     </td>
+                                     <td class="celda-promedio text-center text-muted">
+                                         {{ tipo_data|get_item:"promedio" }}
+                                     </td>
+                                 </tr>
+                                 {% endwith %}
+                             {% endfor %}
+                             {% endwith %}
+                         {% endfor %}
+                         <!-- Fila de totales -->
+                         <tr class="concentrado-fila-total">
+                            <td colspan="2" class="fw-bold text-uppercase ps-3">
+                                <i class="bi bi-calculator-fill me-1"></i>
+                                Equipos Totales Ingresados
+                            </td>
+                            {% for dia in dias_semana %}
+                            <td class="text-center fw-bold">{{ totales_ingreso|get_item:dia }}</td>
+                            {% endfor %}
+                            <td class="text-center fw-bold">{{ totales_ingreso.total }}</td>
+                            <td class="text-center fw-bold">{{ totales_ingreso.promedio }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Resumen Carry-In / Mail-In -->
+            <div class="px-3 py-3 border-top">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="resumen-card resumen-dropoff d-flex align-items-center gap-3 p-3 rounded">
+                            <i class="bi bi-building-down fs-3 text-primary"></i>
+                            <div>
+                                <div class="small text-muted">Carry In &mdash; Drop Off</div>
+                                <div class="fs-4 fw-bold text-primary">{{ carry_in_dropoff }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="resumen-card resumen-sic d-flex align-items-center gap-3 p-3 rounded">
+                            <i class="bi bi-building fs-3 text-info"></i>
+                            <div>
+                                <div class="small text-muted">Carry In &mdash; SIC (Sat&eacute;lite)</div>
+                                <div class="fs-4 fw-bold text-info">{{ carry_in_sic }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="resumen-card resumen-mis d-flex align-items-center gap-3 p-3 rounded">
+                            <i class="bi bi-envelope-fill fs-3 text-warning"></i>
+                            <div>
+                                <div class="small text-muted">Mail In Service (MIS)</div>
+                                <div class="fs-4 fw-bold text-warning">{{ mail_in_service }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 2: ASIGNACIÓN DE EQUIPOS A INGENIERÍA
+         ====================================================================== -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header concentrado-header-asignacion d-flex align-items-center gap-2">
+            <i class="bi bi-person-badge fs-5"></i>
+            <h5 class="mb-0">Asignaci&oacute;n de Equipos a Ingenier&iacute;a</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered concentrado-tabla mb-0">
+                    <thead>
+                        <tr class="concentrado-thead-asignacion">
+                            <th class="col-ingeniero">INGENIERO</th>
+                            {% for dia in dias_semana %}
+                            <th class="col-dia text-center">{{ dia|upper }}</th>
+                            {% endfor %}
+                            <th class="col-total text-center">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                         {% for fila in asignacion %}
+                         <tr class="{% if fila.nombre == 'Candidatos RHITSO' %}concentrado-fila-rhitso{% endif %}">
+                             <td class="celda-ingeniero ps-3">{{ fila.nombre }}</td>
+                             {% for dia in dias_semana %}
+                             <td class="celda-numero text-center {{ fila|get_item:dia|celda_clase }}">{{ fila|get_item:dia|zero_dash }}</td>
+                             {% endfor %}
+                             <td class="celda-total text-center fw-bold">{{ fila.total }}</td>
+                         </tr>
+                         {% endfor %}
+                        <!-- Total general -->
+                        <tr class="concentrado-fila-total">
+                            <td class="fw-bold text-uppercase ps-3">
+                                <i class="bi bi-calculator-fill me-1"></i>
+                                Total Equipos Ingresados
+                            </td>
+                            {% for dia in dias_semana %}
+                            <td class="text-center fw-bold">{{ totales_asignacion|get_item:dia }}</td>
+                            {% endfor %}
+                            <td class="text-center fw-bold">{{ total_asignados }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 3: EGRESO DE EQUIPOS EN CIS
+         ====================================================================== -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header concentrado-header-egreso d-flex align-items-center gap-2">
+            <i class="bi bi-box-arrow-up-right fs-5"></i>
+            <h5 class="mb-0">Egreso de Equipos en CIS</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered concentrado-tabla mb-0">
+                    <thead>
+                        <tr class="concentrado-thead-egreso">
+                            <th class="col-sitio text-center">SITIO</th>
+                            <th class="col-equipo text-center">EQUIPO</th>
+                            {% for dia in dias_semana %}
+                            <th class="col-dia text-center">{{ dia|upper }}</th>
+                            {% endfor %}
+                            <th class="col-total text-center">TOTAL</th>
+                            <th class="col-promedio text-center">PROM.<br>DIARIO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sitio in sitios %}
+                            {% with sitio_data=egreso|get_item:sitio tipos_sitio=tipos_visibles_por_sitio|get_item:sitio %}
+                            {% for tipo in tipos_sitio %}
+                                {% with tipo_data=sitio_data|get_item:tipo %}
+                                <tr{% if sitio == 'DROP OFF' %}{% if tipo == 'LENOVO' %} class="fila-drop-lenovo"{% elif tipo == 'DELL' %} class="fila-drop-dell"{% elif tipo == 'OOW' %} class="fila-drop-oow"{% endif %}{% elif sitio == 'SATELITE' %}{% if tipo == 'LENOVO' %} class="fila-sat-lenovo"{% elif tipo == 'DELL' %} class="fila-sat-dell"{% elif tipo == 'OOW' %} class="fila-sat-oow"{% elif tipo == 'MIS DELL' or tipo == 'MIS LENOVO' %} class="fila-sat-mis"{% endif %}{% endif %}>
+                                    {% if forloop.first %}
+                                    <td class="celda-sitio align-middle text-center fw-bold"
+                                        rowspan="{{ tipos_sitio|length }}">
+                                        {{ sitio }}
+                                    </td>
+                                    {% endif %}
+                                     <td class="celda-tipo">{{ tipo }}</td>
+                                     {% for dia in dias_semana %}
+                                     <td class="celda-numero text-center {{ tipo_data|get_item:dia|celda_clase }}">
+                                         {{ tipo_data|get_item:dia|zero_dash }}
+                                     </td>
+                                     {% endfor %}
+                                     <td class="celda-total text-center fw-bold">
+                                         {{ tipo_data|get_item:"total" }}
+                                     </td>
+                                     <td class="celda-promedio text-center text-muted">
+                                         {{ tipo_data|get_item:"promedio" }}
+                                     </td>
+                                 </tr>
+                                 {% endwith %}
+                             {% endfor %}
+                             {% endwith %}
+                         {% endfor %}
+                         <!-- Totales de egreso -->
+                        <tr class="concentrado-fila-total">
+                            <td colspan="2" class="fw-bold text-uppercase ps-3">
+                                <i class="bi bi-calculator-fill me-1"></i>
+                                Equipos Totales Egresados
+                            </td>
+                            {% for dia in dias_semana %}
+                            <td class="text-center fw-bold">{{ totales_egreso|get_item:dia }}</td>
+                            {% endfor %}
+                            <td class="text-center fw-bold">{{ totales_egreso.total }}</td>
+                            <td class="text-center fw-bold">{{ totales_egreso.promedio }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================================
+         SECCIÓN 4: GRÁFICOS DE TENDENCIA ANUAL
+         ====================================================================== -->
+    <div class="row mb-4">
+        <!-- Gráfico: Ingresos por semana -->
+        <div class="col-lg-6 mb-4 mb-lg-0">
+            <div class="card shadow-sm h-100">
+                <div class="card-header concentrado-header-grafico d-flex align-items-center gap-2">
+                    <i class="bi bi-bar-chart-fill text-primary"></i>
+                    <h6 class="mb-0">Ingresos de Equipos por Semana &mdash; {{ año }}</h6>
+                </div>
+                <div class="card-body p-2">
+                    {{ grafico_ingresos_html|safe }}
+                </div>
+            </div>
+        </div>
+        <!-- Gráfico: Egresos por semana -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header concentrado-header-grafico d-flex align-items-center gap-2">
+                    <i class="bi bi-bar-chart-fill text-success"></i>
+                    <h6 class="mb-0">Egresos de Equipos por Semana &mdash; {{ año }}</h6>
+                </div>
+                <div class="card-body p-2">
+                    {{ grafico_egresos_html|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>{# /container-fluid #}
+
+<!-- Botón flotante para volver al tope de la página -->
+<button id="btn-scroll-top" title="Volver arriba" aria-label="Volver al inicio">
+    <i class="bi bi-arrow-up"></i>
+</button>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/concentrado_semanal.js' %}"></script>
+{% endblock %}

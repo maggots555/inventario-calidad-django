@@ -1,0 +1,718 @@
+/*
+================================================================================
+CONCENTRADO SEMANAL CIS — ESTILOS
+================================================================================
+
+EXPLICACIÓN PARA PRINCIPIANTES:
+Este archivo define la apariencia visual de la página "Concentrado Semanal".
+Tiene tres secciones principales (Ingreso, Asignación a Ingeniería, Egreso),
+cada una con su propio color de encabezado para distinguirlas fácilmente.
+
+COLORES USADOS:
+  - Ingreso      → Azul   (#0d6efd / Bootstrap primary)
+  - Asignación   → Índigo (#6610f2 / Bootstrap indigo)
+  - Egreso       → Verde  (#198754 / Bootstrap success)
+  - Gráficos     → Gris claro (fondo neutro)
+================================================================================
+*/
+
+/* ============================================================================
+   TÍTULO PRINCIPAL DE LA PÁGINA
+   ============================================================================ */
+
+.concentrado-titulo {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #1e3a5f;
+    letter-spacing: -0.3px;
+}
+
+.concentrado-titulo .bi {
+    color: #0d6efd;
+}
+
+/* ============================================================================
+   ENCABEZADOS DE SECCIÓN (card-header de cada tabla)
+   ============================================================================ */
+
+/* Sección 1 – Ingreso: Azul Bootstrap */
+.concentrado-header-ingreso {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: #ffffff;
+    border-bottom: none;
+}
+
+.concentrado-header-ingreso h5,
+.concentrado-header-ingreso h6 {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* Sección 2 – Asignación: Índigo */
+.concentrado-header-asignacion {
+    background: linear-gradient(135deg, #6610f2 0%, #520dc2 100%);
+    color: #ffffff;
+    border-bottom: none;
+}
+
+.concentrado-header-asignacion h5,
+.concentrado-header-asignacion h6 {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* Sección 3 – Egreso: Verde */
+.concentrado-header-egreso {
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+    color: #ffffff;
+    border-bottom: none;
+}
+
+.concentrado-header-egreso h5,
+.concentrado-header-egreso h6 {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* Sección 4 – Gráficos: Gris neutro */
+.concentrado-header-grafico {
+    background-color: #f8f9fa;
+    color: #495057;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* ============================================================================
+   ENCABEZADOS DE THEAD (fila de columnas dentro de la tabla)
+   ============================================================================ */
+
+/* Thead Ingreso */
+.concentrado-thead-ingreso th {
+    background-color: #cfe2ff;     /* Azul muy claro */
+    color: #084298;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+    white-space: nowrap;
+    border-color: #9ec5fe;
+    padding: 6px 8px;
+}
+
+/* Thead Asignación */
+.concentrado-thead-asignacion th {
+    background-color: #e0cffc;     /* Índigo muy claro */
+    color: #3d0a91;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+    white-space: nowrap;
+    border-color: #c5a3f0;
+    padding: 6px 8px;
+}
+
+/* Thead Egreso */
+.concentrado-thead-egreso th {
+    background-color: #d1e7dd;     /* Verde muy claro */
+    color: #0a3622;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+    white-space: nowrap;
+    border-color: #a3cfbb;
+    padding: 6px 8px;
+}
+
+/* ============================================================================
+   TABLA COMPACTA (aplica a todas las tablas del concentrado)
+   ============================================================================ */
+
+.concentrado-tabla {
+    font-size: 0.82rem;
+    margin-bottom: 0;
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.concentrado-tabla td,
+.concentrado-tabla th {
+    vertical-align: middle;
+    border-color: #dee2e6;
+}
+
+/* ============================================================================
+   CELDAS ESPECÍFICAS
+   ============================================================================ */
+
+/* Celda de SITIO (con rowspan, centrada y en negrita) */
+.celda-sitio {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background-color: #f8f9fa;
+    color: #495057;
+    width: 80px;
+    min-width: 70px;
+    max-width: 90px;
+    word-break: break-word;
+}
+
+/* Celda de TIPO DE EQUIPO */
+.celda-tipo {
+    font-size: 0.80rem;
+    font-weight: 600;
+    padding: 5px 10px;
+    color: #212529;
+    white-space: nowrap;
+}
+
+/* Celda de NÚMERO (conteos diarios) */
+.celda-numero {
+    font-size: 0.85rem;
+    color: #343a40;
+    padding: 5px 8px;
+    min-width: 42px;
+}
+
+/* Celda de TOTAL semanal */
+.celda-total {
+    font-weight: 700;
+    font-size: 0.88rem;
+    background-color: #f0f4ff;
+    color: #0d6efd;
+    min-width: 48px;
+}
+
+/* Celda de PROMEDIO diario */
+.celda-promedio {
+    font-size: 0.80rem;
+    color: #6c757d;
+    min-width: 50px;
+}
+
+/* Celda de INGENIERO (sección 2) */
+.celda-ingeniero {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #212529;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ============================================================================
+   ANCHO DE COLUMNAS
+   ============================================================================ */
+
+.col-sitio   { width: 80px;  min-width: 70px;  }
+.col-equipo  { width: 110px; min-width: 90px;  }
+.col-dia     { width: 52px;  min-width: 44px;  text-align: center; }
+.col-total   { width: 60px;  min-width: 52px;  text-align: center; }
+.col-promedio{ width: 62px;  min-width: 54px;  text-align: center; }
+.col-ingeniero { width: 190px; min-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ============================================================================
+   FILA DE TOTALES
+   ============================================================================ */
+
+.concentrado-fila-total {
+    background-color: #e9ecef !important;
+    font-weight: 700;
+    border-top: 2px solid #adb5bd;
+}
+
+.concentrado-fila-total td {
+    color: #212529;
+    font-size: 0.83rem;
+}
+
+/* ============================================================================
+   FILA ESPECIAL: ESCALADOS / PACKING (sección 2)
+   ============================================================================ */
+
+.concentrado-fila-escalados {
+    background-color: #fff3cd !important;   /* Amarillo suave */
+}
+
+.concentrado-fila-escalados td {
+    color: #664d03;
+    font-style: italic;
+}
+
+.concentrado-fila-rhitso {
+    background-color: #f8d7da !important;   /* Rojo muy claro */
+}
+
+.concentrado-fila-rhitso td {
+    color: #842029;
+    font-style: italic;
+}
+
+/* ============================================================================
+   TARJETAS RESUMEN (Carry-In Drop Off / SIC / MIS)
+   ============================================================================ */
+
+.resumen-card {
+    border: 1px solid #dee2e6;
+    background-color: #ffffff;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.resumen-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.10);
+    transform: translateY(-2px);
+}
+
+/* Carry In – Drop Off: fondo azul muy claro */
+.resumen-dropoff {
+    background-color: #e8f0fe !important;
+    border-color: #b6d4fe !important;
+}
+
+/* Carry In – SIC Satélite: fondo celeste */
+.resumen-sic {
+    background-color: #e3f2fd !important;
+    border-color: #90caf9 !important;
+}
+
+/* Mail In Service: fondo amarillo claro */
+.resumen-mis {
+    background-color: #fff8e1 !important;
+    border-color: #ffe082 !important;
+}
+
+/* ============================================================================
+   RESPONSIVE: PANTALLAS PEQUEÑAS
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    .concentrado-titulo {
+        font-size: 1.25rem;
+    }
+
+    .concentrado-tabla {
+        font-size: 0.75rem;
+    }
+
+    .col-sitio   { width: 60px;  min-width: 55px;  }
+    .col-equipo  { width: 80px;  min-width: 70px;  }
+    .col-dia     { width: 40px;  min-width: 36px;  }
+    .col-total   { width: 46px;  min-width: 40px;  }
+    .col-promedio{ width: 48px;  min-width: 42px;  }
+    .col-ingeniero { width: 130px; min-width: 110px; }
+}
+
+/* ============================================================================
+   BADGES DE SEMANA (navegación)
+   ============================================================================ */
+
+.fs-6-sm {
+    font-size: 0.90rem;
+}
+
+/* ============================================================================
+   GRÁFICOS PLOTLY (ajuste de contenedor)
+   ============================================================================ */
+
+#concentrado-container .js-plotly-plot {
+    border-radius: 4px;
+}
+
+/* ============================================================================
+   CUSTOM WEEK PICKER (selector de semana personalizado)
+   ============================================================================ */
+
+/* Contenedor del picker (ya no necesita position: relative porque
+   el dropdown se mueve al <body> vía JS y usa position: fixed) */
+.week-picker-wrapper {
+    display: inline-block;
+    width: 100%;
+}
+
+/* Botón disparador que muestra la semana actual */
+.week-picker-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 4px 10px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #212529;
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 31px; /* altura form-control-sm */
+}
+
+.week-picker-trigger:hover {
+    border-color: #86b7fe;
+}
+
+.week-picker-trigger:focus,
+.week-picker-trigger.abierto {
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.week-picker-trigger .wp-icon {
+    color: #0d6efd;
+    flex-shrink: 0;
+}
+
+.week-picker-trigger .wp-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.week-picker-trigger .wp-chevron {
+    color: #6c757d;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.week-picker-trigger.abierto .wp-chevron {
+    transform: rotate(180deg);
+}
+
+/* Input oculto que contiene el valor ISO (ej. "2025-W18") */
+.week-picker-hidden {
+    display: none;
+}
+
+/* Dropdown calendario */
+.week-picker-dropdown {
+    /* La posición (fixed) y coordenadas las aplica JavaScript dinámicamente.
+       Así el dropdown siempre queda encima de todo sin ser recortado por
+       el card padre ni por ningún overflow. */
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1050;
+    width: 280px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    padding: 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.week-picker-dropdown.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+/* Cabecera del dropdown: mes/año + flechas de navegación */
+.wp-dropdown-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.wp-mes-label {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #1e3a5f;
+    text-align: center;
+    flex: 1;
+}
+
+.wp-nav-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #0d6efd;
+    font-size: 0.9rem;
+    transition: background-color 0.15s, border-color 0.15s;
+    padding: 0;
+}
+
+.wp-nav-btn:hover {
+    background-color: #e8f0fe;
+    border-color: #b6d4fe;
+}
+
+/* Grilla de días del mes */
+.wp-grid {
+    padding: 8px 10px 6px;
+}
+
+/* Fila de encabezados: L M X J V S D */
+.wp-dias-semana {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 4px;
+}
+
+.wp-dia-nombre {
+    font-size: 0.70rem;
+    font-weight: 700;
+    text-align: center;
+    color: #6c757d;
+    text-transform: uppercase;
+    padding: 2px 0;
+}
+
+/* Filas de semanas */
+.wp-semanas {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Cada fila es una semana completa (7 días) */
+.wp-fila-semana {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 1px 2px;
+    transition: background-color 0.12s ease;
+}
+
+.wp-fila-semana:hover {
+    background-color: #e8f0fe;
+}
+
+/* Semana actualmente seleccionada */
+.wp-fila-semana.seleccionada {
+    background-color: #0d6efd;
+}
+
+.wp-fila-semana.seleccionada .wp-dia-num {
+    color: #fff;
+    font-weight: 600;
+}
+
+/* Semana actual (hoy pertenece a ella) */
+.wp-fila-semana.semana-hoy:not(.seleccionada) {
+    background-color: #cfe2ff;
+}
+
+/* Número de día individual */
+.wp-dia-num {
+    font-size: 0.78rem;
+    text-align: center;
+    padding: 4px 2px;
+    border-radius: 3px;
+    color: #212529;
+    user-select: none;
+    line-height: 1;
+}
+
+/* Días que pertenecen a otro mes (aparecen atenuados) */
+.wp-dia-num.otro-mes {
+    color: #adb5bd;
+}
+
+/* Días de fin de semana (S y D) */
+.wp-dia-num.fin-semana {
+    color: #6c757d;
+}
+
+.wp-fila-semana.seleccionada .wp-dia-num.fin-semana,
+.wp-fila-semana.seleccionada .wp-dia-num.otro-mes {
+    color: #cfe2ff;
+}
+
+/* Pie del dropdown: botón "Semana actual" */
+.wp-dropdown-footer {
+    padding: 8px 10px;
+    border-top: 1px solid #e9ecef;
+    text-align: center;
+}
+
+.wp-btn-hoy {
+    font-size: 0.78rem;
+    padding: 3px 12px;
+    border: 1px solid #0d6efd;
+    border-radius: 4px;
+    color: #0d6efd;
+    background: transparent;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.wp-btn-hoy:hover {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+/* ============================================================================
+   BOTONES DE NAVEGACIÓN ← → CON ESTADO DE CARGA
+   ============================================================================ */
+
+.btn-nav-semana {
+    position: relative;
+    min-width: 140px;
+}
+
+.btn-nav-semana .spinner-nav {
+    display: none;
+}
+
+.btn-nav-semana.cargando .spinner-nav {
+    display: inline-block;
+}
+
+.btn-nav-semana.cargando .icono-nav {
+    display: none;
+}
+
+.btn-nav-semana.cargando {
+    opacity: 0.75;
+    pointer-events: none;
+}
+
+/* ============================================================================
+   CELDAS CON VALOR > 0 (resaltado sutil)
+   ============================================================================ */
+
+.celda-numero.valor-positivo {
+    background-color: #f0f7ff;
+    color: #084298;
+    font-weight: 600;
+}
+
+.celda-numero.valor-cero {
+    color: #adb5bd;
+}
+
+/* ============================================================================
+   COLORES DE FILA POR SITIO + TIPO DE EQUIPO
+   Se aplican al <tr> y a todos sus <td> para que los fondos individuales
+   de celdas no cancelen el color de la fila.
+   Opacidad ~15-22% para mantener legibilidad del texto.
+
+   DROP OFF:
+     LENOVO    → #00ff00 (verde neón)
+     DELL      → #ffff00 (amarillo)
+     OOW       → #ff99cc (rosa)
+   SATELITE:
+     LENOVO    → #ff9900 (naranja)
+     DELL      → #0066ff (azul)
+     OOW       → #ff99cc (rosa, mismo que DROP OFF)
+     MIS DELL  → #e2d6d7 (gris rosado)
+     MIS LENOVO→ #e2d6d7 (gris rosado)
+   ============================================================================ */
+
+/* --- DROP OFF ------------------------------------------------------------ */
+tr.fila-drop-lenovo td { background-color: rgba(  0, 255,   0, 0.299) !important; }
+tr.fila-drop-dell   td { background-color: rgba(255, 255,   0, 0.299) !important; }
+tr.fila-drop-oow    td { background-color: rgba(255, 153, 204, 0.299) !important; }
+
+/* --- SATELITE ------------------------------------------------------------ */
+tr.fila-sat-lenovo  td { background-color: rgba(255, 153, 0, 0.299) !important; }
+tr.fila-sat-dell    td { background-color: rgba(  0, 102, 255, 0.299) !important; }
+tr.fila-sat-oow     td { background-color: rgba(255, 153, 204, 0.299) !important; }
+tr.fila-sat-mis     td { background-color: rgba(226, 214, 215, 0.299) !important; }
+
+/* Celda de sitio (columna vertical): tono ligeramente más oscuro para
+   distinguir visualmente el bloque DROP OFF del SATELITE */
+tr.fila-drop-lenovo td.celda-sitio,
+tr.fila-drop-dell   td.celda-sitio,
+tr.fila-drop-oow    td.celda-sitio { background-color: rgba(186, 114, 194, 0.35) !important; }
+
+tr.fila-sat-lenovo  td.celda-sitio,
+tr.fila-sat-dell    td.celda-sitio,
+tr.fila-sat-oow     td.celda-sitio,
+tr.fila-sat-mis     td.celda-sitio { background-color: rgba(114, 194, 159, 0.40) !important; }
+
+/* ============================================================================
+   BOTÓN FLOTANTE SCROLL TO TOP
+   ============================================================================ */
+
+#btn-scroll-top {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 9999;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background-color: #0d6efd;
+    color: #fff;
+    border: none;
+    box-shadow: 0 4px 14px rgba(13, 110, 253, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    font-size: 1rem;
+}
+
+#btn-scroll-top.visible {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0);
+}
+
+#btn-scroll-top:hover {
+    background-color: #0a58ca;
+    box-shadow: 0 6px 18px rgba(13, 110, 253, 0.5);
+}
+
+/* ============================================================================
+   PRINT: ESTILOS PARA IMPRESIÓN
+   ============================================================================ */
+
+@media print {
+    /* Ocultar controles al imprimir */
+    #formConcentrado,
+    .btn,
+    nav,
+    .navbar,
+    .sidebar {
+        display: none !important;
+    }
+
+    .concentrado-tabla {
+        font-size: 8pt;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #999 !important;
+        page-break-inside: avoid;
+    }
+
+    /* Forzar orientación horizontal al imprimir */
+    @page {
+        size: landscape;
+        margin: 10mm;
+    }
+}

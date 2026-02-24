@@ -247,6 +247,25 @@ urlpatterns = [
          views.exportar_dashboard_seguimiento_piezas, 
          name='exportar_dashboard_seguimiento_piezas'),
     
+    # ========================================================================
+    # CONCENTRADO SEMANAL DE CIS (Febrero 2026)
+    # ========================================================================
+    # Página principal del concentrado semanal: ingresos, asignaciones y egresos
+    # Permite navegar entre semanas y filtrar por sucursal
+    path('concentrado-semanal/',
+         views.concentrado_semanal,
+         name='concentrado_semanal'),
+
+    # Exportación a Excel del concentrado (4 hojas: Semanal, Q1-Q4, Gráfico Ingresos, Gráfico Egresos)
+    path('concentrado-semanal/exportar-excel/',
+         views.exportar_concentrado_excel,
+         name='exportar_concentrado_excel'),
+
+    # Exportación a PDF del concentrado (landscape, 3 tablas)
+    path('concentrado-semanal/exportar-pdf/',
+         views.exportar_concentrado_pdf,
+         name='exportar_concentrado_pdf'),
+
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 ]

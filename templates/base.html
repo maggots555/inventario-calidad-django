@@ -209,6 +209,9 @@
                                 <a href="{% url 'servicio_tecnico:dashboard_cotizaciones' %}" class="dropdown-item">
                                     <i class="bi bi-bar-chart-line-fill text-primary"></i> Dashboard Cotizaciones
                                 </a>
+                                <a href="{% url 'servicio_tecnico:concentrado_semanal' %}" class="dropdown-item">
+                                    <i class="bi bi-table text-success"></i> Concentrado Semanal
+                                </a>
                             </div>
                             <div class="dropdown-section">
                                 <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Órdenes</h6>
@@ -610,6 +613,12 @@
                             <a href="{% url 'servicio_tecnico:lista_activas' %}" class="sidebar-link">
                                 <i class="sidebar-icon bi bi-hourglass-split"></i>
                                 <span class="sidebar-text">Órdenes Activas</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'servicio_tecnico:concentrado_semanal' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-table"></i>
+                                <span class="sidebar-text">Concentrado Semanal</span>
                             </a>
                         </li>
                     </ul>
