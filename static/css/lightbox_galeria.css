@@ -206,6 +206,26 @@
     font-weight: 500;
 }
 
+/* Botón eliminar dentro del lightbox */
+.lightbox-delete {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    /* Hereda el rojo de Bootstrap btn-danger */
+}
+
+.lightbox-delete:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .lightbox-close {
@@ -256,6 +276,10 @@
     
     .lightbox-counter {
         text-align: center;
+    }
+    
+    .lightbox-delete {
+        justify-content: center;
     }
 }
 

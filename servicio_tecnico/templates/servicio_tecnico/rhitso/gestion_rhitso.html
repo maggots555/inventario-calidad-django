@@ -1117,7 +1117,7 @@
                                          data-descripcion="{{ imagen.descripcion|default:'Sin descripción' }}"
                                          data-usuario="{{ imagen.subido_por.nombre_completo }}"
                                          data-fecha="{{ imagen.fecha_subida|date:'d/m/Y H:i' }}"
-                                         data-url-descarga="{% url 'servicio_tecnico:descargar_imagen' imagen.pk }}">
+                                         data-url-descarga="{% url 'servicio_tecnico:descargar_imagen' imagen.pk %}">
                                         
                                         <!-- Botón descarga en miniatura -->
                                         <a href="{% url 'servicio_tecnico:descargar_imagen' imagen.pk %}" 

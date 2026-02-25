@@ -38,6 +38,9 @@ class CamaraIntegrada {
         this.modalAbierto = false;
         this.historyStateKey = 'camaraIntegrada';
         this.popstateHandler = null;
+        // FIX iOS Safari: Handler para prevenir el bounce scroll elástico dentro del modal
+        // Se guarda la referencia para poder removerlo al cerrar el modal
+        this.preventTouchMoveHandler = null;
         // Sistema híbrido de detección de orientación (NUEVO v5.2)
         this.orientacionManual = 270; // null = auto, 0/90/180/270 = manual - DEFAULT: 270° landscape
         this.modoDeteccion = 'manual'; // Modo actual - DEFAULT: manual
@@ -124,22 +127,26 @@ class CamaraIntegrada {
     /**
      * Se ejecuta cuando el modal se abre
      * NUEVO: Maneja la protección del botón "Atrás" en Android
+     * FIX iOS Safari: Bloquea el scroll del body para evitar el bounce scroll elástico
      */
     onModalAbierto() {
         this.modalAbierto = true;
         this.agregarProteccionBotonAtras();
         this.iniciarMonitoreoOrientacion(); // NUEVO: Monitorear cambios de orientación
+        this.bloquearScrollBody(); // FIX iOS: Prevenir bounce scroll
         this.abrirCamara();
     }
     /**
      * Se ejecuta cuando el modal se cierra
      * NUEVO: Limpia la protección del botón "Atrás"
      * OPTIMIZACIÓN v6.0: Limpia event listeners para prevenir memory leaks
+     * FIX iOS Safari: Restaura el scroll del body al cerrar
      */
     onModalCerrado() {
         this.modalAbierto = false;
         this.removerProteccionBotonAtras();
         this.detenerMonitoreoOrientacion();
+        this.restaurarScrollBody(); // FIX iOS: Restaurar scroll normal
         // OPTIMIZACIÓN v6.0: Cancelar todos los listeners de tap-to-focus
         if (this.abortController) {
             this.abortController.abort();
@@ -147,6 +154,89 @@ class CamaraIntegrada {
             console.log('🧹 Event listeners limpiados (AbortController)');
         }
         this.cerrarCamara();
+    }
+    /**
+     * Bloquea el scroll del body cuando el modal de cámara está abierto.
+     *
+     * FIX iOS Safari: Este es el fix más crítico para el bug del modal "movible".
+     *
+     * PROBLEMA: iOS Safari tiene un "bounce scroll" elástico que permite desplazar
+     * cualquier contenido aunque CSS diga overflow:hidden. Esto causa que:
+     *   1. El usuario arrastra el modal y lo desplaza visualmente
+     *   2. El layout (y las áreas de toque) permanecen en su posición original
+     *   3. El botón se VE desplazado pero el área de toque sigue arriba
+     *   4. El botón "no funciona" excepto en la orilla donde empieza el área de toque real
+     *
+     * SOLUCIÓN: Interceptar el evento touchmove en el documento y llamar
+     * preventDefault(). Esto cancela el gesto de scroll ANTES de que iOS lo procese.
+     * Los botones siguen recibiendo eventos touchstart/touchend normalmente.
+     *
+     * IMPORTANTE: Solo se cancela touchmove en el modal, no en los botones.
+     * touch-action:manipulation en CSS ya maneja los botones por separado.
+     */
+    bloquearScrollBody() {
+        const body = document.body;
+        const html = document.documentElement;
+        // Guardar posición actual del scroll para restaurarla al cerrar
+        const scrollY = window.scrollY;
+        // Bloquear scroll del body con CSS
+        body.style.overflow = 'hidden';
+        body.style.position = 'fixed';
+        body.style.top = `-${scrollY}px`;
+        body.style.left = '0';
+        body.style.right = '0';
+        body.style.width = '100%';
+        html.style.overflow = 'hidden';
+        // Guardar el scrollY para restaurarlo al cerrar
+        body.dataset.scrollY = String(scrollY);
+        // FIX iOS Safari específico: preventDefault en touchmove del documento
+        // Esto es lo que realmente bloquea el bounce scroll de iOS
+        // NOTA: debe ser { passive: false } para poder llamar preventDefault()
+        this.preventTouchMoveHandler = (event) => {
+            var _a, _b;
+            // Solo bloquear si el toque viene del modal de cámara (no de otros elementos)
+            const target = event.target;
+            const esDentroDelModal = (_b = (_a = this.modal) === null || _a === void 0 ? void 0 : _a.contains(target)) !== null && _b !== void 0 ? _b : false;
+            if (esDentroDelModal) {
+                // Permitir el toque en los botones de control (no bloquear clicks)
+                // pero sí bloquear el gesto de arrastre/scroll
+                const esBoton = target.closest('button, .btn') !== null;
+                if (!esBoton) {
+                    event.preventDefault();
+                }
+                // Los botones tienen touch-action:manipulation en CSS, así que
+                // los gestos en ellos ya están manejados correctamente
+            }
+        };
+        document.addEventListener('touchmove', this.preventTouchMoveHandler, { passive: false });
+        console.log('🔒 Scroll del body bloqueado (FIX iOS Safari)');
+    }
+    /**
+     * Restaura el scroll del body al cerrar el modal.
+     * Revierte exactamente los cambios de bloquearScrollBody().
+     */
+    restaurarScrollBody() {
+        const body = document.body;
+        const html = document.documentElement;
+        // Recuperar posición de scroll guardada
+        const scrollY = parseInt(body.dataset.scrollY || '0', 10);
+        // Restaurar estilos del body
+        body.style.overflow = '';
+        body.style.position = '';
+        body.style.top = '';
+        body.style.left = '';
+        body.style.right = '';
+        body.style.width = '';
+        html.style.overflow = '';
+        delete body.dataset.scrollY;
+        // Restaurar posición de scroll sin animación
+        window.scrollTo({ top: scrollY, behavior: 'instant' });
+        // Remover listener de touchmove
+        if (this.preventTouchMoveHandler) {
+            document.removeEventListener('touchmove', this.preventTouchMoveHandler);
+            this.preventTouchMoveHandler = null;
+        }
+        console.log('🔓 Scroll del body restaurado (FIX iOS Safari)');
     }
     /**
      * Inicia el monitoreo de cambios de orientación

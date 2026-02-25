@@ -93,6 +93,9 @@ class GaleriaLightbox {
                         <span class="lightbox-counter">
                             <span class="current-index">1</span> / <span class="total-images">1</span>
                         </span>
+                        <button type="button" class="btn btn-danger btn-sm lightbox-delete">
+                            <i class="bi bi-trash-fill"></i> Eliminar
+                        </button>
                     </div>
                 </div>
             </div>
@@ -118,12 +121,14 @@ class GaleriaLightbox {
             const container = item.closest('.gallery-image-container');
             if (img && container) {
                 // Obtener metadata
+                const imagenId = parseInt(container.dataset.imagenId || '0', 10);
                 const descripcion = container.dataset.descripcion || '';
                 const usuario = container.dataset.usuario || 'Usuario';
                 const fecha = container.dataset.fecha || '';
                 const urlDescarga = container.dataset.urlDescarga || img.src;
                 this.images.push({
                     index: index,
+                    imagenId: imagenId,
                     src: img.src,
                     descripcion: descripcion,
                     usuario: usuario,
@@ -150,12 +155,14 @@ class GaleriaLightbox {
             const img = item.querySelector('img');
             const container = item.closest('.gallery-image-container');
             if (img && container) {
+                const imagenId = parseInt(container.dataset.imagenId || '0', 10);
                 const descripcion = container.dataset.descripcion || '';
                 const usuario = container.dataset.usuario || 'Usuario';
                 const fecha = container.dataset.fecha || '';
                 const urlDescarga = container.dataset.urlDescarga || img.src;
                 this.images.push({
                     index: index,
+                    imagenId: imagenId,
                     src: img.src,
                     descripcion: descripcion,
                     usuario: usuario,
@@ -193,6 +200,11 @@ class GaleriaLightbox {
         }
         if (nextBtn) {
             nextBtn.addEventListener('click', () => this.next());
+        }
+        // Botón eliminar del lightbox
+        const deleteBtn = this.lightboxContainer.querySelector('.lightbox-delete');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => this.eliminarImagenActual());
         }
         // Teclado
         document.addEventListener('keydown', (e) => {
@@ -298,6 +310,14 @@ class GaleriaLightbox {
         if (totalEl) {
             totalEl.textContent = String(this.images.length);
         }
+        // Botón eliminar: guardar el ID de la imagen actual en un data attribute
+        // para que eliminarImagenActual() sepa qué imagen borrar
+        const deleteBtn = this.lightboxContainer.querySelector('.lightbox-delete');
+        if (deleteBtn) {
+            deleteBtn.dataset.imagenId = String(imageData.imagenId);
+            // Ocultar el botón si la imagen no tiene ID válido (sin permisos / sin datos)
+            deleteBtn.style.display = imageData.imagenId > 0 ? '' : 'none';
+        }
     }
     updateNavigation() {
         if (!this.lightboxContainer)
@@ -323,6 +343,63 @@ class GaleriaLightbox {
             nextBtn.style.opacity = '1';
             nextBtn.style.pointerEvents = 'auto';
         }
+    }
+    /**
+     * Elimina la imagen actualmente visible en el lightbox.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Reutilizamos la misma función confirmarEliminarImagen() que ya existe en la
+     * página (detalle_orden.html) para no duplicar la lógica de confirmación y AJAX.
+     *
+     * BUG CORREGIDO: Antes pasábamos el botón del lightbox (.lightbox-delete) como
+     * event.currentTarget. confirmarEliminarImagen() lo pone en estado "spinner" y
+     * solo lo restaura si hay ERROR — en éxito asume que el botón desaparecerá con
+     * su contenedor. Como el lightbox NO desaparece del DOM, el botón quedaba
+     * permanentemente deshabilitado con spinner.
+     *
+     * SOLUCIÓN: Pasamos el botón de la MINIATURA en la galería como currentTarget.
+     * Ese botón sí desaparece del DOM cuando la eliminación es exitosa (junto con
+     * .col-md-3). Si no se encuentra la miniatura, usamos un elemento temporal
+     * desechable que no afecta al lightbox.
+     */
+    eliminarImagenActual() {
+        if (!this.lightboxContainer)
+            return;
+        const imageData = this.images[this.currentImageIndex];
+        if (!imageData || imageData.imagenId <= 0) {
+            console.warn('⚠️ No se puede eliminar: imagenId no válido');
+            return;
+        }
+        const imagenId = imageData.imagenId;
+        // EXPLICACIÓN: Buscar el botón de eliminar de la MINIATURA en la galería,
+        // no el del lightbox. Ese botón sí desaparece del DOM al eliminar con éxito,
+        // por lo que confirmarEliminarImagen() puede ponerle el spinner sin problema.
+        const contenedorMiniatura = document.querySelector(`.gallery-image-container[data-imagen-id="${imagenId}"]`);
+        const btnMiniatura = contenedorMiniatura
+            ? contenedorMiniatura.querySelector('.btn-eliminar-miniatura')
+            : null;
+        // Si no hay miniatura en el DOM (ej: se eliminó antes), creamos un elemento
+        // temporal desechable para que confirmarEliminarImagen() pueda operar sin
+        // afectar al botón del lightbox.
+        const targetBtn = btnMiniatura !== null && btnMiniatura !== void 0 ? btnMiniatura : document.createElement('button');
+        const eventoSintetico = {
+            stopPropagation: () => { },
+            currentTarget: targetBtn
+        };
+        // OPCIÓN A: Usar la función global confirmarEliminarImagen() si existe en la página
+        // Esta función ya tiene la confirmación, el AJAX, el spinner y la eliminación del DOM
+        if (typeof window.confirmarEliminarImagen === 'function') {
+            // Cerrar lightbox primero para que el usuario vea el efecto en la galería
+            this.close();
+            window.confirmarEliminarImagen(imagenId, imageData.descripcion || 'imagen', eventoSintetico);
+            return;
+        }
+        // OPCIÓN B: Fallback si la función global no está disponible
+        const confirmacion = confirm(`⚠️ ¿Estás seguro de eliminar esta imagen?\n\nEsta acción NO se puede deshacer.`);
+        if (!confirmacion)
+            return;
+        console.log(`🗑️ Eliminando imagen ID: ${imagenId} desde lightbox`);
+        this.close();
     }
     prev() {
         if (this.currentImageIndex > 0) {
