@@ -1,8 +1,9 @@
 # AGENTS.md - Development Guide for AI Coding Agents
 
-> **Project**: Sistema Integrado de Gestión Técnica y Control de Calidad  
+> **Project**: Sistema Integrado de Gestión Técnica y Control de Calidad (SIGMA)  
 > **Framework**: Django 5.2.5 | Python 3.10+ | TypeScript 5.9.3  
-> **Purpose**: Enterprise technical service management with ML analytics
+> **Purpose**: Enterprise technical service management with ML analytics  
+> **Deployment**: PWA (Progressive Web App) — instalable en móviles como app nativa
 
 ---
 
@@ -400,6 +401,22 @@ Intelligent file storage with disk failover:
 - Images organized by order ID
 - Custom Django storage backend
 
+### PWA (Progressive Web App)
+The app is installable on Android and iOS as a native-like app:
+- **Manifest**: `static/manifest.json` — name, icons, theme color, `display: standalone`
+- **iOS support**: `apple-mobile-web-app-capable` + `apple-mobile-web-app-status-bar-style` in `templates/base.html`
+- **Viewport**: `viewport-fit=cover` for notch/Dynamic Island support on iPhones
+- **Theme color**: `#1f6391` (matches brand)
+- **No service worker** currently — app requires internet connection (no offline mode)
+
+**PWA Rules for AI agents**:
+- NEVER remove the `<link rel="manifest">` tag from `base.html`
+- NEVER remove or alter the `apple-mobile-web-app-*` meta tags
+- NEVER set `maximum-scale` > 1.0 or remove `viewport-fit=cover`
+- All UI must be **mobile-first** — test layouts at 375px width minimum
+- Touch targets must be at least **44x44px** (iOS HIG standard)
+- Avoid hover-only interactions — use tap/click equivalents
+
 ---
 
 ## 6. ENVIRONMENT VARIABLES
@@ -550,6 +567,8 @@ Consider adding:
 8. **Don't skip `__str__()`** - Required for all models
 9. **Don't use inline styles** - Use static CSS files
 10. **Don't skip TypeScript compilation** - Run `npm run build` before testing
+11. **Don't break PWA compatibility** - Never remove manifest, apple-mobile-web-app tags, or viewport-fit=cover from `base.html`
+12. **Don't use hover-only UI** - All interactions must work on touch screens (mobile-first)
 
 ---
 
