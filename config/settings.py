@@ -312,7 +312,14 @@ STORAGES = {
         "BACKEND": "config.storage_utils.DynamicFileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # ManifestStaticFilesStorage añade automáticamente un hash del contenido
+        # al nombre de cada archivo estático en producción. Por ejemplo:
+        #   archivo.js  →  archivo.abc123def.js
+        # Esto garantiza que el navegador siempre cargue la versión más nueva
+        # sin necesidad de actualizar ?v=X manualmente en los templates.
+        # El hash cambia solo cuando el contenido del archivo cambia.
+        "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
     },
 }
 

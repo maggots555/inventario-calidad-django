@@ -5,8 +5,8 @@
 {% block title %}Orden {{ orden.numero_orden_interno }} - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}?v=7.3">
-<link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}?v=1.0">
+<link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}">
+<link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -4116,17 +4116,17 @@
 
 {% block extra_js %}
 <!-- Lightbox personalizado para galería -->
-<script src="{% static 'js/lightbox_galeria.js' %}?v=1.0"></script>
+<script src="{% static 'js/lightbox_galeria.js' %}"></script>
 
 <!-- Sistema dual de subida de imágenes (galería + cámara) -->
-<!-- v6.0: Subida por lotes con reintentos automáticos (anti-Cloudflare disconnect) -->
-<script src="{% static 'js/upload_imagenes_dual.js' %}?v=6.0"></script>
+<!-- v6.1: Mejoras en UX del selector de imágenes -->
+<script src="{% static 'js/upload_imagenes_dual.js' %}"></script>
 
-<!-- Cámara integrada - v5.4: Modo manual + 270° por defecto -->
-<script src="{% static 'js/camara_integrada.js' %}?v=6.0"></script>
+<!-- Cámara integrada - v6.1: Soporte iOS PWA + mejoras en cámara/galería -->
+<script src="{% static 'js/camara_integrada.js' %}"></script>
 
 <!-- Modal de envío de diagnóstico al cliente -->
-<script src="{% static 'js/diagnostico_modal.js' %}?v=3.4"></script>
+<script src="{% static 'js/diagnostico_modal.js' %}"></script>
 
 <script>
 // ============================================================================
@@ -5517,7 +5517,7 @@ document.addEventListener('DOMContentLoaded', function() {
      VENTA MOSTRADOR - JavaScript (SIEMPRE cargado - Refactor Oct 2025)
      Panel VM ahora visible en todas las órdenes como complemento opcional
      ============================================================================ -->
-<script src="{% static 'js/venta_mostrador.js' %}?v=2.2"></script>
+<script src="{% static 'js/venta_mostrador.js' %}"></script>
 
 <!-- ============================================================================
      PLANTILLAS AUTOMÁTICAS PARA COMENTARIOS DE RECHAZO

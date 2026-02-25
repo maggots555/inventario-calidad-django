@@ -6,8 +6,8 @@
 
 {% block extra_css %}
 <!-- CSS específico para el dashboard RHITSO -->
-<link rel="stylesheet" href="{% static 'css/dashboard_rhitso.css' %}?v=1.0">
-<link rel="stylesheet" href="{% static 'css/rhitso.css' %}?v=2.3">
+<link rel="stylesheet" href="{% static 'css/dashboard_rhitso.css' %}">
+<link rel="stylesheet" href="{% static 'css/rhitso.css' %}">
 
 <!-- DataTables CSS -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
@@ -657,7 +657,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- JavaScript personalizado del dashboard -->
-<script src="{% static 'js/dashboard_rhitso.js' %}?v=1.0"></script>
+<script src="{% static 'js/dashboard_rhitso.js' %}"></script>
 
 <!-- Nota: Los datos ya están en las tablas HTML, JavaScript los leerá de ahí -->
 {% endblock %}

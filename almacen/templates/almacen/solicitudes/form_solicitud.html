@@ -220,8 +220,8 @@
 
 {% block extra_js %}
 <!-- Cargar el script TypeScript compilado para el formulario de solicitud de baja -->
-<!-- Cache busting: El parámetro ?v= fuerza al navegador a descargar la nueva versión -->
-<script src="{% static 'js/solicitud_baja_form.js' %}?v=1"></script>
+<!-- ManifestStaticFilesStorage añade el hash automáticamente al compilar -->
+<script src="{% static 'js/solicitud_baja_form.js' %}"></script>
 <script>
     /**
      * Inicializar el formulario de solicitud de baja
