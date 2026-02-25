@@ -6,7 +6,7 @@
 class UploadImagenesDual {
     constructor() {
         // NUEVO v5.0: IDs de campos Django (leídos desde data-* attributes del form)
-        this.tipoSelectId = '';
+        // NOTA: tipoSelectId ya no se usa — el tipo ahora se lee desde input[name="tipo"]:checked
         this.descripcionInputId = '';
         // Panel de resumen
         this.panelResumen = null;
@@ -59,7 +59,6 @@ class UploadImagenesDual {
         this.infoArchivos = document.getElementById('infoArchivos');
         // NUEVO v5.0: Leer IDs de campos Django desde data-* attributes
         if (this.formElement) {
-            this.tipoSelectId = this.formElement.dataset.tipoId || '';
             this.descripcionInputId = this.formElement.dataset.descripcionId || '';
         }
         this.init();
@@ -69,7 +68,7 @@ class UploadImagenesDual {
         this.crearContenedorToasts();
         // Crear panel de resumen
         this.crearPanelResumen();
-        // Event listeners para los inputs
+        // Event listeners para los inputs de archivo
         if (this.inputGaleria) {
             this.inputGaleria.addEventListener('change', (e) => this.handleFileSelect(e));
         }
@@ -86,11 +85,80 @@ class UploadImagenesDual {
         if (this.btnLimpiarTodo) {
             this.btnLimpiarTodo.addEventListener('click', () => this.limpiarTodo());
         }
+        // ── NUEVO: Listeners en los radio buttons de tipo de imagen ──────────
+        // Al cambiar el tipo seleccionado:
+        //   1. Actualizamos el estado del botón "Subir" (requiere tipo elegido)
+        //   2. Mostramos un aviso contextual debajo del selector
+        this.inicializarRadioTipo();
         // Configurar callback de la cámara integrada
         this.configurarCamaraIntegrada();
         // NUEVO v5.0: Inicializar formulario de subida (submit handler + beforeunload)
         this.inicializarFormularioSubida();
         console.log('✅ Sistema dual de subida de imágenes v5.0 inicializado');
+    }
+    // =========================================================================
+    // NUEVO: Selector de tipo de imagen (radio cards)
+    // =========================================================================
+    /**
+     * Inicializa los listeners de los radio buttons de tipo de imagen.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Los radio buttons con name="tipo" controlan qué categoría de imagen se sube
+     * (ingreso, diagnóstico, reparación, egreso, autorización).
+     * Este método:
+     *   1. Escucha cada cambio en los radio buttons
+     *   2. Actualiza el botón "Subir" (solo se habilita si hay tipo + archivos)
+     *   3. Muestra un aviso contextual informativo debajo del selector
+     */
+    inicializarRadioTipo() {
+        const radios = document.querySelectorAll('input[name="tipo"].tipo-imagen-radio');
+        radios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                // 1. Actualizar estado del botón subir
+                this.actualizarEstadoBotonSubir();
+                // 2. Mostrar aviso contextual del tipo elegido
+                this.mostrarAvisoTipo(radio.value);
+            });
+        });
+    }
+    /**
+     * Devuelve el valor del radio button de tipo actualmente seleccionado.
+     * Retorna cadena vacía si ninguno está seleccionado.
+     */
+    getTipoSeleccionado() {
+        const checked = this.formElement
+            ? this.formElement.querySelector('input[name="tipo"]:checked')
+            : document.querySelector('input[name="tipo"]:checked');
+        return checked ? checked.value : '';
+    }
+    /**
+     * Muestra un aviso contextual debajo del selector de tipo.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Cada tipo de imagen tiene una implicación diferente en el flujo de trabajo:
+     * - ingreso    → cambia la orden a "En Diagnóstico" automáticamente
+     * - egreso     → cambia la orden a "Finalizado" automáticamente (¡irreversible!)
+     * - los demás  → solo agregan fotos, sin cambio de estado
+     * Informamos al usuario antes de que suba para que tome la decisión consciente.
+     */
+    mostrarAvisoTipo(tipo) {
+        const avisoEl = document.getElementById('tipoImagenAviso');
+        if (!avisoEl)
+            return;
+        const avisos = {
+            ingreso: { clase: 'aviso-ingreso', icono: 'bi-info-circle-fill', texto: 'Subir como <strong>Ingreso</strong> cambiará el estado de la orden a <strong>En Diagnóstico</strong>.' },
+            diagnostico: { clase: 'aviso-diagnostico', icono: 'bi-search', texto: 'Fotos tomadas durante el <strong>diagnóstico</strong> del equipo. No cambia el estado de la orden.' },
+            reparacion: { clase: 'aviso-reparacion', icono: 'bi-wrench-adjustable', texto: 'Fotos del proceso de <strong>reparación</strong>. No cambia el estado de la orden.' },
+            egreso: { clase: 'aviso-egreso', icono: 'bi-exclamation-triangle-fill', texto: '<strong>¡Atención!</strong> Subir como <strong>Egreso</strong> marcará la orden como <strong>Finalizada - Lista para Entrega</strong>.' },
+            autorizacion: { clase: 'aviso-autorizacion', icono: 'bi-patch-check', texto: 'Evidencia de <strong>autorización RHITSO</strong>. No cambia el estado de la orden.' },
+        };
+        const config = avisos[tipo];
+        if (!config) {
+            avisoEl.className = 'tipo-imagen-aviso d-none mt-2';
+            return;
+        }
+        avisoEl.className = `tipo-imagen-aviso ${config.clase} mt-2`;
+        avisoEl.innerHTML = `<i class="bi ${config.icono}"></i><span>${config.texto}</span>`;
     }
     // =========================================================================
     // NUEVO v5.0: Formulario de subida (migrado desde JS inline del template)
@@ -149,6 +217,22 @@ class UploadImagenesDual {
             this.marcarFinEnvio();
             return;
         }
+        // ── Confirmación extra para tipo EGRESO ──────────────────────────────
+        // EXPLICACIÓN: Subir como "egreso" cambia el estado de la orden a
+        // "Finalizado - Listo para Entrega" de forma automática en el servidor.
+        // Al ser una acción de alto impacto y con difícil reversión, pedimos
+        // confirmación explícita al usuario antes de continuar.
+        const tipoActual = this.getTipoSeleccionado();
+        if (tipoActual === 'egreso') {
+            const confirmar = confirm('⚠️ Estás a punto de subir imágenes de EGRESO.\n\n' +
+                'Esto marcará la orden como "Finalizada - Lista para Entrega" automáticamente.\n\n' +
+                '¿Deseas continuar?');
+            if (!confirmar) {
+                // Usuario canceló — devolver el botón a su estado normal
+                this.marcarFinEnvio();
+                return;
+            }
+        }
         // v6.0: Dividir archivos en lotes de BATCH_SIZE
         // Cada lote se envía como un request HTTP independiente,
         // lo que evita que Cloudflare Tunnel corte la conexión.
@@ -193,12 +277,14 @@ class UploadImagenesDual {
         }
         // Agregar tipo de formulario
         formData.append('form_type', 'subir_imagenes');
-        // Agregar tipo de imagen desde el select de Django
-        if (this.tipoSelectId) {
-            const tipoSelect = document.getElementById(this.tipoSelectId);
-            if (tipoSelect) {
-                formData.append('tipo', tipoSelect.value);
-            }
+        // Agregar tipo de imagen desde los radio buttons (input[name="tipo"]:checked)
+        // EXPLICACIÓN: Ya no usamos un <select> sino radio buttons con name="tipo".
+        // Buscamos dentro del formulario el radio que esté marcado.
+        const tipoChecked = this.formElement
+            ? this.formElement.querySelector('input[name="tipo"]:checked')
+            : document.querySelector('input[name="tipo"]:checked');
+        if (tipoChecked) {
+            formData.append('tipo', tipoChecked.value);
         }
         // Agregar descripción desde el input de Django
         if (this.descripcionInputId) {
@@ -658,11 +744,12 @@ class UploadImagenesDual {
             this.btnSubir.disabled = true;
             this.btnSubir.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Subiendo...';
         }
-        // Deshabilitar select de tipo y input de descripción
-        if (this.tipoSelectId) {
-            const tipoSelect = document.getElementById(this.tipoSelectId);
-            if (tipoSelect)
-                tipoSelect.disabled = true;
+        // Deshabilitar los radio buttons de tipo y el input de descripción
+        // EXPLICACIÓN: Al deshabilitar los radio buttons, el CSS :disabled aplica
+        // opacity: 0.5 a los cards y bloquea el puntero (pointer-events: none).
+        if (this.formElement) {
+            this.formElement.querySelectorAll('input[name="tipo"]')
+                .forEach(radio => { radio.disabled = true; });
         }
         if (this.descripcionInputId) {
             const descripcionInput = document.getElementById(this.descripcionInputId);
@@ -677,11 +764,10 @@ class UploadImagenesDual {
     rehabilitarFormulario() {
         if (this.btnSubir)
             this.btnSubir.disabled = false;
-        // Rehabilitar select de tipo y input de descripción
-        if (this.tipoSelectId) {
-            const tipoSelect = document.getElementById(this.tipoSelectId);
-            if (tipoSelect)
-                tipoSelect.disabled = false;
+        // Rehabilitar radio buttons de tipo y el input de descripción
+        if (this.formElement) {
+            this.formElement.querySelectorAll('input[name="tipo"]')
+                .forEach(radio => { radio.disabled = false; });
         }
         if (this.descripcionInputId) {
             const descripcionInput = document.getElementById(this.descripcionInputId);
@@ -1232,14 +1318,23 @@ class UploadImagenesDual {
         }
         // Obtener resumen para validar límite total
         const resumen = this.obtenerResumen();
-        // Deshabilitar si está procesando, enviando, no hay imágenes listas, o excede límite total
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // El botón de subir solo se habilita cuando se cumplen TODAS estas condiciones:
+        // 1. No está procesando archivos en este momento
+        // 2. No está enviando al servidor en este momento
+        // 3. Hay archivos listos para subir
+        // 4. El usuario seleccionó al menos un archivo
+        // 5. El tamaño total no excede el límite del servidor
+        // 6. El usuario seleccionó un tipo de imagen (NUEVO: obligatorio)
+        const tipoSeleccionado = this.getTipoSeleccionado();
         const debeEstarDeshabilitado = this.estaProcesando ||
             this.enviando ||
             !this.archivosListos ||
             this.imagenesSeleccionadas.length === 0 ||
-            resumen.excedeLimiteTotal;
+            resumen.excedeLimiteTotal ||
+            tipoSeleccionado === ''; // ← Tipo obligatorio
         this.btnSubir.disabled = debeEstarDeshabilitado;
-        // Cambiar texto del botón según estado
+        // Cambiar texto del botón según estado (orden de prioridad: errores primero)
         if (resumen.excedeLimiteTotal) {
             this.btnSubir.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Excede límite del servidor';
         }
@@ -1249,13 +1344,17 @@ class UploadImagenesDual {
         else if (this.estaProcesando) {
             this.btnSubir.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
         }
+        else if (tipoSeleccionado === '') {
+            // Guiar al usuario a seleccionar un tipo antes de subir
+            this.btnSubir.innerHTML = '<i class="bi bi-tag"></i> Selecciona un tipo';
+        }
         else if (this.imagenesSeleccionadas.length > 0) {
             this.btnSubir.innerHTML = `<i class="bi bi-cloud-upload"></i> Subir ${this.imagenesSeleccionadas.length} Imagen${this.imagenesSeleccionadas.length !== 1 ? 'es' : ''}`;
         }
         else {
             this.btnSubir.innerHTML = '<i class="bi bi-cloud-upload"></i> Subir Imágenes';
         }
-        console.log(`🔘 Botón: ${debeEstarDeshabilitado ? 'DESHABILITADO' : 'HABILITADO'} | Procesando: ${this.estaProcesando} | Enviando: ${this.enviando} | Listos: ${this.archivosListos} | Excede límite: ${resumen.excedeLimiteTotal}`);
+        console.log(`🔘 Botón: ${debeEstarDeshabilitado ? 'DESHABILITADO' : 'HABILITADO'} | Procesando: ${this.estaProcesando} | Enviando: ${this.enviando} | Listos: ${this.archivosListos} | Excede límite: ${resumen.excedeLimiteTotal} | Tipo: "${tipoSeleccionado}"`);
     }
     /**
      * Actualiza la visualización del preview de imágenes

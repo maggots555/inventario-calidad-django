@@ -3408,3 +3408,224 @@ thead.sticky-top {
         font-size: 0.8rem;
     }
 }
+
+
+/* =============================================================================
+   SELECTOR DE TIPO DE IMAGEN — Radio Cards con colores
+   Reemplaza el antiguo <select> en el formulario de subida de imágenes.
+   Cada tipo de imagen tiene un color propio para que el usuario lo identifique
+   de un vistazo y no se equivoque al subir ingreso/egreso.
+   ============================================================================= */
+
+/* ---- Contenedor flex de los 5 botones ---- */
+.tipo-imagen-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* ---- Input radio: visualmente oculto pero accesible ---- */
+.tipo-imagen-radio {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+/* ---- Card base (estado sin seleccionar) ---- */
+.tipo-imagen-card {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 90px;
+    padding: 10px 14px;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    background: #f8f9fa;
+    color: #6c757d;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    line-height: 1.2;
+}
+
+.tipo-imagen-card i {
+    font-size: 1.3rem;
+    transition: transform 0.18s ease;
+}
+
+.tipo-imagen-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.10);
+}
+
+/* ---- Estado DESHABILITADO (durante subida) ---- */
+.tipo-imagen-radio:disabled + .tipo-imagen-card {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ══════════════════════════════════════════════════════
+   COLORES POR TIPO — hover y seleccionado
+   ══════════════════════════════════════════════════════ */
+
+/* -- INGRESO: Azul Bootstrap (#0d6efd) -- */
+.tipo-imagen-card.tipo-ingreso {
+    border-color: #9ec5fe;
+    color: #084298;
+}
+.tipo-imagen-card.tipo-ingreso:hover {
+    background: #cfe2ff;
+    border-color: #0d6efd;
+    color: #0a58ca;
+}
+.tipo-imagen-radio[value="ingreso"]:checked + .tipo-imagen-card.tipo-ingreso {
+    background: #0d6efd;
+    border-color: #0a58ca;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(13, 110, 253, 0.40);
+    transform: translateY(-2px);
+}
+.tipo-imagen-radio[value="ingreso"]:checked + .tipo-imagen-card.tipo-ingreso i {
+    transform: scale(1.15);
+}
+
+/* -- DIAGNÓSTICO: Naranja (#fd7e14) -- */
+.tipo-imagen-card.tipo-diagnostico {
+    border-color: #fecba1;
+    color: #984c0c;
+}
+.tipo-imagen-card.tipo-diagnostico:hover {
+    background: #ffe5d0;
+    border-color: #fd7e14;
+    color: #b45309;
+}
+.tipo-imagen-radio[value="diagnostico"]:checked + .tipo-imagen-card.tipo-diagnostico {
+    background: #fd7e14;
+    border-color: #e8690a;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(253, 126, 20, 0.40);
+    transform: translateY(-2px);
+}
+.tipo-imagen-radio[value="diagnostico"]:checked + .tipo-imagen-card.tipo-diagnostico i {
+    transform: scale(1.15);
+}
+
+/* -- REPARACIÓN: Verde (#198754) -- */
+.tipo-imagen-card.tipo-reparacion {
+    border-color: #a3cfbb;
+    color: #0f5132;
+}
+.tipo-imagen-card.tipo-reparacion:hover {
+    background: #d1e7dd;
+    border-color: #198754;
+    color: #146c43;
+}
+.tipo-imagen-radio[value="reparacion"]:checked + .tipo-imagen-card.tipo-reparacion {
+    background: #198754;
+    border-color: #146c43;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(25, 135, 84, 0.40);
+    transform: translateY(-2px);
+}
+.tipo-imagen-radio[value="reparacion"]:checked + .tipo-imagen-card.tipo-reparacion i {
+    transform: scale(1.15);
+}
+
+/* -- EGRESO: Rojo (#dc3545) -- */
+.tipo-imagen-card.tipo-egreso {
+    border-color: #f1aeb5;
+    color: #842029;
+}
+.tipo-imagen-card.tipo-egreso:hover {
+    background: #f8d7da;
+    border-color: #dc3545;
+    color: #b02a37;
+}
+.tipo-imagen-radio[value="egreso"]:checked + .tipo-imagen-card.tipo-egreso {
+    background: #dc3545;
+    border-color: #b02a37;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(220, 53, 69, 0.40);
+    transform: translateY(-2px);
+}
+.tipo-imagen-radio[value="egreso"]:checked + .tipo-imagen-card.tipo-egreso i {
+    transform: scale(1.15);
+}
+
+/* -- AUTORIZACIÓN: Morado (#6f42c1) -- */
+.tipo-imagen-card.tipo-autorizacion {
+    border-color: #c29ffa;
+    color: #3d0d7c;
+}
+.tipo-imagen-card.tipo-autorizacion:hover {
+    background: #e9d8fd;
+    border-color: #6f42c1;
+    color: #5a349a;
+}
+.tipo-imagen-radio[value="autorizacion"]:checked + .tipo-imagen-card.tipo-autorizacion {
+    background: #6f42c1;
+    border-color: #5a349a;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(111, 66, 193, 0.40);
+    transform: translateY(-2px);
+}
+.tipo-imagen-radio[value="autorizacion"]:checked + .tipo-imagen-card.tipo-autorizacion i {
+    transform: scale(1.15);
+}
+
+/* ---- Aviso contextual debajo del selector ---- */
+.tipo-imagen-aviso {
+    font-size: 0.85rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border-left: 4px solid currentColor;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: fadeInDown 0.2s ease;
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.tipo-imagen-aviso.aviso-ingreso      { background: #cfe2ff; color: #084298;  border-color: #0d6efd; }
+.tipo-imagen-aviso.aviso-diagnostico  { background: #ffe5d0; color: #984c0c;  border-color: #fd7e14; }
+.tipo-imagen-aviso.aviso-reparacion   { background: #d1e7dd; color: #0f5132;  border-color: #198754; }
+.tipo-imagen-aviso.aviso-egreso       { background: #f8d7da; color: #842029;  border-color: #dc3545; }
+.tipo-imagen-aviso.aviso-autorizacion { background: #e9d8fd; color: #3d0d7c;  border-color: #6f42c1; }
+
+/* ---- Responsive: móvil — los cards se ajustan a 2-3 por fila ---- */
+@media (max-width: 575px) {
+    .tipo-imagen-cards {
+        gap: 6px;
+    }
+    .tipo-imagen-card {
+        min-width: calc(33.333% - 6px);
+        flex: 1 1 calc(33.333% - 6px);
+        padding: 9px 8px;
+        font-size: 0.78rem;
+    }
+    .tipo-imagen-card i {
+        font-size: 1.15rem;
+    }
+}
+
+@media (max-width: 380px) {
+    .tipo-imagen-card {
+        min-width: calc(50% - 6px);
+        flex: 1 1 calc(50% - 6px);
+    }
+}

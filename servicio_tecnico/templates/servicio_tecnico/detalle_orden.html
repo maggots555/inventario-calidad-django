@@ -1921,20 +1921,63 @@
                         </h6>
                         
                         <form method="post" enctype="multipart/form-data" id="formSubirImagenes"
-                              data-tipo-id="{{ form_imagenes.tipo.id_for_label }}"
                               data-descripcion-id="{{ form_imagenes.descripcion.id_for_label }}">
                             {% csrf_token %}
                             <input type="hidden" name="form_type" value="subir_imagenes">
-                            
-                            <div class="row">
-                                <div class="col-md-3 mb-3">
-                                    {{ form_imagenes.tipo.errors }}
-                                    <label for="{{ form_imagenes.tipo.id_for_label }}" class="form-label">
-                                        {{ form_imagenes.tipo.label }}
+
+                            <!-- ════════════════════════════════════════════════════════
+                                 SELECTOR DE TIPO DE IMAGEN — Radio cards con colores
+                                 Reemplaza el antiguo <select> de Django.
+                                 El usuario DEBE elegir uno antes de poder subir.
+                                 ════════════════════════════════════════════════════════ -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold mb-2">
+                                        <i class="bi bi-tag-fill me-1"></i> Tipo de Imagen
+                                        <span class="text-danger ms-1" title="Obligatorio">*</span>
                                     </label>
-                                    {{ form_imagenes.tipo }}
+                                    {{ form_imagenes.tipo.errors }}
+
+                                    <div class="tipo-imagen-cards" id="tipoImagenCards" role="group" aria-label="Tipo de imagen">
+
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="tipo_ingreso"     value="ingreso">
+                                        <label for="tipo_ingreso"     class="tipo-imagen-card tipo-ingreso">
+                                            <i class="bi bi-box-arrow-in-right"></i>
+                                            <span>Ingreso</span>
+                                        </label>
+
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="tipo_diagnostico" value="diagnostico">
+                                        <label for="tipo_diagnostico" class="tipo-imagen-card tipo-diagnostico">
+                                            <i class="bi bi-search"></i>
+                                            <span>Diagnóstico</span>
+                                        </label>
+
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="tipo_reparacion"  value="reparacion">
+                                        <label for="tipo_reparacion"  class="tipo-imagen-card tipo-reparacion">
+                                            <i class="bi bi-wrench-adjustable"></i>
+                                            <span>Reparación</span>
+                                        </label>
+
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="tipo_egreso"      value="egreso">
+                                        <label for="tipo_egreso"      class="tipo-imagen-card tipo-egreso">
+                                            <i class="bi bi-box-arrow-right"></i>
+                                            <span>Egreso</span>
+                                        </label>
+
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="tipo_autorizacion" value="autorizacion">
+                                        <label for="tipo_autorizacion" class="tipo-imagen-card tipo-autorizacion">
+                                            <i class="bi bi-patch-check"></i>
+                                            <span>Autorización</span>
+                                        </label>
+
+                                    </div>
+
+                                    <!-- Aviso contextual que aparece al seleccionar un tipo -->
+                                    <div id="tipoImagenAviso" class="tipo-imagen-aviso d-none mt-2"></div>
                                 </div>
-                                
+                            </div>
+
+                            <div class="row">
                                 <div class="col-md-9 mb-3">
                                     {{ form_imagenes.imagenes.errors }}
                                     <label class="form-label">

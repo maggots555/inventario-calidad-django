@@ -1165,7 +1165,10 @@ class SubirImagenesForm(forms.Form):
     """
     
     tipo = forms.ChoiceField(
-        choices=TIPO_IMAGEN_CHOICES,
+        # EXPLICACIÓN: El placeholder vacío ('') fuerza al usuario a elegir activamente
+        # un tipo antes de poder subir. Sirve como fallback de validación server-side
+        # por si el JavaScript no cargó y el usuario usa el <select> HTML original.
+        choices=[('', '— Selecciona un tipo —')] + list(TIPO_IMAGEN_CHOICES),
         widget=forms.Select(attrs={
             'class': 'form-control form-select',
         }),
