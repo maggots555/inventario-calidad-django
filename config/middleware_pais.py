@@ -27,6 +27,9 @@ Ahora usamos try/finally para SIEMPRE limpiar, sin importar si hubo error.
 
 import threading
 import logging
+from zoneinfo import ZoneInfo
+
+from django.utils import timezone as dj_timezone
 
 from .paises_config import PAISES_CONFIG, PAIS_DEFAULT, get_pais_config
 
@@ -156,13 +159,23 @@ class PaisMiddleware:
         request.pais_codigo = pais_config['codigo']
         request.pais_subdominio = pais_subdominio
 
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Aquí le decimos a Django: "Para este request, usa esta zona horaria".
+        # Esto hace que el filtro |date: en los templates convierta
+        # automáticamente todas las fechas UTC a la hora local del país.
+        # Sin esto, Django muestra todas las fechas en UTC (el valor de TIME_ZONE).
+        # Es el mecanismo oficial de Django para zonas horarias por request.
+        tz_nombre = pais_config.get('timezone', 'America/Mexico_City')
+        dj_timezone.activate(ZoneInfo(tz_nombre))
+
         # Paso 3: Procesar request con limpieza garantizada
         try:
             response = self.get_response(request)
         finally:
-            # Paso 4: SIEMPRE limpiar thread-locals
+            # Paso 4: SIEMPRE limpiar thread-locals y zona horaria activa
             # Esto es CRÍTICO — sin esto, el siguiente request en este
             # thread podría heredar datos del país equivocado
+            dj_timezone.deactivate()
             self._clear_thread_locals()
 
         return response
