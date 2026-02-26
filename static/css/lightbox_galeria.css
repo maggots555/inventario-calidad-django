@@ -226,6 +226,132 @@
     box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
 }
 
+/* Botón "Inspeccionar" en la barra de acciones */
+.lightbox-zoom-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.lightbox-zoom-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13, 202, 240, 0.4);
+}
+
+/* =============================================================================
+   MODO ZOOM / INSPECCIÓN
+   Cuando el usuario activa el modo inspección, el contenedor de imagen
+   se expande para ocupar toda la pantalla disponible, permitiendo zoom
+   y arrastre (pan) sobre la imagen.
+   ============================================================================= */
+
+/* Contenedor de imagen en modo zoom: ocupa toda la ventana */
+.lightbox-image-container.zoom-active {
+    max-width: 100%;
+    max-height: 100%;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    cursor: grab;
+    border-radius: 0;
+}
+
+/* Imagen en modo zoom: sin restricciones de tamaño, GPU-acelerada */
+.lightbox-image-container.zoom-active .lightbox-image {
+    max-width: none;
+    max-height: none;
+    width: auto;
+    height: auto;
+    max-height: 100vh;
+    object-fit: contain;
+    border-radius: 0;
+    box-shadow: none;
+    transition: none;
+    transform-origin: center center;
+    /* GPU acceleration para transforms fluidos */
+    will-change: transform;
+    user-select: none;
+    -webkit-user-select: none;
+    /* Deshabilitar arrastre nativo del navegador */
+    -webkit-user-drag: none;
+    pointer-events: auto;
+}
+
+/* Cursor "grabbing" cuando se está arrastrando */
+.lightbox-image-container.zoom-active:active {
+    cursor: grabbing;
+}
+
+/* En modo zoom, ajustar el layout del lightbox */
+.custom-lightbox.zoom-mode .lightbox-content {
+    padding: 0;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Controles de zoom: barra flotante en la parte inferior */
+.lightbox-zoom-controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(12px);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Indicador de porcentaje de zoom */
+.zoom-level-indicator {
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    min-width: 50px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Botones de los controles de zoom */
+.lightbox-zoom-controls .btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Separador visual entre zoom +/- y los otros botones */
+.zoom-reset-btn {
+    margin-left: 6px;
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+    padding-left: 16px !important;
+}
+
+.zoom-exit-btn {
+    margin-left: 6px;
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+    padding-left: 16px !important;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .lightbox-close {
@@ -274,12 +400,45 @@
         justify-content: center;
     }
     
+    .lightbox-zoom-toggle {
+        justify-content: center;
+    }
+    
     .lightbox-counter {
         text-align: center;
     }
     
     .lightbox-delete {
         justify-content: center;
+    }
+    
+    /* Controles de zoom en móvil: más compactos */
+    .lightbox-zoom-controls {
+        bottom: 10px;
+        padding: 8px 12px;
+        gap: 6px;
+        border-radius: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+        max-width: 95%;
+    }
+    
+    .lightbox-zoom-controls .btn {
+        min-width: 40px;
+        min-height: 40px;
+        font-size: 0.8rem;
+        padding: 6px 10px;
+    }
+    
+    .zoom-level-indicator {
+        font-size: 0.85rem;
+        min-width: 42px;
+    }
+    
+    .zoom-reset-btn,
+    .zoom-exit-btn {
+        margin-left: 2px;
+        padding-left: 10px !important;
     }
 }
 

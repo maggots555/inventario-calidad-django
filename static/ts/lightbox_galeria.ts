@@ -22,11 +22,54 @@ class GaleriaLightbox {
     private images: GalleryImageData[];
     private isOpen: boolean;
     
+    // ========================================================================
+    // PROPIEDADES DEL MODO ZOOM / INSPECCIÓN
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Estas propiedades controlan el estado del zoom interactivo.
+    // - zoomLevel: nivel actual de zoom (1 = 100%, 2 = 200%, etc.)
+    // - panX / panY: desplazamiento horizontal y vertical de la imagen
+    // - isDragging: indica si el usuario está arrastrando la imagen
+    // - isZoomMode: indica si el modo inspección está activo
+    // - dragStartX / dragStartY: posición inicial del drag
+    // - lastPanX / lastPanY: posición del pan antes de iniciar un drag
+    // - pinchStartDistance: distancia inicial entre dedos para pinch-to-zoom
+    // - pinchStartZoom: nivel de zoom al iniciar el gesto pinch
+    // ========================================================================
+    private isZoomMode: boolean;
+    private zoomLevel: number;
+    private panX: number;
+    private panY: number;
+    private isDragging: boolean;
+    private dragStartX: number;
+    private dragStartY: number;
+    private lastPanX: number;
+    private lastPanY: number;
+    private pinchStartDistance: number;
+    private pinchStartZoom: number;
+    
+    // EXPLICACIÓN: Constantes para los límites del zoom
+    private readonly MIN_ZOOM: number = 0.5;
+    private readonly MAX_ZOOM: number = 8;
+    private readonly ZOOM_STEP: number = 0.25;
+    
     constructor() {
         this.lightboxContainer = null;
         this.currentImageIndex = 0;
         this.images = [];
         this.isOpen = false;
+        
+        // Inicializar estado de zoom
+        this.isZoomMode = false;
+        this.zoomLevel = 1;
+        this.panX = 0;
+        this.panY = 0;
+        this.isDragging = false;
+        this.dragStartX = 0;
+        this.dragStartY = 0;
+        this.lastPanX = 0;
+        this.lastPanY = 0;
+        this.pinchStartDistance = 0;
+        this.pinchStartZoom = 1;
         
         this.init();
     }
@@ -93,12 +136,29 @@ class GaleriaLightbox {
                 </button>
                 
                 <div class="lightbox-image-container">
-                    <img src="" alt="" class="lightbox-image">
+                    <img src="" alt="" class="lightbox-image" draggable="false">
                     <div class="lightbox-loader">
                         <div class="spinner-border text-light" role="status">
                             <span class="visually-hidden">Cargando...</span>
                         </div>
                     </div>
+                </div>
+                
+                <!-- CONTROLES DE ZOOM (visibles solo en modo inspección) -->
+                <div class="lightbox-zoom-controls" style="display: none;">
+                    <button type="button" class="btn btn-sm btn-outline-light zoom-out-btn" title="Alejar (-)">
+                        <i class="bi bi-dash-lg"></i>
+                    </button>
+                    <span class="zoom-level-indicator">100%</span>
+                    <button type="button" class="btn btn-sm btn-outline-light zoom-in-btn" title="Acercar (+)">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light zoom-reset-btn" title="Restablecer zoom">
+                        <i class="bi bi-arrows-angle-contract"></i> Reset
+                    </button>
+                    <button type="button" class="btn btn-sm btn-danger zoom-exit-btn" title="Salir de inspección">
+                        <i class="bi bi-x-lg"></i> Cerrar Zoom
+                    </button>
                 </div>
                 
                 <div class="lightbox-info">
@@ -119,6 +179,9 @@ class GaleriaLightbox {
                         <a href="#" class="btn btn-primary btn-sm lightbox-download" download>
                             <i class="bi bi-download"></i> Descargar Original
                         </a>
+                        <button type="button" class="btn btn-info btn-sm lightbox-zoom-toggle" title="Inspeccionar imagen con zoom y arrastre">
+                            <i class="bi bi-search"></i> Inspeccionar
+                        </button>
                         <span class="lightbox-counter">
                             <span class="current-index">1</span> / <span class="total-images">1</span>
                         </span>
@@ -259,19 +322,129 @@ class GaleriaLightbox {
             deleteBtn.addEventListener('click', () => this.eliminarImagenActual());
         }
         
-        // Teclado
-        document.addEventListener('keydown', (e) => {
+        // ====================================================================
+        // EVENT LISTENERS DEL MODO ZOOM / INSPECCIÓN
+        // ====================================================================
+        
+        // Botón "Inspeccionar" en la barra de acciones
+        const zoomToggleBtn = this.lightboxContainer.querySelector('.lightbox-zoom-toggle');
+        if (zoomToggleBtn) {
+            zoomToggleBtn.addEventListener('click', () => this.toggleZoom());
+        }
+        
+        // Controles de zoom (visibles solo en modo inspección)
+        const zoomInBtn = this.lightboxContainer.querySelector('.zoom-in-btn');
+        const zoomOutBtn = this.lightboxContainer.querySelector('.zoom-out-btn');
+        const zoomResetBtn = this.lightboxContainer.querySelector('.zoom-reset-btn');
+        const zoomExitBtn = this.lightboxContainer.querySelector('.zoom-exit-btn');
+        
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', () => this.zoomIn());
+        }
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', () => this.zoomOut());
+        }
+        if (zoomResetBtn) {
+            zoomResetBtn.addEventListener('click', () => this.resetZoom());
+        }
+        if (zoomExitBtn) {
+            zoomExitBtn.addEventListener('click', () => this.toggleZoom());
+        }
+        
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // Wheel event para zoom con la rueda del mouse.
+        // Se usa { passive: false } para poder llamar preventDefault() y evitar
+        // que la página haga scroll mientras el usuario hace zoom en la imagen.
+        const imageContainer = this.lightboxContainer.querySelector('.lightbox-image-container');
+        if (imageContainer) {
+            imageContainer.addEventListener('wheel', (e: Event) => {
+                this.handleWheel(e as WheelEvent);
+            }, { passive: false });
+            
+            // Mouse drag para pan
+            imageContainer.addEventListener('mousedown', (e: Event) => {
+                this.handleMouseDown(e as MouseEvent);
+            });
+            
+            // Touch events para pinch-to-zoom y drag táctil
+            imageContainer.addEventListener('touchstart', (e: Event) => {
+                this.handleTouchStart(e as TouchEvent);
+            }, { passive: false });
+            imageContainer.addEventListener('touchmove', (e: Event) => {
+                this.handleTouchMove(e as TouchEvent);
+            }, { passive: false });
+            imageContainer.addEventListener('touchend', (e: Event) => {
+                this.handleTouchEnd(e as TouchEvent);
+            });
+        }
+        
+        // Mouse move y mouse up se escuchan en el document
+        // para capturar el drag incluso si el cursor sale del contenedor
+        document.addEventListener('mousemove', (e: MouseEvent) => {
+            this.handleMouseMove(e);
+        });
+        document.addEventListener('mouseup', (e: MouseEvent) => {
+            this.handleMouseUp(e);
+        });
+        
+        // Doble click en la imagen para toggle rápido de zoom
+        const imgElement = this.lightboxContainer.querySelector('.lightbox-image');
+        if (imgElement) {
+            imgElement.addEventListener('dblclick', (e: Event) => {
+                e.preventDefault();
+                if (!this.isZoomMode) {
+                    // Si no está en modo zoom, activarlo y hacer zoom 2x
+                    this.toggleZoom();
+                    this.setZoom(2);
+                } else if (this.zoomLevel > 1) {
+                    // Si ya tiene zoom, resetear
+                    this.resetZoom();
+                } else {
+                    // Si está en 1x, hacer zoom 2x
+                    this.setZoom(2);
+                }
+            });
+        }
+        
+        // Teclado — extendido con controles de zoom
+        document.addEventListener('keydown', (e: KeyboardEvent) => {
             if (!this.isOpen) return;
             
             switch(e.key) {
                 case 'Escape':
-                    this.close();
+                    // EXPLICACIÓN: Si estamos en modo zoom, Escape sale del zoom.
+                    // Si estamos en modo normal, Escape cierra el lightbox.
+                    if (this.isZoomMode) {
+                        this.toggleZoom();
+                    } else {
+                        this.close();
+                    }
                     break;
                 case 'ArrowLeft':
-                    this.prev();
+                    if (!this.isZoomMode) this.prev();
                     break;
                 case 'ArrowRight':
-                    this.next();
+                    if (!this.isZoomMode) this.next();
+                    break;
+                case '+':
+                case '=':
+                    if (this.isZoomMode) {
+                        e.preventDefault();
+                        this.zoomIn();
+                    }
+                    break;
+                case '-':
+                case '_':
+                    if (this.isZoomMode) {
+                        e.preventDefault();
+                        this.zoomOut();
+                    }
+                    break;
+                case '0':
+                    if (this.isZoomMode) {
+                        e.preventDefault();
+                        this.resetZoom();
+                    }
                     break;
             }
         });
@@ -300,6 +473,11 @@ class GaleriaLightbox {
         this.isOpen = false;
         
         if (!this.lightboxContainer) return;
+        
+        // Si estamos en modo zoom, salir primero
+        if (this.isZoomMode) {
+            this.exitZoomMode();
+        }
         
         // Ocultar lightbox
         this.lightboxContainer.classList.remove('active');
@@ -492,8 +670,408 @@ class GaleriaLightbox {
         this.close();
     }
     
+    // ========================================================================
+    // MÉTODOS DEL MODO ZOOM / INSPECCIÓN
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // El modo zoom permite al usuario ver la imagen en detalle, hacerle zoom
+    // con la rueda del mouse (o pellizco en móvil) y arrastrarla para
+    // inspeccionar cualquier zona. Esto es útil en control de calidad para
+    // revisar defectos, marcas de reparación, etiquetas, etc.
+    // ========================================================================
+    
+    /**
+     * Activa o desactiva el modo inspección (zoom interactivo).
+     * Al activarlo: oculta controles de navegación, muestra controles de zoom.
+     * Al desactivarlo: restaura todo al estado normal.
+     */
+    private toggleZoom(): void {
+        if (this.isZoomMode) {
+            this.exitZoomMode();
+        } else {
+            this.enterZoomMode();
+        }
+    }
+    
+    /**
+     * Entra al modo inspección:
+     * - Agrega la clase CSS 'zoom-active' al contenedor de imagen
+     * - Oculta botones de navegación y barra de info
+     * - Muestra los controles de zoom
+     * - Carga la imagen original (URL de descarga) para máxima resolución
+     */
+    private enterZoomMode(): void {
+        if (!this.lightboxContainer) return;
+        
+        this.isZoomMode = true;
+        this.zoomLevel = 1;
+        this.panX = 0;
+        this.panY = 0;
+        
+        // Agregar clase CSS al contenedor de imagen
+        const imageContainer = this.lightboxContainer.querySelector('.lightbox-image-container');
+        if (imageContainer) {
+            imageContainer.classList.add('zoom-active');
+        }
+        
+        // Agregar clase al contenedor principal para el layout de zoom
+        this.lightboxContainer.classList.add('zoom-mode');
+        
+        // Ocultar navegación prev/next
+        const prevBtn = this.lightboxContainer.querySelector('.lightbox-prev') as HTMLElement;
+        const nextBtn = this.lightboxContainer.querySelector('.lightbox-next') as HTMLElement;
+        if (prevBtn) prevBtn.style.display = 'none';
+        if (nextBtn) nextBtn.style.display = 'none';
+        
+        // Ocultar barra de info y mostrar controles de zoom
+        const infoBar = this.lightboxContainer.querySelector('.lightbox-info') as HTMLElement;
+        const zoomControls = this.lightboxContainer.querySelector('.lightbox-zoom-controls') as HTMLElement;
+        if (infoBar) infoBar.style.display = 'none';
+        if (zoomControls) zoomControls.style.display = 'flex';
+        
+        // EXPLICACIÓN: Cargar la imagen original (full resolution) para que el zoom
+        // muestre detalles reales, no una imagen escalada de baja resolución.
+        const imageData = this.images[this.currentImageIndex];
+        const imgElement = this.lightboxContainer.querySelector('.lightbox-image') as HTMLImageElement;
+        if (imgElement && imageData.urlDescarga) {
+            // Guardar la URL actual (thumbnail/media) por si necesitamos restaurar
+            imgElement.dataset.originalSrc = imgElement.src;
+            
+            // Intentar cargar la imagen original desde la URL de descarga
+            const tempImg = new Image();
+            tempImg.onload = () => {
+                imgElement.src = imageData.urlDescarga;
+            };
+            tempImg.onerror = () => {
+                // Si falla, nos quedamos con la imagen actual
+                console.warn('⚠️ No se pudo cargar la imagen original para zoom');
+            };
+            tempImg.src = imageData.urlDescarga;
+        }
+        
+        // Actualizar indicador de zoom
+        this.updateZoomIndicator();
+        this.applyTransform();
+        
+        console.log('🔍 Modo inspección activado');
+    }
+    
+    /**
+     * Sale del modo inspección y restaura todo al estado normal.
+     */
+    private exitZoomMode(): void {
+        if (!this.lightboxContainer) return;
+        
+        this.isZoomMode = false;
+        this.zoomLevel = 1;
+        this.panX = 0;
+        this.panY = 0;
+        this.isDragging = false;
+        
+        // Remover clase CSS del contenedor de imagen
+        const imageContainer = this.lightboxContainer.querySelector('.lightbox-image-container');
+        if (imageContainer) {
+            imageContainer.classList.remove('zoom-active');
+        }
+        
+        // Remover clase del contenedor principal
+        this.lightboxContainer.classList.remove('zoom-mode');
+        
+        // Restaurar imagen a la URL original (media)
+        const imgElement = this.lightboxContainer.querySelector('.lightbox-image') as HTMLImageElement;
+        if (imgElement && imgElement.dataset.originalSrc) {
+            imgElement.src = imgElement.dataset.originalSrc;
+            delete imgElement.dataset.originalSrc;
+        }
+        
+        // Resetear transform de la imagen
+        if (imgElement) {
+            imgElement.style.transform = '';
+        }
+        
+        // Restaurar navegación prev/next
+        const prevBtn = this.lightboxContainer.querySelector('.lightbox-prev') as HTMLElement;
+        const nextBtn = this.lightboxContainer.querySelector('.lightbox-next') as HTMLElement;
+        if (prevBtn) prevBtn.style.display = '';
+        if (nextBtn) nextBtn.style.display = '';
+        
+        // Restaurar barra de info y ocultar controles de zoom
+        const infoBar = this.lightboxContainer.querySelector('.lightbox-info') as HTMLElement;
+        const zoomControls = this.lightboxContainer.querySelector('.lightbox-zoom-controls') as HTMLElement;
+        if (infoBar) infoBar.style.display = '';
+        if (zoomControls) zoomControls.style.display = 'none';
+        
+        // Actualizar navegación (prev/next) para restaurar su opacidad
+        this.updateNavigation();
+        
+        console.log('🔍 Modo inspección desactivado');
+    }
+    
+    /**
+     * Establece el nivel de zoom a un valor específico.
+     * Aplica la transformación CSS y actualiza el indicador.
+     */
+    private setZoom(level: number): void {
+        // Limitar el zoom entre MIN_ZOOM y MAX_ZOOM
+        this.zoomLevel = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, level));
+        
+        // EXPLICACIÓN: Si el zoom es menor o igual a 1, centrar la imagen
+        // para evitar que quede desplazada sin sentido.
+        if (this.zoomLevel <= 1) {
+            this.panX = 0;
+            this.panY = 0;
+        }
+        
+        this.applyTransform();
+        this.updateZoomIndicator();
+    }
+    
+    /**
+     * Incrementa el zoom un paso.
+     */
+    private zoomIn(): void {
+        this.setZoom(this.zoomLevel + this.ZOOM_STEP);
+    }
+    
+    /**
+     * Decrementa el zoom un paso.
+     */
+    private zoomOut(): void {
+        this.setZoom(this.zoomLevel - this.ZOOM_STEP);
+    }
+    
+    /**
+     * Restablece el zoom a 1x y centra la imagen.
+     */
+    private resetZoom(): void {
+        this.panX = 0;
+        this.panY = 0;
+        this.setZoom(1);
+    }
+    
+    /**
+     * Aplica la transformación CSS (scale + translate) a la imagen.
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * CSS transform con scale() y translate() es GPU-acelerado,
+     * lo que significa que es muy fluido y no causa "lag" al mover.
+     * El orden importa: primero escalamos, luego trasladamos.
+     */
+    private applyTransform(): void {
+        if (!this.lightboxContainer) return;
+        
+        const imgElement = this.lightboxContainer.querySelector('.lightbox-image') as HTMLImageElement;
+        if (!imgElement) return;
+        
+        imgElement.style.transform = `scale(${this.zoomLevel}) translate(${this.panX}px, ${this.panY}px)`;
+    }
+    
+    /**
+     * Actualiza el indicador visual del porcentaje de zoom.
+     */
+    private updateZoomIndicator(): void {
+        if (!this.lightboxContainer) return;
+        
+        const indicator = this.lightboxContainer.querySelector('.zoom-level-indicator');
+        if (indicator) {
+            indicator.textContent = `${Math.round(this.zoomLevel * 100)}%`;
+        }
+    }
+    
+    // ========================================================================
+    // HANDLERS DE EVENTOS DE MOUSE PARA ZOOM
+    // ========================================================================
+    
+    /**
+     * Maneja el evento wheel (rueda del mouse) para hacer zoom.
+     * deltaY negativo = scroll hacia arriba = zoom in
+     * deltaY positivo = scroll hacia abajo = zoom out
+     */
+    private handleWheel(e: WheelEvent): void {
+        if (!this.isZoomMode) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // EXPLICACIÓN: Calculamos un factor de zoom basado en la velocidad del scroll.
+        // Usamos un factor suave para que el zoom sea gradual.
+        const delta = e.deltaY > 0 ? -this.ZOOM_STEP : this.ZOOM_STEP;
+        const newZoom = this.zoomLevel + delta;
+        
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // Queremos hacer zoom hacia donde está el cursor del mouse,
+        // no solo al centro. Para eso calculamos la posición relativa
+        // del cursor dentro de la imagen y ajustamos el pan.
+        if (newZoom >= this.MIN_ZOOM && newZoom <= this.MAX_ZOOM) {
+            const imgElement = this.lightboxContainer?.querySelector('.lightbox-image') as HTMLImageElement;
+            if (imgElement) {
+                const rect = imgElement.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                // Posición del cursor relativa al centro de la imagen
+                const offsetX = (e.clientX - centerX) / this.zoomLevel;
+                const offsetY = (e.clientY - centerY) / this.zoomLevel;
+                
+                // Ajustar pan para que el zoom se centre en el cursor
+                const zoomRatio = newZoom / this.zoomLevel;
+                this.panX -= offsetX * (zoomRatio - 1) / newZoom;
+                this.panY -= offsetY * (zoomRatio - 1) / newZoom;
+            }
+        }
+        
+        this.setZoom(newZoom);
+    }
+    
+    /**
+     * Inicia el arrastre (drag) de la imagen con el mouse.
+     */
+    private handleMouseDown(e: MouseEvent): void {
+        if (!this.isZoomMode) return;
+        
+        // Solo responder al botón izquierdo del mouse
+        if (e.button !== 0) return;
+        
+        e.preventDefault();
+        
+        this.isDragging = true;
+        this.dragStartX = e.clientX;
+        this.dragStartY = e.clientY;
+        this.lastPanX = this.panX;
+        this.lastPanY = this.panY;
+        
+        // Cambiar cursor a "grabbing" (mano cerrada)
+        const imageContainer = this.lightboxContainer?.querySelector('.lightbox-image-container') as HTMLElement;
+        if (imageContainer) {
+            imageContainer.style.cursor = 'grabbing';
+        }
+    }
+    
+    /**
+     * Mueve la imagen mientras se arrastra con el mouse.
+     * EXPLICACIÓN: La traslación se divide entre el zoomLevel para que
+     * el movimiento sea proporcional al nivel de zoom (a más zoom,
+     * se necesita más arrastre para mover la misma distancia visual).
+     */
+    private handleMouseMove(e: MouseEvent): void {
+        if (!this.isDragging || !this.isZoomMode) return;
+        
+        e.preventDefault();
+        
+        const deltaX = (e.clientX - this.dragStartX) / this.zoomLevel;
+        const deltaY = (e.clientY - this.dragStartY) / this.zoomLevel;
+        
+        this.panX = this.lastPanX + deltaX;
+        this.panY = this.lastPanY + deltaY;
+        
+        this.applyTransform();
+    }
+    
+    /**
+     * Finaliza el arrastre con el mouse.
+     */
+    private handleMouseUp(_e: MouseEvent): void {
+        if (!this.isDragging) return;
+        
+        this.isDragging = false;
+        
+        // Restaurar cursor a "grab" (mano abierta)
+        const imageContainer = this.lightboxContainer?.querySelector('.lightbox-image-container') as HTMLElement;
+        if (imageContainer && this.isZoomMode) {
+            imageContainer.style.cursor = '';
+        }
+    }
+    
+    // ========================================================================
+    // HANDLERS DE EVENTOS TÁCTILES PARA MÓVIL
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // En móvil no hay mouse. Los usuarios usan:
+    // - 1 dedo: arrastrar para mover la imagen (pan)
+    // - 2 dedos: pellizcar para zoom (pinch-to-zoom)
+    // ========================================================================
+    
+    /**
+     * Inicia el gesto táctil.
+     * Si hay 1 dedo: inicia drag.
+     * Si hay 2 dedos: inicia pinch-to-zoom.
+     */
+    private handleTouchStart(e: TouchEvent): void {
+        if (!this.isZoomMode) return;
+        
+        if (e.touches.length === 1) {
+            // Un dedo: drag
+            e.preventDefault();
+            const touch = e.touches[0];
+            this.isDragging = true;
+            this.dragStartX = touch.clientX;
+            this.dragStartY = touch.clientY;
+            this.lastPanX = this.panX;
+            this.lastPanY = this.panY;
+        } else if (e.touches.length === 2) {
+            // Dos dedos: pinch-to-zoom
+            e.preventDefault();
+            this.isDragging = false;
+            this.pinchStartDistance = this.getTouchDistance(e.touches[0], e.touches[1]);
+            this.pinchStartZoom = this.zoomLevel;
+        }
+    }
+    
+    /**
+     * Procesa el movimiento del gesto táctil.
+     */
+    private handleTouchMove(e: TouchEvent): void {
+        if (!this.isZoomMode) return;
+        
+        if (e.touches.length === 1 && this.isDragging) {
+            // Un dedo: mover (pan)
+            e.preventDefault();
+            const touch = e.touches[0];
+            const deltaX = (touch.clientX - this.dragStartX) / this.zoomLevel;
+            const deltaY = (touch.clientY - this.dragStartY) / this.zoomLevel;
+            
+            this.panX = this.lastPanX + deltaX;
+            this.panY = this.lastPanY + deltaY;
+            
+            this.applyTransform();
+        } else if (e.touches.length === 2) {
+            // Dos dedos: pinch-to-zoom
+            e.preventDefault();
+            const currentDistance = this.getTouchDistance(e.touches[0], e.touches[1]);
+            
+            if (this.pinchStartDistance > 0) {
+                const scale = currentDistance / this.pinchStartDistance;
+                this.setZoom(this.pinchStartZoom * scale);
+            }
+        }
+    }
+    
+    /**
+     * Finaliza el gesto táctil.
+     */
+    private handleTouchEnd(_e: TouchEvent): void {
+        this.isDragging = false;
+        this.pinchStartDistance = 0;
+    }
+    
+    /**
+     * Calcula la distancia entre dos puntos de contacto táctil.
+     * EXPLICACIÓN: Usamos el teorema de Pitágoras para calcular
+     * la distancia entre los dos dedos del usuario.
+     */
+    private getTouchDistance(touch1: Touch, touch2: Touch): number {
+        const dx = touch1.clientX - touch2.clientX;
+        const dy = touch1.clientY - touch2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    // ========================================================================
+    // FIN DE MÉTODOS DE ZOOM
+    // ========================================================================
+    
     public prev(): void {
         if (this.currentImageIndex > 0) {
+            // Si estamos en modo zoom, salir antes de navegar
+            if (this.isZoomMode) {
+                this.exitZoomMode();
+            }
             this.currentImageIndex--;
             this.loadImage();
             this.updateNavigation();
@@ -502,6 +1080,10 @@ class GaleriaLightbox {
     
     public next(): void {
         if (this.currentImageIndex < this.images.length - 1) {
+            // Si estamos en modo zoom, salir antes de navegar
+            if (this.isZoomMode) {
+                this.exitZoomMode();
+            }
             this.currentImageIndex++;
             this.loadImage();
             this.updateNavigation();
