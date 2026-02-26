@@ -194,6 +194,13 @@ urlpatterns = [
          views.exportar_dashboard_cotizaciones, 
          name='exportar_dashboard_cotizaciones'),
     
+    # Exportación a Excel: Análisis detallado de rechazos
+    # Genera archivo Excel con 7 hojas: resumen rechazos, detalle, por motivo,
+    # por marca/modelo, tiempos de respuesta, "No Hay Partes", piezas rechazadas
+    path('cotizaciones/dashboard/exportar-rechazos/', 
+         views.exportar_analisis_rechazos, 
+         name='exportar_analisis_rechazos'),
+    
     # ========================================================================
     # API: BÚSQUEDA DE ÓRDENES (Noviembre 2025)
     # ========================================================================

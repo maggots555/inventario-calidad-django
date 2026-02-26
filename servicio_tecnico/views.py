@@ -9045,6 +9045,901 @@ def exportar_dashboard_cotizaciones(request):
 
 
 # ============================================================================
+# EXPORTAR ANÁLISIS DETALLADO DE RECHAZOS A EXCEL (7 HOJAS)
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+def exportar_analisis_rechazos(request):
+    """
+    Exporta un análisis exhaustivo de cotizaciones rechazadas a Excel con 7 hojas.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este Excel es el "detalle del detalle" de los rechazos. Mientras que el Excel
+    general del dashboard muestra un resumen de todo, este se enfoca SOLO en rechazos
+    y profundiza en cada ángulo: por motivo, por marca/modelo, tiempos, piezas, etc.
+    
+    Hojas:
+        1. Resumen Rechazos - KPIs específicos de rechazos
+        2. Detalle Rechazos - Cada cotización rechazada con todos los campos
+        3. Rechazos por Motivo - Tabla pivote por motivo de rechazo
+        4. Rechazos por Marca/Modelo - Análisis cruzado marca-modelo
+        5. Tiempo de Respuesta - Análisis temporal de rechazos
+        6. No Hay Partes - Apartado especial para rechazos por falta de partes
+        7. Piezas Rechazadas - Detalle a nivel pieza individual
+    
+    Returns:
+        HttpResponse: Archivo Excel (.xlsx) para descargar
+    """
+    
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils.dataframe import dataframe_to_rows
+    from openpyxl.utils import get_column_letter
+    from datetime import datetime
+    import pandas as pd
+    
+    from .utils_cotizaciones import (
+        obtener_dataframe_cotizaciones,
+        calcular_kpis_generales,
+        analizar_piezas_cotizadas,
+    )
+    from config.constants import MOTIVO_RECHAZO_COTIZACION
+    
+    # ========================================
+    # OBTENER DATOS CON MISMOS FILTROS QUE EL DASHBOARD
+    # ========================================
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    sucursal_id = request.GET.get('sucursal')
+    tecnico_id = request.GET.get('tecnico')
+    gama = request.GET.get('gama')
+    
+    df_cotizaciones = obtener_dataframe_cotizaciones(
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        sucursal_id=sucursal_id,
+        tecnico_id=tecnico_id,
+        gama=gama
+    )
+    
+    if df_cotizaciones.empty:
+        messages.error(request, 'No hay datos para exportar con los filtros aplicados.')
+        return redirect('servicio_tecnico:dashboard_cotizaciones')
+    
+    # Filtrar solo rechazadas
+    df_rechazos = df_cotizaciones[df_cotizaciones['aceptada'] == False].copy()
+    
+    if df_rechazos.empty:
+        messages.warning(request, 'No hay cotizaciones rechazadas en el período seleccionado.')
+        return redirect('servicio_tecnico:dashboard_cotizaciones')
+    
+    # Diccionario de labels legibles para motivos de rechazo
+    labels_motivos = dict(MOTIVO_RECHAZO_COTIZACION)
+    
+    # Obtener piezas de cotizaciones rechazadas
+    cotizacion_ids_rechazos = df_rechazos['cotizacion_id'].tolist()
+    df_piezas = analizar_piezas_cotizadas(cotizacion_ids_rechazos)
+    
+    # Obtener piezas con proveedor directamente del modelo
+    # (analizar_piezas_cotizadas no incluye proveedor)
+    from .models import PiezaCotizada
+    piezas_con_proveedor = PiezaCotizada.objects.filter(
+        cotizacion_id__in=cotizacion_ids_rechazos
+    ).select_related(
+        'componente',
+        'cotizacion',
+        'cotizacion__orden',
+        'cotizacion__orden__detalle_equipo'
+    ).values(
+        'id', 'cotizacion_id', 'componente__nombre',
+        'descripcion_adicional', 'sugerida_por_tecnico', 'es_necesaria',
+        'cantidad', 'costo_unitario', 'proveedor',
+        'aceptada_por_cliente', 'motivo_rechazo_pieza',
+        'cotizacion__orden__detalle_equipo__marca',
+        'cotizacion__orden__detalle_equipo__modelo',
+    )
+    df_piezas_proveedor = pd.DataFrame(list(piezas_con_proveedor))
+    
+    # KPIs generales para comparativa
+    kpis = calcular_kpis_generales(df_cotizaciones)
+    
+    # ========================================
+    # CREAR WORKBOOK
+    # ========================================
+    wb = Workbook()
+    wb.remove(wb.active)
+    
+    # Estilos reutilizables
+    header_font = Font(bold=True, color='FFFFFF', size=11)
+    header_fill = PatternFill(start_color='c0392c', end_color='c0392c', fill_type='solid')
+    header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    
+    title_font = Font(bold=True, size=14, color='FFFFFF')
+    title_fill = PatternFill(start_color='212529', end_color='212529', fill_type='solid')
+    title_align = Alignment(horizontal='center', vertical='center')
+    
+    subtitle_font = Font(italic=True, size=10, color='666666')
+    
+    kpi_label_font = Font(bold=True, size=11)
+    kpi_value_font = Font(bold=True, size=12, color='c0392c')
+    
+    green_fill = PatternFill(start_color='d4edda', end_color='d4edda', fill_type='solid')
+    red_fill = PatternFill(start_color='f8d7da', end_color='f8d7da', fill_type='solid')
+    yellow_fill = PatternFill(start_color='fff3cd', end_color='fff3cd', fill_type='solid')
+    blue_fill = PatternFill(start_color='d1ecf1', end_color='d1ecf1', fill_type='solid')
+    orange_fill = PatternFill(start_color='ffeaa7', end_color='ffeaa7', fill_type='solid')
+    
+    section_font = Font(bold=True, size=12, color='2c3e50')
+    section_fill = PatternFill(start_color='ecf0f1', end_color='ecf0f1', fill_type='solid')
+    
+    # Texto de filtros para subtítulos
+    filtros_texto = f"Período: {fecha_inicio or 'Inicio'} - {fecha_fin or 'Hoy'}"
+    if sucursal_id:
+        filtros_texto += f" | Sucursal ID: {sucursal_id}"
+    if tecnico_id:
+        filtros_texto += f" | Técnico ID: {tecnico_id}"
+    if gama:
+        filtros_texto += f" | Gama: {gama}"
+    
+    # Función auxiliar para escribir título y subtítulo en cada hoja
+    def escribir_encabezado_hoja(ws, titulo, num_cols=8):
+        ultimo_col = get_column_letter(num_cols)
+        ws.merge_cells(f'A1:{ultimo_col}1')
+        cell = ws['A1']
+        cell.value = titulo
+        cell.font = title_font
+        cell.fill = title_fill
+        cell.alignment = title_align
+        ws.row_dimensions[1].height = 30
+        
+        ws.merge_cells(f'A2:{ultimo_col}2')
+        ws['A2'].value = f"{filtros_texto} | Generado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+        ws['A2'].font = subtitle_font
+        ws['A2'].alignment = Alignment(horizontal='center')
+    
+    # Función auxiliar para escribir encabezados de tabla
+    def escribir_headers(ws, headers, fila, fill=None):
+        fill_usar = fill or header_fill
+        for col_idx, header_text in enumerate(headers, 1):
+            cell = ws.cell(row=fila, column=col_idx, value=header_text)
+            cell.font = header_font
+            cell.fill = fill_usar
+            cell.alignment = header_align
+    
+    # Función auxiliar para auto-ajustar columnas
+    def autoajustar_columnas(ws, min_width=10, max_width=45):
+        for col_idx, column_cells in enumerate(ws.columns, 1):
+            max_length = min_width
+            col_letter = get_column_letter(col_idx)
+            for cell in column_cells:
+                try:
+                    if cell.value and len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[col_letter].width = min(max_length + 2, max_width)
+    
+    # ========================================
+    # HOJA 1: RESUMEN RECHAZOS (KPIs)
+    # ========================================
+    ws1 = wb.create_sheet("Resumen Rechazos")
+    escribir_encabezado_hoja(ws1, "ANÁLISIS DETALLADO DE RECHAZOS - RESUMEN", 4)
+    
+    # Sección 1: KPIs principales
+    ws1.merge_cells('A4:D4')
+    ws1['A4'].value = "INDICADORES PRINCIPALES"
+    ws1['A4'].font = section_font
+    ws1['A4'].fill = section_fill
+    
+    escribir_headers(ws1, ['Métrica', 'Valor', 'Porcentaje', 'Observaciones'], 5)
+    
+    total_rechazos = len(df_rechazos)
+    total_cotizaciones = len(df_cotizaciones)
+    pct_rechazos = (total_rechazos / total_cotizaciones * 100) if total_cotizaciones > 0 else 0
+    valor_perdido = df_rechazos['costo_total'].sum()
+    valor_total = df_cotizaciones['costo_total'].sum()
+    pct_valor_perdido = (valor_perdido / valor_total * 100) if valor_total > 0 else 0
+    ticket_prom_rechazo = df_rechazos['costo_total'].mean()
+    ticket_prom_aceptado = df_cotizaciones[df_cotizaciones['aceptada'] == True]['costo_total'].mean() if len(df_cotizaciones[df_cotizaciones['aceptada'] == True]) > 0 else 0
+    
+    # Tiempo respuesta rechazos vs aceptados
+    df_rechazos_con_resp = df_rechazos[df_rechazos['fecha_respuesta'].notna()]
+    tiempo_resp_rechazos = df_rechazos_con_resp['dias_sin_respuesta'].mean() if len(df_rechazos_con_resp) > 0 else 0
+    
+    df_aceptados = df_cotizaciones[df_cotizaciones['aceptada'] == True]
+    df_aceptados_con_resp = df_aceptados[df_aceptados['fecha_respuesta'].notna()]
+    tiempo_resp_aceptados = df_aceptados_con_resp['dias_sin_respuesta'].mean() if len(df_aceptados_con_resp) > 0 else 0
+    
+    kpis_data = [
+        ['Total Cotizaciones (todas)', total_cotizaciones, '', 'Base de referencia'],
+        ['Total Rechazadas', total_rechazos, f'{pct_rechazos:.1f}%', 'Objetivo: < 30%'],
+        ['Total Aceptadas', kpis.get('aceptadas', 0), f"{kpis.get('tasa_aceptacion', 0):.1f}%", ''],
+        ['Valor Total Perdido', f'${valor_perdido:,.2f}', f'{pct_valor_perdido:.1f}% del total', 'Oportunidad de recuperación'],
+        ['Ticket Promedio (Rechazos)', f'${ticket_prom_rechazo:,.2f}', '', ''],
+        ['Ticket Promedio (Aceptados)', f'${ticket_prom_aceptado:,.2f}', '', 'Comparar con rechazos'],
+        ['Tiempo Resp. Prom (Rechazos)', f'{tiempo_resp_rechazos:.1f} días', '', ''],
+        ['Tiempo Resp. Prom (Aceptados)', f'{tiempo_resp_aceptados:.1f} días', '', 'Comparar con rechazos'],
+        ['Piezas Prom. por Rechazo', f'{df_rechazos["total_piezas"].mean():.1f}', '', ''],
+    ]
+    
+    for i, data in enumerate(kpis_data):
+        row = 6 + i
+        ws1.cell(row=row, column=1, value=data[0]).font = kpi_label_font
+        ws1.cell(row=row, column=2, value=data[1]).font = kpi_value_font
+        ws1.cell(row=row, column=3, value=data[2])
+        ws1.cell(row=row, column=4, value=data[3])
+    
+    # Sección 2: Top Motivos
+    fila_motivos = 6 + len(kpis_data) + 2
+    ws1.merge_cells(f'A{fila_motivos}:D{fila_motivos}')
+    ws1[f'A{fila_motivos}'].value = "TOP MOTIVOS DE RECHAZO"
+    ws1[f'A{fila_motivos}'].font = section_font
+    ws1[f'A{fila_motivos}'].fill = section_fill
+    
+    escribir_headers(ws1, ['Motivo', 'Cantidad', '% de Rechazos', 'Valor Perdido'], fila_motivos + 1)
+    
+    motivos_conteo = df_rechazos['motivo_rechazo'].value_counts()
+    fila = fila_motivos + 2
+    for motivo, conteo in motivos_conteo.items():
+        label = labels_motivos.get(motivo, str(motivo).replace('_', ' ').title()) if motivo else 'Sin motivo especificado'
+        pct = (conteo / total_rechazos * 100) if total_rechazos > 0 else 0
+        valor = df_rechazos[df_rechazos['motivo_rechazo'] == motivo]['costo_total'].sum()
+        
+        ws1.cell(row=fila, column=1, value=label)
+        ws1.cell(row=fila, column=2, value=conteo)
+        ws1.cell(row=fila, column=3, value=f'{pct:.1f}%')
+        ws1.cell(row=fila, column=4, value=f'${valor:,.2f}')
+        
+        # Colorear según criticidad
+        if pct >= 25:
+            ws1.cell(row=fila, column=1).fill = red_fill
+        elif pct >= 15:
+            ws1.cell(row=fila, column=1).fill = yellow_fill
+        
+        fila += 1
+    
+    # Sección 3: Top Marcas rechazadas
+    fila_marcas = fila + 2
+    ws1.merge_cells(f'A{fila_marcas}:D{fila_marcas}')
+    ws1[f'A{fila_marcas}'].value = "TOP MARCAS CON MÁS RECHAZOS"
+    ws1[f'A{fila_marcas}'].font = section_font
+    ws1[f'A{fila_marcas}'].fill = section_fill
+    
+    escribir_headers(ws1, ['Marca', 'Rechazos', '% del Total', 'Tasa de Rechazo'], fila_marcas + 1)
+    
+    marcas_rechazos = df_rechazos['marca'].value_counts().head(10)
+    fila = fila_marcas + 2
+    for marca, conteo in marcas_rechazos.items():
+        total_marca = len(df_cotizaciones[df_cotizaciones['marca'] == marca])
+        tasa = (conteo / total_marca * 100) if total_marca > 0 else 0
+        pct = (conteo / total_rechazos * 100) if total_rechazos > 0 else 0
+        
+        ws1.cell(row=fila, column=1, value=marca or 'Sin marca')
+        ws1.cell(row=fila, column=2, value=conteo)
+        ws1.cell(row=fila, column=3, value=f'{pct:.1f}%')
+        ws1.cell(row=fila, column=4, value=f'{tasa:.1f}%')
+        
+        if tasa >= 50:
+            ws1.cell(row=fila, column=4).fill = red_fill
+        fila += 1
+    
+    ws1.column_dimensions['A'].width = 40
+    ws1.column_dimensions['B'].width = 22
+    ws1.column_dimensions['C'].width = 18
+    ws1.column_dimensions['D'].width = 30
+    
+    # ========================================
+    # HOJA 2: DETALLE RECHAZOS (cada cotización rechazada)
+    # ========================================
+    ws2 = wb.create_sheet("Detalle Rechazos")
+    escribir_encabezado_hoja(ws2, f"DETALLE DE COTIZACIONES RECHAZADAS ({total_rechazos} registros)", 16)
+    
+    headers_detalle = [
+        'Orden Cliente', 'Número Serie',
+        'Marca', 'Modelo', 'Tipo Equipo', 'Gama',
+        'Sucursal', 'Técnico', 'Responsable',
+        'Motivo Rechazo', 'Detalle Rechazo',
+        'Fecha Envío', 'Fecha Respuesta', 'Días Respuesta',
+        'Costo Total', 'Costo Piezas', 'Costo Mano Obra',
+        'Total Piezas', 'Piezas Necesarias'
+    ]
+    escribir_headers(ws2, headers_detalle, 4)
+    
+    fila = 5
+    for _, rec in df_rechazos.iterrows():
+        motivo_label = labels_motivos.get(rec.get('motivo_rechazo', ''), str(rec.get('motivo_rechazo', '')).replace('_', ' ').title()) if rec.get('motivo_rechazo') else 'Sin motivo'
+        
+        fecha_envio_str = ''
+        if pd.notna(rec.get('fecha_envio')):
+            try:
+                fecha_envio_str = pd.to_datetime(rec['fecha_envio']).strftime('%d/%m/%Y')
+            except:
+                fecha_envio_str = str(rec['fecha_envio'])
+        
+        fecha_resp_str = ''
+        if pd.notna(rec.get('fecha_respuesta')):
+            try:
+                fecha_resp_str = pd.to_datetime(rec['fecha_respuesta']).strftime('%d/%m/%Y')
+            except:
+                fecha_resp_str = str(rec['fecha_respuesta'])
+        
+        valores = [
+            rec.get('orden_cliente', ''),
+            rec.get('numero_serie', ''),
+            rec.get('marca', ''),
+            rec.get('modelo', ''),
+            rec.get('tipo_equipo', ''),
+            rec.get('gama', ''),
+            rec.get('sucursal', ''),
+            rec.get('tecnico', ''),
+            rec.get('responsable', ''),
+            motivo_label,
+            rec.get('detalle_rechazo', ''),
+            fecha_envio_str,
+            fecha_resp_str,
+            rec.get('dias_sin_respuesta', ''),
+            f"${rec.get('costo_total', 0):,.2f}",
+            f"${rec.get('costo_total_piezas', 0):,.2f}",
+            f"${rec.get('costo_mano_obra', 0):,.2f}",
+            rec.get('total_piezas', 0),
+            rec.get('piezas_necesarias', 0),
+        ]
+        
+        for col_idx, val in enumerate(valores, 1):
+            ws2.cell(row=fila, column=col_idx, value=val)
+        
+        fila += 1
+    
+    autoajustar_columnas(ws2, max_width=40)
+    # Limitar ancho de la columna de detalle de rechazo
+    ws2.column_dimensions['L'].width = 50
+    
+    # ========================================
+    # HOJA 3: RECHAZOS POR MOTIVO (tabla pivote)
+    # ========================================
+    ws3 = wb.create_sheet("Rechazos por Motivo")
+    escribir_encabezado_hoja(ws3, "ANÁLISIS DETALLADO POR MOTIVO DE RECHAZO", 10)
+    
+    headers_motivo = [
+        'Motivo de Rechazo', 'Cantidad', '% de Rechazos',
+        'Costo Promedio', 'Costo Mediana', 'Costo Mínimo', 'Costo Máximo',
+        'Tiempo Resp. Prom (días)', 'Top 3 Marcas', 'Top 3 Sucursales'
+    ]
+    escribir_headers(ws3, headers_motivo, 4)
+    
+    fila = 5
+    for motivo, conteo in motivos_conteo.items():
+        df_motivo = df_rechazos[df_rechazos['motivo_rechazo'] == motivo]
+        label = labels_motivos.get(motivo, str(motivo).replace('_', ' ').title()) if motivo else 'Sin motivo'
+        pct = (conteo / total_rechazos * 100) if total_rechazos > 0 else 0
+        
+        costo_promedio = df_motivo['costo_total'].mean()
+        costo_mediana = df_motivo['costo_total'].median()
+        costo_min = df_motivo['costo_total'].min()
+        costo_max = df_motivo['costo_total'].max()
+        
+        # Tiempo de respuesta promedio para este motivo
+        df_motivo_resp = df_motivo[df_motivo['fecha_respuesta'].notna()]
+        tiempo_resp = df_motivo_resp['dias_sin_respuesta'].mean() if len(df_motivo_resp) > 0 else 0
+        
+        # Top 3 marcas
+        top_marcas = df_motivo['marca'].value_counts().head(3)
+        marcas_str = ', '.join([f"{m} ({c})" for m, c in top_marcas.items()]) if len(top_marcas) > 0 else 'N/A'
+        
+        # Top 3 sucursales
+        top_sucursales = df_motivo['sucursal'].value_counts().head(3)
+        sucursales_str = ', '.join([f"{s} ({c})" for s, c in top_sucursales.items()]) if len(top_sucursales) > 0 else 'N/A'
+        
+        valores = [
+            label, conteo, f'{pct:.1f}%',
+            f'${costo_promedio:,.2f}', f'${costo_mediana:,.2f}',
+            f'${costo_min:,.2f}', f'${costo_max:,.2f}',
+            f'{tiempo_resp:.1f}',
+            marcas_str, sucursales_str
+        ]
+        
+        for col_idx, val in enumerate(valores, 1):
+            ws3.cell(row=fila, column=col_idx, value=val)
+        
+        # Colorear filas críticas
+        if pct >= 25:
+            for col_idx in range(1, len(valores) + 1):
+                ws3.cell(row=fila, column=col_idx).fill = red_fill
+        elif pct >= 15:
+            for col_idx in range(1, len(valores) + 1):
+                ws3.cell(row=fila, column=col_idx).fill = yellow_fill
+        
+        fila += 1
+    
+    autoajustar_columnas(ws3, max_width=50)
+    
+    # ========================================
+    # HOJA 4: RECHAZOS POR MARCA/MODELO
+    # ========================================
+    ws4 = wb.create_sheet("Rechazos Marca-Modelo")
+    escribir_encabezado_hoja(ws4, "ANÁLISIS DE RECHAZOS POR MARCA Y MODELO", 8)
+    
+    headers_marca = [
+        'Marca', 'Modelo', 'Total Cotizaciones', 'Rechazadas',
+        'Tasa de Rechazo', 'Motivo Más Común', 'Costo Prom. Rechazado',
+        'Valor Total Perdido'
+    ]
+    escribir_headers(ws4, headers_marca, 4)
+    
+    # Agrupar por marca-modelo
+    marcas_modelos = df_rechazos.groupby(['marca', 'modelo']).agg(
+        rechazadas=('cotizacion_id', 'count'),
+        costo_promedio=('costo_total', 'mean'),
+        valor_total=('costo_total', 'sum'),
+    ).reset_index()
+    
+    # Para cada marca-modelo, calcular total cotizaciones y motivo más común
+    fila = 5
+    for _, row_mm in marcas_modelos.sort_values('rechazadas', ascending=False).iterrows():
+        marca = row_mm['marca'] or 'Sin marca'
+        modelo = row_mm['modelo'] or 'Sin modelo'
+        rechazadas = row_mm['rechazadas']
+        
+        # Total cotizaciones (aceptadas + rechazadas + pendientes) para este marca-modelo
+        total_marca_modelo = len(df_cotizaciones[
+            (df_cotizaciones['marca'] == row_mm['marca']) & 
+            (df_cotizaciones['modelo'] == row_mm['modelo'])
+        ])
+        tasa_rechazo = (rechazadas / total_marca_modelo * 100) if total_marca_modelo > 0 else 0
+        
+        # Motivo más común para este marca-modelo
+        df_mm = df_rechazos[
+            (df_rechazos['marca'] == row_mm['marca']) & 
+            (df_rechazos['modelo'] == row_mm['modelo'])
+        ]
+        motivo_comun = df_mm['motivo_rechazo'].mode()
+        motivo_label = labels_motivos.get(motivo_comun.iloc[0], str(motivo_comun.iloc[0]).replace('_', ' ').title()) if len(motivo_comun) > 0 and motivo_comun.iloc[0] else 'N/A'
+        
+        valores = [
+            marca, modelo, total_marca_modelo, rechazadas,
+            f'{tasa_rechazo:.1f}%', motivo_label,
+            f'${row_mm["costo_promedio"]:,.2f}',
+            f'${row_mm["valor_total"]:,.2f}'
+        ]
+        
+        for col_idx, val in enumerate(valores, 1):
+            ws4.cell(row=fila, column=col_idx, value=val)
+        
+        if tasa_rechazo >= 70:
+            for col_idx in range(1, len(valores) + 1):
+                ws4.cell(row=fila, column=col_idx).fill = red_fill
+        elif tasa_rechazo >= 50:
+            for col_idx in range(1, len(valores) + 1):
+                ws4.cell(row=fila, column=col_idx).fill = yellow_fill
+        
+        fila += 1
+    
+    autoajustar_columnas(ws4)
+    
+    # ========================================
+    # HOJA 5: TIEMPO DE RESPUESTA
+    # ========================================
+    ws5 = wb.create_sheet("Tiempo de Respuesta")
+    escribir_encabezado_hoja(ws5, "ANÁLISIS DE TIEMPOS DE RESPUESTA EN RECHAZOS", 6)
+    
+    # Sección 1: Rangos de tiempo vs tasa de rechazo
+    ws5.merge_cells('A4:F4')
+    ws5[f'A4'].value = "RANGOS DE TIEMPO DE RESPUESTA vs RESULTADO"
+    ws5[f'A4'].font = section_font
+    ws5[f'A4'].fill = section_fill
+    
+    headers_tiempo = [
+        'Rango (días)', 'Total Cotizaciones', 'Aceptadas', 'Rechazadas',
+        'Tasa Aceptación', 'Tasa Rechazo'
+    ]
+    escribir_headers(ws5, headers_tiempo, 5)
+    
+    # Solo cotizaciones con respuesta
+    df_con_respuesta = df_cotizaciones[df_cotizaciones['fecha_respuesta'].notna()].copy()
+    
+    rangos = [
+        ('0-2 días', 0, 2),
+        ('3-5 días', 3, 5),
+        ('6-10 días', 6, 10),
+        ('11-15 días', 11, 15),
+        ('16-30 días', 16, 30),
+        ('31+ días', 31, 9999),
+    ]
+    
+    fila = 6
+    for label_rango, min_dias, max_dias in rangos:
+        df_rango = df_con_respuesta[
+            (df_con_respuesta['dias_sin_respuesta'] >= min_dias) & 
+            (df_con_respuesta['dias_sin_respuesta'] <= max_dias)
+        ]
+        total_rango = len(df_rango)
+        aceptadas_rango = len(df_rango[df_rango['aceptada'] == True])
+        rechazadas_rango = len(df_rango[df_rango['aceptada'] == False])
+        tasa_acep = (aceptadas_rango / total_rango * 100) if total_rango > 0 else 0
+        tasa_rech = (rechazadas_rango / total_rango * 100) if total_rango > 0 else 0
+        
+        ws5.cell(row=fila, column=1, value=label_rango)
+        ws5.cell(row=fila, column=2, value=total_rango)
+        ws5.cell(row=fila, column=3, value=aceptadas_rango)
+        ws5.cell(row=fila, column=4, value=rechazadas_rango)
+        ws5.cell(row=fila, column=5, value=f'{tasa_acep:.1f}%')
+        ws5.cell(row=fila, column=6, value=f'{tasa_rech:.1f}%')
+        
+        if tasa_rech >= 60:
+            ws5.cell(row=fila, column=6).fill = red_fill
+        elif tasa_rech >= 40:
+            ws5.cell(row=fila, column=6).fill = yellow_fill
+        else:
+            ws5.cell(row=fila, column=6).fill = green_fill
+        
+        fila += 1
+    
+    # Sección 2: Tiempo promedio por motivo
+    fila += 2
+    ws5.merge_cells(f'A{fila}:F{fila}')
+    ws5[f'A{fila}'].value = "TIEMPO PROMEDIO DE RESPUESTA POR MOTIVO DE RECHAZO"
+    ws5[f'A{fila}'].font = section_font
+    ws5[f'A{fila}'].fill = section_fill
+    fila += 1
+    
+    escribir_headers(ws5, ['Motivo', 'Casos con Respuesta', 'Tiempo Promedio (días)', 'Tiempo Mediana (días)', 'Tiempo Mínimo', 'Tiempo Máximo'], fila)
+    fila += 1
+    
+    for motivo, _ in motivos_conteo.items():
+        df_motivo_resp = df_rechazos[
+            (df_rechazos['motivo_rechazo'] == motivo) & 
+            (df_rechazos['fecha_respuesta'].notna())
+        ]
+        if len(df_motivo_resp) == 0:
+            continue
+        
+        label = labels_motivos.get(motivo, str(motivo).replace('_', ' ').title()) if motivo else 'Sin motivo'
+        
+        ws5.cell(row=fila, column=1, value=label)
+        ws5.cell(row=fila, column=2, value=len(df_motivo_resp))
+        ws5.cell(row=fila, column=3, value=f'{df_motivo_resp["dias_sin_respuesta"].mean():.1f}')
+        ws5.cell(row=fila, column=4, value=f'{df_motivo_resp["dias_sin_respuesta"].median():.1f}')
+        ws5.cell(row=fila, column=5, value=f'{df_motivo_resp["dias_sin_respuesta"].min():.0f}')
+        ws5.cell(row=fila, column=6, value=f'{df_motivo_resp["dias_sin_respuesta"].max():.0f}')
+        fila += 1
+    
+    # Sección 3: Tiempo por sucursal (solo rechazos)
+    fila += 2
+    ws5.merge_cells(f'A{fila}:F{fila}')
+    ws5[f'A{fila}'].value = "TIEMPO DE RESPUESTA EN RECHAZOS POR SUCURSAL"
+    ws5[f'A{fila}'].font = section_font
+    ws5[f'A{fila}'].fill = section_fill
+    fila += 1
+    
+    escribir_headers(ws5, ['Sucursal', 'Total Rechazos', 'Con Respuesta', 'Tiempo Promedio (días)', 'Sin Respuesta', '% Sin Respuesta'], fila)
+    fila += 1
+    
+    for sucursal in df_rechazos['sucursal'].unique():
+        df_suc = df_rechazos[df_rechazos['sucursal'] == sucursal]
+        df_suc_resp = df_suc[df_suc['fecha_respuesta'].notna()]
+        sin_resp = len(df_suc) - len(df_suc_resp)
+        pct_sin = (sin_resp / len(df_suc) * 100) if len(df_suc) > 0 else 0
+        tiempo_prom = df_suc_resp['dias_sin_respuesta'].mean() if len(df_suc_resp) > 0 else 0
+        
+        ws5.cell(row=fila, column=1, value=sucursal)
+        ws5.cell(row=fila, column=2, value=len(df_suc))
+        ws5.cell(row=fila, column=3, value=len(df_suc_resp))
+        ws5.cell(row=fila, column=4, value=f'{tiempo_prom:.1f}')
+        ws5.cell(row=fila, column=5, value=sin_resp)
+        ws5.cell(row=fila, column=6, value=f'{pct_sin:.1f}%')
+        fila += 1
+    
+    # Sección 4: Tiempo por técnico (solo rechazos)
+    fila += 2
+    ws5.merge_cells(f'A{fila}:F{fila}')
+    ws5[f'A{fila}'].value = "TIEMPO DE RESPUESTA EN RECHAZOS POR TÉCNICO"
+    ws5[f'A{fila}'].font = section_font
+    ws5[f'A{fila}'].fill = section_fill
+    fila += 1
+    
+    escribir_headers(ws5, ['Técnico', 'Total Rechazos', 'Con Respuesta', 'Tiempo Promedio (días)', 'Sin Respuesta', '% Sin Respuesta'], fila)
+    fila += 1
+    
+    for tecnico in df_rechazos['tecnico'].unique():
+        df_tec = df_rechazos[df_rechazos['tecnico'] == tecnico]
+        df_tec_resp = df_tec[df_tec['fecha_respuesta'].notna()]
+        sin_resp = len(df_tec) - len(df_tec_resp)
+        pct_sin = (sin_resp / len(df_tec) * 100) if len(df_tec) > 0 else 0
+        tiempo_prom = df_tec_resp['dias_sin_respuesta'].mean() if len(df_tec_resp) > 0 else 0
+        
+        ws5.cell(row=fila, column=1, value=tecnico)
+        ws5.cell(row=fila, column=2, value=len(df_tec))
+        ws5.cell(row=fila, column=3, value=len(df_tec_resp))
+        ws5.cell(row=fila, column=4, value=f'{tiempo_prom:.1f}')
+        ws5.cell(row=fila, column=5, value=sin_resp)
+        ws5.cell(row=fila, column=6, value=f'{pct_sin:.1f}%')
+        fila += 1
+    
+    autoajustar_columnas(ws5)
+    
+    # ========================================
+    # HOJA 6: NO HAY PARTES (Apartado especial)
+    # ========================================
+    ws6 = wb.create_sheet("No Hay Partes")
+    no_hay_partes_fill = PatternFill(start_color='e74c3c', end_color='e74c3c', fill_type='solid')
+    
+    escribir_encabezado_hoja(ws6, "ANÁLISIS ESPECIAL: RECHAZOS POR FALTA DE PARTES EN EL MERCADO", 10)
+    
+    df_no_partes = df_rechazos[df_rechazos['motivo_rechazo'] == 'no_hay_partes'].copy()
+    
+    # KPIs de "No Hay Partes"
+    ws6.merge_cells('A4:J4')
+    ws6['A4'].value = "INDICADORES - NO HAY PARTES DISPONIBLES"
+    ws6['A4'].font = Font(bold=True, size=12, color='FFFFFF')
+    ws6['A4'].fill = no_hay_partes_fill
+    ws6['A4'].alignment = Alignment(horizontal='center')
+    
+    total_no_partes = len(df_no_partes)
+    pct_de_rechazos = (total_no_partes / total_rechazos * 100) if total_rechazos > 0 else 0
+    pct_de_total = (total_no_partes / total_cotizaciones * 100) if total_cotizaciones > 0 else 0
+    valor_perdido_partes = df_no_partes['costo_total'].sum() if total_no_partes > 0 else 0
+    
+    kpis_partes = [
+        ['Casos "No Hay Partes"', total_no_partes],
+        ['% de Todos los Rechazos', f'{pct_de_rechazos:.1f}%'],
+        ['% del Total de Cotizaciones', f'{pct_de_total:.1f}%'],
+        ['Valor Perdido por Falta de Partes', f'${valor_perdido_partes:,.2f}'],
+    ]
+    
+    if total_no_partes > 0:
+        kpis_partes.extend([
+            ['Costo Promedio de Cotización', f'${df_no_partes["costo_total"].mean():,.2f}'],
+            ['Piezas Promedio por Orden', f'{df_no_partes["total_piezas"].mean():.1f}'],
+        ])
+    
+    for i, (kpi_label, kpi_val) in enumerate(kpis_partes):
+        row_num = 6 + i
+        ws6.cell(row=row_num, column=1, value=kpi_label).font = kpi_label_font
+        ws6.cell(row=row_num, column=2, value=kpi_val).font = kpi_value_font
+    
+    if total_no_partes > 0:
+        # Sección: Detalle de cada caso
+        fila = 6 + len(kpis_partes) + 2
+        ws6.merge_cells(f'A{fila}:J{fila}')
+        ws6[f'A{fila}'].value = "DETALLE DE CASOS - NO HAY PARTES"
+        ws6[f'A{fila}'].font = section_font
+        ws6[f'A{fila}'].fill = section_fill
+        fila += 1
+        
+        headers_np = [
+            'Orden Cliente', 'Marca', 'Modelo', 'Tipo Equipo', 'Gama',
+            'Sucursal', 'Técnico', 'Costo Total', 'Total Piezas', 'Detalle Rechazo'
+        ]
+        escribir_headers(ws6, headers_np, fila)
+        fila += 1
+        
+        for _, rec in df_no_partes.iterrows():
+            ws6.cell(row=fila, column=1, value=rec.get('orden_cliente', ''))
+            ws6.cell(row=fila, column=2, value=rec.get('marca', ''))
+            ws6.cell(row=fila, column=3, value=rec.get('modelo', ''))
+            ws6.cell(row=fila, column=4, value=rec.get('tipo_equipo', ''))
+            ws6.cell(row=fila, column=5, value=rec.get('gama', ''))
+            ws6.cell(row=fila, column=6, value=rec.get('sucursal', ''))
+            ws6.cell(row=fila, column=7, value=rec.get('tecnico', ''))
+            ws6.cell(row=fila, column=8, value=f"${rec.get('costo_total', 0):,.2f}")
+            ws6.cell(row=fila, column=9, value=rec.get('total_piezas', 0))
+            ws6.cell(row=fila, column=10, value=rec.get('detalle_rechazo', ''))
+            fila += 1
+        
+        # Sección: Top Marcas afectadas
+        fila += 2
+        ws6.merge_cells(f'A{fila}:J{fila}')
+        ws6[f'A{fila}'].value = "MARCAS MÁS AFECTADAS POR FALTA DE PARTES"
+        ws6[f'A{fila}'].font = section_font
+        ws6[f'A{fila}'].fill = section_fill
+        fila += 1
+        
+        escribir_headers(ws6, ['Marca', 'Casos', '% del Total "No Hay Partes"', 'Modelos Afectados', '', '', '', '', '', ''], fila)
+        fila += 1
+        
+        marcas_np = df_no_partes['marca'].value_counts()
+        for marca, conteo in marcas_np.items():
+            modelos_afectados = df_no_partes[df_no_partes['marca'] == marca]['modelo'].unique()
+            modelos_str = ', '.join([str(m) for m in modelos_afectados[:5]])
+            pct = (conteo / total_no_partes * 100) if total_no_partes > 0 else 0
+            
+            ws6.cell(row=fila, column=1, value=marca or 'Sin marca')
+            ws6.cell(row=fila, column=2, value=conteo)
+            ws6.cell(row=fila, column=3, value=f'{pct:.1f}%')
+            ws6.cell(row=fila, column=4, value=modelos_str)
+            fila += 1
+        
+        # Sección: Piezas que se necesitaban (del modelo PiezaCotizada)
+        if not df_piezas_proveedor.empty:
+            # Filtrar piezas de cotizaciones "no hay partes"
+            ids_no_partes = df_no_partes['cotizacion_id'].tolist()
+            df_piezas_np = df_piezas_proveedor[
+                df_piezas_proveedor['cotizacion_id'].isin(ids_no_partes)
+            ]
+            
+            if not df_piezas_np.empty:
+                fila += 2
+                ws6.merge_cells(f'A{fila}:J{fila}')
+                ws6[f'A{fila}'].value = "PIEZAS QUE SE NECESITABAN (No encontradas en el mercado)"
+                ws6[f'A{fila}'].font = section_font
+                ws6[f'A{fila}'].fill = section_fill
+                fila += 1
+                
+                escribir_headers(ws6, ['Componente', 'Cant. Veces Solicitada', 'Marca Equipo', 'Modelo Equipo', 'Proveedor', 'Costo Unit. Promedio', 'Es Necesaria', '', '', ''], fila)
+                fila += 1
+                
+                # Agrupar piezas por componente
+                piezas_agrupadas = df_piezas_np.groupby('componente__nombre').agg(
+                    veces=('id', 'count'),
+                    costo_prom=('costo_unitario', 'mean'),
+                    marcas=('cotizacion__orden__detalle_equipo__marca', lambda x: ', '.join(x.dropna().unique()[:3])),
+                    modelos=('cotizacion__orden__detalle_equipo__modelo', lambda x: ', '.join(x.dropna().unique()[:3])),
+                    proveedores=('proveedor', lambda x: ', '.join([str(p) for p in x.dropna().unique()[:3]]) if x.notna().any() else 'N/A'),
+                    necesaria=('es_necesaria', 'mean'),
+                ).reset_index().sort_values('veces', ascending=False)
+                
+                for _, pieza_row in piezas_agrupadas.iterrows():
+                    ws6.cell(row=fila, column=1, value=pieza_row['componente__nombre'])
+                    ws6.cell(row=fila, column=2, value=pieza_row['veces'])
+                    ws6.cell(row=fila, column=3, value=pieza_row['marcas'])
+                    ws6.cell(row=fila, column=4, value=pieza_row['modelos'])
+                    ws6.cell(row=fila, column=5, value=pieza_row['proveedores'])
+                    ws6.cell(row=fila, column=6, value=f"${pieza_row['costo_prom']:,.2f}")
+                    es_nec_pct = pieza_row['necesaria'] * 100
+                    ws6.cell(row=fila, column=7, value=f'{es_nec_pct:.0f}% necesaria')
+                    fila += 1
+        
+        # Sección: Tendencia mensual
+        fila += 2
+        ws6.merge_cells(f'A{fila}:J{fila}')
+        ws6[f'A{fila}'].value = "TENDENCIA MENSUAL: ¿ESTÁ MEJORANDO O EMPEORANDO?"
+        ws6[f'A{fila}'].font = section_font
+        ws6[f'A{fila}'].fill = section_fill
+        fila += 1
+        
+        escribir_headers(ws6, ['Mes', 'Casos "No Hay Partes"', 'Total Rechazos del Mes', '% del Mes', 'Tendencia', '', '', '', '', ''], fila)
+        fila += 1
+        
+        # Agrupar por mes
+        if 'fecha_envio' in df_no_partes.columns and len(df_no_partes) > 0:
+            df_no_partes['mes_periodo'] = pd.to_datetime(df_no_partes['fecha_envio']).dt.to_period('M')
+            df_rechazos_temp = df_rechazos.copy()
+            df_rechazos_temp['mes_periodo'] = pd.to_datetime(df_rechazos_temp['fecha_envio']).dt.to_period('M')
+            
+            meses_np = df_no_partes.groupby('mes_periodo').size()
+            meses_total_rech = df_rechazos_temp.groupby('mes_periodo').size()
+            
+            prev_count = None
+            for mes in sorted(meses_np.index):
+                count = meses_np[mes]
+                total_mes = meses_total_rech.get(mes, 0)
+                pct_mes = (count / total_mes * 100) if total_mes > 0 else 0
+                
+                # Determinar tendencia
+                if prev_count is not None:
+                    if count > prev_count:
+                        tendencia = 'EMPEORANDO'
+                    elif count < prev_count:
+                        tendencia = 'MEJORANDO'
+                    else:
+                        tendencia = 'ESTABLE'
+                else:
+                    tendencia = '-'
+                
+                ws6.cell(row=fila, column=1, value=str(mes))
+                ws6.cell(row=fila, column=2, value=count)
+                ws6.cell(row=fila, column=3, value=total_mes)
+                ws6.cell(row=fila, column=4, value=f'{pct_mes:.1f}%')
+                ws6.cell(row=fila, column=5, value=tendencia)
+                
+                if tendencia == 'EMPEORANDO':
+                    ws6.cell(row=fila, column=5).fill = red_fill
+                elif tendencia == 'MEJORANDO':
+                    ws6.cell(row=fila, column=5).fill = green_fill
+                
+                prev_count = count
+                fila += 1
+    else:
+        # No hay casos de "No hay partes"
+        ws6.merge_cells('A6:J6')
+        ws6['A6'].value = "No se encontraron cotizaciones rechazadas por falta de partes en el período seleccionado."
+        ws6['A6'].font = Font(italic=True, size=12)
+        ws6['A6'].alignment = Alignment(horizontal='center')
+    
+    autoajustar_columnas(ws6, max_width=50)
+    
+    # ========================================
+    # HOJA 7: PIEZAS RECHAZADAS (detalle a nivel pieza)
+    # ========================================
+    ws7 = wb.create_sheet("Piezas Rechazadas")
+    escribir_encabezado_hoja(ws7, "DETALLE DE PIEZAS EN COTIZACIONES RECHAZADAS", 12)
+    
+    if not df_piezas_proveedor.empty:
+        headers_piezas = [
+            'Componente', 'Descripción', 'Proveedor', 'Cantidad',
+            'Costo Unitario', 'Costo Total', 'Es Necesaria', 'Sugerida por Técnico',
+            'Marca Equipo', 'Modelo Equipo',
+            'Motivo Rechazo Cotización', 'Motivo Rechazo Pieza'
+        ]
+        escribir_headers(ws7, headers_piezas, 4)
+        
+        # Enriquecer con motivo de rechazo de la cotización padre
+        motivos_por_cotizacion = dict(zip(df_rechazos['cotizacion_id'], df_rechazos['motivo_rechazo']))
+        
+        fila = 5
+        for _, pieza in df_piezas_proveedor.iterrows():
+            cot_id = pieza.get('cotizacion_id')
+            motivo_cot = motivos_por_cotizacion.get(cot_id, '')
+            motivo_cot_label = labels_motivos.get(motivo_cot, str(motivo_cot).replace('_', ' ').title()) if motivo_cot else ''
+            
+            costo_unit = float(pieza.get('costo_unitario', 0))
+            cantidad = int(pieza.get('cantidad', 1))
+            costo_total_pieza = costo_unit * cantidad
+            
+            ws7.cell(row=fila, column=1, value=pieza.get('componente__nombre', ''))
+            ws7.cell(row=fila, column=2, value=pieza.get('descripcion_adicional', ''))
+            ws7.cell(row=fila, column=3, value=pieza.get('proveedor', ''))
+            ws7.cell(row=fila, column=4, value=cantidad)
+            ws7.cell(row=fila, column=5, value=f'${costo_unit:,.2f}')
+            ws7.cell(row=fila, column=6, value=f'${costo_total_pieza:,.2f}')
+            ws7.cell(row=fila, column=7, value='Si' if pieza.get('es_necesaria') else 'No')
+            ws7.cell(row=fila, column=8, value='Si' if pieza.get('sugerida_por_tecnico') else 'No')
+            ws7.cell(row=fila, column=9, value=pieza.get('cotizacion__orden__detalle_equipo__marca', ''))
+            ws7.cell(row=fila, column=10, value=pieza.get('cotizacion__orden__detalle_equipo__modelo', ''))
+            ws7.cell(row=fila, column=11, value=motivo_cot_label)
+            ws7.cell(row=fila, column=12, value=pieza.get('motivo_rechazo_pieza', ''))
+            fila += 1
+        
+        # Sección de resumen de piezas
+        fila += 2
+        ws7.merge_cells(f'A{fila}:L{fila}')
+        ws7[f'A{fila}'].value = "RESUMEN: TOP COMPONENTES MÁS FRECUENTES EN RECHAZOS"
+        ws7[f'A{fila}'].font = section_font
+        ws7[f'A{fila}'].fill = section_fill
+        fila += 1
+        
+        escribir_headers(ws7, ['Componente', 'Veces en Rechazos', 'Costo Unit. Promedio', 'Es Necesaria (%)', 'Top Proveedores', '', '', '', '', '', '', ''], fila)
+        fila += 1
+        
+        resumen_componentes = df_piezas_proveedor.groupby('componente__nombre').agg(
+            veces=('id', 'count'),
+            costo_prom=('costo_unitario', 'mean'),
+            necesaria=('es_necesaria', 'mean'),
+            proveedores=('proveedor', lambda x: ', '.join([str(p) for p in x.dropna().unique()[:3]]) if x.notna().any() else 'N/A'),
+        ).reset_index().sort_values('veces', ascending=False).head(20)
+        
+        for _, comp in resumen_componentes.iterrows():
+            ws7.cell(row=fila, column=1, value=comp['componente__nombre'])
+            ws7.cell(row=fila, column=2, value=comp['veces'])
+            ws7.cell(row=fila, column=3, value=f"${comp['costo_prom']:,.2f}")
+            ws7.cell(row=fila, column=4, value=f"{comp['necesaria'] * 100:.0f}%")
+            ws7.cell(row=fila, column=5, value=comp['proveedores'])
+            fila += 1
+    else:
+        ws7.merge_cells('A4:L4')
+        ws7['A4'].value = "No hay datos de piezas para las cotizaciones rechazadas."
+        ws7['A4'].font = Font(italic=True, size=12)
+    
+    autoajustar_columnas(ws7, max_width=45)
+    
+    # ========================================
+    # GENERAR Y RETORNAR ARCHIVO
+    # ========================================
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    nombre_archivo = f'Analisis_Rechazos_{timestamp}.xlsx'
+    
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+    
+    wb.save(response)
+    
+    return response
+
+
+# ============================================================================
 # API ENDPOINT: AUTOCOMPLETADO DE ÓRDENES PARA BÚSQUEDA INTELIGENTE
 # ============================================================================
 

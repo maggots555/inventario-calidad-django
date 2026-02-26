@@ -26,6 +26,10 @@
                        class="btn btn-exportar">
                         <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
                     </a>
+                    <a href="{% url 'servicio_tecnico:exportar_analisis_rechazos' %}?{{ request.GET.urlencode }}" 
+                       class="btn btn-exportar" style="background: linear-gradient(135deg, #c0392b, #e74c3c); border-color: #c0392b; margin-left: 8px;">
+                        <i class="bi bi-file-earmark-excel"></i> Analisis Rechazos
+                    </a>
                 </div>
             </div>
         </div>
