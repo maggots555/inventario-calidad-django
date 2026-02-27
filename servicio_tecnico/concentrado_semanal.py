@@ -12,7 +12,7 @@ agrupados por sitio y tipo de equipo.
 Las 3 secciones del concentrado son:
   1. INGRESO DE EQUIPOS  → usa OrdenServicio.fecha_ingreso
   2. ASIGNACIÓN A INGENIERÍA → usa OrdenServicio.tecnico_asignado_actual
-  3. EGRESO DE EQUIPOS   → usa OrdenServicio.fecha_entrega
+  3. EGRESO DE EQUIPOS   → usa OrdenServicio.fecha_finalizacion
 
 CLASIFICACIÓN DE EQUIPOS:
   - LENOVO        → marca == 'Lenovo' y NO es MIS y NO es OOW/FL
@@ -312,8 +312,8 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
         'sucursal',
         'tecnico_asignado_actual',
     ).filter(
-        fecha_entrega__date__range=(lunes, viernes),
-        fecha_entrega__week_day__in=[2, 3, 4, 5, 6],
+        fecha_finalizacion__date__range=(lunes, viernes),
+        fecha_finalizacion__week_day__in=[2, 3, 4, 5, 6],
     )
 
     # Filtro adicional por sucursal (individual o grupo)
@@ -462,7 +462,7 @@ def obtener_concentrado_semanal(lunes, sucursal_id=None, sucursal_ids=None):
         if tipo is None:
             continue
 
-        dia_idx = orden.fecha_entrega.weekday()
+        dia_idx = orden.fecha_finalizacion.weekday()
         if dia_idx > 4:
             continue
         dia_nombre = DIAS_SEMANA[dia_idx]
@@ -560,8 +560,8 @@ def obtener_tendencia_semanal(año, sucursal_id=None, sucursal_ids=None):
 
     # Query base de egresos
     qs_egresos = OrdenServicio.objects.filter(
-        fecha_entrega__year=año,
-        fecha_entrega__week_day__in=[2, 3, 4, 5, 6],
+        fecha_finalizacion__year=año,
+        fecha_finalizacion__week_day__in=[2, 3, 4, 5, 6],
     ).exclude(estado='cancelado')
 
     if sucursal_ids:
@@ -583,7 +583,7 @@ def obtener_tendencia_semanal(año, sucursal_id=None, sucursal_ids=None):
     )
 
     egresos_por_semana = dict(
-        qs_egresos.annotate(semana_num=ExtractWeek('fecha_entrega'))
+        qs_egresos.annotate(semana_num=ExtractWeek('fecha_finalizacion'))
         .values('semana_num')
         .annotate(total=Count('id'))
         .values_list('semana_num', 'total')
@@ -661,8 +661,8 @@ def obtener_reporte_trimestral(año, sucursal_id=None):
         qs_egreso = OrdenServicio.objects.select_related(
             'detalle_equipo', 'sucursal'
         ).filter(
-            fecha_entrega__year=año,
-            fecha_entrega__month__in=meses,
+            fecha_finalizacion__year=año,
+            fecha_finalizacion__month__in=meses,
         ).exclude(estado='cancelado')
 
         if sucursal_id:
@@ -771,8 +771,8 @@ def obtener_reporte_mensual(año, sucursal_id=None, sucursal_ids=None):
 
             # ----- Egreso del mes -----
             qs_egreso = OrdenServicio.objects.filter(
-                fecha_entrega__year=año,
-                fecha_entrega__month=mes,
+                fecha_finalizacion__year=año,
+                fecha_finalizacion__month=mes,
             ).exclude(estado='cancelado')
 
             # ----- Aplicar filtros de sucursal -----
