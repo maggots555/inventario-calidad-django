@@ -10008,6 +10008,105 @@ def api_buscar_ordenes_autocomplete(request):
 
 
 # ============================================================================
+# API ENDPOINT: AUTOCOMPLETADO PARA SELECTOR DE ORDEN ORIGINAL (REINGRESO)
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@require_http_methods(["GET"])
+def api_buscar_ordenes_reingreso(request):
+    """
+    API endpoint para el selector inteligente de "Orden Original" en el módulo
+    de Reingreso de la vista detalle_orden.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cuando el usuario marca una orden como "Reingreso", necesita indicar cuál fue
+    la orden original (la primera vez que se reparó ese equipo). Esta API permite
+    buscar esa orden original de forma inteligente, mostrando sugerencias mientras
+    el usuario escribe la orden del cliente, el número de serie, etc.
+
+    Solo busca en órdenes con estado='entregado' porque:
+    - Un reingreso implica que el equipo YA fue reparado y devuelto al cliente
+    - Si el equipo sigue en servicio activo, no puede ser una "orden original" de un reingreso
+
+    Parámetros GET:
+        q (str): Texto de búsqueda (mínimo 2 caracteres) — para búsqueda typeahead
+        id (int): ID exacto de una orden — para restaurar la selección guardada
+        excluir (int): ID de la orden actual (para no mostrarse a sí misma)
+
+    Returns:
+        JsonResponse con lista de coincidencias (máximo 15)
+        Cada resultado incluye: id, orden_cliente, numero_serie, numero_orden_interno,
+        marca, modelo, fecha_entrega (para identificar cuándo fue entregada)
+    """
+    query = request.GET.get('q', '').strip()
+    buscar_por_id = request.GET.get('id', '').strip()
+    excluir_id = request.GET.get('excluir', '').strip()
+
+    # ── MODO RESTAURACIÓN: búsqueda por ID exacto ──────────────────────────────
+    # Cuando el usuario ya guardó la selección, al recargar la página llamamos
+    # a este API con ?id=<pk> para recuperar los datos del chip sin necesidad de
+    # hacer una búsqueda de texto (que fallaría con un número como "47").
+    if buscar_por_id and buscar_por_id.isdigit():
+        try:
+            orden = OrdenServicio.objects.select_related('detalle_equipo').get(
+                pk=int(buscar_por_id)
+            )
+            detalle = orden.detalle_equipo
+            resultado = {
+                'id': orden.id,
+                'orden_cliente': detalle.orden_cliente or '',
+                'numero_serie': detalle.numero_serie or '',
+                'numero_orden_interno': orden.numero_orden_interno or '',
+                'marca': detalle.marca or '',
+                'modelo': detalle.modelo or '',
+                'fecha_entrega': orden.fecha_entrega.strftime('%d/%m/%Y') if orden.fecha_entrega else '',
+            }
+            return JsonResponse({'resultados': [resultado]})
+        except OrdenServicio.DoesNotExist:
+            return JsonResponse({'resultados': []})
+
+    # ── MODO BÚSQUEDA: typeahead por texto ────────────────────────────────────
+    # Requerir mínimo 2 caracteres para buscar
+    if len(query) < 2:
+        return JsonResponse({'resultados': []})
+
+    # Base: solo órdenes entregadas (la única fuente válida para "orden original")
+    ordenes = OrdenServicio.objects.filter(estado='entregado')
+
+    # Excluir la orden actual para evitar auto-referencia
+    if excluir_id and excluir_id.isdigit():
+        ordenes = ordenes.exclude(pk=int(excluir_id))
+
+    # Filtro de búsqueda en los campos más relevantes para identificar una orden
+    ordenes = ordenes.filter(
+        Q(detalle_equipo__orden_cliente__icontains=query) |
+        Q(detalle_equipo__numero_serie__icontains=query) |
+        Q(numero_orden_interno__icontains=query) |
+        Q(detalle_equipo__marca__icontains=query) |
+        Q(detalle_equipo__modelo__icontains=query)
+    ).select_related(
+        'detalle_equipo', 'sucursal'
+    ).order_by('-fecha_entrega')[:15]
+
+    # Construir respuesta JSON con información suficiente para identificar el equipo
+    resultados = []
+    for orden in ordenes:
+        detalle = orden.detalle_equipo
+        resultados.append({
+            'id': orden.id,
+            'orden_cliente': detalle.orden_cliente or '',
+            'numero_serie': detalle.numero_serie or '',
+            'numero_orden_interno': orden.numero_orden_interno or '',
+            'marca': detalle.marca or '',
+            'modelo': detalle.modelo or '',
+            'fecha_entrega': orden.fecha_entrega.strftime('%d/%m/%Y') if orden.fecha_entrega else '',
+        })
+
+    return JsonResponse({'resultados': resultados})
+
+
+# ============================================================================
 # API ENDPOINT: BUSCAR ORDEN POR NÚMERO DE SERIE
 # ============================================================================
 

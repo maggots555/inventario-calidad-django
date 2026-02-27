@@ -593,10 +593,33 @@
                                     
                                     <div class="mb-3">
                                         {{ form_reingreso.orden_original.errors }}
-                                        <label for="{{ form_reingreso.orden_original.id_for_label }}" class="form-label small">
-                                            {{ form_reingreso.orden_original.label }}
+                                        <label class="form-label small">
+                                            <i class="bi bi-search"></i> Buscar Orden Original
                                         </label>
+                                        
+                                        {# Campo hidden que Django recibe al submit — el JS lo llena con el ID #}
                                         {{ form_reingreso.orden_original }}
+                                        
+                                        {# Input visible para buscar — el JS lo lee y lo muestra/oculta #}
+                                        <div style="position: relative;">
+                                            <input type="text"
+                                                   id="reingreso-busqueda"
+                                                   class="form-control form-control-sm"
+                                                   placeholder="Escribe la orden del cliente, serie o número interno..."
+                                                   autocomplete="off"
+                                                   data-api-url="{% url 'servicio_tecnico:api_buscar_ordenes_reingreso' %}"
+                                                   data-excluir-id="{{ orden.pk }}"
+                                                   {% if orden.orden_original %}style="display:none;"{% endif %}>
+                                            <small class="text-muted d-block mt-1">
+                                                <i class="bi bi-info-circle"></i>
+                                                Solo muestra órdenes <strong>entregadas</strong> al cliente
+                                            </small>
+                                        </div>
+                                        
+                                        {# Zona donde aparece el chip de la orden seleccionada #}
+                                        <div id="reingreso-seleccionada" class="mt-2"
+                                             {% if not orden.orden_original %}style="display:none;"{% endif %}>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -4127,6 +4150,10 @@
 
 <!-- Modal de envío de diagnóstico al cliente -->
 <script src="{% static 'js/diagnostico_modal.js' %}"></script>
+
+<!-- Selector inteligente de Orden Original (Reingreso) -->
+<!-- Reemplaza el <select> nativo con un buscador con autocompletado -->
+<script src="{% static 'js/busqueda_reingreso.js' %}"></script>
 
 <script>
 // ============================================================================

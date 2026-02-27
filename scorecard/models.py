@@ -206,7 +206,7 @@ class Incidencia(models.Model):
     numero_orden = models.CharField(
         max_length=50,
         blank=True,
-        help_text="Número de orden interna del servicio"
+        help_text="Número de orden del cliente (ej: OOW-12345). Si no hay orden de cliente, se usa el número de orden interno."
     )
     servicio_realizado = models.ForeignKey(
         ServicioRealizado,

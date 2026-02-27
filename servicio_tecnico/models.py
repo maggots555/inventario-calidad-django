@@ -685,12 +685,20 @@ class OrdenServicio(models.Model):
             # Obtener datos del equipo
             detalle = self.detalle_equipo
             
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # Usamos la "orden del cliente" (número que el cliente conoce, ej: "OOW-12345")
+            # en vez del número interno del sistema (ej: "42"), porque la incidencia de
+            # ScoreCard debe reflejar cómo identifica el cliente su propia orden.
+            # Si la orden_cliente está vacía (campo opcional), usamos numero_orden_interno
+            # como fallback para que el campo nunca quede en blanco.
+            numero_para_incidencia = detalle.orden_cliente or self.numero_orden_interno
+
             incidencia = Incidencia.objects.create(
                 tipo_equipo=detalle.tipo_equipo,
                 marca=detalle.marca,
                 modelo=detalle.modelo,
                 numero_serie=detalle.numero_serie,
-                numero_orden=self.numero_orden_interno,
+                numero_orden=numero_para_incidencia,
                 sucursal=self.sucursal,
                 tecnico_responsable=self.tecnico_asignado_actual,
                 inspector_calidad=self.responsable_seguimiento,
@@ -698,8 +706,9 @@ class OrdenServicio(models.Model):
                 tipo_incidencia=categoria,
                 categoria_fallo='funcional',
                 grado_severidad='alto',
-                descripcion_incidencia=f"Reingreso de orden {self.numero_orden_interno}. Falla: {detalle.falla_principal}",
+                descripcion_incidencia=f"Reingreso de orden {numero_para_incidencia}. Falla: {detalle.falla_principal}",
                 es_reincidencia=True,
+                orden_servicio=self,
             )
             
             self.incidencia_scorecard = incidencia

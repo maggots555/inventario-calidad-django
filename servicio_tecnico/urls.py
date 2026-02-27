@@ -219,6 +219,16 @@ urlpatterns = [
     path('api/buscar-ordenes-autocomplete/',
          views.api_buscar_ordenes_autocomplete,
          name='api_buscar_ordenes_autocomplete'),
+
+    # API: AUTOCOMPLETADO PARA SELECTOR DE ORDEN ORIGINAL (REINGRESO)
+    # ========================================================================
+    # API endpoint para el buscador inteligente del campo "Orden Original"
+    # en el módulo de Reingreso de detalle_orden.
+    # Solo busca en órdenes con estado='entregado' (únicas válidas como origen de reingreso).
+    # Busca por: orden_cliente, numero_serie, numero_orden_interno, marca, modelo
+    path('api/buscar-ordenes-reingreso/',
+         views.api_buscar_ordenes_reingreso,
+         name='api_buscar_ordenes_reingreso'),
     
     # API: BÚSQUEDA DE MODELOS POR MARCA (Diciembre 2025)
     # ========================================================================

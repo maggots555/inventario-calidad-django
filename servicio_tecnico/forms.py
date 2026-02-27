@@ -851,8 +851,8 @@ class ReingresoRHITSOForm(forms.ModelForm):
                 'class': 'form-check-input',
                 'id': 'id_es_reingreso_detalle',
             }),
-            'orden_original': forms.Select(attrs={
-                'class': 'form-control form-select',
+            'orden_original': forms.HiddenInput(attrs={
+                'id': 'id_orden_original_hidden',
             }),
             'es_candidato_rhitso': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
