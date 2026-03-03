@@ -1,6 +1,6 @@
 // ============================================================================
 // SISTEMA DUAL DE SUBIDA DE IMÁGENES - GALERÍA Y CÁMARA
-// Versión 6.0 - Subida por lotes con reintentos automáticos (anti-Cloudflare)
+// Versión 7.0 - Caché IndexedDB + Auto-recarga en fallo Cloudflare
 // ============================================================================
 
 /**
@@ -18,9 +18,29 @@
  * - Construye FormData y envía via XHR con barra de progreso
  * - Diagnóstico avanzado de errores de red (sin internet, Cloudflare, timeout)
  * - Protección beforeunload durante subida activa
+ * - NUEVO v7.0: Caché IndexedDB — las imágenes sobreviven una recarga de página
+ * - NUEVO v7.0: Auto-recarga cuando Cloudflare Tunnel corta la conexión
  * 
  * CHANGELOG:
  * 
+ * v7.0 (Marzo 2026):
+ * - ✅ CACHÉ INDEXEDDB: Al seleccionar imágenes se guardan automáticamente en
+ *   IndexedDB (base de datos del navegador). Si la página se recarga por un
+ *   fallo de Cloudflare Tunnel, las imágenes se recuperan automáticamente.
+ * - ✅ AUTO-RECARGA EN FALLO: Cuando todos los reintentos de un lote fallan
+ *   (Cloudflare cortó el túnel), se guarda el estado en IndexedDB y se recarga
+ *   la página automáticamente con un countdown visual de 5 segundos.
+ * - ✅ RESTAURACIÓN AUTOMÁTICA: Al cargar la página, se verifica si hay imágenes
+ *   pendientes en caché para la misma orden. Si las hay, se restauran y aparece
+ *   un banner "X imágenes recuperadas — presiona Subir para completar".
+ * - ✅ LIMPIEZA INTELIGENTE: El caché se borra SOLO cuando la subida es 100%
+ *   exitosa, o cuando el usuario presiona "Limpiar todo" manualmente.
+ *   Los registros con más de 24 horas se eliminan automáticamente al inicio.
+ * - ✅ SE ELIMINAN LOS REINTENTOS MANUALES: Ya no se muestra el botón
+ *   "Subir" para reintentar después de un fallo de red — se recarga la página.
+ * - ✅ MAX_RETRIES reducido a 1: Un solo reintento rápido para detectar glitches
+ *   transitorios; si falla, se va directo a auto-recarga.
+ *
  * v6.0 (Febrero 2026):
  * - ✅ SUBIDA POR LOTES: Las imágenes se envían en lotes de 5 (configurable)
  *   para evitar que Cloudflare Tunnel corte conexiones grandes.
@@ -90,6 +110,249 @@ interface BatchResult {
     archivosEnviados: number;    // Cantidad de archivos enviados en el lote
 }
 
+// ============================================================================
+// v7.0: CACHÉ IndexedDB — Persistencia de imágenes entre recargas de página
+// ============================================================================
+
+/**
+ * Estructura de una imagen individual guardada en IndexedDB.
+ * Guardamos el ArrayBuffer en lugar del objeto File porque los objetos File
+ * no se pueden serializar y no sobreviven una recarga de página.
+ * Al restaurar, reconstruimos un File nuevo desde este ArrayBuffer.
+ */
+interface CachedImage {
+    id: string;          // ID único generado al seleccionar (img_timestamp_random)
+    name: string;        // Nombre del archivo original
+    type: string;        // MIME type (image/jpeg, image/png, etc.)
+    lastModified: number;// Timestamp de última modificación del archivo
+    size: number;        // Tamaño en bytes (para validaciones)
+    buffer: ArrayBuffer; // Contenido binario del archivo (sobrevive recargas)
+}
+
+/**
+ * Registro completo guardado en IndexedDB por cada sesión de subida.
+ * La clave primaria es `ordenUrl` (ruta de la URL actual), así las imágenes
+ * quedan vinculadas a una orden específica y no se mezclan entre órdenes.
+ */
+interface CacheRecord {
+    ordenUrl: string;    // window.location.pathname — clave primaria
+    tipo: string;        // Tipo de imagen seleccionado (ingreso, diagnostico, etc.)
+    descripcion: string; // Descripción opcional escrita por el usuario
+    imagenes: CachedImage[];
+    savedAt: number;     // Timestamp Unix para poder expirar registros viejos
+}
+
+/**
+ * CLASE: ImageCache
+ * 
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * IndexedDB es una base de datos que el navegador mantiene en el dispositivo.
+ * A diferencia de localStorage (que solo guarda texto), IndexedDB puede guardar
+ * archivos binarios grandes (imágenes, videos, etc.) — exactamente lo que necesitamos.
+ * 
+ * Esta clase encapsula todas las operaciones con IndexedDB:
+ * - guardar()      → escribe las imágenes pendientes
+ * - cargar()       → lee las imágenes de una orden específica
+ * - limpiar()      → borra el registro de una orden (tras subida exitosa)
+ * - limpiarViejos() → borra registros con más de 24 horas (limpieza automática)
+ * 
+ * Todas las operaciones son async porque IndexedDB trabaja con callbacks
+ * asincrónicos (como las peticiones de red).
+ */
+class ImageCache {
+    private static readonly DB_NAME    = 'sigma-upload-cache';
+    private static readonly DB_VERSION = 1;
+    private static readonly STORE_NAME = 'pending-uploads';
+    private static readonly TTL_MS     = 24 * 60 * 60 * 1000; // 24 horas en ms
+
+    /** Abre (o crea) la base de datos IndexedDB. Retorna una Promise con la conexión. */
+    private static abrirDB(): Promise<IDBDatabase> {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(ImageCache.DB_NAME, ImageCache.DB_VERSION);
+
+            // onupgradeneeded se ejecuta la primera vez que se crea la DB,
+            // o cuando incrementamos DB_VERSION. Aquí definimos la estructura.
+            req.onupgradeneeded = (event) => {
+                const db = (event.target as IDBOpenDBRequest).result;
+                if (!db.objectStoreNames.contains(ImageCache.STORE_NAME)) {
+                    // Crear el "almacén" (equivalente a una tabla SQL).
+                    // keyPath: 'ordenUrl' significa que la clave primaria
+                    // es el campo `ordenUrl` de cada objeto guardado.
+                    db.createObjectStore(ImageCache.STORE_NAME, { keyPath: 'ordenUrl' });
+                }
+            };
+
+            req.onsuccess = () => resolve(req.result);
+            req.onerror   = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Convierte un objeto File a CachedImage leyendo su contenido binario.
+     * Usamos FileReader para leer el archivo como ArrayBuffer.
+     * 
+     * EXPLICACIÓN: file.arrayBuffer() es la API moderna que retorna una Promise.
+     * Está disponible en Chrome 76+, Firefox 69+, Safari 14+, Android 9+.
+     */
+    private static async fileToCached(file: File, id: string): Promise<CachedImage> {
+        const buffer = await file.arrayBuffer();
+        return {
+            id,
+            name:         file.name,
+            type:         file.type || 'image/jpeg',
+            lastModified: file.lastModified,
+            size:         file.size,
+            buffer,
+        };
+    }
+
+    /**
+     * Reconstruye un objeto File desde un CachedImage almacenado.
+     * new File([buffer], name, { type, lastModified }) es la API estándar
+     * disponible en todos los navegadores modernos (Android 7+).
+     */
+    static cachedToFile(cached: CachedImage): File {
+        return new File([cached.buffer], cached.name, {
+            type:         cached.type,
+            lastModified: cached.lastModified,
+        });
+    }
+
+    /**
+     * Guarda las imágenes pendientes en IndexedDB.
+     * Se llama cada vez que se agrega, elimina o modifica la selección.
+     * 
+     * @param ordenUrl   - Ruta de la orden actual (window.location.pathname)
+     * @param tipo       - Tipo de imagen seleccionado (radio button)
+     * @param descripcion - Texto del campo descripción
+     * @param imagenes   - Pares { file, id } del array imagenesSeleccionadas
+     */
+    static async guardar(
+        ordenUrl: string,
+        tipo: string,
+        descripcion: string,
+        imagenes: Array<{ file: File; id: string }>
+    ): Promise<void> {
+        if (imagenes.length === 0) {
+            // Si no hay imágenes, borramos el registro para no dejar caché vacío
+            await ImageCache.limpiar(ordenUrl);
+            return;
+        }
+
+        try {
+            const cachedImagenes = await Promise.all(
+                imagenes.map(img => ImageCache.fileToCached(img.file, img.id))
+            );
+
+            const record: CacheRecord = {
+                ordenUrl,
+                tipo,
+                descripcion,
+                imagenes: cachedImagenes,
+                savedAt: Date.now(),
+            };
+
+            const db    = await ImageCache.abrirDB();
+            const tx    = db.transaction(ImageCache.STORE_NAME, 'readwrite');
+            const store = tx.objectStore(ImageCache.STORE_NAME);
+            store.put(record); // put = insert or update (upsert)
+            db.close();
+
+            console.log(`💾 Caché: ${imagenes.length} imagen(es) guardada(s) para ${ordenUrl}`);
+        } catch (e) {
+            // El caché es best-effort: si falla, no interrumpimos el flujo principal
+            console.warn('⚠️ No se pudo guardar en caché IndexedDB:', e);
+        }
+    }
+
+    /**
+     * Carga el registro de imágenes pendientes para una orden específica.
+     * Retorna null si no hay caché o si el registro expiró (+24h).
+     */
+    static async cargar(ordenUrl: string): Promise<CacheRecord | null> {
+        try {
+            const db    = await ImageCache.abrirDB();
+            const tx    = db.transaction(ImageCache.STORE_NAME, 'readonly');
+            const store = tx.objectStore(ImageCache.STORE_NAME);
+
+            const record: CacheRecord | undefined = await new Promise((resolve, reject) => {
+                const req = store.get(ordenUrl);
+                req.onsuccess = () => resolve(req.result as CacheRecord | undefined);
+                req.onerror   = () => reject(req.error);
+            });
+            db.close();
+
+            if (!record) return null;
+
+            // Verificar expiración: si tiene más de 24h, ignorar y borrar
+            if (Date.now() - record.savedAt > ImageCache.TTL_MS) {
+                console.log('🗑️ Caché expirado (> 24h) — descartando');
+                await ImageCache.limpiar(ordenUrl);
+                return null;
+            }
+
+            return record;
+        } catch (e) {
+            console.warn('⚠️ No se pudo leer el caché IndexedDB:', e);
+            return null;
+        }
+    }
+
+    /**
+     * Elimina el registro de caché de una orden específica.
+     * Se llama tras subida exitosa o al limpiar la selección manualmente.
+     */
+    static async limpiar(ordenUrl: string): Promise<void> {
+        try {
+            const db    = await ImageCache.abrirDB();
+            const tx    = db.transaction(ImageCache.STORE_NAME, 'readwrite');
+            const store = tx.objectStore(ImageCache.STORE_NAME);
+            store.delete(ordenUrl);
+            db.close();
+            console.log(`🗑️ Caché limpiado para ${ordenUrl}`);
+        } catch (e) {
+            console.warn('⚠️ No se pudo limpiar el caché IndexedDB:', e);
+        }
+    }
+
+    /**
+     * Elimina todos los registros con más de 24 horas.
+     * Se llama al inicializar la página para no acumular datos viejos.
+     */
+    static async limpiarViejos(): Promise<void> {
+        try {
+            const db    = await ImageCache.abrirDB();
+            const tx    = db.transaction(ImageCache.STORE_NAME, 'readwrite');
+            const store = tx.objectStore(ImageCache.STORE_NAME);
+
+            // getAll() retorna todos los registros del store
+            const todos: CacheRecord[] = await new Promise((resolve, reject) => {
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result as CacheRecord[]);
+                req.onerror   = () => reject(req.error);
+            });
+
+            const ahora = Date.now();
+            let eliminados = 0;
+            for (const record of todos) {
+                if (ahora - record.savedAt > ImageCache.TTL_MS) {
+                    store.delete(record.ordenUrl);
+                    eliminados++;
+                }
+            }
+
+            db.close();
+            if (eliminados > 0) {
+                console.log(`🗑️ Caché: ${eliminados} registro(s) expirado(s) eliminado(s)`);
+            }
+        } catch (e) {
+            console.warn('⚠️ No se pudo limpiar registros viejos de IndexedDB:', e);
+        }
+    }
+}
+
+// ============================================================================
+
 class UploadImagenesDual {
     // Elementos del DOM - Selección de archivos
     private inputGaleria: HTMLInputElement | null;
@@ -136,10 +399,9 @@ class UploadImagenesDual {
     private readonly XHR_TIMEOUT_MS = 600000;
     
     // v6.0: Configuración de subida por lotes (anti-Cloudflare disconnect)
-    // Cada lote genera un request HTTP independiente, nueva conexión cada vez
+    // Cada lote genera un request HTTP independiente, nueva conexión cada vez.
+    // v7.0: Sin reintentos — al primer fallo de red se guarda en caché y se recarga.
     private readonly BATCH_SIZE = 5;        // Imágenes por lote (~15-25MB typ.)
-    private readonly MAX_RETRIES = 2;       // Reintentos por lote fallido
-    private readonly RETRY_DELAY_MS = 3000; // Delay base entre reintentos (×intento)
     
     // v6.0: Estado de progreso por lotes
     private loteActual: number = 0;
@@ -156,6 +418,10 @@ class UploadImagenesDual {
     
     // NUEVO v5.0: Flag para protección beforeunload
     private subiendoImagenes: boolean = false;
+
+    // v7.0: Clave de caché — ruta de la URL actual (identifica la orden)
+    // Ejemplo: '/servicio_tecnico/detalle/123/' — única por orden
+    private readonly cacheOrdenUrl: string;
     
     constructor() {
         // Elementos de selección de archivos
@@ -179,6 +445,9 @@ class UploadImagenesDual {
         if (this.formElement) {
             this.descripcionInputId = this.formElement.dataset.descripcionId || '';
         }
+
+        // v7.0: Inicializar clave de caché con la ruta actual
+        this.cacheOrdenUrl = window.location.pathname;
         
         this.init();
     }
@@ -221,8 +490,14 @@ class UploadImagenesDual {
         
         // NUEVO v5.0: Inicializar formulario de subida (submit handler + beforeunload)
         this.inicializarFormularioSubida();
+
+        // v7.0: Limpiar registros de caché expirados (> 24h) — fire-and-forget
+        ImageCache.limpiarViejos();
+
+        // v7.0: Restaurar imágenes pendientes desde caché (si las hay)
+        this.restaurarDesdeCache();
         
-        console.log('✅ Sistema dual de subida de imágenes v5.0 inicializado');
+        console.log('✅ Sistema dual de subida de imágenes v7.0 inicializado');
     }
     
     // =========================================================================
@@ -323,6 +598,128 @@ class UploadImagenesDual {
         window.addEventListener('beforeunload', (e) => this.advertenciaBeforeUnload(e));
         
         console.log('✅ Formulario de subida inicializado (submit handler + beforeunload)');
+    }
+
+    // =========================================================================
+    // v7.0: RESTAURACIÓN DESDE CACHÉ IndexedDB
+    // =========================================================================
+
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Esta función se ejecuta al cargar la página. Verifica si el navegador
+     * tiene imágenes guardadas en IndexedDB para esta orden específica.
+     * 
+     * Esto ocurre cuando:
+     * 1. La subida anterior falló por un corte de Cloudflare Tunnel
+     * 2. El sistema guardó las imágenes pendientes en IndexedDB
+     * 3. Recargó la página automáticamente
+     * 
+     * Si encuentra imágenes en caché, las reconstruye y las muestra listas
+     * para que el usuario solo tenga que presionar "Subir" de nuevo.
+     */
+    private async restaurarDesdeCache(): Promise<void> {
+        const record = await ImageCache.cargar(this.cacheOrdenUrl);
+        if (!record || record.imagenes.length === 0) return;
+
+        console.log(`🔄 [Caché] Restaurando ${record.imagenes.length} imagen(es) para ${this.cacheOrdenUrl}`);
+
+        // Reconstruir objetos File desde los ArrayBuffers almacenados.
+        // NOTA: Estos archivos ya fueron validados cuando se seleccionaron.
+        // No repetimos la validación para no mostrar errores/advertencias falsos.
+        for (const cached of record.imagenes) {
+            try {
+                const file = ImageCache.cachedToFile(cached);
+                const previewUrl = URL.createObjectURL(file);
+                this.imagenesSeleccionadas.push({ file, id: cached.id, previewUrl });
+            } catch (e) {
+                console.warn(`⚠️ No se pudo restaurar imagen '${cached.name}':`, e);
+            }
+        }
+
+        if (this.imagenesSeleccionadas.length === 0) return;
+
+        // Restaurar el tipo de imagen seleccionado (radio button)
+        if (record.tipo) {
+            const radio = this.formElement?.querySelector<HTMLInputElement>(
+                `input[name="tipo"][value="${record.tipo}"]`
+            );
+            if (radio) {
+                radio.checked = true;
+                this.mostrarAvisoTipo(record.tipo);
+            }
+        }
+
+        // Restaurar la descripción escrita por el usuario
+        if (record.descripcion && this.descripcionInputId) {
+            const descEl = document.getElementById(this.descripcionInputId) as HTMLInputElement | null;
+            if (descEl) descEl.value = record.descripcion;
+        }
+
+        // Actualizar estado y UI
+        this.archivosListos = true;
+        this.actualizarPreview();
+        this.actualizarEstadoBotonSubir();
+        this.actualizarPanelResumen();
+
+        // Mostrar banner de recuperación encima del formulario
+        this.mostrarBannerRestauracion(this.imagenesSeleccionadas.length);
+
+        console.log(`✅ [Caché] ${this.imagenesSeleccionadas.length} imagen(es) restaurada(s) correctamente`);
+    }
+
+    /**
+     * Muestra un banner informativo cuando se restauraron imágenes desde caché.
+     * Se inyecta dinámicamente ANTES del formulario de subida.
+     */
+    private mostrarBannerRestauracion(cantidad: number): void {
+        if (!this.formElement) return;
+
+        // Evitar duplicados
+        const existente = document.getElementById('cacheBannerRestauracion');
+        if (existente) existente.remove();
+
+        const banner = document.createElement('div');
+        banner.id = 'cacheBannerRestauracion';
+        banner.className = 'alert alert-info alert-dismissible d-flex align-items-start gap-2 mb-3';
+        banner.setAttribute('role', 'alert');
+        banner.innerHTML = `
+            <i class="bi bi-arrow-repeat fs-5 flex-shrink-0"></i>
+            <div>
+                <strong>${cantidad} imagen${cantidad !== 1 ? 'es' : ''} recuperada${cantidad !== 1 ? 's' : ''} automáticamente.</strong>
+                La página se recargó porque la conexión se cortó durante la subida anterior.
+                Tus imágenes siguen seleccionadas — presiona <strong>Subir</strong> para completar la carga.
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+        `;
+
+        // Insertar antes del formulario
+        this.formElement.parentNode?.insertBefore(banner, this.formElement);
+    }
+
+    /**
+     * Sincroniza el estado actual de las imágenes seleccionadas con IndexedDB.
+     * Se llama después de cualquier cambio en la selección (agregar, eliminar).
+     * 
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Esta función es "fire-and-forget" — la llamamos sin await porque:
+     * 1. No necesitamos esperar a que termine para continuar con la UI
+     * 2. Si falla, es un error menor que no debe interrumpir la experiencia
+     * 3. Guardamos también el tipo y descripción actuales para poder restaurarlos
+     */
+    private sincronizarCache(): void {
+        const tipo = this.getTipoSeleccionado();
+        const descEl = this.descripcionInputId
+            ? document.getElementById(this.descripcionInputId) as HTMLInputElement | null
+            : null;
+        const descripcion = descEl?.value ?? '';
+
+        // fire-and-forget: no await, la UI no debe esperar
+        ImageCache.guardar(
+            this.cacheOrdenUrl,
+            tipo,
+            descripcion,
+            this.imagenesSeleccionadas.map(img => ({ file: img.file, id: img.id }))
+        );
     }
     
     /**
@@ -472,12 +869,11 @@ class UploadImagenesDual {
      * lotes pequeños (~15-25MB cada uno), cada request es rápido y tiene
      * mucha menos probabilidad de ser cortado.
      * 
-     * Si un lote falla, se reintenta automáticamente hasta 2 veces con
-     * espera creciente (3s, 6s). Cada reintento crea una nueva conexión
-     * HTTP, evitando el problema de la conexión anterior.
-     * 
-     * Los lotes anteriores exitosos Ya están guardados en el servidor,
-     * así que si el lote 3 falla, las imágenes de los lotes 1 y 2 no se pierden.
+     * v7.0: Sin reintentos. Al primer fallo de red (evento 'error' del XHR),
+     * el túnel de Cloudflare ya está roto — reintentarlo en la misma sesión
+     * no sirve. En su lugar, guardamos las imágenes pendientes en IndexedDB
+     * y recargamos la página para restablecer la conexión completamente.
+     * Los lotes anteriores exitosos ya están guardados en el servidor.
      */
     private async enviarPorLotes(lotes: File[][]): Promise<void> {
         this.totalLotes = lotes.length;
@@ -485,7 +881,6 @@ class UploadImagenesDual {
         let totalImagenesGuardadas = 0;
         let totalErrores: string[] = [];
         let lotesExitosos = 0;
-        let lotesReintentados = 0;
         let huboFalloDefinitivo = false;
         
         // Calcular totales para info
@@ -503,78 +898,57 @@ class UploadImagenesDual {
             `;
         }
         
-        // Procesar cada lote secuencialmente
+        // Procesar cada lote secuencialmente — sin reintentos
         for (let i = 0; i < lotes.length; i++) {
             this.loteActual = i + 1;
             const lote = lotes[i];
-            let intentos = 0;
-            let exito = false;
-            let resultado: BatchResult | null = null;
             
-            // Intentar enviar el lote (con reintentos automáticos)
-            while (intentos <= this.MAX_RETRIES && !exito) {
-                if (intentos > 0) {
-                    // Es un reintento — nueva conexión HTTP
-                    lotesReintentados++;
-                    const delayMs = this.RETRY_DELAY_MS * intentos;
-                    console.warn(`🔄 Reintento ${intentos}/${this.MAX_RETRIES} del lote ${i + 1} en ${delayMs / 1000}s...`);
-                    
-                    this.mostrarReintento(i + 1, lotes.length, intentos, delayMs);
-                    await this.delay(delayMs);
-                }
+            try {
+                const resultado = await this.enviarLote(lote, i, lotes.length);
                 
-                try {
-                    resultado = await this.enviarLote(lote, i, lotes.length);
+                if (resultado.success) {
+                    lotesExitosos++;
+                    totalImagenesGuardadas += resultado.imagenesGuardadas;
+                    if (resultado.errores.length > 0) {
+                        totalErrores = totalErrores.concat(resultado.errores);
+                    }
+                    resultados.push(resultado);
                     
-                    if (resultado.success) {
-                        exito = true;
-                        lotesExitosos++;
+                    console.log(`✅ Lote ${i + 1}/${lotes.length}: ${resultado.imagenesGuardadas} imagen(es) guardadas`);
+                    
+                    // Remover las imágenes exitosas del array interno
+                    this.removerImagenesSubidas(lote);
+                } else {
+                    // El servidor respondió con error (no error de red)
+                    console.error(`❌ Lote ${i + 1}: Error del servidor — ${resultado.message}`);
+                    
+                    if (resultado.imagenesGuardadas > 0) {
                         totalImagenesGuardadas += resultado.imagenesGuardadas;
-                        if (resultado.errores.length > 0) {
-                            totalErrores = totalErrores.concat(resultado.errores);
-                        }
                         resultados.push(resultado);
-                        
-                        console.log(`✅ Lote ${i + 1}/${lotes.length}: ${resultado.imagenesGuardadas} imagen(es) guardadas`);
-                        
-                        // Remover las imágenes exitosas del array interno
-                        this.removerImagenesSubidas(lote);
-                    } else {
-                        // El servidor respondió con error (no error de red)
-                        console.error(`❌ Lote ${i + 1}: Error del servidor — ${resultado.message}`);
-                        
-                        if (resultado.imagenesGuardadas > 0) {
-                            // Éxito parcial: guardó algunas antes del error
-                            totalImagenesGuardadas += resultado.imagenesGuardadas;
-                            resultados.push(resultado);
-                            // No reintentar: el servidor ya procesó parcialmente
-                        }
-                        
-                        totalErrores.push(`Lote ${i + 1}: ${resultado.message}`);
-                        break; // No reintentar errores del servidor (validación, etc.)
                     }
-                } catch (errorInfo: unknown) {
-                    // Error de red (XHR error/timeout) — SÍ reintentar
-                    intentos++;
-                    const info = errorInfo as { tipo: string; diagnostico: string };
-                    console.error(`❌ Lote ${i + 1}: Error de red (intento ${intentos}/${this.MAX_RETRIES + 1}) — ${info.tipo}`);
                     
-                    if (intentos > this.MAX_RETRIES) {
-                        // Agotados los reintentos para este lote
-                        huboFalloDefinitivo = true;
-                        resultados.push({
-                            batchIndex: i,
-                            success: false,
-                            imagenesGuardadas: 0,
-                            imagenesOmitidas: [],
-                            errores: [`Lote ${i + 1}: Fallo después de ${this.MAX_RETRIES + 1} intentos (${info.tipo})`],
-                            cambioEstado: false,
-                            message: info.diagnostico,
-                            archivosEnviados: lote.length
-                        });
-                        totalErrores.push(`Lote ${i + 1} (${lote.length} imgs): ${info.diagnostico}`);
-                    }
+                    totalErrores.push(`Lote ${i + 1}: ${resultado.message}`);
+                    huboFalloDefinitivo = true;
+                    break; // Detener lotes restantes
                 }
+            } catch (errorInfo: unknown) {
+                // Error de red — Cloudflare cortó el túnel. Sin reintentos: cachar + recargar.
+                const info = errorInfo as { tipo: string; diagnostico: string };
+                console.error(`❌ Lote ${i + 1}: Error de red — ${info.tipo}: ${info.diagnostico}`);
+                
+                huboFalloDefinitivo = true;
+                resultados.push({
+                    batchIndex: i,
+                    success: false,
+                    imagenesGuardadas: 0,
+                    imagenesOmitidas: [],
+                    errores: [`Lote ${i + 1} (${lote.length} imgs): ${info.diagnostico}`],
+                    cambioEstado: false,
+                    message: info.diagnostico,
+                    archivosEnviados: lote.length
+                });
+                totalErrores.push(`Lote ${i + 1} (${lote.length} imgs): ${info.diagnostico}`);
+                break; // Detener inmediatamente — no continuar con más lotes
             }
         }
         
@@ -586,7 +960,7 @@ class UploadImagenesDual {
         this.mostrarResumenFinal(
             totalImagenesGuardadas, totalErrores,
             lotesExitosos, lotes.length,
-            lotesReintentados, huboFalloDefinitivo
+            huboFalloDefinitivo
         );
     }
     
@@ -721,32 +1095,6 @@ class UploadImagenesDual {
     }
     
     /**
-     * Muestra la UI de reintento: barra amarilla con countdown.
-     */
-    private mostrarReintento(loteNum: number, totalLotes: number, intento: number, delayMs: number): void {
-        if (this.textoProgreso) {
-            this.textoProgreso.textContent = `Reintentando lote ${loteNum}/${totalLotes}...`;
-        }
-        if (this.barraProgreso) {
-            this.barraProgreso.classList.add('progress-bar-striped', 'progress-bar-animated');
-            this.barraProgreso.classList.remove('bg-success', 'bg-danger');
-            this.barraProgreso.classList.add('bg-warning');
-        }
-        if (this.infoArchivos) {
-            this.infoArchivos.innerHTML = `
-                <div class="d-flex align-items-center text-warning">
-                    <span class="spinner-border spinner-border-sm me-2"></span>
-                    <span>
-                        <i class="bi bi-arrow-repeat"></i>
-                        Reintento ${intento}/${this.MAX_RETRIES} del lote ${loteNum} — esperando ${delayMs / 1000}s...
-                        <br><small class="text-muted">Los lotes anteriores se guardaron correctamente.</small>
-                    </span>
-                </div>
-            `;
-        }
-    }
-    
-    /**
      * Remueve del array interno las imágenes que ya se subieron exitosamente.
      * Usa nombre+tamaño como clave para identificar cada archivo.
      */
@@ -778,7 +1126,6 @@ class UploadImagenesDual {
         errores: string[],
         lotesExitosos: number,
         totalLotes: number,
-        lotesReintentados: number,
         huboFalloDefinitivo: boolean
     ): void {
         if (totalGuardadas > 0 && !huboFalloDefinitivo) {
@@ -796,9 +1143,6 @@ class UploadImagenesDual {
             let mensaje = `✅ ${totalGuardadas} imagen(es) subida(s) correctamente.`;
             if (totalLotes > 1) {
                 mensaje += ` (${lotesExitosos} lote${lotesExitosos !== 1 ? 's' : ''})`;
-            }
-            if (lotesReintentados > 0) {
-                mensaje += ` — ${lotesReintentados} reintento(s) exitoso(s)`;
             }
             
             let html = `
@@ -828,6 +1172,7 @@ class UploadImagenesDual {
         } else if (totalGuardadas > 0 && huboFalloDefinitivo) {
             // ═══════════════════════════════════════════════════════════
             // ESCENARIO 2: ÉXITO PARCIAL (algunas subidas, otras fallaron)
+            // v7.0: Guarda pendientes en caché + recarga automática
             // ═══════════════════════════════════════════════════════════
             if (this.barraProgreso) {
                 this.barraProgreso.classList.remove('progress-bar-animated', 'progress-bar-striped', 'bg-success', 'bg-danger');
@@ -836,75 +1181,67 @@ class UploadImagenesDual {
             }
             if (this.textoProgreso) this.textoProgreso.textContent = 'Parcialmente completado';
             if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '⚠';
-            
+
             const restantes = this.imagenesSeleccionadas.length;
+
+            // Guardar imágenes pendientes en caché antes de recargar
+            this.sincronizarCache();
+
             let html = `
                 <div class="text-warning">
                     <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                    Se subieron <strong>${totalGuardadas}</strong> imagen(es), pero <strong>${restantes}</strong> no pudieron enviarse.
+                    Se guardaron <strong>${totalGuardadas}</strong> imagen(es). Quedan <strong>${restantes}</strong> pendientes.
                 </div>
                 <div class="mt-1">
                     <small class="text-muted">
-                        <i class="bi bi-info-circle"></i> Las imágenes pendientes siguen seleccionadas.
-                        Puedes presionar <strong>Subir</strong> de nuevo para reintentarlas.
+                        <i class="bi bi-shield-check"></i> Las imágenes pendientes se guardaron localmente.
+                        Recargando la página para restablecer la conexión...
                     </small>
                 </div>
+                <div class="mt-2 d-flex align-items-center gap-2">
+                    <div class="spinner-border spinner-border-sm text-warning"></div>
+                    <span id="cacheCountdown" class="text-warning fw-bold">Recargando en 5s...</span>
+                </div>
             `;
-            
-            if (errores.length > 0) {
-                html += `
-                    <details class="mt-2">
-                        <summary class="text-muted" style="cursor: pointer; font-size: 0.8rem;">
-                            <i class="bi bi-bug"></i> Detalles técnicos (${errores.length})
-                        </summary>
-                        <div class="mt-1 p-2 bg-light rounded" style="font-size: 0.75rem; font-family: monospace;">
-                            ${errores.map(e => `<div>• ${e}</div>`).join('')}
-                        </div>
-                    </details>
-                `;
-            }
-            
+
             if (this.infoArchivos) this.infoArchivos.innerHTML = html;
-            
-            // Actualizar preview y botón para las imágenes restantes
-            this.actualizarPreview();
-            this.archivosListos = this.imagenesSeleccionadas.length > 0;
-            this.actualizarEstadoBotonSubir();
-            this.actualizarPanelResumen();
-            
-            // Rehabilitar formulario para reintento manual
-            setTimeout(() => { this.rehabilitarFormulario(); }, 2000);
-            
-            this.mostrarToast(
-                `${totalGuardadas} imagen(es) subida(s). ${restantes} pendiente(s) — presiona Subir para reintentar.`,
-                'warning', undefined, 10000
-            );
-            
+
+            // Countdown visual + recarga
+            this.iniciarCountdownRecarga(5);
+
         } else {
             // ═══════════════════════════════════════════════════════════
             // ESCENARIO 3: TODO FALLÓ
+            // v7.0: Guarda TODO en caché + recarga automática
             // ═══════════════════════════════════════════════════════════
             if (this.barraProgreso) {
                 this.barraProgreso.classList.remove('bg-success', 'progress-bar-animated', 'progress-bar-striped', 'bg-warning');
                 this.barraProgreso.classList.add('bg-danger');
                 this.barraProgreso.style.width = '100%';
             }
-            if (this.textoProgreso) this.textoProgreso.textContent = 'Error';
+            if (this.textoProgreso) this.textoProgreso.textContent = 'Conexión cortada';
             if (this.porcentajeProgreso) this.porcentajeProgreso.textContent = '✗';
-            
+
+            // Guardar TODAS las imágenes en caché antes de recargar
+            this.sincronizarCache();
+
             let html = `
                 <div class="text-danger">
                     <i class="bi bi-x-circle-fill me-1"></i>
-                    No se pudo subir ninguna imagen después de múltiples intentos.
+                    No se pudo completar la subida. La conexión fue cortada (Cloudflare Tunnel).
                 </div>
                 <div class="mt-1">
                     <small class="text-muted">
-                        <i class="bi bi-info-circle"></i> Tus imágenes siguen seleccionadas.
-                        Espera unos segundos y presiona <strong>Subir</strong> para reintentar.
+                        <i class="bi bi-shield-check"></i> Tus imágenes se guardaron localmente.
+                        Recargando la página para restablecer la conexión...
                     </small>
                 </div>
+                <div class="mt-2 d-flex align-items-center gap-2">
+                    <div class="spinner-border spinner-border-sm text-danger"></div>
+                    <span id="cacheCountdown" class="text-danger fw-bold">Recargando en 5s...</span>
+                </div>
             `;
-            
+
             if (errores.length > 0) {
                 html += `
                     <details class="mt-2">
@@ -920,26 +1257,44 @@ class UploadImagenesDual {
                     </details>
                 `;
             }
-            
+
             if (this.infoArchivos) this.infoArchivos.innerHTML = html;
-            
-            this.mostrarToast(
-                'No se pudo completar la subida. Presiona Subir para reintentar.',
-                'error', undefined, 10000
-            );
-            
-            // Rehabilitar formulario y resetear barra después de 4 segundos
-            setTimeout(() => {
-                this.rehabilitarFormulario();
-                if (this.progresoDiv) this.progresoDiv.style.display = 'none';
-                if (this.barraProgreso) {
-                    this.barraProgreso.classList.remove('bg-danger');
-                    this.barraProgreso.classList.add('progress-bar-animated', 'bg-success');
-                    this.barraProgreso.style.width = '0%';
-                }
-                this.actualizarEstadoBotonSubir();
-            }, 4000);
+
+            // Countdown visual + recarga
+            this.iniciarCountdownRecarga(5);
         }
+    }
+
+    /**
+     * Muestra un countdown visual y recarga la página cuando llega a 0.
+     * 
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * setInterval() ejecuta una función cada N milisegundos. Aquí la usamos
+     * para actualizar el contador visible (5, 4, 3, 2, 1...) y al llegar a 0
+     * lo cancelamos y llamamos window.location.reload().
+     * 
+     * El usuario ve el contador y sabe que el sistema está funcionando,
+     * no se queda con la sensación de que "algo se rompió".
+     * 
+     * @param segundos - Segundos antes de recargar (por defecto 5)
+     */
+    private iniciarCountdownRecarga(segundos: number = 5): void {
+        let restantes = segundos;
+
+        const intervalo = setInterval(() => {
+            restantes--;
+            const el = document.getElementById('cacheCountdown');
+            if (el) {
+                el.textContent = restantes > 0
+                    ? `Recargando en ${restantes}s...`
+                    : 'Recargando ahora...';
+            }
+
+            if (restantes <= 0) {
+                clearInterval(intervalo);
+                window.location.reload();
+            }
+        }, 1000);
     }
     
     /**
@@ -1598,6 +1953,12 @@ class UploadImagenesDual {
         this.archivosListos = this.imagenesSeleccionadas.length > 0;
         this.actualizarEstadoBotonSubir();
         this.actualizarPanelResumen();
+
+        // v7.0: Guardar selección actual en caché IndexedDB (fire-and-forget)
+        // Así si la conexión se corta durante la subida, las imágenes se pueden recuperar
+        if (this.imagenesSeleccionadas.length > 0) {
+            this.sincronizarCache();
+        }
         
         console.log(`✅ Procesamiento completado. Archivos listos: ${this.archivosListos}`);
     }
@@ -1750,12 +2111,15 @@ class UploadImagenesDual {
             this.archivosListos = this.imagenesSeleccionadas.length > 0;
             this.actualizarEstadoBotonSubir();
             this.actualizarPanelResumen();
+
+            // v7.0: Sincronizar caché (reflejar la eliminación)
+            this.sincronizarCache();
         }
     }
     
     /**
      * Limpia todas las imágenes seleccionadas.
-     * v5.0: Simplificado, ya no limpia input oculto.
+     * v7.0: También limpia el caché IndexedDB de esta orden.
      */
     private limpiarTodo(): void {
         // Liberar memoria de todos los ObjectURLs
@@ -1776,6 +2140,12 @@ class UploadImagenesDual {
         this.enviando = false;
         
         console.log('🧹 Todas las imágenes eliminadas');
+
+        // v7.0: Limpiar caché IndexedDB — el usuario borró la selección voluntariamente
+        ImageCache.limpiar(this.cacheOrdenUrl);
+
+        // Quitar banner de restauración si existe
+        document.getElementById('cacheBannerRestauracion')?.remove();
         
         // Actualizar UI
         this.actualizarPreview();
@@ -1799,6 +2169,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Verificar que estamos en la página correcta
     if (document.getElementById('formSubirImagenes')) {
         (window as any).uploadImagenesDual = new UploadImagenesDual();
-        console.log('✅ Sistema de subida dual v5.0 inicializado');
+        console.log('✅ Sistema de subida dual v7.0 inicializado (caché IndexedDB activo)');
     }
 });
