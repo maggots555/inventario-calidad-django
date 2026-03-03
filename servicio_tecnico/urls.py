@@ -143,6 +143,16 @@ urlpatterns = [
     path('orden/<int:orden_id>/enviar-imagenes-cliente/', 
          views.enviar_imagenes_cliente, 
          name='enviar_imagenes_cliente'),
+
+    # Enviar imágenes de egreso al cliente por correo (dispara tarea Celery)
+    path('orden/<int:orden_id>/enviar-imagenes-egreso-cliente/',
+         views.enviar_imagenes_egreso_cliente,
+         name='enviar_imagenes_egreso_cliente'),
+
+    # API: obtener destinatarios del historial de ingreso para el modal de egreso
+    path('orden/<int:orden_id>/destinatarios-egreso/',
+         views.obtener_destinatarios_egreso,
+         name='obtener_destinatarios_egreso'),
     
     # Enviar diagnóstico al cliente con PDF adjunto
     path('orden/<int:orden_id>/enviar-diagnostico-cliente/', 

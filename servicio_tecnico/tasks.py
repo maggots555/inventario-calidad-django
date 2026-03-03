@@ -1045,3 +1045,313 @@ def enviar_imagenes_cliente_task(
         except Exception:
             pass
         raise self.retry(exc=exc, countdown=60)
+
+
+# ============================================================================
+# TAREA 4: ENVIAR IMÁGENES DE EGRESO AL CLIENTE
+# ============================================================================
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='servicio_tecnico.enviar_imagenes_egreso_cliente'
+)
+def enviar_imagenes_egreso_cliente_task(
+    self, orden_id, destinatarios_copia, usuario_id=None
+):
+    """
+    Tarea Celery: comprime imágenes de egreso y las envía al cliente por correo.
+
+    A diferencia de la tarea de ingreso, esta tarea:
+    - Envía TODAS las imágenes de tipo 'egreso' de la orden (sin selección manual).
+    - Usa el template imagenes_egreso_cliente.html con la nota aclaratoria de
+      que el equipo aún NO está listo para ser recolectado.
+    - Los destinatarios provienen del parseo del historial del envío de ingreso.
+
+    Parámetros:
+        orden_id             : ID de la OrdenServicio
+        destinatarios_copia  : Lista de emails en CC (extraídos del historial de ingreso)
+        usuario_id           : ID del usuario que disparó la acción
+    """
+    import io
+    import re
+    from pathlib import Path
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+    from PIL import Image
+
+    from .models import OrdenServicio, ImagenOrden, HistorialOrden
+
+    logger.info(f"[IMAGENES-EGRESO] Iniciando tarea para Orden ID {orden_id}")
+
+    try:
+        # ===================================================================
+        # PASO 1: RECUPERAR ORDEN
+        # ===================================================================
+        try:
+            orden = OrdenServicio.objects.select_related('detalle_equipo').get(pk=orden_id)
+        except OrdenServicio.DoesNotExist:
+            logger.error(f"[IMAGENES-EGRESO] Orden ID {orden_id} no encontrada.")
+            return {'success': False, 'mensaje': f'Orden ID {orden_id} no encontrada.'}
+
+        email_cliente = orden.detalle_equipo.email_cliente
+
+        # ===================================================================
+        # PASO 2: OBTENER Y COMPRIMIR IMÁGENES DE EGRESO
+        # ===================================================================
+        imagenes = ImagenOrden.objects.filter(orden=orden, tipo='egreso')
+        logger.info(f"[IMAGENES-EGRESO] Encontradas {imagenes.count()} imágenes de egreso.")
+
+        imagenes_comprimidas = []
+        tamaño_total_original = 0
+        tamaño_total_comprimido = 0
+
+        for imagen in imagenes:
+            try:
+                img_path = imagen.imagen.path
+                if not Path(img_path).exists() or not Path(img_path).is_file():
+                    continue
+
+                img = Image.open(img_path)
+                tamaño_original = os.path.getsize(img_path)
+                tamaño_total_original += tamaño_original
+
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                    img = background
+
+                max_dimension = 1920
+                if max(img.size) > max_dimension:
+                    ratio = max_dimension / max(img.size)
+                    new_size = tuple([int(dim * ratio) for dim in img.size])
+                    img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+                output = io.BytesIO()
+                img.save(output, format='JPEG', quality=85, optimize=True)
+                output.seek(0)
+
+                tamaño_comprimido = len(output.getvalue())
+                tamaño_total_comprimido += tamaño_comprimido
+
+                nombre_archivo = f"egreso_{imagen.id}_{os.path.basename(imagen.imagen.name)}"
+                if not nombre_archivo.lower().endswith('.jpg'):
+                    nombre_archivo = os.path.splitext(nombre_archivo)[0] + '.jpg'
+
+                imagenes_comprimidas.append({
+                    'nombre': nombre_archivo,
+                    'contenido': output.getvalue(),
+                    'tamaño_comprimido': tamaño_comprimido,
+                })
+            except Exception as e:
+                logger.warning(f"[IMAGENES-EGRESO] Error procesando imagen {imagen.id}: {e}")
+
+        if not imagenes_comprimidas:
+            raise Exception("No se pudo procesar ninguna imagen de egreso.")
+
+        logger.info(
+            f"[IMAGENES-EGRESO] Compresión: {tamaño_total_original/1024/1024:.2f} MB → "
+            f"{tamaño_total_comprimido/1024/1024:.2f} MB"
+        )
+
+        # ===================================================================
+        # PASO 3: PREPARAR HTML DEL CORREO
+        # ===================================================================
+        from config.paises_config import get_pais_actual, fecha_local_pais
+        _pais_email = get_pais_actual()
+
+        whatsapp_empleado = ''
+        if usuario_id:
+            User = get_user_model()
+            try:
+                usuario = User.objects.get(pk=usuario_id)
+                if hasattr(usuario, 'empleado') and usuario.empleado:
+                    numero_local = usuario.empleado.numero_whatsapp
+                    if numero_local:
+                        codigo_tel = _pais_email.get('codigo_telefonico', '')
+                        whatsapp_empleado = f"{codigo_tel}{numero_local}"
+            except User.DoesNotExist:
+                pass
+
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+
+        context = {
+            'orden': orden,
+            'detalle': orden.detalle_equipo,
+            'mensaje_personalizado': '',
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'cantidad_imagenes': len(imagenes_comprimidas),
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
+            'whatsapp_empleado': whatsapp_empleado,
+        }
+
+        html_content = render_to_string(
+            'servicio_tecnico/emails/imagenes_egreso_cliente.html',
+            context
+        )
+
+        # ===================================================================
+        # PASO 4: CREAR Y ENVIAR EL CORREO
+        # ===================================================================
+        numero_orden_display = (
+            orden.detalle_equipo.orden_cliente
+            if orden.detalle_equipo.orden_cliente
+            else orden.numero_orden_interno
+        )
+        asunto = f'📦 Fotografías de egreso - Orden {numero_orden_display}'
+
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente = f"Servicio Técnico System <{email_solo}>"
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=[email_cliente],
+            cc=destinatarios_copia if destinatarios_copia else None,
+        )
+        email_msg.content_subtype = 'html'
+
+        # Adjuntar logo SIC
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f"[IMAGENES-EGRESO] Error al adjuntar logo: {e}")
+
+        # Adjuntar iconos de redes sociales
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+                'icon_whatsapp': 'images/utilitys/whatsapp.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning(f"[IMAGENES-EGRESO] Error al adjuntar iconos: {e}")
+
+        # Adjuntar imágenes de egreso comprimidas
+        for img_data in imagenes_comprimidas:
+            email_msg.attach(img_data['nombre'], img_data['contenido'], 'image/jpeg')
+
+        email_msg.send(fail_silently=False)
+        logger.info(f"[IMAGENES-EGRESO] Correo enviado a {email_cliente}")
+
+        # ===================================================================
+        # PASO 5: REGISTRAR EN HISTORIAL
+        # ===================================================================
+        try:
+            usuario_empleado = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    usuario = User.objects.get(pk=usuario_id)
+                    if hasattr(usuario, 'empleado'):
+                        usuario_empleado = usuario.empleado
+                except User.DoesNotExist:
+                    pass
+
+            comentario = (
+                f"📧 Imágenes de egreso enviadas al cliente (background) ({email_cliente})\n"
+                f"📸 Cantidad de imágenes: {len(imagenes_comprimidas)}\n"
+                f"📦 Tamaño total: {tamaño_total_comprimido/1024/1024:.2f} MB"
+            )
+            if destinatarios_copia:
+                comentario += f"\n👥 Copia a: {', '.join(destinatarios_copia)}"
+
+            HistorialOrden.objects.create(
+                orden=orden,
+                tipo_evento='email',
+                comentario=comentario,
+                usuario=usuario_empleado,
+                es_sistema=False
+            )
+        except Exception as e:
+            logger.warning(f"[IMAGENES-EGRESO] No se pudo registrar historial: {e}")
+
+        logger.info(f"[IMAGENES-EGRESO] Tarea completada para Orden {orden.numero_orden_interno}")
+
+        # ── Notificar éxito al usuario ──
+        try:
+            _usuario_notif = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_notif = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            _oc = (
+                orden.detalle_equipo.orden_cliente
+                if orden.detalle_equipo and orden.detalle_equipo.orden_cliente
+                else orden.numero_orden_interno
+            )
+            notificar_exito(
+                titulo="Imágenes de egreso enviadas al cliente",
+                mensaje=(
+                    f"Orden {_oc}"
+                    f" — "
+                    f"{len(imagenes_comprimidas)} imagen(es) de egreso enviada(s) a {email_cliente}. "
+                    f"Tamaño total: {tamaño_total_comprimido/1024/1024:.2f} MB."
+                ),
+                usuario=_usuario_notif,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e:
+            logger.warning(f"[IMAGENES-EGRESO] No se pudo crear notificación de éxito: {e}")
+
+        return {
+            'success': True,
+            'orden': orden.numero_orden_interno,
+            'destinatario': email_cliente,
+            'imagenes_enviadas': len(imagenes_comprimidas),
+            'tamaño_mb': round(tamaño_total_comprimido / 1024 / 1024, 2),
+        }
+
+    except Exception as exc:
+        logger.error(f"[IMAGENES-EGRESO] Error para Orden ID {orden_id}: {exc}\n{traceback.format_exc()}")
+        # ── Notificar error al usuario ──
+        try:
+            _usuario_err = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo="Error al enviar imágenes de egreso",
+                mensaje=f"Orden {orden_id} — {str(exc)[:200]}",
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
+        raise self.retry(exc=exc, countdown=60)

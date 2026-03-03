@@ -1827,7 +1827,16 @@ def detalle_orden(request, orden_id):
                             'imagenes_guardadas': imagenes_guardadas,
                             'imagenes_omitidas': imagenes_omitidas,
                             'errores': errores_procesamiento,
-                            'cambio_estado': cambio_realizado
+                            'cambio_estado': cambio_realizado,
+                            # Flag para el frontend: indica si ya existe un envío previo de
+                            # imágenes de egreso por correo (para mostrar u ocultar el modal)
+                            'egreso_correo_ya_enviado': (
+                                HistorialOrden.objects
+                                .filter(orden=orden, tipo_evento='email')
+                                .filter(comentario__icontains='imágenes de egreso')
+                                .exists()
+                            ) if tipo_imagen == 'egreso' else False,
+                            'tipo_imagen': tipo_imagen,
                         })
                     else:
                         # No se guardó ninguna imagen
@@ -2324,6 +2333,16 @@ def detalle_orden(request, orden_id):
     
     total_imagenes = orden.imagenes.count()
     
+    # Verificar si ya se enviaron correos de imágenes (para el estado de los botones)
+    egreso_correo_ya_enviado = orden.historial.filter(
+        tipo_evento='email',
+        comentario__icontains='imágenes de egreso'
+    ).exists()
+    ingreso_correo_ya_enviado = orden.historial.filter(
+        tipo_evento='email',
+        comentario__icontains='imágenes de ingreso'
+    ).exists()
+    
     # ========================================================================
     # DATOS DE COTIZACIÓN (Si existe)
     # ========================================================================
@@ -2489,6 +2508,8 @@ def detalle_orden(request, orden_id):
         # Imágenes
         'imagenes_por_tipo': imagenes_por_tipo,
         'total_imagenes': total_imagenes,
+        'egreso_correo_ya_enviado': egreso_correo_ya_enviado,
+        'ingreso_correo_ya_enviado': ingreso_correo_ya_enviado,
         
         # Empleados para copia en envío de imágenes
         'empleados_copia_imagenes': empleados_copia_imagenes,
@@ -5769,6 +5790,212 @@ def enviar_imagenes_cliente(request, orden_id):
         return JsonResponse({
             'success': False,
             'error': f'❌ Error al procesar la solicitud: {str(e)}'
+        }, status=500)
+
+
+# ============================================================================
+# ENVIAR IMÁGENES DE EGRESO AL CLIENTE
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@require_http_methods(["POST"])
+def enviar_imagenes_egreso_cliente(request, orden_id):
+    """
+    Vista para enviar las imágenes de egreso al cliente por correo electrónico.
+
+    Flujo:
+    1. Valida que la orden exista y tenga imágenes de egreso.
+    2. Busca en el historial el último envío de imágenes de ingreso para reutilizar
+       los mismos destinatarios (email principal + CC). Si no hay historial previo,
+       usa el email del cliente sin CC.
+    3. Dispara la tarea Celery enviar_imagenes_egreso_cliente_task en segundo plano.
+    4. Retorna JsonResponse inmediato con task_id, destinatario y lista de correos CC.
+    """
+    import re as _re
+    from .tasks import enviar_imagenes_egreso_cliente_task
+
+    try:
+        # ===================================================================
+        # PASO 1: OBTENER Y VALIDAR LA ORDEN
+        # ===================================================================
+        orden = get_object_or_404(
+            OrdenServicio.objects.select_related('detalle_equipo'), pk=orden_id
+        )
+
+        # Validar email del cliente
+        email_cliente = orden.detalle_equipo.email_cliente
+        if not email_cliente or email_cliente == 'cliente@ejemplo.com':
+            return JsonResponse({
+                'success': False,
+                'error': (
+                    '❌ El email del cliente no está configurado o es el valor por defecto. '
+                    'Por favor, actualiza el email del cliente antes de enviar.'
+                )
+            }, status=400)
+
+        # ===================================================================
+        # PASO 2: VERIFICAR QUE EXISTAN IMÁGENES DE EGRESO
+        # ===================================================================
+        imagenes_egreso = ImagenOrden.objects.filter(orden=orden, tipo='egreso')
+        if not imagenes_egreso.exists():
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden no tiene imágenes de egreso registradas.'
+            }, status=400)
+
+        # ===================================================================
+        # PASO 3: RECUPERAR DESTINATARIOS DEL HISTORIAL DE INGRESO
+        #
+        # Se parsea el comentario del último HistorialOrden con tipo_evento='email'
+        # que corresponda al envío de imágenes de ingreso.
+        # Patrón del comentario guardado por enviar_imagenes_cliente_task:
+        #   "📧 Imágenes de ingreso enviadas al cliente (background) (email@ejemplo.com)
+        #    📸 Cantidad de imágenes: X
+        #    📦 Tamaño total: X.XX MB
+        #    👥 Copia a: cc1@email.com, cc2@email.com"
+        # ===================================================================
+        destinatarios_copia = []
+
+        historial_ingreso = (
+            HistorialOrden.objects
+            .filter(orden=orden, tipo_evento='email')
+            .filter(comentario__icontains='imágenes de ingreso')
+            .order_by('-fecha_evento')
+            .first()
+        )
+
+        if historial_ingreso:
+            # Extraer los correos en CC de la línea "👥 Copia a: ..."
+            match_cc = _re.search(
+                r'Copia a:\s*(.+)',
+                historial_ingreso.comentario,
+                _re.IGNORECASE
+            )
+            if match_cc:
+                raw_cc = match_cc.group(1).strip()
+                # Separar por coma y limpiar espacios
+                destinatarios_copia = [
+                    email.strip()
+                    for email in raw_cc.split(',')
+                    if email.strip() and '@' in email.strip()
+                ]
+
+        # ===================================================================
+        # PASO 4: DISPARAR TAREA CELERY EN SEGUNDO PLANO
+        # ===================================================================
+        usuario_id = request.user.pk if request.user.is_authenticated else None
+
+        tarea = enviar_imagenes_egreso_cliente_task.delay(
+            orden_id=orden_id,
+            destinatarios_copia=destinatarios_copia,
+            usuario_id=usuario_id,
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': (
+                f'✅ Imágenes de egreso en proceso de envío a {email_cliente}. '
+                f'La compresión y envío se están procesando en segundo plano.'
+            ),
+            'data': {
+                'task_id': tarea.id,
+                'destinatario': email_cliente,
+                'destinatarios_copia': destinatarios_copia,
+                'imagenes_count': imagenes_egreso.count(),
+                'orden': orden.numero_orden_interno,
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error al procesar la solicitud: {str(e)}'
+        }, status=500)
+
+
+# ============================================================================
+# DIAGNÓSTICO: OBTENER DESTINATARIOS DEL HISTORIAL DE INGRESO (API auxiliar)
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@require_http_methods(["GET"])
+def obtener_destinatarios_egreso(request, orden_id):
+    """
+    API auxiliar que devuelve los destinatarios del último envío de imágenes
+    de ingreso para esta orden. El frontend los muestra en el modal de confirmación
+    antes de disparar el envío de egreso, para que el usuario pueda verificarlos.
+    """
+    import re as _re
+
+    try:
+        orden = get_object_or_404(
+            OrdenServicio.objects.select_related('detalle_equipo'), pk=orden_id
+        )
+
+        email_cliente = orden.detalle_equipo.email_cliente
+        email_valido = (
+            bool(email_cliente)
+            and email_cliente != 'cliente@ejemplo.com'
+        )
+
+        destinatarios_copia = []
+        historial_encontrado = False
+
+        historial_ingreso = (
+            HistorialOrden.objects
+            .filter(orden=orden, tipo_evento='email')
+            .filter(comentario__icontains='imágenes de ingreso')
+            .order_by('-fecha_evento')
+            .first()
+        )
+
+        if historial_ingreso:
+            historial_encontrado = True
+            import re as _re2
+            match_cc = _re2.search(
+                r'Copia a:\s*(.+)',
+                historial_ingreso.comentario,
+                _re2.IGNORECASE
+            )
+            if match_cc:
+                raw_cc = match_cc.group(1).strip()
+                destinatarios_copia = [
+                    email.strip()
+                    for email in raw_cc.split(',')
+                    if email.strip() and '@' in email.strip()
+                ]
+
+        # Verificar si ya se enviaron imágenes de egreso previamente
+        egreso_ya_enviado = (
+            HistorialOrden.objects
+            .filter(orden=orden, tipo_evento='email')
+            .filter(comentario__icontains='imágenes de egreso')
+            .exists()
+        )
+
+        # Contar imágenes de egreso disponibles
+        imagenes_egreso_count = ImagenOrden.objects.filter(
+            orden=orden, tipo='egreso'
+        ).count()
+
+        return JsonResponse({
+            'success': True,
+            'email': email_cliente if email_valido else '',
+            'email_valido': email_valido,
+            'destinatarios_copia': destinatarios_copia,
+            'desde_historial': historial_encontrado,
+            'egreso_ya_enviado': egreso_ya_enviado,
+            'imagenes_egreso_count': imagenes_egreso_count,
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
         }, status=500)
 
 

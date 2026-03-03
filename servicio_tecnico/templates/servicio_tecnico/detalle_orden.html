@@ -1944,7 +1944,9 @@
                         </h6>
                         
                         <form method="post" enctype="multipart/form-data" id="formSubirImagenes"
-                              data-descripcion-id="{{ form_imagenes.descripcion.id_for_label }}">
+                              data-descripcion-id="{{ form_imagenes.descripcion.id_for_label }}"
+                              data-url-destinatarios-egreso="{% url 'servicio_tecnico:obtener_destinatarios_egreso' orden.id %}"
+                              data-url-enviar-egreso="{% url 'servicio_tecnico:enviar_imagenes_egreso_cliente' orden.id %}">
                             {% csrf_token %}
                             <input type="hidden" name="form_type" value="subir_imagenes">
 
@@ -2064,27 +2066,58 @@
                                 </div>
                             </div>
                             
-                            <!-- Botón para enviar imágenes al cliente -->
-                            <div class="row mb-3">
-                                <div class="col-12">
-                                    <button type="button" 
-                                            class="btn btn-primary w-100" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#modalEnviarImagenesCliente"
-                                            {% if not imagenes_por_tipo.ingreso %}disabled{% endif %}
-                                            title="{% if not imagenes_por_tipo.ingreso %}Debe subir al menos una imagen de ingreso{% else %}Enviar fotografías del equipo al cliente por correo{% endif %}">
-                                        <i class="bi bi-envelope-paper"></i> Envío de imágenes al cliente
-                                        {% if imagenes_por_tipo.ingreso %}
-                                            <span class="badge bg-light text-primary ms-2">{{ imagenes_por_tipo.ingreso.count }} disponible{{ imagenes_por_tipo.ingreso.count|pluralize:"s" }}</span>
-                                        {% endif %}
-                                    </button>
-                                    {% if not imagenes_por_tipo.ingreso %}
-                                    <small class="text-muted d-block mt-2 text-center">
-                                        <i class="bi bi-info-circle"></i> Sube al menos una imagen de ingreso para habilitar el envío
-                                    </small>
-                                    {% endif %}
-                                </div>
-                            </div>
+                             <!-- Botón para enviar imágenes de ingreso al cliente -->
+                             <div class="row mb-3">
+                                 <div class="col-12">
+                                     <button type="button"
+                                             class="btn w-100 {% if ingreso_correo_ya_enviado %}btn-outline-primary{% else %}btn-primary{% endif %}"
+                                             data-bs-toggle="modal"
+                                             data-bs-target="#modalEnviarImagenesCliente"
+                                             {% if not imagenes_por_tipo.ingreso %}disabled{% endif %}
+                                             title="{% if not imagenes_por_tipo.ingreso %}Debe subir al menos una imagen de ingreso{% elif ingreso_correo_ya_enviado %}Ya enviado — click para reenviar{% else %}Enviar fotografías del equipo al cliente por correo{% endif %}">
+                                         {% if ingreso_correo_ya_enviado %}
+                                             <i class="bi bi-check-circle-fill me-1"></i> Imágenes de ingreso ya enviadas
+                                             <span class="badge bg-primary bg-opacity-25 text-primary ms-2">reenviar</span>
+                                         {% else %}
+                                             <i class="bi bi-envelope-paper me-1"></i> Envío de imágenes al cliente
+                                             {% if imagenes_por_tipo.ingreso %}
+                                                 <span class="badge bg-light text-primary ms-2">{{ imagenes_por_tipo.ingreso.count }} disponible{{ imagenes_por_tipo.ingreso.count|pluralize:"s" }}</span>
+                                             {% endif %}
+                                         {% endif %}
+                                     </button>
+                                     {% if not imagenes_por_tipo.ingreso %}
+                                     <small class="text-muted d-block mt-2 text-center">
+                                         <i class="bi bi-info-circle"></i> Sube al menos una imagen de ingreso para habilitar el envío
+                                     </small>
+                                     {% endif %}
+                                 </div>
+                             </div>
+
+                             <!-- Botón para enviar imágenes de egreso al cliente -->
+                             <div class="row mb-3">
+                                 <div class="col-12">
+                                     <button type="button"
+                                             class="btn w-100 {% if egreso_correo_ya_enviado %}btn-outline-warning{% else %}btn-warning text-white{% endif %}"
+                                             id="btnEnviarImagenesEgreso"
+                                             {% if not imagenes_por_tipo.egreso %}disabled{% endif %}
+                                             title="{% if not imagenes_por_tipo.egreso %}Debe subir al menos una imagen de egreso{% elif egreso_correo_ya_enviado %}Ya enviado — click para reenviar{% else %}Enviar fotografías de egreso al cliente por correo{% endif %}">
+                                         {% if egreso_correo_ya_enviado %}
+                                             <i class="bi bi-check-circle-fill me-1"></i> Imágenes de egreso ya enviadas
+                                             <span class="badge bg-warning bg-opacity-25 text-warning ms-2">reenviar</span>
+                                         {% else %}
+                                             <i class="bi bi-envelope-paper-fill me-1"></i> Enviar imágenes de egreso al cliente
+                                             {% if imagenes_por_tipo.egreso %}
+                                                 <span class="badge bg-light text-warning ms-2">{{ imagenes_por_tipo.egreso.count }} disponible{{ imagenes_por_tipo.egreso.count|pluralize:"s" }}</span>
+                                             {% endif %}
+                                         {% endif %}
+                                     </button>
+                                     {% if not imagenes_por_tipo.egreso %}
+                                     <small class="text-muted d-block mt-2 text-center">
+                                         <i class="bi bi-info-circle"></i> Sube al menos una imagen de egreso para habilitar el envío
+                                     </small>
+                                     {% endif %}
+                                 </div>
+                             </div>
                             
                             <!-- Barra de progreso (oculta por defecto) -->
                             <div class="row mb-3" id="progresoUpload" style="display: none;">

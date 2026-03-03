@@ -286,6 +286,11 @@ class UploadImagenesDual {
         ImageCache.limpiarViejos();
         // v7.0: Restaurar imágenes pendientes desde caché (si las hay)
         this.restaurarDesdeCache();
+        // Botón manual de envío de imágenes de egreso (mostrado si no se envió vía modal)
+        const btnEgreso = document.getElementById('btnEnviarImagenesEgreso');
+        if (btnEgreso) {
+            btnEgreso.addEventListener('click', () => this.mostrarModalEgresoEmail());
+        }
         console.log('✅ Sistema dual de subida de imágenes v7.0 inicializado');
     }
     // =========================================================================
@@ -680,7 +685,9 @@ class UploadImagenesDual {
                     errores: [`Lote ${i + 1} (${lote.length} imgs): ${info.diagnostico}`],
                     cambioEstado: false,
                     message: info.diagnostico,
-                    archivosEnviados: lote.length
+                    archivosEnviados: lote.length,
+                    tipoImagen: '',
+                    egresoCorreoYaEnviado: false,
                 });
                 totalErrores.push(`Lote ${i + 1} (${lote.length} imgs): ${info.diagnostico}`);
                 break; // Detener inmediatamente — no continuar con más lotes
@@ -690,7 +697,7 @@ class UploadImagenesDual {
         this.subiendoImagenes = false;
         this.marcarFinEnvio();
         // Mostrar resumen final consolidado
-        this.mostrarResumenFinal(totalImagenesGuardadas, totalErrores, lotesExitosos, lotes.length, huboFalloDefinitivo);
+        this.mostrarResumenFinal(totalImagenesGuardadas, totalErrores, lotesExitosos, lotes.length, huboFalloDefinitivo, resultados);
     }
     /**
      * EXPLICACIÓN PARA PRINCIPIANTES:
@@ -774,7 +781,9 @@ class UploadImagenesDual {
                             errores: data.errores || [],
                             cambioEstado: data.cambio_estado || false,
                             message: data.message || data.error || '',
-                            archivosEnviados: archivos.length
+                            archivosEnviados: archivos.length,
+                            tipoImagen: data.tipo_imagen || '',
+                            egresoCorreoYaEnviado: data.egreso_correo_ya_enviado || false,
                         });
                     }
                     catch (e) {
@@ -841,7 +850,8 @@ class UploadImagenesDual {
      * 2. Éxito parcial → mensaje amarillo, las imágenes pendientes quedan seleccionadas
      * 3. Todo falló → mensaje rojo, todas las imágenes quedan seleccionadas para reintento
      */
-    mostrarResumenFinal(totalGuardadas, errores, lotesExitosos, totalLotes, huboFalloDefinitivo) {
+    mostrarResumenFinal(totalGuardadas, errores, lotesExitosos, totalLotes, huboFalloDefinitivo, resultados = []) {
+        var _a;
         if (totalGuardadas > 0 && !huboFalloDefinitivo) {
             // ═══════════════════════════════════════════════════════════
             // ESCENARIO 1: TODO EXITOSO
@@ -877,8 +887,18 @@ class UploadImagenesDual {
             if (this.infoArchivos)
                 this.infoArchivos.innerHTML = html;
             this.limpiarDespuesDeExito();
-            // Recargar para mostrar las imágenes guardadas
-            setTimeout(() => { window.location.reload(); }, 1500);
+            // Detectar si fue una subida de tipo egreso para mostrar modal de correo
+            const ultimoExitoso = resultados.filter(r => r.success).pop();
+            const esEgreso = (ultimoExitoso === null || ultimoExitoso === void 0 ? void 0 : ultimoExitoso.tipoImagen) === 'egreso';
+            const egresoCorreoYaEnviado = (_a = ultimoExitoso === null || ultimoExitoso === void 0 ? void 0 : ultimoExitoso.egresoCorreoYaEnviado) !== null && _a !== void 0 ? _a : false;
+            if (esEgreso && !egresoCorreoYaEnviado) {
+                // Mostrar modal preguntando si quiere enviar correo de egreso
+                this.mostrarModalEgresoEmail();
+            }
+            else {
+                // Recargar normalmente para mostrar las imágenes guardadas
+                setTimeout(() => { window.location.reload(); }, 1500);
+            }
         }
         else if (totalGuardadas > 0 && huboFalloDefinitivo) {
             // ═══════════════════════════════════════════════════════════
@@ -970,6 +990,199 @@ class UploadImagenesDual {
             // Countdown visual + recarga
             this.iniciarCountdownRecarga(5);
         }
+    }
+    /**
+     * Obtiene los destinatarios de egreso y muestra un modal Bootstrap preguntando
+     * si el usuario quiere enviar las imágenes de egreso al cliente por correo.
+     *
+     * FLUJO:
+     * 1. Obtiene URL de destinatarios desde data-url-destinatarios-egreso del form
+     * 2. Hace GET al endpoint para obtener email, CC y conteo de imágenes
+     * 3. Construye e inyecta un modal Bootstrap dinámicamente
+     * 4. Cancel → recarga normal; Accept → POST al endpoint de envío + recarga
+     */
+    async mostrarModalEgresoEmail() {
+        var _a, _b;
+        const form = this.formElement;
+        if (!form) {
+            window.location.reload();
+            return;
+        }
+        const urlDestinatarios = form.dataset.urlDestinatariosEgreso;
+        const urlEnviar = form.dataset.urlEnviarEgreso;
+        if (!urlDestinatarios || !urlEnviar) {
+            // No están configuradas las URLs — recargar normalmente
+            window.location.reload();
+            return;
+        }
+        // ── 1. Obtener destinatarios ─────────────────────────────────────────
+        let emailPrincipal = '';
+        let destinatariosCopia = [];
+        let imagenesCount = 0;
+        let desdeHistorial = false;
+        try {
+            const resp = await fetch(urlDestinatarios, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                emailPrincipal = data.email || '';
+                destinatariosCopia = data.destinatarios_copia || [];
+                imagenesCount = data.imagenes_egreso_count || 0;
+                desdeHistorial = data.desde_historial || false;
+            }
+        }
+        catch (_) {
+            // Si falla el fetch, recargar normalmente
+            window.location.reload();
+            return;
+        }
+        // ── 2. Construir HTML del modal ──────────────────────────────────────
+        const modalId = 'modalEgresoEmailDinamico';
+        // Limpiar modal anterior si existiera
+        (_a = document.getElementById(modalId)) === null || _a === void 0 ? void 0 : _a.remove();
+        const ccHtml = destinatariosCopia.length > 0
+            ? destinatariosCopia.map(cc => `<li class="list-group-item py-1 px-2 small text-muted">${cc}</li>`).join('')
+            : '<li class="list-group-item py-1 px-2 small text-muted fst-italic">Sin copias</li>';
+        const origenBadge = desdeHistorial
+            ? `<span class="badge bg-success-subtle text-success border border-success-subtle ms-1" title="Obtenido del historial de ingreso">
+                    <i class="bi bi-clock-history"></i> Desde historial
+               </span>`
+            : `<span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-1" title="No se encontró historial de ingreso — usando email de la orden">
+                    <i class="bi bi-exclamation-triangle"></i> Sin historial
+               </span>`;
+        const modalHtml = `
+        <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}Label" aria-modal="true" role="dialog">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #e67e22 0%, #d35400 100%); color: white;">
+                        <h5 class="modal-title" id="${modalId}Label">
+                            <i class="bi bi-envelope-paper-fill me-2"></i> ¿Enviar imágenes de egreso?
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-3">
+                            Se subieron <strong>${imagenesCount}</strong> imagen(es) de egreso.
+                            ¿Deseas enviarlas al cliente por correo electrónico?
+                        </p>
+
+                        <!-- Destinatarios colapsables -->
+                        <div class="mb-3">
+                            <button class="btn btn-sm btn-outline-secondary w-100 d-flex justify-content-between align-items-center"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#egresoDestinatariosCollapse"
+                                    aria-expanded="false"
+                                    aria-controls="egresoDestinatariosCollapse">
+                                <span>
+                                    <i class="bi bi-people me-1"></i>
+                                    Destinatarios ${origenBadge}
+                                </span>
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                            <div class="collapse mt-2" id="egresoDestinatariosCollapse">
+                                <ul class="list-group list-group-flush border rounded">
+                                    <li class="list-group-item py-1 px-2">
+                                        <i class="bi bi-envelope me-1 text-primary"></i>
+                                        <strong class="small">Para:</strong>
+                                        <span class="small ms-1">${emailPrincipal || '(sin correo)'}</span>
+                                    </li>
+                                    ${destinatariosCopia.length > 0 ? `
+                                    <li class="list-group-item py-1 px-2">
+                                        <i class="bi bi-people me-1 text-secondary"></i>
+                                        <strong class="small">CC:</strong>
+                                    </li>
+                                    ${ccHtml}
+                                    ` : ''}
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Aviso importante -->
+                        <div class="alert alert-warning py-2 mb-0 small">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                            <strong>Nota:</strong> El correo indicará al cliente que su equipo
+                            <strong>aún NO está listo</strong> para recoger. Solo se le notifica
+                            que el proceso de egreso ha comenzado.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="btnEgresoModalCancelar">
+                            <i class="bi bi-x-lg me-1"></i> No enviar
+                        </button>
+                        <button type="button" class="btn btn-warning text-white" id="btnEgresoModalAceptar" ${!emailPrincipal ? 'disabled' : ''}>
+                            <i class="bi bi-send-fill me-1"></i> Sí, enviar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        // ── 3. Mostrar modal con Bootstrap ───────────────────────────────────
+        const modalEl = document.getElementById(modalId);
+        const modal = new window.bootstrap.Modal(modalEl);
+        modal.show();
+        // ── 4. Manejadores de botones ────────────────────────────────────────
+        // Cancelar → recargar normalmente
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            modalEl.remove();
+            window.location.reload();
+        });
+        // Aceptar → POST al endpoint de envío
+        (_b = document.getElementById('btnEgresoModalAceptar')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', async () => {
+            const btnAceptar = document.getElementById('btnEgresoModalAceptar');
+            const btnCancelar = document.getElementById('btnEgresoModalCancelar');
+            if (btnAceptar) {
+                btnAceptar.disabled = true;
+                btnAceptar.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Enviando...';
+            }
+            if (btnCancelar)
+                btnCancelar.disabled = true;
+            try {
+                // Obtener CSRF token del DOM
+                const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+                const csrfToken = (csrfInput === null || csrfInput === void 0 ? void 0 : csrfInput.value) || '';
+                const resp = await fetch(urlEnviar, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                });
+                if (resp.ok) {
+                    if (btnAceptar) {
+                        btnAceptar.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> ¡Enviado!';
+                        btnAceptar.classList.replace('btn-warning', 'btn-success');
+                    }
+                    // Esperar un momento para que el usuario vea el feedback
+                    setTimeout(() => {
+                        modal.hide();
+                    }, 1200);
+                }
+                else {
+                    // Error del servidor
+                    if (btnAceptar) {
+                        btnAceptar.disabled = false;
+                        btnAceptar.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i> Error — reintentar';
+                        btnAceptar.classList.replace('btn-warning', 'btn-danger');
+                    }
+                    if (btnCancelar)
+                        btnCancelar.disabled = false;
+                }
+            }
+            catch (_) {
+                if (btnAceptar) {
+                    btnAceptar.disabled = false;
+                    btnAceptar.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i> Error de red — reintentar';
+                    btnAceptar.classList.replace('btn-warning', 'btn-danger');
+                }
+                if (btnCancelar)
+                    btnCancelar.disabled = false;
+            }
+        });
     }
     /**
      * Muestra un countdown visual y recarga la página cuando llega a 0.
