@@ -21,6 +21,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from inventario import views as inventario_views
 from config.media_views import serve_media_from_multiple_locations
+from servicio_tecnico.views import feedback_rechazo_view
 
 urlpatterns = [
     # Panel de administración (URL personalizada por seguridad)
@@ -43,6 +44,11 @@ urlpatterns = [
     path('servicio-tecnico/', include('servicio_tecnico.urls')),  # URLs del módulo de servicio técnico
     path('almacen/', include('almacen.urls')),  # URLs del módulo de almacén central - Dic 2025
     path('notificaciones/', include('notificaciones.urls')),  # API de notificaciones 🔔
+
+    # ── URL PÚBLICA: Feedback de rechazo de cotización (sin autenticación) ──
+    # El cliente abre este link desde el correo. No requiere login.
+    # Formato: /feedback/<token>/
+    path('feedback/<str:token>/', feedback_rechazo_view, name='feedback_rechazo_publico'),
 ]
 
 # ============================================================================

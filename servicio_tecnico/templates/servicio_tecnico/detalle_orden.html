@@ -4168,6 +4168,154 @@
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- MODAL: CONFIRMACIÓN DE ENVÍO DE FEEDBACK DE RECHAZO -->
+<!-- ============================================================ -->
+<!-- 
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este modal aparece DESPUÉS de que el operador registra un rechazo de cotización.
+    Le permite OPTAR por enviar o NO el correo de feedback al cliente.
+    
+    FLUJO:
+    1. Operador guarda rechazo en formulario
+    2. Backend crea FeedbackCliente con token
+    3. Backend guarda ID y email en sesión (feedback_pendiente_id, feedback_pendiente_email)
+    4. Vista redirect a detalle_orden con esos valores en contexto
+    5. Este modal se muestra automáticamente (JavaScript detecta la variable)
+    6. Operador decide: "Enviar correo" o "Cancelar"
+-->
+{% if feedback_pendiente_id and feedback_pendiente_email %}
+<div class="modal fade" id="modalConfirmarFeedback" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-left: 5px solid #0d6efd;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <h5 class="modal-title">
+                    <i class="bi bi-envelope-paper"></i> Enviar Feedback al Cliente
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-3" style="border-left: 4px solid #0dcaf0;">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <strong>Sistema de Feedback de Rechazo</strong>
+                    <p class="mb-0 mt-2 small">
+                        El sistema ha preparado un correo para solicitar la opinión del cliente 
+                        sobre por qué rechazó la cotización. Esto nos ayuda a mejorar.
+                    </p>
+                </div>
+                
+                <p class="mb-2">
+                    <strong><i class="bi bi-envelope"></i> Destinatario:</strong><br>
+                    <code class="bg-light p-2 d-inline-block rounded">{{ feedback_pendiente_email }}</code>
+                </p>
+                
+                <p class="mb-3">
+                    <strong><i class="bi bi-file-text"></i> Contenido del correo:</strong>
+                </p>
+                <ul class="small text-muted">
+                    <li>Link personalizado y seguro (válido 7 días)</li>
+                    <li>Solicitud de comentario sobre el motivo del rechazo</li>
+                    <li>Información del equipo para contexto</li>
+                    <li>Límite de 1000 caracteres para el comentario</li>
+                </ul>
+                
+                <div class="alert alert-warning mb-0 mt-3" style="border-left: 4px solid #ffc107;">
+                    <small>
+                        <i class="bi bi-lightning-fill"></i>
+                        <strong>Nota:</strong> El envío es opcional. Si prefieres NO enviar el correo, 
+                        simplemente cancela. El rechazo ya ha sido registrado.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <form method="post" action="{% url 'servicio_tecnico:confirmar_envio_feedback' feedback_pendiente_id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="cancelar">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="bi bi-x-lg"></i> No Enviar Correo
+                    </button>
+                </form>
+                <form method="post" action="{% url 'servicio_tecnico:confirmar_envio_feedback' feedback_pendiente_id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="enviar">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send-fill"></i> Enviar Correo al Cliente
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- MODAL: CONFIRMACIÓN DE ENVÍO POR VIGENCIA VENCIDA -->
+<!-- ============================================================ -->
+<!-- 
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este modal es para el caso especial de "falta_de_respuesta" (vigencia vencida).
+    No envía link de feedback, solo notifica que la cotización venció.
+-->
+{% if vigencia_vencida_orden_id and vigencia_vencida_email %}
+<div class="modal fade" id="modalConfirmarVigenciaVencida" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-left: 5px solid #ffc107;">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="bi bi-clock-history"></i> Notificar Vigencia Vencida
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning mb-3" style="border-left: 4px solid #ffc107;">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <strong>Cotización Vencida por Falta de Respuesta</strong>
+                    <p class="mb-0 mt-2 small">
+                        El cliente no respondió dentro del plazo establecido. 
+                        Puedes enviar un correo informativo.
+                    </p>
+                </div>
+                
+                <p class="mb-2">
+                    <strong><i class="bi bi-envelope"></i> Destinatario:</strong><br>
+                    <code class="bg-light p-2 d-inline-block rounded">{{ vigencia_vencida_email }}</code>
+                </p>
+                
+                <p class="mb-3">
+                    <strong><i class="bi bi-file-text"></i> Contenido del correo:</strong>
+                </p>
+                <ul class="small text-muted">
+                    <li>Notificación de que la cotización ha vencido</li>
+                    <li>Información de contacto para renovar la cotización</li>
+                    <li>NO incluye link de feedback</li>
+                </ul>
+                
+                <div class="alert alert-info mb-0 mt-3" style="border-left: 4px solid #0dcaf0;">
+                    <small>
+                        <i class="bi bi-lightning-fill"></i>
+                        <strong>Nota:</strong> El envío es opcional. El rechazo ya ha sido registrado.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <form method="post" action="{% url 'servicio_tecnico:confirmar_envio_vigencia_vencida' vigencia_vencida_orden_id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="cancelar">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="bi bi-x-lg"></i> No Enviar Correo
+                    </button>
+                </form>
+                <form method="post" action="{% url 'servicio_tecnico:confirmar_envio_vigencia_vencida' vigencia_vencida_orden_id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="enviar">
+                    <button type="submit" class="btn btn-warning text-dark">
+                        <i class="bi bi-send-fill"></i> Enviar Notificación
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -4207,6 +4355,30 @@ document.addEventListener('DOMContentLoaded', function() {
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
+    
+    // ============================================================================
+    // ✅ NUEVO: MOSTRAR MODALES DE CONFIRMACIÓN POST-RECHAZO (Feedback System)
+    // ============================================================================
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Después de registrar un rechazo, el backend guarda variables en la sesión.
+    // Cuando se hace redirect a detalle_orden, esas variables vienen en el contexto.
+    // Este código detecta si existen y muestra el modal correspondiente automáticamente.
+    
+    {% if feedback_pendiente_id and feedback_pendiente_email %}
+    // Caso 1: Rechazo que requiere feedback del cliente
+    const modalFeedback = document.getElementById('modalConfirmarFeedback');
+    if (modalFeedback) {
+        const bsModalFeedback = new bootstrap.Modal(modalFeedback);
+        bsModalFeedback.show();
+    }
+    {% elif vigencia_vencida_orden_id and vigencia_vencida_email %}
+    // Caso 2: Rechazo por vigencia vencida (falta de respuesta)
+    const modalVigencia = document.getElementById('modalConfirmarVigenciaVencida');
+    if (modalVigencia) {
+        const bsModalVigencia = new bootstrap.Modal(modalVigencia);
+        bsModalVigencia.show();
+    }
+    {% endif %}
     
     // ============================================================================
     // ALERTA DE CARGA DE TRABAJO DEL TÉCNICO
@@ -4435,6 +4607,77 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             const accion = accionSeleccionada.value;
+            
+            // ✅ NUEVO (Feedback Rechazo): Validar email del cliente antes de rechazar
+            if (accion === 'rechazar') {
+                const emailCliente = '{{ detalle.email_cliente|default:"" }}';
+                const motivoSeleccionado = selectMotivo ? selectMotivo.value : '';
+                
+                // Lista de motivos que requieren envío de correo con link de feedback
+                const motivosConFeedback = [
+                    'costo_alto', 'muchas_piezas', 'tiempo_largo', 
+                    'falta_justificacion', 'no_vale_pena', 'rechazo_sin_decision',
+                    'no_especifica_motivo', 'no_autorizado_por_empresa', 'otro'
+                ];
+                
+                // Validar solo si el motivo requiere envío de correo
+                if (motivosConFeedback.includes(motivoSeleccionado)) {
+                    if (!emailCliente || emailCliente === 'cliente@ejemplo.com') {
+                        e.preventDefault();
+                        
+                        // Mostrar modal de error explicativo
+                        const modalHTML = `
+                            <div class="modal fade" id="modalEmailInvalido" tabindex="-1" data-bs-backdrop="static">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content" style="border-left: 5px solid #dc3545;">
+                                        <div class="modal-header bg-danger text-white">
+                                            <h5 class="modal-title">
+                                                <i class="bi bi-exclamation-triangle-fill"></i> Email del Cliente Inválido
+                                            </h5>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="alert alert-warning mb-3" style="border-left: 4px solid #ffc107;">
+                                                <strong><i class="bi bi-info-circle"></i> ¿Por qué necesitamos un email válido?</strong>
+                                                <p class="mb-0 mt-2 small">
+                                                    Este motivo de rechazo requiere enviar un correo al cliente para solicitar 
+                                                    su retroalimentación sobre por qué rechazó la cotización. Esto nos ayuda a 
+                                                    mejorar nuestro servicio.
+                                                </p>
+                                            </div>
+                                            <p class="mb-3">
+                                                El email actual es: <strong class="text-danger">${emailCliente || '(vacío)'}</strong>
+                                            </p>
+                                            <p class="mb-0">
+                                                <i class="bi bi-arrow-right-circle text-primary"></i>
+                                                Por favor, actualiza el email del cliente antes de continuar.
+                                            </p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                <i class="bi bi-x-lg"></i> Cancelar
+                                            </button>
+                                            <button type="button" class="btn btn-primary" onclick="document.querySelector('[data-bs-target=\\'#modalEditarInfoEquipo\\']').click(); bootstrap.Modal.getInstance(document.getElementById('modalEmailInvalido')).hide();">
+                                                <i class="bi bi-pencil-square"></i> Editar Información del Equipo
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Remover modal existente si hay
+                        const modalExistente = document.getElementById('modalEmailInvalido');
+                        if (modalExistente) modalExistente.remove();
+                        
+                        // Agregar y mostrar modal
+                        document.body.insertAdjacentHTML('beforeend', modalHTML);
+                        const modal = new bootstrap.Modal(document.getElementById('modalEmailInvalido'));
+                        modal.show();
+                        
+                        return false;
+                    }
+                }
+            }
             
             // 🆕 NUEVO: Mensaje personalizado si aplica descuento
             let mensaje;

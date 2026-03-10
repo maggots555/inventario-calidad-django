@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tu opinión importa — Folio {{ folio }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(180deg, #ffffff 0%, #e3f2fd 50%, #90caf9 100%);
+            color: #051d63;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .header::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231976d2' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        
+        .logo-container {
+            position: relative;
+            z-index: 1;
+            margin-bottom: 15px;
+        }
+        
+        .logo-image {
+            max-width: 180px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+        }
+        
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .intro-text {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 25px;
+            line-height: 1.7;
+        }
+        
+        .equipment-info {
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .info-title {
+            font-size: 20px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-align: center;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .info-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #667eea;
+            min-width: 150px;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            color: #333;
+            font-size: 15px;
+            flex: 1;
+        }
+        
+        .info-value.highlight {
+            font-weight: 700;
+            color: #764ba2;
+        }
+
+        /* ── Tabla de piezas rechazadas ── */
+        .piezas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        
+        .piezas-table thead th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .piezas-table thead th:first-child {
+            border-radius: 8px 0 0 0;
+        }
+        
+        .piezas-table thead th:last-child {
+            border-radius: 0 8px 0 0;
+            text-align: right;
+        }
+        
+        .piezas-table tbody td {
+            padding: 10px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #555;
+        }
+        
+        .piezas-table tbody td:last-child {
+            text-align: right;
+            font-weight: 600;
+        }
+        
+        .piezas-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .total-label {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+        
+        .total-value {
+            font-weight: 700;
+            color: #e53e3e;
+            font-size: 20px;
+        }
+
+        /* ── Botón CTA ── */
+        .cta-section {
+            text-align: center;
+            margin: 35px 0;
+        }
+        
+        .cta-text {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 20px;
+            line-height: 1.7;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 16px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            letter-spacing: 0.5px;
+        }
+        
+        .cta-note {
+            font-size: 13px;
+            color: #999;
+            margin-top: 15px;
+        }
+
+        .help-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        .help-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #17a2b8;
+            margin-bottom: 10px;
+        }
+        
+        .help-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .signature {
+            margin-bottom: 15px;
+        }
+        
+        .signature-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .signature-role {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .signature-area {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+        
+        .company {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+        
+        .social-media {
+            margin: 20px 0;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+        
+        .social-title {
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+            text-align: center;
+        }
+        
+        .social-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            text-align: center;
+        }
+        
+        .social-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            text-decoration: none;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .social-link:hover {
+            background-color: rgba(255, 255, 255, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 0;
+            }
+            
+            .content {
+                padding: 20px 15px;
+            }
+            
+            .info-row {
+                flex-direction: column;
+            }
+            
+            .info-label {
+                min-width: auto;
+                margin-bottom: 5px;
+            }
+            
+            .cta-button {
+                padding: 14px 30px;
+                font-size: 16px;
+            }
+            
+            .social-media {
+                padding: 15px 5px;
+            }
+            
+            .social-links {
+                gap: 8px;
+                padding: 0 5px;
+            }
+            
+            .social-link {
+                padding: 6px 10px;
+                font-size: 11px;
+                gap: 6px;
+                flex: 0 1 auto;
+                min-width: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-container">
+                <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
+            </div>
+            <div class="logo">Tu opinión nos importa</div>
+            <div class="subtitle">Nos gustaría conocer tu experiencia</div>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Estimado/a {{ nombre_cliente }},
+            </div>
+            
+            <div class="intro-text">
+                Notamos que decidiste no continuar con la cotización de tu equipo.
+                Nos gustaría mucho conocer tu opinión para poder mejorar nuestro servicio.
+                <strong>Tu comentario es completamente confidencial.</strong>
+            </div>
+            
+            <div class="equipment-info">
+                <div class="info-title">Información de tu equipo</div>
+                
+                <div class="info-row">
+                    <div class="info-label">Folio:</div>
+                    <div class="info-value highlight">{{ folio }}</div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">Equipo:</div>
+                    <div class="info-value">
+                        {{ tipo_equipo }} {{ marca_equipo }}
+                        {% if modelo_equipo %}{{ modelo_equipo }}{% endif %}
+                    </div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">Motivo registrado:</div>
+                    <div class="info-value">{{ motivo_rechazo }}</div>
+                </div>
+            </div>
+
+            {% if piezas %}
+            <div class="equipment-info">
+                <div class="info-title">Detalle de la cotización</div>
+                <table class="piezas-table">
+                    <thead>
+                        <tr>
+                            <th>Pieza / Componente</th>
+                            <th>Cant.</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in piezas %}
+                        <tr>
+                            <td>{{ p.nombre_pieza }}</td>
+                            <td>{{ p.cantidad }}</td>
+                            <td>${{ p.costo_unitario|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if monto_mano_obra %}
+                        <tr>
+                            <td>Mano de obra</td>
+                            <td>1</td>
+                            <td>${{ monto_mano_obra|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+                <div class="total-row">
+                    <span class="total-label">Total cotizado:</span>
+                    <span class="total-value">${{ monto_total|floatformat:2 }}</span>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="cta-section">
+                <div class="cta-text">
+                    Tomará menos de <strong>1 minuto</strong>. Solo queremos saber
+                    qué podemos hacer mejor.
+                </div>
+                <a href="{{ feedback_url }}" class="cta-button">
+                    Dejar mi comentario
+                </a>
+                <div class="cta-note">
+                    Este enlace es personal y expira en {{ dias_vigencia }} días.
+                </div>
+            </div>
+            
+            <div class="help-section">
+                <div class="help-title">Información</div>
+                <div class="help-text">
+                    <strong>&bull;</strong> Tu respuesta es anónima y confidencial.<br>
+                    <strong>&bull;</strong> No necesitas crear cuenta ni iniciar sesión.<br>
+                    <strong>&bull;</strong> El enlace solo puede usarse una vez.<br>
+                    <strong>&bull;</strong> Si el enlace no funciona, copia y pega esta dirección en tu navegador:<br>
+                    <span style="word-break: break-all; color: #667eea;">{{ feedback_url }}</span>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
+                <p style="margin: 0; font-size: 14px;">
+                    Gracias por tu tiempo y confianza.
+                </p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-name">
+                    Sistema de Servicio Técnico
+                </div>
+                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 18.2px;">
+                    Este es un correo automático no supervisado.
+                </div>
+                <div class="signature-area" style="margin-top: 10px; font-size: 16.9px; line-height: 1.5;">
+                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                    Para seguimiento de su orden, contacte directamente a su responsable.
+                </div>
+            </div>
+            
+            <div class="social-media">
+                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+                <div class="social-links">
+                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
+                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Sitio Web</span>
+                    </a>
+                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Instagram</span>
+                    </a>
+                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Facebook</span>
+                    </a>
+                    <a href="https://wa.me/" class="social-link" target="_blank">
+                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>WhatsApp</span>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="timestamp">
+                Enviado el {{ fecha_envio }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

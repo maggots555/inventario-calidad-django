@@ -2858,3 +2858,51 @@ class EditarDiagnosticoSICForm(forms.Form):
             )
         
         return descripcion
+
+
+# ============================================================
+# FORMULARIO: FeedbackRechazoClienteForm
+# Usado en la vista PÚBLICA (sin autenticación) que el cliente
+# abre desde el link enviado por correo al rechazar la cotización.
+# ============================================================
+
+class FeedbackRechazoClienteForm(forms.Form):
+    """
+    Formulario simple que el cliente llena en la vista pública
+    para explicar por qué rechazó la cotización.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Este formulario NO usa ModelForm porque no queremos que el cliente
+    acceda directamente al modelo. La vista procesa el formulario
+    y guarda el dato en FeedbackCliente manualmente.
+    """
+    comentario_cliente = forms.CharField(
+        label="Cuéntenos por qué rechazó la cotización",
+        max_length=1000,
+        min_length=10,
+        required=True,
+        widget=forms.Textarea(attrs={
+            'rows': 6,
+            'maxlength': '1000',
+            'placeholder': (
+                'Ejemplo: El costo de las piezas fue más alto de lo que esperaba, '
+                'o el tiempo de reparación era demasiado largo para mis necesidades...'
+            ),
+            'class': 'feedback-textarea',
+            'id': 'id_comentario_cliente',
+        }),
+        error_messages={
+            'required': 'Por favor comparte tu opinión. Es muy valiosa para nosotros.',
+            'min_length': 'Tu comentario debe tener al menos 10 caracteres.',
+            'max_length': 'Tu comentario no puede exceder 1000 caracteres.',
+        }
+    )
+
+    def clean_comentario_cliente(self):
+        comentario = self.cleaned_data.get('comentario_cliente', '').strip()
+        if len(comentario) < 10:
+            raise forms.ValidationError(
+                'Tu comentario debe tener al menos 10 caracteres.'
+            )
+        return comentario

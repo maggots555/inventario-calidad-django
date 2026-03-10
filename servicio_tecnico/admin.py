@@ -24,6 +24,8 @@ from .models import (
     SeguimientoRHITSO,
     IncidenciaRHITSO,
     ConfiguracionRHITSO,
+    # NUEVO - SISTEMA DE FEEDBACK (Enero 2026)
+    FeedbackCliente,
 )
 
 
@@ -1533,6 +1535,195 @@ class ConfiguracionRHITSOAdmin(admin.ModelAdmin):
             obj.get_tipo_display()
         )
     tipo_badge.short_description = 'Tipo'
+
+
+# ============================================================================
+# FEEDBACK CLIENTE - Sistema de Retroalimentación (Enero 2026)
+# ============================================================================
+
+@admin.register(FeedbackCliente)
+class FeedbackClienteAdmin(admin.ModelAdmin):
+    """
+    Administración del sistema de feedback de clientes.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Este modelo guarda los feedbacks de los clientes sobre rechazos de cotización
+    - También está preparado para futura encuesta de satisfacción
+    - El token es único y expira en 7 días
+    - Solo se puede usar una vez (campo 'utilizado')
+    
+    CAMPOS:
+    - cotizacion: Relación con la cotización rechazada
+    - tipo: 'rechazo' o 'satisfaccion' (futuro)
+    - token: String único y seguro para el link público
+    - fecha_creacion: Cuándo se creó el token
+    - utilizado: Si el cliente ya dejó su comentario
+    - comentario_cliente: Texto libre del cliente (max 1000 chars)
+    """
+    
+    list_display = (
+        'id',
+        'cotizacion_badge',
+        'tipo_badge',
+        'email_cliente',
+        'estado_badge',
+        'fecha_creacion',
+        'dias_restantes_badge',
+        'utilizado_badge',
+    )
+    
+    list_filter = (
+        'tipo',
+        'utilizado',
+        'fecha_creacion',
+    )
+    
+    search_fields = (
+        'cotizacion__orden__numero_orden_interno',
+        'cotizacion__orden__detalle_equipo__numero_serie',
+        'comentario_cliente',
+    )
+    
+    readonly_fields = (
+        'token',
+        'fecha_creacion',
+        'cotizacion',
+        'tipo',
+        'estado_actual',
+        'dias_restantes_info',
+    )
+    
+    fieldsets = (
+        ('Información General', {
+            'fields': (
+                'cotizacion',
+                'tipo',
+                'estado_actual',
+            )
+        }),
+        ('Token de Acceso', {
+            'fields': (
+                'token',
+                'fecha_creacion',
+                'dias_restantes_info',
+            ),
+            'description': 'El token es único y seguro. Expira en 7 días desde su creación.'
+        }),
+        ('Estado de Uso', {
+            'fields': (
+                'utilizado',
+            )
+        }),
+        ('Feedback de Rechazo', {
+            'fields': (
+                'comentario_cliente',
+            ),
+            'description': 'Comentario del cliente sobre por qué rechazó la cotización.'
+        }),
+        ('Futura Encuesta de Satisfacción', {
+            'fields': (
+                'calificacion_general',
+                'calificacion_atencion',
+                'calificacion_tiempo',
+                'recomienda',
+                'nps',
+            ),
+            'classes': ('collapse',),
+            'description': 'Campos preparados para futura implementación de encuesta de satisfacción.'
+        }),
+    )
+    
+    def cotizacion_badge(self, obj):
+        """Link a la orden relacionada"""
+        orden = obj.cotizacion.orden
+        url = reverse('admin:servicio_tecnico_ordenservicio_change', args=[orden.pk])
+        return format_html(
+            '<a href="{}" class="badge bg-primary text-decoration-none">{}</a>',
+            url,
+            orden.numero_orden_interno
+        )
+    cotizacion_badge.short_description = 'Orden'
+    
+    def tipo_badge(self, obj):
+        """Badge visual del tipo de feedback"""
+        colores = {
+            'rechazo': 'danger',
+            'satisfaccion': 'success',
+        }
+        return format_html(
+            '<span class="badge bg-{}">{}</span>',
+            colores.get(obj.tipo, 'secondary'),
+            obj.get_tipo_display()
+        )
+    tipo_badge.short_description = 'Tipo'
+    
+    def email_cliente(self, obj):
+        """Email del cliente desde la orden"""
+        email = obj.cotizacion.orden.detalle_equipo.email_cliente
+        if email and email != 'cliente@ejemplo.com':
+            return format_html('<a href="mailto:{}">{}</a>', email, email)
+        return format_html('<span class="text-danger">Sin email</span>')
+    email_cliente.short_description = 'Email Cliente'
+    
+    def estado_badge(self, obj):
+        """Badge visual del estado actual"""
+        if obj.utilizado:
+            return format_html('<span class="badge bg-success">✓ Respondido</span>')
+        elif obj.esta_expirado:
+            return format_html('<span class="badge bg-danger">⏰ Expirado</span>')
+        else:
+            return format_html('<span class="badge bg-warning text-dark">⏳ Pendiente</span>')
+    estado_badge.short_description = 'Estado'
+    
+    def dias_restantes_badge(self, obj):
+        """Muestra días restantes con color"""
+        dias = obj.dias_restantes
+        if obj.utilizado:
+            return format_html('<span class="badge bg-success">Completado</span>')
+        elif dias <= 0:
+            return format_html('<span class="badge bg-danger">Expirado</span>')
+        elif dias <= 2:
+            return format_html('<span class="badge bg-warning text-dark">{} días</span>', dias)
+        else:
+            return format_html('<span class="badge bg-info">{} días</span>', dias)
+    dias_restantes_badge.short_description = 'Vigencia'
+    
+    def utilizado_badge(self, obj):
+        """Badge visual de si fue utilizado"""
+        if obj.utilizado:
+            return format_html('<span class="badge bg-success">✓ SÍ</span>')
+        return format_html('<span class="badge bg-secondary">✗ NO</span>')
+    utilizado_badge.short_description = '¿Usado?'
+    
+    def estado_actual(self, obj):
+        """Campo readonly que muestra el estado completo"""
+        if obj.utilizado:
+            return "✓ Respondido"
+        elif obj.esta_expirado:
+            return "⏰ Expirado"
+        else:
+            return f"⏳ Pendiente ({obj.dias_restantes} días restantes)"
+    estado_actual.short_description = 'Estado Actual'
+    
+    def dias_restantes_info(self, obj):
+        """Información detallada de días restantes"""
+        if obj.utilizado:
+            return "Token ya utilizado"
+        elif obj.esta_expirado:
+            dias_vencido = abs(obj.dias_restantes)
+            return f"Expirado hace {dias_vencido} días"
+        else:
+            return f"{obj.dias_restantes} días restantes"
+    dias_restantes_info.short_description = 'Vigencia del Token'
+    
+    # Deshabilitar edición de campos críticos
+    def has_add_permission(self, request):
+        """No permitir crear feedback manualmente desde admin"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Solo superusuarios pueden eliminar"""
+        return request.user.is_superuser
 
 
 # Configuración del sitio admin

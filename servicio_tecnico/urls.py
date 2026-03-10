@@ -295,4 +295,17 @@ urlpatterns = [
 
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
+
+    # ========================================================================
+    # FEEDBACK DE RECHAZO DE COTIZACIÓN (Marzo 2026)
+    # ========================================================================
+    # Confirmación interna (operador): ¿enviar correo de feedback al cliente?
+    path('cotizacion/feedback/<int:feedback_id>/confirmar-envio/',
+         views.confirmar_envio_feedback,
+         name='confirmar_envio_feedback'),
+
+    # Confirmación interna (operador): correo de cotización vencida por falta de respuesta
+    path('orden/<int:orden_id>/confirmar-vigencia-vencida/',
+         views.confirmar_envio_vigencia_vencida,
+         name='confirmar_envio_vigencia_vencida'),
 ]

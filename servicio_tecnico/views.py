@@ -2242,7 +2242,8 @@ def detalle_orden(request, orden_id):
                 
                 elif accion == 'rechazar':
                     motivo = cotizacion_actualizada.get_motivo_rechazo_display()
-                    detalle = cotizacion_actualizada.detalle_rechazo
+                    motivo_clave = cotizacion_actualizada.motivo_rechazo
+                    detalle_rechazo = cotizacion_actualizada.detalle_rechazo
                     
                     messages.warning(
                         request,
@@ -2272,8 +2273,8 @@ def detalle_orden(request, orden_id):
                     
                     # Registrar en historial
                     comentario_historial = f'Cliente RECHAZÓ la cotización - Motivo: {motivo} ({piezas_rechazadas_count} pieza(s) rechazada(s))'
-                    if detalle:
-                        comentario_historial += f' | Detalle: {detalle}'
+                    if detalle_rechazo:
+                        comentario_historial += f' | Detalle: {detalle_rechazo}'
                     
                     HistorialOrden.objects.create(
                         orden=orden,
@@ -2282,6 +2283,50 @@ def detalle_orden(request, orden_id):
                         usuario=empleado_actual,
                         es_sistema=False
                     )
+
+                    # ── SISTEMA DE FEEDBACK DE RECHAZO ──────────────────────────
+                    # Motivos que requieren correo con link de feedback:
+                    MOTIVOS_CON_FEEDBACK = {
+                        'costo_alto', 'muchas_piezas', 'tiempo_largo',
+                        'falta_justificacion', 'no_vale_pena', 'rechazo_sin_decision',
+                        'no_especifica_motivo', 'no_autorizado_por_empresa', 'otro',
+                    }
+                    # Motivos que envían correo informativo (sin link de feedback):
+                    MOTIVOS_VIGENCIA_VENCIDA = {'falta_de_respuesta'}
+                    # Motivos que NO envían correo: no_hay_partes, solo_venta_mostrador, no_apto
+
+                    email_cliente_actual = (
+                        orden.detalle_equipo.email_cliente
+                        if orden.detalle_equipo else None
+                    )
+
+                    if motivo_clave in MOTIVOS_CON_FEEDBACK and email_cliente_actual:
+                        # Crear token de feedback usando django.core.signing
+                        from django.core.signing import TimestampSigner
+                        from .models import FeedbackCliente
+                        import uuid
+
+                        signer = TimestampSigner()
+                        # El token es la firma de un UUID único
+                        token_raw = str(uuid.uuid4())
+                        token_firmado = signer.sign(token_raw)
+
+                        feedback_obj = FeedbackCliente.objects.create(
+                            cotizacion=cotizacion_actualizada,
+                            token=token_firmado,
+                            tipo='rechazo',
+                            motivo_rechazo_snapshot=motivo_clave,
+                            enviado_por=empleado_actual,
+                        )
+                        # Guardar feedback_id en sesión para que el modal en detalle_orden lo lea
+                        request.session['feedback_pendiente_id'] = feedback_obj.pk
+                        request.session['feedback_pendiente_email'] = email_cliente_actual
+
+                    elif motivo_clave in MOTIVOS_VIGENCIA_VENCIDA and email_cliente_actual:
+                        # Marcar en sesión que se debe enviar correo de vigencia vencida
+                        request.session['vigencia_vencida_orden_id'] = orden.pk
+                        request.session['vigencia_vencida_email'] = email_cliente_actual
+                    # ────────────────────────────────────────────────────────────
                 
                 return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
             else:
@@ -2539,14 +2584,198 @@ def detalle_orden(request, orden_id):
         
         # Estadísticas de técnicos (para alertas) - Convertido a JSON para JavaScript
         'estadisticas_tecnicos': mark_safe(json.dumps(estadisticas_tecnicos)),
+
+        # ── Feedback de rechazo pendiente de confirmar envío ──
+        # Estas variables llegan desde la sesión tras guardar un rechazo de cotización.
+        # El template las usa para mostrar el modal de confirmación de envío de correo.
+        'feedback_pendiente_id': request.session.pop('feedback_pendiente_id', None),
+        'feedback_pendiente_email': request.session.pop('feedback_pendiente_email', None),
+        'vigencia_vencida_orden_id': request.session.pop('vigencia_vencida_orden_id', None),
+        'vigencia_vencida_email': request.session.pop('vigencia_vencida_email', None),
     }
     
     return render(request, 'servicio_tecnico/detalle_orden.html', context)
 
 
 # ============================================================================
-# FUNCIÓN AUXILIAR: Comprimir y Guardar Imagen
+# VISTA: confirmar_envio_feedback
+# El operador acepta o cancela el envío del correo de feedback al cliente.
+# Se llama vía POST desde el modal en detalle_orden.html.
 # ============================================================================
+
+@login_required
+@require_http_methods(['POST'])
+def confirmar_envio_feedback(request, feedback_id):
+    """
+    Recibe la decisión del operador sobre si enviar o no el correo de feedback.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cuando el operador rechaza una cotización, se muestra un modal preguntando
+    si quiere enviar el correo al cliente. Esta vista procesa esa respuesta.
+
+    Si acepta → encola la tarea Celery que envía el correo.
+    Si cancela → no hace nada (el token queda guardado pero sin correo enviado).
+    """
+    from .models import FeedbackCliente
+    from .tasks import enviar_feedback_rechazo_task
+
+    feedback = get_object_or_404(FeedbackCliente, pk=feedback_id)
+    accion = request.POST.get('accion', 'cancelar')
+    orden_id = feedback.cotizacion.orden.pk
+
+    if accion == 'enviar':
+        if feedback.correo_enviado:
+            messages.warning(request, '⚠️ El correo de feedback ya fue enviado anteriormente.')
+        else:
+            usuario_id = request.user.pk if request.user.is_authenticated else None
+            enviar_feedback_rechazo_task.delay(feedback_id=feedback.pk, usuario_id=usuario_id)
+            messages.success(
+                request,
+                f'📧 Correo de feedback enviado a {feedback.cotizacion.orden.detalle_equipo.email_cliente}. '
+                f'El cliente tiene 7 días para responder.'
+            )
+    else:
+        messages.info(request, 'ℹ️ Envío de correo de feedback cancelado.')
+
+    return redirect('servicio_tecnico:detalle_orden', orden_id=orden_id)
+
+
+# ============================================================================
+# VISTA: confirmar_envio_vigencia_vencida
+# Envío opcional del correo de cotización vencida (motivo: falta_de_respuesta).
+# ============================================================================
+
+@login_required
+@require_http_methods(['POST'])
+def confirmar_envio_vigencia_vencida(request, orden_id):
+    """
+    Encola el correo informativo de cotización vencida por falta de respuesta.
+    """
+    from .tasks import enviar_vigencia_vencida_task
+
+    orden = get_object_or_404(OrdenServicio, pk=orden_id)
+    accion = request.POST.get('accion', 'cancelar')
+
+    if accion == 'enviar':
+        usuario_id = request.user.pk if request.user.is_authenticated else None
+        enviar_vigencia_vencida_task.delay(orden_id=orden.pk, usuario_id=usuario_id)
+        email_cl = orden.detalle_equipo.email_cliente if orden.detalle_equipo else '(sin email)'
+        messages.success(
+            request,
+            f'📧 Correo de cotización vencida enviado a {email_cl}.'
+        )
+    else:
+        messages.info(request, 'ℹ️ Envío de correo cancelado.')
+
+    return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+
+
+# ============================================================================
+# VISTA PÚBLICA: feedback_rechazo_view
+# Página accesible sin autenticación. El cliente abre el link desde el correo,
+# ve la información de su equipo y piezas, y puede escribir su comentario.
+# ============================================================================
+
+def feedback_rechazo_view(request, token):
+    """
+    Vista pública para que el cliente deje su comentario de rechazo.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista NO usa @login_required porque la abre el cliente desde su correo.
+    Valida el token antes de mostrar cualquier información.
+    Si el token ya fue usado o expiró, muestra un mensaje apropiado.
+    """
+    from django.core.signing import BadSignature, SignatureExpired
+    from .models import FeedbackCliente
+    from .forms import FeedbackRechazoClienteForm
+
+    # ── Buscar el feedback por token ──
+    try:
+        feedback = FeedbackCliente.objects.select_related(
+            'cotizacion__orden__detalle_equipo',
+        ).get(token=token)
+    except FeedbackCliente.DoesNotExist:
+        return render(request, 'servicio_tecnico/feedback_rechazo.html', {
+            'estado': 'invalido',
+            'mensaje': 'El enlace no es válido o ya no existe.',
+        })
+
+    # ── Validar estado del token ──
+    if feedback.utilizado:
+        return render(request, 'servicio_tecnico/feedback_rechazo.html', {
+            'estado': 'ya_respondido',
+            'mensaje': 'Ya enviaste tu comentario. ¡Gracias por tu tiempo!',
+        })
+
+    if feedback.esta_expirado:
+        return render(request, 'servicio_tecnico/feedback_rechazo.html', {
+            'estado': 'expirado',
+            'mensaje': 'Este enlace ha expirado. Los links son válidos por 7 días.',
+        })
+
+    orden = feedback.cotizacion.orden
+    detalle = orden.detalle_equipo
+    piezas = feedback.cotizacion.piezas_cotizadas.filter(aceptada_por_cliente=False)
+
+    # ── Calcular monto total rechazado ──
+    monto_piezas = sum(
+        (p.costo_unitario or 0) * (p.cantidad or 1) for p in piezas
+    )
+    monto_mano_obra = feedback.cotizacion.costo_mano_obra or 0
+
+    if request.method == 'POST':
+        form = FeedbackRechazoClienteForm(request.POST)
+        if form.is_valid():
+            feedback.comentario_cliente = form.cleaned_data['comentario_cliente']
+            feedback.utilizado = True
+            feedback.fecha_respuesta = timezone.now()
+            # Guardar IP del cliente para trazabilidad
+            x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+            feedback.ip_respuesta = (
+                x_forwarded.split(',')[0].strip()
+                if x_forwarded
+                else request.META.get('REMOTE_ADDR')
+            )
+            feedback.save(update_fields=[
+                'comentario_cliente', 'utilizado', 'fecha_respuesta', 'ip_respuesta'
+            ])
+
+            # Registrar en historial de la orden
+            try:
+                HistorialOrden.objects.create(
+                    orden=orden,
+                    tipo_evento='cotizacion',
+                    comentario=(
+                        f'💬 Cliente dejó comentario de rechazo (feedback)\n'
+                        f'   {feedback.comentario_cliente[:200]}'
+                    ),
+                    usuario=None,
+                    es_sistema=True
+                )
+            except Exception:
+                pass
+
+            return render(request, 'servicio_tecnico/feedback_rechazo.html', {
+                'estado': 'gracias',
+                'mensaje': '¡Gracias por tu comentario! Tu opinión nos ayuda a mejorar.',
+            })
+    else:
+        form = FeedbackRechazoClienteForm()
+
+    context = {
+        'estado': 'formulario',
+        'form': form,
+        'feedback': feedback,
+        'orden': orden,
+        'detalle': detalle,
+        'piezas': piezas,
+        'monto_piezas': monto_piezas,
+        'monto_mano_obra': monto_mano_obra,
+        'monto_total': monto_piezas + monto_mano_obra,
+        'motivo_rechazo': feedback.cotizacion.get_motivo_rechazo_display(),
+        'dias_restantes': feedback.dias_restantes,
+    }
+    return render(request, 'servicio_tecnico/feedback_rechazo.html', context)
 
 def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
     """

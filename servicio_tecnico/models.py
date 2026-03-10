@@ -2479,3 +2479,167 @@ class ConfiguracionRHITSO(models.Model):
         verbose_name_plural = "Configuraciones RHITSO"
 
 
+# ============================================================
+# MODELO: FeedbackCliente
+# Almacena tokens de feedback enviados a clientes.
+# Soporta dos tipos:
+#   - 'rechazo': Tras rechazar una cotización, se pide al cliente
+#                que explique el motivo detallado. Incluye info de piezas.
+#   - 'satisfaccion': Encuesta general de satisfacción al finalizar
+#                     el servicio (flujo futuro).
+# Seguridad:
+#   - Token único firmado con django.core.signing.TimestampSigner
+#   - Expiración de 7 días
+#   - Uso único: una vez enviado el feedback, el token queda consumido
+#   - La vista pública NO expone login ni navegación del sistema
+# ============================================================
+
+TIPO_FEEDBACK_CHOICES = [
+    ('rechazo', 'Rechazo de Cotización'),
+    ('satisfaccion', 'Encuesta de Satisfacción'),
+]
+
+
+class FeedbackCliente(models.Model):
+    """
+    Token de feedback para clientes.
+    Permite a clientes externos dar retroalimentación mediante
+    un enlace único firmado sin necesidad de autenticación.
+    """
+
+    # --- Relación ---
+    cotizacion = models.ForeignKey(
+        'Cotizacion',
+        on_delete=models.CASCADE,
+        related_name='feedbacks',
+        verbose_name="Cotización",
+        help_text="Cotización a la que pertenece este feedback"
+    )
+
+    # --- Token de acceso seguro ---
+    token = models.CharField(
+        max_length=512,
+        unique=True,
+        db_index=True,
+        verbose_name="Token de acceso",
+        help_text="Token firmado generado con TimestampSigner. Válido por 7 días."
+    )
+
+    # --- Tipo y contexto ---
+    tipo = models.CharField(
+        max_length=20,
+        choices=TIPO_FEEDBACK_CHOICES,
+        default='rechazo',
+        verbose_name="Tipo de feedback"
+    )
+    motivo_rechazo_snapshot = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Snapshot del motivo de rechazo",
+        help_text="Copia del motivo de rechazo al momento de crear el token"
+    )
+
+    # --- Respuesta del cliente (feedback tipo 'rechazo') ---
+    comentario_cliente = models.TextField(
+        max_length=1000,
+        blank=True,
+        verbose_name="Comentario del cliente",
+        help_text="Explicación libre del cliente sobre por qué rechazó (máx. 1000 chars)"
+    )
+
+    # --- Respuesta del cliente (feedback tipo 'satisfaccion') ---
+    # Calificaciones estructuradas para métricas (futuro)
+    calificacion_general = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Calificación general (1-5 estrellas)"
+    )
+    calificacion_atencion = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Calificación atención al cliente (1-5 estrellas)"
+    )
+    calificacion_tiempo = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Calificación tiempo de respuesta (1-5 estrellas)"
+    )
+    recomienda = models.BooleanField(
+        null=True,
+        blank=True,
+        verbose_name="¿Recomendaría el servicio? (pulgar arriba/abajo)"
+    )
+    nps = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="NPS: ¿Del 0 al 10, qué tan probable es que nos recomiende?"
+    )
+
+    # --- Control de estado ---
+    utilizado = models.BooleanField(
+        default=False,
+        verbose_name="Token utilizado",
+        help_text="True cuando el cliente ya envió su feedback"
+    )
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de creación del token"
+    )
+    fecha_respuesta = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha en que el cliente respondió"
+    )
+
+    # --- Trazabilidad ---
+    ip_respuesta = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name="IP del cliente al responder"
+    )
+    enviado_por = models.ForeignKey(
+        Empleado,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='feedbacks_enviados',
+        verbose_name="Enviado por (empleado)"
+    )
+    correo_enviado = models.BooleanField(
+        default=False,
+        verbose_name="¿Correo enviado al cliente?",
+        help_text="Se actualiza a True cuando la tarea Celery envía el correo exitosamente"
+    )
+
+    class Meta:
+        verbose_name = "Feedback de Cliente"
+        verbose_name_plural = "Feedbacks de Clientes"
+        ordering = ['-fecha_creacion']
+
+    def __str__(self):
+        return (
+            f"Feedback [{self.get_tipo_display()}] - "
+            f"Orden {self.cotizacion.orden.numero_orden_interno} "
+            f"({'Respondido' if self.utilizado else 'Pendiente'})"
+        )
+
+    @property
+    def esta_expirado(self):
+        """Token válido por 7 días desde su creación."""
+        from datetime import timedelta
+        return timezone.now() > self.fecha_creacion + timedelta(days=7)
+
+    @property
+    def es_valido(self):
+        """True si el token no ha sido usado y no ha expirado."""
+        return not self.utilizado and not self.esta_expirado
+
+    @property
+    def dias_restantes(self):
+        """Días que quedan antes de que expire el token."""
+        from datetime import timedelta
+        expiracion = self.fecha_creacion + timedelta(days=7)
+        delta = expiracion - timezone.now()
+        return max(0, delta.days)
+
+

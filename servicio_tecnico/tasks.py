@@ -314,9 +314,421 @@ def enviar_correo_rhitso_task(self, orden_id, destinatarios_principales, copia_e
             )
         except Exception:
             pass
-        # EXPLICACIÓN: self.retry() vuelve a intentar la tarea automáticamente.
-        # countdown=60 espera 60 segundos antes de reintentar.
-        # Si falla las max_retries veces (3), la tarea queda en estado FAILURE en Redis.
+        raise self.retry(exc=exc, countdown=60)
+
+
+# ==============================================================================
+# TAREA: enviar_feedback_rechazo_task
+# Envía correo al cliente con link único para que explique por qué rechazó la
+# cotización. Usa token seguro firmado (TimestampSigner). Adjunta logo CID.
+# ==============================================================================
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_feedback_rechazo')
+def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None):
+    """
+    Envía correo al cliente con link de feedback de rechazo de cotización.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta tarea recibe el ID del FeedbackCliente ya creado.
+    Genera el link firmado, renderiza el HTML y envía el correo.
+    Al terminar, marca correo_enviado=True en el modelo.
+
+    Parámetros:
+        feedback_id : ID del FeedbackCliente
+        usuario_id  : ID del usuario Django que disparó la acción (para notificaciones)
+    """
+    import re
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+
+    from .models import FeedbackCliente, HistorialOrden
+
+    logger.info(f"[FEEDBACK-RECHAZO] Iniciando tarea para FeedbackCliente ID {feedback_id}")
+
+    try:
+        # ── Recuperar feedback ──
+        try:
+            feedback = FeedbackCliente.objects.select_related(
+                'cotizacion__orden__detalle_equipo',
+                'enviado_por',
+            ).get(pk=feedback_id)
+        except FeedbackCliente.DoesNotExist:
+            logger.error(f"[FEEDBACK-RECHAZO] FeedbackCliente ID {feedback_id} no encontrado.")
+            return {'success': False, 'mensaje': f'FeedbackCliente ID {feedback_id} no encontrado.'}
+
+        orden = feedback.cotizacion.orden
+        detalle = orden.detalle_equipo
+        email_cliente = detalle.email_cliente if detalle else None
+
+        if not email_cliente:
+            logger.error(f"[FEEDBACK-RECHAZO] Orden {orden.numero_orden_interno} sin email de cliente.")
+            return {'success': False, 'mensaje': 'Sin email de cliente.'}
+
+        # ── Construir URL pública del feedback ──
+        site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        feedback_url = f"{site_url}/feedback/{feedback.token}/"
+
+        # ── Datos del cliente y equipo ──
+        # NOTA: No se registra nombre del cliente en el sistema, usamos saludo genérico
+        nombre_cliente = 'Estimado usuario'
+        marca_equipo = detalle.marca or ''
+        modelo_equipo = detalle.modelo or ''
+        tipo_equipo = detalle.tipo_equipo or ''
+        folio = (
+            detalle.orden_cliente if detalle and detalle.orden_cliente
+            else orden.numero_orden_interno
+        )
+
+        # ── Piezas rechazadas ──
+        # NOTA: 'componente__nombre' accede al nombre a través de la relación ForeignKey
+        # Renombramos la clave para que el template sea más legible
+        piezas_raw = feedback.cotizacion.piezas_cotizadas.filter(aceptada_por_cliente=False).values(
+            'componente__nombre', 'costo_unitario', 'cantidad'
+        )
+        piezas = [
+            {
+                'nombre_pieza': p['componente__nombre'],
+                'costo_unitario': p['costo_unitario'],
+                'cantidad': p['cantidad']
+            }
+            for p in piezas_raw
+        ]
+        monto_total_piezas = sum(
+            (p['costo_unitario'] or 0) * (p['cantidad'] or 1) for p in piezas
+        )
+        monto_mano_obra = feedback.cotizacion.costo_mano_obra or 0
+
+        # ── Contexto para template email ──
+        ahora_local = timezone.localtime(timezone.now())
+        context_email = {
+            'nombre_cliente': nombre_cliente,
+            'folio': folio,
+            'marca_equipo': marca_equipo,
+            'modelo_equipo': modelo_equipo,
+            'tipo_equipo': tipo_equipo,
+            'motivo_rechazo': feedback.cotizacion.get_motivo_rechazo_display(),
+            'piezas': piezas,
+            'monto_total_piezas': monto_total_piezas,
+            'monto_mano_obra': monto_mano_obra,
+            'monto_total': monto_total_piezas + monto_mano_obra,
+            'feedback_url': feedback_url,
+            'dias_vigencia': 7,
+            'fecha_envio': ahora_local.strftime('%d/%m/%Y'),
+        }
+
+        html_content = render_to_string(
+            'servicio_tecnico/emails/feedback_rechazo.html',
+            context_email
+        )
+
+        asunto = f'Tu opinión importa — Folio {folio}'
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente = f"Servicio Técnico System <{email_solo}>"
+
+        # ── Preparar CC (Jefe de Calidad) ──
+        cc_list = []
+        jefe_calidad_email = getattr(settings, 'JEFE_CALIDAD_EMAIL', None)
+        if jefe_calidad_email:
+            cc_list.append(jefe_calidad_email)
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=[email_cliente],
+            cc=cc_list,
+        )
+        email_msg.content_subtype = 'html'
+
+        # ── Adjuntar logo SIC ──
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f"[FEEDBACK-RECHAZO] Error al adjuntar logo: {e}")
+
+        # ── Adjuntar iconos de redes sociales ──
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+                'icon_whatsapp': 'images/utilitys/whatsapp.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning(f"[FEEDBACK-RECHAZO] Error al adjuntar iconos: {e}")
+
+        email_msg.send(fail_silently=False)
+        logger.info(f"[FEEDBACK-RECHAZO] Correo enviado a {email_cliente}")
+
+        # ── Marcar correo como enviado ──
+        FeedbackCliente.objects.filter(pk=feedback_id).update(correo_enviado=True)
+
+        # ── Registrar en historial ──
+        try:
+            HistorialOrden.objects.create(
+                orden=orden,
+                tipo_evento='email',
+                comentario=(
+                    f"📧 Correo de feedback de rechazo enviado al cliente ({email_cliente})\n"
+                    f"🔗 Link válido por 7 días — Token ID: {feedback_id}"
+                ),
+                usuario=feedback.enviado_por,
+                es_sistema=True
+            )
+        except Exception as e:
+            logger.warning(f"[FEEDBACK-RECHAZO] No se pudo registrar historial: {e}")
+
+        # ── Notificar éxito ──
+        try:
+            _usuario_notif = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _usuario_notif = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_exito(
+                titulo="Correo de feedback enviado",
+                mensaje=f"Orden {folio} — Correo de feedback de rechazo enviado a {email_cliente}.",
+                usuario=_usuario_notif,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e:
+            logger.warning(f"[FEEDBACK-RECHAZO] No se pudo crear notificación: {e}")
+
+        return {'success': True, 'feedback_id': feedback_id, 'destinatario': email_cliente}
+
+    except Exception as exc:
+        logger.error(f"[FEEDBACK-RECHAZO] Error para FeedbackCliente ID {feedback_id}: {exc}\n{traceback.format_exc()}")
+        try:
+            _usuario_err = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo="Error al enviar correo de feedback",
+                mensaje=f"FeedbackCliente ID {feedback_id} — {str(exc)[:200]}",
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
+        raise self.retry(exc=exc, countdown=60)
+
+
+# ==============================================================================
+# TAREA: enviar_vigencia_vencida_task
+# Para el motivo 'falta_de_respuesta': envía correo informando que la cotización
+# venció por falta de respuesta del cliente. Sin link de feedback.
+# ==============================================================================
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_vigencia_vencida')
+def enviar_vigencia_vencida_task(self, orden_id, usuario_id=None):
+    """
+    Envía correo al cliente informando que la cotización venció por falta de respuesta.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Solo envía un correo informativo. No crea FeedbackCliente ni token.
+    Se usa únicamente con el motivo 'falta_de_respuesta'.
+
+    Parámetros:
+        orden_id   : ID de OrdenServicio
+        usuario_id : ID del usuario Django que disparó la acción (para notificaciones)
+    """
+    import re
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+
+    from .models import OrdenServicio, HistorialOrden
+
+    logger.info(f"[VIGENCIA-VENCIDA] Iniciando tarea para Orden ID {orden_id}")
+
+    try:
+        try:
+            orden = OrdenServicio.objects.select_related(
+                'detalle_equipo', 'cotizacion'
+            ).get(pk=orden_id)
+        except OrdenServicio.DoesNotExist:
+            logger.error(f"[VIGENCIA-VENCIDA] Orden ID {orden_id} no encontrada.")
+            return {'success': False, 'mensaje': f'Orden ID {orden_id} no encontrada.'}
+
+        detalle = orden.detalle_equipo
+        email_cliente = detalle.email_cliente if detalle else None
+
+        if not email_cliente:
+            logger.error(f"[VIGENCIA-VENCIDA] Orden {orden.numero_orden_interno} sin email de cliente.")
+            return {'success': False, 'mensaje': 'Sin email de cliente.'}
+
+        # NOTA: No se registra nombre del cliente en el sistema, usamos saludo genérico
+        nombre_cliente = 'Estimado usuario'
+        folio = (
+            detalle.orden_cliente if detalle and detalle.orden_cliente
+            else orden.numero_orden_interno
+        )
+        marca_equipo = detalle.marca or ''
+        modelo_equipo = detalle.modelo or ''
+
+        ahora_local = timezone.localtime(timezone.now())
+        context_email = {
+            'nombre_cliente': nombre_cliente,
+            'folio': folio,
+            'marca_equipo': marca_equipo,
+            'modelo_equipo': modelo_equipo,
+            'fecha_envio': ahora_local.strftime('%d/%m/%Y'),
+        }
+
+        html_content = render_to_string(
+            'servicio_tecnico/emails/vigencia_vencida.html',
+            context_email
+        )
+
+        asunto = f'Tu cotización venció — Folio {folio}'
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente = f"Servicio Técnico System <{email_solo}>"
+
+        # ── Preparar CC (Jefe de Calidad) ──
+        cc_list = []
+        jefe_calidad_email = getattr(settings, 'JEFE_CALIDAD_EMAIL', None)
+        if jefe_calidad_email:
+            cc_list.append(jefe_calidad_email)
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=[email_cliente],
+            cc=cc_list,
+        )
+        email_msg.content_subtype = 'html'
+
+        # ── Adjuntar logo SIC ──
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f"[VIGENCIA-VENCIDA] Error al adjuntar logo: {e}")
+
+        # ── Adjuntar iconos de redes sociales ──
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+                'icon_whatsapp': 'images/utilitys/whatsapp.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning(f"[VIGENCIA-VENCIDA] Error al adjuntar iconos: {e}")
+
+        email_msg.send(fail_silently=False)
+        logger.info(f"[VIGENCIA-VENCIDA] Correo enviado a {email_cliente}")
+
+        # ── Registrar en historial ──
+        try:
+            empleado_actual = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    usuario = User.objects.get(pk=usuario_id)
+                    if hasattr(usuario, 'empleado'):
+                        empleado_actual = usuario.empleado
+                except User.DoesNotExist:
+                    pass
+            HistorialOrden.objects.create(
+                orden=orden,
+                tipo_evento='email',
+                comentario=f"📧 Correo de cotización vencida enviado al cliente ({email_cliente})",
+                usuario=empleado_actual,
+                es_sistema=True
+            )
+        except Exception as e:
+            logger.warning(f"[VIGENCIA-VENCIDA] No se pudo registrar historial: {e}")
+
+        # ── Notificar éxito ──
+        try:
+            _usuario_notif = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _usuario_notif = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_exito(
+                titulo="Correo de vigencia vencida enviado",
+                mensaje=f"Orden {folio} — Correo de cotización vencida enviado a {email_cliente}.",
+                usuario=_usuario_notif,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e:
+            logger.warning(f"[VIGENCIA-VENCIDA] No se pudo crear notificación: {e}")
+
+        return {'success': True, 'orden': orden.numero_orden_interno, 'destinatario': email_cliente}
+
+    except Exception as exc:
+        logger.error(f"[VIGENCIA-VENCIDA] Error para Orden ID {orden_id}: {exc}\n{traceback.format_exc()}")
+        try:
+            _usuario_err = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo="Error al enviar correo de vigencia vencida",
+                mensaje=f"Orden {orden_id} — {str(exc)[:200]}",
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
         raise self.retry(exc=exc, countdown=60)
 
 
