@@ -1323,7 +1323,7 @@ def cerrar_orden(request, orden_id):
             ):
                 _fb_cerrar = _FBCCerrar.objects.create(
                     cotizacion=_cot_cerrar,
-                    token=_TSignerCerrar().sign(str(_uuid_cerrar.uuid4())),
+                    token=_secrets_cerrar.token_urlsafe(32),
                     tipo='satisfaccion',
                 )
                 request.session['feedback_satisfaccion_pendiente_id'] = _fb_cerrar.pk
@@ -1388,11 +1388,9 @@ def cerrar_todas_finalizadas(request):
             # Para el bulk, no hay flujo de modal; se envían automáticamente
             # a las órdenes con cotización aceptada que tengan email de cliente.
             try:
-                import uuid as _uuid_bulk
-                from django.core.signing import TimestampSigner as _TSBulk
+                import secrets as _secrets_bulk
                 from .models import FeedbackCliente as _FBCBulk
                 from .tasks import enviar_feedback_satisfaccion_task
-                _signer_bulk = _TSBulk()
                 _uid_bulk    = request.user.pk if request.user.is_authenticated else None
                 _enviadas    = 0
                 _ordenes_bulk = OrdenServicio.objects.filter(
@@ -1413,7 +1411,7 @@ def cerrar_todas_finalizadas(request):
                         ):
                             _fb_bulk = _FBCBulk.objects.create(
                                 cotizacion=_cot,
-                                token=_signer_bulk.sign(str(_uuid_bulk.uuid4())),
+                                token=_secrets_bulk.token_urlsafe(32),
                                 tipo='satisfaccion',
                             )
                             enviar_feedback_satisfaccion_task.delay(

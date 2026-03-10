@@ -47,6 +47,9 @@ CSRF_TRUSTED_ORIGINS = config(
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 
+# URL pública del sitio — se usa para construir links en correos (feedback, encuestas, etc.)
+SITE_URL = config('SITE_URL', default='http://localhost:8000')
+
 # ============================================================================
 # CONFIGURACIONES DE SEGURIDAD PARA PRODUCCIÓN
 # ============================================================================
