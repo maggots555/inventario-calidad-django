@@ -1,0 +1,278 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#667eea">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Encuesta de satisfacción — SIC</title>
+  <link rel="icon" href="{% static 'images/logos/logo_sic.png' %}">
+  <link rel="stylesheet" href="{% static 'css/feedback_satisfaccion.css' %}">
+</head>
+<body class="fs-body">
+
+{% if estado == 'formulario' %}
+
+<div class="fs-card">
+
+  {# ── Header ── #}
+  <div class="fs-card-header">
+    <img src="{% static 'images/logos/logo_sic.png' %}" alt="SIC" class="fs-header-logo">
+    <p class="fs-header-title">¿Cómo fue tu experiencia?</p>
+    <p class="fs-header-subtitle">Tu opinión nos ayuda a mejorar — solo toma 2 minutos</p>
+  </div>
+
+  {# ── Info del equipo ── #}
+  <div class="fs-equipo-info">
+    <span class="fs-equipo-icon">💻</span>
+    <div>
+      <div class="fs-equipo-folio">Folio: {{ detalle.orden_cliente|default:orden.numero_orden_interno }}</div>
+      <p class="fs-equipo-nombre">
+        {% if detalle.tipo_equipo %}{{ detalle.tipo_equipo }} · {% endif %}
+        {{ detalle.marca|default:"" }} {{ detalle.modelo|default:"" }}
+      </p>
+      {% if orden.fecha_entrega %}
+      <p class="fs-equipo-fecha">📅 Entregado el {{ orden.fecha_entrega|date:"d/m/Y" }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Cuerpo del formulario ── #}
+  <div class="fs-card-body">
+
+    {# Barra de progreso #}
+    <div class="fs-progress-bar">
+      <div class="fs-progress-fill" id="progressFill"></div>
+    </div>
+
+    {# Errores de backend #}
+    {% if form.errors %}
+    <div class="fs-backend-error">
+      <strong>Por favor corrige los siguientes campos:</strong>
+      {{ form.non_field_errors }}
+      {% for field in form %}
+        {% if field.errors %}<div>{{ field.label }}: {{ field.errors.0 }}</div>{% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" id="feedbackForm" novalidate>
+      {% csrf_token %}
+
+      {# ── Inputs hidden (llenados por JS) ── #}
+      {{ form.calificacion_general }}
+      {{ form.nps }}
+      {{ form.recomienda }}
+      {{ form.calificacion_atencion }}
+      {{ form.calificacion_tiempo }}
+
+      {# ─────────────────────────────────────────────────── #}
+      {# SECCIÓN 1: Calificación general (estrellas) #}
+      {# ─────────────────────────────────────────────────── #}
+      <div class="fs-section" id="section-estrellas">
+        <div class="fs-section-label">
+          <span class="fs-required-dot">*</span>
+          ¿Cómo calificarías tu experiencia general?
+        </div>
+        <div class="fs-stars" id="generalStars" role="group" aria-label="Calificación de 1 a 5 estrellas">
+          <span class="fs-star" data-value="1" aria-label="1 estrella" title="Muy malo">★</span>
+          <span class="fs-star" data-value="2" aria-label="2 estrellas" title="Malo">★</span>
+          <span class="fs-star" data-value="3" aria-label="3 estrellas" title="Regular">★</span>
+          <span class="fs-star" data-value="4" aria-label="4 estrellas" title="Bueno">★</span>
+          <span class="fs-star" data-value="5" aria-label="5 estrellas" title="Excelente">★</span>
+        </div>
+        <div class="fs-star-label" id="generalStarLabel">Toca para calificar</div>
+        <div class="fs-error-msg" id="errorGeneral">Por favor selecciona una calificación.</div>
+      </div>
+
+      {# ─────────────────────────────────────────────────── #}
+      {# SECCIÓN 2: NPS (0-10) #}
+      {# ─────────────────────────────────────────────────── #}
+      <div class="fs-section" id="section-nps">
+        <div class="fs-section-label">
+          <span class="fs-required-dot">*</span>
+          ¿Qué tan probable es que recomiendes SIC a un amigo?
+        </div>
+        <div class="fs-nps-grid" id="npsGrid" role="group" aria-label="Escala del 0 al 10">
+          {% for i in "01234567890" %}{% endfor %}
+          <button type="button" class="fs-nps-btn" data-value="0">0</button>
+          <button type="button" class="fs-nps-btn" data-value="1">1</button>
+          <button type="button" class="fs-nps-btn" data-value="2">2</button>
+          <button type="button" class="fs-nps-btn" data-value="3">3</button>
+          <button type="button" class="fs-nps-btn" data-value="4">4</button>
+          <button type="button" class="fs-nps-btn" data-value="5">5</button>
+          <button type="button" class="fs-nps-btn" data-value="6">6</button>
+          <button type="button" class="fs-nps-btn" data-value="7">7</button>
+          <button type="button" class="fs-nps-btn" data-value="8">8</button>
+          <button type="button" class="fs-nps-btn" data-value="9">9</button>
+          <button type="button" class="fs-nps-btn" data-value="10">10</button>
+        </div>
+        <div class="fs-nps-labels">
+          <span>😞 Nada probable</span>
+          <span>Muy probable 😊</span>
+        </div>
+        <div class="fs-error-msg" id="errorNps">Por favor selecciona un valor del 0 al 10.</div>
+      </div>
+
+      {# ─────────────────────────────────────────────────── #}
+      {# SECCIÓN 3: ¿Recomienda? (pulgares) #}
+      {# ─────────────────────────────────────────────────── #}
+      <div class="fs-section" id="section-recomienda">
+        <div class="fs-section-label">
+          <span class="fs-required-dot">*</span>
+          ¿Recomendarías nuestro servicio?
+        </div>
+        <div class="fs-thumbs" id="thumbButtons">
+          <button type="button" class="fs-thumb-btn" id="thumbYes" data-value="true">
+            <span class="thumb-icon">👍</span>
+            <span>Sí, claro</span>
+          </button>
+          <button type="button" class="fs-thumb-btn" id="thumbNo" data-value="false">
+            <span class="thumb-icon">👎</span>
+            <span>No por ahora</span>
+          </button>
+        </div>
+        <div class="fs-error-msg" id="errorRecomienda">Por favor indica si recomendarías el servicio.</div>
+      </div>
+
+      {# ─────────────────────────────────────────────────── #}
+      {# SECCIÓN 4: Calificaciones opcionales (colapsable) #}
+      {# ─────────────────────────────────────────────────── #}
+      <div class="fs-section">
+        <div class="fs-optional-wrapper" id="optionalWrapper">
+          <div class="fs-optional-toggle" id="optionalToggle" role="button" tabindex="0" aria-expanded="false">
+            <span>✨ Calificaciones adicionales (opcional)</span>
+            <span class="chevron">▼</span>
+          </div>
+          <div class="fs-optional-content" id="optionalContent">
+            {# Sub-calificación: Atención #}
+            <div>
+              <div class="fs-mini-label">Calidad de la atención recibida</div>
+              <div class="fs-mini-stars" id="atencionStars">
+                <span class="fs-mini-star" data-group="atencion" data-value="1" title="1">★</span>
+                <span class="fs-mini-star" data-group="atencion" data-value="2" title="2">★</span>
+                <span class="fs-mini-star" data-group="atencion" data-value="3" title="3">★</span>
+                <span class="fs-mini-star" data-group="atencion" data-value="4" title="4">★</span>
+                <span class="fs-mini-star" data-group="atencion" data-value="5" title="5">★</span>
+              </div>
+            </div>
+            {# Sub-calificación: Tiempo #}
+            <div>
+              <div class="fs-mini-label">Tiempo de reparación</div>
+              <div class="fs-mini-stars" id="tiempoStars">
+                <span class="fs-mini-star" data-group="tiempo" data-value="1" title="1">★</span>
+                <span class="fs-mini-star" data-group="tiempo" data-value="2" title="2">★</span>
+                <span class="fs-mini-star" data-group="tiempo" data-value="3" title="3">★</span>
+                <span class="fs-mini-star" data-group="tiempo" data-value="4" title="4">★</span>
+                <span class="fs-mini-star" data-group="tiempo" data-value="5" title="5">★</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ─────────────────────────────────────────────────── #}
+      {# SECCIÓN 5: Comentario libre #}
+      {# ─────────────────────────────────────────────────── #}
+      <div class="fs-section">
+        <div class="fs-section-label">
+          💬 Comentarios adicionales <span style="font-weight:400;color:#9ca3af;">(opcional)</span>
+        </div>
+        {{ form.comentario_cliente }}
+        <div style="text-align:right;font-size:0.72rem;color:#9ca3af;margin-top:4px;">
+          <span id="charCount">0</span>/1000
+        </div>
+      </div>
+
+      {# ── Vigencia ── #}
+      <div style="text-align:center;margin-bottom:1.25rem;">
+        <span class="fs-vigencia-badge">
+          ⏳ Enlace válido {{ dias_restantes }} día{{ dias_restantes|pluralize }} más
+        </span>
+      </div>
+
+      {# ── Botón enviar ── #}
+      <button type="submit" class="fs-submit-btn" id="submitBtn">
+        Enviar mi calificación &nbsp;🚀
+      </button>
+    </form>
+
+  </div>{# /fs-card-body #}
+
+  {# ── Footer ── #}
+  <div class="fs-footer">
+    <div class="fs-redes">
+      <a href="https://sicfix.mx"><img src="{% static 'images/utilitys/link.png' %}" alt="Web"></a>
+      <a href="https://instagram.com/sicfix.mx"><img src="{% static 'images/utilitys/instagram.png' %}" alt="Instagram"></a>
+      <a href="https://facebook.com/sicfix.mx"><img src="{% static 'images/utilitys/facebook.png' %}" alt="Facebook"></a>
+      <a href="https://wa.me/523318189988"><img src="{% static 'images/utilitys/whatsapp.png' %}" alt="WhatsApp"></a>
+    </div>
+    <p>SIC - Comercialización y Servicios · <a href="https://sicfix.mx" style="color:#7c3aed;">sicfix.mx</a></p>
+  </div>
+
+</div>{# /fs-card #}
+
+
+{% elif estado == 'gracias' %}
+
+{# Confetti animado #}
+<div class="fs-confetti-wrapper" id="confettiWrapper"></div>
+
+<div class="fs-estado-card">
+  <span class="fs-estado-icon">🎉</span>
+  <h2 class="fs-estado-title">¡Gracias por tu calificación!</h2>
+  <p class="fs-estado-msg">
+    Tu opinión ha sido registrada. Nos motiva saber cómo te fue y trabajaremos
+    para seguir mejorando.
+  </p>
+  {% if calificacion and calificacion >= 4 %}
+  <p style="font-size:1.5rem;margin:0 0 1.25rem;">
+    {% for i in "12345" %}{% if forloop.counter <= calificacion %}⭐{% else %}☆{% endif %}{% endfor %}
+  </p>
+  {% endif %}
+  <a href="https://sicfix.mx" class="fs-estado-btn">Visitar sicfix.mx</a>
+</div>
+
+
+{% elif estado == 'ya_respondido' %}
+<div class="fs-estado-card">
+  <span class="fs-estado-icon">✅</span>
+  <h2 class="fs-estado-title">Ya enviaste tu calificación</h2>
+  <p class="fs-estado-msg">
+    Este enlace ya fue utilizado anteriormente. Cada enlace es de uso único por
+    razones de seguridad.<br><br>
+    ¡Gracias por tu tiempo!
+  </p>
+  <a href="https://sicfix.mx" class="fs-estado-btn">Visitar sicfix.mx</a>
+</div>
+
+
+{% elif estado == 'expirado' %}
+<div class="fs-estado-card">
+  <span class="fs-estado-icon">⏰</span>
+  <h2 class="fs-estado-title">Este enlace ha expirado</h2>
+  <p class="fs-estado-msg">
+    Los enlaces de encuesta son válidos durante <strong>7 días</strong>.
+    Si deseas compartir tu experiencia, puedes contactarnos directamente.
+  </p>
+  <a href="https://wa.me/523318189988" class="fs-estado-btn">Contactar por WhatsApp</a>
+</div>
+
+
+{% else %}
+<div class="fs-estado-card">
+  <span class="fs-estado-icon">🔍</span>
+  <h2 class="fs-estado-title">Enlace no encontrado</h2>
+  <p class="fs-estado-msg">
+    Este enlace no es válido o ya no existe. Verifica que hayas copiado
+    correctamente el link del correo que recibiste.
+  </p>
+  <a href="https://sicfix.mx" class="fs-estado-btn">Ir al sitio web</a>
+</div>
+{% endif %}
+
+<script src="{% static 'js/feedback_satisfaccion.js' %}"></script>
+</body>
+</html>

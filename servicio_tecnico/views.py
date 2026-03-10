@@ -1301,17 +1301,54 @@ def cerrar_orden(request, orden_id):
         orden.estado = 'entregado'
         orden.fecha_entrega = timezone.now()
         orden.save()
-        
+
+        # ── TRIGGER: Encuesta de satisfacción post-entrega ──────────────────
+        # Se crea si la cotización fue aceptada y el cliente tiene email.
+        # El operador confirma el envío desde el modal en detalle_orden.html.
+        _feedback_sat_creado = False
+        try:
+            import uuid as _uuid_cerrar
+            from django.core.signing import TimestampSigner as _TSignerCerrar
+            from .models import FeedbackCliente as _FBCCerrar
+            _cot_cerrar = getattr(orden, 'cotizacion', None)
+            if (
+                _cot_cerrar is not None
+                and _cot_cerrar.usuario_acepto is True
+                and not _cot_cerrar.motivo_rechazo
+                and orden.detalle_equipo
+                and orden.detalle_equipo.email_cliente
+                and not _FBCCerrar.objects.filter(
+                    cotizacion=_cot_cerrar, tipo='satisfaccion'
+                ).exists()
+            ):
+                _fb_cerrar = _FBCCerrar.objects.create(
+                    cotizacion=_cot_cerrar,
+                    token=_TSignerCerrar().sign(str(_uuid_cerrar.uuid4())),
+                    tipo='satisfaccion',
+                )
+                request.session['feedback_satisfaccion_pendiente_id'] = _fb_cerrar.pk
+                request.session['feedback_satisfaccion_email'] = orden.detalle_equipo.email_cliente
+                _feedback_sat_creado = True
+        except Exception as _e_cerrar:
+            import logging as _log_cerrar
+            _log_cerrar.getLogger(__name__).warning(
+                f"[FEEDBACK-SAT] Error al crear encuesta para orden {orden_id}: {_e_cerrar}"
+            )
+        # ────────────────────────────────────────────────────────────────────
+
         messages.success(
             request,
             f'Orden {orden.numero_orden_interno} marcada como entregada.'
         )
+        # Si hay encuesta pendiente, ir a detalle para mostrar el modal de confirmación.
+        if _feedback_sat_creado:
+            return redirect('servicio_tecnico:detalle_orden', orden_id=orden.id)
     else:
         messages.warning(
             request,
             f'La orden debe estar en estado "Finalizado" para poder cerrarla. Estado actual: {orden.get_estado_display()}'
         )
-    
+
     # Redirigir a la lista de órdenes activas
     return redirect('servicio_tecnico:lista_activas')
 
@@ -1332,16 +1369,74 @@ def cerrar_todas_finalizadas(request):
         cantidad = ordenes_finalizadas.count()
         
         if cantidad > 0:
+            # Capturar IDs ANTES del update: el .update() omite save() y señales,
+            # por lo que el queryset ya no coincidirá después del cambio de estado.
+            _ids_bulk = list(ordenes_finalizadas.values_list('id', flat=True))
+
             # Actualizar todas a 'entregado'
             ordenes_finalizadas.update(
                 estado='entregado',
                 fecha_entrega=timezone.now()
             )
-            
+
             messages.success(
                 request,
                 f'Se cerraron {cantidad} orden(es) finalizada(s).'
             )
+
+            # ── Encuestas de satisfacción para cierre en lote ──────────────
+            # Para el bulk, no hay flujo de modal; se envían automáticamente
+            # a las órdenes con cotización aceptada que tengan email de cliente.
+            try:
+                import uuid as _uuid_bulk
+                from django.core.signing import TimestampSigner as _TSBulk
+                from .models import FeedbackCliente as _FBCBulk
+                from .tasks import enviar_feedback_satisfaccion_task
+                _signer_bulk = _TSBulk()
+                _uid_bulk    = request.user.pk if request.user.is_authenticated else None
+                _enviadas    = 0
+                _ordenes_bulk = OrdenServicio.objects.filter(
+                    id__in=_ids_bulk
+                ).select_related('cotizacion', 'detalle_equipo')
+                for _ord in _ordenes_bulk:
+                    try:
+                        _cot = getattr(_ord, 'cotizacion', None)
+                        if (
+                            _cot is not None
+                            and _cot.usuario_acepto is True
+                            and not _cot.motivo_rechazo
+                            and _ord.detalle_equipo
+                            and _ord.detalle_equipo.email_cliente
+                            and not _FBCBulk.objects.filter(
+                                cotizacion=_cot, tipo='satisfaccion'
+                            ).exists()
+                        ):
+                            _fb_bulk = _FBCBulk.objects.create(
+                                cotizacion=_cot,
+                                token=_signer_bulk.sign(str(_uuid_bulk.uuid4())),
+                                tipo='satisfaccion',
+                            )
+                            enviar_feedback_satisfaccion_task.delay(
+                                feedback_id=_fb_bulk.pk,
+                                usuario_id=_uid_bulk,
+                            )
+                            _enviadas += 1
+                    except Exception as _e_ord:
+                        import logging as _log_ord
+                        _log_ord.getLogger(__name__).warning(
+                            f"[FEEDBACK-SAT-BULK] Error para orden {_ord.pk}: {_e_ord}"
+                        )
+                if _enviadas > 0:
+                    messages.info(
+                        request,
+                        f'📧 {_enviadas} encuesta(s) de satisfacción enviadas automáticamente.'
+                    )
+            except Exception as _e_bulk:
+                import logging as _log_bulk
+                _log_bulk.getLogger(__name__).warning(
+                    f"[FEEDBACK-SAT-BULK] Error general en cierre masivo: {_e_bulk}"
+                )
+            # ────────────────────────────────────────────────────────────────
         else:
             messages.info(
                 request,
@@ -2592,6 +2687,9 @@ def detalle_orden(request, orden_id):
         'feedback_pendiente_email': request.session.pop('feedback_pendiente_email', None),
         'vigencia_vencida_orden_id': request.session.pop('vigencia_vencida_orden_id', None),
         'vigencia_vencida_email': request.session.pop('vigencia_vencida_email', None),
+        # ── Encuesta de satisfacción pendiente de confirmar envío ──
+        'feedback_satisfaccion_pendiente_id': request.session.pop('feedback_satisfaccion_pendiente_id', None),
+        'feedback_satisfaccion_email': request.session.pop('feedback_satisfaccion_email', None),
     }
     
     return render(request, 'servicio_tecnico/detalle_orden.html', context)
@@ -12095,3 +12193,135 @@ def exportar_concentrado_pdf(request):
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
     return response
+
+
+# ============================================================================
+# VISTA: confirmar_feedback_satisfaccion
+# El operador acepta o cancela el envío de la encuesta de satisfacción.
+# Se llama vía POST desde el modal en detalle_orden.html.
+# ============================================================================
+
+@login_required
+@require_http_methods(['POST'])
+def confirmar_feedback_satisfaccion(request, feedback_id):
+    """
+    Recibe la decisión del operador sobre si enviar o no la encuesta de satisfacción.
+
+    Si acepta → encola enviar_feedback_satisfaccion_task.
+    Si cancela → no hace nada (el token queda guardado pero sin correo enviado).
+    """
+    from .models import FeedbackCliente
+    from .tasks import enviar_feedback_satisfaccion_task
+
+    feedback = get_object_or_404(FeedbackCliente, pk=feedback_id)
+    accion   = request.POST.get('accion', 'cancelar')
+    orden_id = feedback.cotizacion.orden.pk
+
+    if accion == 'enviar':
+        if feedback.correo_enviado:
+            messages.warning(request, '⚠️ La encuesta de satisfacción ya fue enviada anteriormente.')
+        else:
+            usuario_id = request.user.pk if request.user.is_authenticated else None
+            enviar_feedback_satisfaccion_task.delay(feedback_id=feedback.pk, usuario_id=usuario_id)
+            messages.success(
+                request,
+                f'⭐ Encuesta de satisfacción enviada a '
+                f'{feedback.cotizacion.orden.detalle_equipo.email_cliente}. '
+                f'El cliente tiene 7 días para responder.'
+            )
+    else:
+        messages.info(request, 'ℹ️ Envío de encuesta de satisfacción cancelado.')
+
+    return redirect('servicio_tecnico:detalle_orden', orden_id=orden_id)
+
+
+# ============================================================================
+# VISTA PÚBLICA: feedback_satisfaccion_cliente
+# El cliente llena la encuesta desde el link del correo de entrega.
+# NO requiere autenticación.
+# ============================================================================
+
+def feedback_satisfaccion_cliente(request, token):
+    """
+    Vista pública para la encuesta de satisfacción post-entrega.
+    Valida el token, muestra el formulario interactivo y guarda la respuesta.
+    """
+    from .models import FeedbackCliente
+    from .forms import FeedbackSatisfaccionClienteForm
+
+    TEMPLATE = 'servicio_tecnico/feedback_satisfaccion.html'
+
+    # ── Buscar feedback por token y tipo ──────────────────────────────────
+    try:
+        feedback = FeedbackCliente.objects.select_related(
+            'cotizacion__orden__detalle_equipo',
+        ).get(token=token, tipo='satisfaccion')
+    except FeedbackCliente.DoesNotExist:
+        return render(request, TEMPLATE, {'estado': 'invalido'})
+
+    # ── Validar estado del token ──────────────────────────────────────────
+    if feedback.utilizado:
+        return render(request, TEMPLATE, {'estado': 'ya_respondido'})
+
+    if feedback.esta_expirado:
+        return render(request, TEMPLATE, {'estado': 'expirado'})
+
+    orden   = feedback.cotizacion.orden
+    detalle = orden.detalle_equipo
+
+    if request.method == 'POST':
+        form = FeedbackSatisfaccionClienteForm(request.POST)
+        if form.is_valid():
+            d = form.cleaned_data
+            feedback.calificacion_general  = d['calificacion_general']
+            feedback.nps                   = d['nps']
+            feedback.recomienda            = d['recomienda']
+            feedback.calificacion_atencion = d.get('calificacion_atencion')
+            feedback.calificacion_tiempo   = d.get('calificacion_tiempo')
+            feedback.comentario_cliente    = d.get('comentario_cliente', '')
+            feedback.utilizado             = True
+            feedback.fecha_respuesta       = timezone.now()
+            x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+            feedback.ip_respuesta = (
+                x_forwarded.split(',')[0].strip()
+                if x_forwarded
+                else request.META.get('REMOTE_ADDR')
+            )
+            feedback.save(update_fields=[
+                'calificacion_general', 'nps', 'recomienda',
+                'calificacion_atencion', 'calificacion_tiempo',
+                'comentario_cliente', 'utilizado', 'fecha_respuesta', 'ip_respuesta',
+            ])
+
+            # Registrar en historial de la orden
+            try:
+                HistorialOrden.objects.create(
+                    orden=orden,
+                    tipo_evento='cotizacion',
+                    comentario=(
+                        f'⭐ Cliente completó encuesta de satisfacción\n'
+                        f'   Calificación: {d["calificacion_general"]}/5 | '
+                        f'NPS: {d["nps"]}/10 | '
+                        f'Recomienda: {"Sí" if d["recomienda"] else "No"}'
+                    ),
+                    usuario=None,
+                    es_sistema=True,
+                )
+            except Exception:
+                pass
+
+            return render(request, TEMPLATE, {
+                'estado': 'gracias',
+                'calificacion': d['calificacion_general'],
+            })
+    else:
+        form = FeedbackSatisfaccionClienteForm()
+
+    return render(request, TEMPLATE, {
+        'estado': 'formulario',
+        'form': form,
+        'feedback': feedback,
+        'orden': orden,
+        'detalle': detalle,
+        'dias_restantes': feedback.dias_restantes,
+    })

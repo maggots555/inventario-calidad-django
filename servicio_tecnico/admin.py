@@ -1554,7 +1554,7 @@ class FeedbackClienteAdmin(admin.ModelAdmin):
     
     CAMPOS:
     - cotizacion: Relación con la cotización rechazada
-    - tipo: 'rechazo' o 'satisfaccion' (futuro)
+    - tipo: 'rechazo' o 'satisfaccion'
     - token: String único y seguro para el link público
     - fecha_creacion: Cuándo se creó el token
     - utilizado: Si el cliente ya dejó su comentario
@@ -1591,6 +1591,11 @@ class FeedbackClienteAdmin(admin.ModelAdmin):
         'tipo',
         'estado_actual',
         'dias_restantes_info',
+        'calificacion_general',
+        'calificacion_atencion',
+        'calificacion_tiempo',
+        'recomienda',
+        'nps',
     )
     
     fieldsets = (
@@ -1620,7 +1625,7 @@ class FeedbackClienteAdmin(admin.ModelAdmin):
             ),
             'description': 'Comentario del cliente sobre por qué rechazó la cotización.'
         }),
-        ('Futura Encuesta de Satisfacción', {
+        ('Encuesta de Satisfacción', {
             'fields': (
                 'calificacion_general',
                 'calificacion_atencion',
@@ -1628,8 +1633,7 @@ class FeedbackClienteAdmin(admin.ModelAdmin):
                 'recomienda',
                 'nps',
             ),
-            'classes': ('collapse',),
-            'description': 'Campos preparados para futura implementación de encuesta de satisfacción.'
+            'description': 'Calificaciones enviadas por el cliente al recibir su equipo reparado.'
         }),
     )
     

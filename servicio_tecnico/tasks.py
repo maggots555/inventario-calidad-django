@@ -1767,3 +1767,190 @@ def enviar_imagenes_egreso_cliente_task(
         except Exception:
             pass
         raise self.retry(exc=exc, countdown=60)
+
+
+# ============================================================================
+# TAREA: enviar_feedback_satisfaccion_task
+# Envía correo al cliente con link de encuesta de satisfacción después de
+# que su equipo fue entregado y la cotización fue aceptada.
+# ============================================================================
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_feedback_satisfaccion')
+def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None):
+    """
+    Envía correo al cliente con link de encuesta de satisfacción.
+    Se dispara cuando una orden cambia a estado 'entregado' con cotización aceptada.
+    """
+    import re
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+
+    from .models import FeedbackCliente, HistorialOrden
+
+    try:
+        # ── Recuperar feedback ──
+        try:
+            feedback = FeedbackCliente.objects.select_related(
+                'cotizacion__orden__detalle_equipo',
+                'enviado_por',
+            ).get(pk=feedback_id)
+        except FeedbackCliente.DoesNotExist:
+            return {'success': False, 'mensaje': f'FeedbackCliente ID {feedback_id} no encontrado.'}
+
+        orden   = feedback.cotizacion.orden
+        detalle = orden.detalle_equipo
+        email_cliente = detalle.email_cliente if detalle else None
+
+        if not email_cliente:
+            return {'success': False, 'mensaje': 'Sin email de cliente.'}
+
+        # ── Construir URL pública ──
+        site_url     = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        feedback_url = f"{site_url}/feedback-satisfaccion/{feedback.token}/"
+
+        # ── Datos del equipo ──
+        marca_equipo  = detalle.marca         or ''
+        modelo_equipo = detalle.modelo        or ''
+        tipo_equipo   = detalle.tipo_equipo   or ''
+        folio = (
+            detalle.orden_cliente if detalle and detalle.orden_cliente
+            else orden.numero_orden_interno
+        )
+
+        fecha_entrega_str = ''
+        if orden.fecha_entrega:
+            fecha_entrega_str = timezone.localtime(orden.fecha_entrega).strftime('%d/%m/%Y')
+
+        # ── Contexto para el template de email ──
+        ahora_local   = timezone.localtime(timezone.now())
+        context_email = {
+            'folio':         folio,
+            'marca_equipo':  marca_equipo,
+            'modelo_equipo': modelo_equipo,
+            'tipo_equipo':   tipo_equipo,
+            'fecha_entrega': fecha_entrega_str,
+            'feedback_url':  feedback_url,
+            'dias_vigencia': 7,
+            'fecha_envio':   ahora_local.strftime('%d/%m/%Y'),
+        }
+
+        html_content = render_to_string(
+            'servicio_tecnico/emails/feedback_satisfaccion.html',
+            context_email
+        )
+
+        asunto      = f'¿Cómo fue tu experiencia? — Folio {folio}'
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo  = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente   = f"Servicio Técnico System <{email_solo}>"
+
+        # ── CC a Jefe(s) de Calidad ──
+        cc_list = []
+        jefe_calidad_email   = getattr(settings, 'JEFE_CALIDAD_EMAIL',   None)
+        jefe_calidad_2_email = getattr(settings, 'JEFE_CALIDAD_2_EMAIL', None)
+        if jefe_calidad_email:
+            cc_list.append(jefe_calidad_email)
+        if jefe_calidad_2_email:
+            cc_list.append(jefe_calidad_2_email)
+
+        email_msg = EmailMessage(
+            subject=asunto, body=html_content,
+            from_email=remitente, to=[email_cliente], cc=cc_list,
+        )
+        email_msg.content_subtype = 'html'
+
+        # ── Logo SIC (CID inline) ──
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f"[FEEDBACK-SATISFACCION] Error al adjuntar logo: {e}")
+
+        # ── Iconos de redes sociales ──
+        iconos_sociales = {
+            'icon_link':      'images/utilitys/link.png',
+            'icon_instagram': 'images/utilitys/instagram.png',
+            'icon_facebook':  'images/utilitys/facebook.png',
+            'icon_whatsapp':  'images/utilitys/whatsapp.png',
+        }
+        for cid_name, icon_static_path in iconos_sociales.items():
+            icon_path = finders.find(icon_static_path)
+            if icon_path:
+                try:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+                except Exception as e:
+                    logger.warning(f"[FEEDBACK-SATISFACCION] Error al adjuntar icono {cid_name}: {e}")
+
+        email_msg.send(fail_silently=False)
+
+        # ── Marcar correo como enviado ──
+        FeedbackCliente.objects.filter(pk=feedback_id).update(correo_enviado=True)
+
+        # ── Registrar en historial ──
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='email',
+            comentario=(
+                f"⭐ Encuesta de satisfacción enviada al cliente ({email_cliente})\n"
+                f"🔗 Link válido por 7 días — Token ID: {feedback_id}"
+            ),
+            usuario=feedback.enviado_por,
+            es_sistema=True
+        )
+
+        # ── Notificar éxito ──
+        try:
+            _usuario_notif = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _usuario_notif = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_exito(
+                titulo="Encuesta de satisfacción enviada",
+                mensaje=f"Orden {folio} — Encuesta de satisfacción enviada a {email_cliente}.",
+                usuario=_usuario_notif,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e:
+            logger.warning(f"[FEEDBACK-SATISFACCION] No se pudo crear notificación: {e}")
+
+        return {'success': True, 'feedback_id': feedback_id, 'destinatario': email_cliente}
+
+    except Exception as exc:
+        logger.error(f"[FEEDBACK-SATISFACCION] Error para FeedbackCliente ID {feedback_id}: {exc}\n{traceback.format_exc()}")
+        try:
+            _usuario_err = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo="Error al enviar encuesta de satisfacción",
+                mensaje=f"FeedbackCliente ID {feedback_id} — {str(exc)[:200]}",
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
+        raise self.retry(exc=exc, countdown=60)

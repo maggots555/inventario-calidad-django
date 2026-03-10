@@ -1,318 +1,260 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#1f6391">
-    <title>Tu opinión importa — SIC</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/feedback_rechazo.css' %}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#667eea">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Tu opinión importa — SIC</title>
+  <link rel="icon" href="{% static 'images/logos/logo_sic.png' %}">
+  <link rel="stylesheet" href="{% static 'css/feedback_satisfaccion.css' %}">
+  <link rel="stylesheet" href="{% static 'css/feedback_rechazo.css' %}">
 </head>
-<body>
-    <div class="container-fluid vh-100 d-flex flex-column">
-        
-        {% if estado == 'formulario' %}
-        {# ── ESTADO: Formulario activo (token válido) ── #}
-        <div class="row flex-grow-1 g-0">
-            <!-- Columna izquierda: Información del equipo y piezas (desktop) -->
-            <div class="col-lg-5 bg-info-gradient d-none d-lg-flex flex-column p-5">
-                <div class="logo-container mb-4">
-                    <img src="{% static 'images/logos/logo_sic.png' %}" alt="SIC Logo" class="logo-image">
-                </div>
-                
-                <h2 class="text-white fw-bold mb-3">Tu opinión nos ayuda a mejorar</h2>
-                <p class="text-white-50 mb-4">
-                    Queremos saber qué podemos hacer mejor. Tu comentario es completamente confidencial.
-                </p>
-                
-                <div class="info-card mb-3">
-                    <h5 class="fw-bold text-primary mb-3">📋 Información del equipo</h5>
-                    <div class="info-item">
-                        <span class="info-label">Folio:</span>
-                        <span class="info-value">{{ detalle.orden_cliente|default:orden.numero_orden_interno }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Equipo:</span>
-                        <span class="info-value">{{ detalle.marca }} {{ detalle.modelo|default:'' }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Motivo registrado:</span>
-                        <span class="info-value">{{ motivo_rechazo }}</span>
-                    </div>
-                </div>
+<body class="fs-body">
 
-                {% if piezas %}
-                <div class="info-card">
-                    <h5 class="fw-bold text-primary mb-3">💰 Cotización</h5>
-                    <div class="piezas-list">
-                        {% for p in piezas %}
-                        <div class="pieza-item">
-                            <span class="pieza-nombre">{{ p.componente.nombre }}</span>
-                            <span class="pieza-precio">${{ p.costo_unitario|floatformat:2 }}</span>
-                        </div>
-                        {% endfor %}
-                        {% if monto_mano_obra %}
-                        <div class="pieza-item">
-                            <span class="pieza-nombre">Mano de obra</span>
-                            <span class="pieza-precio">${{ monto_mano_obra|floatformat:2 }}</span>
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div class="total-cotizacion mt-3 pt-3 border-top">
-                        <span class="fw-bold">Total:</span>
-                        <span class="fw-bold text-danger fs-5">${{ monto_total|floatformat:2 }}</span>
-                    </div>
-                </div>
-                {% endif %}
+{% if estado == 'formulario' %}
+<div class="fs-card">
 
-                <div class="mt-auto pt-4">
-                    <div class="text-white-50 small">
-                        ⏱️ Este enlace expira en <strong class="text-white">{{ dias_restantes }}</strong> día{{ dias_restantes|pluralize }}
-                    </div>
-                </div>
-            </div>
+  <div class="fs-card-header">
+    <img src="{% static 'images/logos/logo_sic.png' %}" alt="SIC" class="fs-header-logo">
+    <p class="fs-header-title">Tu opinión nos importa</p>
+    <p class="fs-header-subtitle">Cuéntanos qué podemos mejorar — solo toma 2 minutos</p>
+  </div>
 
-            <!-- Columna derecha: Formulario -->
-            <div class="col-lg-7 d-flex flex-column">
-                <div class="form-container">
-                    <!-- Header mobile (solo visible en móvil) -->
-                    <div class="d-lg-none text-center mb-4">
-                        <img src="{% static 'images/logos/logo_sic.png' %}" alt="SIC Logo" style="max-width: 150px; margin-bottom: 20px;">
-                        <h3 class="fw-bold text-primary">Tu opinión nos importa</h3>
-                        <p class="text-muted small">
-                            Folio: <strong>{{ detalle.orden_cliente|default:orden.numero_orden_interno }}</strong>
-                        </p>
-                    </div>
+  <div class="fs-equipo-info">
+    <span class="fs-equipo-icon">🔧</span>
+    <div>
+      <div class="fs-equipo-folio">Folio: {{ detalle.orden_cliente|default:orden.numero_orden_interno }}</div>
+      <p class="fs-equipo-nombre">
+        {% if detalle.tipo_equipo %}{{ detalle.tipo_equipo }} · {% endif %}
+        {{ detalle.marca|default:"" }} {{ detalle.modelo|default:"" }}
+      </p>
+      {% if motivo_rechazo %}
+      <p class="fs-equipo-fecha">📝 {{ motivo_rechazo }}</p>
+      {% endif %}
+    </div>
+  </div>
 
-                    <div class="card shadow-lg border-0">
-                        <div class="card-body p-4 p-md-5">
-                            <div class="text-center mb-4">
-                                <div class="icon-feedback mb-3">💬</div>
-                                <h4 class="fw-bold text-dark">Cuéntanos tu experiencia</h4>
-                                <p class="text-muted">
-                                    Tu comentario es confidencial y nos ayudará a mejorar nuestro servicio.
-                                </p>
-                            </div>
+  <div class="fs-card-body">
 
-                            <form method="post" id="feedbackForm">
-                                {% csrf_token %}
-                                
-                                <div class="mb-4">
-                                    <label for="{{ form.comentario_cliente.id_for_label }}" class="form-label fw-bold">
-                                        ¿Por qué decidiste no continuar con la reparación?
-                                        <span class="text-danger">*</span>
-                                    </label>
-                                    <textarea 
-                                        name="{{ form.comentario_cliente.name }}"
-                                        id="{{ form.comentario_cliente.id_for_label }}"
-                                        class="form-control form-control-lg {% if form.comentario_cliente.errors %}is-invalid{% endif %}"
-                                        rows="6"
-                                        maxlength="1000"
-                                        placeholder="Escribe aquí tu comentario... (mínimo 10 caracteres)"
-                                        required
-                                    >{{ form.comentario_cliente.value|default:'' }}</textarea>
-                                    
-                                    <div class="form-text d-flex justify-content-between">
-                                        <span>Mínimo 10 caracteres</span>
-                                        <span id="charCount">0 / 1000</span>
-                                    </div>
-                                    
-                                    {% if form.comentario_cliente.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ form.comentario_cliente.errors.0 }}
-                                        </div>
-                                    {% endif %}
-                                </div>
+    {% if form.errors %}
+    <div class="fs-backend-error">
+      <strong>Por favor corrige los siguientes campos:</strong>
+      {% for field in form %}
+        {% if field.errors %}<div>{{ field.label }}: {{ field.errors.0 }}</div>{% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
 
-                                <div class="alert alert-info d-flex align-items-start mb-4">
-                                    <div class="me-3 fs-4">🔒</div>
-                                    <div class="small">
-                                        <strong>Tu privacidad está protegida:</strong><br>
-                                        Tu comentario es completamente anónimo. No necesitas iniciar sesión ni proporcionar datos adicionales.
-                                    </div>
-                                </div>
-
-                                <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold">
-                                    Enviar mi comentario
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-
-                    <div class="text-center mt-4">
-                        <p class="text-muted small mb-1">¿Necesitas ayuda?</p>
-                        <p class="text-muted small">
-                            Contacta directamente a tu responsable de seguimiento
-                        </p>
-                    </div>
-                </div>
-            </div>
+    {% if piezas %}
+    <div class="fr-cotizacion" id="cotizacionWrapper">
+      <div class="fr-cotizacion-toggle" id="cotizacionToggle" role="button" tabindex="0" aria-expanded="false">
+        <span>💰 Ver cotización rechazada</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="fr-cotizacion-content" id="cotizacionContent">
+        {% for p in piezas %}
+        <div class="fr-pieza-item">
+          <span>{{ p.componente.nombre }}</span>
+          <span>${{ p.costo_unitario|floatformat:2 }}</span>
         </div>
-
-        {% elif estado == 'gracias' %}
-        {# ── ESTADO: Feedback enviado exitosamente ── #}
-        <div class="row flex-grow-1 g-0 align-items-center justify-content-center">
-            <div class="col-md-8 col-lg-6">
-                <div class="card shadow-lg border-0 text-center">
-                    <div class="card-body p-5">
-                        <div class="success-icon mb-4">✅</div>
-                        <h2 class="fw-bold text-success mb-3">¡Gracias por tu tiempo!</h2>
-                        <p class="text-muted fs-5 mb-4">
-                            Tu comentario ha sido recibido y nos ayudará a mejorar nuestro servicio.
-                        </p>
-                        <div class="alert alert-light border">
-                            <p class="mb-0 text-muted">
-                                <strong>Tu opinión es muy valiosa para nosotros.</strong><br>
-                                Trabajaremos constantemente para ofrecerte una mejor experiencia.
-                            </p>
-                        </div>
-                        <div class="mt-4">
-                            <a href="https://sicfix.mx" class="btn btn-outline-primary">
-                                Visitar nuestro sitio web
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {% elif estado == 'ya_respondido' %}
-        {# ── ESTADO: Token ya fue utilizado ── #}
-        <div class="row flex-grow-1 g-0 align-items-center justify-content-center">
-            <div class="col-md-8 col-lg-6">
-                <div class="card shadow-lg border-0 text-center">
-                    <div class="card-body p-5">
-                        <div class="warning-icon mb-4">ℹ️</div>
-                        <h2 class="fw-bold text-info mb-3">Ya enviaste tu comentario</h2>
-                        <p class="text-muted fs-5 mb-4">
-                            Este enlace ya fue utilizado anteriormente.
-                        </p>
-                        <div class="alert alert-light border">
-                            <p class="mb-0 text-muted">
-                                Cada enlace de feedback solo puede usarse <strong>una vez</strong> por motivos de seguridad.
-                            </p>
-                        </div>
-                        <div class="mt-4">
-                            <a href="https://sicfix.mx" class="btn btn-outline-primary">
-                                Visitar nuestro sitio web
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {% elif estado == 'expirado' %}
-        {# ── ESTADO: Token expirado ── #}
-        <div class="row flex-grow-1 g-0 align-items-center justify-content-center">
-            <div class="col-md-8 col-lg-6">
-                <div class="card shadow-lg border-0 text-center">
-                    <div class="card-body p-5">
-                        <div class="error-icon mb-4">⏰</div>
-                        <h2 class="fw-bold text-warning mb-3">Este enlace ha expirado</h2>
-                        <p class="text-muted fs-5 mb-4">
-                            Los enlaces de feedback son válidos por <strong>7 días</strong>.
-                        </p>
-                        <div class="alert alert-light border">
-                            <p class="mb-0 text-muted">
-                                Si deseas compartir tu opinión, contacta directamente a tu responsable de seguimiento.
-                            </p>
-                        </div>
-                        <div class="mt-4">
-                            <a href="https://sicfix.mx" class="btn btn-outline-primary">
-                                Visitar nuestro sitio web
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {% elif estado == 'invalido' %}
-        {# ── ESTADO: Token inválido o no existe ── #}
-        <div class="row flex-grow-1 g-0 align-items-center justify-content-center">
-            <div class="col-md-8 col-lg-6">
-                <div class="card shadow-lg border-0 text-center">
-                    <div class="card-body p-5">
-                        <div class="error-icon mb-4">❌</div>
-                        <h2 class="fw-bold text-danger mb-3">Enlace no válido</h2>
-                        <p class="text-muted fs-5 mb-4">
-                            El enlace que usaste no es válido o ya no existe.
-                        </p>
-                        <div class="alert alert-light border">
-                            <p class="mb-0 text-muted">
-                                Por favor verifica que copiaste correctamente la URL completa del correo.
-                            </p>
-                        </div>
-                        <div class="mt-4">
-                            <a href="https://sicfix.mx" class="btn btn-outline-primary">
-                                Visitar nuestro sitio web
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        {% endfor %}
+        {% if monto_mano_obra %}
+        <div class="fr-pieza-item">
+          <span>Mano de obra</span>
+          <span>${{ monto_mano_obra|floatformat:2 }}</span>
         </div>
         {% endif %}
-
-        <!-- Footer -->
-        <footer class="footer-public py-3 mt-auto">
-            <div class="container-fluid">
-                <div class="row align-items-center">
-                    <div class="col-md-6 text-center text-md-start mb-2 mb-md-0">
-                        <span class="text-muted small">
-                            © {{ request.resolver_match.kwargs.token|slice:":4"|default:"2026" }} SIC — Sistema Integrado de Calidad
-                        </span>
-                    </div>
-                    <div class="col-md-6 text-center text-md-end">
-                        <a href="https://sicfix.mx" class="text-decoration-none text-muted small me-3" target="_blank">Sitio Web</a>
-                        <a href="https://www.facebook.com/LatAmSic" class="text-decoration-none text-muted small me-3" target="_blank">Facebook</a>
-                        <a href="https://www.instagram.com/sic_mexico/?hl=es" class="text-decoration-none text-muted small" target="_blank">Instagram</a>
-                    </div>
-                </div>
-            </div>
-        </footer>
+        <div class="fr-pieza-total">
+          <span>Total</span>
+          <span>${{ monto_total|floatformat:2 }}</span>
+        </div>
+      </div>
     </div>
+    {% endif %}
 
-    <script>
-        // Contador de caracteres
-        const textarea = document.getElementById('{{ form.comentario_cliente.id_for_label }}');
-        const charCount = document.getElementById('charCount');
-        
-        if (textarea && charCount) {
-            textarea.addEventListener('input', function() {
-                const count = this.value.length;
-                charCount.textContent = count + ' / 1000';
-                
-                // Cambiar color según progreso
-                if (count < 10) {
-                    charCount.className = 'text-danger';
-                } else if (count > 900) {
-                    charCount.className = 'text-warning';
-                } else {
-                    charCount.className = 'text-success';
-                }
-            });
-            
-            // Inicializar contador
-            textarea.dispatchEvent(new Event('input'));
-        }
+    <form method="post" id="feedbackForm" novalidate>
+      {% csrf_token %}
 
-        // Validación antes de enviar
-        const form = document.getElementById('feedbackForm');
-        if (form) {
-            form.addEventListener('submit', function(e) {
-                const comentario = textarea.value.trim();
-                if (comentario.length < 10) {
-                    e.preventDefault();
-                    alert('Por favor escribe al menos 10 caracteres.');
-                    textarea.focus();
-                }
-            });
-        }
-    </script>
+      <div class="fs-section">
+        <div class="fs-section-label">
+          <span class="fs-required-dot">*</span>
+          ¿Por qué decidiste no continuar con la reparación?
+        </div>
+        <textarea
+          name="{{ form.comentario_cliente.name }}"
+          id="{{ form.comentario_cliente.id_for_label }}"
+          class="feedback-textarea{% if form.comentario_cliente.errors %} feedback-textarea--error{% endif %}"
+          rows="6"
+          maxlength="1000"
+          placeholder="Escribe aquí tu comentario… (mínimo 10 caracteres)"
+          required
+        >{{ form.comentario_cliente.value|default:'' }}</textarea>
+        <div style="text-align:right;font-size:0.72rem;color:#9ca3af;margin-top:4px;">
+          <span id="charCount">0</span>/1000
+        </div>
+        <div class="fs-error-msg" id="errorComentario">Por favor escribe al menos 10 caracteres.</div>
+      </div>
+
+      <div class="fr-privacy-notice">
+        <span class="fr-lock-icon">🔒</span>
+        <div>
+          <strong>Tu privacidad está protegida:</strong>
+          Tu comentario es completamente confidencial. No necesitas iniciar sesión ni proporcionar datos adicionales.
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-bottom:1.25rem;">
+        <span class="fs-vigencia-badge">
+          ⏳ Enlace válido {{ dias_restantes }} día{{ dias_restantes|pluralize }} más
+        </span>
+      </div>
+
+      <button type="submit" class="fs-submit-btn" id="submitBtn">
+        Enviar mi comentario &nbsp;📤
+      </button>
+    </form>
+
+  </div>
+
+  <div class="fs-footer">
+    <div class="fs-redes">
+      <a href="https://sicfix.mx"><img src="{% static 'images/utilitys/link.png' %}" alt="Web"></a>
+      <a href="https://instagram.com/sicfix.mx"><img src="{% static 'images/utilitys/instagram.png' %}" alt="Instagram"></a>
+      <a href="https://facebook.com/sicfix.mx"><img src="{% static 'images/utilitys/facebook.png' %}" alt="Facebook"></a>
+      <a href="https://wa.me/523318189988"><img src="{% static 'images/utilitys/whatsapp.png' %}" alt="WhatsApp"></a>
+    </div>
+    <p>SIC - Comercialización y Servicios · <a href="https://sicfix.mx" style="color:#7c3aed;">sicfix.mx</a></p>
+  </div>
+
+</div>
+
+{% elif estado == 'gracias' %}
+<div class="fs-confetti-wrapper" id="confettiWrapper"></div>
+<div class="fs-estado-card">
+  <span class="fs-estado-icon">✅</span>
+  <h2 class="fs-estado-title">¡Gracias por tu tiempo!</h2>
+  <p class="fs-estado-msg">
+    Tu comentario ha sido recibido. Nos ayudará a entender cómo mejorar
+    y ofrecerte una mejor experiencia en el futuro.
+  </p>
+  <a href="https://sicfix.mx" class="fs-estado-btn">Visitar sicfix.mx</a>
+</div>
+
+{% elif estado == 'ya_respondido' %}
+<div class="fs-estado-card">
+  <span class="fs-estado-icon">✅</span>
+  <h2 class="fs-estado-title">Ya enviaste tu comentario</h2>
+  <p class="fs-estado-msg">
+    Este enlace ya fue utilizado anteriormente. Cada enlace es de uso único por
+    razones de seguridad.<br><br>
+    ¡Gracias por tu tiempo!
+  </p>
+  <a href="https://sicfix.mx" class="fs-estado-btn">Visitar sicfix.mx</a>
+</div>
+
+{% elif estado == 'expirado' %}
+<div class="fs-estado-card">
+  <span class="fs-estado-icon">⏰</span>
+  <h2 class="fs-estado-title">Este enlace ha expirado</h2>
+  <p class="fs-estado-msg">
+    Los enlaces de feedback son válidos durante <strong>7 días</strong>.
+    Si deseas compartir tu opinión, puedes contactarnos directamente.
+  </p>
+  <a href="https://wa.me/523318189988" class="fs-estado-btn">Contactar por WhatsApp</a>
+</div>
+
+{% elif estado == 'invalido' %}
+<div class="fs-estado-card">
+  <span class="fs-estado-icon">🔍</span>
+  <h2 class="fs-estado-title">Enlace no encontrado</h2>
+  <p class="fs-estado-msg">
+    Este enlace no es válido o ya no existe. Verifica que hayas copiado
+    correctamente el link del correo que recibiste.
+  </p>
+  <a href="https://sicfix.mx" class="fs-estado-btn">Ir al sitio web</a>
+</div>
+{% endif %}
+
+<script>
+  // ── Cotización toggle ─────────────────────────────────────────────────────────
+  (function () {
+    var toggle  = document.getElementById('cotizacionToggle');
+    var content = document.getElementById('cotizacionContent');
+    var wrapper = document.getElementById('cotizacionWrapper');
+    if (!toggle || !content) return;
+    function doToggle() {
+      var isOpen = content.classList.toggle('open');
+      if (wrapper) wrapper.classList.toggle('open', isOpen);
+      toggle.setAttribute('aria-expanded', String(isOpen));
+    }
+    toggle.addEventListener('click', doToggle);
+    toggle.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doToggle(); }
+    });
+  })();
+
+  // ── Contador de caracteres ────────────────────────────────────────────────────
+  (function () {
+    var textarea = document.getElementById('{{ form.comentario_cliente.id_for_label }}');
+    var counter  = document.getElementById('charCount');
+    if (!textarea || !counter) return;
+    textarea.addEventListener('input', function () {
+      counter.textContent = String(this.value.length);
+    });
+    textarea.dispatchEvent(new Event('input'));
+  })();
+
+  // ── Validación frontend ───────────────────────────────────────────────────────
+  (function () {
+    var form     = document.getElementById('feedbackForm');
+    var textarea = document.getElementById('{{ form.comentario_cliente.id_for_label }}');
+    var errorEl  = document.getElementById('errorComentario');
+    if (!form || !textarea) return;
+
+    form.addEventListener('submit', function (e) {
+      if (textarea.value.trim().length < 10) {
+        e.preventDefault();
+        if (errorEl) errorEl.classList.add('visible');
+        textarea.focus();
+      } else {
+        if (errorEl) errorEl.classList.remove('visible');
+        var btn = document.getElementById('submitBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Enviando… ⏳'; }
+      }
+    });
+
+    textarea.addEventListener('input', function () {
+      if (this.value.trim().length >= 10 && errorEl) {
+        errorEl.classList.remove('visible');
+      }
+    });
+  })();
+
+  // ── Confetti (estado gracias) ─────────────────────────────────────────────────
+  (function () {
+    var wrapper = document.getElementById('confettiWrapper');
+    if (!wrapper) return;
+    var colors = ['#667eea', '#764ba2', '#fbbf24', '#10b981', '#f093fb', '#ef4444'];
+    for (var i = 0; i < 80; i++) {
+      var piece = document.createElement('div');
+      piece.className = 'fs-confetti-piece';
+      piece.style.left              = (Math.random() * 100) + '%';
+      piece.style.animationDuration = (1.5 + Math.random() * 2.5) + 's';
+      piece.style.animationDelay    = (Math.random() * 0.8) + 's';
+      piece.style.backgroundColor   = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.transform         = 'rotate(' + (Math.random() * 360) + 'deg)';
+      if (Math.random() > 0.5) {
+        piece.style.borderRadius = '50%';
+        var s = (6 + Math.random() * 8) + 'px';
+        piece.style.width  = s;
+        piece.style.height = s;
+      }
+      wrapper.appendChild(piece);
+    }
+  })();
+</script>
 </body>
 </html>

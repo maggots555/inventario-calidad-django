@@ -308,4 +308,12 @@ urlpatterns = [
     path('orden/<int:orden_id>/confirmar-vigencia-vencida/',
          views.confirmar_envio_vigencia_vencida,
          name='confirmar_envio_vigencia_vencida'),
+
+    # ========================================================================
+    # FEEDBACK DE SATISFACCIÓN (Marzo 2026)
+    # ========================================================================
+    # Confirmación interna (operador): ¿enviar encuesta de satisfacción al cliente?
+    path('feedback-satisfaccion/<int:feedback_id>/confirmar/',
+         views.confirmar_feedback_satisfaccion,
+         name='confirmar_feedback_satisfaccion'),
 ]

@@ -1,311 +1,84 @@
-/* ============================================================================
-   FEEDBACK DE RECHAZO — CSS PARA VISTA PÚBLICA
-   Mobile-first, PWA-compatible, sin dependencias externas de Bootstrap
-   ============================================================================ */
+/* =============================================================================
+   feedback_rechazo.css — Estilos específicos de la encuesta de rechazo
+   Extiende feedback_satisfaccion.css con componentes propios de este formulario.
+   ============================================================================= */
 
-/* ── Variables globales ── */
-:root {
-    --primary-color: #1f6391;
-    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --info-gradient: linear-gradient(180deg, #1f6391 0%, #164a6d 100%);
-    --success-color: #28a745;
-    --danger-color: #e53e3e;
-    --warning-color: #ffc107;
-    --light-bg: #f8f9fa;
-    --white: #ffffff;
-    --text-dark: #2c3e50;
-    --text-muted: #6c757d;
-    --border-color: #e9ecef;
-    --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.05);
-    --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.15);
+/* === Cotización plegable === */
+.fr-cotizacion {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
 }
 
-/* ── Reset y base ── */
-* {
-    box-sizing: border-box;
+.fr-cotizacion-toggle {
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #065f46;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.18s;
+}
+.fr-cotizacion-toggle:hover { background: #dcfce7; }
+
+.fr-cotizacion-toggle .chevron { transition: transform 0.3s ease; font-size: 0.72rem; }
+.fr-cotizacion.open .chevron   { transform: rotate(180deg); }
+
+.fr-cotizacion-content {
+  display: none;
+  padding: 0 1rem 1rem;
+  flex-direction: column;
+  border-top: 1px solid #bbf7d0;
+}
+.fr-cotizacion-content.open { display: flex; }
+
+.fr-pieza-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: 0.84rem;
+  color: #374151;
+}
+.fr-pieza-item:last-of-type { border-bottom: none; }
+
+.fr-pieza-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0 0;
+  font-weight: 700;
+  color: #065f46;
+  font-size: 0.95rem;
+  border-top: 1px solid #bbf7d0;
+  margin-top: 4px;
 }
 
-body {
-    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", Arial, sans-serif;
-    background-color: var(--light-bg);
-    color: var(--text-dark);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+/* === Aviso de privacidad === */
+.fr-privacy-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.82rem;
+  color: #1e40af;
+  line-height: 1.5;
 }
+.fr-privacy-notice .fr-lock-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
 
-/* ── Gradiente de fondo izquierdo (desktop) ── */
-.bg-info-gradient {
-    background: var(--info-gradient);
-    position: relative;
-    overflow: hidden;
-}
-
-.bg-info-gradient::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-    opacity: 0.3;
-}
-
-/* ── Logo ── */
-.logo-container {
-    position: relative;
-    z-index: 1;
-}
-
-.logo-image {
-    max-width: 180px;
-    height: auto;
-    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
-}
-
-/* ── Tarjetas de información (sidebar izquierdo) ── */
-.info-card {
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-radius: 12px;
-    padding: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.info-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.info-item:last-child {
-    border-bottom: none;
-}
-
-.info-label {
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.9rem;
-}
-
-.info-value {
-    color: #ffffff;
-    font-weight: 500;
-    text-align: right;
-}
-
-/* ── Lista de piezas ── */
-.piezas-list {
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.pieza-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: 0.9rem;
-}
-
-.pieza-item:last-child {
-    border-bottom: none;
-}
-
-.pieza-nombre {
-    color: rgba(255, 255, 255, 0.85);
-    flex: 1;
-    margin-right: 10px;
-}
-
-.pieza-precio {
-    color: #ffffff;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.total-cotizacion {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: #ffffff;
-}
-
-/* ── Contenedor del formulario ── */
-.form-container {
-    padding: 40px 20px;
-    max-width: 700px;
-    margin: 0 auto;
-    width: 100%;
-}
-
-/* ── Iconos decorativos ── */
-.icon-feedback {
-    font-size: 4rem;
-    line-height: 1;
-}
-
-.success-icon,
-.warning-icon,
-.error-icon {
-    font-size: 5rem;
-    line-height: 1;
-    margin-bottom: 1rem;
-}
-
-/* ── Formulario ── */
-textarea.form-control-lg {
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
-    resize: vertical;
-    transition: all 0.3s ease;
-    font-size: 1rem;
-    padding: 15px;
-}
-
-textarea.form-control-lg:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.2rem rgba(31, 99, 145, 0.15);
-    outline: none;
-}
-
-textarea.is-invalid {
-    border-color: var(--danger-color);
-}
-
-/* ── Contador de caracteres ── */
-#charCount {
-    font-weight: 600;
-}
-
-/* ── Botones ── */
-.btn-primary {
-    background: var(--primary-gradient);
-    border: none;
-    border-radius: 50px;
-    padding: 14px 30px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-}
-
-.btn-primary:active {
-    transform: translateY(0);
-}
-
-/* ── Footer público ── */
-.footer-public {
-    background-color: #ffffff;
-    border-top: 1px solid var(--border-color);
-    margin-top: auto;
-}
-
-/* ── Responsive (mobile-first) ── */
-@media (max-width: 991.98px) {
-    .form-container {
-        padding: 30px 15px;
-    }
-
-    .icon-feedback {
-        font-size: 3rem;
-    }
-
-    .success-icon,
-    .warning-icon,
-    .error-icon {
-        font-size: 4rem;
-    }
-}
-
-@media (max-width: 575.98px) {
-    .form-container {
-        padding: 20px 10px;
-    }
-
-    .card-body {
-        padding: 1.5rem !important;
-    }
-
-    textarea.form-control-lg {
-        font-size: 0.95rem;
-        padding: 12px;
-    }
-
-    .btn-primary {
-        padding: 12px 25px;
-        font-size: 0.95rem;
-    }
-}
-
-/* ── Scrollbar personalizado para lista de piezas ── */
-.piezas-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.piezas-list::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-}
-
-.piezas-list::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 10px;
-}
-
-.piezas-list::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
-}
-
-/* ── Animaciones sutiles ── */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.card {
-    animation: fadeIn 0.4s ease-out;
-}
-
-/* ── PWA: Safe area para notch/Dynamic Island ── */
-@supports (padding: max(0px)) {
-    body {
-        padding-left: max(0px, env(safe-area-inset-left));
-        padding-right: max(0px, env(safe-area-inset-right));
-    }
-    
-    .footer-public {
-        padding-bottom: max(1rem, env(safe-area-inset-bottom));
-    }
-}
-
-/* ── Accesibilidad: mejor contraste en focus ── */
-a:focus,
-button:focus,
-textarea:focus,
-input:focus {
-    outline: 3px solid rgba(31, 99, 145, 0.5);
-    outline-offset: 2px;
-}
-
-/* ── Touch targets mínimos 44x44px (iOS HIG) ── */
-.btn {
-    min-height: 44px;
-    min-width: 44px;
+/* === Textarea: estado de error === */
+.feedback-textarea--error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.13);
 }

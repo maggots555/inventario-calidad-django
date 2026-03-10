@@ -4248,6 +4248,82 @@
 {% endif %}
 
 <!-- ============================================================ -->
+<!-- MODAL: CONFIRMACIÓN DE ENVÍO DE ENCUESTA DE SATISFACCIÓN     -->
+<!-- ============================================================ -->
+{% if feedback_satisfaccion_pendiente_id and feedback_satisfaccion_email %}
+<div class="modal fade" id="modalConfirmarSatisfaccion" tabindex="-1"
+     data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-left: 5px solid #f59e0b;">
+
+            <div class="modal-header"
+                 style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+                <h5 class="modal-title">
+                    <i class="bi bi-star-fill"></i> Enviar Encuesta de Satisfacción
+                </h5>
+            </div>
+
+            <div class="modal-body">
+                <div class="alert mb-3" style="border-left: 4px solid #f59e0b; background: #fffbeb;">
+                    <i class="bi bi-info-circle-fill text-warning"></i>
+                    <strong>Encuesta de Satisfacción Post-Entrega</strong>
+                    <p class="mb-0 mt-2 small">
+                        El equipo fue entregado con cotización aceptada.
+                        Esta encuesta nos permite medir la calidad del servicio.
+                    </p>
+                </div>
+
+                <p class="mb-2">
+                    <strong><i class="bi bi-envelope"></i> Destinatario:</strong><br>
+                    <code class="bg-light p-2 d-inline-block rounded">
+                        {{ feedback_satisfaccion_email }}
+                    </code>
+                </p>
+
+                <p class="mb-2"><strong><i class="bi bi-clipboard-check"></i> La encuesta incluye:</strong></p>
+                <ul class="small text-muted mb-3">
+                    <li>Calificación general del servicio (1–5 ⭐)</li>
+                    <li>NPS: probabilidad de recomendación (0–10)</li>
+                    <li>¿Recomendaría nuestro servicio? (👍 / 👎)</li>
+                    <li>Calificaciones opcionales de atención y tiempo</li>
+                    <li>Campo libre para comentarios adicionales</li>
+                </ul>
+
+                <div class="alert alert-light border mb-0">
+                    <small>
+                        <i class="bi bi-clock"></i>
+                        El enlace es personal y válido por <strong>7 días</strong>.
+                        Si no la envías, el equipo ya quedó registrado como entregado.
+                    </small>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <form method="post"
+                      action="{% url 'servicio_tecnico:confirmar_feedback_satisfaccion' feedback_satisfaccion_pendiente_id %}"
+                      style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="cancelar">
+                    <button type="submit" class="btn btn-secondary">
+                        <i class="bi bi-x-lg"></i> No Enviar
+                    </button>
+                </form>
+                <form method="post"
+                      action="{% url 'servicio_tecnico:confirmar_feedback_satisfaccion' feedback_satisfaccion_pendiente_id %}"
+                      style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="enviar">
+                    <button type="submit" class="btn btn-warning text-dark fw-semibold">
+                        <i class="bi bi-send-fill"></i> Enviar Encuesta al Cliente
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
 <!-- MODAL: CONFIRMACIÓN DE ENVÍO POR VIGENCIA VENCIDA -->
 <!-- ============================================================ -->
 <!-- 
@@ -4377,6 +4453,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (modalVigencia) {
         const bsModalVigencia = new bootstrap.Modal(modalVigencia);
         bsModalVigencia.show();
+    }
+    {% elif feedback_satisfaccion_pendiente_id and feedback_satisfaccion_email %}
+    // Caso 3: Encuesta de satisfacción post-entrega
+    const modalSatisfaccion = document.getElementById('modalConfirmarSatisfaccion');
+    if (modalSatisfaccion) {
+        const bsModalSatisfaccion = new bootstrap.Modal(modalSatisfaccion);
+        bsModalSatisfaccion.show();
     }
     {% endif %}
     

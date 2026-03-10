@@ -2906,3 +2906,98 @@ class FeedbackRechazoClienteForm(forms.Form):
                 'Tu comentario debe tener al menos 10 caracteres.'
             )
         return comentario
+
+
+# ============================================================================
+# FORMULARIO: FeedbackSatisfaccionClienteForm
+# Encuesta de satisfacción que llena el cliente desde el correo de entrega.
+# ============================================================================
+
+class FeedbackSatisfaccionClienteForm(forms.Form):
+    """
+    Formulario público para la encuesta de satisfacción del cliente.
+    Los campos hidden son llenados por JavaScript (estrellas, NPS, pulgares).
+    """
+
+    # Campos obligatorios — llenados vía JS con inputs hidden
+    calificacion_general = forms.IntegerField(
+        label="Calificación general",
+        min_value=1,
+        max_value=5,
+        widget=forms.HiddenInput(attrs={'id': 'id_calificacion_general'}),
+        error_messages={
+            'required': 'Por favor califica tu experiencia general.',
+            'invalid':  'Calificación inválida.',
+        }
+    )
+    nps = forms.IntegerField(
+        label="¿Qué tan probable es que nos recomiendes?",
+        min_value=0,
+        max_value=10,
+        widget=forms.HiddenInput(attrs={'id': 'id_nps'}),
+        error_messages={
+            'required': 'Por favor indica qué tan probable es que nos recomiendes.',
+            'invalid':  'Valor de NPS inválido.',
+        }
+    )
+    recomienda = forms.CharField(
+        label="¿Recomendarías nuestro servicio?",
+        max_length=10,
+        widget=forms.HiddenInput(attrs={'id': 'id_recomienda'}),
+        error_messages={
+            'required': 'Por favor indica si recomendarías nuestro servicio.',
+        }
+    )
+
+    # Campos opcionales
+    calificacion_atencion = forms.IntegerField(
+        label="Calificación de la atención",
+        min_value=1,
+        max_value=5,
+        required=False,
+        widget=forms.HiddenInput(attrs={'id': 'id_calificacion_atencion'}),
+    )
+    calificacion_tiempo = forms.IntegerField(
+        label="Calificación del tiempo de reparación",
+        min_value=1,
+        max_value=5,
+        required=False,
+        widget=forms.HiddenInput(attrs={'id': 'id_calificacion_tiempo'}),
+    )
+    comentario_cliente = forms.CharField(
+        label="Comentarios adicionales (opcional)",
+        max_length=1000,
+        required=False,
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'maxlength': '1000',
+            'placeholder': 'Comparte cualquier comentario adicional sobre tu experiencia...',
+            'class': 'feedback-textarea',
+            'id': 'id_comentario_satisfaccion',
+        }),
+    )
+
+    def clean_recomienda(self):
+        """Convierte el string 'true'/'false' del input hidden a booleano."""
+        valor = self.cleaned_data.get('recomienda', '').strip().lower()
+        if valor in ('true', '1', 'si', 'sí', 'yes'):
+            return True
+        elif valor in ('false', '0', 'no'):
+            return False
+        raise forms.ValidationError('Por favor indica si recomendarías nuestro servicio.')
+
+    def clean_calificacion_general(self):
+        val = self.cleaned_data.get('calificacion_general')
+        if val is None:
+            raise forms.ValidationError('Por favor califica tu experiencia general.')
+        if not 1 <= val <= 5:
+            raise forms.ValidationError('La calificación debe ser entre 1 y 5 estrellas.')
+        return val
+
+    def clean_nps(self):
+        val = self.cleaned_data.get('nps')
+        if val is None:
+            raise forms.ValidationError('Por favor indica qué tan probable es que nos recomiendes.')
+        if not 0 <= val <= 10:
+            raise forms.ValidationError('El valor debe estar entre 0 y 10.')
+        return val
