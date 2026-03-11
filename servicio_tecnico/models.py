@@ -1479,7 +1479,14 @@ class VentaMostrador(models.Model):
         default='ninguno',
         help_text="Paquete de servicio adicional"
     )
-    
+    costo_paquete = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Costo del paquete de servicio (editable)"
+    )
+
     # SERVICIOS ADICIONALES
     incluye_cambio_pieza = models.BooleanField(
         default=False,
@@ -1555,11 +1562,6 @@ class VentaMostrador(models.Model):
     
     # Fechas de control
     fecha_actualizacion = models.DateTimeField(auto_now=True)
-    
-    @property
-    def costo_paquete(self):
-        """Obtiene el costo del paquete desde constants.py"""
-        return Decimal(str(obtener_precio_paquete(self.paquete)))
     
     @property
     def total_venta(self):

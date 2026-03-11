@@ -2798,7 +2798,16 @@
                             </label>
                             {{ form_venta_mostrador.paquete }}
                         </div>
-                        
+
+                        <!-- Campo de precio abierto para el paquete -->
+                        <div id="divCostoPaquete" style="display: none;" class="mb-3">
+                            <label for="id_costo_paquete" class="form-label small">
+                                Precio del Paquete <span class="text-danger">*</span>
+                            </label>
+                            {{ form_venta_mostrador.costo_paquete }}
+                            <div class="form-text text-muted small">El precio sugerido se carga automáticamente, puedes modificarlo.</div>
+                        </div>
+
                         <!-- Descripciones de paquetes -->
                         <div id="descripcionPaquete" class="alert alert-info small mb-0" style="display: none;">
                             <div id="textoPaquete"></div>

@@ -12,10 +12,10 @@
 // Obtener el ID de la orden desde el DOM
 const ordenId = window.location.pathname.split('/')[3];
 
-// Descripciones de paquetes (sincronizado con constants.py)
+// Descripciones de paquetes (sin precios fijos — ahora son editables en el formulario)
 const DESCRIPCIONES_PAQUETES = {
     'premium': `
-        <strong>🏆 SOLUCIÓN PREMIUM - $5,500 IVA incluido</strong><br>
+        <strong>🏆 SOLUCIÓN PREMIUM</strong><br>
         <ul class="mb-0 mt-2">
             <li>RAM 16GB DDR5 Samsung (4800-5600 MHz)</li>
             <li>SSD 1TB de alta velocidad</li>
@@ -24,7 +24,7 @@ const DESCRIPCIONES_PAQUETES = {
         </ul>
     `,
     'oro': `
-        <strong>🥇 SOLUCIÓN ORO - $3,850 IVA incluido</strong><br>
+        <strong>🥇 SOLUCIÓN ORO</strong><br>
         <ul class="mb-0 mt-2">
             <li>RAM 8GB DDR5 Samsung (3200 MHz)</li>
             <li>SSD 1TB de alta velocidad</li>
@@ -32,13 +32,21 @@ const DESCRIPCIONES_PAQUETES = {
         </ul>
     `,
     'plata': `
-        <strong>🥈 SOLUCIÓN PLATA - $2,900 IVA incluido</strong><br>
+        <strong>🥈 SOLUCIÓN PLATA</strong><br>
         <ul class="mb-0 mt-2">
             <li>SSD 1TB de alta velocidad</li>
             <li>Instalación y configuración incluida</li>
         </ul>
     `,
     'ninguno': '<em>Sin paquete adicional - Servicios individuales</em>'
+};
+
+// Precios sugeridos (se autorellenan al seleccionar paquete, pero son editables)
+const PRECIOS_SUGERIDOS_PAQUETES = {
+    'premium': 5500.00,
+    'oro':     3850.00,
+    'plata':   2900.00,
+    'ninguno': 0.00,
 };
 
 // ============================================================================
@@ -131,16 +139,36 @@ function mostrarDescripcionPaquete() {
     const selectPaquete = document.getElementById('id_paquete_venta');
     const divDescripcion = document.getElementById('descripcionPaquete');
     const textoDescripcion = document.getElementById('textoPaquete');
-    
+    const divCostoPaquete = document.getElementById('divCostoPaquete');
+    const inputCostoPaquete = document.getElementById('id_costo_paquete');
+
     if (!selectPaquete || !divDescripcion || !textoDescripcion) return;
-    
+
     const paqueteSeleccionado = selectPaquete.value;
-    
-    if (paqueteSeleccionado && DESCRIPCIONES_PAQUETES[paqueteSeleccionado]) {
+
+    if (paqueteSeleccionado && paqueteSeleccionado !== 'ninguno' && DESCRIPCIONES_PAQUETES[paqueteSeleccionado]) {
         textoDescripcion.innerHTML = DESCRIPCIONES_PAQUETES[paqueteSeleccionado];
         divDescripcion.style.display = 'block';
+
+        // Mostrar campo de precio y autorellenar solo si está vacío o en cero
+        if (divCostoPaquete) divCostoPaquete.style.display = 'block';
+        if (inputCostoPaquete) {
+            inputCostoPaquete.required = true;
+            const valorActual = parseFloat(inputCostoPaquete.value) || 0;
+            if (valorActual <= 0) {
+                inputCostoPaquete.value = PRECIOS_SUGERIDOS_PAQUETES[paqueteSeleccionado].toFixed(2);
+            }
+        }
     } else {
         divDescripcion.style.display = 'none';
+
+        // Ocultar campo de precio y resetear
+        if (divCostoPaquete) divCostoPaquete.style.display = 'none';
+        if (inputCostoPaquete) {
+            inputCostoPaquete.required = false;
+            inputCostoPaquete.value = '0.00';
+            inputCostoPaquete.classList.remove('is-invalid');
+        }
     }
 }
 
@@ -277,7 +305,11 @@ function abrirModalVentaMostrador() {
     
     // Limpiar formulario
     if (form) form.reset();
-    
+
+    // Ocultar campo de precio de paquete al resetear
+    const divCostoPaquete = document.getElementById('divCostoPaquete');
+    if (divCostoPaquete) divCostoPaquete.style.display = 'none';
+
     // Ocultar alerta de errores
     const alertErrores = document.getElementById('alertErroresVentaMostrador');
     if (alertErrores) alertErrores.classList.add('d-none');
@@ -302,6 +334,21 @@ function guardarVentaMostrador() {
     if (!paquete) {
         mostrarAlerta('Por favor selecciona un paquete', 'danger');
         return;
+    }
+
+    // Validar precio del paquete si se seleccionó uno real
+    if (paquete !== 'ninguno') {
+        const inputCostoPaquete = document.getElementById('id_costo_paquete');
+        const costoPaquete = parseFloat(inputCostoPaquete ? inputCostoPaquete.value : 0) || 0;
+        if (costoPaquete <= 0) {
+            mostrarAlerta('⚠️ El precio del paquete debe ser mayor a $0.00', 'danger');
+            if (inputCostoPaquete) {
+                inputCostoPaquete.focus();
+                inputCostoPaquete.classList.add('is-invalid');
+            }
+            return;
+        }
+        if (inputCostoPaquete) inputCostoPaquete.classList.remove('is-invalid');
     }
     
     // 🆕 VALIDACIÓN MEJORADA: Servicios con costos obligatorios

@@ -2011,6 +2011,7 @@ class VentaMostradorForm(forms.ModelForm):
         model = VentaMostrador
         fields = [
             'paquete',
+            'costo_paquete',
             'incluye_cambio_pieza',
             'costo_cambio_pieza',
             'incluye_limpieza',
@@ -2028,6 +2029,13 @@ class VentaMostradorForm(forms.ModelForm):
             'paquete': forms.Select(attrs={
                 'class': 'form-control form-select',
                 'id': 'id_paquete_venta',
+            }),
+            'costo_paquete': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0.00',
+                'step': '0.01',
+                'min': '0',
+                'id': 'id_costo_paquete',
             }),
             'incluye_cambio_pieza': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
@@ -2088,6 +2096,7 @@ class VentaMostradorForm(forms.ModelForm):
         
         labels = {
             'paquete': 'Paquete de Servicio',
+            'costo_paquete': 'Precio del Paquete',
             'incluye_cambio_pieza': 'Incluye cambio de pieza',
             'costo_cambio_pieza': 'Costo de instalación',
             'incluye_limpieza': 'Incluye limpieza y mantenimiento',
@@ -2103,6 +2112,7 @@ class VentaMostradorForm(forms.ModelForm):
         
         help_texts = {
             'paquete': 'Selecciona el paquete que desea el cliente',
+            'costo_paquete': 'Precio acordado con el cliente para este paquete',
             'incluye_cambio_pieza': 'Marca si incluye instalación de pieza comprada',
             'costo_cambio_pieza': 'Costo del servicio de instalación',
             'incluye_limpieza': 'Limpieza interna y externa del equipo',
@@ -2125,7 +2135,16 @@ class VentaMostradorForm(forms.ModelForm):
         Por ejemplo: Si "incluye_cambio_pieza" = True, entonces "costo_cambio_pieza" > 0
         """
         cleaned_data = super().clean()
-        
+
+        # Validar precio del paquete: si se seleccionó un paquete real, el costo debe ser mayor a 0
+        paquete = cleaned_data.get('paquete')
+        costo_paquete = cleaned_data.get('costo_paquete')
+        if paquete and paquete != 'ninguno':
+            if not costo_paquete or costo_paquete <= 0:
+                raise ValidationError({
+                    'costo_paquete': '❌ Si seleccionas un paquete, el precio debe ser mayor a $0.00'
+                })
+
         # Validar cambio de pieza
         if cleaned_data.get('incluye_cambio_pieza'):
             if not cleaned_data.get('costo_cambio_pieza') or cleaned_data.get('costo_cambio_pieza') <= 0:
