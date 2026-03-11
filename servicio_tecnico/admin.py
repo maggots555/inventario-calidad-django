@@ -714,7 +714,7 @@ class VentaMostradorAdmin(admin.ModelAdmin):
             'fields': ('folio_venta', 'orden', 'fecha_venta')
         }),
         ('Paquete', {
-            'fields': ('paquete',)
+            'fields': (('paquete', 'costo_paquete'),)
         }),
         ('Comisiones', {
             'fields': ('genera_comision',),
