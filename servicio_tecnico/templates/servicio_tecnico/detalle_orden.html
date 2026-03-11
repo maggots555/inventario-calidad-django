@@ -4289,7 +4289,11 @@
                     <i class="bi bi-info-circle-fill text-warning"></i>
                     <strong>Encuesta de Satisfacción Post-Entrega</strong>
                     <p class="mb-0 mt-2 small">
+                        {% if orden.cotizacion and orden.cotizacion.usuario_acepto %}
                         El equipo fue entregado con cotización aceptada.
+                        {% else %}
+                        El equipo fue entregado como venta mostrador con servicio.
+                        {% endif %}
                         Esta encuesta nos permite medir la calidad del servicio.
                     </p>
                 </div>

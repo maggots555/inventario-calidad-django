@@ -1593,7 +1593,20 @@ class VentaMostrador(models.Model):
         if hasattr(self, 'piezas_vendidas'):
             return sum(pieza.subtotal for pieza in self.piezas_vendidas.all())
         return Decimal('0.00')
-    
+
+    @property
+    def tiene_al_menos_un_servicio(self):
+        """True si la venta incluye al menos un servicio facturable."""
+        return (
+            (self.paquete and self.paquete != 'ninguno')
+            or self.incluye_cambio_pieza
+            or self.incluye_limpieza
+            or self.incluye_kit_limpieza
+            or self.incluye_reinstalacion_so
+            or self.incluye_respaldo
+            or self.piezas_vendidas.exists()
+        )
+
     def save(self, *args, **kwargs):
         """
         Generar folio VM-YYYY-XXXX si es nuevo.
@@ -2509,13 +2522,22 @@ class FeedbackCliente(models.Model):
     un enlace único firmado sin necesidad de autenticación.
     """
 
-    # --- Relación ---
+    # --- Relaciones ---
+    orden = models.ForeignKey(
+        'OrdenServicio',
+        on_delete=models.CASCADE,
+        related_name='feedbacks_directos',
+        verbose_name="Orden",
+        help_text="Orden de servicio a la que pertenece este feedback (siempre presente)."
+    )
     cotizacion = models.ForeignKey(
         'Cotizacion',
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name='feedbacks',
         verbose_name="Cotización",
-        help_text="Cotización a la que pertenece este feedback"
+        help_text="Cotización asociada (nullable para VentaMostrador)."
     )
 
     # --- Token de acceso seguro ---
@@ -2621,7 +2643,7 @@ class FeedbackCliente(models.Model):
     def __str__(self):
         return (
             f"Feedback [{self.get_tipo_display()}] - "
-            f"Orden {self.cotizacion.orden.numero_orden_interno} "
+            f"Orden {self.orden.numero_orden_interno} "
             f"({'Respondido' if self.utilizado else 'Pendiente'})"
         )
 

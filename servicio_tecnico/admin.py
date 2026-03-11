@@ -1579,14 +1579,15 @@ class FeedbackClienteAdmin(admin.ModelAdmin):
     )
     
     search_fields = (
-        'cotizacion__orden__numero_orden_interno',
-        'cotizacion__orden__detalle_equipo__numero_serie',
+        'orden__numero_orden_interno',
+        'orden__detalle_equipo__numero_serie',
         'comentario_cliente',
     )
     
     readonly_fields = (
         'token',
         'fecha_creacion',
+        'orden',
         'cotizacion',
         'tipo',
         'estado_actual',
@@ -1597,10 +1598,11 @@ class FeedbackClienteAdmin(admin.ModelAdmin):
         'recomienda',
         'nps',
     )
-    
+
     fieldsets = (
         ('Información General', {
             'fields': (
+                'orden',
                 'cotizacion',
                 'tipo',
                 'estado_actual',
@@ -1639,7 +1641,7 @@ class FeedbackClienteAdmin(admin.ModelAdmin):
     
     def cotizacion_badge(self, obj):
         """Link a la orden relacionada"""
-        orden = obj.cotizacion.orden
+        orden = obj.orden
         url = reverse('admin:servicio_tecnico_ordenservicio_change', args=[orden.pk])
         return format_html(
             '<a href="{}" class="badge bg-primary text-decoration-none">{}</a>',
@@ -1663,7 +1665,7 @@ class FeedbackClienteAdmin(admin.ModelAdmin):
     
     def email_cliente(self, obj):
         """Email del cliente desde la orden"""
-        email = obj.cotizacion.orden.detalle_equipo.email_cliente
+        email = obj.orden.detalle_equipo.email_cliente
         if email and email != 'cliente@ejemplo.com':
             return format_html('<a href="mailto:{}">{}</a>', email, email)
         return format_html('<span class="text-danger">Sin email</span>')

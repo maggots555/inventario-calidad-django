@@ -1303,32 +1303,63 @@ def cerrar_orden(request, orden_id):
         orden.save()
 
         # ── TRIGGER: Encuesta de satisfacción post-entrega ──────────────────
-        # Se crea si la cotización fue aceptada y el cliente tiene email.
+        # Se crea si la cotización fue aceptada y el cliente tiene email válido.
+        # También aplica para VentaMostrador con al menos un servicio.
         # El operador confirma el envío desde el modal en detalle_orden.html.
         _feedback_sat_creado = False
         try:
+            import secrets as _secrets_cerrar
             import uuid as _uuid_cerrar
             from django.core.signing import TimestampSigner as _TSignerCerrar
             from .models import FeedbackCliente as _FBCCerrar
             _cot_cerrar = getattr(orden, 'cotizacion', None)
+            _email_cerrar = (
+                orden.detalle_equipo.email_cliente
+                if orden.detalle_equipo and orden.detalle_equipo.email_cliente
+                else None
+            )
+            _email_valido = (
+                _email_cerrar
+                and _email_cerrar != 'cliente@ejemplo.com'
+            )
+
             if (
                 _cot_cerrar is not None
                 and _cot_cerrar.usuario_acepto is True
                 and not _cot_cerrar.motivo_rechazo
-                and orden.detalle_equipo
-                and orden.detalle_equipo.email_cliente
+                and _email_valido
                 and not _FBCCerrar.objects.filter(
-                    cotizacion=_cot_cerrar, tipo='satisfaccion'
+                    orden=orden, tipo='satisfaccion'
                 ).exists()
             ):
                 _fb_cerrar = _FBCCerrar.objects.create(
+                    orden=orden,
                     cotizacion=_cot_cerrar,
                     token=_secrets_cerrar.token_urlsafe(32),
                     tipo='satisfaccion',
                 )
                 request.session['feedback_satisfaccion_pendiente_id'] = _fb_cerrar.pk
-                request.session['feedback_satisfaccion_email'] = orden.detalle_equipo.email_cliente
+                request.session['feedback_satisfaccion_email'] = _email_cerrar
                 _feedback_sat_creado = True
+
+            elif (
+                not _feedback_sat_creado
+                and hasattr(orden, 'venta_mostrador')
+                and orden.venta_mostrador.tiene_al_menos_un_servicio
+                and _email_valido
+                and not _FBCCerrar.objects.filter(
+                    orden=orden, tipo='satisfaccion'
+                ).exists()
+            ):
+                _fb_cerrar = _FBCCerrar.objects.create(
+                    orden=orden,
+                    token=_secrets_cerrar.token_urlsafe(32),
+                    tipo='satisfaccion',
+                )
+                request.session['feedback_satisfaccion_pendiente_id'] = _fb_cerrar.pk
+                request.session['feedback_satisfaccion_email'] = _email_cerrar
+                _feedback_sat_creado = True
+
         except Exception as _e_cerrar:
             import logging as _log_cerrar
             _log_cerrar.getLogger(__name__).warning(
@@ -1386,7 +1417,8 @@ def cerrar_todas_finalizadas(request):
 
             # ── Encuestas de satisfacción para cierre en lote ──────────────
             # Para el bulk, no hay flujo de modal; se envían automáticamente
-            # a las órdenes con cotización aceptada que tengan email de cliente.
+            # a las órdenes con cotización aceptada o VentaMostrador con servicios
+            # que tengan email de cliente válido.
             try:
                 import secrets as _secrets_bulk
                 from .models import FeedbackCliente as _FBCBulk
@@ -1395,21 +1427,32 @@ def cerrar_todas_finalizadas(request):
                 _enviadas    = 0
                 _ordenes_bulk = OrdenServicio.objects.filter(
                     id__in=_ids_bulk
-                ).select_related('cotizacion', 'detalle_equipo')
+                ).select_related('cotizacion', 'detalle_equipo', 'venta_mostrador')
                 for _ord in _ordenes_bulk:
                     try:
                         _cot = getattr(_ord, 'cotizacion', None)
+                        _email_bulk = (
+                            _ord.detalle_equipo.email_cliente
+                            if _ord.detalle_equipo and _ord.detalle_equipo.email_cliente
+                            else None
+                        )
+                        _email_ok = (
+                            _email_bulk
+                            and _email_bulk != 'cliente@ejemplo.com'
+                        )
+                        _ya_existe = _FBCBulk.objects.filter(
+                            orden=_ord, tipo='satisfaccion'
+                        ).exists()
+
                         if (
                             _cot is not None
                             and _cot.usuario_acepto is True
                             and not _cot.motivo_rechazo
-                            and _ord.detalle_equipo
-                            and _ord.detalle_equipo.email_cliente
-                            and not _FBCBulk.objects.filter(
-                                cotizacion=_cot, tipo='satisfaccion'
-                            ).exists()
+                            and _email_ok
+                            and not _ya_existe
                         ):
                             _fb_bulk = _FBCBulk.objects.create(
+                                orden=_ord,
                                 cotizacion=_cot,
                                 token=_secrets_bulk.token_urlsafe(32),
                                 tipo='satisfaccion',
@@ -1419,6 +1462,24 @@ def cerrar_todas_finalizadas(request):
                                 usuario_id=_uid_bulk,
                             )
                             _enviadas += 1
+
+                        elif (
+                            not _ya_existe
+                            and hasattr(_ord, 'venta_mostrador')
+                            and _ord.venta_mostrador.tiene_al_menos_un_servicio
+                            and _email_ok
+                        ):
+                            _fb_bulk = _FBCBulk.objects.create(
+                                orden=_ord,
+                                token=_secrets_bulk.token_urlsafe(32),
+                                tipo='satisfaccion',
+                            )
+                            enviar_feedback_satisfaccion_task.delay(
+                                feedback_id=_fb_bulk.pk,
+                                usuario_id=_uid_bulk,
+                            )
+                            _enviadas += 1
+
                     except Exception as _e_ord:
                         import logging as _log_ord
                         _log_ord.getLogger(__name__).warning(
@@ -2405,6 +2466,7 @@ def detalle_orden(request, orden_id):
                         token_firmado = signer.sign(token_raw)
 
                         feedback_obj = FeedbackCliente.objects.create(
+                            orden=cotizacion_actualizada.orden,
                             cotizacion=cotizacion_actualizada,
                             token=token_firmado,
                             tipo='rechazo',
@@ -12214,7 +12276,7 @@ def confirmar_feedback_satisfaccion(request, feedback_id):
 
     feedback = get_object_or_404(FeedbackCliente, pk=feedback_id)
     accion   = request.POST.get('accion', 'cancelar')
-    orden_id = feedback.cotizacion.orden.pk
+    orden_id = feedback.orden.pk
 
     if accion == 'enviar':
         if feedback.correo_enviado:
@@ -12225,7 +12287,7 @@ def confirmar_feedback_satisfaccion(request, feedback_id):
             messages.success(
                 request,
                 f'⭐ Encuesta de satisfacción enviada a '
-                f'{feedback.cotizacion.orden.detalle_equipo.email_cliente}. '
+                f'{feedback.orden.detalle_equipo.email_cliente}. '
                 f'El cliente tiene 7 días para responder.'
             )
     else:
@@ -12253,7 +12315,7 @@ def feedback_satisfaccion_cliente(request, token):
     # ── Buscar feedback por token y tipo ──────────────────────────────────
     try:
         feedback = FeedbackCliente.objects.select_related(
-            'cotizacion__orden__detalle_equipo',
+            'orden__detalle_equipo',
         ).get(token=token, tipo='satisfaccion')
     except FeedbackCliente.DoesNotExist:
         return render(request, TEMPLATE, {'estado': 'invalido'})
@@ -12265,7 +12327,7 @@ def feedback_satisfaccion_cliente(request, token):
     if feedback.esta_expirado:
         return render(request, TEMPLATE, {'estado': 'expirado'})
 
-    orden   = feedback.cotizacion.orden
+    orden   = feedback.orden
     detalle = orden.detalle_equipo
 
     if request.method == 'POST':

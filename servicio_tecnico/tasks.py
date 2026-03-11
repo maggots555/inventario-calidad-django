@@ -1796,13 +1796,13 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None):
         # ── Recuperar feedback ──
         try:
             feedback = FeedbackCliente.objects.select_related(
-                'cotizacion__orden__detalle_equipo',
+                'orden__detalle_equipo',
                 'enviado_por',
             ).get(pk=feedback_id)
         except FeedbackCliente.DoesNotExist:
             return {'success': False, 'mensaje': f'FeedbackCliente ID {feedback_id} no encontrado.'}
 
-        orden   = feedback.cotizacion.orden
+        orden   = feedback.orden
         detalle = orden.detalle_equipo
         email_cliente = detalle.email_cliente if detalle else None
 
