@@ -194,6 +194,7 @@ TIPO_IMAGEN_CHOICES = [
     ('reparacion', 'Durante Reparación'),
     ('egreso', 'Egreso - Estado Final'),
     ('autorizacion', 'Autorización/Pass - RHITSO'),
+    ('packing', 'Imágenes Packing'),
 ]
 
 # ============================================================================

@@ -3584,6 +3584,27 @@ thead.sticky-top {
     transform: scale(1.15);
 }
 
+/* -- PACKING: Teal (#20c997) -- */
+.tipo-imagen-card.tipo-packing {
+    border-color: #a3e9cd;
+    color: #0a4c27;
+}
+.tipo-imagen-card.tipo-packing:hover {
+    background: #d1f5e3;
+    border-color: #20c997;
+    color: #17a589;
+}
+.tipo-imagen-radio[value="packing"]:checked + .tipo-imagen-card.tipo-packing {
+    background: #20c997;
+    border-color: #17a589;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(32, 201, 151, 0.40);
+    transform: translateY(-2px);
+}
+.tipo-imagen-radio[value="packing"]:checked + .tipo-imagen-card.tipo-packing i {
+    transform: scale(1.15);
+}
+
 /* ---- Aviso contextual debajo del selector ---- */
 .tipo-imagen-aviso {
     font-size: 0.85rem;
@@ -3606,6 +3627,7 @@ thead.sticky-top {
 .tipo-imagen-aviso.aviso-reparacion   { background: #d1e7dd; color: #0f5132;  border-color: #198754; }
 .tipo-imagen-aviso.aviso-egreso       { background: #f8d7da; color: #842029;  border-color: #dc3545; }
 .tipo-imagen-aviso.aviso-autorizacion { background: #e9d8fd; color: #3d0d7c;  border-color: #6f42c1; }
+.tipo-imagen-aviso.aviso-packing      { background: #d1f5e3; color: #0a4c27;  border-color: #20c997; }
 
 /* ---- Responsive: móvil — los cards se ajustan a 2-3 por fila ---- */
 @media (max-width: 575px) {

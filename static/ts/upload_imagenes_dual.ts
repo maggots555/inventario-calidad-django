@@ -569,6 +569,7 @@ class UploadImagenesDual {
             reparacion:   { clase: 'aviso-reparacion',   icono: 'bi-wrench-adjustable',     texto: 'Fotos del proceso de <strong>reparación</strong>. No cambia el estado de la orden.' },
             egreso:       { clase: 'aviso-egreso',       icono: 'bi-exclamation-triangle-fill', texto: '<strong>¡Atención!</strong> Subir como <strong>Egreso</strong> marcará la orden como <strong>Finalizada - Lista para Entrega</strong>.' },
             autorizacion: { clase: 'aviso-autorizacion', icono: 'bi-patch-check',           texto: 'Evidencia de <strong>autorización RHITSO</strong>. No cambia el estado de la orden.' },
+            packing:      { clase: 'aviso-packing',      icono: 'bi-box-seam',               texto: 'Fotos del proceso de <strong>packing</strong> del equipo. No cambia el estado de la orden.' },
         };
 
         const config = avisos[tipo];

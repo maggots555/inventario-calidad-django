@@ -1995,6 +1995,12 @@
                                             <span>Autorización</span>
                                         </label>
 
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="tipo_packing" value="packing">
+                                        <label for="tipo_packing" class="tipo-imagen-card tipo-packing">
+                                            <i class="bi bi-box-seam"></i>
+                                            <span>Packing</span>
+                                        </label>
+
                                     </div>
 
                                     <!-- Aviso contextual que aparece al seleccionar un tipo -->
@@ -2181,8 +2187,14 @@
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="autorizacion-tab" data-bs-toggle="pill" data-bs-target="#autorizacion" type="button">
-                                <i class="bi bi-shield-check"></i> Autorización/Pass 
+                                <i class="bi bi-shield-check"></i> Autorización/Pass
                                 <span class="badge bg-success">{{ imagenes_por_tipo.autorizacion.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="packing-tab" data-bs-toggle="pill" data-bs-target="#packing" type="button">
+                                <i class="bi bi-box-seam"></i> Packing
+                                <span class="badge bg-info text-dark">{{ imagenes_por_tipo.packing.count }}</span>
                             </button>
                         </li>
                     </ul>

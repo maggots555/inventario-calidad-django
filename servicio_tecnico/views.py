@@ -2467,6 +2467,7 @@ def detalle_orden(request, orden_id):
         'reparacion': orden.imagenes.filter(tipo='reparacion').order_by('-fecha_subida'),
         'egreso': orden.imagenes.filter(tipo='egreso').order_by('-fecha_subida'),
         'autorizacion': orden.imagenes.filter(tipo='autorizacion').order_by('-fecha_subida'),
+        'packing': orden.imagenes.filter(tipo='packing').order_by('-fecha_subida'),
     }
     
     total_imagenes = orden.imagenes.count()
