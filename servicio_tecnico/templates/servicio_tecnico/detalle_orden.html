@@ -245,6 +245,15 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small">Orden del Cliente</label>
                             <p class="mb-0"><code>{{ detalle.orden_cliente|default:"N/A" }}</code></p>
+                            {% if orden.es_fuera_garantia %}
+                                <span class="badge bg-warning text-dark" style="font-size: 0.7em;" title="Orden fuera de garantía (prefijo OOW- o FL-)">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> Fuera de Garantía
+                                </span>
+                            {% else %}
+                                <span class="badge bg-success" style="font-size: 0.7em;" title="Orden dentro de garantía">
+                                    <i class="bi bi-shield-check"></i> En Garantía
+                                </span>
+                            {% endif %}
                         </div>
                         
                         <!-- ✅ NUEVO: Email del Cliente (Noviembre 2025) -->

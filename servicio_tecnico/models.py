@@ -228,6 +228,17 @@ class OrdenServicio(models.Model):
         help_text="¿Requiere pasar por control de calidad? (Opcional para ventas simples como accesorios)"
     )
     
+    # GARANTÍA
+    # =========================================================================
+    # Distintor formal en base de datos para diferenciar órdenes fuera de garantía
+    # (OOW-/FL-) de las órdenes dentro de garantía. Se sincroniza automáticamente
+    # desde DetalleEquipo.save() al detectar el prefijo en orden_cliente.
+    es_fuera_garantia = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="¿La orden es fuera de garantía? Se activa automáticamente si orden_cliente tiene prefijo OOW- o FL-"
+    )
+    
     # CAMPOS CALCULADOS (para reportes y KPIs)
     año = models.IntegerField(
         editable=False,
@@ -972,6 +983,14 @@ class DetalleEquipo(models.Model):
             self.email_cliente = self.email_cliente.strip().lower()
         
         super().save(*args, **kwargs)
+        
+        # Auto-sync: sincronizar es_fuera_garantia en la orden padre
+        # Si orden_cliente empieza con OOW- o FL-, la orden es fuera de garantía
+        orden_cliente_upper = (self.orden_cliente or '').upper().strip()
+        nuevo_valor = orden_cliente_upper.startswith('OOW-') or orden_cliente_upper.startswith('FL-')
+        if self.orden.es_fuera_garantia != nuevo_valor:
+            self.orden.es_fuera_garantia = nuevo_valor
+            self.orden.save(update_fields=['es_fuera_garantia'])
     
     def __str__(self):
         return f"{self.tipo_equipo.upper()} {self.marca} {self.modelo} - S/N: {self.numero_serie}"

@@ -177,6 +177,7 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         'es_reingreso',
         'es_candidato_rhitso',
         'estado_rhitso_display',  # NUEVO - Muestra estado RHITSO con indicadores de fechas
+        'es_fuera_garantia',
         'requiere_factura',
     )
     list_filter = (
@@ -188,6 +189,7 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         'estado_rhitso',  # NUEVO - Filtrar por estado RHITSO
         'fecha_envio_rhitso',  # NUEVO - Filtrar por fecha de envío a RHITSO
         'fecha_recepcion_rhitso',  # NUEVO - Filtrar por fecha de recepción desde RHITSO
+        'es_fuera_garantia',
         'requiere_factura',
         'año',
         'mes',
@@ -210,8 +212,9 @@ class OrdenServicioAdmin(admin.ModelAdmin):
             'fields': (
                 'tipo_servicio',
                 'control_calidad_requerido',
+                'es_fuera_garantia',
             ),
-            'description': 'Define si esta orden es una venta mostrador (sin diagnóstico) o requiere diagnóstico técnico completo.'
+            'description': 'Define si esta orden es una venta mostrador (sin diagnóstico) o requiere diagnóstico técnico completo. El campo "Fuera de garantía" se calcula automáticamente según el prefijo OOW-/FL- de la orden del cliente.'
         }),
         ('Ubicación y Responsables', {
             'fields': (
@@ -261,7 +264,7 @@ class OrdenServicioAdmin(admin.ModelAdmin):
         }),
     )
     
-    readonly_fields = ('numero_orden_interno', 'año', 'mes', 'semana')
+    readonly_fields = ('numero_orden_interno', 'es_fuera_garantia', 'año', 'mes', 'semana')
     
     inlines = [
         DetalleEquipoInline,
