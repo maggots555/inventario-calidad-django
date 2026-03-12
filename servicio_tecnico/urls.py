@@ -316,4 +316,50 @@ urlpatterns = [
     path('feedback-satisfaccion/<int:feedback_id>/confirmar/',
          views.confirmar_feedback_satisfaccion,
          name='confirmar_feedback_satisfaccion'),
+
+    # ========================================================================
+    # DASHBOARD DE ENCUESTAS DE SATISFACCIÓN (Marzo 2026)
+    # ========================================================================
+    path('encuestas/dashboard/',
+         views.dashboard_encuestas, name='dashboard_encuestas'),
+
+    # APIs JSON para el dashboard de encuestas
+    path('encuestas/api/kpis/',
+         views.api_encuestas_kpis, name='api_encuestas_kpis'),
+    path('encuestas/api/tendencia/',
+         views.api_encuestas_tendencia, name='api_encuestas_tendencia'),
+    path('encuestas/api/por-responsable/',
+         views.api_encuestas_por_responsable, name='api_encuestas_por_responsable'),
+    path('encuestas/api/distribucion-nps/',
+         views.api_encuestas_distribucion_nps, name='api_encuestas_distribucion_nps'),
+    path('encuestas/api/lista/',
+         views.api_encuestas_lista, name='api_encuestas_lista'),
+    path('encuestas/api/comentarios/',
+         views.api_encuestas_comentarios, name='api_encuestas_comentarios'),
+
+    # Exportación a Excel del dashboard de encuestas
+    path('encuestas/dashboard/exportar-excel/',
+         views.exportar_encuestas_excel, name='exportar_encuestas_excel'),
+
+    # ========================================================================
+    # DASHBOARD DE FEEDBACK DE RECHAZO (Marzo 2026)
+    # ========================================================================
+    path('feedback-rechazo/dashboard/',
+         views.dashboard_feedback_rechazo, name='dashboard_feedback_rechazo'),
+
+    # APIs JSON para el dashboard de feedback de rechazo
+    path('feedback-rechazo/api/kpis/',
+         views.api_feedback_rechazo_kpis, name='api_feedback_rechazo_kpis'),
+    path('feedback-rechazo/api/por-motivo/',
+         views.api_feedback_rechazo_por_motivo, name='api_feedback_rechazo_por_motivo'),
+    path('feedback-rechazo/api/tendencia/',
+         views.api_feedback_rechazo_tendencia, name='api_feedback_rechazo_tendencia'),
+    path('feedback-rechazo/api/lista/',
+         views.api_feedback_rechazo_lista, name='api_feedback_rechazo_lista'),
+    path('feedback-rechazo/api/comentarios/',
+         views.api_feedback_rechazo_comentarios, name='api_feedback_rechazo_comentarios'),
+
+    # Exportación a Excel del dashboard de feedback de rechazo
+    path('feedback-rechazo/dashboard/exportar-excel/',
+         views.exportar_feedback_rechazo_excel, name='exportar_feedback_rechazo_excel'),
 ]

@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Panel de Encuestas de Satisfacción — SIGMA{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard_encuestas.css' %}">
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="enc-dashboard-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1><i class="bi bi-clipboard-pulse me-2"></i>Panel de Encuestas de Satisfacción</h1>
+            <p>Métricas, tendencias y análisis de la experiencia del cliente</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'servicio_tecnico:dashboard_feedback_rechazo' %}" class="btn btn-outline-light btn-sm">
+                <i class="bi bi-exclamation-triangle me-1"></i>Feedback de Rechazo
+            </a>
+            <a href="{% url 'servicio_tecnico:exportar_encuestas_excel' %}" id="btnExportarExcel"
+               class="btn btn-light btn-sm" title="Exportar a Excel">
+                <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="enc-filtros-card card">
+    <div class="card-header d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#filtrosCollapse">
+        <span><i class="bi bi-funnel me-2"></i>Filtros</span>
+        <i class="bi bi-chevron-down"></i>
+    </div>
+    <div class="collapse show" id="filtrosCollapse">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Desde</label>
+                    <input type="date" class="form-control form-control-sm" id="filtroFechaDesde">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Hasta</label>
+                    <input type="date" class="form-control form-control-sm" id="filtroFechaHasta">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Responsable de Seguimiento</label>
+                    <select class="form-select form-select-sm" id="filtroResponsable">
+                        <option value="">Todos</option>
+                        {% for emp in empleados %}
+                        <option value="{{ emp.id }}">{{ emp.nombre_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Sucursal</label>
+                    <select class="form-select form-select-sm" id="filtroSucursal">
+                        <option value="">Todas</option>
+                        {% for suc in sucursales %}
+                        <option value="{{ suc.id }}">{{ suc.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Tipo Orden</label>
+                    <select class="form-select form-select-sm" id="filtroTipoOrden">
+                        <option value="">Todos</option>
+                        <option value="diagnostico">Diagnóstico</option>
+                        <option value="venta_mostrador">Venta Mostrador</option>
+                    </select>
+                </div>
+                <div class="col-md-1 d-flex gap-1">
+                    <button class="btn btn-primary btn-sm flex-fill" id="btnAplicarFiltros" title="Aplicar">
+                        <i class="bi bi-search"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="btnLimpiarFiltros" title="Limpiar">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4" id="kpiContainer">
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="enc-kpi-card border-blue">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">Enviadas</div>
+                    <div class="kpi-valor" id="kpiEnviadas">-</div>
+                </div>
+                <div class="kpi-icon text-primary"><i class="bi bi-send"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="enc-kpi-card border-green">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">Respondidas</div>
+                    <div class="kpi-valor" id="kpiRespondidas">-</div>
+                    <div class="kpi-sub" id="kpiTasaRespuesta"></div>
+                </div>
+                <div class="kpi-icon text-success"><i class="bi bi-check-circle"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="enc-kpi-card border-amber">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">Pendientes</div>
+                    <div class="kpi-valor" id="kpiPendientes">-</div>
+                </div>
+                <div class="kpi-icon" style="color: var(--enc-amber)"><i class="bi bi-hourglass-split"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="enc-kpi-card border-red">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">Expiradas</div>
+                    <div class="kpi-valor" id="kpiExpiradas">-</div>
+                </div>
+                <div class="kpi-icon text-danger"><i class="bi bi-x-circle"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="enc-kpi-card border-purple">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">NPS Score</div>
+                    <div class="kpi-valor" id="kpiNPSScore">-</div>
+                </div>
+                <div class="kpi-icon" style="color: var(--enc-purple)"><i class="bi bi-speedometer"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="enc-kpi-card border-gold">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">Calificación</div>
+                    <div class="kpi-valor" id="kpiCalificacion">-</div>
+                    <div class="kpi-sub enc-estrellas" id="kpiEstrellas"></div>
+                </div>
+                <div class="kpi-icon" style="color: var(--enc-gold)"><i class="bi bi-star-fill"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gráficos principales -->
+<div class="row g-3 mb-4">
+    <!-- Tendencia temporal -->
+    <div class="col-lg-8">
+        <div class="enc-chart-card position-relative">
+            <div class="chart-titulo">
+                <i class="bi bi-graph-up me-2"></i>Tendencia Semanal
+            </div>
+            <div class="enc-chart-wrapper tendencia">
+                <canvas id="chartTendencia"></canvas>
+            </div>
+            <div class="enc-loading" id="loadingTendencia">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+        </div>
+    </div>
+    <!-- Distribución NPS -->
+    <div class="col-lg-4">
+        <div class="enc-chart-card position-relative">
+            <div class="chart-titulo">
+                <i class="bi bi-pie-chart me-2"></i>Distribución NPS
+            </div>
+            <div class="enc-chart-wrapper dona">
+                <canvas id="chartNPS"></canvas>
+            </div>
+            <div class="enc-nps-central">
+                <div class="nps-valor" id="npsScoreCentral">-</div>
+                <div class="nps-label">NPS Score</div>
+            </div>
+            <div class="enc-loading" id="loadingNPS">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Análisis por responsable -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-5">
+        <div class="enc-chart-card position-relative" style="height: 100%;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="chart-titulo mb-0">
+                    <i class="bi bi-diagram-3 me-2"></i>Comparativa Radar
+                </div>
+                <select class="form-select form-select-sm" style="width: auto;" id="selectOrdenResponsable">
+                    <option value="calificacion">Mejor Calificación</option>
+                    <option value="nps">Mayor NPS</option>
+                    <option value="enviadas">Más Encuestas</option>
+                </select>
+            </div>
+            <div class="enc-chart-wrapper radar">
+                <canvas id="chartResponsables"></canvas>
+            </div>
+            <div class="enc-loading" id="loadingResponsables">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="enc-chart-card position-relative" style="height: 100%;">
+            <div class="chart-titulo">
+                <i class="bi bi-trophy me-2"></i>Ranking por Responsable de Seguimiento
+            </div>
+            <div class="enc-tabla-contenedor">
+                <table class="table enc-tabla enc-tabla-ranking">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Responsable</th>
+                            <th>Enviadas</th>
+                            <th>Respondidas</th>
+                            <th>Calificación</th>
+                            <th>NPS Score</th>
+                            <th>Recomienda</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaRankingBody">
+                        <tr>
+                            <td colspan="7" class="enc-sin-datos">
+                                <i class="bi bi-people"></i>
+                                Cargando datos...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sub-métricas -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="enc-chart-card">
+            <div class="enc-submetrica">
+                <i class="bi bi-headset" style="font-size: 1.5rem; color: var(--enc-blue);"></i>
+                <div class="submetrica-label mt-2">Calificación Atención</div>
+                <div class="submetrica-valor" id="subCalAtencion" style="color: var(--enc-blue);">-</div>
+                <div class="enc-progress-ring">
+                    <div class="fill" id="barraAtencion" style="background: var(--enc-blue); width: 0%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="enc-chart-card">
+            <div class="enc-submetrica">
+                <i class="bi bi-clock-history" style="font-size: 1.5rem; color: var(--enc-purple);"></i>
+                <div class="submetrica-label mt-2">Calificación Tiempo</div>
+                <div class="submetrica-valor" id="subCalTiempo" style="color: var(--enc-purple);">-</div>
+                <div class="enc-progress-ring">
+                    <div class="fill" id="barraTiempo" style="background: var(--enc-purple); width: 0%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="enc-chart-card">
+            <div class="enc-submetrica">
+                <i class="bi bi-hand-thumbs-up" style="font-size: 1.5rem; color: var(--enc-green);"></i>
+                <div class="submetrica-label mt-2">Tasa de Recomendación</div>
+                <div class="submetrica-valor" id="subTasaRec" style="color: var(--enc-green);">-</div>
+                <div class="enc-progress-ring">
+                    <div class="fill" id="barraRecomendacion" style="background: var(--enc-green); width: 0%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de encuestas -->
+<div class="enc-tabla-card card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <ul class="nav enc-tabs" id="tabsEncuestas">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#" data-estado="todas">Todas</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-estado="pendientes">
+                        Pendientes <span class="badge bg-warning text-dark ms-1" id="badgePendientes"></span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-estado="respondidas">
+                        Respondidas <span class="badge bg-success ms-1" id="badgeRespondidas"></span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-estado="expiradas">
+                        Expiradas <span class="badge bg-danger ms-1" id="badgeExpiradas"></span>
+                    </a>
+                </li>
+            </ul>
+            <div class="enc-buscador">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control form-control-sm" id="inputBusqueda"
+                       placeholder="Buscar orden, email, equipo..." style="width: 250px;">
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0 position-relative">
+        <div class="enc-tabla-contenedor">
+            <table class="table enc-tabla">
+                <thead>
+                    <tr>
+                        <th style="width: 30px;"></th>
+                        <th>Orden</th>
+                        <th>Equipo</th>
+                        <th>Email</th>
+                        <th>Responsable</th>
+                        <th>Sucursal</th>
+                        <th>Fecha Envío</th>
+                        <th>Estado</th>
+                        <th>Calificación</th>
+                        <th>NPS</th>
+                        <th>Recomienda</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaEncuestasBody">
+                    <tr>
+                        <td colspan="11" class="enc-sin-datos">
+                            <i class="bi bi-clipboard-data"></i>
+                            Cargando encuestas...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="enc-paginacion" id="paginacionEncuestas"></div>
+        <div class="enc-loading" id="loadingTabla">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Comentarios recientes -->
+<div class="enc-chart-card mb-4">
+    <div class="chart-titulo">
+        <i class="bi bi-chat-quote me-2"></i>Comentarios Recientes de Clientes
+    </div>
+    <div class="enc-comentarios-grid" id="comentariosContainer">
+        <div class="enc-sin-datos">
+            <i class="bi bi-chat-left-text"></i>
+            Cargando comentarios...
+        </div>
+    </div>
+</div>
+
+<!-- URLs para JavaScript (data attributes) -->
+<div id="dashboardUrls" class="d-none"
+     data-url-kpis="{% url 'servicio_tecnico:api_encuestas_kpis' %}"
+     data-url-tendencia="{% url 'servicio_tecnico:api_encuestas_tendencia' %}"
+     data-url-responsable="{% url 'servicio_tecnico:api_encuestas_por_responsable' %}"
+     data-url-nps="{% url 'servicio_tecnico:api_encuestas_distribucion_nps' %}"
+     data-url-lista="{% url 'servicio_tecnico:api_encuestas_lista' %}"
+     data-url-comentarios="{% url 'servicio_tecnico:api_encuestas_comentarios' %}"
+     data-url-exportar="{% url 'servicio_tecnico:exportar_encuestas_excel' %}"
+     data-url-detalle="{% url 'servicio_tecnico:detalle_orden' orden_id=0 %}"
+></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/dashboard_encuestas.js' %}"></script>
+{% endblock %}

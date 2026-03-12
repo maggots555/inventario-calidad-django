@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Panel de Feedback de Rechazo — SIGMA{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard_feedback_rechazo.css' %}">
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="fbr-dashboard-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1><i class="bi bi-exclamation-triangle me-2"></i>Panel de Feedback de Rechazo</h1>
+            <p>Análisis de los motivos de rechazo de cotización y comentarios de clientes</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'servicio_tecnico:dashboard_encuestas' %}" class="btn btn-outline-light btn-sm">
+                <i class="bi bi-clipboard-pulse me-1"></i>Encuestas Satisfacción
+            </a>
+            <a href="{% url 'servicio_tecnico:exportar_feedback_rechazo_excel' %}" id="btnExportarExcel"
+               class="btn btn-light btn-sm" title="Exportar a Excel">
+                <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="fbr-filtros-card card">
+    <div class="card-header d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#filtrosCollapse">
+        <span><i class="bi bi-funnel me-2"></i>Filtros</span>
+        <i class="bi bi-chevron-down"></i>
+    </div>
+    <div class="collapse show" id="filtrosCollapse">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Desde</label>
+                    <input type="date" class="form-control form-control-sm" id="filtroFechaDesde">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Hasta</label>
+                    <input type="date" class="form-control form-control-sm" id="filtroFechaHasta">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Responsable</label>
+                    <select class="form-select form-select-sm" id="filtroResponsable">
+                        <option value="">Todos</option>
+                        {% for emp in empleados %}
+                        <option value="{{ emp.id }}">{{ emp.nombre_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Sucursal</label>
+                    <select class="form-select form-select-sm" id="filtroSucursal">
+                        <option value="">Todas</option>
+                        {% for suc in sucursales %}
+                        <option value="{{ suc.id }}">{{ suc.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Motivo de Rechazo</label>
+                    <select class="form-select form-select-sm" id="filtroMotivo">
+                        <option value="">Todos</option>
+                        {% for motivo_key, motivo_label in motivos_rechazo %}
+                        <option value="{{ motivo_key }}">{{ motivo_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-1 d-flex gap-1">
+                    <button class="btn btn-danger btn-sm flex-fill" id="btnAplicarFiltros" title="Aplicar">
+                        <i class="bi bi-search"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="btnLimpiarFiltros" title="Limpiar">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4" id="kpiContainer">
+    <div class="col-lg col-md-4 col-6">
+        <div class="fbr-kpi-card border-red">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">Enviados</div>
+                    <div class="kpi-valor" id="kpiEnviados">-</div>
+                </div>
+                <div class="kpi-icon" style="color: var(--fbr-primary);"><i class="bi bi-send"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg col-md-4 col-6">
+        <div class="fbr-kpi-card border-green">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">Respondidos</div>
+                    <div class="kpi-valor" id="kpiRespondidos">-</div>
+                    <div class="kpi-sub" id="kpiTasaRespuesta"></div>
+                </div>
+                <div class="kpi-icon text-success"><i class="bi bi-check-circle"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg col-md-4 col-6">
+        <div class="fbr-kpi-card border-amber">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">Pendientes</div>
+                    <div class="kpi-valor" id="kpiPendientes">-</div>
+                </div>
+                <div class="kpi-icon" style="color: var(--fbr-amber);"><i class="bi bi-hourglass-split"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg col-md-4 col-6">
+        <div class="fbr-kpi-card border-orange">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">Expirados</div>
+                    <div class="kpi-valor" id="kpiExpirados">-</div>
+                </div>
+                <div class="kpi-icon" style="color: var(--fbr-secondary);"><i class="bi bi-x-circle"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg col-md-4 col-6">
+        <div class="fbr-kpi-card border-gray">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="kpi-label">Motivo Principal</div>
+                    <div class="kpi-valor" id="kpiMotivoPrincipal" style="font-size: 1.1rem;">-</div>
+                    <div class="kpi-sub" id="kpiMotivoPorcentaje"></div>
+                </div>
+                <div class="kpi-icon" style="color: var(--fbr-gray);"><i class="bi bi-bar-chart"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Gráficos -->
+<div class="row g-3 mb-4">
+    <!-- Distribución por motivo -->
+    <div class="col-lg-7">
+        <div class="fbr-chart-card position-relative">
+            <div class="chart-titulo">
+                <i class="bi bi-bar-chart-steps me-2"></i>Distribución por Motivo de Rechazo
+            </div>
+            <div class="fbr-chart-wrapper barras-motivos">
+                <canvas id="chartMotivos"></canvas>
+            </div>
+            <div class="fbr-loading" id="loadingMotivos">
+                <div class="spinner-border text-danger" role="status"></div>
+            </div>
+        </div>
+    </div>
+    <!-- Tendencia temporal -->
+    <div class="col-lg-5">
+        <div class="fbr-chart-card position-relative">
+            <div class="chart-titulo">
+                <i class="bi bi-graph-up me-2"></i>Tendencia Semanal
+            </div>
+            <div class="fbr-chart-wrapper tendencia">
+                <canvas id="chartTendencia"></canvas>
+            </div>
+            <div class="fbr-loading" id="loadingTendencia">
+                <div class="spinner-border text-danger" role="status"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de feedbacks -->
+<div class="fbr-tabla-card card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <ul class="nav fbr-tabs" id="tabsFeedbacks">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#" data-estado="todos">Todos</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-estado="pendientes">
+                        Pendientes <span class="badge bg-warning text-dark ms-1" id="badgePendientes"></span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-estado="respondidos">
+                        Respondidos <span class="badge bg-success ms-1" id="badgeRespondidos"></span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-estado="expirados">
+                        Expirados <span class="badge bg-danger ms-1" id="badgeExpirados"></span>
+                    </a>
+                </li>
+            </ul>
+            <div class="fbr-buscador">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control form-control-sm" id="inputBusqueda"
+                       placeholder="Buscar orden, email, equipo..." style="width: 250px;">
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0 position-relative">
+        <div class="fbr-tabla-contenedor">
+            <table class="table fbr-tabla">
+                <thead>
+                    <tr>
+                        <th style="width: 30px;"></th>
+                        <th>Orden</th>
+                        <th>Equipo</th>
+                        <th>Email</th>
+                        <th>Responsable</th>
+                        <th>Sucursal</th>
+                        <th>Motivo</th>
+                        <th>Fecha Envío</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaFeedbacksBody">
+                    <tr>
+                        <td colspan="9" class="fbr-sin-datos">
+                            <i class="bi bi-clipboard-data"></i>
+                            Cargando feedbacks...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="fbr-paginacion" id="paginacionFeedbacks"></div>
+        <div class="fbr-loading" id="loadingTabla">
+            <div class="spinner-border text-danger" role="status"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Comentarios recientes -->
+<div class="fbr-chart-card mb-4">
+    <div class="chart-titulo">
+        <i class="bi bi-chat-quote me-2"></i>Comentarios Recientes de Clientes
+    </div>
+    <div class="fbr-comentarios-grid" id="comentariosContainer">
+        <div class="fbr-sin-datos">
+            <i class="bi bi-chat-left-text"></i>
+            Cargando comentarios...
+        </div>
+    </div>
+</div>
+
+<!-- URLs para JavaScript -->
+<div id="dashboardUrls" class="d-none"
+     data-url-kpis="{% url 'servicio_tecnico:api_feedback_rechazo_kpis' %}"
+     data-url-por-motivo="{% url 'servicio_tecnico:api_feedback_rechazo_por_motivo' %}"
+     data-url-tendencia="{% url 'servicio_tecnico:api_feedback_rechazo_tendencia' %}"
+     data-url-lista="{% url 'servicio_tecnico:api_feedback_rechazo_lista' %}"
+     data-url-comentarios="{% url 'servicio_tecnico:api_feedback_rechazo_comentarios' %}"
+     data-url-exportar="{% url 'servicio_tecnico:exportar_feedback_rechazo_excel' %}"
+     data-url-detalle="{% url 'servicio_tecnico:detalle_orden' orden_id=0 %}"
+></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/dashboard_feedback_rechazo.js' %}"></script>
+{% endblock %}
