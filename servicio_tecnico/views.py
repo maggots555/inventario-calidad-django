@@ -11841,6 +11841,7 @@ def actualizar_email_cliente(request, detalle_id):
 # ============================================================================
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def concentrado_semanal(request):
     """
     Página principal del Concentrado Semanal de CIS.
@@ -12118,6 +12119,7 @@ def concentrado_semanal(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def exportar_concentrado_excel(request):
     """
     Exporta el concentrado semanal a un archivo Excel (.xlsx) con 4 hojas:
@@ -12194,6 +12196,7 @@ def exportar_concentrado_excel(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def exportar_concentrado_pdf(request):
     """
     Exporta el concentrado semanal a un PDF con las 3 tablas del reporte.
@@ -12457,7 +12460,7 @@ def _filtrar_encuestas_satisfaccion(request):
 
 
 @login_required
-@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def dashboard_encuestas(request):
     """
     Vista principal del panel de encuestas de satisfacción.
@@ -12473,6 +12476,7 @@ def dashboard_encuestas(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_encuestas_kpis(request):
     """
@@ -12534,6 +12538,7 @@ def api_encuestas_kpis(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_encuestas_tendencia(request):
     """
@@ -12586,6 +12591,7 @@ def api_encuestas_tendencia(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_encuestas_por_responsable(request):
     """
@@ -12640,6 +12646,7 @@ def api_encuestas_por_responsable(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_encuestas_distribucion_nps(request):
     """
@@ -12672,6 +12679,7 @@ def api_encuestas_distribucion_nps(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_encuestas_lista(request):
     """
@@ -12756,6 +12764,7 @@ def api_encuestas_lista(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_encuestas_comentarios(request):
     """
@@ -13021,7 +13030,7 @@ def _filtrar_feedback_rechazo(request):
 
 
 @login_required
-@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def dashboard_feedback_rechazo(request):
     """
     Vista principal del panel de feedback de rechazo.
@@ -13040,6 +13049,7 @@ def dashboard_feedback_rechazo(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_feedback_rechazo_kpis(request):
     """
@@ -13091,6 +13101,7 @@ def api_feedback_rechazo_kpis(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_feedback_rechazo_por_motivo(request):
     """
@@ -13124,6 +13135,7 @@ def api_feedback_rechazo_por_motivo(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_feedback_rechazo_tendencia(request):
     """
@@ -13164,6 +13176,7 @@ def api_feedback_rechazo_tendencia(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_feedback_rechazo_lista(request):
     """
@@ -13247,6 +13260,7 @@ def api_feedback_rechazo_lista(request):
 
 
 @login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
 def api_feedback_rechazo_comentarios(request):
     """
