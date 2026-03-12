@@ -432,14 +432,15 @@ class PasswordValidator {
     }
 
     /**
-     * Obtiene el token CSRF para peticiones AJAX
+     * Obtiene el token CSRF para peticiones AJAX.
+     * En producción Django usa 'sigma_csrftoken'; en desarrollo usa 'csrftoken'.
      */
     private getCSRFToken(): string {
-        const cookieValue = document.cookie
-            .split('; ')
-            .find(row => row.startsWith('csrftoken='))
-            ?.split('=')[1];
-        return cookieValue || '';
+        const cookies = document.cookie.split('; ');
+        const productionToken = cookies.find(row => row.startsWith('sigma_csrftoken='))?.split('=')[1];
+        if (productionToken) return productionToken;
+        const devToken = cookies.find(row => row.startsWith('csrftoken='))?.split('=')[1];
+        return devToken || '';
     }
 }
 

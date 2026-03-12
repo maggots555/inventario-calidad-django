@@ -153,7 +153,7 @@ class ScorecardFormHandler {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': this.getCookie('csrftoken') || ''
+                    'X-CSRFToken': this.getCookie('sigma_csrftoken') || this.getCookie('csrftoken') || ''
                 }
             });
             if (!response.ok) {
@@ -209,7 +209,7 @@ class ScorecardFormHandler {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': this.getCookie('csrftoken') || ''
+                    'X-CSRFToken': this.getCookie('sigma_csrftoken') || this.getCookie('csrftoken') || ''
                 }
             });
             if (!response.ok) {

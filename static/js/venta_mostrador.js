@@ -650,21 +650,30 @@ function eliminarPiezaVentaMostrador(piezaId) {
 // ============================================================================
 
 /**
- * Obtiene el valor de una cookie (para CSRF token)
+ * Obtiene el valor de una cookie (para CSRF token).
+ * Si se busca 'csrftoken' y no existe, intenta 'sigma_csrftoken' (nombre de producción).
+ * Esto permite que el código funcione igual en desarrollo y en producción.
  */
 function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+    const namesToTry = (name === 'csrftoken')
+        ? ['sigma_csrftoken', 'csrftoken']
+        : [name];
+
+    for (const cookieName of namesToTry) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, cookieName.length + 1) === (cookieName + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(cookieName.length + 1));
+                    break;
+                }
             }
         }
+        if (cookieValue) return cookieValue;
     }
-    return cookieValue;
+    return null;
 }
 
 /**
