@@ -13,6 +13,9 @@
 </head>
 <body class="fs-body">
 
+{# Canvas de partículas (fondo interactivo) #}
+<canvas id="particles-canvas"></canvas>
+
 {% if estado == 'formulario' %}
 
 <div class="fs-card">
@@ -273,6 +276,7 @@
 </div>
 {% endif %}
 
+<script src="{% static 'js/feedback_particles.js' %}"></script>
 <script src="{% static 'js/feedback_satisfaccion.js' %}"></script>
 </body>
 </html>
