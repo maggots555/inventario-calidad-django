@@ -66,6 +66,9 @@
                 </label>
                 <select name="responsable_id" id="responsable_id" class="form-select">
                     <option value="">Todos los responsables</option>
+                    <option value="sin_asignar" {% if filtros.responsable_id == "sin_asignar" %}selected{% endif %}>
+                        Sin asignar
+                    </option>
                     {% for responsable in lista_responsables %}
                     <option value="{{ responsable.id }}" 
                             {% if filtros.responsable_id|stringformat:"s" == responsable.id|stringformat:"s" %}selected{% endif %}>

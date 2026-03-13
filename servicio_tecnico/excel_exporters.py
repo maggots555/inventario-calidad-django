@@ -319,8 +319,14 @@ def calcular_estadisticas_por_responsable(ordenes):
     responsables_data = {}
     
     for orden in ordenes:
-        resp_id = orden.responsable_seguimiento.id
-        resp_nombre = orden.responsable_seguimiento.nombre_completo
+        # EXPLICACIÓN: Si la orden no tiene responsable asignado, usamos id=0
+        # y nombre "Sin asignar" para no romper el cálculo del Excel.
+        if orden.responsable_seguimiento:
+            resp_id = orden.responsable_seguimiento.id
+            resp_nombre = orden.responsable_seguimiento.nombre_completo
+        else:
+            resp_id = 0
+            resp_nombre = "Sin asignar"
         
         if resp_id not in responsables_data:
             responsables_data[resp_id] = {

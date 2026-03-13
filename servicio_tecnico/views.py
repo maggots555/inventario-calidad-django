@@ -7645,7 +7645,10 @@ def dashboard_seguimiento_oow_fl(request):
     # PASO 3: APLICAR FILTROS ADICIONALES
     # =========================================================================
     
-    if responsable_id:
+    if responsable_id == 'sin_asignar':
+        # Filtrar solo órdenes sin responsable asignado
+        ordenes = ordenes.filter(responsable_seguimiento__isnull=True)
+    elif responsable_id:
         ordenes = ordenes.filter(responsable_seguimiento_id=responsable_id)
     
     if fecha_desde:
@@ -7751,8 +7754,14 @@ def dashboard_seguimiento_oow_fl(request):
     responsables_data = {}
     
     for orden in ordenes:
-        resp_id = orden.responsable_seguimiento.id
-        resp_nombre = orden.responsable_seguimiento.nombre_completo
+        # EXPLICACIÓN: Algunas órdenes OOW/FL pueden no tener responsable asignado.
+        # En ese caso usamos id=0 y nombre "Sin asignar" para no romper el dashboard.
+        if orden.responsable_seguimiento:
+            resp_id = orden.responsable_seguimiento.id
+            resp_nombre = orden.responsable_seguimiento.nombre_completo
+        else:
+            resp_id = 0
+            resp_nombre = "Sin asignar"
         
         if resp_id not in responsables_data:
             responsables_data[resp_id] = {
@@ -7848,7 +7857,11 @@ def dashboard_seguimiento_oow_fl(request):
         resp_id = responsable['id']
         
         # Obtener todas las órdenes de este responsable con venta mostrador
-        ordenes_resp = [o for o in ordenes if o.responsable_seguimiento.id == resp_id]
+        # EXPLICACIÓN: Mismo manejo seguro — si no tiene responsable, su id es 0
+        ordenes_resp = [
+            o for o in ordenes
+            if (o.responsable_seguimiento.id if o.responsable_seguimiento else 0) == resp_id
+        ]
         
         # NUEVO: Crear desglose detallado de productos vendidos por este responsable
         productos_responsable = {}  # {descripcion: {cantidad, subtotal, categoria}}
@@ -8292,7 +8305,9 @@ def exportar_excel_dashboard_oow_fl(request):
     ).prefetch_related('historial')
     
     # Aplicar filtros adicionales
-    if responsable_id:
+    if responsable_id == 'sin_asignar':
+        ordenes = ordenes.filter(responsable_seguimiento__isnull=True)
+    elif responsable_id:
         ordenes = ordenes.filter(responsable_seguimiento_id=responsable_id)
     
     if fecha_desde:
@@ -8349,7 +8364,9 @@ def exportar_excel_dashboard_oow_fl(request):
     filtros_texto = []
     if prefijo_filtro != 'ambos':
         filtros_texto.append(f"Prefijo: {prefijo_filtro}-")
-    if responsable_id:
+    if responsable_id == 'sin_asignar':
+        filtros_texto.append("Responsable: Sin asignar")
+    elif responsable_id:
         try:
             resp = Empleado.objects.get(id=responsable_id)
             filtros_texto.append(f"Responsable: {resp.nombre_completo}")
@@ -8600,8 +8617,13 @@ def exportar_excel_dashboard_oow_fl(request):
             
             row += 1
         
-        # Obtener órdenes del responsable
-        ordenes_resp = ordenes.filter(responsable_seguimiento__id=resp_stat['id'])
+        # Obtener órdenes del responsable.
+        # EXPLICACIÓN: Si el id es 0 significa "Sin asignar" — filtramos por NULL en la BD,
+        # ya que no existe ningún empleado con id=0.
+        if resp_stat['id'] == 0:
+            ordenes_resp = ordenes.filter(responsable_seguimiento__isnull=True)
+        else:
+            ordenes_resp = ordenes.filter(responsable_seguimiento__id=resp_stat['id'])
         
         # ============== SECCIÓN: ÓRDENES ACTIVAS ==============
         row += 2
@@ -8825,7 +8847,7 @@ def exportar_excel_dashboard_oow_fl(request):
         ws_all.cell(row=row, column=4).value = orden.detalle_equipo.marca
         ws_all.cell(row=row, column=5).value = orden.detalle_equipo.modelo[:30] if orden.detalle_equipo.modelo else 'N/A'
         ws_all.cell(row=row, column=6).value = orden.get_estado_display()
-        ws_all.cell(row=row, column=7).value = orden.responsable_seguimiento.nombre_completo
+        ws_all.cell(row=row, column=7).value = orden.responsable_seguimiento.nombre_completo if orden.responsable_seguimiento else 'Sin asignar'
         ws_all.cell(row=row, column=8).value = orden.tecnico_asignado_actual.nombre_completo if orden.tecnico_asignado_actual else 'No asignado'
         ws_all.cell(row=row, column=9).value = orden.dias_habiles_en_servicio
         ws_all.cell(row=row, column=10).value = orden.dias_sin_actualizacion_estado
@@ -8918,7 +8940,9 @@ def exportar_excel_dashboard_oow_fl(request):
     if prefijo_filtro != 'ambos':
         nombre_archivo_partes.append(f'Prefijo_{prefijo_filtro}')
     
-    if responsable_id:
+    if responsable_id == 'sin_asignar':
+        nombre_archivo_partes.append('Resp_Sin_Asignar')
+    elif responsable_id:
         try:
             resp = Empleado.objects.get(id=responsable_id)
             # Limpiar nombre para usar en archivo
@@ -11146,8 +11170,8 @@ def api_buscar_orden_por_serie(request):
                 # Responsables
                 'tecnico_responsable': orden.tecnico_asignado_actual.nombre_completo,
                 'tecnico_id': orden.tecnico_asignado_actual.id,
-                'responsable_seguimiento': orden.responsable_seguimiento.nombre_completo,
-                'responsable_id': orden.responsable_seguimiento.id,
+                'responsable_seguimiento': orden.responsable_seguimiento.nombre_completo if orden.responsable_seguimiento else 'Sin asignar',
+                'responsable_id': orden.responsable_seguimiento.id if orden.responsable_seguimiento else 0,
                 
                 # Ubicación
                 'sucursal': orden.sucursal.nombre,
