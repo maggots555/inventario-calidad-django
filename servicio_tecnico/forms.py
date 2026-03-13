@@ -346,18 +346,15 @@ class NuevaOrdenForm(forms.ModelForm):
         # Esto es importante para métricas, reportes y análisis del negocio
         orden.tipo_servicio = 'diagnostico'
         
-        # IMPORTANTE: OrdenServicio requiere responsable_seguimiento y tecnico_asignado_actual
-        # Como este es un formulario simplificado, usamos el usuario actual o el primero disponible
-        
+        # IMPORTANTE: tecnico_asignado_actual se asigna automáticamente al usuario que crea la orden.
+        # responsable_seguimiento queda vacío (null) para asignarse después manualmente.
+
         if self.user and hasattr(self.user, 'empleado'):
-            # Si el usuario tiene un empleado asociado, usarlo
-            orden.responsable_seguimiento = self.user.empleado
             orden.tecnico_asignado_actual = self.user.empleado
         else:
-            # Si no, usar el primer empleado activo (el campo es 'activo' para Empleado)
+            # Si no, usar el primer empleado activo
             primer_empleado = Empleado.objects.filter(activo=True).first()
             if primer_empleado:
-                orden.responsable_seguimiento = primer_empleado
                 orden.tecnico_asignado_actual = primer_empleado
             else:
                 raise ValidationError("No hay empleados activos para asignar a la orden")
@@ -628,14 +625,12 @@ class NuevaOrdenVentaMostradorForm(forms.ModelForm):
         # Establecer estado inicial como 'recepcion' (pueden empezar servicio de inmediato)
         orden.estado = 'recepcion'
         
-        # Asignar responsable y técnico
+        # Asignar técnico — responsable_seguimiento queda vacío (null) para asignarse después.
         if self.user and hasattr(self.user, 'empleado'):
-            orden.responsable_seguimiento = self.user.empleado
             orden.tecnico_asignado_actual = self.user.empleado
         else:
             primer_empleado = Empleado.objects.filter(activo=True).first()
             if primer_empleado:
-                orden.responsable_seguimiento = primer_empleado
                 orden.tecnico_asignado_actual = primer_empleado
             else:
                 raise ValidationError("No hay empleados activos para asignar a la orden")

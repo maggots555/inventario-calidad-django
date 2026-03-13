@@ -103,6 +103,8 @@ class OrdenServicio(models.Model):
         Empleado,
         on_delete=models.PROTECT,
         related_name='ordenes_responsable',
+        null=True,
+        blank=True,
         help_text="Empleado responsable del seguimiento de la orden"
     )
     tecnico_asignado_actual = models.ForeignKey(

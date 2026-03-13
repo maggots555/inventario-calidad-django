@@ -215,9 +215,9 @@
     {% endif %}
 
     {# Sección de contacto con responsable #}
-    {% if nombre_responsable %}
     <div class="st-contacto">
       <p class="st-contacto-title">👤 Tu responsable de seguimiento</p>
+      {% if nombre_responsable %}
       <p class="st-contacto-nombre">{{ nombre_responsable }}</p>
       <div class="st-contacto-actions">
         {% if whatsapp_url %}
@@ -233,8 +233,11 @@
         </a>
         {% endif %}
       </div>
+      {% else %}
+      <p class="st-contacto-nombre" style="color:#f59e0b;">Pendiente de asignar</p>
+      <p style="font-size:0.85rem;color:#6b7280;">Se te notificará cuando se asigne a tu responsable.</p>
+      {% endif %}
     </div>
-    {% endif %}
 
   </div>{# /st-card-body #}
 

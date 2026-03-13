@@ -147,17 +147,22 @@
   </div>
 
   <!-- ── RESPONSABLE ── -->
-  {% if nombre_responsable %}
   <div class="equipo-box" style="border-left-color:#10b981;">
     <div class="label" style="color:#065f46;">Tu responsable de seguimiento</div>
+    {% if nombre_responsable %}
     <p class="equipo-nombre" style="color:#065f46;font-size:1rem;">{{ nombre_responsable }}</p>
     {% if email_responsable %}
     <p style="font-size:0.82rem;color:#6b7280;margin:4px 0 0;">
       ✉️ {{ email_responsable }}
     </p>
     {% endif %}
+    {% else %}
+    <p class="equipo-nombre" style="color:#f59e0b;font-size:1rem;">Pendiente de asignar</p>
+    <p style="font-size:0.82rem;color:#6b7280;margin:4px 0 0;">
+      Se te notificará cuando se asigne a tu responsable.
+    </p>
+    {% endif %}
   </div>
-  {% endif %}
 
   <!-- ── FOOTER ── -->
   <div class="footer">
