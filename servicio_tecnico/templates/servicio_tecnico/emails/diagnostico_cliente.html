@@ -455,6 +455,15 @@
                     Gracias por confiar en nuestros servicios.
                 </p>
             </div>
+
+            {% if seguimiento_url %}
+            <div style="margin-top: 20px; padding: 16px 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 10px; border-left: 4px solid #0284c7; text-align: center;">
+                <p style="margin: 0 0 10px; font-size: 14px; color: #0c4a6e;">
+                    🔍 Consulta el <strong>estado de tu equipo</strong> en cualquier momento:
+                </p>
+                <a href="{{ seguimiento_url }}" style="display: inline-block; padding: 10px 24px; background-color: #0284c7; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: bold;">Ver seguimiento de mi equipo</a>
+            </div>
+            {% endif %}
         </div>
         
         <div class="footer">

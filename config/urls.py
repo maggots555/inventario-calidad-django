@@ -21,7 +21,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from inventario import views as inventario_views
 from config.media_views import serve_media_from_multiple_locations
-from servicio_tecnico.views import feedback_rechazo_view, feedback_satisfaccion_cliente
+from servicio_tecnico.views import feedback_rechazo_view, feedback_satisfaccion_cliente, seguimiento_orden_cliente
 
 urlpatterns = [
     # Panel de administración (URL personalizada por seguridad)
@@ -54,6 +54,12 @@ urlpatterns = [
     # El cliente abre este link desde el correo de entrega. No requiere login.
     # Formato: /feedback-satisfaccion/<token>/
     path('feedback-satisfaccion/<str:token>/', feedback_satisfaccion_cliente, name='feedback_satisfaccion_publico'),
+
+    # ── URL PÚBLICA: Seguimiento de orden (sin autenticación) ──
+    # El cliente abre este link desde el correo de imágenes de ingreso.
+    # Muestra timeline del estado, info del equipo y contacto del responsable.
+    # Caduca 3 días después de estado 'entregado'. Formato: /seguimiento/<token>/
+    path('seguimiento/<str:token>/', seguimiento_orden_cliente, name='seguimiento_orden_publico'),
 ]
 
 # ============================================================================

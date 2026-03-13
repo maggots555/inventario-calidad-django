@@ -943,6 +943,17 @@ def enviar_diagnostico_cliente_task(
 
         ahora_local = fecha_local_pais(timezone.now(), _pais_email)
 
+        # ── URL de seguimiento público (si existe para esta orden) ──
+        seguimiento_url = None
+        if orden.es_fuera_garantia:
+            try:
+                enlace = orden.enlace_seguimiento
+                if enlace and enlace.activo:
+                    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                    seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
+            except Exception:
+                pass
+
         context_email = {
             'orden': orden,
             'detalle': detalle,
@@ -958,6 +969,7 @@ def enviar_diagnostico_cliente_task(
             'email_empleado': email_empleado,
             'nombre_empleado': nombre_empleado,
             'whatsapp_empleado': whatsapp_empleado,
+            'seguimiento_url': seguimiento_url,
         }
 
         html_content = render_to_string(
@@ -1277,6 +1289,17 @@ def enviar_imagenes_cliente_task(
 
         ahora_local = fecha_local_pais(timezone.now(), _pais_email)
 
+        # ── URL de seguimiento público (si existe para esta orden) ──
+        seguimiento_url = None
+        if orden.es_fuera_garantia:
+            try:
+                enlace = orden.enlace_seguimiento
+                if enlace and enlace.activo:
+                    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                    seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
+            except Exception:
+                pass
+
         context = {
             'orden': orden,
             'detalle': orden.detalle_equipo,
@@ -1287,6 +1310,7 @@ def enviar_imagenes_cliente_task(
             'empresa_nombre': _pais_email['empresa_nombre_corto'],
             'pais_nombre': _pais_email['nombre'],
             'whatsapp_empleado': whatsapp_empleado,
+            'seguimiento_url': seguimiento_url,
         }
 
         html_content = render_to_string(
@@ -1595,6 +1619,17 @@ def enviar_imagenes_egreso_cliente_task(
 
         ahora_local = fecha_local_pais(timezone.now(), _pais_email)
 
+        # ── URL de seguimiento público (si existe para esta orden) ──
+        seguimiento_url = None
+        if orden.es_fuera_garantia:
+            try:
+                enlace = orden.enlace_seguimiento
+                if enlace and enlace.activo:
+                    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                    seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
+            except Exception:
+                pass
+
         context = {
             'orden': orden,
             'detalle': orden.detalle_equipo,
@@ -1605,6 +1640,7 @@ def enviar_imagenes_egreso_cliente_task(
             'empresa_nombre': _pais_email['empresa_nombre_corto'],
             'pais_nombre': _pais_email['nombre'],
             'whatsapp_empleado': whatsapp_empleado,
+            'seguimiento_url': seguimiento_url,
         }
 
         html_content = render_to_string(
@@ -1947,6 +1983,200 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None):
             notificar_error(
                 titulo="Error al enviar encuesta de satisfacción",
                 mensaje=f"FeedbackCliente ID {feedback_id} — {str(exc)[:200]}",
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
+        raise self.retry(exc=exc, countdown=60)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# TAREA: Enviar enlace de seguimiento público al cliente
+# ═══════════════════════════════════════════════════════════════════════
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_seguimiento_cliente')
+def enviar_seguimiento_cliente_task(self, orden_id, usuario_id=None):
+    """
+    Envía correo al cliente con link de seguimiento público de su orden.
+    Solo se dispara para órdenes fuera de garantía (es_fuera_garantia=True).
+    Se invoca al crear la orden (si hay email), con fallback al enviar imágenes de ingreso.
+    """
+    import re
+    import secrets
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+
+    from .models import OrdenServicio, EnlaceSeguimientoCliente, HistorialOrden
+
+    try:
+        # ── Recuperar orden ──
+        try:
+            orden = OrdenServicio.objects.select_related(
+                'detalle_equipo',
+                'responsable_seguimiento',
+            ).get(pk=orden_id)
+        except OrdenServicio.DoesNotExist:
+            return {'success': False, 'mensaje': f'OrdenServicio ID {orden_id} no encontrada.'}
+
+        # ── Validar que sea fuera de garantía ──
+        if not orden.es_fuera_garantia:
+            return {'success': False, 'mensaje': 'La orden no es fuera de garantía. No se envía seguimiento.'}
+
+        detalle = orden.detalle_equipo
+        email_cliente = detalle.email_cliente if detalle else None
+
+        if not email_cliente:
+            return {'success': False, 'mensaje': 'Sin email de cliente en los datos del equipo.'}
+
+        # ── Obtener o crear enlace de seguimiento ──
+        enlace, created = EnlaceSeguimientoCliente.objects.get_or_create(
+            orden=orden,
+            defaults={'token': secrets.token_urlsafe(32)},
+        )
+
+        if enlace.correo_enviado and not created:
+            return {'success': False, 'mensaje': 'El correo de seguimiento ya fue enviado previamente.'}
+
+        # ── Datos del equipo y responsable ──
+        site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
+
+        marca_equipo = detalle.marca or ''
+        modelo_equipo = detalle.modelo or ''
+        tipo_equipo = detalle.tipo_equipo or ''
+        folio = detalle.orden_cliente if detalle and detalle.orden_cliente else orden.numero_orden_interno
+
+        responsable = orden.responsable_seguimiento
+        nombre_responsable = responsable.nombre_completo if responsable else None
+        email_responsable = responsable.email if responsable else None
+
+        ahora_local = timezone.localtime(timezone.now())
+
+        # ── Contexto para el template de email ──
+        context_email = {
+            'folio': folio,
+            'marca_equipo': marca_equipo,
+            'modelo_equipo': modelo_equipo,
+            'tipo_equipo': tipo_equipo,
+            'seguimiento_url': seguimiento_url,
+            'nombre_responsable': nombre_responsable,
+            'email_responsable': email_responsable,
+            'fecha_envio': ahora_local.strftime('%d/%m/%Y'),
+        }
+
+        html_content = render_to_string(
+            'servicio_tecnico/emails/seguimiento_cliente.html',
+            context_email,
+        )
+
+        asunto = f'Seguimiento de tu equipo — Folio {folio}'
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente = f"Servicio Técnico System <{email_solo}>"
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=[email_cliente],
+        )
+        email_msg.content_subtype = 'html'
+
+        # ── Logo SIC (CID inline) ──
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f"[SEGUIMIENTO-CLIENTE] Error al adjuntar logo: {e}")
+
+        # ── Iconos de redes sociales ──
+        iconos_sociales = {
+            'icon_link':      'images/utilitys/link.png',
+            'icon_instagram': 'images/utilitys/instagram.png',
+            'icon_facebook':  'images/utilitys/facebook.png',
+            'icon_whatsapp':  'images/utilitys/whatsapp.png',
+        }
+        for cid_name, icon_static_path in iconos_sociales.items():
+            icon_path = finders.find(icon_static_path)
+            if icon_path:
+                try:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+                except Exception as e:
+                    logger.warning(f"[SEGUIMIENTO-CLIENTE] Error al adjuntar icono {cid_name}: {e}")
+
+        email_msg.send(fail_silently=False)
+
+        # ── Marcar correo como enviado ──
+        EnlaceSeguimientoCliente.objects.filter(pk=enlace.pk).update(correo_enviado=True)
+
+        # ── Recuperar usuario y empleado ──
+        usuario_obj = None
+        usuario_empleado = None
+        if usuario_id:
+            User = get_user_model()
+            try:
+                usuario_obj = User.objects.get(pk=usuario_id)
+                if hasattr(usuario_obj, 'empleado'):
+                    usuario_empleado = usuario_obj.empleado
+            except User.DoesNotExist:
+                pass
+
+        # ── Registrar en historial (usuario debe ser Empleado) ──
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='email',
+            comentario=(
+                f"🔗 Enlace de seguimiento público enviado al cliente ({email_cliente})\n"
+                f"📦 URL: {seguimiento_url}"
+            ),
+            usuario=usuario_empleado,
+            es_sistema=True,
+        )
+
+        # ── Notificar éxito ──
+        try:
+            notificar_exito(
+                titulo="Enlace de seguimiento enviado",
+                mensaje=f"Orden {folio} — Enlace de seguimiento enviado a {email_cliente}.",
+                usuario=usuario_obj,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e:
+            logger.warning(f"[SEGUIMIENTO-CLIENTE] No se pudo crear notificación: {e}")
+
+        return {'success': True, 'orden_id': orden_id, 'destinatario': email_cliente}
+
+    except Exception as exc:
+        logger.error(f"[SEGUIMIENTO-CLIENTE] Error para OrdenServicio ID {orden_id}: {exc}\n{traceback.format_exc()}")
+        try:
+            _usuario_err = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo="Error al enviar enlace de seguimiento",
+                mensaje=f"OrdenServicio ID {orden_id} — {str(exc)[:200]}",
                 usuario=_usuario_err,
                 task_id=self.request.id,
                 app_origen='servicio_tecnico',

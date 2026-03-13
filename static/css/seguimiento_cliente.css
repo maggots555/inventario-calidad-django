@@ -1,0 +1,657 @@
+/* =============================================================================
+   seguimiento_cliente.css — Seguimiento público de orden para clientes
+   Diseño glassmorphism + timeline moderno, mobile-first, responsive.
+   Marzo 2026 — Sistema SIGMA
+   ============================================================================= */
+
+/* === Variables de diseño === */
+:root {
+  --st-primary:       #1f6391;
+  --st-primary-light: #2980b9;
+  --st-primary-end:   #0e4d6f;
+  --st-accent:        #10b981;
+  --st-accent-warm:   #f59e0b;
+  --st-danger:        #ef4444;
+  --st-card-bg:       rgba(255, 255, 255, 0.92);
+  --st-radius:        18px;
+  --st-radius-sm:     12px;
+  --st-shadow:        0 20px 60px rgba(0, 0, 0, 0.15);
+  --st-spring:        all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --st-ease:          all 0.25s ease;
+  --st-font:          'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* === Reset y base === */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* === Layout principal === */
+.st-body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: linear-gradient(135deg, #1f6391 0%, #0e4d6f 40%, #164e63 70%, #134e4a 100%);
+  background-size: 400% 400%;
+  animation: stGradientShift 15s ease infinite;
+  font-family: var(--st-font);
+  padding: env(safe-area-inset-top, 1rem) 1rem env(safe-area-inset-bottom, 1rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  position: relative;
+  color: #1e293b;
+}
+
+@keyframes stGradientShift {
+  0%   { background-position: 0% 50%;   }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%;   }
+}
+
+/* === Partículas flotantes (fondo) === */
+#particles-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* === Card principal (glassmorphism) === */
+.st-card {
+  background: var(--st-card-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--st-radius);
+  box-shadow: var(--st-shadow);
+  overflow: hidden;
+  max-width: 680px;
+  width: 100%;
+  margin: 1.5rem 0;
+  animation: stSlideIn 0.5s ease both;
+  position: relative;
+  z-index: 10;
+}
+
+@keyframes stSlideIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* === Header de la card === */
+.st-card-header {
+  background: linear-gradient(135deg, #1f6391 0%, #0e4d6f 60%, #164e63 100%);
+  padding: 2rem 1.75rem 1.5rem;
+  text-align: center;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.st-card-header::before,
+.st-card-header::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 50%;
+}
+.st-card-header::before { width: 250px; height: 250px; top: -70%; right: -12%; }
+.st-card-header::after  { width: 160px; height: 160px; bottom: -50%; left: 8%; }
+
+.st-header-logo {
+  height: 42px;
+  margin-bottom: 0.75rem;
+  filter: brightness(0) invert(1);
+  position: relative;
+  z-index: 1;
+}
+
+.st-header-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.4px;
+  position: relative;
+  z-index: 1;
+}
+
+.st-header-subtitle {
+  font-size: 0.88rem;
+  opacity: 0.8;
+  margin: 0.4rem 0 0;
+  position: relative;
+  z-index: 1;
+  font-weight: 400;
+}
+
+/* === Info del equipo === */
+.st-equipo-info {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  padding: 1rem 1.75rem;
+  border-bottom: 1px solid rgba(31, 99, 145, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.st-equipo-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.st-equipo-folio {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--st-primary);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.st-equipo-nombre {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0c4a6e;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.st-equipo-serial {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 2px 0 0;
+}
+
+/* === Badge de estado actual === */
+.st-estado-badge-container {
+  padding: 1rem 1.75rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.st-estado-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: 50px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  animation: stPulseGlow 2.5s ease-in-out infinite;
+}
+
+.st-estado-badge--activo {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #1e40af;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.st-estado-badge--finalizado {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.st-estado-badge--entregado {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #065f46;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+@keyframes stPulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(31, 99, 145, 0.15); }
+  50%      { box-shadow: 0 0 0 8px rgba(31, 99, 145, 0); }
+}
+
+/* === Body de la card === */
+.st-card-body {
+  padding: 1.5rem 1.75rem;
+}
+
+/* === Timeline vertical === */
+.st-timeline {
+  position: relative;
+  padding: 0;
+  margin: 0 0 1.5rem;
+  list-style: none;
+}
+
+/* Línea vertical conectora */
+.st-timeline::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+  border-radius: 2px;
+}
+
+.st-timeline-item {
+  position: relative;
+  padding-left: 48px;
+  padding-bottom: 1.25rem;
+  animation: stFadeInUp 0.4s ease both;
+}
+
+.st-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+/* Nodo circular */
+.st-timeline-dot {
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  background: white;
+  border: 3px solid #94a3b8;
+  z-index: 2;
+  transition: var(--st-spring);
+}
+
+.st-timeline-dot--completed {
+  background: var(--st-accent);
+  border-color: var(--st-accent);
+}
+
+.st-timeline-dot--completed::after {
+  content: '✓';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 900;
+  height: 100%;
+}
+
+/* Nodo actual — más grande con pulse */
+.st-timeline-dot--current {
+  width: 27px;
+  height: 27px;
+  left: 3px;
+  top: 0;
+  background: var(--st-primary);
+  border-color: var(--st-primary);
+  animation: stDotPulse 2s ease-in-out infinite;
+}
+
+.st-timeline-dot--current::after {
+  content: '';
+  display: block;
+  width: 9px;
+  height: 9px;
+  margin: auto;
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border-radius: 50%;
+}
+
+@keyframes stDotPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(31, 99, 145, 0.4); }
+  50%      { box-shadow: 0 0 0 10px rgba(31, 99, 145, 0); }
+}
+
+/* Contenido del nodo */
+.st-timeline-content {
+  background: #f8fafc;
+  border-radius: var(--st-radius-sm);
+  padding: 0.65rem 0.9rem;
+  border: 1px solid #e2e8f0;
+  transition: var(--st-ease);
+}
+
+.st-timeline-item--current .st-timeline-content {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border-color: rgba(59, 130, 246, 0.25);
+  box-shadow: 0 2px 8px rgba(31, 99, 145, 0.08);
+}
+
+.st-timeline-nombre {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.st-timeline-fecha {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin: 2px 0 0;
+}
+
+.st-timeline-hace {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+@keyframes stFadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Nodo de "siguiente paso" (sin fecha, solo texto descriptivo) */
+.st-timeline-item--current .st-timeline-content .st-timeline-nombre {
+  color: var(--st-primary);
+}
+
+/* Stagger animations for timeline items */
+.st-timeline-item:nth-child(1) { animation-delay: 0.05s; }
+.st-timeline-item:nth-child(2) { animation-delay: 0.1s;  }
+.st-timeline-item:nth-child(3) { animation-delay: 0.15s; }
+.st-timeline-item:nth-child(4) { animation-delay: 0.2s;  }
+.st-timeline-item:nth-child(5) { animation-delay: 0.25s; }
+.st-timeline-item:nth-child(6) { animation-delay: 0.3s;  }
+.st-timeline-item:nth-child(7) { animation-delay: 0.35s; }
+.st-timeline-item:nth-child(8) { animation-delay: 0.4s;  }
+.st-timeline-item:nth-child(9) { animation-delay: 0.45s; }
+.st-timeline-item:nth-child(10){ animation-delay: 0.5s;  }
+
+/* === Banner contextual (finalizado) === */
+.st-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--st-radius-sm);
+  margin-bottom: 1.25rem;
+  animation: stSlideIn 0.5s ease both;
+  animation-delay: 0.3s;
+}
+
+.st-banner--warning {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-left: 4px solid #f59e0b;
+}
+
+.st-banner--success {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-left: 4px solid #10b981;
+}
+
+.st-banner-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.st-banner-text {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #1e293b;
+}
+
+.st-banner-text strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* === Sección de contacto === */
+.st-contacto {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: var(--st-radius-sm);
+  padding: 1.25rem;
+  border: 1px solid #e2e8f0;
+  margin-top: 0.5rem;
+}
+
+.st-contacto-title {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #64748b;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.st-contacto-nombre {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 0.85rem;
+}
+
+.st-contacto-actions {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.st-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.2rem;
+  border-radius: 50px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: var(--st-spring);
+  min-height: 44px;
+  line-height: 1;
+}
+
+.st-btn:active { transform: scale(0.96); }
+
+.st-btn--whatsapp {
+  background: linear-gradient(135deg, #25d366, #128c7e);
+  color: white;
+  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);
+}
+
+.st-btn--whatsapp:hover {
+  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4);
+  transform: translateY(-1px);
+  color: white;
+}
+
+.st-btn--email {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+}
+
+.st-btn--email:hover {
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+  color: white;
+}
+
+.st-btn--encuesta {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+  width: 100%;
+  padding: 0.85rem 1.5rem;
+  font-size: 0.95rem;
+}
+
+.st-btn--encuesta:hover {
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+  transform: translateY(-1px);
+  color: white;
+}
+
+.st-btn-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+/* === Sección de entrega (agradecimiento) === */
+.st-gracias {
+  text-align: center;
+  padding: 1.5rem 1.75rem 1rem;
+}
+
+.st-gracias-emoji {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 0.5rem;
+  animation: stBounce 0.6s ease both;
+  animation-delay: 0.3s;
+}
+
+@keyframes stBounce {
+  0%   { opacity: 0; transform: scale(0.5); }
+  60%  { transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.st-gracias-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #065f46;
+  margin: 0 0 0.5rem;
+}
+
+.st-gracias-text {
+  font-size: 0.9rem;
+  color: #475569;
+  line-height: 1.55;
+  margin: 0 0 1rem;
+}
+
+.st-gracias-fecha {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #ecfdf5;
+  color: #065f46;
+  padding: 0.4rem 1rem;
+  border-radius: 50px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.st-encuesta-box {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: var(--st-radius-sm);
+  padding: 1.25rem;
+  margin: 1rem 0 0;
+}
+
+.st-encuesta-box p {
+  font-size: 0.88rem;
+  color: #78350f;
+  margin: 0 0 0.75rem;
+  font-weight: 500;
+}
+
+/* === Estado inválido === */
+.st-invalido {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.st-invalido-icon {
+  font-size: 3.5rem;
+  display: block;
+  opacity: 0.6;
+  margin-bottom: 1rem;
+}
+
+.st-invalido-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #374151;
+  margin: 0 0 0.5rem;
+}
+
+.st-invalido-text {
+  font-size: 0.9rem;
+  color: #6b7280;
+  line-height: 1.55;
+  max-width: 380px;
+  margin: 0 auto;
+}
+
+/* === Footer === */
+.st-footer {
+  text-align: center;
+  padding: 1.25rem 1.75rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: #f8fafc;
+}
+
+.st-footer-text {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.st-footer-brand {
+  font-weight: 700;
+  color: var(--st-primary);
+}
+
+/* === Vigencia badge === */
+.st-vigencia {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(148, 163, 184, 0.12);
+  color: #64748b;
+  padding: 0.3rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+}
+
+/* === Responsive === */
+@media (max-width: 480px) {
+  .st-body { padding: 0.75rem; }
+  .st-card { margin: 0.75rem 0; border-radius: 14px; }
+  .st-card-header { padding: 1.5rem 1.25rem 1.25rem; }
+  .st-header-title { font-size: 1.25rem; }
+  .st-equipo-info { padding: 0.85rem 1.25rem; }
+  .st-card-body { padding: 1.25rem; }
+  .st-estado-badge-container { padding: 0.85rem 1.25rem; }
+  .st-contacto-actions { flex-direction: column; }
+  .st-btn { width: 100%; justify-content: center; }
+  .st-timeline-content { padding: 0.55rem 0.75rem; }
+  .st-footer { padding: 1rem 1.25rem; }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .st-card { max-width: 560px; }
+}
+
+/* === Confetti canvas (solo para estado entregado) === */
+#confetti-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 999;
+  pointer-events: none;
+}
+
+/* === Accesibilidad === */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

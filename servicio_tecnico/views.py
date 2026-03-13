@@ -587,7 +587,23 @@ def crear_orden(request):
                 # Guardar el formulario (esto crea OrdenServicio Y DetalleEquipo)
                 # El método save() del formulario maneja toda la lógica
                 orden = form.save()
-                
+
+                # ── Enviar enlace de seguimiento para órdenes fuera de garantía ──
+                # Refrescar porque DetalleEquipo.save() actualiza es_fuera_garantia
+                # en la BD pero la instancia en memoria no lo refleja aún
+                orden.refresh_from_db(fields=['es_fuera_garantia'])
+                if orden.es_fuera_garantia:
+                    try:
+                        email_cli = orden.detalle_equipo.email_cliente
+                        if email_cli:
+                            from .tasks import enviar_seguimiento_cliente_task
+                            enviar_seguimiento_cliente_task.delay(
+                                orden_id=orden.id,
+                                usuario_id=request.user.id,
+                            )
+                    except Exception:
+                        pass  # No bloquear la creación si falla el envío
+
                 # Mensaje de éxito para el usuario
                 messages.success(
                     request,
@@ -647,7 +663,23 @@ def crear_orden_venta_mostrador(request):
             try:
                 # Guardar la orden (automáticamente se marca como venta_mostrador)
                 orden = form.save()
-                
+
+                # ── Enviar enlace de seguimiento para órdenes fuera de garantía (FL-) ──
+                # Refrescar porque DetalleEquipo.save() actualiza es_fuera_garantia
+                # en la BD pero la instancia en memoria no lo refleja aún
+                orden.refresh_from_db(fields=['es_fuera_garantia'])
+                if orden.es_fuera_garantia:
+                    try:
+                        email_cli = orden.detalle_equipo.email_cliente
+                        if email_cli:
+                            from .tasks import enviar_seguimiento_cliente_task
+                            enviar_seguimiento_cliente_task.delay(
+                                orden_id=orden.id,
+                                usuario_id=request.user.id,
+                            )
+                    except Exception:
+                        pass  # No bloquear la creación si falla el envío
+
                 # Mensaje de éxito
                 messages.success(
                     request,
@@ -1976,20 +2008,36 @@ def detalle_orden(request, orden_id):
                         cambio_realizado = False
                         mensaje_estado = ''
                         
-                        # Si se suben imágenes de INGRESO → Cambiar a "En Diagnóstico"
-                        if tipo_imagen == 'ingreso' and estado_anterior != 'diagnostico':
-                            orden.estado = 'diagnostico'
-                            cambio_realizado = True
-                            mensaje_estado = f'Estado actualizado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico'
-                            
-                            # Registrar cambio automático en historial
-                            HistorialOrden.objects.create(
-                                orden=orden,
-                                tipo_evento='estado',
-                                comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico (imágenes de ingreso cargadas)',
-                                usuario=empleado_actual,
-                                es_sistema=True
-                            )
+                        # Si se suben imágenes de INGRESO → Cambiar estado según tipo de orden
+                        # VentaMostrador: pasan directo a reparación (sin diagnóstico previo)
+                        # Órdenes normales: pasan a diagnóstico
+                        if tipo_imagen == 'ingreso':
+                            if orden.tipo_servicio == 'venta_mostrador' and estado_anterior != 'reparacion':
+                                orden.estado = 'reparacion'
+                                cambio_realizado = True
+                                mensaje_estado = f'Estado actualizado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Reparación'
+
+                                # Registrar cambio automático en historial
+                                HistorialOrden.objects.create(
+                                    orden=orden,
+                                    tipo_evento='estado',
+                                    comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Reparación (imágenes de ingreso cargadas — Venta Mostrador)',
+                                    usuario=empleado_actual,
+                                    es_sistema=True
+                                )
+                            elif orden.tipo_servicio != 'venta_mostrador' and estado_anterior != 'diagnostico':
+                                orden.estado = 'diagnostico'
+                                cambio_realizado = True
+                                mensaje_estado = f'Estado actualizado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico'
+
+                                # Registrar cambio automático en historial
+                                HistorialOrden.objects.create(
+                                    orden=orden,
+                                    tipo_evento='estado',
+                                    comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → En Diagnóstico (imágenes de ingreso cargadas)',
+                                    usuario=empleado_actual,
+                                    es_sistema=True
+                                )
                         
                         # Si se suben imágenes de EGRESO → Cambiar a "Finalizado - Listo para Entrega"
                         elif tipo_imagen == 'egreso' and estado_anterior != 'finalizado':
@@ -2870,6 +2918,222 @@ def confirmar_envio_vigencia_vencida(request, orden_id):
         messages.info(request, 'ℹ️ Envío de correo cancelado.')
 
     return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
+
+
+# ============================================================================
+# VISTA PÚBLICA: seguimiento_orden_cliente
+# Página accesible sin autenticación. El cliente abre el link desde el correo
+# de seguimiento y ve la información de su equipo, timeline de estados y
+# datos de contacto de su responsable de seguimiento.
+# ============================================================================
+
+def seguimiento_orden_cliente(request, token):
+    """
+    Vista pública de seguimiento de orden para el cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista NO usa @login_required porque la abre el cliente desde su correo.
+    Valida el token antes de mostrar cualquier información.
+    States del template:
+      - 'tracking': Orden activa con timeline
+      - 'finalizado': Orden finalizada, esperando confirmación de entrega
+      - 'entregado': Agradecimiento + link a encuesta si existe
+      - 'invalido': Token no existe, orden cancelada o link expirado
+    """
+    from .models import EnlaceSeguimientoCliente, FeedbackCliente
+    from config.constants import ESTADO_ORDEN_CHOICES
+    from config.paises_config import PAISES_CONFIG
+
+    TEMPLATE = 'servicio_tecnico/seguimiento_cliente.html'
+
+    # ── Buscar el enlace por token ──
+    try:
+        enlace = EnlaceSeguimientoCliente.objects.select_related(
+            'orden__detalle_equipo',
+            'orden__sucursal',
+            'orden__responsable_seguimiento',
+        ).get(token=token)
+    except EnlaceSeguimientoCliente.DoesNotExist:
+        return render(request, TEMPLATE, {'estado': 'invalido'})
+
+    orden = enlace.orden
+    detalle = orden.detalle_equipo
+
+    # ── Verificar disponibilidad ──
+    if not enlace.esta_disponible:
+        return render(request, TEMPLATE, {'estado': 'invalido'})
+
+    # ── Registrar acceso del cliente ──
+    x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+    ip_cliente = (
+        x_forwarded.split(',')[0].strip() if x_forwarded
+        else request.META.get('REMOTE_ADDR')
+    )
+    enlace.registrar_acceso(ip=ip_cliente)
+
+    # ── Construir timeline de cambios de estado ──
+    historial_estados = HistorialOrden.objects.filter(
+        orden=orden,
+        tipo_evento='cambio_estado',
+    ).order_by('fecha_evento').values(
+        'estado_nuevo', 'fecha_evento'
+    )
+
+    estado_dict = dict(ESTADO_ORDEN_CHOICES)
+    ahora = timezone.now()
+
+    # ── Estados que son "hitos completados" (ya sucedieron, no son procesos activos) ──
+    # Si el estado actual de la orden es uno de estos, TODOS los nodos del timeline
+    # van con palomita ✓ y se agrega un nodo auxiliar indicando qué sigue.
+    ESTADOS_HITO = {
+        'equipo_diagnosticado',
+        'diagnostico_enviado_cliente',
+        'cotizacion_enviada_proveedor',
+        'cotizacion_recibida_proveedor',
+        'cliente_acepta_cotizacion',
+        'rechazada',
+        'partes_solicitadas_proveedor',
+        'piezas_recibidas',
+        'wpb_pieza_incorrecta',
+        'doa_pieza_danada',
+        'pnc_parte_no_disponible',
+        'finalizado',
+        'entregado',
+    }
+
+    # Texto que describe qué viene después de cada hito
+    SIGUIENTE_PASO = {
+        'equipo_diagnosticado': 'El diagnóstico será enviado para tu revisión',
+        'diagnostico_enviado_cliente': 'En espera de tu respuesta al diagnóstico',
+        'cotizacion_enviada_proveedor': 'En espera de cotización del proveedor',
+        'cotizacion_recibida_proveedor': 'Tu cotización está siendo preparada',
+        'cliente_acepta_cotizacion': 'Gestionando las piezas necesarias para tu equipo',
+        'rechazada': 'En espera de indicaciones',
+        'partes_solicitadas_proveedor': 'En espera de llegada de piezas',
+        'piezas_recibidas': 'Tu equipo entrará a reparación próximamente',
+        'wpb_pieza_incorrecta': 'Gestionando reemplazo de pieza',
+        'doa_pieza_danada': 'Gestionando reemplazo de pieza dañada',
+        'pnc_parte_no_disponible': 'Buscando alternativas de disponibilidad',
+    }
+
+    timeline_raw = []
+    for h in historial_estados:
+        codigo = h['estado_nuevo']
+        if not codigo:
+            continue
+        fecha = h['fecha_evento']
+        delta = ahora - fecha
+        if delta.days > 0:
+            hace = f"Hace {delta.days} día{'s' if delta.days != 1 else ''}"
+        elif delta.seconds >= 3600:
+            horas = delta.seconds // 3600
+            hace = f"Hace {horas} hora{'s' if horas != 1 else ''}"
+        else:
+            hace = "Hace unos minutos"
+
+        timeline_raw.append({
+            'codigo': codigo,
+            'nombre': estado_dict.get(codigo, codigo),
+            'fecha': fecha,
+            'hace': hace,
+        })
+
+    # ── Eliminar estados duplicados consecutivos ──
+    timeline = []
+    for paso in timeline_raw:
+        if timeline and timeline[-1]['codigo'] == paso['codigo']:
+            continue
+        timeline.append(paso)
+
+    # ── Determinar si el estado actual es un hito o un proceso activo ──
+    # Si es hito → todos completados + nodo "siguiente paso" con pulse
+    # Si es proceso activo → el último nodo tiene pulse (está en progreso)
+    estado_orden = orden.estado
+    estado_es_hito = estado_orden in ESTADOS_HITO
+    siguiente_paso_texto = SIGUIENTE_PASO.get(estado_orden) if estado_es_hito else None
+
+    # Marcar cada nodo del timeline como completado o actual
+    for i, paso in enumerate(timeline):
+        es_ultimo = (i == len(timeline) - 1)
+        if estado_es_hito:
+            # Hito: TODOS los nodos son completados (ya sucedieron)
+            paso['completado'] = True
+            paso['es_actual'] = False
+        else:
+            # Proceso activo: el último nodo es "actual" (en progreso)
+            paso['completado'] = not es_ultimo
+            paso['es_actual'] = es_ultimo
+
+    if estado_orden == 'cancelado':
+        return render(request, TEMPLATE, {'estado': 'invalido'})
+
+    # ── Datos del responsable de seguimiento ──
+    responsable = orden.responsable_seguimiento
+    whatsapp_url = None
+    email_responsable = None
+    nombre_responsable = None
+
+    if responsable:
+        nombre_responsable = responsable.nombre_completo
+        email_responsable = responsable.email
+
+        # Construir link de WhatsApp
+        if responsable.numero_whatsapp:
+            pais_code = getattr(orden.sucursal, 'pais', 'mexico') if orden.sucursal else 'mexico'
+            pais_conf = PAISES_CONFIG.get(pais_code, PAISES_CONFIG.get('mexico', {}))
+            codigo_tel = pais_conf.get('codigo_telefonico', '52')
+            numero = responsable.numero_whatsapp
+            folio = detalle.orden_cliente or orden.numero_orden_interno
+            service_tag = detalle.numero_serie or ''
+            msg = (
+                f"Hola, me puedes ayudar con el seguimiento de mi orden "
+                f"\"{folio}\" / \"{service_tag}\", por favor."
+            )
+            from urllib.parse import quote
+            whatsapp_url = f"https://wa.me/{codigo_tel}{numero}?text={quote(msg)}"
+
+    # Folio visible para el cliente
+    folio_display = detalle.orden_cliente or orden.numero_orden_interno
+
+    # ── Construir contexto según estado ──
+    context = {
+        'orden': orden,
+        'detalle': detalle,
+        'timeline': timeline,
+        'estado_actual_nombre': estado_dict.get(estado_orden, estado_orden),
+        'folio_display': folio_display,
+        'nombre_responsable': nombre_responsable,
+        'email_responsable': email_responsable,
+        'whatsapp_url': whatsapp_url,
+        'dias_restantes': enlace.dias_restantes,
+        'siguiente_paso': siguiente_paso_texto,
+    }
+
+    if estado_orden == 'entregado':
+        # Buscar encuesta de satisfacción activa
+        encuesta_url = None
+        try:
+            from django.conf import settings as _settings
+            fb = FeedbackCliente.objects.filter(
+                orden=orden,
+                tipo='satisfaccion',
+                correo_enviado=True,
+            ).first()
+            if fb and fb.es_valido:
+                site_url = getattr(_settings, 'SITE_URL', 'http://localhost:8000')
+                encuesta_url = f"{site_url}/feedback-satisfaccion/{fb.token}/"
+        except Exception:
+            pass
+
+        context['estado'] = 'entregado'
+        context['encuesta_url'] = encuesta_url
+        context['encuesta_dias_restantes'] = fb.dias_restantes if fb and fb.es_valido else None
+    elif estado_orden == 'finalizado':
+        context['estado'] = 'finalizado'
+    else:
+        context['estado'] = 'tracking'
+
+    return render(request, TEMPLATE, context)
 
 
 # ============================================================================
@@ -6199,6 +6463,14 @@ def enviar_imagenes_cliente(request, orden_id):
             mensaje_personalizado=mensaje_personalizado,
             usuario_id=usuario_id,
         )
+        
+        # ── Disparar envío de enlace de seguimiento (solo fuera de garantía) ──
+        if orden.es_fuera_garantia:
+            from .tasks import enviar_seguimiento_cliente_task
+            enviar_seguimiento_cliente_task.delay(
+                orden_id=orden_id,
+                usuario_id=usuario_id,
+            )
         
         return JsonResponse({
             'success': True,

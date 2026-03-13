@@ -26,6 +26,8 @@ from .models import (
     ConfiguracionRHITSO,
     # NUEVO - SISTEMA DE FEEDBACK (Enero 2026)
     FeedbackCliente,
+    # NUEVO - SEGUIMIENTO PÚBLICO DE ORDEN (Marzo 2026)
+    EnlaceSeguimientoCliente,
 )
 
 
@@ -1733,6 +1735,104 @@ class FeedbackClienteAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         """Solo superusuarios pueden eliminar"""
         return request.user.is_superuser
+
+
+# ============================================================================
+# ENLACE SEGUIMIENTO CLIENTE - Seguimiento público de órdenes (Marzo 2026)
+# ============================================================================
+
+@admin.register(EnlaceSeguimientoCliente)
+class EnlaceSeguimientoClienteAdmin(admin.ModelAdmin):
+    """
+    Administración de los enlaces de seguimiento público enviados a clientes.
+    Solo para órdenes fuera de garantía (OOW-/FL-).
+    """
+
+    list_display = (
+        'id',
+        'orden_badge',
+        'activo_badge',
+        'correo_enviado_badge',
+        'accesos_count',
+        'fecha_creacion',
+        'fecha_ultimo_acceso',
+    )
+
+    list_filter = (
+        'activo',
+        'correo_enviado',
+        'fecha_creacion',
+    )
+
+    search_fields = (
+        'orden__numero_orden_interno',
+        'orden__detalle_equipo__orden_cliente',
+        'orden__detalle_equipo__numero_serie',
+        'token',
+    )
+
+    readonly_fields = (
+        'token',
+        'fecha_creacion',
+        'fecha_ultimo_acceso',
+        'accesos_count',
+        'ip_ultimo_acceso',
+        'orden',
+        'disponibilidad_info',
+    )
+
+    fieldsets = (
+        ('Orden Relacionada', {
+            'fields': ('orden',)
+        }),
+        ('Token de Acceso', {
+            'fields': ('token', 'activo', 'disponibilidad_info'),
+        }),
+        ('Estadísticas de Acceso', {
+            'fields': ('accesos_count', 'fecha_ultimo_acceso', 'ip_ultimo_acceso'),
+        }),
+        ('Estado del Correo', {
+            'fields': ('correo_enviado', 'fecha_creacion'),
+        }),
+    )
+
+    def orden_badge(self, obj):
+        url = reverse('admin:servicio_tecnico_ordenservicio_change', args=[obj.orden.pk])
+        return format_html(
+            '<a href="{}" class="badge bg-primary text-decoration-none">{}</a>',
+            url,
+            obj.orden.numero_orden_interno
+        )
+    orden_badge.short_description = 'Orden'
+
+    def activo_badge(self, obj):
+        if obj.esta_disponible:
+            return format_html('<span class="badge bg-success">Activo</span>')
+        elif obj.esta_expirado:
+            return format_html('<span class="badge bg-danger">Expirado</span>')
+        else:
+            return format_html('<span class="badge bg-secondary">Inactivo</span>')
+    activo_badge.short_description = 'Estado'
+
+    def correo_enviado_badge(self, obj):
+        if obj.correo_enviado:
+            return format_html('<span class="badge bg-success">✓ Enviado</span>')
+        return format_html('<span class="badge bg-warning text-dark">Pendiente</span>')
+    correo_enviado_badge.short_description = 'Correo'
+
+    def disponibilidad_info(self, obj):
+        if obj.esta_disponible:
+            dias = obj.dias_restantes
+            if dias is not None:
+                return f"Activo — {dias} días restantes"
+            return "Activo — Sin fecha de expiración aún"
+        elif obj.esta_expirado:
+            return "Expirado"
+        return "Desactivado manualmente"
+    disponibilidad_info.short_description = 'Disponibilidad'
+
+    def has_add_permission(self, request):
+        return False
 
 
 # Configuración del sitio admin

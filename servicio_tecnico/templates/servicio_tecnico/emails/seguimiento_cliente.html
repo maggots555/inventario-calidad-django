@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seguimiento de tu orden — {{ folio }}</title>
+<style>
+  body { margin:0; padding:0; background:#f0f4f8; font-family:'Segoe UI',Arial,sans-serif; }
+  .wrapper { max-width:600px; margin:0 auto; }
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%);
+    padding: 32px 32px 24px;
+    text-align: center;
+    border-bottom: 3px solid #38bdf8;
+  }
+  .header img.logo { height:48px; margin-bottom:16px; }
+  .header .emoji-big { font-size:3rem; display:block; margin-bottom:8px; }
+  .header h1 {
+    margin:0; font-size:1.5rem; font-weight:800;
+    color:#0c4a6e; letter-spacing:-0.5px;
+  }
+  .header p { margin:8px 0 0; color:#0369a1; font-size:0.95rem; }
+  /* Equipo info */
+  .equipo-box {
+    margin: 24px 32px;
+    background: white;
+    border-radius: 12px;
+    border-left: 5px solid #1f6391;
+    padding: 16px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .equipo-box .label {
+    font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em;
+    color:#1f6391; font-weight:700; margin-bottom:4px;
+  }
+  .equipo-box .equipo-nombre {
+    font-size:1.1rem; font-weight:800; color:#0c4a6e; margin:0 0 8px;
+  }
+  .equipo-box .folio-badge {
+    display:inline-block; background:#e0f2fe; color:#0369a1;
+    border-radius:20px; padding:3px 12px; font-size:0.8rem; font-weight:600;
+  }
+  /* Mensaje principal */
+  .mensaje {
+    padding: 8px 32px 24px;
+    text-align: center;
+  }
+  .mensaje h2 { font-size:1.25rem; color:#374151; font-weight:700; margin:0 0 10px; }
+  .mensaje p  { color:#6b7280; font-size:0.92rem; line-height:1.6; margin:0 0 24px; }
+  /* CTA Button */
+  .cta-wrapper { text-align:center; padding:0 32px 32px; }
+  .cta-btn {
+    display:inline-block;
+    background: linear-gradient(135deg, #1f6391 0%, #0e4d6f 100%);
+    color:white !important;
+    text-decoration:none;
+    padding:16px 36px;
+    border-radius:50px;
+    font-size:1.05rem;
+    font-weight:700;
+    letter-spacing:0.3px;
+    box-shadow:0 6px 20px rgba(31,99,145,0.4);
+  }
+  /* Info lista */
+  .info-lista {
+    margin: 0 32px 28px;
+    padding: 16px 20px;
+    background: #f0fdf4;
+    border-radius: 10px;
+    border: 1px solid #bbf7d0;
+  }
+  .info-lista p {
+    margin:0 0 8px; font-size:0.8rem; color:#065f46; font-weight:600;
+  }
+  .info-lista ul {
+    margin:0; padding-left:18px;
+  }
+  .info-lista li {
+    font-size:0.8rem; color:#047857; margin-bottom:4px;
+  }
+  /* Footer */
+  .footer {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    padding: 24px 32px;
+    text-align: center;
+  }
+  .redes { margin-bottom: 12px; }
+  .redes a { display:inline-block; margin:0 6px; }
+  .redes img { width:24px; height:24px; opacity:0.85; }
+  .footer p { color:#94a3b8; font-size:0.75rem; margin:0; line-height:1.5; }
+  .footer a { color:#7dd3fc; text-decoration:none; }
+  /* Responsive */
+  @media (max-width:600px) {
+    .header, .equipo-box, .mensaje, .cta-wrapper, .info-lista {
+      padding-left:16px; padding-right:16px; margin-left:8px; margin-right:8px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ── HEADER ── -->
+  <div class="header">
+    <img src="cid:logo_sic" alt="SIC" class="logo">
+    <span class="emoji-big">&#x1F4BB;</span>
+    <h1>Seguimiento de tu equipo</h1>
+    <p>Consulta el estado de tu orden en cualquier momento.</p>
+  </div>
+
+  <!-- ── INFO DEL EQUIPO ── -->
+  <div class="equipo-box">
+    <div class="label">Tu equipo en servicio</div>
+    <p class="equipo-nombre">
+      {% if tipo_equipo %}{{ tipo_equipo }} — {% endif %}{{ marca_equipo }} {{ modelo_equipo }}
+    </p>
+    <span class="folio-badge">Folio: {{ folio }}</span>
+  </div>
+
+  <!-- ── MENSAJE ── -->
+  <div class="mensaje">
+    <h2>Sigue de cerca tu reparación</h2>
+    <p>
+      Hemos creado un enlace personalizado para que puedas consultar el
+      <strong>estado actual de tu equipo</strong> en cualquier momento.
+      Verás cada paso del proceso de reparación conforme avance.
+    </p>
+  </div>
+
+  <!-- ── BOTÓN CTA ── -->
+  <div class="cta-wrapper">
+    <a href="{{ seguimiento_url }}" class="cta-btn">
+      🔍&nbsp;&nbsp;Ver estado de mi equipo
+    </a>
+  </div>
+
+  <!-- ── INFORMACIÓN ── -->
+  <div class="info-lista">
+    <p>ℹ️ Sobre este enlace:</p>
+    <ul>
+      <li>No requiere crear cuenta ni iniciar sesión</li>
+      <li>El enlace es personal y seguro</li>
+      <li>Puedes consultarlo las veces que necesites</li>
+      <li>Se actualiza automáticamente con cada cambio de estado</li>
+    </ul>
+  </div>
+
+  <!-- ── RESPONSABLE ── -->
+  {% if nombre_responsable %}
+  <div class="equipo-box" style="border-left-color:#10b981;">
+    <div class="label" style="color:#065f46;">Tu responsable de seguimiento</div>
+    <p class="equipo-nombre" style="color:#065f46;font-size:1rem;">{{ nombre_responsable }}</p>
+    {% if email_responsable %}
+    <p style="font-size:0.82rem;color:#6b7280;margin:4px 0 0;">
+      ✉️ {{ email_responsable }}
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ── FOOTER ── -->
+  <div class="footer">
+    <div class="redes">
+      <a href="https://sicfix.mx"><img src="cid:icon_link" alt="Web"></a>
+      <a href="https://instagram.com/sicfix.mx"><img src="cid:icon_instagram" alt="Instagram"></a>
+      <a href="https://facebook.com/sicfix.mx"><img src="cid:icon_facebook" alt="Facebook"></a>
+      <a href="https://wa.me/523318189988"><img src="cid:icon_whatsapp" alt="WhatsApp"></a>
+    </div>
+    <p>
+      SIC - Comercialización y Servicios<br>
+      <a href="https://sicfix.mx">sicfix.mx</a>
+      &nbsp;·&nbsp;
+      Este correo fue enviado el {{ fecha_envio }}
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

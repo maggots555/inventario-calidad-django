@@ -2686,3 +2686,134 @@ class FeedbackCliente(models.Model):
         return max(0, delta.days)
 
 
+# ============================================================================
+# ENLACE DE SEGUIMIENTO PÚBLICO PARA CLIENTES (Marzo 2026)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Este modelo almacena un "enlace de seguimiento" que se envía al cliente
+# cuando su equipo es fuera de garantía (es_fuera_garantia=True).
+# El enlace permite al cliente ver el estado de su orden SIN necesidad
+# de iniciar sesión. Es un link único con un token seguro.
+#
+# El enlace caduca automáticamente:
+# - 3 días después de que la orden sea marcada como "entregado"
+# - Inmediatamente si la orden se cancela
+# - Mientras la orden está activa, el enlace NO expira
+
+class EnlaceSeguimientoCliente(models.Model):
+    """
+    Enlace público de seguimiento de orden para clientes.
+    Permite al cliente consultar el estado de su equipo
+    a través de un link único sin autenticación.
+    Solo se genera para órdenes fuera de garantía (es_fuera_garantia=True).
+    """
+
+    # --- Relación con la orden (una orden → un solo enlace) ---
+    orden = models.OneToOneField(
+        'OrdenServicio',
+        on_delete=models.CASCADE,
+        related_name='enlace_seguimiento',
+        verbose_name="Orden de servicio",
+    )
+
+    # --- Token de acceso seguro ---
+    token = models.CharField(
+        max_length=512,
+        unique=True,
+        db_index=True,
+        verbose_name="Token de acceso",
+        help_text="Token generado con secrets.token_urlsafe(32). Identifica el enlace de forma única."
+    )
+
+    # --- Estado del enlace ---
+    activo = models.BooleanField(
+        default=True,
+        verbose_name="Enlace activo",
+        help_text="Se puede desactivar manualmente desde el admin si es necesario."
+    )
+
+    # --- Fechas ---
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de creación del enlace"
+    )
+    fecha_ultimo_acceso = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Último acceso del cliente"
+    )
+
+    # --- Analytics ---
+    accesos_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Veces que el cliente abrió el enlace"
+    )
+    ip_ultimo_acceso = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name="IP del último acceso"
+    )
+
+    # --- Trazabilidad ---
+    correo_enviado = models.BooleanField(
+        default=False,
+        verbose_name="¿Correo enviado al cliente?",
+        help_text="Se actualiza a True cuando la tarea Celery envía el correo."
+    )
+
+    class Meta:
+        verbose_name = "Enlace de Seguimiento"
+        verbose_name_plural = "Enlaces de Seguimiento"
+        ordering = ['-fecha_creacion']
+
+    def __str__(self):
+        return (
+            f"Seguimiento [{self.orden.numero_orden_interno}] "
+            f"({'Activo' if self.esta_disponible else 'Inactivo'})"
+        )
+
+    @property
+    def esta_expirado(self):
+        """
+        El enlace expira:
+        - 3 días después de que la orden llega a 'entregado'
+        - Inmediatamente si la orden está cancelada
+        - Nunca mientras la orden está activa
+        """
+        from datetime import timedelta
+        estado = self.orden.estado
+
+        if estado == 'cancelado':
+            return True
+
+        if estado == 'entregado' and self.orden.fecha_entrega:
+            return timezone.now() > self.orden.fecha_entrega + timedelta(days=3)
+
+        return False
+
+    @property
+    def esta_disponible(self):
+        """True si el enlace está activo y no ha expirado."""
+        return self.activo and not self.esta_expirado
+
+    @property
+    def dias_restantes(self):
+        """Días restantes antes de caducidad (solo aplica en estado entregado)."""
+        from datetime import timedelta
+        if self.orden.estado == 'entregado' and self.orden.fecha_entrega:
+            expiracion = self.orden.fecha_entrega + timedelta(days=3)
+            delta = expiracion - timezone.now()
+            return max(0, delta.days)
+        if self.orden.estado == 'cancelado':
+            return 0
+        return None  # Sin caducidad mientras esté activa
+
+    def registrar_acceso(self, ip=None):
+        """Registra un acceso del cliente al enlace."""
+        self.accesos_count += 1
+        self.fecha_ultimo_acceso = timezone.now()
+        if ip:
+            self.ip_ultimo_acceso = ip
+        self.save(update_fields=['accesos_count', 'fecha_ultimo_acceso', 'ip_ultimo_acceso'])
+
+
