@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Panel de Seguimiento de Clientes — SIGMA{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/dashboard_seguimiento_enlaces.css' %}">
+{% endblock %}
+
+{% block content %}
+<!-- ── HEADER ── -->
+<div class="se-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h1 class="text-white"><i class="bi bi-link-45deg me-2"></i>Seguimiento de Clientes</h1>
+            <p class="text-white">Métricas de uso de los enlaces de seguimiento de órdenes fuera de garantía</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'servicio_tecnico:dashboard_encuestas' %}" class="btn btn-outline-light btn-sm">
+                <i class="bi bi-clipboard-pulse me-1"></i>Encuestas Satisfacción
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ── FILTROS ── -->
+<div class="se-card card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse" data-bs-target="#filtrosCollapse" style="cursor:pointer">
+        <span><i class="bi bi-funnel me-2"></i>Filtros</span>
+        <i class="bi bi-chevron-down"></i>
+    </div>
+    <div class="collapse show" id="filtrosCollapse">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Desde</label>
+                    <input type="date" class="form-control form-control-sm" id="filtroFechaDesde">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Hasta</label>
+                    <input type="date" class="form-control form-control-sm" id="filtroFechaHasta">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Responsable</label>
+                    <select class="form-select form-select-sm" id="filtroResponsable">
+                        <option value="">Todos</option>
+                        {% for emp in empleados %}
+                        <option value="{{ emp.id }}">{{ emp.nombre_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Sucursal</label>
+                    <select class="form-select form-select-sm" id="filtroSucursal">
+                        <option value="">Todas</option>
+                        {% for suc in sucursales %}
+                        <option value="{{ suc.id }}">{{ suc.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Tipo Orden</label>
+                    <select class="form-select form-select-sm" id="filtroTipoOrden">
+                        <option value="">Todos</option>
+                        <option value="diagnostico">Diagnóstico</option>
+                        <option value="venta_mostrador">Venta Mostrador</option>
+                    </select>
+                </div>
+                <div class="col-md-1 d-flex gap-1">
+                    <button class="btn btn-primary btn-sm flex-fill" id="btnAplicar" title="Aplicar filtros">
+                        <i class="bi bi-search"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="btnLimpiar" title="Limpiar filtros">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── KPI CARDS ── -->
+<div class="row g-3 mb-4" id="kpiContainer">
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="se-kpi-card border-blue">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="kpi-label">Total Enlaces</div>
+                    <div class="kpi-valor" id="kpiTotalEnlaces">—</div>
+                    <div class="kpi-sub">generados</div>
+                </div>
+                <div class="kpi-icon text-primary"><i class="bi bi-link-45deg"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="se-kpi-card border-green">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="kpi-label">Total Accesos</div>
+                    <div class="kpi-valor" id="kpiTotalAccesos">—</div>
+                    <div class="kpi-sub">visitas totales</div>
+                </div>
+                <div class="kpi-icon text-success"><i class="bi bi-eye"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="se-kpi-card border-teal">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="kpi-label">Promedio</div>
+                    <div class="kpi-valor" id="kpiPromedioAccesos">—</div>
+                    <div class="kpi-sub">accesos/enlace</div>
+                </div>
+                <div class="kpi-icon" style="color:var(--se-teal)"><i class="bi bi-bar-chart-line"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="se-kpi-card border-amber">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="kpi-label">Sin Visitas</div>
+                    <div class="kpi-valor" id="kpiSinVisitas">—</div>
+                    <div class="kpi-sub">no abrieron</div>
+                </div>
+                <div class="kpi-icon" style="color:var(--se-amber)"><i class="bi bi-envelope-x"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="se-kpi-card border-green2">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="kpi-label">Correos Enviados</div>
+                    <div class="kpi-valor" id="kpiCorreosEnviados">—</div>
+                    <div class="kpi-sub" id="kpiCorreosNoenviados"></div>
+                </div>
+                <div class="kpi-icon text-success"><i class="bi bi-envelope-check"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-6">
+        <div class="se-kpi-card border-purple">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="kpi-label">Tasa Apertura</div>
+                    <div class="kpi-valor" id="kpiTasaApertura">—</div>
+                    <div class="kpi-sub">de clientes</div>
+                </div>
+                <div class="kpi-icon" style="color:var(--se-purple)"><i class="bi bi-percent"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── GRÁFICAS ── -->
+<div class="row g-3 mb-4">
+    <!-- Tendencia -->
+    <div class="col-lg-8">
+        <div class="se-chart-card h-100">
+            <div class="se-chart-titulo">
+                <i class="bi bi-graph-up me-2"></i>Tendencia de Actividad
+                <span class="se-chart-subtitle">Nuevos enlaces y accesos por día</span>
+            </div>
+            <div class="se-chart-loader" id="loaderTendencia">
+                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                <span class="ms-2">Cargando...</span>
+            </div>
+            <canvas id="chartTendencia" style="display:none"></canvas>
+            <p class="se-empty-msg" id="emptyTendencia" style="display:none">Sin datos para mostrar</p>
+        </div>
+    </div>
+
+    <!-- Top órdenes -->
+    <div class="col-lg-4">
+        <div class="se-chart-card h-100">
+            <div class="se-chart-titulo">
+                <i class="bi bi-trophy me-2"></i>Top Órdenes Consultadas
+                <span class="se-chart-subtitle">Las 15 más consultadas por clientes</span>
+            </div>
+            <div class="se-chart-loader" id="loaderTop">
+                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                <span class="ms-2">Cargando...</span>
+            </div>
+            <canvas id="chartTop" style="display:none"></canvas>
+            <p class="se-empty-msg" id="emptyTop" style="display:none">Sin datos para mostrar</p>
+        </div>
+    </div>
+</div>
+
+<!-- ── TABLA DE ENLACES ── -->
+<div class="se-card card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-table me-2"></i>Detalle de Enlaces <span id="tablaTotalBadge" class="badge bg-secondary ms-1">—</span></span>
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm" id="tablaOrden" style="width:auto">
+                <option value="-fecha_creacion">Más recientes primero</option>
+                <option value="fecha_creacion">Más antiguas primero</option>
+                <option value="-accesos_count">Más consultadas</option>
+                <option value="accesos_count">Menos consultadas</option>
+            </select>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="se-tabla-loader" id="loaderTabla">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            <span class="ms-2">Cargando tabla...</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0" id="tablaEnlaces">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Orden Cliente</th>
+                        <th>Equipo</th>
+                        <th>Service Tag</th>
+                        <th>Email</th>
+                        <th>Sucursal</th>
+                        <th>Estado</th>
+                        <th class="text-center">Accesos</th>
+                        <th class="text-center">Correo</th>
+                        <th>Creado</th>
+                        <th>Último Acceso</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaBody">
+                    <tr>
+                        <td colspan="10" class="text-center text-muted py-4">
+                            <i class="bi bi-hourglass-split me-2"></i>Cargando datos...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <!-- Paginación -->
+    <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <small class="text-muted" id="tablaPaginaInfo">—</small>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" id="btnPaginaAnterior" disabled>
+                <i class="bi bi-chevron-left"></i> Anterior
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" id="btnPaginaSiguiente" disabled>
+                Siguiente <i class="bi bi-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/dashboard_seguimiento_enlaces.js' %}"></script>
+{% endblock %}

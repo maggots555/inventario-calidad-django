@@ -363,4 +363,20 @@ urlpatterns = [
     # Exportación a Excel del dashboard de feedback de rechazo
     path('feedback-rechazo/dashboard/exportar-excel/',
          views.exportar_feedback_rechazo_excel, name='exportar_feedback_rechazo_excel'),
+
+    # ========================================================================
+    # DASHBOARD DE MÉTRICAS DE SEGUIMIENTO DE CLIENTES (Marzo 2026)
+    # ========================================================================
+    path('seguimiento-enlaces/dashboard/',
+         views.dashboard_seguimiento_enlaces, name='dashboard_seguimiento_enlaces'),
+
+    # APIs JSON para el dashboard de seguimiento de clientes
+    path('seguimiento-enlaces/api/kpis/',
+         views.api_seguimiento_enlaces_kpis, name='api_seguimiento_enlaces_kpis'),
+    path('seguimiento-enlaces/api/tendencia/',
+         views.api_seguimiento_enlaces_tendencia, name='api_seguimiento_enlaces_tendencia'),
+    path('seguimiento-enlaces/api/top/',
+         views.api_seguimiento_enlaces_top, name='api_seguimiento_enlaces_top'),
+    path('seguimiento-enlaces/api/tabla/',
+         views.api_seguimiento_enlaces_tabla, name='api_seguimiento_enlaces_tabla'),
 ]

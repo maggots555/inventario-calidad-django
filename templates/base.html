@@ -253,6 +253,9 @@
                                 <a href="{% url 'servicio_tecnico:dashboard_feedback_rechazo' %}" class="dropdown-item">
                                     <i class="bi bi-exclamation-triangle text-warning"></i> Feedback de Rechazo
                                 </a>
+                                <a href="{% url 'servicio_tecnico:dashboard_seguimiento_enlaces' %}" class="dropdown-item">
+                                    <i class="bi bi-link-45deg text-teal" style="color:#0d9488"></i> Seguimiento de Clientes
+                                </a>
                             </div>
                             <div class="dropdown-section">
                                 <h6 class="dropdown-header"><i class="bi bi-receipt"></i> Cotizaciones y Piezas</h6>
@@ -657,6 +660,12 @@
                             <a href="{% url 'servicio_tecnico:dashboard_feedback_rechazo' %}" class="sidebar-link">
                                 <i class="sidebar-icon bi bi-exclamation-triangle"></i>
                                 <span class="sidebar-text">Feedback Rechazo</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'servicio_tecnico:dashboard_seguimiento_enlaces' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-link-45deg"></i>
+                                <span class="sidebar-text">Seguimiento Clientes</span>
                             </a>
                         </li>
                     </ul>

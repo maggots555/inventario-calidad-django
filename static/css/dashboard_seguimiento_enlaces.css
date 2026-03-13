@@ -1,0 +1,248 @@
+/* ============================================================
+   DASHBOARD DE SEGUIMIENTO DE CLIENTES
+   Estilos consistentes con el sistema de dashboards SIGMA
+   ============================================================ */
+
+:root {
+    --se-bg: #f0f4f8;
+    --se-card-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+    --se-card-hover-shadow: 0 6px 25px rgba(0, 0, 0, 0.14);
+    --se-radius: 12px;
+    --se-transition: all 0.25s ease;
+
+    /* Colores de acento para KPI cards */
+    --se-blue: #3b82f6;
+    --se-green: #10b981;
+    --se-teal: #0d9488;
+    --se-amber: #f59e0b;
+    --se-red: #ef4444;
+    --se-purple: #8b5cf6;
+    --se-green2: #22c55e;
+}
+
+/* ── HEADER ─────────────────────────────────────────────────── */
+.se-header {
+    background: linear-gradient(135deg, #1f6391 0%, #0d9488 100%);
+    color: white;
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.5rem;
+    border-radius: var(--se-radius);
+    box-shadow: var(--se-card-shadow);
+}
+
+.se-header h1 {
+    font-weight: 700;
+    font-size: 1.75rem;
+    margin-bottom: 0.2rem;
+}
+
+.se-header p {
+    opacity: 0.88;
+    font-size: 0.95rem;
+    margin-bottom: 0;
+}
+
+/* ── CARDS GENÉRICAS ─────────────────────────────────────────── */
+.se-card {
+    border: none;
+    border-radius: var(--se-radius);
+    box-shadow: var(--se-card-shadow);
+    transition: var(--se-transition);
+}
+
+.se-card:hover {
+    box-shadow: var(--se-card-hover-shadow);
+}
+
+.se-card .card-header {
+    background: white;
+    border-bottom: 1px solid #e9ecef;
+    border-radius: var(--se-radius) var(--se-radius) 0 0;
+    font-weight: 600;
+    color: #374151;
+    padding: 0.85rem 1.25rem;
+}
+
+.se-card .card-footer {
+    background: #f8fafc;
+    border-top: 1px solid #e9ecef;
+    border-radius: 0 0 var(--se-radius) var(--se-radius);
+    padding: 0.6rem 1.25rem;
+}
+
+/* Filtros card — match dashboard_encuestas */
+.se-card .card-header[data-bs-toggle="collapse"] {
+    background: linear-gradient(135deg, #1f6391 0%, #0d9488 100%);
+    color: white;
+    cursor: pointer;
+}
+
+.se-card .card-body {
+    background: white;
+    border-radius: 0 0 var(--se-radius) var(--se-radius);
+    padding: 1.25rem;
+}
+
+/* ── KPI CARDS ───────────────────────────────────────────────── */
+.se-kpi-card {
+    background: white;
+    border-radius: var(--se-radius);
+    padding: 1.1rem 1.2rem;
+    box-shadow: var(--se-card-shadow);
+    border-left: 4px solid transparent;
+    transition: var(--se-transition);
+}
+
+.se-kpi-card:hover {
+    box-shadow: var(--se-card-hover-shadow);
+    transform: translateY(-2px);
+}
+
+.se-kpi-card.border-blue   { border-left-color: var(--se-blue); }
+.se-kpi-card.border-green  { border-left-color: var(--se-green); }
+.se-kpi-card.border-teal   { border-left-color: var(--se-teal); }
+.se-kpi-card.border-amber  { border-left-color: var(--se-amber); }
+.se-kpi-card.border-red    { border-left-color: var(--se-red); }
+.se-kpi-card.border-purple { border-left-color: var(--se-purple); }
+.se-kpi-card.border-green2 { border-left-color: var(--se-green2); }
+
+.kpi-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.kpi-valor {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: #111827;
+    line-height: 1.1;
+}
+
+.kpi-sub {
+    font-size: 0.72rem;
+    color: #9ca3af;
+    margin-top: 2px;
+}
+
+.kpi-icon {
+    font-size: 1.8rem;
+    opacity: 0.25;
+}
+
+/* ── CHART CARDS ─────────────────────────────────────────────── */
+.se-chart-card {
+    background: white;
+    border-radius: var(--se-radius);
+    box-shadow: var(--se-card-shadow);
+    padding: 1.25rem;
+    transition: var(--se-transition);
+}
+
+.se-chart-card:hover {
+    box-shadow: var(--se-card-hover-shadow);
+}
+
+.se-chart-titulo {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #374151;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.se-chart-subtitle {
+    font-weight: 400;
+    font-size: 0.78rem;
+    color: #9ca3af;
+    margin-left: auto;
+}
+
+.se-chart-loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 0;
+    color: #6b7280;
+    font-size: 0.88rem;
+}
+
+.se-empty-msg {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.88rem;
+    padding: 2rem 0;
+}
+
+/* ── TABLA ───────────────────────────────────────────────────── */
+.se-tabla-loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    color: #6b7280;
+    font-size: 0.88rem;
+}
+
+#tablaEnlaces thead th {
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    padding: 0.55rem 0.75rem;
+}
+
+#tablaEnlaces tbody td {
+    font-size: 0.82rem;
+    vertical-align: middle;
+    padding: 0.4rem 0.75rem;
+}
+
+#tablaEnlaces tbody tr:hover {
+    background: #f0f7ff;
+}
+
+.badge-correo-ok {
+    font-size: 0.7rem;
+    background: #d1fae5;
+    color: #065f46;
+    border-radius: 20px;
+    padding: 2px 8px;
+}
+
+.badge-correo-no {
+    font-size: 0.7rem;
+    background: #fee2e2;
+    color: #991b1b;
+    border-radius: 20px;
+    padding: 2px 8px;
+}
+
+.badge-accesos-alto {
+    font-size: 0.72rem;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-weight: 700;
+}
+
+.badge-accesos-sin {
+    font-size: 0.72rem;
+    background: #f3f4f6;
+    color: #6b7280;
+    border-radius: 20px;
+    padding: 2px 8px;
+}
+
+/* ── RESPONSIVO ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .se-header { padding: 1.1rem 1rem; }
+    .se-header h1 { font-size: 1.35rem; }
+    .kpi-valor { font-size: 1.5rem; }
+}

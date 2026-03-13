@@ -13752,3 +13752,229 @@ def exportar_feedback_rechazo_excel(request):
     response['Content-Disposition'] = f'attachment; filename=Feedback_Rechazo_{fecha_str}.xlsx'
     wb.save(response)
     return response
+
+
+# ============================================================================
+# DASHBOARD DE MÉTRICAS DE SEGUIMIENTO DE CLIENTES (Marzo 2026)
+# Monitorea el uso de los enlaces públicos EnlaceSeguimientoCliente:
+# cuántos se generaron, cuántos visitan los clientes, cuáles son los más consultados.
+# ============================================================================
+
+def _filtrar_enlaces_seguimiento(request):
+    """
+    Helper: construye queryset base de EnlaceSeguimientoCliente
+    aplicando los filtros GET comunes (fecha, responsable, sucursal, tipo_orden).
+    """
+    from .models import EnlaceSeguimientoCliente
+
+    qs = EnlaceSeguimientoCliente.objects.select_related(
+        'orden__responsable_seguimiento',
+        'orden__sucursal',
+        'orden__detalle_equipo',
+    )
+
+    fecha_desde = request.GET.get('fecha_desde')
+    fecha_hasta = request.GET.get('fecha_hasta')
+    responsable_id = request.GET.get('responsable_id')
+    sucursal_id = request.GET.get('sucursal_id')
+    tipo_orden = request.GET.get('tipo_orden')
+
+    if fecha_desde:
+        qs = qs.filter(fecha_creacion__date__gte=fecha_desde)
+    if fecha_hasta:
+        qs = qs.filter(fecha_creacion__date__lte=fecha_hasta)
+    if responsable_id:
+        qs = qs.filter(orden__responsable_seguimiento_id=responsable_id)
+    if sucursal_id:
+        qs = qs.filter(orden__sucursal_id=sucursal_id)
+    if tipo_orden and tipo_orden in ('diagnostico', 'venta_mostrador'):
+        qs = qs.filter(orden__tipo_servicio=tipo_orden)
+
+    return qs
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+def dashboard_seguimiento_enlaces(request):
+    """
+    Vista principal del panel de métricas de seguimiento de clientes.
+    Renderiza el template con lookups; la data se carga vía AJAX.
+    """
+    empleados = Empleado.objects.filter(activo=True).order_by('nombre_completo')
+    sucursales = Sucursal.objects.filter(activa=True).order_by('nombre')
+
+    return render(request, 'servicio_tecnico/dashboard_seguimiento_enlaces.html', {
+        'empleados': empleados,
+        'sucursales': sucursales,
+    })
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+@require_http_methods(['GET'])
+def api_seguimiento_enlaces_kpis(request):
+    """
+    API JSON: KPIs del dashboard de seguimiento de clientes.
+    """
+    from django.db.models import Sum, Avg, Count
+
+    qs = _filtrar_enlaces_seguimiento(request)
+
+    total_enlaces = qs.count()
+    agregados = qs.aggregate(
+        total_accesos=Sum('accesos_count'),
+        promedio_accesos=Avg('accesos_count'),
+    )
+    total_accesos = agregados['total_accesos'] or 0
+    promedio_accesos = round(agregados['promedio_accesos'] or 0, 1)
+
+    sin_visitas = qs.filter(accesos_count=0).count()
+    correos_enviados = qs.filter(correo_enviado=True).count()
+    correos_no_enviados = qs.filter(correo_enviado=False).count()
+
+    tasa_apertura = round(
+        ((total_enlaces - sin_visitas) / total_enlaces * 100) if total_enlaces > 0 else 0, 1
+    )
+
+    return JsonResponse({
+        'total_enlaces': total_enlaces,
+        'total_accesos': total_accesos,
+        'promedio_accesos': promedio_accesos,
+        'sin_visitas': sin_visitas,
+        'correos_enviados': correos_enviados,
+        'correos_no_enviados': correos_no_enviados,
+        'tasa_apertura': tasa_apertura,
+    })
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+@require_http_methods(['GET'])
+def api_seguimiento_enlaces_tendencia(request):
+    """
+    API JSON: tendencia de accesos agrupados por día (últimos 60 días).
+    Retorna dos series: enlaces creados y suma de accesos por día de creación.
+    """
+    from django.db.models.functions import TruncDate
+    from django.db.models import Sum, Count
+
+    qs = _filtrar_enlaces_seguimiento(request)
+
+    # Nuevos enlaces creados por día
+    creados_por_dia = (
+        qs
+        .annotate(dia=TruncDate('fecha_creacion'))
+        .values('dia')
+        .annotate(total=Count('id'))
+        .order_by('dia')
+    )
+
+    # Accesos registrados por día de último acceso (solo enlaces con accesos)
+    accesos_por_dia = (
+        qs
+        .filter(fecha_ultimo_acceso__isnull=False)
+        .annotate(dia=TruncDate('fecha_ultimo_acceso'))
+        .values('dia')
+        .annotate(total=Sum('accesos_count'))
+        .order_by('dia')
+    )
+
+    return JsonResponse({
+        'creados': [
+            {'dia': str(r['dia']), 'total': r['total']}
+            for r in creados_por_dia
+        ],
+        'accesos': [
+            {'dia': str(r['dia']), 'total': r['total']}
+            for r in accesos_por_dia
+        ],
+    })
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+@require_http_methods(['GET'])
+def api_seguimiento_enlaces_top(request):
+    """
+    API JSON: top 15 órdenes más consultadas por los clientes.
+    """
+    qs = _filtrar_enlaces_seguimiento(request)
+
+    top = (
+        qs
+        .filter(accesos_count__gt=0)
+        .select_related('orden__detalle_equipo', 'orden__sucursal')
+        .order_by('-accesos_count')[:15]
+    )
+
+    data = []
+    for enlace in top:
+        de = getattr(enlace.orden, 'detalle_equipo', None)
+        equipo = f"{de.marca} {de.modelo}".strip() if de else '—'
+        orden_cliente = de.orden_cliente if de else enlace.orden.numero_orden_interno
+        data.append({
+            'folio': orden_cliente,
+            'equipo': equipo,
+            'accesos': enlace.accesos_count,
+            'ultimo_acceso': enlace.fecha_ultimo_acceso.strftime('%d/%m/%Y %H:%M') if enlace.fecha_ultimo_acceso else '—',
+        })
+
+    return JsonResponse({'top': data})
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+@require_http_methods(['GET'])
+def api_seguimiento_enlaces_tabla(request):
+    """
+    API JSON: lista paginada de enlaces de seguimiento con datos de la orden.
+    """
+    from django.core.paginator import Paginator
+
+    qs = _filtrar_enlaces_seguimiento(request).order_by('-fecha_creacion')
+
+    # Ordenamiento
+    order_by = request.GET.get('order_by', '-fecha_creacion')
+    campos_validos = {'fecha_creacion', '-fecha_creacion', 'accesos_count', '-accesos_count'}
+    if order_by in campos_validos:
+        qs = qs.order_by(order_by)
+
+    paginator = Paginator(qs, 50)
+    page_num = request.GET.get('page', 1)
+    page = paginator.get_page(page_num)
+
+    filas = []
+    for enlace in page.object_list:
+        de = getattr(enlace.orden, 'detalle_equipo', None)
+        equipo = f"{de.marca} {de.modelo}".strip() if de else '—'
+        orden_cliente = de.orden_cliente if de else '—'
+        email = de.email_cliente if de else '—'
+        sucursal = enlace.orden.sucursal.nombre if enlace.orden.sucursal else '—'
+        responsable = ''
+        if enlace.orden.responsable_seguimiento:
+            responsable = enlace.orden.responsable_seguimiento.nombre_completo
+
+        filas.append({
+            'folio': orden_cliente or enlace.orden.numero_orden_interno,
+            'orden_id': enlace.orden.id,
+            'orden_cliente': orden_cliente,
+            'numero_serie': de.numero_serie if de else '—',
+            'equipo': equipo,
+            'email': email,
+            'sucursal': sucursal,
+            'responsable': responsable,
+            'estado': enlace.orden.get_estado_display(),
+            'accesos': enlace.accesos_count,
+            'correo_enviado': enlace.correo_enviado,
+            'fecha_creacion': enlace.fecha_creacion.strftime('%d/%m/%Y'),
+            'ultimo_acceso': enlace.fecha_ultimo_acceso.strftime('%d/%m/%Y %H:%M') if enlace.fecha_ultimo_acceso else '—',
+        })
+
+    return JsonResponse({
+        'filas': filas,
+        'total': paginator.count,
+        'pagina': page.number,
+        'total_paginas': paginator.num_pages,
+        'tiene_siguiente': page.has_next(),
+        'tiene_anterior': page.has_previous(),
+    })
