@@ -1510,6 +1510,49 @@ def cerrar_todas_finalizadas(request):
     return redirect('servicio_tecnico:lista_activas')
 
 
+@login_required
+@permission_required_with_message('servicio_tecnico.change_ordenservicio')
+def cerrar_finalizados_garantia(request):
+    """
+    Vista para cerrar únicamente las órdenes finalizadas que están DENTRO de garantía.
+    
+    Filtra por estado='finalizado' y es_fuera_garantia=False.
+    NO dispara envío de correos ni encuestas de satisfacción.
+    Solo procesa con método POST para evitar cambios accidentales.
+    """
+    if request.method == 'POST':
+        from django.utils import timezone
+
+        # Solo órdenes finalizadas que están DENTRO de garantía
+        ordenes_garantia = OrdenServicio.objects.filter(
+            estado='finalizado',
+            es_fuera_garantia=False
+        )
+        cantidad = ordenes_garantia.count()
+
+        if cantidad > 0:
+            ordenes_garantia.update(
+                estado='entregado',
+                fecha_entrega=timezone.now()
+            )
+            messages.success(
+                request,
+                f'Se cerraron {cantidad} orden(es) finalizada(s) de garantía.'
+            )
+        else:
+            messages.info(
+                request,
+                'No hay órdenes finalizadas de garantía para cerrar.'
+            )
+    else:
+        messages.warning(
+            request,
+            'Método no permitido. Use el botón correspondiente.'
+        )
+
+    return redirect('servicio_tecnico:lista_activas')
+
+
 # ============================================================================
 # VISTA DE DETALLES DE ORDEN (Vista Principal y Más Compleja)
 # ============================================================================

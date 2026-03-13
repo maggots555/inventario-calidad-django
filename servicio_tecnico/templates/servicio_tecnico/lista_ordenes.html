@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load permission_tags %}
 
 {% block title %}{{ titulo }} - {{ block.super }}{% endblock %}
 
@@ -107,13 +108,25 @@
                         <a href="{% url 'servicio_tecnico:lista_finalizadas' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-check-circle"></i> Ver Cerrados
                         </a>
+                        {# Botón Cerrar Finalizados Garantía: visible para todos los roles #}
+                        <form method="post" action="{% url 'servicio_tecnico:cerrar_finalizados_garantia' %}" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-success" 
+                                    onclick="return confirm('¿Cerrar todas las órdenes finalizadas de GARANTÍA? (No incluye fuera de garantía)')">
+                                <i class="bi bi-shield-check"></i> Cerrar Finalizados Garantía
+                            </button>
+                        </form>
+                        {# Botón Cerrar Finalizados (TODOS): solo Gerencia y Superusuario #}
+                        {% user_has_any_role user 'Gerente Operacional' 'Gerente General' as es_gerencia %}
+                        {% if es_gerencia %}
                         <form method="post" action="{% url 'servicio_tecnico:cerrar_todas' %}" style="display: inline;">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-success" 
-                                    onclick="return confirm('¿Cerrar todas las órdenes finalizadas?')">
+                                    onclick="return confirm('¿Cerrar TODAS las órdenes finalizadas? (Incluye garantía y fuera de garantía)')">
                                 <i class="bi bi-check-all"></i> Cerrar Finalizados
                             </button>
                         </form>
+                        {% endif %}
                     {% else %}
                         <a href="{% url 'servicio_tecnico:lista_activas' %}" class="btn btn-outline-primary">
                             <i class="bi bi-hourglass-split"></i> Ver Activos

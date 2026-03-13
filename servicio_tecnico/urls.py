@@ -45,6 +45,7 @@ urlpatterns = [
     # Acciones de cierre
     path('ordenes/cerrar/<int:orden_id>/', views.cerrar_orden, name='cerrar_orden'),
     path('ordenes/cerrar-todas/', views.cerrar_todas_finalizadas, name='cerrar_todas'),
+    path('ordenes/cerrar-garantia/', views.cerrar_finalizados_garantia, name='cerrar_finalizados_garantia'),
     
     # ========================================================================
     # GESTIÓN DE REFERENCIAS DE GAMA
