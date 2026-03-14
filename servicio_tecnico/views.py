@@ -2798,9 +2798,10 @@ def detalle_orden(request, orden_id):
         'seguimientos_piezas': seguimientos_piezas,
         'seguimientos_retrasados_count': seguimientos_retrasados_count,
         
-        # Historial y comentarios
-        'historial_automatico': historial_automatico[:20],  # Últimos 20
-        'comentarios': comentarios[:20],  # Últimos 20
+        # Historial y comentarios - ACTUALIZADO: Cargar todos (Opción A - Marzo 2026)
+        'historial_automatico': historial_automatico,  # Todos los eventos
+        'comentarios': comentarios[:20],  # Últimos 20 (comentarios siguen limitados)
+        'total_eventos_historial': historial_automatico.count(),
         
         # Imágenes
         'imagenes_por_tipo': imagenes_por_tipo,
@@ -3018,7 +3019,7 @@ def seguimiento_orden_cliente(request, token):
     # Texto que describe qué viene después de cada hito
     SIGUIENTE_PASO = {
         'equipo_diagnosticado': 'El diagnóstico será enviado para tu revisión',
-        'diagnostico_enviado_cliente': 'En espera de tu respuesta al diagnóstico',
+        'diagnostico_enviado_cliente': 'Envío de Cotización a Proveedor',
         'cotizacion_enviada_proveedor': 'En espera de cotización del proveedor',
         'cotizacion_recibida_proveedor': 'Tu cotización está siendo preparada',
         'cliente_acepta_cotizacion': 'Gestionando las piezas necesarias para tu equipo',
@@ -3028,6 +3029,13 @@ def seguimiento_orden_cliente(request, token):
         'wpb_pieza_incorrecta': 'Gestionando reemplazo de pieza',
         'doa_pieza_danada': 'Gestionando reemplazo de pieza dañada',
         'pnc_parte_no_disponible': 'Buscando alternativas de disponibilidad',
+    }
+
+    # Nombres alternativos para el cliente en la vista pública
+    # (no modifica los nombres internos usados en el panel de administración)
+    NOMBRES_PUBLICOS = {
+        'cotizacion': 'Cotización enviada, en espera de aprobación',
+        'control_calidad': 'Equipo reparado, en control de calidad',
     }
 
     timeline_raw = []
@@ -3047,7 +3055,7 @@ def seguimiento_orden_cliente(request, token):
 
         timeline_raw.append({
             'codigo': codigo,
-            'nombre': estado_dict.get(codigo, codigo),
+            'nombre': NOMBRES_PUBLICOS.get(codigo, estado_dict.get(codigo, codigo)),
             'fecha': fecha,
             'hace': hace,
         })
