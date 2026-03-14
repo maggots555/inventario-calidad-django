@@ -712,11 +712,32 @@ AXES_VERBOSE = True  # Registra intentos de acceso en logs
 #
 # En producción con Nginx + Gunicorn (Unix socket), REMOTE_ADDR está vacío
 # porque la conexión no es directa. Nginx añade la IP real en el header
-# X-Forwarded-For. Le decimos a django-ratelimit que busque la IP ahí.
+# X-Forwarded-For, pero ese header puede contener MÚLTIPLES IPs separadas
+# por coma: "IP_cliente, 127.0.0.1" (la del cliente + la del proxy).
+# Si se usa la cadena completa como IP, Python lanza un ValueError.
+#
+# La solución es un callable que extrae SOLO la primera IP de la lista.
+
+
+def _get_client_ip(request):
+    """
+    Extrae la IP real del cliente de forma segura.
+
+    X-Forwarded-For puede contener varias IPs: "cliente, proxy1, proxy2"
+    Solo nos interesa la primera (la del cliente real).
+    Si el header no existe (desarrollo sin proxy), usa REMOTE_ADDR.
+    """
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        # Tomar solo la primera IP, ignorar proxies intermedios
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', '127.0.0.1')
+
 
 RATELIMIT_ENABLE = True               # Activar rate limiting
 RATELIMIT_USE_CACHE = 'default'       # Usar cache de Redis para tracking
 
-# CRÍTICO para producción: Nginx + Gunicorn (Unix socket)
-# Buscar IP del cliente en X-Forwarded-For en lugar de REMOTE_ADDR
-RATELIMIT_IP_META_KEY = 'HTTP_X_FORWARDED_FOR'
+# Callable personalizado para obtener la IP del cliente correctamente.
+# Maneja X-Forwarded-For con múltiples IPs (Nginx + Gunicorn) y también
+# funciona en desarrollo local donde no hay proxy (usa REMOTE_ADDR).
+RATELIMIT_IP_META_KEY = _get_client_ip
