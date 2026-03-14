@@ -701,3 +701,22 @@ AXES_VERBOSE = True  # Registra intentos de acceso en logs
 # IP Whitelisting (opcional - descomentarlo si necesitas permitir IPs específicas)
 # AXES_NEVER_LOCKOUT_WHITELIST = True
 # AXES_IP_WHITELIST = ['127.0.0.1', '192.168.100.22']  # IPs que nunca se bloquean
+
+# ============================================================================
+# DJANGO-RATELIMIT: Rate Limiting para vistas públicas
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# django-ratelimit protege contra ataques de fuerza bruta en vistas públicas
+# (enlaces de seguimiento, encuestas, etc.) limitando cuántas requests puede
+# hacer una IP por minuto.
+#
+# En producción con Nginx + Gunicorn (Unix socket), REMOTE_ADDR está vacío
+# porque la conexión no es directa. Nginx añade la IP real en el header
+# X-Forwarded-For. Le decimos a django-ratelimit que busque la IP ahí.
+
+RATELIMIT_ENABLE = True               # Activar rate limiting
+RATELIMIT_USE_CACHE = 'default'       # Usar cache de Redis para tracking
+
+# CRÍTICO para producción: Nginx + Gunicorn (Unix socket)
+# Buscar IP del cliente en X-Forwarded-For en lugar de REMOTE_ADDR
+RATELIMIT_IP_META_KEY = 'HTTP_X_FORWARDED_FOR'
