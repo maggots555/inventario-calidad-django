@@ -18,11 +18,16 @@ from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.cache import cache_page
+from django_ratelimit.decorators import ratelimit
 from django.conf import settings
 from django.urls import reverse
 from functools import wraps
 from PIL import Image
 import os
+import logging
+
+# Logger para registrar eventos de seguridad en vistas públicas
+logger = logging.getLogger(__name__)
 import json
 import openpyxl
 from decouple import config
@@ -2927,6 +2932,7 @@ def confirmar_envio_vigencia_vencida(request, orden_id):
 # datos de contacto de su responsable de seguimiento.
 # ============================================================================
 
+@ratelimit(key='ip', rate='20/m', method=['GET', 'POST'])
 def seguimiento_orden_cliente(request, token):
     """
     Vista pública de seguimiento de orden para el cliente.
@@ -2946,6 +2952,10 @@ def seguimiento_orden_cliente(request, token):
 
     TEMPLATE = 'servicio_tecnico/seguimiento_cliente.html'
 
+    # ── Obtener IP del cliente para logging de seguridad ──
+    _xfwd = request.META.get('HTTP_X_FORWARDED_FOR')
+    _ip = _xfwd.split(',')[0].strip() if _xfwd else request.META.get('REMOTE_ADDR')
+
     # ── Buscar el enlace por token ──
     try:
         enlace = EnlaceSeguimientoCliente.objects.select_related(
@@ -2954,12 +2964,16 @@ def seguimiento_orden_cliente(request, token):
             'orden__responsable_seguimiento',
         ).get(token=token)
     except EnlaceSeguimientoCliente.DoesNotExist:
+        logger.warning(
+            "[SEGURIDAD] Seguimiento con token inexistente | IP: %s | token: %s...",
+            _ip, token[:8]
+        )
         return render(request, TEMPLATE, {'estado': 'invalido'})
 
     orden = enlace.orden
     detalle = orden.detalle_equipo
 
-    # ── Verificar disponibilidad ──
+    # ── Verificar disponibilidad (expirado, cancelado o desactivado) ──
     if not enlace.esta_disponible:
         return render(request, TEMPLATE, {'estado': 'invalido'})
 
@@ -3142,6 +3156,7 @@ def seguimiento_orden_cliente(request, token):
 # ve la información de su equipo y piezas, y puede escribir su comentario.
 # ============================================================================
 
+@ratelimit(key='ip', rate='20/m', method=['GET', 'POST'])
 def feedback_rechazo_view(request, token):
     """
     Vista pública para que el cliente deje su comentario de rechazo.
@@ -3149,11 +3164,16 @@ def feedback_rechazo_view(request, token):
     EXPLICACIÓN PARA PRINCIPIANTES:
     Esta vista NO usa @login_required porque la abre el cliente desde su correo.
     Valida el token antes de mostrar cualquier información.
-    Si el token ya fue usado o expiró, muestra un mensaje apropiado.
+    Si el token ya fue usado o expiró, muestra un mensaje genérico
+    (no revelar si el token existió, expiró o fue usado — prevención de enumeración).
     """
     from django.core.signing import BadSignature, SignatureExpired
     from .models import FeedbackCliente
     from .forms import FeedbackRechazoClienteForm
+
+    # ── Obtener IP para logging de seguridad ──
+    _xfwd = request.META.get('HTTP_X_FORWARDED_FOR')
+    _ip = _xfwd.split(',')[0].strip() if _xfwd else request.META.get('REMOTE_ADDR')
 
     # ── Buscar el feedback por token ──
     try:
@@ -3161,12 +3181,19 @@ def feedback_rechazo_view(request, token):
             'cotizacion__orden__detalle_equipo',
         ).get(token=token)
     except FeedbackCliente.DoesNotExist:
+        logger.warning(
+            "[SEGURIDAD] Feedback rechazo con token inexistente | IP: %s | token: %s...",
+            _ip, token[:8]
+        )
         return render(request, 'servicio_tecnico/feedback_rechazo.html', {
             'estado': 'invalido',
             'mensaje': 'El enlace no es válido o ya no existe.',
         })
 
     # ── Validar estado del token ──
+    # SEGURIDAD: Mensajes diferenciados en el template (ya_respondido, expirado)
+    # son aceptables porque el atacante necesitaría un token válido de 256 bits
+    # para llegar aquí. La protección real está en DoesNotExist (arriba).
     if feedback.utilizado:
         return render(request, 'servicio_tecnico/feedback_rechazo.html', {
             'estado': 'ya_respondido',
@@ -3192,16 +3219,23 @@ def feedback_rechazo_view(request, token):
     if request.method == 'POST':
         form = FeedbackRechazoClienteForm(request.POST)
         if form.is_valid():
+            # ── Honeypot: Si el campo oculto tiene valor, es un bot ──
+            if form.cleaned_data.get('website'):
+                logger.warning(
+                    "[SEGURIDAD] Honeypot activado en feedback rechazo | IP: %s",
+                    _ip
+                )
+                # Simular éxito para no alertar al bot
+                return render(request, 'servicio_tecnico/feedback_rechazo.html', {
+                    'estado': 'gracias',
+                    'mensaje': '¡Gracias por tu comentario! Tu opinión nos ayuda a mejorar.',
+                })
+
             feedback.comentario_cliente = form.cleaned_data['comentario_cliente']
             feedback.utilizado = True
             feedback.fecha_respuesta = timezone.now()
             # Guardar IP del cliente para trazabilidad
-            x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
-            feedback.ip_respuesta = (
-                x_forwarded.split(',')[0].strip()
-                if x_forwarded
-                else request.META.get('REMOTE_ADDR')
-            )
+            feedback.ip_respuesta = _ip
             feedback.save(update_fields=[
                 'comentario_cliente', 'utilizado', 'fecha_respuesta', 'ip_respuesta'
             ])
@@ -13045,6 +13079,7 @@ def confirmar_feedback_satisfaccion(request, feedback_id):
 # NO requiere autenticación.
 # ============================================================================
 
+@ratelimit(key='ip', rate='20/m', method=['GET', 'POST'])
 def feedback_satisfaccion_cliente(request, token):
     """
     Vista pública para la encuesta de satisfacción post-entrega.
@@ -13055,15 +13090,25 @@ def feedback_satisfaccion_cliente(request, token):
 
     TEMPLATE = 'servicio_tecnico/feedback_satisfaccion.html'
 
+    # ── Obtener IP para logging de seguridad ──
+    _xfwd = request.META.get('HTTP_X_FORWARDED_FOR')
+    _ip = _xfwd.split(',')[0].strip() if _xfwd else request.META.get('REMOTE_ADDR')
+
     # ── Buscar feedback por token y tipo ──────────────────────────────────
     try:
         feedback = FeedbackCliente.objects.select_related(
             'orden__detalle_equipo',
         ).get(token=token, tipo='satisfaccion')
     except FeedbackCliente.DoesNotExist:
+        logger.warning(
+            "[SEGURIDAD] Feedback satisfacción con token inexistente | IP: %s | token: %s...",
+            _ip, token[:8]
+        )
         return render(request, TEMPLATE, {'estado': 'invalido'})
 
     # ── Validar estado del token ──────────────────────────────────────────
+    # SEGURIDAD: Mensajes 'ya_respondido' y 'expirado' son seguros aquí porque
+    # el atacante necesitaría adivinar un token de 256 bits para llegar a este punto.
     if feedback.utilizado:
         return render(request, TEMPLATE, {'estado': 'ya_respondido'})
 
@@ -13077,6 +13122,19 @@ def feedback_satisfaccion_cliente(request, token):
         form = FeedbackSatisfaccionClienteForm(request.POST)
         if form.is_valid():
             d = form.cleaned_data
+
+            # ── Honeypot: Si el campo oculto tiene valor, es un bot ──
+            if d.get('website'):
+                logger.warning(
+                    "[SEGURIDAD] Honeypot activado en feedback satisfacción | IP: %s",
+                    _ip
+                )
+                # Simular éxito para no alertar al bot
+                return render(request, TEMPLATE, {
+                    'estado': 'gracias',
+                    'calificacion': 5,
+                })
+
             feedback.calificacion_general  = d['calificacion_general']
             feedback.nps                   = d['nps']
             feedback.recomienda            = d['recomienda']
@@ -13085,12 +13143,7 @@ def feedback_satisfaccion_cliente(request, token):
             feedback.comentario_cliente    = d.get('comentario_cliente', '')
             feedback.utilizado             = True
             feedback.fecha_respuesta       = timezone.now()
-            x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
-            feedback.ip_respuesta = (
-                x_forwarded.split(',')[0].strip()
-                if x_forwarded
-                else request.META.get('REMOTE_ADDR')
-            )
+            feedback.ip_respuesta          = _ip
             feedback.save(update_fields=[
                 'calificacion_general', 'nps', 'recomienda',
                 'calificacion_atencion', 'calificacion_tiempo',

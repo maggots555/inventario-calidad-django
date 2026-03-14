@@ -60,6 +60,14 @@ SITE_URL = config('SITE_URL', default='http://localhost:8000')
 # HTTPS Strict Transport Security (HSTS)
 # Obliga a los navegadores a usar HTTPS durante 1 año (31536000 segundos)
 # IMPORTANTE: Solo activar cuando estés 100% seguro de que todo funciona con HTTPS
+# ── Headers de seguridad (aplican siempre, dev y producción) ──
+# EXPLICACIÓN: Estos headers protegen contra ataques comunes como
+# clickjacking (incrustar tu sitio en un iframe malicioso) y
+# XSS (inyección de scripts maliciosos en la página).
+X_FRAME_OPTIONS = 'DENY'                    # Prohíbe incrustar tu sitio en iframes
+SECURE_CONTENT_TYPE_NOSNIFF = True           # Evita que el navegador "adivine" el tipo MIME
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'  # Aísla ventanas cross-origin
+
 if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 año
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True

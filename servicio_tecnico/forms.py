@@ -2891,6 +2891,19 @@ class FeedbackRechazoClienteForm(forms.Form):
     acceda directamente al modelo. La vista procesa el formulario
     y guarda el dato en FeedbackCliente manualmente.
     """
+    # ── Honeypot: Campo invisible para detectar bots ──
+    # EXPLICACIÓN: Los bots llenan TODOS los campos de un formulario.
+    # Este campo está oculto con CSS (display:none), así que un humano
+    # nunca lo verá ni lo llenará. Si llega con valor → es un bot.
+    website = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'tabindex': '-1',
+            'autocomplete': 'off',
+            'style': 'position:absolute;left:-9999px;opacity:0;height:0;width:0;',
+        }),
+    )
+
     comentario_cliente = forms.CharField(
         label="Cuéntenos por qué rechazó la cotización",
         max_length=1000,
@@ -2932,6 +2945,17 @@ class FeedbackSatisfaccionClienteForm(forms.Form):
     Formulario público para la encuesta de satisfacción del cliente.
     Los campos hidden son llenados por JavaScript (estrellas, NPS, pulgares).
     """
+
+    # ── Honeypot: Campo invisible para detectar bots ──
+    # Si un bot llena este campo oculto, la vista lo detecta y descarta el envío.
+    website = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'tabindex': '-1',
+            'autocomplete': 'off',
+            'style': 'position:absolute;left:-9999px;opacity:0;height:0;width:0;',
+        }),
+    )
 
     # Campos obligatorios — llenados vía JS con inputs hidden
     calificacion_general = forms.IntegerField(
