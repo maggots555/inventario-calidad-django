@@ -19,7 +19,7 @@
 {# ESTADO INVÁLIDO — Token expirado, cancelado o inexistente #}
 <div class="st-card">
   <div class="st-card-header">
-    <img src="{% static 'images/logos/logo_sic.png' %}" alt="SIC" class="st-header-logo">
+    <img src="{% static 'images/logos/logo_sic_white.svg' %}" alt="SIC" class="st-header-logo">
     <h1 class="st-header-title">Seguimiento de Orden</h1>
   </div>
   <div class="st-invalido">
@@ -32,10 +32,26 @@
     </p>
   </div>
   <div class="st-footer">
-    <p class="st-footer-text">
-      <span class="st-footer-brand">SIC</span> · Comercialización y Servicios ·
-      <a href="https://sicfix.mx" style="color:var(--st-primary);text-decoration:none;">sicfix.mx</a>
+    <div class="st-footer-redes">
+      <a href="https://sicfix.mx/" class="st-footer-red" target="_blank" rel="noopener" aria-label="Sitio web SIC">
+        <img src="{% static 'images/utilitys/footer_link.svg' %}" alt="Web" class="st-footer-red-icon">
+      </a>
+      <a href="https://www.instagram.com/sic_mexico/?hl=es" class="st-footer-red" target="_blank" rel="noopener" aria-label="Instagram de SIC">
+        <img src="{% static 'images/utilitys/footer_instagram.svg' %}" alt="Instagram" class="st-footer-red-icon">
+      </a>
+      <a href="https://www.facebook.com/LatAmSic" class="st-footer-red" target="_blank" rel="noopener" aria-label="Facebook de SIC">
+        <img src="{% static 'images/utilitys/footer_facebook.svg' %}" alt="Facebook" class="st-footer-red-icon">
+      </a>
+      <a href="mailto:atencionaclientes@sic.com.mx" class="st-footer-red" aria-label="Correo electrónico SIC">
+        <img src="{% static 'images/utilitys/footer_email.svg' %}" alt="Correo" class="st-footer-red-icon">
+      </a>
+    </div>
+    <p class="st-footer-brand-line">
+      <span class="st-footer-brand">SIC</span>
+      <span class="st-footer-sep">·</span>
+      Comercialización y Servicios
     </p>
+    <a href="https://sicfix.mx" class="st-footer-website" target="_blank" rel="noopener">sicfix.mx</a>
   </div>
 </div>
 
@@ -48,7 +64,7 @@
 
 <div class="st-card">
   <div class="st-card-header">
-    <img src="{% static 'images/logos/logo_sic.png' %}" alt="SIC" class="st-header-logo">
+    <img src="{% static 'images/logos/logo_sic_white.svg' %}" alt="SIC" class="st-header-logo">
     <h1 class="st-header-title">Seguimiento de Orden</h1>
     <p class="st-header-subtitle">{{ folio_display }}</p>
   </div>
@@ -64,6 +80,9 @@
       </p>
       {% if detalle.numero_serie %}
       <p class="st-equipo-serial">S/N: {{ detalle.numero_serie }}</p>
+      {% endif %}
+      {% if detalle.falla_principal %}
+      <p class="st-equipo-falla">🔧 {{ detalle.falla_principal }}</p>
       {% endif %}
     </div>
   </div>
@@ -106,6 +125,37 @@
     {% endif %}
   </div>
 
+  {# Galería de imágenes del equipo (entregado) #}
+  {% if imagenes_galeria %}
+  <div class="st-galeria" aria-label="Galería de imágenes del equipo">
+    <div class="st-galeria-header">
+      <span class="st-galeria-title">📸 Fotos del equipo</span>
+      <div class="st-galeria-nav">
+        <button class="st-galeria-prev" type="button" aria-label="Imagen anterior">❮</button>
+        <button class="st-galeria-next" type="button" aria-label="Imagen siguiente">❯</button>
+      </div>
+    </div>
+    <div class="st-galeria-track">
+      <div class="st-galeria-rail">
+        {% for img in imagenes_galeria %}
+        <div class="st-galeria-item"
+             data-src="{{ img.url }}"
+             data-tipo="{{ img.tipo }}"
+             data-tipo-label="{{ img.tipo_label }}"
+             data-descripcion="{{ img.descripcion }}"
+             role="button"
+             tabindex="0"
+             aria-label="{{ img.tipo_label }}{% if img.descripcion %}: {{ img.descripcion }}{% endif %}">
+          <img src="{{ img.url }}" alt="{{ img.tipo_label }}" loading="lazy">
+          <span class="st-galeria-chip st-galeria-chip--{{ img.tipo }}">{{ img.tipo_label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="st-galeria-dots" role="tablist" aria-label="Selector de imagen"></div>
+  </div>
+  {% endif %}
+
   {# Timeline #}
   {% if timeline %}
   <div class="st-card-body">
@@ -126,10 +176,26 @@
   {% endif %}
 
   <div class="st-footer">
-    <p class="st-footer-text">
-      <span class="st-footer-brand">SIC</span> · Comercialización y Servicios ·
-      <a href="https://sicfix.mx" style="color:var(--st-primary);text-decoration:none;">sicfix.mx</a>
+    <div class="st-footer-redes">
+      <a href="https://sicfix.mx/" class="st-footer-red" target="_blank" rel="noopener" aria-label="Sitio web SIC">
+        <img src="{% static 'images/utilitys/footer_link.svg' %}" alt="Web" class="st-footer-red-icon">
+      </a>
+      <a href="https://www.instagram.com/sic_mexico/?hl=es" class="st-footer-red" target="_blank" rel="noopener" aria-label="Instagram de SIC">
+        <img src="{% static 'images/utilitys/footer_instagram.svg' %}" alt="Instagram" class="st-footer-red-icon">
+      </a>
+      <a href="https://www.facebook.com/LatAmSic" class="st-footer-red" target="_blank" rel="noopener" aria-label="Facebook de SIC">
+        <img src="{% static 'images/utilitys/footer_facebook.svg' %}" alt="Facebook" class="st-footer-red-icon">
+      </a>
+      <a href="mailto:atencionaclientes@sic.com.mx" class="st-footer-red" aria-label="Correo electrónico SIC">
+        <img src="{% static 'images/utilitys/footer_email.svg' %}" alt="Correo" class="st-footer-red-icon">
+      </a>
+    </div>
+    <p class="st-footer-brand-line">
+      <span class="st-footer-brand">SIC</span>
+      <span class="st-footer-sep">·</span>
+      Comercialización y Servicios
     </p>
+    <a href="https://sicfix.mx" class="st-footer-website" target="_blank" rel="noopener">sicfix.mx</a>
   </div>
 </div>
 
@@ -140,7 +206,7 @@
 
   {# Header #}
   <div class="st-card-header">
-    <img src="{% static 'images/logos/logo_sic.png' %}" alt="SIC" class="st-header-logo">
+    <img src="{% static 'images/logos/logo_sic_white.svg' %}" alt="SIC" class="st-header-logo">
     <h1 class="st-header-title">Seguimiento de Orden</h1>
     <p class="st-header-subtitle">{{ folio_display }}</p>
   </div>
@@ -156,6 +222,9 @@
       </p>
       {% if detalle.numero_serie %}
       <p class="st-equipo-serial">S/N: {{ detalle.numero_serie }}</p>
+      {% endif %}
+      {% if detalle.falla_principal %}
+      <p class="st-equipo-falla">🔧 {{ detalle.falla_principal }}</p>
       {% endif %}
     </div>
   </div>
@@ -214,6 +283,37 @@
     </ul>
     {% endif %}
 
+    {# Galería de imágenes del equipo (tracking/finalizado) #}
+    {% if imagenes_galeria %}
+    <div class="st-galeria" aria-label="Galería de imágenes del equipo">
+      <div class="st-galeria-header">
+        <span class="st-galeria-title">📸 Fotos del equipo</span>
+        <div class="st-galeria-nav">
+          <button class="st-galeria-prev" type="button" aria-label="Imagen anterior">❮</button>
+          <button class="st-galeria-next" type="button" aria-label="Imagen siguiente">❯</button>
+        </div>
+      </div>
+      <div class="st-galeria-track">
+        <div class="st-galeria-rail">
+          {% for img in imagenes_galeria %}
+          <div class="st-galeria-item"
+               data-src="{{ img.url }}"
+               data-tipo="{{ img.tipo }}"
+               data-tipo-label="{{ img.tipo_label }}"
+               data-descripcion="{{ img.descripcion }}"
+               role="button"
+               tabindex="0"
+               aria-label="{{ img.tipo_label }}{% if img.descripcion %}: {{ img.descripcion }}{% endif %}">
+            <img src="{{ img.url }}" alt="{{ img.tipo_label }}" loading="lazy">
+            <span class="st-galeria-chip st-galeria-chip--{{ img.tipo }}">{{ img.tipo_label }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="st-galeria-dots" role="tablist" aria-label="Selector de imagen"></div>
+    </div>
+    {% endif %}
+
     {# Sección de contacto con responsable #}
     <div class="st-contacto">
       <p class="st-contacto-title">👤 Tu responsable de seguimiento</p>
@@ -242,15 +342,46 @@
   </div>{# /st-card-body #}
 
   <div class="st-footer">
-    <p class="st-footer-text">
-      Para actualizar el estado, recarga esta página.<br>
-      <span class="st-footer-brand">SIC</span> · Comercialización y Servicios ·
-      <a href="https://sicfix.mx" style="color:var(--st-primary);text-decoration:none;">sicfix.mx</a>
+    <div class="st-footer-redes">
+      <a href="https://sicfix.mx/" class="st-footer-red" target="_blank" rel="noopener" aria-label="Sitio web SIC">
+        <img src="{% static 'images/utilitys/footer_link.svg' %}" alt="Web" class="st-footer-red-icon">
+      </a>
+      <a href="https://www.instagram.com/sic_mexico/?hl=es" class="st-footer-red" target="_blank" rel="noopener" aria-label="Instagram de SIC">
+        <img src="{% static 'images/utilitys/footer_instagram.svg' %}" alt="Instagram" class="st-footer-red-icon">
+      </a>
+      <a href="https://www.facebook.com/LatAmSic" class="st-footer-red" target="_blank" rel="noopener" aria-label="Facebook de SIC">
+        <img src="{% static 'images/utilitys/footer_facebook.svg' %}" alt="Facebook" class="st-footer-red-icon">
+      </a>
+      <a href="mailto:atencionaclientes@sic.com.mx" class="st-footer-red" aria-label="Correo electrónico SIC">
+        <img src="{% static 'images/utilitys/footer_email.svg' %}" alt="Correo" class="st-footer-red-icon">
+      </a>
+    </div>
+    <p class="st-footer-brand-line">
+      <span class="st-footer-brand">SIC</span>
+      <span class="st-footer-sep">·</span>
+      Comercialización y Servicios
     </p>
+    <a href="https://sicfix.mx" class="st-footer-website" target="_blank" rel="noopener">sicfix.mx</a>
+    <p class="st-footer-refresh">🔄 Para actualizar el estado, recarga esta página.</p>
   </div>
 
 </div>
 {% endif %}
+
+{# === Lightbox para galería de imágenes === #}
+<div id="st-lightbox" class="st-lightbox" role="dialog" aria-modal="true" aria-label="Visor de imagen">
+  <button class="st-lb-close" type="button" aria-label="Cerrar visor">✕</button>
+  <button class="st-lb-prev"  type="button" aria-label="Imagen anterior">❮</button>
+  <button class="st-lb-next"  type="button" aria-label="Imagen siguiente">❯</button>
+  <div class="st-lb-content">
+    <img class="st-lb-img" src="" alt="Imagen del equipo">
+    <div class="st-lb-info">
+      <span class="st-lb-tipo"></span>
+      <span class="st-lb-counter"></span>
+      <p class="st-lb-desc"></p>
+    </div>
+  </div>
+</div>
 
 {# === Partículas flotantes (reutiliza el mismo script del feedback) === #}
 <script>
@@ -361,6 +492,11 @@
   animate();
 })();
 </script>
+{% endif %}
+
+{# === Galería de imágenes: carrusel + lightbox === #}
+{% if imagenes_galeria %}
+<script src="{% static 'js/galeria_seguimiento.js' %}"></script>
 {% endif %}
 
 </body>

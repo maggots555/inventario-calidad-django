@@ -3117,6 +3117,27 @@ def seguimiento_orden_cliente(request, token):
     # Folio visible para el cliente
     folio_display = detalle.orden_cliente or orden.numero_orden_interno
 
+    # ── Imágenes del equipo para la galería pública ──
+    # Solo se muestran los tipos relevantes para el cliente (no autorizacion/packing).
+    _TIPO_LABEL_GALERIA = {
+        'ingreso':     'Ingreso',
+        'diagnostico': 'Diagnóstico',
+        'reparacion':  'Reparación',
+        'egreso':      'Egreso',
+    }
+    imagenes_galeria = [
+        {
+            'url':        img.imagen.url,
+            'tipo':       img.tipo,
+            'tipo_label': _TIPO_LABEL_GALERIA.get(img.tipo, img.tipo.capitalize()),
+            'descripcion': img.descripcion,
+        }
+        for img in ImagenOrden.objects.filter(
+            orden=orden,
+            tipo__in=['ingreso', 'diagnostico', 'reparacion', 'egreso'],
+        ).order_by('tipo', 'fecha_subida')
+    ]
+
     # ── Construir contexto según estado ──
     context = {
         'orden': orden,
@@ -3129,6 +3150,7 @@ def seguimiento_orden_cliente(request, token):
         'whatsapp_url': whatsapp_url,
         'dias_restantes': enlace.dias_restantes,
         'siguiente_paso': siguiente_paso_texto,
+        'imagenes_galeria': imagenes_galeria,
     }
 
     if estado_orden == 'entregado':
