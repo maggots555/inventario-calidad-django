@@ -391,6 +391,12 @@
                             <a href="{% url 'admin_storage_monitor' %}" class="dropdown-item">
                                 <i class="bi bi-hdd-stack text-info"></i> Monitor de Almacenamiento
                             </a>
+                            {% if user.is_superuser %}
+                            <a href="{% url 'admin_clear_redis_cache' %}" class="dropdown-item" 
+                               onclick="return confirm('¿Estás seguro de limpiar la caché de Redis? Los dashboards se regenerarán en la próxima carga.');">
+                                <i class="bi bi-arrow-clockwise text-warning"></i> Limpiar Caché Redis
+                            </a>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

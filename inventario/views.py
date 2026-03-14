@@ -1881,6 +1881,55 @@ def admin_storage_monitor(request):
 
 
 @login_required
+@user_passes_test(lambda u: u.is_superuser, login_url='/acceso-denegado/')
+def admin_clear_redis_cache(request):
+    """
+    Vista para limpiar la caché de Redis (base de datos 2).
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Redis es una base de datos en memoria que usa Django para guardar resultados
+    de dashboards y gráficas (cache). Esto acelera la carga de páginas pesadas.
+    
+    Esta función limpia toda la caché almacenada en Redis BD #2, forzando que
+    los dashboards se regeneren con datos frescos la próxima vez.
+    
+    Casos de uso:
+    - Después de actualizar datos masivos y quieres ver cambios inmediatos
+    - Debugging de problemas de cache
+    - Después de cambios en la lógica de visualizaciones
+    
+    Solo superusuarios pueden ejecutar esta acción (is_superuser=True).
+    
+    Returns:
+        Redirect al storage monitor con mensaje de confirmación
+    """
+    from django.core.cache import cache
+    
+    try:
+        # Limpiar toda la caché de Redis (BD 2)
+        # EXPLICACIÓN: cache.clear() borra todos los datos almacenados en la cache de Django.
+        # En este proyecto, eso incluye:
+        # - Gráficas Plotly del dashboard de cotizaciones
+        # - Resultados de consultas pesadas con @cache_page()
+        # - Notificaciones cacheadas (TTL 10 segundos)
+        cache.clear()
+        
+        messages.success(
+            request,
+            '✅ Caché de Redis limpiada exitosamente. '
+            'Los dashboards se regenerarán con datos actualizados en la próxima carga.'
+        )
+    except Exception as e:
+        messages.error(
+            request,
+            f'❌ Error al limpiar la caché de Redis: {str(e)}'
+        )
+    
+    # Redirigir al monitor de almacenamiento o a la página anterior
+    return redirect('admin_storage_monitor')
+
+
+@login_required
 def acceso_denegado(request):
     """
     Página de acceso denegado cuando el usuario no tiene permisos

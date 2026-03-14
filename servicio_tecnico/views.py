@@ -9030,9 +9030,13 @@ def dashboard_cotizaciones(request):
     # 1. OBTENER Y VALIDAR FILTROS DEL REQUEST
     # ========================================
     
-    # Fechas por defecto: últimos 3 meses
-    fecha_fin_default = datetime.now().date()
-    fecha_inicio_default = (datetime.now() - timedelta(days=90)).date()
+    # Fechas por defecto: últimos 3 meses (timezone-aware)
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # timezone.now() devuelve datetime con zona horaria (timezone-aware)
+    # Esto previene warnings de Django cuando se compara con DateTimeFields
+    from django.utils import timezone as tz
+    fecha_fin_default = tz.now().date()
+    fecha_inicio_default = (tz.now() - timedelta(days=90)).date()
     
     # Capturar parámetros GET
     fecha_inicio_str = request.GET.get('fecha_inicio')
@@ -9042,16 +9046,34 @@ def dashboard_cotizaciones(request):
     gama = request.GET.get('gama')
     periodo = request.GET.get('periodo', 'M')  # Default: Mensual
     
-    # Validar y parsear fechas
+    # Validar y parsear fechas (convertir a timezone-aware datetime)
+    # EXPLICACIÓN: Los DateTimeFields en Django requieren datetimes timezone-aware
+    # para evitar warnings. Convertimos date → datetime → timezone-aware
     try:
-        fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date() if fecha_inicio_str else fecha_inicio_default
+        if fecha_inicio_str:
+            fecha_dt = datetime.strptime(fecha_inicio_str, '%Y-%m-%d')
+            fecha_inicio = tz.make_aware(fecha_dt)
+        else:
+            # Convertir date a datetime timezone-aware (inicio del día)
+            fecha_dt = datetime.combine(fecha_inicio_default, datetime.min.time())
+            fecha_inicio = tz.make_aware(fecha_dt)
     except ValueError:
-        fecha_inicio = fecha_inicio_default
+        fecha_dt = datetime.combine(fecha_inicio_default, datetime.min.time())
+        fecha_inicio = tz.make_aware(fecha_dt)
     
     try:
-        fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date() if fecha_fin_str else fecha_fin_default
+        if fecha_fin_str:
+            fecha_dt = datetime.strptime(fecha_fin_str, '%Y-%m-%d')
+            # Para fecha_fin, usar fin del día (23:59:59.999999)
+            fecha_dt = datetime.combine(fecha_dt.date(), datetime.max.time())
+            fecha_fin = tz.make_aware(fecha_dt)
+        else:
+            # Convertir date a datetime timezone-aware (fin del día)
+            fecha_dt = datetime.combine(fecha_fin_default, datetime.max.time())
+            fecha_fin = tz.make_aware(fecha_dt)
     except ValueError:
-        fecha_fin = fecha_fin_default
+        fecha_dt = datetime.combine(fecha_fin_default, datetime.max.time())
+        fecha_fin = tz.make_aware(fecha_dt)
     
     # Validar período
     if periodo not in ['D', 'W', 'M', 'Q', 'Y']:
@@ -10759,9 +10781,11 @@ def exportar_analisis_rechazos(request):
         
         # Agrupar por mes
         if 'fecha_envio' in df_no_partes.columns and len(df_no_partes) > 0:
-            df_no_partes['mes_periodo'] = pd.to_datetime(df_no_partes['fecha_envio']).dt.to_period('M')
+            # EXPLICACIÓN: tz_localize(None) quita el timezone antes de convertir a Period
+            # Esto evita el warning de Pandas sobre pérdida de timezone
+            df_no_partes['mes_periodo'] = pd.to_datetime(df_no_partes['fecha_envio']).dt.tz_localize(None).dt.to_period('M')
             df_rechazos_temp = df_rechazos.copy()
-            df_rechazos_temp['mes_periodo'] = pd.to_datetime(df_rechazos_temp['fecha_envio']).dt.to_period('M')
+            df_rechazos_temp['mes_periodo'] = pd.to_datetime(df_rechazos_temp['fecha_envio']).dt.tz_localize(None).dt.to_period('M')
             
             meses_np = df_no_partes.groupby('mes_periodo').size()
             meses_total_rech = df_rechazos_temp.groupby('mes_periodo').size()
@@ -10936,10 +10960,19 @@ def exportar_analisis_rechazos(request):
             cot_id = rec_ca['cotizacion_id']
             orden_cli = rec_ca.get('orden_cliente', '') or 'Sin orden cliente'
             
+            # Formatear fecha de envío
+            fecha_envio_ca = ''
+            if pd.notna(rec_ca.get('fecha_envio')):
+                try:
+                    fecha_envio_ca = pd.to_datetime(rec_ca['fecha_envio']).strftime('%d/%m/%Y')
+                except:
+                    fecha_envio_ca = str(rec_ca['fecha_envio'])
+            
             # Encabezado de la orden
             ws8.merge_cells(f'A{fila}:J{fila}')
             ws8[f'A{fila}'].value = (
                 f"Orden Cliente: {orden_cli}  |  "
+                f"Fecha: {fecha_envio_ca}  |  "
                 f"Marca: {rec_ca.get('marca', '')}  |  "
                 f"Modelo: {rec_ca.get('modelo', '')}  |  "
                 f"Sucursal: {rec_ca.get('sucursal', '')}  |  "
@@ -11007,21 +11040,29 @@ def exportar_analisis_rechazos(request):
         fila += 1
         
         escribir_headers(ws8, [
-            'Orden Cliente', 'Marca', 'Modelo', 'Sucursal', 'Técnico',
-            'Total Piezas', 'Costo Piezas', 'Costo M.O.', 'Costo Total', ''
+            'Orden Cliente', 'Fecha Cotización', 'Marca', 'Modelo', 'Sucursal', 'Técnico',
+            'Total Piezas', 'Costo Piezas', 'Costo M.O.', 'Costo Total'
         ], fila)
         fila += 1
         
         for _, rec_ca in df_costo_alto.sort_values('costo_total', ascending=False).iterrows():
+            fecha_envio_resumen = ''
+            if pd.notna(rec_ca.get('fecha_envio')):
+                try:
+                    fecha_envio_resumen = pd.to_datetime(rec_ca['fecha_envio']).strftime('%d/%m/%Y')
+                except:
+                    fecha_envio_resumen = str(rec_ca['fecha_envio'])
+            
             ws8.cell(row=fila, column=1, value=rec_ca.get('orden_cliente', ''))
-            ws8.cell(row=fila, column=2, value=rec_ca.get('marca', ''))
-            ws8.cell(row=fila, column=3, value=rec_ca.get('modelo', ''))
-            ws8.cell(row=fila, column=4, value=rec_ca.get('sucursal', ''))
-            ws8.cell(row=fila, column=5, value=rec_ca.get('tecnico', ''))
-            ws8.cell(row=fila, column=6, value=rec_ca.get('total_piezas', 0))
-            ws8.cell(row=fila, column=7, value=f'${rec_ca.get("costo_total_piezas", 0):,.2f}')
-            ws8.cell(row=fila, column=8, value=f'${rec_ca.get("costo_mano_obra", 0):,.2f}')
-            ws8.cell(row=fila, column=9, value=f'${rec_ca.get("costo_total", 0):,.2f}')
+            ws8.cell(row=fila, column=2, value=fecha_envio_resumen)
+            ws8.cell(row=fila, column=3, value=rec_ca.get('marca', ''))
+            ws8.cell(row=fila, column=4, value=rec_ca.get('modelo', ''))
+            ws8.cell(row=fila, column=5, value=rec_ca.get('sucursal', ''))
+            ws8.cell(row=fila, column=6, value=rec_ca.get('tecnico', ''))
+            ws8.cell(row=fila, column=7, value=rec_ca.get('total_piezas', 0))
+            ws8.cell(row=fila, column=8, value=f'${rec_ca.get("costo_total_piezas", 0):,.2f}')
+            ws8.cell(row=fila, column=9, value=f'${rec_ca.get("costo_mano_obra", 0):,.2f}')
+            ws8.cell(row=fila, column=10, value=f'${rec_ca.get("costo_total", 0):,.2f}')
             fila += 1
     else:
         ws8.merge_cells('A6:J6')
@@ -11054,7 +11095,7 @@ def exportar_analisis_rechazos(request):
     
     if total_3_plus > 0:
         headers_multi = [
-            'Orden Cliente', 'Marca', 'Modelo', 'Sucursal', 'Técnico',
+            'Orden Cliente', 'Fecha Cotización', 'Marca', 'Modelo', 'Sucursal', 'Técnico',
             'Motivo Rechazo', 'Total Piezas', 'Costo Piezas', 'Costo M.O.', 'Costo Total'
         ]
         escribir_headers(ws9, headers_multi, 5)
@@ -11070,24 +11111,32 @@ def exportar_analisis_rechazos(request):
             costo_t = rec_mp.get('costo_total', 0)
             suma_total_3 += costo_t
             
+            fecha_envio_3 = ''
+            if pd.notna(rec_mp.get('fecha_envio')):
+                try:
+                    fecha_envio_3 = pd.to_datetime(rec_mp['fecha_envio']).strftime('%d/%m/%Y')
+                except:
+                    fecha_envio_3 = str(rec_mp['fecha_envio'])
+            
             ws9.cell(row=fila, column=1, value=rec_mp.get('orden_cliente', ''))
-            ws9.cell(row=fila, column=2, value=rec_mp.get('marca', ''))
-            ws9.cell(row=fila, column=3, value=rec_mp.get('modelo', ''))
-            ws9.cell(row=fila, column=4, value=rec_mp.get('sucursal', ''))
-            ws9.cell(row=fila, column=5, value=rec_mp.get('tecnico', ''))
-            ws9.cell(row=fila, column=6, value=motivo_lab)
-            ws9.cell(row=fila, column=7, value=rec_mp.get('total_piezas', 0))
-            ws9.cell(row=fila, column=8, value=f'${rec_mp.get("costo_total_piezas", 0):,.2f}')
-            ws9.cell(row=fila, column=9, value=f'${rec_mp.get("costo_mano_obra", 0):,.2f}')
-            ws9.cell(row=fila, column=10, value=f'${costo_t:,.2f}')
+            ws9.cell(row=fila, column=2, value=fecha_envio_3)
+            ws9.cell(row=fila, column=3, value=rec_mp.get('marca', ''))
+            ws9.cell(row=fila, column=4, value=rec_mp.get('modelo', ''))
+            ws9.cell(row=fila, column=5, value=rec_mp.get('sucursal', ''))
+            ws9.cell(row=fila, column=6, value=rec_mp.get('tecnico', ''))
+            ws9.cell(row=fila, column=7, value=motivo_lab)
+            ws9.cell(row=fila, column=8, value=rec_mp.get('total_piezas', 0))
+            ws9.cell(row=fila, column=9, value=f'${rec_mp.get("costo_total_piezas", 0):,.2f}')
+            ws9.cell(row=fila, column=10, value=f'${rec_mp.get("costo_mano_obra", 0):,.2f}')
+            ws9.cell(row=fila, column=11, value=f'${costo_t:,.2f}')
             fila += 1
         
         # Fila de totales
-        ws9.cell(row=fila, column=6, value='TOTAL:').font = Font(bold=True)
-        ws9.cell(row=fila, column=7, value=f'{df_3_plus["total_piezas"].sum()} piezas').font = Font(bold=True)
-        ws9.cell(row=fila, column=10, value=f'${suma_total_3:,.2f}')
-        ws9[f'J{fila}'].font = Font(bold=True, size=11, color='8e44ad')
-        for c in range(1, 11):
+        ws9.cell(row=fila, column=7, value='TOTAL:').font = Font(bold=True)
+        ws9.cell(row=fila, column=8, value=f'{df_3_plus["total_piezas"].sum()} piezas').font = Font(bold=True)
+        ws9.cell(row=fila, column=11, value=f'${suma_total_3:,.2f}')
+        ws9[f'K{fila}'].font = Font(bold=True, size=11, color='8e44ad')
+        for c in range(1, 12):
             ws9.cell(row=fila, column=c).fill = blue_fill
         fila += 1
     else:
@@ -11110,7 +11159,7 @@ def exportar_analisis_rechazos(request):
     
     if total_4_plus > 0:
         escribir_headers(ws9, [
-            'Orden Cliente', 'Marca', 'Modelo', 'Sucursal', 'Técnico',
+            'Orden Cliente', 'Fecha Cotización', 'Marca', 'Modelo', 'Sucursal', 'Técnico',
             'Motivo Rechazo', 'Total Piezas', 'Costo Piezas', 'Costo M.O.', 'Costo Total'
         ], fila)
         fila += 1
@@ -11125,24 +11174,32 @@ def exportar_analisis_rechazos(request):
             costo_t = rec_mp.get('costo_total', 0)
             suma_total_4 += costo_t
             
+            fecha_envio_4 = ''
+            if pd.notna(rec_mp.get('fecha_envio')):
+                try:
+                    fecha_envio_4 = pd.to_datetime(rec_mp['fecha_envio']).strftime('%d/%m/%Y')
+                except:
+                    fecha_envio_4 = str(rec_mp['fecha_envio'])
+            
             ws9.cell(row=fila, column=1, value=rec_mp.get('orden_cliente', ''))
-            ws9.cell(row=fila, column=2, value=rec_mp.get('marca', ''))
-            ws9.cell(row=fila, column=3, value=rec_mp.get('modelo', ''))
-            ws9.cell(row=fila, column=4, value=rec_mp.get('sucursal', ''))
-            ws9.cell(row=fila, column=5, value=rec_mp.get('tecnico', ''))
-            ws9.cell(row=fila, column=6, value=motivo_lab)
-            ws9.cell(row=fila, column=7, value=rec_mp.get('total_piezas', 0))
-            ws9.cell(row=fila, column=8, value=f'${rec_mp.get("costo_total_piezas", 0):,.2f}')
-            ws9.cell(row=fila, column=9, value=f'${rec_mp.get("costo_mano_obra", 0):,.2f}')
-            ws9.cell(row=fila, column=10, value=f'${costo_t:,.2f}')
+            ws9.cell(row=fila, column=2, value=fecha_envio_4)
+            ws9.cell(row=fila, column=3, value=rec_mp.get('marca', ''))
+            ws9.cell(row=fila, column=4, value=rec_mp.get('modelo', ''))
+            ws9.cell(row=fila, column=5, value=rec_mp.get('sucursal', ''))
+            ws9.cell(row=fila, column=6, value=rec_mp.get('tecnico', ''))
+            ws9.cell(row=fila, column=7, value=motivo_lab)
+            ws9.cell(row=fila, column=8, value=rec_mp.get('total_piezas', 0))
+            ws9.cell(row=fila, column=9, value=f'${rec_mp.get("costo_total_piezas", 0):,.2f}')
+            ws9.cell(row=fila, column=10, value=f'${rec_mp.get("costo_mano_obra", 0):,.2f}')
+            ws9.cell(row=fila, column=11, value=f'${costo_t:,.2f}')
             fila += 1
         
         # Fila de totales
-        ws9.cell(row=fila, column=6, value='TOTAL:').font = Font(bold=True)
-        ws9.cell(row=fila, column=7, value=f'{df_4_plus["total_piezas"].sum()} piezas').font = Font(bold=True)
-        ws9.cell(row=fila, column=10, value=f'${suma_total_4:,.2f}')
-        ws9[f'J{fila}'].font = Font(bold=True, size=11, color='8e44ad')
-        for c in range(1, 11):
+        ws9.cell(row=fila, column=7, value='TOTAL:').font = Font(bold=True)
+        ws9.cell(row=fila, column=8, value=f'{df_4_plus["total_piezas"].sum()} piezas').font = Font(bold=True)
+        ws9.cell(row=fila, column=11, value=f'${suma_total_4:,.2f}')
+        ws9[f'K{fila}'].font = Font(bold=True, size=11, color='8e44ad')
+        for c in range(1, 12):
             ws9.cell(row=fila, column=c).fill = blue_fill
         fila += 1
     else:
@@ -11165,8 +11222,16 @@ def exportar_analisis_rechazos(request):
             
             # Encabezado de la orden
             ws9.merge_cells(f'A{fila}:J{fila}')
+            fecha_envio_c = ''
+            if pd.notna(rec_mp.get('fecha_envio')):
+                try:
+                    fecha_envio_c = pd.to_datetime(rec_mp['fecha_envio']).strftime('%d/%m/%Y')
+                except:
+                    fecha_envio_c = str(rec_mp['fecha_envio'])
+            
             ws9[f'A{fila}'].value = (
                 f"Orden Cliente: {orden_cli}  |  "
+                f"Fecha: {fecha_envio_c}  |  "
                 f"{rec_mp.get('marca', '')} {rec_mp.get('modelo', '')}  |  "
                 f"Piezas: {rec_mp.get('total_piezas', 0)}  |  "
                 f"Total: ${rec_mp.get('costo_total', 0):,.2f}"
