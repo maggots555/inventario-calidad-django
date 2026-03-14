@@ -10021,6 +10021,8 @@ def exportar_analisis_rechazos(request):
         5. Tiempo de Respuesta - Análisis temporal de rechazos
         6. No Hay Partes - Apartado especial para rechazos por falta de partes
         7. Piezas Rechazadas - Detalle a nivel pieza individual
+        8. Costo Alto - Detalle de rechazos por costo elevado con piezas desglosadas
+        9. Servicios 3+ Piezas - Servicios con múltiples piezas cotizadas
     
     Returns:
         HttpResponse: Archivo Excel (.xlsx) para descargar
@@ -10876,6 +10878,340 @@ def exportar_analisis_rechazos(request):
         ws7['A4'].font = Font(italic=True, size=12)
     
     autoajustar_columnas(ws7, max_width=45)
+    
+    # ========================================
+    # HOJA 8: RECHAZOS POR COSTO ALTO (detalle con piezas)
+    # ========================================
+    ws8 = wb.create_sheet("Costo Alto")
+    costo_alto_fill = PatternFill(start_color='e67e22', end_color='e67e22', fill_type='solid')
+    
+    escribir_encabezado_hoja(ws8, "ANÁLISIS DETALLADO: RECHAZOS POR COSTO ELEVADO", 10)
+    
+    df_costo_alto = df_rechazos[df_rechazos['motivo_rechazo'] == 'costo_alto'].copy()
+    
+    # KPIs de "Costo Alto"
+    ws8.merge_cells('A4:J4')
+    ws8['A4'].value = "INDICADORES - RECHAZOS POR COSTO ELEVADO"
+    ws8['A4'].font = Font(bold=True, size=12, color='FFFFFF')
+    ws8['A4'].fill = costo_alto_fill
+    ws8['A4'].alignment = Alignment(horizontal='center')
+    
+    total_costo_alto = len(df_costo_alto)
+    pct_de_rechazos_ca = (total_costo_alto / total_rechazos * 100) if total_rechazos > 0 else 0
+    pct_de_total_ca = (total_costo_alto / total_cotizaciones * 100) if total_cotizaciones > 0 else 0
+    valor_perdido_ca = df_costo_alto['costo_total'].sum() if total_costo_alto > 0 else 0
+    
+    kpis_ca = [
+        ['Casos por Costo Elevado', total_costo_alto],
+        ['% de Todos los Rechazos', f'{pct_de_rechazos_ca:.1f}%'],
+        ['% del Total de Cotizaciones', f'{pct_de_total_ca:.1f}%'],
+        ['Valor Perdido por Costo Alto', f'${valor_perdido_ca:,.2f}'],
+    ]
+    
+    if total_costo_alto > 0:
+        kpis_ca.extend([
+            ['Costo Promedio de Cotización', f'${df_costo_alto["costo_total"].mean():,.2f}'],
+            ['Costo Mediana de Cotización', f'${df_costo_alto["costo_total"].median():,.2f}'],
+            ['Piezas Promedio por Orden', f'{df_costo_alto["total_piezas"].mean():.1f}'],
+        ])
+    
+    for i, (kpi_label_ca, kpi_val_ca) in enumerate(kpis_ca):
+        row_num = 6 + i
+        ws8.cell(row=row_num, column=1, value=kpi_label_ca).font = kpi_label_font
+        ws8.cell(row=row_num, column=2, value=kpi_val_ca).font = kpi_value_font
+    
+    if total_costo_alto > 0:
+        # Mapeo de cotizacion_id → orden_cliente
+        mapa_orden_cliente = dict(zip(df_rechazos['cotizacion_id'], df_rechazos['orden_cliente']))
+        
+        # Sección: Detalle por cada orden con sus piezas desglosadas
+        fila = 6 + len(kpis_ca) + 2
+        ws8.merge_cells(f'A{fila}:J{fila}')
+        ws8[f'A{fila}'].value = "DETALLE POR ORDEN - COSTO ALTO (con piezas desglosadas)"
+        ws8[f'A{fila}'].font = section_font
+        ws8[f'A{fila}'].fill = section_fill
+        fila += 1
+        
+        for _, rec_ca in df_costo_alto.sort_values('costo_total', ascending=False).iterrows():
+            cot_id = rec_ca['cotizacion_id']
+            orden_cli = rec_ca.get('orden_cliente', '') or 'Sin orden cliente'
+            
+            # Encabezado de la orden
+            ws8.merge_cells(f'A{fila}:J{fila}')
+            ws8[f'A{fila}'].value = (
+                f"Orden Cliente: {orden_cli}  |  "
+                f"Marca: {rec_ca.get('marca', '')}  |  "
+                f"Modelo: {rec_ca.get('modelo', '')}  |  "
+                f"Sucursal: {rec_ca.get('sucursal', '')}  |  "
+                f"Técnico: {rec_ca.get('tecnico', '')}  |  "
+                f"Detalle: {rec_ca.get('detalle_rechazo', '')}"
+            )
+            ws8[f'A{fila}'].font = Font(bold=True, size=10, color='FFFFFF')
+            ws8[f'A{fila}'].fill = costo_alto_fill
+            fila += 1
+            
+            # Headers de piezas para esta orden
+            headers_piezas_ca = [
+                'Componente', 'Descripción', 'Proveedor',
+                'Cantidad', 'Costo Unitario', 'Costo Total Pieza',
+                'Es Necesaria', 'Sugerida por Técnico', '', ''
+            ]
+            escribir_headers(ws8, headers_piezas_ca, fila)
+            fila += 1
+            
+            # Obtener piezas de esta cotización
+            if not df_piezas_proveedor.empty:
+                piezas_orden = df_piezas_proveedor[
+                    df_piezas_proveedor['cotizacion_id'] == cot_id
+                ]
+            else:
+                piezas_orden = pd.DataFrame()
+            
+            subtotal_piezas = 0
+            if not piezas_orden.empty:
+                for _, pieza_ca in piezas_orden.iterrows():
+                    costo_unit = float(pieza_ca.get('costo_unitario', 0))
+                    cantidad = int(pieza_ca.get('cantidad', 1))
+                    costo_total_pieza = costo_unit * cantidad
+                    subtotal_piezas += costo_total_pieza
+                    
+                    ws8.cell(row=fila, column=1, value=pieza_ca.get('componente__nombre', ''))
+                    ws8.cell(row=fila, column=2, value=pieza_ca.get('descripcion_adicional', ''))
+                    ws8.cell(row=fila, column=3, value=pieza_ca.get('proveedor', ''))
+                    ws8.cell(row=fila, column=4, value=cantidad)
+                    ws8.cell(row=fila, column=5, value=f'${costo_unit:,.2f}')
+                    ws8.cell(row=fila, column=6, value=f'${costo_total_pieza:,.2f}')
+                    ws8.cell(row=fila, column=7, value='Sí' if pieza_ca.get('es_necesaria') else 'No')
+                    ws8.cell(row=fila, column=8, value='Sí' if pieza_ca.get('sugerida_por_tecnico') else 'No')
+                    fila += 1
+            else:
+                ws8.cell(row=fila, column=1, value='(Sin piezas registradas)')
+                ws8[f'A{fila}'].font = Font(italic=True, color='999999')
+                fila += 1
+            
+            # Fila de totales para esta orden
+            ws8.cell(row=fila, column=4, value='TOTAL ORDEN:').font = Font(bold=True)
+            ws8.cell(row=fila, column=5, value=f'Piezas: ${subtotal_piezas:,.2f}').font = Font(bold=True)
+            ws8.cell(row=fila, column=6, value=f'M.O.: ${rec_ca.get("costo_mano_obra", 0):,.2f}').font = Font(bold=True)
+            ws8.cell(row=fila, column=7, value=f'Total: ${rec_ca.get("costo_total", 0):,.2f}')
+            ws8[f'G{fila}'].font = Font(bold=True, size=11, color='c0392c')
+            for c in range(1, 11):
+                ws8.cell(row=fila, column=c).fill = orange_fill
+            fila += 2  # Espacio entre órdenes
+        
+        # Sección: Resumen comparativo (tabla resumen)
+        ws8.merge_cells(f'A{fila}:J{fila}')
+        ws8[f'A{fila}'].value = "RESUMEN: TODAS LAS ÓRDENES RECHAZADAS POR COSTO ALTO"
+        ws8[f'A{fila}'].font = section_font
+        ws8[f'A{fila}'].fill = section_fill
+        fila += 1
+        
+        escribir_headers(ws8, [
+            'Orden Cliente', 'Marca', 'Modelo', 'Sucursal', 'Técnico',
+            'Total Piezas', 'Costo Piezas', 'Costo M.O.', 'Costo Total', ''
+        ], fila)
+        fila += 1
+        
+        for _, rec_ca in df_costo_alto.sort_values('costo_total', ascending=False).iterrows():
+            ws8.cell(row=fila, column=1, value=rec_ca.get('orden_cliente', ''))
+            ws8.cell(row=fila, column=2, value=rec_ca.get('marca', ''))
+            ws8.cell(row=fila, column=3, value=rec_ca.get('modelo', ''))
+            ws8.cell(row=fila, column=4, value=rec_ca.get('sucursal', ''))
+            ws8.cell(row=fila, column=5, value=rec_ca.get('tecnico', ''))
+            ws8.cell(row=fila, column=6, value=rec_ca.get('total_piezas', 0))
+            ws8.cell(row=fila, column=7, value=f'${rec_ca.get("costo_total_piezas", 0):,.2f}')
+            ws8.cell(row=fila, column=8, value=f'${rec_ca.get("costo_mano_obra", 0):,.2f}')
+            ws8.cell(row=fila, column=9, value=f'${rec_ca.get("costo_total", 0):,.2f}')
+            fila += 1
+    else:
+        ws8.merge_cells('A6:J6')
+        ws8['A6'].value = "No se encontraron cotizaciones rechazadas por costo elevado en el período seleccionado."
+        ws8['A6'].font = Font(italic=True, size=12)
+        ws8['A6'].alignment = Alignment(horizontal='center')
+    
+    autoajustar_columnas(ws8, max_width=50)
+    
+    # ========================================
+    # HOJA 9: SERVICIOS CON 3+ Y 4+ PIEZAS COTIZADAS
+    # ========================================
+    ws9 = wb.create_sheet("Servicios 3+ Piezas")
+    multi_piezas_fill = PatternFill(start_color='8e44ad', end_color='8e44ad', fill_type='solid')
+    
+    escribir_encabezado_hoja(ws9, "SERVICIOS CON MÚLTIPLES PIEZAS COTIZADAS (RECHAZADAS)", 10)
+    
+    # Mapeo cotizacion_id → orden_cliente para esta hoja
+    mapa_oc = dict(zip(df_rechazos['cotizacion_id'], df_rechazos['orden_cliente']))
+    
+    # ---- SECCIÓN A: Servicios con 3 o más piezas ----
+    df_3_plus = df_rechazos[df_rechazos['total_piezas'] >= 3].copy()
+    total_3_plus = len(df_3_plus)
+    
+    ws9.merge_cells('A4:J4')
+    ws9['A4'].value = f"SECCIÓN A: SERVICIOS CON 3 O MÁS PIEZAS COTIZADAS ({total_3_plus} registros)"
+    ws9['A4'].font = Font(bold=True, size=12, color='FFFFFF')
+    ws9['A4'].fill = multi_piezas_fill
+    ws9['A4'].alignment = Alignment(horizontal='center')
+    
+    if total_3_plus > 0:
+        headers_multi = [
+            'Orden Cliente', 'Marca', 'Modelo', 'Sucursal', 'Técnico',
+            'Motivo Rechazo', 'Total Piezas', 'Costo Piezas', 'Costo M.O.', 'Costo Total'
+        ]
+        escribir_headers(ws9, headers_multi, 5)
+        
+        fila = 6
+        suma_total_3 = 0
+        for _, rec_mp in df_3_plus.sort_values('total_piezas', ascending=False).iterrows():
+            motivo_lab = labels_motivos.get(
+                rec_mp.get('motivo_rechazo', ''),
+                str(rec_mp.get('motivo_rechazo', '')).replace('_', ' ').title()
+            ) if rec_mp.get('motivo_rechazo') else 'Sin motivo'
+            
+            costo_t = rec_mp.get('costo_total', 0)
+            suma_total_3 += costo_t
+            
+            ws9.cell(row=fila, column=1, value=rec_mp.get('orden_cliente', ''))
+            ws9.cell(row=fila, column=2, value=rec_mp.get('marca', ''))
+            ws9.cell(row=fila, column=3, value=rec_mp.get('modelo', ''))
+            ws9.cell(row=fila, column=4, value=rec_mp.get('sucursal', ''))
+            ws9.cell(row=fila, column=5, value=rec_mp.get('tecnico', ''))
+            ws9.cell(row=fila, column=6, value=motivo_lab)
+            ws9.cell(row=fila, column=7, value=rec_mp.get('total_piezas', 0))
+            ws9.cell(row=fila, column=8, value=f'${rec_mp.get("costo_total_piezas", 0):,.2f}')
+            ws9.cell(row=fila, column=9, value=f'${rec_mp.get("costo_mano_obra", 0):,.2f}')
+            ws9.cell(row=fila, column=10, value=f'${costo_t:,.2f}')
+            fila += 1
+        
+        # Fila de totales
+        ws9.cell(row=fila, column=6, value='TOTAL:').font = Font(bold=True)
+        ws9.cell(row=fila, column=7, value=f'{df_3_plus["total_piezas"].sum()} piezas').font = Font(bold=True)
+        ws9.cell(row=fila, column=10, value=f'${suma_total_3:,.2f}')
+        ws9[f'J{fila}'].font = Font(bold=True, size=11, color='8e44ad')
+        for c in range(1, 11):
+            ws9.cell(row=fila, column=c).fill = blue_fill
+        fila += 1
+    else:
+        fila = 6
+        ws9.cell(row=fila, column=1, value='No hay servicios rechazados con 3 o más piezas cotizadas.')
+        ws9[f'A{fila}'].font = Font(italic=True)
+        fila += 1
+    
+    # ---- SECCIÓN B: Servicios con 4 o más piezas ----
+    fila += 2
+    df_4_plus = df_rechazos[df_rechazos['total_piezas'] >= 4].copy()
+    total_4_plus = len(df_4_plus)
+    
+    ws9.merge_cells(f'A{fila}:J{fila}')
+    ws9[f'A{fila}'].value = f"SECCIÓN B: SERVICIOS CON 4 O MÁS PIEZAS COTIZADAS ({total_4_plus} registros)"
+    ws9[f'A{fila}'].font = Font(bold=True, size=12, color='FFFFFF')
+    ws9[f'A{fila}'].fill = multi_piezas_fill
+    ws9[f'A{fila}'].alignment = Alignment(horizontal='center')
+    fila += 1
+    
+    if total_4_plus > 0:
+        escribir_headers(ws9, [
+            'Orden Cliente', 'Marca', 'Modelo', 'Sucursal', 'Técnico',
+            'Motivo Rechazo', 'Total Piezas', 'Costo Piezas', 'Costo M.O.', 'Costo Total'
+        ], fila)
+        fila += 1
+        
+        suma_total_4 = 0
+        for _, rec_mp in df_4_plus.sort_values('total_piezas', ascending=False).iterrows():
+            motivo_lab = labels_motivos.get(
+                rec_mp.get('motivo_rechazo', ''),
+                str(rec_mp.get('motivo_rechazo', '')).replace('_', ' ').title()
+            ) if rec_mp.get('motivo_rechazo') else 'Sin motivo'
+            
+            costo_t = rec_mp.get('costo_total', 0)
+            suma_total_4 += costo_t
+            
+            ws9.cell(row=fila, column=1, value=rec_mp.get('orden_cliente', ''))
+            ws9.cell(row=fila, column=2, value=rec_mp.get('marca', ''))
+            ws9.cell(row=fila, column=3, value=rec_mp.get('modelo', ''))
+            ws9.cell(row=fila, column=4, value=rec_mp.get('sucursal', ''))
+            ws9.cell(row=fila, column=5, value=rec_mp.get('tecnico', ''))
+            ws9.cell(row=fila, column=6, value=motivo_lab)
+            ws9.cell(row=fila, column=7, value=rec_mp.get('total_piezas', 0))
+            ws9.cell(row=fila, column=8, value=f'${rec_mp.get("costo_total_piezas", 0):,.2f}')
+            ws9.cell(row=fila, column=9, value=f'${rec_mp.get("costo_mano_obra", 0):,.2f}')
+            ws9.cell(row=fila, column=10, value=f'${costo_t:,.2f}')
+            fila += 1
+        
+        # Fila de totales
+        ws9.cell(row=fila, column=6, value='TOTAL:').font = Font(bold=True)
+        ws9.cell(row=fila, column=7, value=f'{df_4_plus["total_piezas"].sum()} piezas').font = Font(bold=True)
+        ws9.cell(row=fila, column=10, value=f'${suma_total_4:,.2f}')
+        ws9[f'J{fila}'].font = Font(bold=True, size=11, color='8e44ad')
+        for c in range(1, 11):
+            ws9.cell(row=fila, column=c).fill = blue_fill
+        fila += 1
+    else:
+        ws9.cell(row=fila, column=1, value='No hay servicios rechazados con 4 o más piezas cotizadas.')
+        ws9[f'A{fila}'].font = Font(italic=True)
+        fila += 1
+    
+    # ---- SECCIÓN C: Desglose de piezas por orden (solo 4+) ----
+    if total_4_plus > 0 and not df_piezas_proveedor.empty:
+        fila += 2
+        ws9.merge_cells(f'A{fila}:J{fila}')
+        ws9[f'A{fila}'].value = "DESGLOSE DE PIEZAS: SERVICIOS CON 4+ PIEZAS"
+        ws9[f'A{fila}'].font = section_font
+        ws9[f'A{fila}'].fill = section_fill
+        fila += 1
+        
+        for _, rec_mp in df_4_plus.sort_values('total_piezas', ascending=False).iterrows():
+            cot_id = rec_mp['cotizacion_id']
+            orden_cli = rec_mp.get('orden_cliente', '') or 'Sin orden cliente'
+            
+            # Encabezado de la orden
+            ws9.merge_cells(f'A{fila}:J{fila}')
+            ws9[f'A{fila}'].value = (
+                f"Orden Cliente: {orden_cli}  |  "
+                f"{rec_mp.get('marca', '')} {rec_mp.get('modelo', '')}  |  "
+                f"Piezas: {rec_mp.get('total_piezas', 0)}  |  "
+                f"Total: ${rec_mp.get('costo_total', 0):,.2f}"
+            )
+            ws9[f'A{fila}'].font = Font(bold=True, size=10, color='FFFFFF')
+            ws9[f'A{fila}'].fill = multi_piezas_fill
+            fila += 1
+            
+            piezas_esta_orden = df_piezas_proveedor[
+                df_piezas_proveedor['cotizacion_id'] == cot_id
+            ]
+            
+            if not piezas_esta_orden.empty:
+                escribir_headers(ws9, [
+                    'Componente', 'Descripción', 'Proveedor',
+                    'Cantidad', 'Costo Unitario', 'Costo Total Pieza',
+                    'Es Necesaria', 'Sugerida Técnico', '', ''
+                ], fila)
+                fila += 1
+                
+                sub_total = 0
+                for _, pieza_mp in piezas_esta_orden.iterrows():
+                    cu = float(pieza_mp.get('costo_unitario', 0))
+                    cant = int(pieza_mp.get('cantidad', 1))
+                    ct = cu * cant
+                    sub_total += ct
+                    
+                    ws9.cell(row=fila, column=1, value=pieza_mp.get('componente__nombre', ''))
+                    ws9.cell(row=fila, column=2, value=pieza_mp.get('descripcion_adicional', ''))
+                    ws9.cell(row=fila, column=3, value=pieza_mp.get('proveedor', ''))
+                    ws9.cell(row=fila, column=4, value=cant)
+                    ws9.cell(row=fila, column=5, value=f'${cu:,.2f}')
+                    ws9.cell(row=fila, column=6, value=f'${ct:,.2f}')
+                    ws9.cell(row=fila, column=7, value='Sí' if pieza_mp.get('es_necesaria') else 'No')
+                    ws9.cell(row=fila, column=8, value='Sí' if pieza_mp.get('sugerida_por_tecnico') else 'No')
+                    fila += 1
+                
+                ws9.cell(row=fila, column=5, value='Subtotal piezas:').font = Font(bold=True)
+                ws9.cell(row=fila, column=6, value=f'${sub_total:,.2f}').font = Font(bold=True)
+            else:
+                ws9.cell(row=fila, column=1, value='(Sin piezas registradas)')
+                ws9[f'A{fila}'].font = Font(italic=True, color='999999')
+            fila += 2
+    
+    autoajustar_columnas(ws9, max_width=50)
     
     # ========================================
     # GENERAR Y RETORNAR ARCHIVO
