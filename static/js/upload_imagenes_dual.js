@@ -1,7 +1,7 @@
 "use strict";
 // ============================================================================
 // SISTEMA DUAL DE SUBIDA DE IMÁGENES - GALERÍA Y CÁMARA
-// Versión 7.0 - Caché IndexedDB + Auto-recarga en fallo Cloudflare
+// Versión 8.0 - Transacción única + Caché IndexedDB + Auto-recarga
 // ============================================================================
 /**
  * CLASE: ImageCache
@@ -212,13 +212,6 @@ class UploadImagenesDual {
         this.ADVERTENCIA_REQUEST_MB = 76; // Advertir al 80% del límite
         // NUEVO v5.0: Timeout de XHR (10 minutos, alineado con Gunicorn y Nginx)
         this.XHR_TIMEOUT_MS = 600000;
-        // v6.0: Configuración de subida por lotes (anti-Cloudflare disconnect)
-        // Cada lote genera un request HTTP independiente, nueva conexión cada vez.
-        // v7.0: Sin reintentos — al primer fallo de red se guarda en caché y se recarga.
-        this.BATCH_SIZE = 5; // Imágenes por lote (~15-25MB typ.)
-        // v6.0: Estado de progreso por lotes
-        this.loteActual = 0;
-        this.totalLotes = 0;
         // Control de estado de procesamiento
         this.estaProcesando = false;
         this.archivosListos = false;
@@ -291,7 +284,7 @@ class UploadImagenesDual {
         if (btnEgreso) {
             btnEgreso.addEventListener('click', () => this.mostrarModalEgresoEmail());
         }
-        console.log('✅ Sistema dual de subida de imágenes v7.0 inicializado');
+        console.log('✅ Sistema dual de subida de imágenes v8.0 inicializado');
     }
     // =========================================================================
     // NUEVO: Selector de tipo de imagen (radio cards)
@@ -539,14 +532,7 @@ class UploadImagenesDual {
                 return;
             }
         }
-        // v6.0: Dividir archivos en lotes de BATCH_SIZE
-        // Cada lote se envía como un request HTTP independiente,
-        // lo que evita que Cloudflare Tunnel corte la conexión.
-        const lotes = [];
-        for (let i = 0; i < archivosParaSubir.length; i += this.BATCH_SIZE) {
-            lotes.push(archivosParaSubir.slice(i, i + this.BATCH_SIZE));
-        }
-        console.log(`📦 Dividiendo ${archivosParaSubir.length} imagen(es) en ${lotes.length} lote(s) de hasta ${this.BATCH_SIZE}`);
+        console.log(`📤 Enviando ${archivosParaSubir.length} imagen(es) en una sola transacción`);
         // Deshabilitar formulario durante la subida
         this.deshabilitarFormulario();
         // Mostrar barra de progreso
@@ -560,8 +546,8 @@ class UploadImagenesDual {
             this.porcentajeProgreso.textContent = '0%';
         // Activar protección beforeunload
         this.subiendoImagenes = true;
-        // Iniciar subida por lotes (async)
-        this.enviarPorLotes(lotes);
+        // Iniciar subida (transacción única)
+        this.enviarTodo(archivosParaSubir);
     }
     /**
      * EXPLICACIÓN PARA PRINCIPIANTES:
@@ -607,343 +593,108 @@ class UploadImagenesDual {
         return formData;
     }
     // =========================================================================
-    // v6.0: SISTEMA DE SUBIDA POR LOTES CON REINTENTOS AUTOMÁTICOS
+    // v8.0: SUBIDA EN TRANSACCIÓN ÚNICA (con caché IndexedDB para fallos)
     // =========================================================================
     /**
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Envía las imágenes divididas en lotes pequeños (5 imágenes cada uno).
+     * Envía TODAS las imágenes al servidor en una sola petición HTTP.
      *
-     * ¿Por qué lotes? Cloudflare Tunnel (el proxy que protege tu servidor)
-     * a veces corta conexiones grandes de forma aleatoria. Al dividir en
-     * lotes pequeños (~15-25MB cada uno), cada request es rápido y tiene
-     * mucha menos probabilidad de ser cortado.
+     * v8.0: Se eliminó la subida por lotes. El sistema de caché IndexedDB (v7.0)
+     * ya resuelve el problema de desconexiones de Cloudflare: si se corta la
+     * conexión, la página se recarga automáticamente y las imágenes se recuperan
+     * del caché, listas para reintentar la subida completa.
      *
-     * v7.0: Sin reintentos. Al primer fallo de red (evento 'error' del XHR),
-     * el túnel de Cloudflare ya está roto — reintentarlo en la misma sesión
-     * no sirve. En su lugar, guardamos las imágenes pendientes en IndexedDB
-     * y recargamos la página para restablecer la conexión completamente.
-     * Los lotes anteriores exitosos ya están guardados en el servidor.
+     * Escenarios posibles:
+     * 1. Éxito → limpiar caché, mostrar mensaje verde, recargar página
+     * 2. Error del servidor → mostrar mensaje, rehabilitar formulario
+     * 3. Error de red (Cloudflare) → guardar en caché, auto-recargar
      */
-    async enviarPorLotes(lotes) {
-        this.totalLotes = lotes.length;
-        const resultados = [];
-        let totalImagenesGuardadas = 0;
-        let totalErrores = [];
-        let lotesExitosos = 0;
-        let huboFalloDefinitivo = false;
-        // Calcular totales para info
-        const totalArchivos = lotes.reduce((sum, l) => sum + l.length, 0);
-        const totalBytes = lotes.reduce((sum, l) => sum + l.reduce((s, f) => s + f.size, 0), 0);
+    async enviarTodo(archivos) {
+        const totalBytes = archivos.reduce((sum, f) => sum + f.size, 0);
         const totalMB = (totalBytes / (1024 * 1024)).toFixed(2);
         // Mostrar info inicial
         if (this.infoArchivos) {
             this.infoArchivos.innerHTML = `
                 <div class="d-flex align-items-center justify-content-between flex-wrap">
-                    <span><i class="bi bi-collection"></i> <strong>${totalArchivos}</strong> imagen${totalArchivos !== 1 ? 'es' : ''} en <strong>${lotes.length}</strong> lote${lotes.length !== 1 ? 's' : ''}</span>
+                    <span><i class="bi bi-collection"></i> <strong>${archivos.length}</strong> imagen${archivos.length !== 1 ? 'es' : ''}</span>
                     <span class="badge bg-secondary">${totalMB} MB total</span>
                 </div>
             `;
         }
-        // Procesar cada lote secuencialmente — sin reintentos
-        for (let i = 0; i < lotes.length; i++) {
-            this.loteActual = i + 1;
-            const lote = lotes[i];
-            try {
-                const resultado = await this.enviarLote(lote, i, lotes.length);
-                if (resultado.success) {
-                    lotesExitosos++;
-                    totalImagenesGuardadas += resultado.imagenesGuardadas;
-                    if (resultado.errores.length > 0) {
-                        totalErrores = totalErrores.concat(resultado.errores);
-                    }
-                    resultados.push(resultado);
-                    console.log(`✅ Lote ${i + 1}/${lotes.length}: ${resultado.imagenesGuardadas} imagen(es) guardadas`);
-                    // Remover las imágenes exitosas del array interno
-                    this.removerImagenesSubidas(lote);
+        try {
+            const resultado = await this.enviarXHR(archivos);
+            // Desactivar protección beforeunload
+            this.subiendoImagenes = false;
+            this.marcarFinEnvio();
+            if (resultado.success) {
+                // ═══ ÉXITO: Todas las imágenes se subieron correctamente ═══
+                if (this.barraProgreso) {
+                    this.barraProgreso.classList.remove('progress-bar-animated', 'progress-bar-striped', 'bg-warning');
+                    this.barraProgreso.classList.add('bg-success');
+                    this.barraProgreso.style.width = '100%';
                 }
-                else {
-                    // El servidor respondió con error (no error de red)
-                    console.error(`❌ Lote ${i + 1}: Error del servidor — ${resultado.message}`);
-                    if (resultado.imagenesGuardadas > 0) {
-                        totalImagenesGuardadas += resultado.imagenesGuardadas;
-                        resultados.push(resultado);
-                    }
-                    totalErrores.push(`Lote ${i + 1}: ${resultado.message}`);
-                    huboFalloDefinitivo = true;
-                    break; // Detener lotes restantes
-                }
-            }
-            catch (errorInfo) {
-                // Error de red — Cloudflare cortó el túnel. Sin reintentos: cachar + recargar.
-                const info = errorInfo;
-                console.error(`❌ Lote ${i + 1}: Error de red — ${info.tipo}: ${info.diagnostico}`);
-                huboFalloDefinitivo = true;
-                resultados.push({
-                    batchIndex: i,
-                    success: false,
-                    imagenesGuardadas: 0,
-                    imagenesOmitidas: [],
-                    errores: [`Lote ${i + 1} (${lote.length} imgs): ${info.diagnostico}`],
-                    cambioEstado: false,
-                    message: info.diagnostico,
-                    archivosEnviados: lote.length,
-                    tipoImagen: '',
-                    egresoCorreoYaEnviado: false,
-                });
-                totalErrores.push(`Lote ${i + 1} (${lote.length} imgs): ${info.diagnostico}`);
-                break; // Detener inmediatamente — no continuar con más lotes
-            }
-        }
-        // Desactivar protección beforeunload
-        this.subiendoImagenes = false;
-        this.marcarFinEnvio();
-        // Mostrar resumen final consolidado
-        this.mostrarResumenFinal(totalImagenesGuardadas, totalErrores, lotesExitosos, lotes.length, huboFalloDefinitivo, resultados);
-    }
-    /**
-     * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Envía UN solo lote de imágenes al servidor usando XMLHttpRequest (XHR).
-     * Retorna una Promise (promesa) que se resuelve cuando el servidor responde,
-     * o se rechaza si hay un error de red (Cloudflare cortó la conexión, etc.)
-     *
-     * Cada llamada a este método crea un XHR NUEVO = una conexión HTTP nueva.
-     * Esto es clave: si la conexión anterior se cortó, la nueva es independiente.
-     */
-    enviarLote(archivos, batchIndex, totalBatches) {
-        return new Promise((resolve, reject) => {
-            var _a;
-            const formData = this.construirFormData(archivos);
-            const tamanioLote = archivos.reduce((sum, f) => sum + f.size, 0);
-            const tamanioMB = (tamanioLote / (1024 * 1024)).toFixed(2);
-            console.log(`📤 Enviando lote ${batchIndex + 1}/${totalBatches}: ${archivos.length} archivo(s), ${tamanioMB} MB`);
-            const xhr = new XMLHttpRequest();
-            // Progreso: calcular posición global dentro de todos los lotes
-            xhr.upload.addEventListener('progress', (e) => {
-                if (!e.lengthComputable)
-                    return;
-                const porcentajeLote = Math.round((e.loaded / e.total) * 100);
-                // Progreso global: cada lote contribuye una fracción igual
-                const porcentajeBase = (batchIndex / totalBatches) * 100;
-                const porcentajeContribucion = (1 / totalBatches) * 100;
-                const porcentajeGlobal = Math.round(porcentajeBase + (porcentajeLote / 100) * porcentajeContribucion);
-                if (this.barraProgreso)
-                    this.barraProgreso.style.width = porcentajeGlobal + '%';
+                if (this.textoProgreso)
+                    this.textoProgreso.textContent = '¡Completado!';
                 if (this.porcentajeProgreso)
-                    this.porcentajeProgreso.textContent = porcentajeGlobal + '%';
-                if (porcentajeLote < 100) {
-                    // Subiendo datos al servidor
-                    if (this.textoProgreso) {
-                        this.textoProgreso.textContent = totalBatches > 1
-                            ? `Lote ${batchIndex + 1}/${totalBatches} — Subiendo... ${porcentajeLote}%`
-                            : `Subiendo... ${porcentajeLote}%`;
-                    }
-                    if (this.infoArchivos) {
-                        const mbSubidos = (e.loaded / (1024 * 1024)).toFixed(2);
-                        this.infoArchivos.innerHTML = `
-                            <div class="d-flex align-items-center justify-content-between flex-wrap">
-                                <span><i class="bi bi-cloud-arrow-up text-primary"></i> ${totalBatches > 1 ? `Lote ${batchIndex + 1}/${totalBatches}: ` : ''}Subiendo <strong>${archivos.length}</strong> imagen${archivos.length !== 1 ? 'es' : ''}...</span>
-                                <span class="badge bg-primary">${mbSubidos} / ${tamanioMB} MB</span>
-                            </div>
-                            ${totalBatches > 1 ? `<div class="mt-1"><small class="text-muted">Progreso global: ${porcentajeGlobal}%</small></div>` : ''}
-                        `;
-                    }
-                }
-                else {
-                    // Datos enviados, servidor procesando
-                    if (this.textoProgreso) {
-                        this.textoProgreso.textContent = totalBatches > 1
-                            ? `Lote ${batchIndex + 1}/${totalBatches} — Procesando en servidor...`
-                            : 'Procesando en servidor...';
-                    }
-                    if (this.barraProgreso)
-                        this.barraProgreso.classList.add('progress-bar-striped');
-                    if (this.infoArchivos) {
-                        this.infoArchivos.innerHTML = `
-                            <div class="d-flex align-items-center">
-                                <span class="spinner-border spinner-border-sm text-info me-2"></span>
-                                <span>${totalBatches > 1 ? `Lote ${batchIndex + 1}/${totalBatches}: ` : ''}Comprimiendo y guardando ${archivos.length} imagen${archivos.length !== 1 ? 'es' : ''}...</span>
-                            </div>
-                        `;
-                    }
-                }
-            });
-            // Respuesta del servidor
-            xhr.addEventListener('load', () => {
-                if (this.barraProgreso)
-                    this.barraProgreso.classList.remove('progress-bar-striped');
-                if (xhr.status === 200 || xhr.status === 500) {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        resolve({
-                            batchIndex: batchIndex,
-                            success: data.success,
-                            imagenesGuardadas: data.imagenes_guardadas || 0,
-                            imagenesOmitidas: data.imagenes_omitidas || [],
-                            errores: data.errores || [],
-                            cambioEstado: data.cambio_estado || false,
-                            message: data.message || data.error || '',
-                            archivosEnviados: archivos.length,
-                            tipoImagen: data.tipo_imagen || '',
-                            egresoCorreoYaEnviado: data.egreso_correo_ya_enviado || false,
-                        });
-                    }
-                    catch (e) {
-                        console.error('Error al parsear respuesta del lote:', e);
-                        reject({ tipo: 'parse_error', diagnostico: 'Respuesta del servidor no válida' });
-                    }
-                }
-                else {
-                    reject({ tipo: `http_${xhr.status}`, diagnostico: `Error HTTP ${xhr.status}` });
-                }
-            });
-            // Error de red — esto es lo que dispara Cloudflare al cortar
-            xhr.addEventListener('error', () => {
-                let tipo = 'desconocido';
-                let diagnostico = '';
-                if (!navigator.onLine) {
-                    tipo = 'sin_internet';
-                    diagnostico = 'Sin conexión a internet';
-                }
-                else if (tamanioLote > 100 * 1024 * 1024) {
-                    tipo = 'cloudflare_limite';
-                    diagnostico = `Lote de ${tamanioMB}MB excede límite Cloudflare`;
-                }
-                else {
-                    tipo = 'conexion_cortada';
-                    diagnostico = 'Conexión cortada (Cloudflare Tunnel, red inestable)';
-                }
-                console.error(`[LOTE ${batchIndex + 1} ERROR] Tipo: ${tipo} | ${diagnostico}`);
-                console.error(`[LOTE ${batchIndex + 1} ERROR] Archivos: ${archivos.length}, Tamaño: ${tamanioMB} MB, Hora: ${new Date().toISOString()}`);
-                reject({ tipo, diagnostico });
-            });
-            // Timeout
-            xhr.addEventListener('timeout', () => {
-                console.error(`[LOTE ${batchIndex + 1} TIMEOUT] ${tamanioMB}MB, timeout=${this.XHR_TIMEOUT_MS / 1000}s`);
-                reject({ tipo: 'timeout', diagnostico: `Timeout después de ${this.XHR_TIMEOUT_MS / 60000} minutos` });
-            });
-            // Abrir y enviar (nueva conexión HTTP cada vez)
-            const url = ((_a = this.formElement) === null || _a === void 0 ? void 0 : _a.action) || window.location.href;
-            xhr.open('POST', url);
-            xhr.timeout = this.XHR_TIMEOUT_MS;
-            xhr.send(formData);
-        });
-    }
-    /**
-     * Remueve del array interno las imágenes que ya se subieron exitosamente.
-     * Usa nombre+tamaño como clave para identificar cada archivo.
-     */
-    removerImagenesSubidas(archivosSubidos) {
-        const clavesSubidas = new Set(archivosSubidos.map(f => `${f.name}_${f.size}_${f.lastModified}`));
-        this.imagenesSeleccionadas = this.imagenesSeleccionadas.filter(img => {
-            const clave = `${img.file.name}_${img.file.size}_${img.file.lastModified}`;
-            if (clavesSubidas.has(clave)) {
-                URL.revokeObjectURL(img.previewUrl); // Liberar memoria
-                return false; // Remover del array
-            }
-            return true; // Mantener
-        });
-    }
-    /**
-     * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Muestra el resumen final después de que todos los lotes terminaron.
-     * Hay 3 escenarios posibles:
-     * 1. Todo exitoso → mensaje verde, recarga la página
-     * 2. Éxito parcial → mensaje amarillo, las imágenes pendientes quedan seleccionadas
-     * 3. Todo falló → mensaje rojo, todas las imágenes quedan seleccionadas para reintento
-     */
-    mostrarResumenFinal(totalGuardadas, errores, lotesExitosos, totalLotes, huboFalloDefinitivo, resultados = []) {
-        var _a;
-        if (totalGuardadas > 0 && !huboFalloDefinitivo) {
-            // ═══════════════════════════════════════════════════════════
-            // ESCENARIO 1: TODO EXITOSO
-            // ═══════════════════════════════════════════════════════════
-            if (this.barraProgreso) {
-                this.barraProgreso.classList.remove('progress-bar-animated', 'progress-bar-striped', 'bg-warning');
-                this.barraProgreso.classList.add('bg-success');
-                this.barraProgreso.style.width = '100%';
-            }
-            if (this.textoProgreso)
-                this.textoProgreso.textContent = '¡Completado!';
-            if (this.porcentajeProgreso)
-                this.porcentajeProgreso.textContent = '✓';
-            let mensaje = `✅ ${totalGuardadas} imagen(es) subida(s) correctamente.`;
-            if (totalLotes > 1) {
-                mensaje += ` (${lotesExitosos} lote${lotesExitosos !== 1 ? 's' : ''})`;
-            }
-            let html = `
-                <div class="d-flex align-items-center text-success">
-                    <i class="bi bi-check-circle-fill me-2"></i>
-                    <span>${mensaje}</span>
-                </div>
-            `;
-            if (errores.length > 0) {
-                html += `
-                    <div class="mt-1">
-                        <small class="text-danger">
-                            <i class="bi bi-x-circle"></i> ${errores.length} error(es) menores al procesar
-                        </small>
+                    this.porcentajeProgreso.textContent = '✓';
+                let html = `
+                    <div class="d-flex align-items-center text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        <span>✅ ${resultado.imagenesGuardadas} imagen(es) subida(s) correctamente.</span>
                     </div>
                 `;
-            }
-            if (this.infoArchivos)
-                this.infoArchivos.innerHTML = html;
-            this.limpiarDespuesDeExito();
-            // Detectar si fue una subida de tipo egreso para mostrar modal de correo
-            const ultimoExitoso = resultados.filter(r => r.success).pop();
-            const esEgreso = (ultimoExitoso === null || ultimoExitoso === void 0 ? void 0 : ultimoExitoso.tipoImagen) === 'egreso';
-            const egresoCorreoYaEnviado = (_a = ultimoExitoso === null || ultimoExitoso === void 0 ? void 0 : ultimoExitoso.egresoCorreoYaEnviado) !== null && _a !== void 0 ? _a : false;
-            if (esEgreso && !egresoCorreoYaEnviado) {
-                // Mostrar modal preguntando si quiere enviar correo de egreso
-                this.mostrarModalEgresoEmail();
+                if (resultado.errores.length > 0) {
+                    html += `
+                        <div class="mt-1">
+                            <small class="text-danger">
+                                <i class="bi bi-x-circle"></i> ${resultado.errores.length} error(es) menores al procesar
+                            </small>
+                        </div>
+                    `;
+                }
+                if (this.infoArchivos)
+                    this.infoArchivos.innerHTML = html;
+                // Limpiar selección y caché
+                this.limpiarDespuesDeExito();
+                // Detectar si fue egreso para mostrar modal de correo
+                const esEgreso = resultado.tipoImagen === 'egreso';
+                if (esEgreso && !resultado.egresoCorreoYaEnviado) {
+                    this.mostrarModalEgresoEmail();
+                }
+                else {
+                    setTimeout(() => { window.location.reload(); }, 1500);
+                }
             }
             else {
-                // Recargar normalmente para mostrar las imágenes guardadas
-                setTimeout(() => { window.location.reload(); }, 1500);
+                // ═══ ERROR DEL SERVIDOR (respondió pero con error) ═══
+                if (this.barraProgreso) {
+                    this.barraProgreso.classList.remove('bg-success', 'progress-bar-animated', 'progress-bar-striped');
+                    this.barraProgreso.classList.add('bg-danger');
+                    this.barraProgreso.style.width = '100%';
+                }
+                if (this.textoProgreso)
+                    this.textoProgreso.textContent = 'Error del servidor';
+                if (this.porcentajeProgreso)
+                    this.porcentajeProgreso.textContent = '✗';
+                if (this.infoArchivos) {
+                    this.infoArchivos.innerHTML = `
+                        <div class="text-danger">
+                            <i class="bi bi-x-circle-fill me-1"></i>
+                            ${resultado.message || 'Error al procesar las imágenes en el servidor.'}
+                        </div>
+                    `;
+                }
+                // Rehabilitar formulario para reintentar
+                this.rehabilitarFormulario();
             }
         }
-        else if (totalGuardadas > 0 && huboFalloDefinitivo) {
-            // ═══════════════════════════════════════════════════════════
-            // ESCENARIO 2: ÉXITO PARCIAL (algunas subidas, otras fallaron)
-            // v7.0: Guarda pendientes en caché + recarga automática
-            // ═══════════════════════════════════════════════════════════
-            if (this.barraProgreso) {
-                this.barraProgreso.classList.remove('progress-bar-animated', 'progress-bar-striped', 'bg-success', 'bg-danger');
-                this.barraProgreso.classList.add('bg-warning');
-                this.barraProgreso.style.width = '100%';
-            }
-            if (this.textoProgreso)
-                this.textoProgreso.textContent = 'Parcialmente completado';
-            if (this.porcentajeProgreso)
-                this.porcentajeProgreso.textContent = '⚠';
-            const restantes = this.imagenesSeleccionadas.length;
-            // Guardar imágenes pendientes en caché antes de recargar
-            this.sincronizarCache();
-            let html = `
-                <div class="text-warning">
-                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                    Se guardaron <strong>${totalGuardadas}</strong> imagen(es). Quedan <strong>${restantes}</strong> pendientes.
-                </div>
-                <div class="mt-1">
-                    <small class="text-muted">
-                        <i class="bi bi-shield-check"></i> Las imágenes pendientes se guardaron localmente.
-                        Recargando la página para restablecer la conexión...
-                    </small>
-                </div>
-                <div class="mt-2 d-flex align-items-center gap-2">
-                    <div class="spinner-border spinner-border-sm text-warning"></div>
-                    <span id="cacheCountdown" class="text-warning fw-bold">Recargando en 5s...</span>
-                </div>
-            `;
-            if (this.infoArchivos)
-                this.infoArchivos.innerHTML = html;
-            // Countdown visual + recarga
-            this.iniciarCountdownRecarga(5);
-        }
-        else {
-            // ═══════════════════════════════════════════════════════════
-            // ESCENARIO 3: TODO FALLÓ
-            // v7.0: Guarda TODO en caché + recarga automática
-            // ═══════════════════════════════════════════════════════════
+        catch (errorInfo) {
+            // ═══ ERROR DE RED — Cloudflare cortó el túnel ═══
+            const info = errorInfo;
+            console.error(`❌ Error de red: ${info.tipo}: ${info.diagnostico}`);
+            // Desactivar protección beforeunload
+            this.subiendoImagenes = false;
+            this.marcarFinEnvio();
             if (this.barraProgreso) {
                 this.barraProgreso.classList.remove('bg-success', 'progress-bar-animated', 'progress-bar-striped', 'bg-warning');
                 this.barraProgreso.classList.add('bg-danger');
@@ -971,26 +722,138 @@ class UploadImagenesDual {
                     <span id="cacheCountdown" class="text-danger fw-bold">Recargando en 5s...</span>
                 </div>
             `;
-            if (errores.length > 0) {
-                html += `
-                    <details class="mt-2">
-                        <summary class="text-muted" style="cursor: pointer; font-size: 0.8rem;">
-                            <i class="bi bi-bug"></i> Info técnica para soporte
-                        </summary>
-                        <div class="mt-1 p-2 bg-light rounded" style="font-size: 0.75rem; font-family: monospace;">
-                            ${errores.map(e => `<div>• ${e}</div>`).join('')}
-                            <div><strong>Hora:</strong> ${new Date().toLocaleString('es-MX')}</div>
-                            <div><strong>Navegador:</strong> ${navigator.userAgent.substring(0, 80)}...</div>
-                            <div><strong>Online:</strong> ${navigator.onLine ? 'Sí' : 'No'}</div>
-                        </div>
-                    </details>
-                `;
-            }
+            html += `
+                <details class="mt-2">
+                    <summary class="text-muted" style="cursor: pointer; font-size: 0.8rem;">
+                        <i class="bi bi-bug"></i> Info técnica para soporte
+                    </summary>
+                    <div class="mt-1 p-2 bg-light rounded" style="font-size: 0.75rem; font-family: monospace;">
+                        <div>• ${info.diagnostico}</div>
+                        <div><strong>Hora:</strong> ${new Date().toLocaleString('es-MX')}</div>
+                        <div><strong>Navegador:</strong> ${navigator.userAgent.substring(0, 80)}...</div>
+                        <div><strong>Online:</strong> ${navigator.onLine ? 'Sí' : 'No'}</div>
+                    </div>
+                </details>
+            `;
             if (this.infoArchivos)
                 this.infoArchivos.innerHTML = html;
             // Countdown visual + recarga
             this.iniciarCountdownRecarga(5);
         }
+    }
+    /**
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Envía todas las imágenes al servidor usando XMLHttpRequest (XHR).
+     * Retorna una Promise que se resuelve cuando el servidor responde,
+     * o se rechaza si hay un error de red (Cloudflare cortó la conexión, etc.)
+     */
+    enviarXHR(archivos) {
+        return new Promise((resolve, reject) => {
+            var _a;
+            const formData = this.construirFormData(archivos);
+            const tamanioTotal = archivos.reduce((sum, f) => sum + f.size, 0);
+            const tamanioMB = (tamanioTotal / (1024 * 1024)).toFixed(2);
+            console.log(`📤 Enviando ${archivos.length} archivo(s), ${tamanioMB} MB`);
+            const xhr = new XMLHttpRequest();
+            // Progreso de subida
+            xhr.upload.addEventListener('progress', (e) => {
+                if (!e.lengthComputable)
+                    return;
+                const porcentaje = Math.round((e.loaded / e.total) * 100);
+                if (this.barraProgreso)
+                    this.barraProgreso.style.width = porcentaje + '%';
+                if (this.porcentajeProgreso)
+                    this.porcentajeProgreso.textContent = porcentaje + '%';
+                if (porcentaje < 100) {
+                    // Subiendo datos al servidor
+                    if (this.textoProgreso) {
+                        this.textoProgreso.textContent = `Subiendo... ${porcentaje}%`;
+                    }
+                    if (this.infoArchivos) {
+                        const mbSubidos = (e.loaded / (1024 * 1024)).toFixed(2);
+                        this.infoArchivos.innerHTML = `
+                            <div class="d-flex align-items-center justify-content-between flex-wrap">
+                                <span><i class="bi bi-cloud-arrow-up text-primary"></i> Subiendo <strong>${archivos.length}</strong> imagen${archivos.length !== 1 ? 'es' : ''}...</span>
+                                <span class="badge bg-primary">${mbSubidos} / ${tamanioMB} MB</span>
+                            </div>
+                        `;
+                    }
+                }
+                else {
+                    // Datos enviados, servidor procesando
+                    if (this.textoProgreso) {
+                        this.textoProgreso.textContent = 'Procesando en servidor...';
+                    }
+                    if (this.barraProgreso)
+                        this.barraProgreso.classList.add('progress-bar-striped');
+                    if (this.infoArchivos) {
+                        this.infoArchivos.innerHTML = `
+                            <div class="d-flex align-items-center">
+                                <span class="spinner-border spinner-border-sm text-info me-2"></span>
+                                <span>Comprimiendo y guardando ${archivos.length} imagen${archivos.length !== 1 ? 'es' : ''}...</span>
+                            </div>
+                        `;
+                    }
+                }
+            });
+            // Respuesta del servidor
+            xhr.addEventListener('load', () => {
+                if (this.barraProgreso)
+                    this.barraProgreso.classList.remove('progress-bar-striped');
+                if (xhr.status === 200 || xhr.status === 500) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        resolve({
+                            success: data.success,
+                            imagenesGuardadas: data.imagenes_guardadas || 0,
+                            imagenesOmitidas: data.imagenes_omitidas || [],
+                            errores: data.errores || [],
+                            cambioEstado: data.cambio_estado || false,
+                            message: data.message || data.error || '',
+                            archivosEnviados: archivos.length,
+                            tipoImagen: data.tipo_imagen || '',
+                            egresoCorreoYaEnviado: data.egreso_correo_ya_enviado || false,
+                        });
+                    }
+                    catch (e) {
+                        console.error('Error al parsear respuesta:', e);
+                        reject({ tipo: 'parse_error', diagnostico: 'Respuesta del servidor no válida' });
+                    }
+                }
+                else {
+                    reject({ tipo: `http_${xhr.status}`, diagnostico: `Error HTTP ${xhr.status}` });
+                }
+            });
+            // Error de red — esto es lo que dispara Cloudflare al cortar
+            xhr.addEventListener('error', () => {
+                let tipo = 'desconocido';
+                let diagnostico = '';
+                if (!navigator.onLine) {
+                    tipo = 'sin_internet';
+                    diagnostico = 'Sin conexión a internet';
+                }
+                else if (tamanioTotal > 100 * 1024 * 1024) {
+                    tipo = 'cloudflare_limite';
+                    diagnostico = `Archivo(s) de ${tamanioMB}MB excede límite Cloudflare`;
+                }
+                else {
+                    tipo = 'conexion_cortada';
+                    diagnostico = 'Conexión cortada (Cloudflare Tunnel, red inestable)';
+                }
+                console.error(`[ERROR RED] Tipo: ${tipo} | ${diagnostico}`);
+                reject({ tipo, diagnostico });
+            });
+            // Timeout
+            xhr.addEventListener('timeout', () => {
+                console.error(`[TIMEOUT] ${tamanioMB}MB, timeout=${this.XHR_TIMEOUT_MS / 1000}s`);
+                reject({ tipo: 'timeout', diagnostico: `Timeout después de ${this.XHR_TIMEOUT_MS / 60000} minutos` });
+            });
+            // Abrir y enviar
+            const url = ((_a = this.formElement) === null || _a === void 0 ? void 0 : _a.action) || window.location.href;
+            xhr.open('POST', url);
+            xhr.timeout = this.XHR_TIMEOUT_MS;
+            xhr.send(formData);
+        });
     }
     /**
      * Obtiene los destinatarios de egreso y muestra un modal Bootstrap preguntando
@@ -1969,7 +1832,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Verificar que estamos en la página correcta
     if (document.getElementById('formSubirImagenes')) {
         window.uploadImagenesDual = new UploadImagenesDual();
-        console.log('✅ Sistema de subida dual v7.0 inicializado (caché IndexedDB activo)');
+        console.log('✅ Sistema de subida dual v8.0 inicializado (caché IndexedDB activo)');
     }
 });
 //# sourceMappingURL=upload_imagenes_dual.js.map
