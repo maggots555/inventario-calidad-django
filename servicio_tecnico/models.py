@@ -2655,6 +2655,11 @@ class FeedbackCliente(models.Model):
         verbose_name="¿Correo enviado al cliente?",
         help_text="Se actualiza a True cuando la tarea Celery envía el correo exitosamente"
     )
+    recordatorio_enviado = models.BooleanField(
+        default=False,
+        verbose_name="¿Recordatorio enviado?",
+        help_text="True cuando se envió el correo de recordatorio al día 10 de vigencia (solo aplica a tipo='satisfaccion')"
+    )
 
     class Meta:
         verbose_name = "Feedback de Cliente"
@@ -2670,9 +2675,9 @@ class FeedbackCliente(models.Model):
 
     @property
     def esta_expirado(self):
-        """Token válido por 7 días desde su creación."""
+        """Token válido por 12 días desde su creación."""
         from datetime import timedelta
-        return timezone.now() > self.fecha_creacion + timedelta(days=7)
+        return timezone.now() > self.fecha_creacion + timedelta(days=12)
 
     @property
     def es_valido(self):
@@ -2683,7 +2688,7 @@ class FeedbackCliente(models.Model):
     def dias_restantes(self):
         """Días que quedan antes de que expire el token."""
         from datetime import timedelta
-        expiracion = self.fecha_creacion + timedelta(days=7)
+        expiracion = self.fecha_creacion + timedelta(days=12)
         delta = expiracion - timezone.now()
         return max(0, delta.days)
 

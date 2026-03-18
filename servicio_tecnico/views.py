@@ -2954,7 +2954,7 @@ def confirmar_envio_feedback(request, feedback_id):
             messages.success(
                 request,
                 f'📧 Correo de feedback enviado a {feedback.cotizacion.orden.detalle_equipo.email_cliente}. '
-                f'El cliente tiene 7 días para responder.'
+                f'El cliente tiene 12 días para responder.'
             )
     else:
         messages.info(request, 'ℹ️ Envío de correo de feedback cancelado.')
@@ -13161,7 +13161,7 @@ def confirmar_feedback_satisfaccion(request, feedback_id):
                 request,
                 f'⭐ Encuesta de satisfacción enviada a '
                 f'{feedback.orden.detalle_equipo.email_cliente}. '
-                f'El cliente tiene 7 días para responder.'
+                f'El cliente tiene 12 días para responder.'
             )
     else:
         messages.info(request, 'ℹ️ Envío de encuesta de satisfacción cancelado.')

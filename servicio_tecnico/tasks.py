@@ -1871,7 +1871,7 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None):
             'tipo_equipo':   tipo_equipo,
             'fecha_entrega': fecha_entrega_str,
             'feedback_url':  feedback_url,
-            'dias_vigencia': 7,
+            'dias_vigencia': 12,
             'fecha_envio':   ahora_local.strftime('%d/%m/%Y'),
         }
 
@@ -1942,7 +1942,7 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None):
             tipo_evento='email',
             comentario=(
                 f"⭐ Encuesta de satisfacción enviada al cliente ({email_cliente})\n"
-                f"🔗 Link válido por 7 días — Token ID: {feedback_id}"
+                f"🔗 Link válido por 12 días — Token ID: {feedback_id}"
             ),
             usuario=feedback.enviado_por,
             es_sistema=True
@@ -1990,6 +1990,207 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None):
         except Exception:
             pass
         raise self.retry(exc=exc, countdown=60)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# TAREA: Recordatorio de encuesta de satisfacción (día 10)
+# ═══════════════════════════════════════════════════════════════════════
+# Se dispara automáticamente para encuestas que llevan 10 días sin
+# respuesta. Reutiliza el mismo template de email del envío inicial
+# pero con asunto diferente para indicar que es un recordatorio.
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_recordatorio_encuesta')
+def enviar_recordatorio_encuesta_task(self, feedback_id):
+    """
+    Envía un correo de recordatorio al cliente para que conteste
+    la encuesta de satisfacción antes de que expire (día 10 de 12).
+    """
+    import re
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+
+    from .models import FeedbackCliente, HistorialOrden
+
+    try:
+        try:
+            feedback = FeedbackCliente.objects.select_related(
+                'orden__detalle_equipo',
+                'enviado_por',
+            ).get(pk=feedback_id)
+        except FeedbackCliente.DoesNotExist:
+            return {'success': False, 'mensaje': f'FeedbackCliente ID {feedback_id} no encontrado.'}
+
+        # Doble verificación: no enviar si ya respondió o el recordatorio ya fue enviado
+        if feedback.utilizado:
+            return {'success': False, 'mensaje': 'El cliente ya respondió la encuesta.'}
+        if feedback.recordatorio_enviado:
+            return {'success': False, 'mensaje': 'Recordatorio ya enviado previamente.'}
+
+        orden   = feedback.orden
+        detalle = orden.detalle_equipo
+        email_cliente = detalle.email_cliente if detalle else None
+
+        if not email_cliente:
+            return {'success': False, 'mensaje': 'Sin email de cliente.'}
+
+        # ── Construir URL y datos del equipo ──
+        site_url     = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        feedback_url = f"{site_url}/feedback-satisfaccion/{feedback.token}/"
+
+        marca_equipo  = detalle.marca       or ''
+        modelo_equipo = detalle.modelo      or ''
+        tipo_equipo   = detalle.tipo_equipo or ''
+        folio = (
+            detalle.orden_cliente if detalle and detalle.orden_cliente
+            else orden.numero_orden_interno
+        )
+
+        fecha_entrega_str = ''
+        if orden.fecha_entrega:
+            fecha_entrega_str = timezone.localtime(orden.fecha_entrega).strftime('%d/%m/%Y')
+
+        ahora_local = timezone.localtime(timezone.now())
+
+        # ── Contexto: reutilizamos el mismo template con dias_vigencia ajustado ──
+        context_email = {
+            'folio':            folio,
+            'marca_equipo':     marca_equipo,
+            'modelo_equipo':    modelo_equipo,
+            'tipo_equipo':      tipo_equipo,
+            'fecha_entrega':    fecha_entrega_str,
+            'feedback_url':     feedback_url,
+            'dias_vigencia':    feedback.dias_restantes,  # Días que quedan realmente
+            'fecha_envio':      ahora_local.strftime('%d/%m/%Y'),
+            'es_recordatorio':  True,  # Flag para personalizar el template si se desea
+        }
+
+        html_content = render_to_string(
+            'servicio_tecnico/emails/feedback_satisfaccion.html',
+            context_email
+        )
+
+        asunto      = f'Recordatorio: ¿Cómo fue tu experiencia? — Folio {folio}'
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo  = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente   = f"Servicio Técnico System <{email_solo}>"
+
+        email_msg = EmailMessage(
+            subject=asunto, body=html_content,
+            from_email=remitente, to=[email_cliente],
+        )
+        email_msg.content_subtype = 'html'
+
+        # ── Logo SIC (CID inline) ──
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f"[RECORDATORIO-ENCUESTA] Error al adjuntar logo: {e}")
+
+        # ── Iconos de redes sociales ──
+        iconos_sociales = {
+            'icon_link':      'images/utilitys/link.png',
+            'icon_instagram': 'images/utilitys/instagram.png',
+            'icon_facebook':  'images/utilitys/facebook.png',
+            'icon_whatsapp':  'images/utilitys/whatsapp.png',
+        }
+        for cid_name, icon_static_path in iconos_sociales.items():
+            icon_path = finders.find(icon_static_path)
+            if icon_path:
+                try:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+                except Exception as e:
+                    logger.warning(f"[RECORDATORIO-ENCUESTA] Error al adjuntar icono {cid_name}: {e}")
+
+        email_msg.send(fail_silently=False)
+
+        # ── Marcar recordatorio como enviado ──
+        FeedbackCliente.objects.filter(pk=feedback_id).update(recordatorio_enviado=True)
+
+        # ── Registrar en historial ──
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='email',
+            comentario=(
+                f"🔔 Recordatorio de encuesta de satisfacción enviado al cliente ({email_cliente})\n"
+                f"⏳ Quedan {feedback.dias_restantes} día(s) — Token ID: {feedback_id}"
+            ),
+            usuario=feedback.enviado_por,
+            es_sistema=True,
+        )
+
+        logger.info(f"[RECORDATORIO-ENCUESTA] Enviado a {email_cliente} para Orden {folio}")
+        return {'success': True, 'feedback_id': feedback_id, 'destinatario': email_cliente}
+
+    except Exception as exc:
+        logger.error(f"[RECORDATORIO-ENCUESTA] Error para FeedbackCliente ID {feedback_id}: {exc}\n{traceback.format_exc()}")
+        raise self.retry(exc=exc, countdown=60)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# TAREA PERIÓDICA: Verificar encuestas de satisfacción pendientes de recordatorio
+# ═══════════════════════════════════════════════════════════════════════
+# Celery Beat la ejecuta diariamente a las 8:00 AM.
+# Busca encuestas que:
+#   - son de tipo 'satisfaccion'
+#   - el correo inicial fue enviado (correo_enviado=True)
+#   - no han sido respondidas (utilizado=False)
+#   - llevan ≥10 días sin respuesta
+#   - aún no han expirado (≤12 días)
+#   - no se les ha enviado recordatorio (recordatorio_enviado=False)
+
+@shared_task(name='servicio_tecnico.verificar_encuestas_pendientes')
+def verificar_encuestas_pendientes_task():
+    """
+    Tarea periódica diaria (Celery Beat) que detecta encuestas de satisfacción
+    que llevan 10+ días sin respuesta y dispara el recordatorio por correo.
+    """
+    from datetime import timedelta
+    from django.utils import timezone
+    from .models import FeedbackCliente
+
+    ahora = timezone.now()
+
+    # Ventana: entre día 10 y día 12 desde la creación del feedback
+    limite_inferior = ahora - timedelta(days=12)  # No expiradas aún
+    limite_superior = ahora - timedelta(days=10)  # Al menos 10 días de antigüedad
+
+    pendientes = FeedbackCliente.objects.filter(
+        tipo='satisfaccion',
+        correo_enviado=True,
+        utilizado=False,
+        recordatorio_enviado=False,
+        fecha_creacion__lte=limite_superior,   # Tiene ≥10 días
+        fecha_creacion__gte=limite_inferior,   # Aún no expiró
+    )
+
+    total = pendientes.count()
+    logger.info(f"[VERIFICAR-ENCUESTAS] Encontradas {total} encuesta(s) para recordatorio.")
+
+    for feedback in pendientes:
+        try:
+            enviar_recordatorio_encuesta_task.delay(feedback_id=feedback.pk)
+            logger.info(
+                f"[VERIFICAR-ENCUESTAS] Recordatorio encolado para FeedbackCliente ID {feedback.pk} "
+                f"(Orden {feedback.orden.numero_orden_interno})"
+            )
+        except Exception as e:
+            logger.error(f"[VERIFICAR-ENCUESTAS] Error al encolar feedback ID {feedback.pk}: {e}")
+
+    return {'procesadas': total}
 
 
 # ═══════════════════════════════════════════════════════════════════════

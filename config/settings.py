@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from decouple import config
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -499,6 +500,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'notificaciones.limpiar_antiguas',
         'schedule': 60 * 60 * 24,  # Cada 24 horas (en segundos)
         'args': (7,),              # Borrar las de más de 7 días
+    },
+    # ── Recordatorio de encuesta de satisfacción (día 10 de 12) ────────────
+    # Ejecuta diariamente a las 8:00 AM. Busca encuestas de satisfacción que
+    # llevan 10+ días sin respuesta y envía un correo de recordatorio.
+    # El campo FeedbackCliente.recordatorio_enviado evita duplicados.
+    'recordatorio-encuestas-satisfaccion': {
+        'task': 'servicio_tecnico.verificar_encuestas_pendientes',
+        'schedule': crontab(hour=8, minute=0),  # Diario a las 8:00 AM
     },
 }
 
