@@ -2122,6 +2122,14 @@ def detalle_orden(request, orden_id):
         # FORMULARIO 7: Editar Información Principal del Equipo
         # ------------------------------------------------------------------------
         elif form_type == 'editar_info_equipo':
+            # Capturar el email actual ANTES de guardar el formulario,
+            # para poder detectar si cambió después de guardar.
+            email_anterior = (
+                orden.detalle_equipo.email_cliente
+                if orden.detalle_equipo and orden.detalle_equipo.email_cliente
+                else None
+            )
+
             form_editar_info = EditarInformacionEquipoForm(
                 request.POST,
                 instance=orden.detalle_equipo
@@ -2139,6 +2147,64 @@ def detalle_orden(request, orden_id):
                     usuario=empleado_actual,
                     es_sistema=False
                 )
+
+                # ── Reenviar enlace de seguimiento si el email cambió ──────────
+                # Solo aplica a órdenes fuera de garantía que ya tienen enlace.
+                # Lógica:
+                #   1. Si el correo nunca se envió y hay email nuevo → enviar.
+                #   2. Si el correo ya se envió, extraemos a qué dirección
+                #      se envió del historial. Si el email nuevo es diferente
+                #      → resetear correo_enviado y reenviar al nuevo destino.
+                try:
+                    if orden.es_fuera_garantia:
+                        email_nuevo = detalle_actualizado.email_cliente or ''
+                        if email_nuevo:
+                            from .models import EnlaceSeguimientoCliente
+                            enlace_qs = EnlaceSeguimientoCliente.objects.filter(orden=orden)
+                            enlace_obj = enlace_qs.first()
+
+                            debe_enviar = False
+
+                            if enlace_obj is None or not enlace_obj.correo_enviado:
+                                # Caso 1: nunca se envió (o no existe enlace aún)
+                                debe_enviar = True
+                            else:
+                                # Caso 2: ya se envió — buscar el email destino en historial
+                                import re as _re
+                                historial_envio = HistorialOrden.objects.filter(
+                                    orden=orden,
+                                    tipo_evento='email',
+                                    comentario__icontains='Enlace de seguimiento público enviado',
+                                ).order_by('fecha_evento').first()
+
+                                email_enviado_previo = None
+                                if historial_envio:
+                                    _match = _re.search(
+                                        r'enviado al cliente \((.+?)\)',
+                                        historial_envio.comentario,
+                                    )
+                                    if _match:
+                                        email_enviado_previo = _match.group(1).strip().lower()
+
+                                if email_enviado_previo and email_nuevo.lower() != email_enviado_previo:
+                                    # El email cambió respecto al que ya recibió el link
+                                    EnlaceSeguimientoCliente.objects.filter(orden=orden).update(
+                                        correo_enviado=False
+                                    )
+                                    debe_enviar = True
+
+                            if debe_enviar:
+                                from .tasks import enviar_seguimiento_cliente_task
+                                enviar_seguimiento_cliente_task.delay(
+                                    orden_id=orden.id,
+                                    usuario_id=request.user.id,
+                                )
+                                messages.info(
+                                    request,
+                                    f'📧 Enlace de seguimiento enviado a {email_nuevo}.'
+                                )
+                except Exception:
+                    pass  # No bloquear la actualización si falla el reenvío
                 
                 return redirect('servicio_tecnico:detalle_orden', orden_id=orden.pk)
             else:
