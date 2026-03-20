@@ -3,7 +3,7 @@
 <!-- Badges -->
 <p align="center">
   <img src="https://img.shields.io/badge/Django-5.2.5-092E20?style=for-the-badge&logo=django&logoColor=white" alt="Django 5.2.5">
-  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/Python-3.12.3-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12.3">
   <img src="https://img.shields.io/badge/TypeScript-5.9.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript 5.9.3">
   <img src="https://img.shields.io/badge/Bootstrap-5.3.2-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white" alt="Bootstrap 5.3.2">
 </p>
@@ -13,20 +13,22 @@
   <img src="https://img.shields.io/badge/Pandas-2.3+-150458?style=for-the-badge&logo=pandas&logoColor=white" alt="Pandas">
   <img src="https://img.shields.io/badge/scikit--learn-1.5+-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white" alt="Scikit-learn">
   <img src="https://img.shields.io/badge/Chart.js-4.4.0-FF6384?style=for-the-badge&logo=chartdotjs&logoColor=white" alt="Chart.js">
+  <img src="https://img.shields.io/badge/Celery-5.3+-37814A?style=for-the-badge&logo=celery&logoColor=white" alt="Celery">
+  <img src="https://img.shields.io/badge/Redis-5.4+-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Production-success?style=for-the-badge" alt="Status">
-  <img src="https://img.shields.io/badge/Version-3.5-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-4.0-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Modules-5-orange?style=for-the-badge" alt="Modules">
+  <img src="https://img.shields.io/badge/Modules-6-orange?style=for-the-badge" alt="Modules">
 </p>
 
 ---
 
-**Sistema empresarial de última generación** para centros de servicio técnico de equipos de cómputo con **Machine Learning**, **Analytics avanzado** y **TypeScript frontend**.
+**Sistema empresarial de última generación** para centros de servicio técnico de equipos de cómputo con **Machine Learning**, **Analytics avanzado**, **TypeScript frontend** y **arquitectura multi-país**.
 
-Combina gestión de órdenes de servicio, control de calidad, **predicciones con IA**, **dashboards interactivos tipo Power BI**, seguimiento de incidencias y sistema RHITSO para casos complejos.
+Combina gestión de órdenes de servicio, control de calidad, **predicciones con IA**, **dashboards interactivos tipo Power BI**, seguimiento de incidencias, sistema RHITSO para casos complejos, **procesamiento en segundo plano con Celery + Redis**, **encuestas de satisfacción** y **seguimiento público para clientes fuera de garantía**.
 
 ---
 
@@ -105,9 +107,17 @@ Sistema completo de órdenes de servicio técnico con flujo dual:
 - ✅ Seguimiento de piezas solicitadas (WPB, DOA, PNC)
 - ✅ Referencias de gama de equipos para cotización rápida
 - ✅ Historial completo de eventos por orden
-- ✅ Sistema de imágenes con tipos (ingreso, diagnóstico, reparación, entrega)
+- ✅ Sistema de imágenes con tipos (ingreso, diagnóstico, reparación, entrega, packing)
+- ✅ **Cámara Integrada**: Captura de fotos directamente desde dispositivos móviles con selector de lentes, orientación híbrida y UI minimalista
+- ✅ **Envío de Diagnóstico por PDF**: Generación automática de PDF con componentes dinámicos y mano de obra editable, enviado al cliente por correo
+- ✅ **Seguimiento Público OOW/FL**: Portal de seguimiento para clientes de órdenes fuera de garantía con galería de imágenes y timeline
+- ✅ **Dashboard OOW/FL**: Panel de métricas para seguimiento de clientes fuera de garantía con filtros avanzados
+- ✅ **Encuestas de Satisfacción**: Sistema NPS con envío automático por correo y dashboard de resultados
+- ✅ **Concentrado Semanal CIS**: Reporte semanal con exportación a Excel mensual
+- ✅ **Correo de Cotización Rechazada**: Notificación con feedback del cliente mediante token seguro
 - ✅ Venta mostrador con paquetes predefinidos y servicios adicionales
 - ✅ Integración con sistema de calidad para reingresos
+- ✅ **Buscador Inteligente de Reingresos**: Búsqueda de orden original con chip visual
 
 **Estados del flujo:**
 
@@ -251,9 +261,42 @@ SEGUIMIENTO DE ENVÍO → RECEPCIÓN EN ALMACÉN → INGRESO A STOCK
 - Login personalizado con usuarios de Django
 - Relación Usuario ↔ Empleado para gestión completa
 - Forzado de cambio de contraseña en primer inicio
-- Permisos granulares por módulo
-- **Protección Brute-Force**: Bloqueo automático ante múltiples intentos fallidos
+- **Permisos granulares por Django Groups**: Decoradores `@permission_required` en todas las vistas
+- **Protección Brute-Force**: Bloqueo automático ante múltiples intentos fallidos (django-axes)
+- **Rate Limiting**: Protección de vistas públicas con `django-ratelimit`
 - **Validación de Credenciales**: Sistema robusto de validación de fortaleza de contraseñas
+
+---
+
+## 🌍 Sistema Multi-País
+
+### Arquitectura Multi-Tenant por Subdominio
+
+El sistema soporta operaciones en múltiples países con bases de datos independientes:
+
+- **México** (`mexico.sigmasystem.work`) - Operación principal
+- **Argentina** (`argentina.sigmasystem.work`) - Operación secundaria
+
+**Características:**
+
+- ✅ **Middleware de País**: Detección automática por subdominio con `PaisMiddleware`
+- ✅ **Database Router**: Enrutamiento automático de consultas a la BD correcta por país
+- ✅ **Configuración Centralizada**: `config/paises_config.py` con timezone, moneda, empresa por país
+- ✅ **Banderas SVG Animadas**: Indicador visual del país activo en navbar
+- ✅ **Context Processors**: Variables de país disponibles en todos los templates
+- ✅ **Media Segregado**: Archivos de cada país en subcarpetas independientes
+
+---
+
+## ⚡ Celery + Redis - Procesamiento en Segundo Plano
+
+### Tareas Asíncronas y Cache
+
+- ✅ **Celery Workers**: Procesamiento de correos electrónicos en segundo plano (RHITSO, diagnóstico, imágenes, encuestas)
+- ✅ **Celery Beat**: Tareas programadas (notificación automática de encuestas pendientes)
+- ✅ **Redis Cache**: Cache de dashboards pesados (RHITSO, OOW/FL, cotizaciones, piezas) para respuesta inmediata
+- ✅ **Panel de Notificaciones (🔔)**: Campanita con polling adaptativo, soporte móvil y eliminación individual
+- ✅ **App `notificaciones`**: Módulo dedicado con modelo `Notificacion` y vistas REST
 
 ---
 
@@ -262,9 +305,11 @@ SEGUIMIENTO DE ENVÍO → RECEPCIÓN EN ALMACÉN → INGRESO A STOCK
 ### Gestión de Datos y Conectividad
 
 - **Almacenamiento Dual**: Sistema configurado para gestión dinámica entre discos (Soporte hasta 1TB)
-- **Cloudflare Tunnel**: Configuración segura para acceso remoto en producción sin apertura de puertos
+- **Cloudflare Tunnel**: Configuración segura para acceso remoto en producción sin apertura de puertos (con validación SSL estricta)
 - **Backup Automatizado**: Scripts mensuales/diarios para PostgreSQL y SQLite
 - **Soporte SVG**: Visualización optimizada de gráficos vectoriales en todo el sistema
+- **ManifestStaticFilesStorage**: Cache busting automático de archivos estáticos
+- **PWA (Progressive Web App)**: Instalable en Android e iOS como app nativa con soporte para notch/Dynamic Island
 
 ---
 
@@ -359,16 +404,38 @@ El sistema utiliza **TypeScript 5.9.3** para desarrollo frontend profesional y m
 - Source maps para debugging
 - Types de Bootstrap incluidos (@types/bootstrap)
 
-**Módulos TypeScript** (8 archivos, 160KB total):
+**Módulos TypeScript** (30 archivos, ~19,600 líneas):
 
-1. **`base.ts`** (23KB) - Funcionalidad base compartida, utilities y helpers
-2. **`dashboard_cotizaciones.ts`** (22KB) - Dashboard interactivo con filtros dinámicos
-3. **`dashboard_rhitso.ts`** (35KB) - Timeline RHITSO, estadísticas en tiempo real
-4. **`dashboard_seguimiento_piezas.ts`** (20KB) - Tracking WPB, DOA, PNC
-5. **`lightbox_galeria.ts`** (15KB) - Sistema de galería completo con navegación
-6. **`login_particles.ts`** (6KB) - Efectos de partículas, canvas interactivo
-7. **`plantillas_rechazo.ts`** (11KB) - Gestión de plantillas con autocompletado
-8. **`scorecard_form.ts`** (24KB) - Formularios con detección de reincidencias
+1. **`base.ts`** (689 líneas) - Funcionalidad base compartida, utilities y helpers
+2. **`camara_integrada.ts`** (1,579 líneas) - Sistema de cámara nativa con selector de lentes y orientación híbrida
+3. **`upload_imagenes_dual.ts`** (2,248 líneas) - Subida de imágenes con reintentos automáticos anti-Cloudflare
+4. **`diagnostico_modal.ts`** (2,458 líneas) - Modal de envío de diagnóstico con PDF y componentes dinámicos
+5. **`lightbox_galeria.ts`** (1,100 líneas) - Sistema de galería con modo inspección y navegación
+6. **`solicitud_baja_form.ts`** (1,086 líneas) - Formularios de solicitud de baja con workflow
+7. **`dashboard_rhitso.ts`** (769 líneas) - Timeline RHITSO, estadísticas en tiempo real
+8. **`dashboard_encuestas.ts`** (774 líneas) - Dashboard de encuestas de satisfacción NPS
+9. **`dashboard_cotizaciones.ts`** (603 líneas) - Dashboard interactivo con filtros dinámicos
+10. **`dashboard_seguimiento_piezas.ts`** (583 líneas) - Tracking WPB, DOA, PNC
+11. **`scorecard_form.ts`** (610 líneas) - Formularios con detección de reincidencias
+12. **`busqueda_reingreso.ts`** (642 líneas) - Buscador inteligente de órdenes originales con chip
+13. **`busqueda_ordenes.ts`** (555 líneas) - Búsqueda con autocompletado y paginación
+14. **`concentrado_semanal.ts`** (584 líneas) - Concentrado CIS con reporte mensual
+15. **`notificaciones.ts`** (570 líneas) - Panel de notificaciones con polling adaptativo
+16. **`dashboard_feedback_rechazo.ts`** (531 líneas) - Análisis de rechazos por costo y piezas
+17. **`dashboard_seguimiento_enlaces.ts`** (464 líneas) - Dashboard de seguimiento público OOW
+18. **`modelo_autocomplete.ts`** (364 líneas) - Autocompletado de modelos de equipos
+19. **`modelo_autocomplete_modal.ts`** (460 líneas) - Modal de autocompletado avanzado
+20. **`form_compra.ts`** (457 líneas) - Formularios de compra de almacén
+21. **`password-validator.ts`** (448 líneas) - Validación de fortaleza de contraseñas
+22. **`galeria_seguimiento.ts`** (394 líneas) - Galería de seguimiento público
+23. **`dashboard-distribucion-sucursales.ts`** (370 líneas) - Distribución multi-sucursal
+24. **`feedback_satisfaccion.ts`** (332 líneas) - Formulario de encuesta con partículas
+25. **`plantillas_rechazo.ts`** (247 líneas) - Gestión de plantillas con autocompletado
+26. **`historial_orden.ts`** (234 líneas) - Timeline de historial de orden
+27. **`login_particles.ts`** (181 líneas) - Efectos de partículas, canvas interactivo
+28. **`feedback_particles.ts`** (139 líneas) - Partículas animadas en encuestas
+29. **`unidades_agrupadas.ts`** (135 líneas) - Agrupación de unidades de inventario
+30. **`globals.d.ts`** - Declaraciones de tipos globales
 
 **Ventajas del TypeScript:**
 
@@ -389,13 +456,19 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 
 ### 📧 Sistema de Notificaciones por Email
 
-**Configurado con Gmail SMTP**
+**Configurado con Gmail SMTP + Celery (segundo plano)**
 
 - Notificaciones automáticas de incidencias
 - Envío manual con múltiples destinatarios
-- Plantillas profesionales con branding
+- **Procesamiento asíncrono con Celery**: Correos no bloquean vistas del usuario
+- Plantillas profesionales con branding estandarizado
+- **WhatsApp dinámico**: Contacto en footer de emails
 - Historial completo de notificaciones enviadas
 - Seguimiento de éxito/fallo de envíos
+- **Correo de diagnóstico**: PDF adjunto con componentes y mano de obra
+- **Correo de cotización rechazada**: Con token seguro para feedback
+- **Correo de encuesta de satisfacción**: Enlace con token único
+- **Correo de imágenes de egreso**: Notificación al finalizar
 
 ### 📊 Sistema de Reportes y Análisis
 
@@ -406,17 +479,24 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - Gráficas dinámicas: Pareto, Sunburst, Sankey, Heatmaps, Rankings
 - Análisis de reincidencias y tiempos de resolución
 - **Machine Learning**: Predicciones y recomendaciones inteligentes
+- **Dashboard de Rechazos**: Análisis por costo y número de piezas
+- **Concentrado Semanal CIS**: Reporte con exportación Excel mensual
+- **Dashboard de Encuestas NPS**: Análisis de satisfacción del cliente
+- **Distribución Multi-Sucursal**: Vista con exportación Excel
 
 ### 📱 Interfaz de Usuario Moderna
 
-- **TypeScript 5.9.3**: Frontend type-safe con 8 módulos (160KB)
+- **TypeScript 5.9.3**: Frontend type-safe con 30 módulos (~19,600 líneas)
 - **Glassmorphism UI**: Efectos 3D y transparencias modernas
-- **Particle Effects**: Canvas interactivo en login/logout
+- **Particle Effects**: Canvas interactivo en login/logout y encuestas
 - Diseño responsivo con Bootstrap 5.3.2
-- Drag & Drop avanzado para carga de imágenes
+- **Cámara Integrada**: Captura nativa desde móviles con selector de lentes y orientación 270°
+- Drag & Drop avanzado para carga de imágenes con reintentos automáticos
 - Autocompletado inteligente en formularios
 - Pestañas dinámicas para organización de datos
-- **Lightbox Gallery**: Sistema completo con navegación (TypeScript)
+- **Lightbox Gallery**: Sistema completo con modo inspección y navegación (TypeScript)
+- **PWA Nativa**: Instalable en Android e iOS con soporte para notch/Dynamic Island
+- **Banderas SVG Animadas**: Indicador visual de país en navbar
 - Sistema de badges con colores semánticos
 
 ### 🔄 APIs REST Internas
@@ -437,14 +517,19 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **ORM avanzado** con relaciones complejas (OneToOne, ForeignKey, ManyToMany)
 - **Signals de Django** para automatizaciones (cambios de estado, notificaciones)
 - **Validaciones personalizadas** a nivel de modelo y formulario
-- **Sistema de archivos** con gestión de media uploads
+- **Sistema de archivos** con gestión de media uploads por país
 - **Custom Template Tags y Filters** para lógica de presentación
 - **APIs REST** con JsonResponse para frontend dinámico
 - **Machine Learning Models** integrados en el flujo de trabajo
+- **Celery + Redis** para procesamiento asíncrono de correos y tareas programadas
+- **Redis Cache** para dashboards pesados con invalidación automática
+- **Multi-País** con middleware, DB router y configuración centralizada
+- **Rate Limiting** con `django-ratelimit` en vistas públicas
+- **ManifestStaticFilesStorage** para cache busting automático
 
 ### Frontend Moderno
 
-- **TypeScript 5.9.3** - Type-safe development (8 módulos, 160KB)
+- **TypeScript 5.9.3** - Type-safe development (30 módulos, ~19,600 líneas)
 - **Plotly.js** - Dashboards interactivos tipo Power BI
 - **Bootstrap 5.3.2** - Framework CSS responsivo
 - **Bootstrap Icons** - Iconografía consistente
@@ -453,6 +538,7 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **CSS modular** organizado por responsabilidad
 - **Glassmorphism & 3D Effects** - UI de última generación
 - **Drag & Drop API** nativa para carga de archivos
+- **Cámara Integrada** - Captura nativa desde móviles (TypeScript)
 
 ### Data Science & Analytics
 
@@ -465,18 +551,24 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 
 ### Base de Datos
 
-- **SQLite3** (desarrollo)
+- **SQLite3** (desarrollo) / **PostgreSQL** (producción)
+- **Multi-Database**: Base de datos independiente por país con `DatabaseRouter`
 - **Migraciones versionadas** con Django Migrations
 - **Índices optimizados** para consultas frecuentes
+- **Connection Pooling**: `CONN_MAX_AGE=600` en PostgreSQL
 - **Backup automatizado** de base de datos
 
 ### Seguridad
 
 - **CSRF Protection** habilitada
 - **Sanitización de inputs** con validadores Django
-- **Permisos granulares** por modelo
+- **Permisos granulares** por modelo con Django Groups
 - **Passwords hasheados** con PBKDF2
 - **Variables de entorno** (.env) para configuración sensible
+- **django-axes**: Bloqueo ante múltiples intentos fallidos
+- **django-ratelimit**: Protección de vistas públicas contra abuso
+- **Tokens seguros**: Para enlaces de feedback y encuestas
+- **Cloudflare SSL**: Validación estricta en producción
 
 ---
 
@@ -486,16 +578,22 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 
 - **OrdenServicio**: Orden principal (21 estados posibles)
 - **DetalleEquipo**: Información técnica del equipo
+- **ReferenciaGamaEquipo**: Catálogo de modelos para autocompletado
 - **Cotizacion**: Cotizaciones de reparación
 - **PiezaCotizada**: Piezas en cotizaciones
 - **SeguimientoPieza**: Tracking de piezas solicitadas
 - **VentaMostrador**: Ventas directas
 - **PiezaVentaMostrador**: Items de venta mostrador
-- **ImagenOrden**: Evidencias fotográficas (4 tipos)
+- **ImagenOrden**: Evidencias fotográficas (5 tipos: ingreso, diagnóstico, reparación, entrega, packing)
 - **HistorialOrden**: Eventos de auditoría
 - **EstadoRHITSO**: Estados de proceso RHITSO
+- **CategoriaDiagnostico**: Categorías de diagnóstico
+- **TipoIncidenciaRHITSO**: Tipos de incidencias RHITSO
 - **SeguimientoRHITSO**: Fechas clave del proceso
 - **IncidenciaRHITSO**: Problemas durante reparación externa
+- **ConfiguracionRHITSO**: Configuración del subsistema RHITSO
+- **FeedbackCliente**: Encuestas de satisfacción NPS con comentarios
+- **EnlaceSeguimientoCliente**: Enlaces de seguimiento público para órdenes OOW/FL
 
 ### Score Card
 
@@ -521,6 +619,10 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **Producto**: Productos en inventario base
 - **Sucursal**: Sucursales de la empresa
 - **Empleado**: Personal (técnicos, inspectores, etc.)
+
+### Notificaciones
+
+- **Notificacion**: Notificaciones internas del sistema con polling adaptativo
 
 ---
 
@@ -563,6 +665,12 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - `/servicio/<id>/cotizacion/` - Crear cotización
 - `/servicio/<id>/venta-mostrador/` - Crear venta
 - `/servicio/rhitso/` - Gestión RHITSO
+- `/servicio/concentrado-semanal/` - Concentrado Semanal CIS
+- `/servicio/dashboard-oow/` - Dashboard de seguimiento OOW/FL
+- `/servicio/seguimiento/<token>/` - Seguimiento público para clientes (OOW)
+- `/servicio/encuesta/<token>/` - Encuesta de satisfacción (público)
+- `/servicio/dashboard-encuestas/` - Dashboard de encuestas NPS
+- `/servicio/dashboard-feedback-rechazo/` - Análisis de rechazos
 
 ### Score Card
 
@@ -586,6 +694,7 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - `/admin/` - Panel de administración Django
 - `/login/` - Autenticación de usuarios
 - `/` - Página principal (redirect según rol)
+- `/notificaciones/` - API de notificaciones internas (polling)
 
 ---
 
@@ -593,8 +702,10 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 
 ### Requisitos Previos
 
-- Python 3.10+
+- Python 3.12+
 - pip (gestor de paquetes Python)
+- Node.js 18+ (para compilación TypeScript)
+- Redis (para Celery y cache en producción)
 - Git
 - Cuenta Gmail (para notificaciones por email)
 
@@ -635,6 +746,11 @@ Crear archivo `.env` en la raíz del proyecto:
 # Django
 SECRET_KEY=tu-secret-key-aqui
 DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# Base de datos (SQLite para desarrollo)
+DB_ENGINE=django.db.backends.sqlite3
+DB_NAME=db.sqlite3
 
 # Email (Gmail)
 EMAIL_HOST_USER=tu-email@gmail.com
@@ -643,6 +759,15 @@ EMAIL_HOST_PASSWORD=tu-app-password-gmail
 # Notificaciones
 CORREO_REMITENTE_NOMBRE=Sistema de Calidad
 CORREO_REMITENTE_EMAIL=sistema@tuempresa.com
+
+# Celery + Redis (producción)
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+
+# Almacenamiento
+PRIMARY_MEDIA_ROOT=/path/to/primary
+ALTERNATE_MEDIA_ROOT=/path/to/alternate
+MIN_FREE_SPACE_GB=10
 ```
 
 **Obtener App Password de Gmail:**
@@ -680,13 +805,20 @@ python scripts/poblado/poblar_estados_rhitso.py
 python scripts/poblado/poblar_scorecard.py
 ```
 
-8. **Ejecutar el servidor**
+8. **Compilar TypeScript**
+
+```bash
+npm install
+npm run build
+```
+
+9. **Ejecutar el servidor**
 
 ```bash
 python manage.py runserver
 ```
 
-9. **Acceder al sistema**
+10. **Acceder al sistema**
 
 - Sistema: http://127.0.0.1:8000/
 - Admin: http://127.0.0.1:8000/admin/
@@ -818,23 +950,23 @@ Ver índice completo en [`docs/README.md`](./docs/README.md)
 
 ### Corto Plazo
 
-- [ ] Módulo de reportes PDF personalizados
+- [x] ~~Módulo de reportes PDF personalizados~~ ✅ (Diagnóstico PDF implementado)
 - [ ] Firma digital del cliente en entregas
 - [ ] App móvil para técnicos (seguimiento en campo)
-- [ ] Integración con WhatsApp Business API
+- [x] ~~Integración con WhatsApp Business API~~ ✅ (WhatsApp dinámico en emails)
 - [ ] Dashboard ejecutivo con métricas financieras
 
 ### Mediano Plazo
 
 - [ ] Sistema de garantías automatizado
-- [ ] Portal de clientes (consulta de órdenes)
+- [x] ~~Portal de clientes (consulta de órdenes)~~ ✅ (Seguimiento público OOW/FL)
 - [ ] Integración con sistema de facturación
-- [ ] IA para predicción de fallas recurrentes
-- [ ] Sistema de feedback del cliente
+- [x] ~~IA para predicción de fallas recurrentes~~ ✅ (ML predictor implementado)
+- [x] ~~Sistema de feedback del cliente~~ ✅ (Encuestas NPS + feedback de rechazo)
 
 ### Largo Plazo
 
-- [ ] Multi-tenant para franquicias
+- [x] ~~Multi-tenant para franquicias~~ ✅ (Sistema multi-país México/Argentina)
 - [ ] Marketplace de refacciones
 - [ ] Sistema de capacitación de técnicos
 - [ ] Integración con ERPs empresariales
@@ -844,29 +976,54 @@ Ver índice completo en [`docs/README.md`](./docs/README.md)
 ## Estructura del Proyecto
 
 ```
-mi_proyecto_django/
+inventario-calidad-django/
 ├── config/                 # Configuración del proyecto Django
-│   ├── settings.py
-│   ├── urls.py
+│   ├── settings.py        # Settings principal
+│   ├── urls.py            # URLs raíz
 │   ├── constants.py       # Constantes del sistema
-│   └── wsgi.py
-├── almacen/               # App de gestión de Almacén Central
-├── inventario/            # App de gestión de inventario base
-├── servicio_tecnico/      # App de servicio técnico
+│   ├── celery.py          # Configuración Celery
+│   ├── paises_config.py   # Configuración multi-país
+│   ├── middleware_pais.py # Middleware de detección de país
+│   ├── db_router.py       # Database Router multi-país
+│   ├── context_processors.py # Variables globales de templates
+│   ├── storage_utils.py   # Almacenamiento dinámico
+│   ├── media_views.py     # Servicio seguro de media
+│   └── wsgi.py / asgi.py
+├── servicio_tecnico/      # App principal de servicio técnico
+│   ├── models.py          # 18 modelos
+│   ├── views.py           # Vistas principales
+│   ├── plotly_visualizations.py  # 3,949 líneas - Dashboards Plotly
+│   ├── ml_predictor.py    # Predictor ML
+│   ├── ml_advanced/       # ML avanzado (4 módulos)
+│   ├── excel_exporters.py # Exportación Excel
+│   └── templates/         # Templates del módulo
 ├── scorecard/             # App de control de calidad
-├── templates/             # Templates base
-├── static/                # Archivos estáticos
-├── media/                 # Archivos subidos por usuarios
-├── docs/                  # 📚 Documentación completa del proyecto
-│   ├── README.md          # Índice de documentación
-│   ├── implementaciones/  # Docs por módulo (RHITSO, Scorecard, etc.)
-│   └── guias/             # Guías de setup y referencias
-├── scripts/               # 🔧 Scripts de utilidades
-│   ├── poblado/           # Scripts para datos iniciales
-│   ├── verificacion/      # Scripts de validación
-│   └── testing/           # Scripts de pruebas
+├── inventario/            # App de inventario base
+├── almacen/               # App de gestión de almacén central
+├── notificaciones/        # App de notificaciones internas (Celery)
+├── templates/             # Templates globales (base.html)
+├── static/
+│   ├── ts/                # 30 módulos TypeScript fuente (~19,600 líneas)
+│   ├── js/                # JavaScript compilado (auto-generado)
+│   ├── css/               # CSS organizado (base, components, forms)
+│   └── images/            # Imágenes y SVGs
+├── media/                 # Archivos subidos (organizados por país)
+│   ├── mexico/
+│   ├── argentina/
+│   └── ...
+├── docs/                  # 79 documentos técnicos
+├── scripts/               # 72 scripts de utilidades
+│   ├── poblado/           # Datos iniciales
+│   ├── testing/           # Scripts de pruebas
+│   ├── verificacion/      # Validación de datos
+│   ├── migracion/         # Migraciones de datos
+│   └── ml/                # Entrenamiento ML
+├── ml_models/             # Modelos ML entrenados (.pkl)
+├── logs/                  # Logs de aplicación
 ├── manage.py
-└── requirements.txt
+├── requirements.txt
+├── package.json           # Dependencias Node (TypeScript)
+└── tsconfig.json          # Configuración TypeScript
 ```
 
 > **📖 Documentación Completa**: Ver [`docs/README.md`](./docs/README.md) para acceso a toda la documentación técnica, guías de implementación y scripts de utilidades.
@@ -878,8 +1035,12 @@ mi_proyecto_django/
 ### Backend
 
 - **Django 5.2.5** - Framework web Python
-- **Python 3.10+** - Lenguaje de programación
+- **Python 3.12.3** - Lenguaje de programación
 - **SQLite3** - Base de datos (desarrollo)
+- **PostgreSQL** - Base de datos (producción) con connection pooling
+- **Celery 5.3+** - Tareas asíncronas en segundo plano
+- **Redis 5.4+** - Broker de mensajes y cache
+- **django-celery-beat** - Tareas programadas
 - **Pillow** - Procesamiento de imágenes
 - **openpyxl** - Exportación Excel avanzada
 - **ReportLab** - Generación de PDFs
@@ -887,10 +1048,12 @@ mi_proyecto_django/
 - **Pandas** - Procesamiento y análisis de datos
 - **Scikit-learn** - Machine Learning
 - **Matplotlib & Seaborn** - Análisis estadístico
+- **django-axes** - Protección contra brute-force
+- **django-ratelimit** - Rate limiting de vistas públicas
 
 ### Frontend
 
-- **TypeScript 5.9.3** - Type-safe development
+- **TypeScript 5.9.3** - Type-safe development (30 módulos)
 - **Plotly.js** - Dashboards interactivos tipo Power BI
 - **Bootstrap 5.3.2** - Framework CSS
 - **Bootstrap Icons** - Iconografía
@@ -901,7 +1064,10 @@ mi_proyecto_django/
 ### DevOps & Herramientas
 
 - **Git** - Control de versiones
-- **PowerShell** - Automatización Windows
+- **Celery + Redis** - Cola de tareas y cache
+- **Cloudflare Tunnel** - Acceso remoto seguro sin puertos abiertos
+- **Nginx** - Proxy inverso en producción
+- **Linux (Producción)** / **Windows (Desarrollo)**
 - **VS Code** - Editor recomendado
 - **Django Debug Toolbar** - Debugging (dev)
 
@@ -928,7 +1094,7 @@ mi_proyecto_django/
 
 Este proyecto está licenciado bajo la **GNU General Public License v3.0**.
 
-Copyright © 2025 [Jorge Magos/maggosts555 corp]
+Copyright © 2025-2026 Jorge Magos (maggots555)
 
 Este programa es software libre: puedes redistribuirlo y/o modificarlo bajo los términos de la GNU General Public License publicada por la Free Software Foundation, ya sea la versión 3 de la Licencia, o (a tu elección) cualquier versión posterior.
 
@@ -963,17 +1129,18 @@ Este sistema integra las mejores prácticas de:
 
 ## 📈 Estado del Proyecto
 
-**Versión Actual**: 3.5 (Enero 2026)  
-**Estado**: ✅ Producción (5 módulos integrados + ML/Analytics/Almacén)  
-**Última Actualización**: Enero 20, 2026
+**Versión Actual**: 4.0 (Marzo 2026)  
+**Estado**: ✅ Producción (6 módulos integrados + ML/Analytics/Multi-País/Celery)  
+**Última Actualización**: Marzo 19, 2026
 
 ### Módulos Completados
 
 - ✅ **Inventario** (v1.0) - Sistema base
-- ✅ **Servicio Técnico** (v2.5) - Con RHITSO mejorado y autocompletado inteligente
+- ✅ **Servicio Técnico** (v3.0) - Con RHITSO, cámara integrada, seguimiento OOW/FL, encuestas NPS, diagnóstico PDF
 - ✅ **Score Card** (v2.2) - Con reportes avanzados y notificaciones optimizadas
 - ✅ **RHITSO** (v1.5) - Seguimiento externo con motivos detallados
 - ✅ **Almacén Central** (v1.0) - Compras, Cotizaciones y Stock único
+- ✅ **Notificaciones** (v1.0) - Panel campanita con Celery + polling adaptativo
 
 ### Estadísticas del Sistema
 
@@ -982,13 +1149,15 @@ Este sistema integra las mejores prácticas de:
 - **4 niveles** de severidad de incidencias
 - **7 tabs** de reportes avanzados
 - **50+ visualizaciones** Plotly interactivas tipo Power BI
-- **8 módulos** TypeScript (160KB)
+- **30 módulos** TypeScript (~19,600 líneas)
 - **4 sistemas** ML/IA especializados (con soporte para etiquetas nuevas)
-- **56 documentos** técnicos
-- **25 scripts** de utilidades
-- **69,000+ líneas** de código Python
-- **7,000+ líneas** de TypeScript
-- **3,500+ líneas** de templates Django
+- **79 documentos** técnicos
+- **72 scripts** de utilidades
+- **86,000+ líneas** de código Python
+- **19,600+ líneas** de TypeScript
+- **45,700+ líneas** de templates Django
+- **2 países** en producción (México + Argentina)
+- **18 modelos** en servicio técnico
 
 ---
 
@@ -1003,6 +1172,8 @@ Si eres nuevo en el proyecto, sigue este orden:
    - Servicio Técnico (core del sistema)
    - Score Card (análisis de calidad)
    - RHITSO (seguimiento externo)
+   - Almacén Central (gestión de suministros)
+   - Notificaciones (sistema de alertas)
 4. **Documentar**: Lee la documentación de cada módulo en [`docs/implementaciones/`](./docs/implementaciones/)
 5. **Practicar**: Usa los scripts de poblado para crear datos de prueba
 6. **Verificar**: Ejecuta los scripts de testing para validar tu setup
