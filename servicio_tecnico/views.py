@@ -13574,6 +13574,8 @@ def api_encuestas_lista(request):
     """
     API JSON: lista paginada de encuestas con búsqueda y filtro por estado.
     """
+    from config.paises_config import fecha_local_pais, get_pais_actual
+    pais = get_pais_actual()
     now = timezone.now()
     qs = _filtrar_encuestas_satisfaccion(request)
 
@@ -13632,8 +13634,8 @@ def api_encuestas_lista(request):
             'responsable': str(orden.responsable_seguimiento) if orden.responsable_seguimiento else '',
             'sucursal': str(orden.sucursal) if orden.sucursal else '',
             'tipo_orden': orden.get_tipo_servicio_display(),
-            'fecha_envio': fb.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
-            'fecha_respuesta': fb.fecha_respuesta.strftime('%d/%m/%Y %H:%M') if fb.fecha_respuesta else None,
+            'fecha_envio': fecha_local_pais(fb.fecha_creacion, pais).strftime('%d/%m/%Y %H:%M'),
+            'fecha_respuesta': fecha_local_pais(fb.fecha_respuesta, pais).strftime('%d/%m/%Y %H:%M') if fb.fecha_respuesta else None,
             'dias_restantes': fb.dias_restantes,
             'estado': estado_encuesta,
             'calificacion_general': fb.calificacion_general,
@@ -13659,6 +13661,8 @@ def api_encuestas_comentarios(request):
     """
     API JSON: últimos comentarios de clientes con calificación.
     """
+    from config.paises_config import fecha_local_pais, get_pais_actual
+    pais = get_pais_actual()
     qs = _filtrar_encuestas_satisfaccion(request).filter(
         utilizado=True,
     ).exclude(
@@ -13679,7 +13683,7 @@ def api_encuestas_comentarios(request):
             'nps': fb.nps,
             'recomienda': fb.recomienda,
             'comentario': fb.comentario_cliente,
-            'fecha': fb.fecha_respuesta.strftime('%d/%m/%Y') if fb.fecha_respuesta else '',
+            'fecha': fecha_local_pais(fb.fecha_respuesta, pais).strftime('%d/%m/%Y') if fb.fecha_respuesta else '',
         })
 
     return JsonResponse({'comentarios': comentarios})
@@ -14031,6 +14035,8 @@ def api_feedback_rechazo_tendencia(request):
     API JSON: tendencia temporal semanal de feedbacks de rechazo.
     """
     from django.db.models.functions import TruncWeek
+    from config.paises_config import fecha_local_pais, get_pais_actual
+    pais = get_pais_actual()
 
     qs = _filtrar_feedback_rechazo(request).filter(correo_enviado=True)
 
@@ -14052,7 +14058,7 @@ def api_feedback_rechazo_tendencia(request):
     }
 
     for row in datos_por_semana:
-        labels.append(row['semana'].strftime('%d/%m/%Y'))
+        labels.append(fecha_local_pais(row['semana'], pais).strftime('%d/%m/%Y'))
         datasets['total_enviados'].append(row['total_enviados'])
         datasets['total_respondidos'].append(row['total_respondidos'])
         tasa = round(
@@ -14072,7 +14078,9 @@ def api_feedback_rechazo_lista(request):
     API JSON: lista paginada de feedbacks de rechazo.
     """
     from config.constants import MOTIVO_RECHAZO_COTIZACION
+    from config.paises_config import fecha_local_pais, get_pais_actual
     motivos_dict = dict(MOTIVO_RECHAZO_COTIZACION)
+    pais = get_pais_actual()
 
     now = timezone.now()
     qs = _filtrar_feedback_rechazo(request)
@@ -14133,8 +14141,8 @@ def api_feedback_rechazo_lista(request):
             'responsable': str(orden.responsable_seguimiento) if orden.responsable_seguimiento else '',
             'sucursal': str(orden.sucursal) if orden.sucursal else '',
             'motivo_rechazo': motivos_dict.get(fb.motivo_rechazo_snapshot, fb.motivo_rechazo_snapshot or 'Sin motivo'),
-            'fecha_envio': fb.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
-            'fecha_respuesta': fb.fecha_respuesta.strftime('%d/%m/%Y %H:%M') if fb.fecha_respuesta else None,
+            'fecha_envio': fecha_local_pais(fb.fecha_creacion, pais).strftime('%d/%m/%Y %H:%M'),
+            'fecha_respuesta': fecha_local_pais(fb.fecha_respuesta, pais).strftime('%d/%m/%Y %H:%M') if fb.fecha_respuesta else None,
             'dias_restantes': fb.dias_restantes,
             'estado': estado_fb,
             'comentario_cliente': fb.comentario_cliente,
@@ -14156,7 +14164,9 @@ def api_feedback_rechazo_comentarios(request):
     API JSON: últimos comentarios de clientes en feedbacks de rechazo.
     """
     from config.constants import MOTIVO_RECHAZO_COTIZACION
+    from config.paises_config import fecha_local_pais, get_pais_actual
     motivos_dict = dict(MOTIVO_RECHAZO_COTIZACION)
+    pais = get_pais_actual()
 
     qs = _filtrar_feedback_rechazo(request).filter(
         utilizado=True,
@@ -14173,7 +14183,7 @@ def api_feedback_rechazo_comentarios(request):
             'responsable': str(fb.orden.responsable_seguimiento) if fb.orden.responsable_seguimiento else '',
             'motivo_rechazo': motivos_dict.get(fb.motivo_rechazo_snapshot, fb.motivo_rechazo_snapshot or 'Sin motivo'),
             'comentario': fb.comentario_cliente,
-            'fecha': fb.fecha_respuesta.strftime('%d/%m/%Y') if fb.fecha_respuesta else '',
+            'fecha': fecha_local_pais(fb.fecha_respuesta, pais).strftime('%d/%m/%Y') if fb.fecha_respuesta else '',
         })
 
     return JsonResponse({'comentarios': comentarios})
@@ -14472,6 +14482,9 @@ def api_seguimiento_enlaces_top(request):
     """
     API JSON: top 15 órdenes más consultadas por los clientes.
     """
+    from config.paises_config import fecha_local_pais, get_pais_actual
+    pais = get_pais_actual()
+
     qs = _filtrar_enlaces_seguimiento(request)
 
     top = (
@@ -14490,7 +14503,7 @@ def api_seguimiento_enlaces_top(request):
             'folio': orden_cliente,
             'equipo': equipo,
             'accesos': enlace.accesos_count,
-            'ultimo_acceso': enlace.fecha_ultimo_acceso.strftime('%d/%m/%Y %H:%M') if enlace.fecha_ultimo_acceso else '—',
+            'ultimo_acceso': fecha_local_pais(enlace.fecha_ultimo_acceso, pais).strftime('%d/%m/%Y %H:%M') if enlace.fecha_ultimo_acceso else '—',
         })
 
     return JsonResponse({'top': data})
@@ -14504,6 +14517,8 @@ def api_seguimiento_enlaces_tabla(request):
     API JSON: lista paginada de enlaces de seguimiento con datos de la orden.
     """
     from django.core.paginator import Paginator
+    from config.paises_config import fecha_local_pais, get_pais_actual
+    pais = get_pais_actual()
 
     qs = _filtrar_enlaces_seguimiento(request).order_by('-fecha_creacion')
 
@@ -14541,7 +14556,7 @@ def api_seguimiento_enlaces_tabla(request):
             'accesos': enlace.accesos_count,
             'correo_enviado': enlace.correo_enviado,
             'fecha_creacion': enlace.fecha_creacion.strftime('%d/%m/%Y'),
-            'ultimo_acceso': enlace.fecha_ultimo_acceso.strftime('%d/%m/%Y %H:%M') if enlace.fecha_ultimo_acceso else '—',
+            'ultimo_acceso': fecha_local_pais(enlace.fecha_ultimo_acceso, pais).strftime('%d/%m/%Y %H:%M') if enlace.fecha_ultimo_acceso else '—',
         })
 
     return JsonResponse({
