@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Directorio de Empleados — {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/mi_perfil.css' %}">
+<link rel="stylesheet" href="{% static 'css/directorio_empleados.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="directorio-page">
+    <div class="container">
+
+        {# Breadcrumb #}
+        <nav class="directorio-breadcrumb" aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="{% url 'servicio_tecnico:inicio' %}">Servicio Técnico</a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">Directorio de Empleados</li>
+            </ol>
+        </nav>
+
+        {# Encabezado #}
+        <div class="directorio-header">
+            <h1>Directorio de Empleados</h1>
+            <p class="directorio-subtitle">Vista gerencial · Selecciona un empleado para ver su perfil completo</p>
+        </div>
+
+        {# Filtros #}
+        <form method="get" class="directorio-filtros">
+            <div class="filtro-row">
+                <div class="filtro-group">
+                    <label for="filtro-busqueda">Buscar</label>
+                    <input type="text" id="filtro-busqueda" name="q" value="{{ busqueda }}"
+                           placeholder="Nombre, apellido o cargo…">
+                </div>
+                <div class="filtro-group">
+                    <label for="filtro-rol">Rol</label>
+                    <select id="filtro-rol" name="rol">
+                        <option value="">Todos los roles</option>
+                        {% for value, label in roles_disponibles %}
+                            <option value="{{ value }}" {% if filtro_rol == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filtro-group">
+                    <label for="filtro-sucursal">Sucursal</label>
+                    <select id="filtro-sucursal" name="sucursal">
+                        <option value="">Todas las sucursales</option>
+                        {% for suc in sucursales_disponibles %}
+                            <option value="{{ suc.pk }}" {% if filtro_sucursal == suc.pk|stringformat:"s" %}selected{% endif %}>
+                                {{ suc.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filtro-actions">
+                    <button type="submit" class="btn-filtrar">Filtrar</button>
+                    <a href="{% url 'servicio_tecnico:directorio_empleados' %}" class="btn-limpiar">Limpiar</a>
+                </div>
+            </div>
+        </form>
+
+        {# Contador de resultados #}
+        <div class="directorio-counter">
+            <strong>{{ total_empleados }}</strong> empleado{{ total_empleados|pluralize:"s" }} encontrado{{ total_empleados|pluralize:"s" }}
+        </div>
+
+        {# Cuadrícula de mini-cards #}
+        {% if empleados_data %}
+        <div class="directorio-grid">
+            {% for item in empleados_data %}
+            <a href="{% url 'servicio_tecnico:perfil_empleado' item.empleado.pk %}" class="mini-card">
+                <div class="mini-card-avatar">
+                    {% if item.empleado.foto_perfil %}
+                        <img src="{{ item.empleado.get_foto_perfil_url }}" alt="{{ item.empleado.nombre_completo }}">
+                    {% else %}
+                        <div class="iniciales-circle">{{ item.empleado.get_iniciales }}</div>
+                    {% endif %}
+                </div>
+                <div class="mini-card-nombre">{{ item.empleado.nombre_completo }}</div>
+                <div class="mini-card-cargo">{{ item.empleado.cargo|default:"Sin cargo" }}</div>
+                <div class="mini-card-footer">
+                    <span class="mini-card-rol">{{ item.rol_display }}</span>
+                    <span class="mini-card-rating">{{ item.rating }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="directorio-empty">
+            <i class="bi bi-people"></i>
+            <p>No se encontraron empleados con los filtros seleccionados.</p>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

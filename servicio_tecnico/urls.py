@@ -382,4 +382,8 @@ urlpatterns = [
 
     # ── Mi Perfil ──────────────────────
     path('mi-perfil/', views.mi_perfil, name='mi_perfil'),
+
+    # ── Directorio de Empleados (vista gerencial) ──
+    path('directorio-empleados/', views.directorio_empleados, name='directorio_empleados'),
+    path('directorio-empleados/<int:empleado_id>/', views.perfil_empleado, name='perfil_empleado'),
 ]

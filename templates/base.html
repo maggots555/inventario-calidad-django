@@ -385,6 +385,11 @@
                             <a href="{% url 'crear_empleado' %}" class="dropdown-item">
                                 <i class="bi bi-person-plus text-success"></i> Agregar Empleado
                             </a>
+                            {% if user.empleado.rol == 'gerente_general' or user.empleado.rol == 'gerente_operacional' or user.empleado.rol == 'supervisor' %}
+                            <a href="{% url 'servicio_tecnico:directorio_empleados' %}" class="dropdown-item">
+                                <i class="bi bi-people-fill text-warning"></i> Directorio Empleados
+                            </a>
+                            {% endif %}
                         </div>
                         <div class="dropdown-section">
                             <h6 class="dropdown-header"><i class="bi bi-hdd-stack"></i> Sistema</h6>
@@ -680,6 +685,14 @@
                                 <span class="sidebar-text">Mi Perfil</span>
                             </a>
                         </li>
+                        {% if user.empleado.rol == 'gerente_general' or user.empleado.rol == 'gerente_operacional' or user.empleado.rol == 'supervisor' %}
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'servicio_tecnico:directorio_empleados' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-people-fill"></i>
+                                <span class="sidebar-text">Directorio Empleados</span>
+                            </a>
+                        </li>
+                        {% endif %}
                     </ul>
                 </div>
             </li>

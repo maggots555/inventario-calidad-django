@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Mi Perfil — {{ empleado.nombre_completo }}{% endblock %}
+{% block title %}{% if es_vista_directorio %}Perfil de {{ empleado.nombre_completo }}{% else %}Mi Perfil — {{ empleado.nombre_completo }}{% endif %}{% endblock %}
 
 {% block extra_css %}
 {# Fuente Oswald para los números del perfil #}
@@ -31,7 +31,13 @@
         <nav class="perfil-breadcrumb">
             <a href="{% url 'servicio_tecnico:inicio' %}">Servicio Técnico</a>
             <span class="sep">/</span>
-            <span class="current">Mi Perfil</span>
+            {% if es_vista_directorio %}
+                <a href="{% url 'servicio_tecnico:directorio_empleados' %}">Directorio</a>
+                <span class="sep">/</span>
+                <span class="current">{{ empleado.nombre_completo }}</span>
+            {% else %}
+                <span class="current">Mi Perfil</span>
+            {% endif %}
         </nav>
 
         {# ── ENCABEZADO ── #}

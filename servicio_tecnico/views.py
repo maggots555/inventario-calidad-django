@@ -14570,56 +14570,37 @@ def api_seguimiento_enlaces_tabla(request):
 
 
 # ============================================================================
-# MI PERFIL — MÉTRICAS PERSONALES DEL EMPLEADO (Marzo 2026)
+# FUNCIONES AUXILIARES PARA PERFIL DE EMPLEADO (Marzo 2026)
 # ============================================================================
 
-@login_required
-def mi_perfil(request):
+def _calcular_metricas_empleado(empleado):
     """
-    Página "Mi Perfil" con tarjeta de métricas personales.
-    Muestra métricas personalizadas según el rol del empleado:
-      - Recepcionista: cotizaciones gestionadas, ventas mostrador, encuestas
-      - Técnico: órdenes asignadas, cotizaciones donde participó, RHITSO
+    Calcula métricas de desempeño y rating para un empleado dado.
+    Reutilizable por mi_perfil y perfil_empleado (vista gerencial).
 
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    Esta vista detecta automáticamente el rol del empleado logueado
-    y calcula métricas relevantes para él, reutilizando datos que
-    ya se calculan en otros dashboards del sistema.
+    Retorna: (metricas: dict, rating: int, rol: str, rol_display: str)
     """
     from django.db.models import Avg, Sum, Count, Q
     from decimal import Decimal
     from datetime import timedelta
     from .models import Cotizacion, VentaMostrador, FeedbackCliente
 
-    # =====================================================================
-    # 1. OBTENER EMPLEADO DEL USUARIO LOGUEADO
-    # =====================================================================
-    empleado = getattr(request.user, 'empleado', None)
-    if not empleado:
-        messages.warning(request, 'Tu cuenta no tiene un perfil de empleado asociado.')
-        return redirect('servicio_tecnico:inicio')
-
-    rol = empleado.rol  # 'recepcionista', 'tecnico', etc.
+    rol = empleado.rol
     ahora = timezone.now()
     inicio_mes = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     hace_90_dias = ahora - timedelta(days=90)
 
-    # =====================================================================
-    # 2. MÉTRICAS COMUNES A TODOS LOS ROLES
-    # =====================================================================
-    # Órdenes activas donde participan (como técnico O como responsable)
+    # Métricas comunes a todos los roles
     ordenes_activas_count = OrdenServicio.objects.filter(
         Q(tecnico_asignado_actual=empleado) | Q(responsable_seguimiento=empleado)
     ).exclude(estado__in=['entregado', 'cancelado']).distinct().count()
 
-    # Órdenes entregadas este mes
     ordenes_entregadas_mes = OrdenServicio.objects.filter(
         Q(tecnico_asignado_actual=empleado) | Q(responsable_seguimiento=empleado),
         estado='entregado',
         fecha_entrega__gte=inicio_mes
     ).distinct().count()
 
-    # Antigüedad en el sistema
     dias_en_sistema = (ahora - empleado.fecha_ingreso).days if empleado.fecha_ingreso else 0
 
     metricas = {
@@ -14628,11 +14609,8 @@ def mi_perfil(request):
         'dias_en_sistema': dias_en_sistema,
     }
 
-    # =====================================================================
-    # 3. MÉTRICAS PARA RECEPCIONISTA (responsable_seguimiento)
-    # =====================================================================
+    # Métricas para recepcionista
     if rol == 'recepcionista':
-        # --- Cotizaciones donde es responsable de seguimiento ---
         ordenes_con_cotizacion = OrdenServicio.objects.filter(
             responsable_seguimiento=empleado,
             cotizacion__isnull=False,
@@ -14651,7 +14629,6 @@ def mi_perfil(request):
             (cotizaciones_aceptadas / total_cotizaciones * 100) if total_cotizaciones > 0 else 0, 1
         )
 
-        # Valor cotizado y valor aceptado (últimos 90 días)
         valor_cotizado = Decimal('0.00')
         valor_aceptado = Decimal('0.00')
         for orden in cotizaciones_ordenes.select_related('cotizacion'):
@@ -14660,7 +14637,6 @@ def mi_perfil(request):
             if cot.usuario_acepto:
                 valor_aceptado += cot.costo_total_final
 
-        # --- Ventas Mostrador donde es responsable ---
         ventas_mostrador_qs = OrdenServicio.objects.filter(
             responsable_seguimiento=empleado,
             venta_mostrador__isnull=False,
@@ -14672,7 +14648,6 @@ def mi_perfil(request):
         for orden in ventas_mostrador_qs:
             monto_ventas_mostrador += orden.venta_mostrador.total_venta
 
-        # --- Encuestas de satisfacción (donde es responsable) ---
         encuestas_qs = FeedbackCliente.objects.filter(
             tipo='satisfaccion',
             orden__responsable_seguimiento=empleado,
@@ -14686,7 +14661,6 @@ def mi_perfil(request):
         nps_promedio = round(encuestas_avgs['nps_promedio'] or 0, 1)
         calificacion_promedio = round(encuestas_avgs['calificacion_promedio'] or 0, 1)
 
-        # Tasa de recomendación
         con_recomendacion = encuestas_qs.filter(recomienda__isnull=False).count()
         recomiendan = encuestas_qs.filter(recomienda=True).count()
         tasa_recomendacion = round(
@@ -14709,14 +14683,10 @@ def mi_perfil(request):
             'tasa_recomendacion': tasa_recomendacion,
         })
 
-    # =====================================================================
-    # 4. MÉTRICAS PARA TÉCNICO (tecnico_asignado_actual)
-    # =====================================================================
+    # Métricas para técnico
     elif rol == 'tecnico':
-        # Reutilizar método existente del modelo Empleado
         stats_activas = empleado.obtener_estadisticas_ordenes_activas()
 
-        # --- Cotizaciones donde fue técnico asignado ---
         ordenes_tecnico_cot = OrdenServicio.objects.filter(
             tecnico_asignado_actual=empleado,
             cotizacion__isnull=False,
@@ -14739,20 +14709,17 @@ def mi_perfil(request):
             if cot.usuario_acepto:
                 valor_aceptado += cot.costo_total_final
 
-        # --- Órdenes completadas (entregadas) este mes ---
         ordenes_completadas_mes = OrdenServicio.objects.filter(
             tecnico_asignado_actual=empleado,
             estado='entregado',
             fecha_entrega__gte=inicio_mes,
         ).count()
 
-        # --- RHITSO: órdenes donde fue técnico ---
         ordenes_rhitso = OrdenServicio.objects.filter(
             tecnico_asignado_actual=empleado,
             es_candidato_rhitso=True,
         ).exclude(estado__in=['cancelado']).count()
 
-        # --- Encuestas de satisfacción (como técnico) ---
         encuestas_qs = FeedbackCliente.objects.filter(
             tipo='satisfaccion',
             orden__tecnico_asignado_actual=empleado,
@@ -14783,34 +14750,184 @@ def mi_perfil(request):
             'calificacion_promedio': calificacion_promedio,
         })
 
-    # =====================================================================
-    # 5. RATING GENERAL (cálculo ponderado de desempeño)
-    # =====================================================================
-    # El "rating" es un número de 1-99 basado en indicadores clave.
-    rating = 50  # Base
-
+    # Rating de desempeño (1-99)
+    rating = 50
     if metricas.get('tasa_aceptacion', 0) > 0:
-        # Ponderar tasa de aceptación (máx +30 puntos)
         rating += min(30, int(metricas['tasa_aceptacion'] * 0.3))
-
     if metricas.get('calificacion_promedio', 0) > 0:
-        # Ponderar calificación (máx +15 puntos — 5 estrellas = 15 pts)
         rating += min(15, int(metricas['calificacion_promedio'] * 3))
-
     if metricas.get('total_ventas_mostrador', 0) > 0:
-        # Ponderar ventas mostrador realizadas (máx +4 puntos)
-        # Cada venta suma 0.5 puntos, hasta 4 puntos máximo
         rating += min(4, int(metricas['total_ventas_mostrador'] * 0.5))
-
-    # Limitar entre 1 y 99
     rating = max(1, min(99, rating))
+
+    rol_display = dict(empleado.ROL_CHOICES).get(rol, rol)
+    return metricas, rating, rol, rol_display
+
+
+def _calcular_rating_rapido(empleado):
+    """
+    Cálculo rápido del rating para las mini-cards del directorio.
+    Evita consultas pesadas: solo usa tasa de aceptación y órdenes activas.
+    Retorna un int entre 1 y 99.
+    """
+    from django.db.models import Q
+    from datetime import timedelta
+    from .models import Cotizacion
+
+    ahora = timezone.now()
+    hace_90_dias = ahora - timedelta(days=90)
+    rol = empleado.rol
+    rating = 50
+
+    if rol == 'recepcionista':
+        ordenes_cot = OrdenServicio.objects.filter(
+            responsable_seguimiento=empleado,
+            cotizacion__isnull=False,
+            cotizacion__fecha_envio__gte=hace_90_dias,
+        )
+        total = ordenes_cot.count()
+        aceptadas = ordenes_cot.filter(cotizacion__usuario_acepto=True).count()
+        if total > 0:
+            rating += min(30, int((aceptadas / total * 100) * 0.3))
+        # Ventas mostrador
+        ventas = OrdenServicio.objects.filter(
+            responsable_seguimiento=empleado,
+            venta_mostrador__isnull=False,
+            venta_mostrador__fecha_venta__gte=hace_90_dias,
+        ).count()
+        rating += min(4, int(ventas * 0.5))
+
+    elif rol == 'tecnico':
+        ordenes_cot = OrdenServicio.objects.filter(
+            tecnico_asignado_actual=empleado,
+            cotizacion__isnull=False,
+            cotizacion__fecha_envio__gte=hace_90_dias,
+        )
+        total = ordenes_cot.count()
+        aceptadas = ordenes_cot.filter(cotizacion__usuario_acepto=True).count()
+        if total > 0:
+            rating += min(30, int((aceptadas / total * 100) * 0.3))
+
+    return max(1, min(99, rating))
+
+
+# ============================================================================
+# MI PERFIL — MÉTRICAS PERSONALES DEL EMPLEADO (Marzo 2026)
+# ============================================================================
+
+@login_required
+def mi_perfil(request):
+    """
+    Página "Mi Perfil" con tarjeta de métricas personales.
+    Muestra métricas personalizadas según el rol del empleado:
+      - Recepcionista: cotizaciones gestionadas, ventas mostrador, encuestas
+      - Técnico: órdenes asignadas, cotizaciones donde participó, RHITSO
+    """
+    empleado = getattr(request.user, 'empleado', None)
+    if not empleado:
+        messages.warning(request, 'Tu cuenta no tiene un perfil de empleado asociado.')
+        return redirect('servicio_tecnico:inicio')
+
+    metricas, rating, rol, rol_display = _calcular_metricas_empleado(empleado)
 
     context = {
         'empleado': empleado,
         'rol': rol,
-        'rol_display': dict(empleado.ROL_CHOICES).get(rol, rol),
+        'rol_display': rol_display,
         'metricas': metricas,
         'rating': rating,
+    }
+
+    return render(request, 'servicio_tecnico/mi_perfil.html', context)
+
+
+# ============================================================================
+# DIRECTORIO DE EMPLEADOS — VISTA GERENCIAL (Marzo 2026)
+# ============================================================================
+
+ROLES_GERENCIALES = ('gerente_general', 'gerente_operacional', 'supervisor')
+
+
+@login_required
+def directorio_empleados(request):
+    """
+    Vista gerencial: muestra una cuadrícula de mini-cards con todos los
+    empleados activos. Cada card muestra avatar, nombre, rol y rating rápido.
+    Solo accesible para roles gerenciales.
+    """
+    empleado_actual = getattr(request.user, 'empleado', None)
+    if not empleado_actual or empleado_actual.rol not in ROLES_GERENCIALES:
+        messages.error(request, 'No tienes permiso para acceder al directorio de empleados.')
+        return redirect('servicio_tecnico:inicio')
+
+    # Filtros opcionales (GET params)
+    filtro_rol = request.GET.get('rol', '')
+    filtro_sucursal = request.GET.get('sucursal', '')
+    busqueda = request.GET.get('q', '').strip()
+
+    empleados_qs = Empleado.objects.filter(
+        activo=True
+    ).select_related('user', 'sucursal').order_by('nombre_completo')
+
+    if filtro_rol:
+        empleados_qs = empleados_qs.filter(rol=filtro_rol)
+    if filtro_sucursal:
+        empleados_qs = empleados_qs.filter(sucursal_id=filtro_sucursal)
+    if busqueda:
+        empleados_qs = empleados_qs.filter(
+            Q(nombre_completo__icontains=busqueda) |
+            Q(cargo__icontains=busqueda)
+        )
+
+    # Calcular rating rápido para cada empleado
+    empleados_data = []
+    for emp in empleados_qs:
+        rating = _calcular_rating_rapido(emp)
+        empleados_data.append({
+            'empleado': emp,
+            'rating': rating,
+            'rol_display': dict(Empleado.ROL_CHOICES).get(emp.rol, emp.rol),
+        })
+
+    # Datos para filtros
+    roles_disponibles = Empleado.ROL_CHOICES
+    sucursales_disponibles = Sucursal.objects.filter(activa=True).order_by('nombre')
+
+    context = {
+        'empleados_data': empleados_data,
+        'total_empleados': len(empleados_data),
+        'roles_disponibles': roles_disponibles,
+        'sucursales_disponibles': sucursales_disponibles,
+        'filtro_rol': filtro_rol,
+        'filtro_sucursal': filtro_sucursal,
+        'busqueda': busqueda,
+    }
+
+    return render(request, 'servicio_tecnico/directorio_empleados.html', context)
+
+
+@login_required
+def perfil_empleado(request, empleado_id):
+    """
+    Vista gerencial: muestra la tarjeta completa de un empleado específico.
+    Reutiliza la misma template de mi_perfil con contexto adicional.
+    Solo accesible para roles gerenciales.
+    """
+    empleado_actual = getattr(request.user, 'empleado', None)
+    if not empleado_actual or empleado_actual.rol not in ROLES_GERENCIALES:
+        messages.error(request, 'No tienes permiso para ver perfiles de otros empleados.')
+        return redirect('servicio_tecnico:inicio')
+
+    empleado = get_object_or_404(Empleado, pk=empleado_id, activo=True)
+    metricas, rating, rol, rol_display = _calcular_metricas_empleado(empleado)
+
+    context = {
+        'empleado': empleado,
+        'rol': rol,
+        'rol_display': rol_display,
+        'metricas': metricas,
+        'rating': rating,
+        'es_vista_directorio': True,
     }
 
     return render(request, 'servicio_tecnico/mi_perfil.html', context)

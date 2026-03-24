@@ -1,0 +1,426 @@
+/* ===========================================================================
+   DIRECTORIO DE EMPLEADOS — VISTA GERENCIAL
+   Cuadrícula de mini-cards con avatar, nombre, rol y rating.
+   Reutiliza las variables de mi_perfil (--pcard-*)
+   =========================================================================== */
+
+/* ── Canvas de fondo ─────────────────────────────────────────────────── */
+.directorio-page {
+    min-height: 100vh;
+    background:
+        radial-gradient(ellipse 70% 60% at 50% 0%, rgba(22, 42, 90, 0.55), transparent),
+        radial-gradient(ellipse 50% 50% at 80% 90%, rgba(50, 30, 10, 0.35), transparent),
+        linear-gradient(175deg, var(--pcard-bg-start) 0%, var(--pcard-bg-end) 100%);
+    padding: 2rem 1rem 4rem;
+    position: relative;
+}
+
+/* ── Encabezado del directorio ───────────────────────────────────────── */
+.directorio-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.directorio-header h1 {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 2.4rem;
+    color: var(--pcard-gold);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 0.25rem;
+}
+
+.directorio-header .directorio-subtitle {
+    color: var(--pcard-muted);
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+}
+
+/* ── Barra de filtros ────────────────────────────────────────────────── */
+.directorio-filtros {
+    background: var(--pcard-surface);
+    border: 1px solid var(--pcard-border);
+    border-radius: var(--card-radius);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2rem;
+    backdrop-filter: blur(8px);
+}
+
+.directorio-filtros .filtro-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.directorio-filtros .filtro-group {
+    flex: 1;
+    min-width: 160px;
+}
+
+.directorio-filtros label {
+    display: block;
+    color: var(--pcard-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+}
+
+.directorio-filtros select,
+.directorio-filtros input[type="text"] {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(212, 168, 67, 0.2);
+    border-radius: 8px;
+    color: var(--pcard-text);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+}
+
+.directorio-filtros select:focus,
+.directorio-filtros input[type="text"]:focus {
+    outline: none;
+    border-color: var(--pcard-gold);
+    box-shadow: 0 0 0 2px rgba(212, 168, 67, 0.15);
+}
+
+.directorio-filtros select option {
+    background: #1a2340;
+    color: var(--pcard-text);
+}
+
+.directorio-filtros .filtro-actions {
+    display: flex;
+    gap: 0.5rem;
+    min-width: auto;
+    flex: 0 0 auto;
+}
+
+.directorio-filtros .btn-filtrar {
+    background: linear-gradient(135deg, var(--pcard-gold-dark), var(--pcard-gold));
+    color: #0b1120;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1.25rem;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.directorio-filtros .btn-filtrar:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(212, 168, 67, 0.3);
+}
+
+.directorio-filtros .btn-limpiar {
+    background: transparent;
+    color: var(--pcard-muted);
+    border: 1px solid rgba(138, 154, 181, 0.3);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
+.directorio-filtros .btn-limpiar:hover {
+    color: var(--pcard-text);
+    border-color: var(--pcard-text);
+}
+
+/* ── Contador de resultados ──────────────────────────────────────────── */
+.directorio-counter {
+    color: var(--pcard-muted);
+    font-size: 0.85rem;
+    margin-bottom: 1.5rem;
+    padding-left: 0.25rem;
+    letter-spacing: 0.5px;
+}
+
+.directorio-counter strong {
+    color: var(--pcard-gold);
+    font-weight: 700;
+}
+
+/* ── Cuadrícula de mini-cards ────────────────────────────────────────── */
+.directorio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.25rem;
+}
+
+/* ── Mini-card de empleado ───────────────────────────────────────────── */
+.mini-card {
+    background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+    border: 1px solid var(--pcard-border);
+    border-radius: 16px;
+    padding: 1.5rem 1.25rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+    text-decoration: none;
+    display: block;
+}
+
+.mini-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--pcard-gold), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.mini-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(212, 168, 67, 0.1);
+    border-color: rgba(212, 168, 67, 0.5);
+}
+
+.mini-card:hover::before {
+    opacity: 1;
+}
+
+/* Avatar en mini-card */
+.mini-card-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    margin: 0 auto 0.75rem;
+    border: 2px solid var(--pcard-border);
+    overflow: hidden;
+    position: relative;
+    transition: border-color 0.3s;
+}
+
+.mini-card:hover .mini-card-avatar {
+    border-color: var(--pcard-gold);
+}
+
+.mini-card-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mini-card-avatar .iniciales-circle {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--pcard-gold-dark), var(--pcard-gold));
+    color: #0b1120;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: 1px;
+}
+
+/* Nombre del empleado */
+.mini-card-nombre {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--pcard-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.15rem;
+    line-height: 1.2;
+}
+
+/* Cargo */
+.mini-card-cargo {
+    color: var(--pcard-muted);
+    font-size: 0.78rem;
+    margin-bottom: 0.75rem;
+    line-height: 1.3;
+}
+
+/* Footer de mini-card: rol badge + rating */
+.mini-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(212, 168, 67, 0.12);
+}
+
+.mini-card-rol {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--pcard-gold);
+    background: rgba(212, 168, 67, 0.12);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 60%;
+}
+
+.mini-card-rating {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 1;
+    background: linear-gradient(180deg, var(--pcard-gold-light), var(--pcard-gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ── Estado vacío ────────────────────────────────────────────────────── */
+.directorio-empty {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--pcard-muted);
+}
+
+.directorio-empty i {
+    font-size: 3rem;
+    color: rgba(212, 168, 67, 0.3);
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.directorio-empty p {
+    font-size: 1.1rem;
+}
+
+/* ── Breadcrumb oscuro ───────────────────────────────────────────────── */
+.directorio-breadcrumb {
+    margin-bottom: 1.5rem;
+}
+
+.directorio-breadcrumb .breadcrumb {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+.directorio-breadcrumb .breadcrumb-item a {
+    color: var(--pcard-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.directorio-breadcrumb .breadcrumb-item a:hover {
+    color: var(--pcard-gold);
+}
+
+.directorio-breadcrumb .breadcrumb-item.active {
+    color: var(--pcard-gold);
+}
+
+.directorio-breadcrumb .breadcrumb-item + .breadcrumb-item::before {
+    color: rgba(138, 154, 181, 0.4);
+}
+
+/* ── Animación de entrada escalonada ─────────────────────────────────── */
+@keyframes fadeInCard {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.mini-card {
+    animation: fadeInCard 0.4s ease-out both;
+}
+
+.mini-card:nth-child(1)  { animation-delay: 0.03s; }
+.mini-card:nth-child(2)  { animation-delay: 0.06s; }
+.mini-card:nth-child(3)  { animation-delay: 0.09s; }
+.mini-card:nth-child(4)  { animation-delay: 0.12s; }
+.mini-card:nth-child(5)  { animation-delay: 0.15s; }
+.mini-card:nth-child(6)  { animation-delay: 0.18s; }
+.mini-card:nth-child(7)  { animation-delay: 0.21s; }
+.mini-card:nth-child(8)  { animation-delay: 0.24s; }
+.mini-card:nth-child(9)  { animation-delay: 0.27s; }
+.mini-card:nth-child(10) { animation-delay: 0.30s; }
+.mini-card:nth-child(11) { animation-delay: 0.33s; }
+.mini-card:nth-child(12) { animation-delay: 0.36s; }
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .directorio-header h1 {
+        font-size: 1.8rem;
+        letter-spacing: 2px;
+    }
+
+    .directorio-grid {
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap: 0.85rem;
+    }
+
+    .mini-card {
+        padding: 1.15rem 1rem;
+    }
+
+    .mini-card-avatar {
+        width: 56px;
+        height: 56px;
+    }
+
+    .mini-card-avatar .iniciales-circle {
+        font-size: 1.2rem;
+    }
+
+    .mini-card-nombre {
+        font-size: 0.9rem;
+    }
+
+    .mini-card-rating {
+        font-size: 1.3rem;
+    }
+
+    .directorio-filtros .filtro-row {
+        flex-direction: column;
+    }
+
+    .directorio-filtros .filtro-group {
+        min-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .directorio-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.65rem;
+    }
+
+    .mini-card {
+        padding: 1rem 0.75rem;
+    }
+
+    .mini-card-avatar {
+        width: 48px;
+        height: 48px;
+    }
+
+    .mini-card-footer {
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+
+    .mini-card-rol {
+        max-width: 100%;
+    }
+}
