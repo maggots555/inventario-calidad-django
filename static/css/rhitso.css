@@ -539,3 +539,92 @@ input[type="checkbox"]:checked,
 #modalEnviarRHITSO .shadow-sm {
     box-shadow: 0 .125rem .25rem rgba(0,0,0,.075) !important;
 }
+
+/* ========================================================================== */
+/* DARK MODE OVERRIDES                                                        */
+/* ========================================================================== */
+
+/* Alertas de días */
+[data-bs-theme="dark"] .alert-dias-rhitso {
+    background: linear-gradient(135deg, rgba(255, 243, 205, 0.12) 0%, rgba(255, 234, 167, 0.12) 100%);
+    border-left-color: #ffc107;
+    color: #ffe69c;
+}
+
+[data-bs-theme="dark"] .alert-dias-rhitso.critico {
+    background: linear-gradient(135deg, rgba(248, 215, 218, 0.12) 0%, rgba(245, 198, 203, 0.12) 100%);
+    border-left-color: #dc3545;
+    color: #f5b7b1;
+}
+
+/* Línea de tiempo */
+[data-bs-theme="dark"] .rhitso-timeline::before {
+    background: #495057;
+}
+
+/* Dropdown de estados: fondo base */
+[data-bs-theme="dark"] #id_estado_rhitso optgroup {
+    background-color: #2b3035;
+    color: #dee2e6;
+}
+
+/* Bloques de optgroup por responsable */
+[data-bs-theme="dark"] #id_estado_rhitso optgroup:nth-of-type(1) {
+    background: linear-gradient(135deg, rgba(209, 236, 241, 0.15) 0%, rgba(190, 229, 235, 0.15) 100%);
+    color: #6edff6;
+}
+
+[data-bs-theme="dark"] #id_estado_rhitso optgroup:nth-of-type(2) {
+    background: linear-gradient(135deg, rgba(231, 217, 245, 0.15) 0%, rgba(216, 196, 232, 0.15) 100%);
+    color: #c8a9eb;
+}
+
+[data-bs-theme="dark"] #id_estado_rhitso optgroup:nth-of-type(3) {
+    background: linear-gradient(135deg, rgba(255, 243, 205, 0.15) 0%, rgba(255, 234, 167, 0.15) 100%);
+    color: #ffe69c;
+}
+
+[data-bs-theme="dark"] #id_estado_rhitso optgroup:nth-of-type(4) {
+    background: linear-gradient(135deg, rgba(255, 229, 208, 0.15) 0%, rgba(255, 212, 173, 0.15) 100%);
+    color: #ffc078;
+}
+
+[data-bs-theme="dark"] #id_estado_rhitso optgroup:nth-of-type(5) {
+    background: linear-gradient(135deg, rgba(212, 237, 218, 0.15) 0%, rgba(195, 230, 203, 0.15) 100%);
+    color: #75b798;
+}
+
+[data-bs-theme="dark"] #id_estado_rhitso option {
+    background-color: #2b3035;
+    color: #dee2e6;
+}
+
+/* Hover-shadow en tarjetas */
+[data-bs-theme="dark"] .hover-shadow {
+    border-color: #495057 !important;
+}
+
+[data-bs-theme="dark"] .hover-shadow:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    border-color: #6ea8fe !important;
+}
+
+/* Tarjeta de destinatario */
+[data-bs-theme="dark"] .destinatario-card:hover {
+    background-color: #2b3035 !important;
+}
+
+/* Foto de empleado */
+[data-bs-theme="dark"] .empleado-foto {
+    border-color: #3dd5f3;
+    background-color: #212529;
+}
+
+/* Previsualización del correo */
+[data-bs-theme="dark"] .correo-preview {
+    color: #dee2e6;
+}
+
+[data-bs-theme="dark"] #modalEnviarRHITSO .shadow-sm {
+    box-shadow: 0 .125rem .25rem rgba(0, 0, 0, 0.2) !important;
+}

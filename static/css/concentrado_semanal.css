@@ -678,3 +678,222 @@ tr.fila-sat-mis     td.celda-sitio { background-color: rgba(114, 194, 159, 0.40)
         margin: 10mm;
     }
 }
+
+/* ============================================================================
+   DARK MODE OVERRIDES
+   ============================================================================ */
+
+/* Título principal */
+[data-bs-theme="dark"] .concentrado-titulo {
+    color: #cfe2ff;
+}
+
+[data-bs-theme="dark"] .concentrado-titulo .bi {
+    color: #6ea8fe;
+}
+
+/* Sección gráficos */
+[data-bs-theme="dark"] .concentrado-header-grafico {
+    background-color: #2b3035;
+    color: #dee2e6;
+    border-bottom-color: #495057;
+}
+
+/* Thead Ingreso */
+[data-bs-theme="dark"] .concentrado-thead-ingreso th {
+    background-color: rgba(13, 110, 253, 0.2);
+    color: #6ea8fe;
+    border-color: rgba(13, 110, 253, 0.3);
+}
+
+/* Thead Asignación */
+[data-bs-theme="dark"] .concentrado-thead-asignacion th {
+    background-color: rgba(102, 16, 242, 0.2);
+    color: #a370f7;
+    border-color: rgba(102, 16, 242, 0.3);
+}
+
+/* Thead Egreso */
+[data-bs-theme="dark"] .concentrado-thead-egreso th {
+    background-color: rgba(25, 135, 84, 0.2);
+    color: #75b798;
+    border-color: rgba(25, 135, 84, 0.3);
+}
+
+/* Bordes de tabla */
+[data-bs-theme="dark"] .concentrado-tabla td,
+[data-bs-theme="dark"] .concentrado-tabla th {
+    border-color: #495057;
+}
+
+/* Celdas específicas */
+[data-bs-theme="dark"] .celda-sitio {
+    background-color: #2b3035;
+    color: #dee2e6;
+}
+
+[data-bs-theme="dark"] .celda-tipo {
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .celda-numero {
+    color: #dee2e6;
+}
+
+[data-bs-theme="dark"] .celda-total {
+    background-color: rgba(13, 110, 253, 0.15);
+    color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .celda-ingeniero {
+    color: #e9ecef;
+}
+
+/* Fila de totales */
+[data-bs-theme="dark"] .concentrado-fila-total {
+    background-color: #343a40 !important;
+    border-top-color: #6c757d;
+}
+
+[data-bs-theme="dark"] .concentrado-fila-total td {
+    color: #e9ecef;
+}
+
+/* Fila escalados */
+[data-bs-theme="dark"] .concentrado-fila-escalados {
+    background-color: rgba(255, 243, 205, 0.1) !important;
+}
+
+[data-bs-theme="dark"] .concentrado-fila-escalados td {
+    color: #ffe69c;
+}
+
+/* Fila RHITSO */
+[data-bs-theme="dark"] .concentrado-fila-rhitso {
+    background-color: rgba(248, 215, 218, 0.1) !important;
+}
+
+[data-bs-theme="dark"] .concentrado-fila-rhitso td {
+    color: #f5b7b1;
+}
+
+/* Tarjetas resumen */
+[data-bs-theme="dark"] .resumen-card {
+    background-color: #212529;
+    border-color: #495057;
+}
+
+[data-bs-theme="dark"] .resumen-dropoff {
+    background-color: rgba(13, 110, 253, 0.1) !important;
+    border-color: rgba(13, 110, 253, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .resumen-sic {
+    background-color: rgba(13, 202, 240, 0.1) !important;
+    border-color: rgba(13, 202, 240, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .resumen-mis {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+    border-color: rgba(255, 193, 7, 0.3) !important;
+}
+
+/* Valor positivo / cero */
+[data-bs-theme="dark"] .celda-numero.valor-positivo {
+    background-color: rgba(13, 110, 253, 0.15);
+    color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .celda-numero.valor-cero {
+    color: #6c757d;
+}
+
+/* Colores de fila por sitio — opacidad reducida para fondo oscuro */
+[data-bs-theme="dark"] tr.fila-drop-lenovo td { background-color: rgba(  0, 255,   0, 0.10) !important; }
+[data-bs-theme="dark"] tr.fila-drop-dell   td { background-color: rgba(255, 255,   0, 0.10) !important; }
+[data-bs-theme="dark"] tr.fila-drop-oow    td { background-color: rgba(255, 153, 204, 0.10) !important; }
+
+[data-bs-theme="dark"] tr.fila-sat-lenovo  td { background-color: rgba(255, 153,   0, 0.10) !important; }
+[data-bs-theme="dark"] tr.fila-sat-dell    td { background-color: rgba(  0, 102, 255, 0.10) !important; }
+[data-bs-theme="dark"] tr.fila-sat-oow     td { background-color: rgba(255, 153, 204, 0.10) !important; }
+[data-bs-theme="dark"] tr.fila-sat-mis     td { background-color: rgba(226, 214, 215, 0.10) !important; }
+
+[data-bs-theme="dark"] tr.fila-drop-lenovo td.celda-sitio,
+[data-bs-theme="dark"] tr.fila-drop-dell   td.celda-sitio,
+[data-bs-theme="dark"] tr.fila-drop-oow    td.celda-sitio {
+    background-color: rgba(186, 114, 194, 0.18) !important;
+}
+
+[data-bs-theme="dark"] tr.fila-sat-lenovo td.celda-sitio,
+[data-bs-theme="dark"] tr.fila-sat-dell   td.celda-sitio,
+[data-bs-theme="dark"] tr.fila-sat-oow    td.celda-sitio,
+[data-bs-theme="dark"] tr.fila-sat-mis    td.celda-sitio {
+    background-color: rgba(114, 194, 159, 0.18) !important;
+}
+
+/* ============================================================================
+   WEEK PICKER — DARK MODE
+   ============================================================================ */
+
+[data-bs-theme="dark"] .week-picker-trigger {
+    background-color: #2b3035;
+    border-color: #495057;
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .week-picker-trigger:hover {
+    border-color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .week-picker-trigger:focus,
+[data-bs-theme="dark"] .week-picker-trigger.abierto {
+    border-color: #6ea8fe;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.35);
+}
+
+[data-bs-theme="dark"] .week-picker-trigger .wp-chevron {
+    color: #adb5bd;
+}
+
+[data-bs-theme="dark"] .week-picker-dropdown {
+    background: #2b3035;
+    border-color: #495057;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+[data-bs-theme="dark"] .wp-dropdown-header {
+    border-bottom-color: #495057;
+}
+
+[data-bs-theme="dark"] .wp-mes-label {
+    color: #cfe2ff;
+}
+
+[data-bs-theme="dark"] .wp-nav-btn {
+    color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .wp-nav-btn:hover {
+    background-color: rgba(13, 110, 253, 0.15);
+    border-color: rgba(13, 110, 253, 0.3);
+}
+
+[data-bs-theme="dark"] .wp-dia-num {
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .wp-dia-num.otro-mes {
+    color: #6c757d;
+}
+
+[data-bs-theme="dark"] .wp-fila-semana:hover {
+    background-color: rgba(13, 110, 253, 0.15);
+}
+
+[data-bs-theme="dark"] .wp-fila-semana.semana-hoy:not(.seleccionada) {
+    background-color: rgba(13, 110, 253, 0.2);
+}
+
+[data-bs-theme="dark"] .wp-dropdown-footer {
+    border-top-color: #495057;
+}

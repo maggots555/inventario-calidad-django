@@ -461,3 +461,23 @@
 .custom-lightbox.active .lightbox-info {
     animation: lightboxFadeIn 0.4s ease;
 }
+
+/* =============================================================================
+   DARK MODE OVERRIDES
+   El lightbox ya es oscuro por diseño (overlay negro, texto blanco).
+   Solo se ajustan detalles sutiles para coherencia con el tema dark.
+   ============================================================================= */
+
+[data-bs-theme="dark"] .lightbox-info {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-bs-theme="dark"] .lightbox-image {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+}
+
+[data-bs-theme="dark"] .lightbox-zoom-controls {
+    background: rgba(0, 0, 0, 0.92);
+    border-color: rgba(255, 255, 255, 0.2);
+}

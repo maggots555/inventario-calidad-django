@@ -356,3 +356,49 @@
  *    <button class="btn btn-agregar-complemento">...</button>
  *    <button class="btn btn-venta-principal">...</button>
  */
+
+/* ============================================================================
+   DARK MODE OVERRIDES
+   ============================================================================ */
+
+[data-bs-theme="dark"] .alert-vm-complemento {
+    background-color: rgba(102, 126, 234, 0.15);
+    color: #c8cfd8;
+    border-left-color: #667eea;
+}
+
+[data-bs-theme="dark"] .alert-vm-complemento .alert-heading {
+    color: #8ea4f0;
+}
+
+[data-bs-theme="dark"] .alert-vm-principal {
+    background-color: rgba(253, 160, 133, 0.15);
+    color: #c8cfd8;
+    border-left-color: #fda085;
+}
+
+[data-bs-theme="dark"] .alert-vm-principal .alert-heading {
+    color: #fdb99b;
+}
+
+[data-bs-theme="dark"] .badge-venta-mostrador {
+    color: #212529;
+}
+
+[data-bs-theme="dark"] .btn-venta-principal {
+    color: #212529;
+}
+
+[data-bs-theme="dark"] .btn-venta-principal:hover {
+    color: #212529;
+}
+
+[data-bs-theme="dark"] .badge-complemento:focus,
+[data-bs-theme="dark"] .mini-indicador:focus {
+    outline-color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .btn-loading::after {
+    border-color: rgba(255, 255, 255, 0.5);
+    border-top-color: transparent;
+}

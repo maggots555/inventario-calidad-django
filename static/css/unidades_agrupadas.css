@@ -84,3 +84,40 @@
         font-size: 0.75rem;
     }
 }
+
+/* =============================================================================
+   DARK MODE
+   ============================================================================= */
+[data-bs-theme="dark"] .grupo-principal:hover {
+    background-color: #334155;
+}
+
+[data-bs-theme="dark"] .grupo-principal .toggle-icon {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .grupo-principal[aria-expanded="true"] .toggle-icon {
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .collapse table {
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .collapse .bg-light {
+    background-color: #0f172a !important;
+}
+
+[data-bs-theme="dark"] .collapse .table-bordered {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .collapse .table-bordered th,
+[data-bs-theme="dark"] .collapse .table-bordered td {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .collapse .table-secondary th {
+    background-color: #1e293b;
+    color: #e2e8f0;
+}

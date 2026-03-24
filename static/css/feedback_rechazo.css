@@ -82,3 +82,44 @@
   border-color: #ef4444;
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.13);
 }
+
+/* =============================================================================
+   DARK MODE
+   ============================================================================= */
+[data-bs-theme="dark"] .fr-cotizacion {
+    background: #064e3b;
+    border-color: #065f46;
+}
+
+[data-bs-theme="dark"] .fr-cotizacion-toggle {
+    color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .fr-cotizacion-toggle:hover {
+    background: #065f46;
+}
+
+[data-bs-theme="dark"] .fr-cotizacion-content {
+    border-top-color: #065f46;
+}
+
+[data-bs-theme="dark"] .fr-pieza-item {
+    color: #cbd5e1;
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-bs-theme="dark"] .fr-pieza-total {
+    color: #6ee7b7;
+    border-top-color: #065f46;
+}
+
+[data-bs-theme="dark"] .fr-privacy-notice {
+    background: #1e3a5f;
+    border-color: #2563eb;
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .feedback-textarea--error {
+    border-color: #f87171;
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15);
+}

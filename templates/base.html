@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-bs-theme="light">
 
 <head>
     <meta charset="UTF-8">
@@ -57,6 +57,13 @@
     {% endblock %}
     <!-- Script inline para prevenir parpadeo de sidebar -->
     <script>
+        // Aplicar tema oscuro ANTES del render para evitar flash blanco
+        (function () {
+            var theme = localStorage.getItem('theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+        })();
         // Aplicar estado colapsado ANTES de que la página se renderice
         // PREDETERMINADO: La sidebar inicia colapsada para usuarios nuevos
         (function () {
@@ -481,6 +488,11 @@
                             </ul>
                         </div>
                     </div>
+                    <!-- Toggle Modo Oscuro -->
+                    <button class="dark-mode-toggle" id="darkModeToggle" title="Cambiar tema">
+                        <i class="bi bi-moon-fill"></i>
+                        <i class="bi bi-sun-fill"></i>
+                    </button>
                     <a href="{% url 'movimiento_rapido' %}" class="navbar-action-btn" title="Scanner QR">
                         <i class="bi bi-qr-code-scan"></i>
                     </a>
@@ -966,6 +978,7 @@
 
     <!-- JavaScript personalizado -->
     <script src="{% static 'js/base.js' %}"></script>
+    <script src="{% static 'js/dark_mode.js' %}"></script>
 
     <!-- Panel de Notificaciones Celery 🔔 -->
     {% if user.is_authenticated %}

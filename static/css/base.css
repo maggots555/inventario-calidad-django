@@ -140,6 +140,351 @@
     --z-tooltip: 1070;
 }
 
+/* =============================================================================
+   MODO OSCURO - Variables sobrescritas cuando data-bs-theme="dark"
+   Bootstrap 5.3.2 cambia sus propios componentes automáticamente;
+   aquí solo redefinimos las variables CUSTOM del proyecto.
+   ============================================================================= */
+[data-bs-theme="dark"] {
+    /* Colores Principales */
+    --primary-color: #60a5fa;
+    --primary-dark: #93c5fd;
+    --primary-light: #1e3a5f;
+    --secondary-color: #94a3b8;
+    --accent-color: #60a5fa;
+
+    /* Colores de Estado */
+    --success-color: #34d399;
+    --success-light: #064e3b;
+    --success-dark: #6ee7b7;
+    --danger-color: #f87171;
+    --danger-light: #450a0a;
+    --danger-dark: #fca5a5;
+    --warning-color: #fbbf24;
+    --warning-light: #451a03;
+    --warning-dark: #fde68a;
+    --info-color: #22d3ee;
+    --info-light: #083344;
+    --info-dark: #67e8f9;
+
+    /* Colores Neutros - invertidos */
+    --white: #1a1a2e;
+    --gray-50: #111827;
+    --gray-100: #1f2937;
+    --gray-200: #374151;
+    --gray-300: #4b5563;
+    --gray-400: #9ca3af;
+    --gray-500: #d1d5db;
+    --gray-600: #e5e7eb;
+    --gray-700: #f3f4f6;
+    --gray-800: #f9fafb;
+    --gray-900: #ffffff;
+
+    /* Sombras oscuras */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Componentes que usan colores hardcodeados y necesitan override ---- */
+
+/* Body */
+[data-bs-theme="dark"] body {
+    background-color: #0f172a;
+    color: #e2e8f0;
+}
+
+/* Navbar */
+[data-bs-theme="dark"] .modern-navbar {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Sidebar */
+[data-bs-theme="dark"] .app-sidebar {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+[data-bs-theme="dark"] .sidebar-tooltip {
+    background: #1e293b;
+}
+
+[data-bs-theme="dark"] .sidebar-tooltip::before {
+    border-right-color: #1e293b;
+}
+
+/* Cards */
+[data-bs-theme="dark"] .card {
+    background-color: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .card::before {
+    background: linear-gradient(90deg, #60a5fa, #3b82f6);
+}
+
+[data-bs-theme="dark"] .card:hover {
+    border-color: #475569;
+}
+
+[data-bs-theme="dark"] .card-header {
+    background-color: #0f172a;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .card-footer {
+    background-color: #0f172a;
+    border-top-color: #334155;
+}
+
+[data-bs-theme="dark"] .card-icon {
+    background: linear-gradient(135deg, #60a5fa, #3b82f6);
+}
+
+[data-bs-theme="dark"] .dashboard-card {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+
+[data-bs-theme="dark"] .card-success {
+    background: linear-gradient(135deg, #1e293b 0%, #064e3b 100%);
+}
+
+[data-bs-theme="dark"] .card-warning {
+    background: linear-gradient(135deg, #1e293b 0%, #451a03 100%);
+}
+
+[data-bs-theme="dark"] .card-danger {
+    background: linear-gradient(135deg, #1e293b 0%, #450a0a 100%);
+}
+
+[data-bs-theme="dark"] .card-info {
+    background: linear-gradient(135deg, #1e293b 0%, #083344 100%);
+}
+
+/* Tables */
+[data-bs-theme="dark"] .table {
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .table thead th {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .table tbody td {
+    border-bottom-color: #334155;
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .table tbody tr:hover {
+    background-color: #334155;
+}
+
+/* Dropdowns */
+[data-bs-theme="dark"] .dropdown-menu {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+}
+
+[data-bs-theme="dark"] .dropdown-item {
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .dropdown-item:hover,
+[data-bs-theme="dark"] .dropdown-item:focus {
+    background-color: #334155;
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .dropdown-divider {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .navbar-dropdown {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+}
+
+/* Buttons */
+[data-bs-theme="dark"] .btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+[data-bs-theme="dark"] .btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+}
+
+/* Alerts */
+[data-bs-theme="dark"] .alert-success {
+    background-color: #064e3b;
+    color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .alert-danger {
+    background-color: #450a0a;
+    color: #fca5a5;
+}
+
+[data-bs-theme="dark"] .alert-warning {
+    background-color: #451a03;
+    color: #fde68a;
+}
+
+[data-bs-theme="dark"] .alert-info {
+    background-color: #083344;
+    color: #67e8f9;
+}
+
+/* Footer */
+[data-bs-theme="dark"] .modern-footer {
+    background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+}
+
+[data-bs-theme="dark"] footer {
+    background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
+}
+
+/* Sidebar submenu colapsada */
+[data-bs-theme="dark"] .app-sidebar.collapsed .sidebar-item.has-submenu.open .sidebar-submenu {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%) !important;
+}
+
+/* Forms */
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    background-color: #1e293b;
+    border-color: #60a5fa;
+    color: #f1f5f9;
+    box-shadow: 0 0 0 0.2rem rgba(96, 165, 250, 0.15);
+}
+
+[data-bs-theme="dark"] .form-control::placeholder {
+    color: #64748b;
+}
+
+/* Select2 dark mode */
+[data-bs-theme="dark"] .select2-container--bootstrap-5 .select2-selection {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .select2-container--bootstrap-5 .select2-dropdown {
+    background-color: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .select2-container--bootstrap-5 .select2-results__option--highlighted {
+    background-color: #334155;
+    color: #60a5fa;
+}
+
+/* Modal */
+[data-bs-theme="dark"] .modal-content {
+    background-color: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .modal-header {
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .modal-footer {
+    border-top-color: #334155;
+}
+
+/* Pagination */
+[data-bs-theme="dark"] .page-link {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .page-link:hover {
+    background-color: #334155;
+    color: #60a5fa;
+}
+
+/* Breadcrumbs */
+[data-bs-theme="dark"] .breadcrumb {
+    background-color: #1e293b;
+}
+
+/* Scrollbar global dark */
+[data-bs-theme="dark"] ::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: #334155;
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+/* ===== DARK MODE TOGGLE BUTTON ===== */
+.dark-mode-toggle {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ecf0f1;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    min-width: 38px;
+    min-height: 38px;
+    position: relative;
+    overflow: hidden;
+}
+
+.dark-mode-toggle:hover {
+    background: rgba(96, 165, 250, 0.3);
+    color: #60a5fa;
+    transform: translateY(-2px);
+}
+
+.dark-mode-toggle .bi-sun-fill {
+    display: none;
+}
+
+.dark-mode-toggle .bi-moon-fill {
+    display: inline-block;
+}
+
+[data-bs-theme="dark"] .dark-mode-toggle .bi-sun-fill {
+    display: inline-block;
+}
+
+[data-bs-theme="dark"] .dark-mode-toggle .bi-moon-fill {
+    display: none;
+}
+
+/* Animation for icon switch */
+.dark-mode-toggle i {
+    transition: transform 0.4s ease, opacity 0.3s ease;
+}
+
+.dark-mode-toggle:active i {
+    transform: rotate(360deg);
+}
+
 /* ===== ESTILOS GENERALES ===== */
 /* Importamos una fuente moderna de Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');

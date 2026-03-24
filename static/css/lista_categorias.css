@@ -170,3 +170,57 @@
   margin: 0 auto 1.5rem;
   opacity: 0.5;
 }
+
+/* =============================================================================
+   DARK MODE
+   ============================================================================= */
+[data-bs-theme="dark"] .categoria-card:hover {
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-bs-theme="dark"] .categoria-badge {
+    background: rgba(30, 41, 59, 0.9);
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .categoria-info {
+    background: #1e293b;
+}
+
+[data-bs-theme="dark"] .categoria-title {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .categoria-description {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .categoria-actions {
+    background: #1e293b;
+    border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-bs-theme="dark"] .categoria-svg-container {
+    background-color: #0f172a;
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-bs-theme="dark"] .bg-accesorios,
+[data-bs-theme="dark"] .bg-audio-video,
+[data-bs-theme="dark"] .bg-baterias,
+[data-bs-theme="dark"] .bg-cables-conectores,
+[data-bs-theme="dark"] .bg-carcasas-estructuras,
+[data-bs-theme="dark"] .bg-cargadores-adaptadores,
+[data-bs-theme="dark"] .bg-componentes-input,
+[data-bs-theme="dark"] .bg-discos-almacenamiento,
+[data-bs-theme="dark"] .bg-equipos-completos,
+[data-bs-theme="dark"] .bg-general,
+[data-bs-theme="dark"] .bg-herramientas-consumibles,
+[data-bs-theme="dark"] .bg-memoria-ram,
+[data-bs-theme="dark"] .bg-pantallas-displays,
+[data-bs-theme="dark"] .bg-placas-tarjetas,
+[data-bs-theme="dark"] .bg-refrigeracion,
+[data-bs-theme="dark"] .bg-servicios-soluciones,
+[data-bs-theme="dark"] .bg-default {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
