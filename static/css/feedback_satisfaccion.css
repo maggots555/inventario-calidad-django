@@ -542,3 +542,135 @@
   .fs-nps-grid { gap: 3px; }
   .fs-nps-btn  { min-height: 30px; font-size: 0.68rem; border-radius: 5px; }
 }
+
+/* ============================================================
+   DARK MODE - Encuesta de satisfacción
+   ============================================================ */
+[data-bs-theme="dark"] {
+  --fs-card-bg: rgba(15, 23, 42, 0.92);
+  --fs-star-inactive: #475569;
+}
+
+/* El fondo animado se suaviza en dark (ya es oscuro, se darkifica un poco más) */
+[data-bs-theme="dark"] .fs-body {
+  background: linear-gradient(135deg, #1e1b4b 0%, #3b0764 50%, #4a044e 100%);
+}
+
+/* Card principal - glassmorphism oscuro */
+[data-bs-theme="dark"] .fs-card {
+  background: var(--fs-card-bg);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Info del equipo - gradiente claro → oscuro */
+[data-bs-theme="dark"] .fs-equipo-info {
+  background: linear-gradient(135deg, #2d1b69 0%, #1e1b4b 100%);
+  border-color: rgba(139, 92, 246, 0.15);
+}
+
+[data-bs-theme="dark"] .fs-equipo-folio {
+  color: #a78bfa;
+}
+
+[data-bs-theme="dark"] .fs-equipo-nombre {
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .fs-equipo-fecha {
+  color: #94a3b8;
+}
+
+/* Sección labels y textos */
+[data-bs-theme="dark"] .fs-section-label {
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .fs-star-label {
+  color: #94a3b8;
+}
+
+/* Botones NPS */
+[data-bs-theme="dark"] .fs-nps-btn {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+
+[data-bs-theme="dark"] .fs-nps-btn:hover {
+  background: #334155;
+}
+
+[data-bs-theme="dark"] .fs-nps-labels {
+  color: #64748b;
+}
+
+/* Botones Thumb */
+[data-bs-theme="dark"] .fs-thumb-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .fs-thumb-btn.active-yes {
+  background: linear-gradient(135deg, #064e3b, #065f46);
+  color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .fs-thumb-btn.active-no {
+  background: linear-gradient(135deg, #450a0a, #7f1d1d);
+  color: #fca5a5;
+}
+
+/* Sección opcionales colapsable */
+[data-bs-theme="dark"] .fs-optional-wrapper {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-bs-theme="dark"] .fs-optional-toggle {
+  color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .fs-optional-toggle:hover {
+  background: #1e293b;
+}
+
+[data-bs-theme="dark"] .fs-optional-content {
+  border-top-color: #334155;
+}
+
+[data-bs-theme="dark"] .fs-mini-label {
+  color: #cbd5e1;
+}
+
+/* Textarea */
+[data-bs-theme="dark"] .feedback-textarea {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .feedback-textarea:focus {
+  border-color: var(--fs-primary);
+  background: #1e293b;
+}
+
+[data-bs-theme="dark"] .feedback-textarea::placeholder {
+  color: #64748b;
+}
+
+/* Badge de vigencia */
+[data-bs-theme="dark"] .fs-vigencia-badge {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+}
+
+/* Progress bar */
+[data-bs-theme="dark"] .fs-progress-bar {
+  background: #1e293b;
+}
+
+/* Card body */
+[data-bs-theme="dark"] .fs-card-body {
+  background: #0f172a;
+}

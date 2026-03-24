@@ -697,3 +697,188 @@ CARACTERÍSTICAS:
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ============================================================================
+   DARK MODE - Tema oscuro
+   ============================================================================ */
+[data-bs-theme="dark"] {
+    /* Neutrales invertidos */
+    --st-bg-light: #1e293b;
+    --st-bg-white: #0f172a;
+    --st-text-dark: #f1f5f9;
+    --st-text-gray: #cbd5e1;
+    --st-text-light: #94a3b8;
+
+    /* Sombras oscuras */
+    --st-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --st-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --st-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    --st-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* Fondo amarillo → fondo oscuro */
+[data-bs-theme="dark"] .st-dashboard-wrapper {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* Textos */
+[data-bs-theme="dark"] .st-hero-title {
+    color: var(--st-text-dark);
+}
+
+[data-bs-theme="dark"] .st-hero-subtitle {
+    color: var(--st-text-gray);
+}
+
+/* Cards y secciones con background: white hardcodeado */
+[data-bs-theme="dark"] .st-content-section {
+    background: #1e293b;
+}
+
+[data-bs-theme="dark"] .st-section-header {
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .st-section-title {
+    color: var(--st-text-dark);
+}
+
+/* Stats / gama items */
+[data-bs-theme="dark"] .st-gama-card {
+    background: #1e293b;
+}
+
+[data-bs-theme="dark"] .st-gama-card:hover {
+    background: #334155;
+}
+
+[data-bs-theme="dark"] .st-stat-item {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] .st-stat-item:hover {
+    background: #1e293b;
+}
+
+/* Distribución de estados */
+[data-bs-theme="dark"] .st-estado-item {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] .st-estado-item:hover {
+    background: #1e293b;
+}
+
+/* Sucursales */
+[data-bs-theme="dark"] .st-sucursal-item {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] .st-sucursal-item:hover {
+    background: #1e293b;
+}
+
+[data-bs-theme="dark"] .st-sucursal-name {
+    color: var(--st-text-dark);
+}
+
+/* Técnicos */
+[data-bs-theme="dark"] .st-tecnico-card {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] .st-tecnico-card:hover {
+    background: #1e293b;
+    border-color: var(--st-primary-light);
+}
+
+[data-bs-theme="dark"] .st-tecnico-name {
+    color: var(--st-text-dark);
+}
+
+[data-bs-theme="dark"] .st-tecnico-label {
+    color: var(--st-text-gray);
+}
+
+/* Órdenes sin actualización */
+[data-bs-theme="dark"] .st-orden-card {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] .st-orden-card:hover {
+    background: #1e293b;
+}
+
+[data-bs-theme="dark"] .st-orden-numero {
+    color: var(--st-text-dark);
+}
+
+[data-bs-theme="dark"] .st-orden-info {
+    color: var(--st-text-gray);
+}
+
+/* Progress bars y etiquetas de estado */
+[data-bs-theme="dark"] .st-progress-track {
+    background: #334155;
+}
+
+[data-bs-theme="dark"] .st-label-text,
+[data-bs-theme="dark"] .st-label {
+    color: var(--st-text-gray);
+}
+
+/* Distribución por estado */
+[data-bs-theme="dark"] .st-estado-item {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] .st-estado-item:hover {
+    background: #1e293b;
+}
+
+[data-bs-theme="dark"] .st-estado-progress {
+    background: #334155;
+}
+
+[data-bs-theme="dark"] .st-estado-count {
+    color: var(--st-primary);
+}
+
+/* Equipos por Gama */
+[data-bs-theme="dark"] .st-gama-item {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] .st-gama-item.alta:hover {
+    background: #450a0a;
+}
+
+[data-bs-theme="dark"] .st-gama-item.media:hover {
+    background: #1e3a5f;
+}
+
+[data-bs-theme="dark"] .st-gama-item.baja:hover {
+    background: #064e3b;
+}
+
+[data-bs-theme="dark"] .st-gama-label {
+    color: var(--st-text-gray);
+}
+
+/* Órdenes - textos */
+[data-bs-theme="dark"] .st-orden-equipo {
+    color: var(--st-text-dark);
+}
+
+[data-bs-theme="dark"] .st-orden-fecha {
+    color: var(--st-text-gray);
+}
+
+[data-bs-theme="dark"] .st-orden-tecnico {
+    color: var(--st-text-gray);
+}
+
+/* Estado vacío */
+[data-bs-theme="dark"] .st-empty-state {
+    color: var(--st-text-gray);
+}

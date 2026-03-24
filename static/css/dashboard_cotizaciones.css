@@ -418,3 +418,101 @@ body {
         margin-bottom: 1rem;
     }
 }
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+[data-bs-theme="dark"] {
+    --dashboard-bg: #0f172a;
+}
+
+[data-bs-theme="dark"] body {
+    background-color: #0f172a;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .dashboard-header {
+    background: linear-gradient(135deg, #1e1b4b 0%, #3b0764 100%);
+}
+
+[data-bs-theme="dark"] .filtros-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .filtros-card .card-header {
+    background: linear-gradient(135deg, #1e1b4b 0%, #3b0764 100%);
+}
+
+[data-bs-theme="dark"] .kpi-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .kpi-label {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .kpi-value {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .kpi-sub {
+    color: #64748b;
+}
+
+[data-bs-theme="dark"] .grafico-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .grafico-card .card-header {
+    background: linear-gradient(135deg, rgba(30, 27, 75, 0.8) 0%, rgba(59, 7, 100, 0.5) 100%);
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .grafico-card .card-header h5 {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .grafico-card .card-body {
+    background: linear-gradient(135deg, rgba(30, 27, 75, 0.15) 0%, transparent 100%);
+}
+
+[data-bs-theme="dark"] .form-label {
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .table {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .table thead th {
+    background: #0f172a;
+    color: #94a3b8;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .table tbody td {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .table tbody tr:hover td {
+    background: #334155;
+}
+
+/* Indicadores de estado en tabla */
+[data-bs-theme="dark"] .badge-aceptada {
+    background: #064e3b;
+    color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .badge-rechazada {
+    background: #450a0a;
+    color: #fca5a5;
+}
+
+[data-bs-theme="dark"] .card-body.compact {
+    background: #1e293b;
+}

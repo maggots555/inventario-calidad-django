@@ -3761,3 +3761,659 @@ thead.sticky-top {
         gap: 0.5rem !important;
     }
 }
+
+/* =============================================================================
+   DARK MODE OVERRIDES
+   Modificaciones para tema oscuro — organizadas por sección
+   ============================================================================= */
+
+[data-bs-theme="dark"] {
+    /* ===== VARIABLES CSS DARK ===== */
+    --st-primary: #8b9ff5;
+    --st-secondary: #9b6fc5;
+    --st-success: #4ade80;
+    --st-danger: #f87171;
+    --st-warning: #fbbf24;
+    --st-info: #60a5fa;
+    
+    --st-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    --st-shadow-hover: 0 4px 16px rgba(0,0,0,0.4);
+    
+    --primary-color: #6ea8fe;
+    --gray-50: #2b3035;
+    --gray-600: #adb5bd;
+    --gray-900: #e9ecef;
+}
+
+/* ===== CARDS DE SERVICIO TÉCNICO ===== */
+[data-bs-theme="dark"] .service-card {
+    background: #2b3035;
+    border-color: #495057;
+}
+
+[data-bs-theme="dark"] .service-card:hover {
+    border-color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .service-card-header,
+[data-bs-theme="dark"] .service-card-body,
+[data-bs-theme="dark"] .service-card-footer {
+    border-color: #495057;
+}
+
+[data-bs-theme="dark"] .service-card-footer {
+    background-color: #212529;
+}
+
+[data-bs-theme="dark"] .marca-principal,
+[data-bs-theme="dark"] .info-item strong {
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .info-item {
+    color: #dee2e6;
+}
+
+/* ===== INDICADORES ===== */
+[data-bs-theme="dark"] .indicadores .indicador {
+    background-color: #343a40;
+}
+
+/* Indicador-icon: reemplaza fondos pastel por equivalentes oscuros */
+[data-bs-theme="dark"] .indicador-icon {
+    border-radius: inherit;
+}
+
+/* Azul → azul oscuro translúcido */
+[data-bs-theme="dark"] .indicador-icon.has-images,
+[data-bs-theme="dark"] .indicador-icon.has-technician,
+[data-bs-theme="dark"] .indicador-icon.has-diagnostic {
+    background-color: rgba(96, 165, 250, 0.15) !important;
+    color: #60a5fa !important;
+}
+
+/* Verde → verde oscuro translúcido */
+[data-bs-theme="dark"] .indicador-icon.has-charger,
+[data-bs-theme="dark"] .indicador-icon.has-sale,
+[data-bs-theme="dark"] .indicador-icon.gama-alta {
+    background-color: rgba(52, 211, 153, 0.15) !important;
+    color: #34d399 !important;
+}
+
+/* Rojo → rojo oscuro translúcido */
+[data-bs-theme="dark"] .indicador-icon.no-charger,
+[data-bs-theme="dark"] .indicador-icon.no-sale {
+    background-color: rgba(248, 113, 113, 0.15) !important;
+    color: #f87171 !important;
+}
+
+/* Gris → gris oscuro */
+[data-bs-theme="dark"] .indicador-icon.no-images,
+[data-bs-theme="dark"] .indicador-icon.no-technician,
+[data-bs-theme="dark"] .indicador-icon.no-responsible,
+[data-bs-theme="dark"] .indicador-icon.no-quotation,
+[data-bs-theme="dark"] .indicador-icon.no-diagnostic,
+[data-bs-theme="dark"] .indicador-icon.gama-baja {
+    background-color: rgba(75, 85, 99, 0.35) !important;
+    color: #94a3b8 !important;
+}
+
+/* Morado → morado oscuro */
+[data-bs-theme="dark"] .indicador-icon.has-responsible {
+    background-color: rgba(167, 139, 250, 0.15) !important;
+    color: #a78bfa !important;
+}
+
+/* Ámbar → ámbar oscuro */
+[data-bs-theme="dark"] .indicador-icon.has-quotation {
+    background-color: rgba(251, 191, 36, 0.15) !important;
+    color: #fbbf24 !important;
+}
+
+/* Naranja → naranja oscuro */
+[data-bs-theme="dark"] .indicador-icon.gama-media {
+    background-color: rgba(251, 146, 60, 0.15) !important;
+    color: #fb923c !important;
+}
+
+/* ===== BARRA DE BÚSQUEDA ===== */
+[data-bs-theme="dark"] .search-box {
+    background: #2b3035;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* ===== SECTION CARDS ===== */
+[data-bs-theme="dark"] .section-card {
+    background: #2b3035;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* ===== TIMELINE ===== */
+[data-bs-theme="dark"] .timeline-item {
+    border-left-color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .timeline-item::before {
+    background: #8b9ff5;
+    border-color: #2b3035;
+    box-shadow: 0 0 0 3px rgba(139, 159, 245, 0.3);
+}
+
+/* ===== GALERÍA DE IMÁGENES ===== */
+[data-bs-theme="dark"] .gallery-image {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+[data-bs-theme="dark"] .image-footer {
+    background: #343a40;
+    border-color: #495057;
+}
+
+[data-bs-theme="dark"] .image-footer small {
+    color: #adb5bd;
+}
+
+[data-bs-theme="dark"] .image-footer i {
+    color: #6ea8fe;
+}
+
+/* ===== TABS DE IMÁGENES ===== */
+[data-bs-theme="dark"] #imagenesTab .nav-link:hover {
+    background-color: rgba(139, 159, 245, 0.15);
+}
+
+/* ===== FORMULARIOS ===== */
+[data-bs-theme="dark"] .section-card form .form-control:focus,
+[data-bs-theme="dark"] .section-card form .form-select:focus {
+    border-color: #8b9ff5;
+    box-shadow: 0 0 0 0.2rem rgba(139, 159, 245, 0.25);
+}
+
+/* ===== SCROLLBARS PERSONALIZADOS ===== */
+[data-bs-theme="dark"] .card-body::-webkit-scrollbar-track {
+    background: #343a40;
+}
+
+[data-bs-theme="dark"] .card-body::-webkit-scrollbar-thumb {
+    background: #8b9ff5;
+}
+
+[data-bs-theme="dark"] .card-body::-webkit-scrollbar-thumb:hover {
+    background: #9b6fc5;
+}
+
+/* ===== BADGES DE DÍAS SIN ACTUALIZACIÓN ===== */
+[data-bs-theme="dark"] .badge-dias-sin-actualizacion.bg-success {
+    background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+}
+
+[data-bs-theme="dark"] .badge-dias-sin-actualizacion.bg-warning {
+    background: linear-gradient(135deg, #eab308, #ca8a04) !important;
+}
+
+[data-bs-theme="dark"] .badge-dias-sin-actualizacion.bg-danger {
+    background: linear-gradient(135deg, #f87171, #ef4444) !important;
+}
+
+/* ===== ÓRDENES ESPECIALES ===== */
+[data-bs-theme="dark"] .orden-oow {
+    background: linear-gradient(135deg, rgba(252, 228, 236, 0.15) 0%, rgba(248, 187, 217, 0.15) 100%);
+    border-color: rgba(216, 111, 146, 0.5);
+    box-shadow: 0 3px 12px rgba(167, 73, 151, 0.3);
+}
+
+[data-bs-theme="dark"] .orden-fl {
+    background: linear-gradient(135deg, rgba(244, 143, 177, 0.15) 0%, rgba(235, 166, 189, 0.15) 100%);
+    border-color: rgba(199, 95, 137, 0.5);
+}
+
+[data-bs-theme="dark"] .orden-mx-cis {
+    background: linear-gradient(135deg, rgba(225, 190, 231, 0.15) 0%, rgba(186, 104, 200, 0.15) 100%);
+    border-color: rgba(156, 39, 176, 0.5);
+}
+
+/* ===== CUADROS INFORMATIVOS ===== */
+[data-bs-theme="dark"] .tecnico-no-enciende-card,
+[data-bs-theme="dark"] .tecnico-gama-card {
+    background: #343a40;
+    border-color: #495057;
+}
+
+[data-bs-theme="dark"] .tecnico-no-enciende-card:hover,
+[data-bs-theme="dark"] .tecnico-gama-card:hover {
+    background: #3c4248;
+}
+
+[data-bs-theme="dark"] .tecnico-nombre {
+    color: #dee2e6;
+}
+
+[data-bs-theme="dark"] .tecnico-foto {
+    border-color: #495057;
+}
+
+/* ===== TARJETAS DE DESTINATARIOS ===== */
+[data-bs-theme="dark"] .destinatario-card {
+    background: #2b3035;
+}
+
+[data-bs-theme="dark"] .destinatario-card:hover {
+    background-color: #343a40 !important;
+}
+
+[data-bs-theme="dark"] .hover-shadow {
+    border-color: #495057 !important;
+}
+
+[data-bs-theme="dark"] .hover-shadow:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    border-color: #6ea8fe !important;
+}
+
+/* ===== TABLA DE COMPONENTES DIAGNÓSTICO ===== */
+[data-bs-theme="dark"] #tablaComponentesDiagnostico .input-dpn:disabled,
+[data-bs-theme="dark"] #tablaComponentesDiagnostico .input-dpn-dinamico:disabled {
+    background-color: #343a40;
+}
+
+/* ===== FECHAS SECCIÓN ===== */
+[data-bs-theme="dark"] .fechas-seccion .border {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+[data-bs-theme="dark"] .fechas-seccion .border:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+[data-bs-theme="dark"] .fechas-seccion input[type="date"],
+[data-bs-theme="dark"] .fechas-seccion input[type="datetime-local"] {
+    border-color: #495057;
+    background-color: #2b3035;
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .fechas-seccion input[type="date"]:focus,
+[data-bs-theme="dark"] .fechas-seccion input[type="datetime-local"]:focus {
+    border-color: #6ea8fe;
+    box-shadow: 0 0 0 0.2rem rgba(110, 168, 254, 0.25);
+}
+
+[data-bs-theme="dark"] .fechas-seccion input[type="date"]:hover,
+[data-bs-theme="dark"] .fechas-seccion input[type="datetime-local"]:hover {
+    border-color: #6c757d;
+}
+
+/* ===== SELECCIÓN DE PIEZAS ===== */
+[data-bs-theme="dark"] #listaPiezasDisponibles .form-check:hover {
+    background-color: rgba(110, 168, 254, 0.1) !important;
+    border-color: #6ea8fe !important;
+}
+
+[data-bs-theme="dark"] #listaPiezasDisponibles .form-check:has(input:checked) {
+    background-color: rgba(110, 168, 254, 0.15) !important;
+    border-color: #6ea8fe !important;
+}
+
+[data-bs-theme="dark"] #listaPiezasDisponibles .form-check-input:hover {
+    border-color: #6ea8fe;
+    box-shadow: 0 0 0 3px rgba(110, 168, 254, 0.2);
+}
+
+[data-bs-theme="dark"] #listaPiezasDisponibles .form-check-input:checked {
+    background-color: #6ea8fe;
+    border-color: #6ea8fe;
+}
+
+/* ===== GRID DE TÉCNICOS ===== */
+[data-bs-theme="dark"] .st-tecnico-card {
+    background: #343a40;
+}
+
+[data-bs-theme="dark"] .st-tecnico-card:hover {
+    background: #2b3035;
+    border-color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .st-tecnico-avatar {
+    border-color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .st-tecnico-avatar-placeholder {
+    background: rgba(110, 168, 254, 0.2);
+    color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .st-tecnico-nombre {
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .st-tecnico-ordenes {
+    color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .st-tecnico-label {
+    color: #adb5bd;
+}
+
+/* ===== TABLA DE TRACKING ===== */
+/* Bootstrap 5 dark usa --bs-table-bg, no background-color */
+[data-bs-theme="dark"] .table-success.bg-success.bg-opacity-10 {
+    --bs-table-bg: rgba(34, 197, 94, 0.08) !important;
+    --bs-table-striped-bg: rgba(34, 197, 94, 0.10) !important;
+    --bs-table-hover-bg: rgba(34, 197, 94, 0.12) !important;
+    --bs-table-color: #d1fae5 !important;
+    background-color: rgba(34, 197, 94, 0.08) !important;
+    border-left-color: #22c55e;
+}
+
+[data-bs-theme="dark"] .table-hover tbody tr:hover {
+    background-color: rgba(110, 168, 254, 0.08);
+}
+
+[data-bs-theme="dark"] thead.sticky-top {
+    background-color: #2b3035;
+}
+
+[data-bs-theme="dark"] .alert-light.border-top {
+    background-color: #343a40 !important;
+    border-color: #495057 !important;
+}
+
+/* ===== BOTÓN FLOTANTE IR A GALERÍA ===== */
+[data-bs-theme="dark"] .btn-ir-galeria {
+    background: linear-gradient(135deg, #3c4248 0%, #495057 100%);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-bs-theme="dark"] .btn-ir-galeria:hover {
+    background: linear-gradient(135deg, #495057 0%, #3c4248 100%);
+}
+
+/* ===== SISTEMA DUAL DE SUBIDA ===== */
+[data-bs-theme="dark"] .preview-container {
+    background: #343a40;
+    border-color: #495057;
+}
+
+[data-bs-theme="dark"] #contenedorMiniaturas::-webkit-scrollbar-track {
+    background: #2b3035;
+}
+
+[data-bs-theme="dark"] #contenedorMiniaturas::-webkit-scrollbar-thumb {
+    background: #6c757d;
+}
+
+[data-bs-theme="dark"] #contenedorMiniaturas::-webkit-scrollbar-thumb:hover {
+    background: #8b9099;
+}
+
+[data-bs-theme="dark"] .preview-thumbnail {
+    background: #2b3035;
+    border-color: #495057;
+}
+
+[data-bs-theme="dark"] .preview-thumbnail:hover {
+    border-color: #6ea8fe;
+}
+
+/* ===== VISOR DE CÁMARA ===== */
+/* El modal de cámara ya es negro por diseño, solo ajustes menores */
+[data-bs-theme="dark"] .camera-error {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+/* ===== AUTOCOMPLETADO ===== */
+[data-bs-theme="dark"] .autocomplete-dropdown {
+    background: #2b3035;
+    border-color: #495057;
+    border-top-color: #6ea8fe;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-bs-theme="dark"] .autocomplete-item {
+    border-bottom-color: #343a40;
+}
+
+[data-bs-theme="dark"] .autocomplete-item:hover,
+[data-bs-theme="dark"] .autocomplete-item-activo {
+    background-color: rgba(110, 168, 254, 0.15);
+}
+
+[data-bs-theme="dark"] .autocomplete-item-activo {
+    border-left-color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .autocomplete-orden {
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .autocomplete-item-secundario {
+    color: #adb5bd;
+}
+
+[data-bs-theme="dark"] .autocomplete-service-tag {
+    color: #dee2e6;
+}
+
+[data-bs-theme="dark"] .autocomplete-orden-interna {
+    color: #6c757d;
+}
+
+[data-bs-theme="dark"] .autocomplete-item mark {
+    background-color: rgba(251, 191, 36, 0.3);
+    color: #fde68a;
+}
+
+[data-bs-theme="dark"] .autocomplete-cargando {
+    color: #adb5bd;
+}
+
+[data-bs-theme="dark"] .autocomplete-sin-resultados {
+    color: #6c757d;
+}
+
+[data-bs-theme="dark"] .autocomplete-sin-resultados small {
+    color: #495057;
+}
+
+/* ===== PAGINACIÓN ===== */
+[data-bs-theme="dark"] .paginacion-info {
+    color: #adb5bd;
+}
+
+[data-bs-theme="dark"] .paginacion-info strong {
+    color: #e9ecef;
+}
+
+[data-bs-theme="dark"] .paginacion-container .page-link {
+    border-color: #495057;
+    color: #dee2e6;
+    background-color: #2b3035;
+}
+
+[data-bs-theme="dark"] .paginacion-container .page-link:hover {
+    background-color: rgba(110, 168, 254, 0.15);
+    border-color: #6ea8fe;
+    color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .paginacion-container .page-item.disabled .page-link {
+    background-color: #343a40;
+    border-color: #495057;
+    color: #6c757d;
+}
+
+[data-bs-theme="dark"] .paginacion-container .page-item.disabled .page-link.paginacion-ellipsis {
+    background: transparent;
+    color: #6c757d;
+}
+
+/* ===== SELECTOR DE TIPO DE IMAGEN ===== */
+[data-bs-theme="dark"] .tipo-imagen-card {
+    background: #343a40;
+    border-color: #495057;
+    color: #adb5bd;
+}
+
+[data-bs-theme="dark"] .tipo-imagen-card:hover {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Colores por tipo en dark mode (ajustados a opacidad menor) */
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-ingreso {
+    border-color: rgba(158, 197, 254, 0.3);
+    color: #6ea8fe;
+}
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-ingreso:hover {
+    background: rgba(13, 110, 253, 0.15);
+    border-color: #6ea8fe;
+}
+[data-bs-theme="dark"] .tipo-imagen-radio[value="ingreso"]:checked + .tipo-imagen-card.tipo-ingreso {
+    background: rgba(13, 110, 253, 0.25);
+    border-color: #6ea8fe;
+    color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-diagnostico {
+    border-color: rgba(254, 203, 161, 0.3);
+    color: #fdb88e;
+}
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-diagnostico:hover {
+    background: rgba(253, 126, 20, 0.15);
+    border-color: #fd7e14;
+}
+[data-bs-theme="dark"] .tipo-imagen-radio[value="diagnostico"]:checked + .tipo-imagen-card.tipo-diagnostico {
+    background: rgba(253, 126, 20, 0.25);
+    border-color: #fd7e14;
+    color: #fdb88e;
+}
+
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-reparacion {
+    border-color: rgba(163, 207, 187, 0.3);
+    color: #75b798;
+}
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-reparacion:hover {
+    background: rgba(25, 135, 84, 0.15);
+    border-color: #198754;
+}
+[data-bs-theme="dark"] .tipo-imagen-radio[value="reparacion"]:checked + .tipo-imagen-card.tipo-reparacion {
+    background: rgba(25, 135, 84, 0.25);
+    border-color: #198754;
+    color: #75b798;
+}
+
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-egreso {
+    border-color: rgba(241, 174, 181, 0.3);
+    color: #f5b7b1;
+}
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-egreso:hover {
+    background: rgba(220, 53, 69, 0.15);
+    border-color: #dc3545;
+}
+[data-bs-theme="dark"] .tipo-imagen-radio[value="egreso"]:checked + .tipo-imagen-card.tipo-egreso {
+    background: rgba(220, 53, 69, 0.25);
+    border-color: #dc3545;
+    color: #f5b7b1;
+}
+
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-autorizacion {
+    border-color: rgba(194, 159, 250, 0.3);
+    color: #c29ffa;
+}
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-autorizacion:hover {
+    background: rgba(111, 66, 193, 0.15);
+    border-color: #6f42c1;
+}
+[data-bs-theme="dark"] .tipo-imagen-radio[value="autorizacion"]:checked + .tipo-imagen-card.tipo-autorizacion {
+    background: rgba(111, 66, 193, 0.25);
+    border-color: #6f42c1;
+    color: #c29ffa;
+}
+
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-packing {
+    border-color: rgba(163, 233, 205, 0.3);
+    color: #5edead;
+}
+[data-bs-theme="dark"] .tipo-imagen-card.tipo-packing:hover {
+    background: rgba(32, 201, 151, 0.15);
+    border-color: #20c997;
+}
+[data-bs-theme="dark"] .tipo-imagen-radio[value="packing"]:checked + .tipo-imagen-card.tipo-packing {
+    background: rgba(32, 201, 151, 0.25);
+    border-color: #20c997;
+    color: #5edead;
+}
+
+/* Avisos de tipo de imagen */
+[data-bs-theme="dark"] .tipo-imagen-aviso.aviso-ingreso      { background: rgba(207, 226, 255, 0.15); color: #9ec5fe; border-color: #6ea8fe; }
+[data-bs-theme="dark"] .tipo-imagen-aviso.aviso-diagnostico  { background: rgba(255, 229, 208, 0.15); color: #fdb88e; border-color: #fd7e14; }
+[data-bs-theme="dark"] .tipo-imagen-aviso.aviso-reparacion   { background: rgba(209, 231, 221, 0.15); color: #75b798; border-color: #198754; }
+[data-bs-theme="dark"] .tipo-imagen-aviso.aviso-egreso       { background: rgba(248, 215, 218, 0.15); color: #f5b7b1; border-color: #dc3545; }
+[data-bs-theme="dark"] .tipo-imagen-aviso.aviso-autorizacion { background: rgba(233, 216, 253, 0.15); color: #c29ffa; border-color: #6f42c1; }
+[data-bs-theme="dark"] .tipo-imagen-aviso.aviso-packing      { background: rgba(209, 245, 227, 0.15); color: #5edead; border-color: #20c997; }
+
+/* ===== REINGRESO CHIP ===== */
+[data-bs-theme="dark"] .reingreso-chip {
+    background: #2b3035;
+}
+
+[data-bs-theme="dark"] .reingreso-chip:hover {
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+}
+
+[data-bs-theme="dark"] #reingreso-busqueda:focus {
+    border-color: #f87171;
+    box-shadow: 0 0 0 0.2rem rgba(248, 113, 113, 0.25);
+}
+
+[data-bs-theme="dark"] #reingreso-dropdown {
+    border-top-color: #f87171;
+}
+
+[data-bs-theme="dark"] .autocomplete-item-modelo {
+    color: #adb5bd;
+}
+
+/* Alerts con gradiente hardcodeado → override con background shorthand */
+[data-bs-theme="dark"] .alert-info.d-flex {
+    background: linear-gradient(135deg, #0c2a4a 0%, #0f3460 100%) !important;
+    border-left-color: #3b82f6 !important;
+    color: #93c5fd !important;
+}
+
+[data-bs-theme="dark"] .alert-info.d-flex h6,
+[data-bs-theme="dark"] .alert-info.d-flex .h6 {
+    color: #bfdbfe !important;
+}
+
+[data-bs-theme="dark"] .alert-info.d-flex strong {
+    color: #93c5fd !important;
+}
+
+[data-bs-theme="dark"] .alert-info.d-flex i {
+    color: #60a5fa !important;
+}
+
+/* =====================================================================
+   ENCABEZADOS CON GRADIENTE (inline styles) → DARK MODE
+   ===================================================================== */
+
+/* Card-header principal ("Estadísticas Unificadas") y cabecera de sucursal:
+   el gradiente púrpura vibrante #667eea→#764ba2 se reemplaza por
+   un azul-índigo profundo más apto para fondos oscuros */
+[data-bs-theme="dark"] .sucursal-header,
+[data-bs-theme="dark"] .card-header[style*="linear-gradient"] {
+    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%) !important;
+    border-bottom-color: #4338ca !important;
+    box-shadow: 0 3px 8px rgba(67, 56, 202, 0.25) !important;
+}
+
+/* Encabezados de área (DELL, Lenovo, OOW…):
+   cada marca tiene su propio color vibrante — con filter los atenuamos
+   un 40% de brillo y un 15% de saturación; el texto blanco queda
+   legible (gris claro) y los colores de marca se reconocen */
+[data-bs-theme="dark"] .area-header {
+    filter: brightness(0.6) saturate(0.85);
+}
+
+/* ===== FIN DARK MODE ===== */

@@ -634,6 +634,134 @@ CARACTERÍSTICAS:
 }
 
 /* ============================================================================
+   DARK MODE - Tema oscuro
+   ============================================================================ */
+[data-bs-theme="dark"] {
+    /* Colores neutrales invertidos */
+    --color-bg-light: #1e293b;
+    --color-bg-white: #0f172a;
+    --color-text-dark: #f1f5f9;
+    --color-text-gray: #cbd5e1;
+    --color-text-light: #94a3b8;
+    
+    /* Colores de módulos - ajustados para dark mode */
+    --color-inventario: #818CF8;
+    --color-inventario-light: #A5B4FC;
+    --color-inventario-dark: #4F46E5;
+    
+    --color-scorecard: #34D399;
+    --color-scorecard-light: #6EE7B7;
+    --color-scorecard-dark: #10B981;
+    
+    --color-servicio: #FBBF24;
+    --color-servicio-light: #FCD34D;
+    --color-servicio-dark: #F59E0B;
+
+    --color-almacen: #A78BFA;
+    --color-almacen-light: #C4B5FD;
+    --color-almacen-dark: #8B5CF6;
+    
+    /* Sombras oscuras */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* Fondo principal dark */
+[data-bs-theme="dark"] .dashboard-principal-wrapper {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* Hero section dark */
+[data-bs-theme="dark"] .hero-title {
+    color: var(--color-text-dark);
+}
+
+[data-bs-theme="dark"] .hero-subtitle {
+    color: var(--color-text-gray);
+}
+
+/* Module cards dark */
+[data-bs-theme="dark"] .module-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .module-card::before {
+    background: radial-gradient(circle, rgba(96, 165, 250, 0.2) 0%, transparent 70%);
+}
+
+[data-bs-theme="dark"] .module-card:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+}
+
+/* Bordes hover dark */
+[data-bs-theme="dark"] .module-card.inventario:hover {
+    border-color: var(--color-inventario);
+}
+
+[data-bs-theme="dark"] .module-card.scorecard:hover {
+    border-color: var(--color-scorecard);
+}
+
+[data-bs-theme="dark"] .module-card.servicio:hover {
+    border-color: var(--color-servicio);
+}
+
+[data-bs-theme="dark"] .module-card.almacen:hover {
+    border-color: var(--color-almacen);
+}
+
+/* Títulos y descripciones dark */
+[data-bs-theme="dark"] .module-title {
+    color: var(--color-text-dark);
+}
+
+[data-bs-theme="dark"] .module-description {
+    color: var(--color-text-gray);
+}
+
+/* Estadísticas dark */
+[data-bs-theme="dark"] .stat-item {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] .stat-item:hover {
+    background: #1e293b;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+[data-bs-theme="dark"] .stat-label {
+    color: var(--color-text-light);
+}
+
+/* Botones dark */
+[data-bs-theme="dark"] .module-button {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+}
+
+[data-bs-theme="dark"] .module-button:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
+/* Info box dark */
+[data-bs-theme="dark"] .info-box {
+    background: #1e293b;
+    border-left-color: var(--color-inventario);
+}
+
+[data-bs-theme="dark"] .info-box i {
+    color: var(--color-inventario);
+}
+
+[data-bs-theme="dark"] .info-box p {
+    color: var(--color-text-gray);
+}
+
+/* Colores específicos de botones ya están definidos por variables que se cambian arriba */
+
+/* ============================================================================
    MEJORAS DE ACCESIBILIDAD
    ============================================================================ */
 
@@ -648,5 +776,5 @@ CARACTERÍSTICAS:
 
 /* Mejores contrastes para modo oscuro del sistema */
 @media (prefers-color-scheme: dark) {
-    /* Puedes agregar estilos para modo oscuro aquí si lo deseas */
+    /* Estilos manejados por [data-bs-theme="dark"] arriba */
 }

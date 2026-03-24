@@ -22,9 +22,15 @@
 
 /* ====================================================================
    TARJETAS DE MÉTRICAS
+   Estilo alineado con scorecard/.kpi-card: gradiente sutil + borde lateral
    ==================================================================== */
 .metric-card {
-    border-left: 4px solid;
+    border-left: 5px solid;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+    overflow: hidden;
+    position: relative;
     transition: transform var(--transition-speed), box-shadow var(--transition-speed);
 }
 
@@ -35,13 +41,17 @@
 
 .metric-value {
     font-size: 2rem;
-    font-weight: bold;
+    font-weight: 700;
     margin: 0;
+    letter-spacing: -0.5px;
 }
 
 .metric-label {
     color: #6c757d;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 600;
     margin: 0;
 }
 
@@ -355,4 +365,113 @@ tr.row-rhitso:hover td {
     .table-dashboard {
         font-size: 0.75rem;
     }
+}
+
+/* ====================================================================
+   MODO OSCURO - dashboard_oow_fl.css
+   ==================================================================== */
+
+[data-bs-theme="dark"] {
+    --filter-gradient-start: #1e293b;
+    --filter-gradient-end: #0f172a;
+    --primary-gradient-start: #4338ca;
+    --primary-gradient-end: #5b21b6;
+}
+
+/* Sección de filtros (panel superior) */
+[data-bs-theme="dark"] .filter-section {
+    background: linear-gradient(135deg, #1e293b 0%, #162032 100%) !important;
+    border: 1px solid #334155;
+}
+
+/* Tarjetas de métricas: gradiente oscuro sutil (mismo patrón que scorecard) */
+[data-bs-theme="dark"] .metric-card {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+    border-color: inherit; /* mantiene el color del border-left */
+}
+
+[data-bs-theme="dark"] .metric-label {
+    color: #94a3b8;
+}
+
+/* Desglose de cotizaciones */
+[data-bs-theme="dark"] .cotizaciones-desglose {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+}
+
+[data-bs-theme="dark"] .cotizaciones-desglose .estado-item small {
+    color: #94a3b8;
+}
+
+/* Cuerpo de sección de responsable */
+[data-bs-theme="dark"] .responsable-body {
+    background: #1e293b !important;
+}
+
+[data-bs-theme="dark"] .responsable-section {
+    border-color: #334155;
+}
+
+/* Header de responsable: índigo oscuro en vez de púrpura vibrante */
+[data-bs-theme="dark"] .responsable-header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%) !important;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+/* Compact states */
+[data-bs-theme="dark"] .cotizaciones-desglose-compact .estado-aceptadas-compact {
+    background-color: rgba(52, 211, 153, 0.12);
+}
+
+[data-bs-theme="dark"] .cotizaciones-desglose-compact .estado-pendientes-compact {
+    background-color: rgba(251, 191, 36, 0.12);
+}
+
+[data-bs-theme="dark"] .cotizaciones-desglose-compact .estado-rechazadas-compact {
+    background-color: rgba(248, 113, 113, 0.12);
+}
+
+/* Header de tabla oscuro */
+[data-bs-theme="dark"] .table-dashboard th {
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-color: #334155;
+}
+
+/* Chart cards */
+[data-bs-theme="dark"] .card.chart-card {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .card.chart-card .card-header {
+    background: linear-gradient(135deg, rgba(240, 147, 251, 0.07) 0%, rgba(240, 147, 251, 0.03) 100%);
+    border-bottom-color: rgba(240, 147, 251, 0.2);
+}
+
+[data-bs-theme="dark"] .card.chart-card .card-header.top-productos {
+    background: linear-gradient(135deg, rgba(67, 233, 123, 0.07) 0%, rgba(67, 233, 123, 0.03) 100%);
+    border-bottom-color: rgba(67, 233, 123, 0.2);
+}
+
+/* Filas RHITSO (morado) → versión oscura */
+[data-bs-theme="dark"] .bg-purple-light {
+    background-color: #4c1d95 !important;
+    color: #ddd6fe !important;
+}
+
+[data-bs-theme="dark"] tr.row-rhitso td,
+[data-bs-theme="dark"] tr.row-rhitso {
+    background-color: #2e1065 !important;
+    border-color: #6d28d9 !important;
+}
+
+[data-bs-theme="dark"] tr.row-rhitso:hover td {
+    background-color: #3b0764 !important;
+}
+
+/* Badge gradient */
+[data-bs-theme="dark"] .badge-custom-primary {
+    background: linear-gradient(135deg, #4338ca 0%, #5b21b6 100%);
 }

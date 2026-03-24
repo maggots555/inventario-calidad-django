@@ -556,3 +556,91 @@
         height: 250px;
     }
 }
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+[data-bs-theme="dark"] {
+    --enc-bg: #0f172a;
+}
+
+[data-bs-theme="dark"] body {
+    background-color: #0f172a;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .enc-dashboard-header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d1b69 100%);
+}
+
+[data-bs-theme="dark"] .enc-filtros-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .enc-filtros-card .card-header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d1b69 100%);
+}
+
+[data-bs-theme="dark"] .enc-kpi-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .enc-kpi-card .kpi-label {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .enc-kpi-card .kpi-valor {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .enc-kpi-card .kpi-sub {
+    color: #64748b;
+}
+
+[data-bs-theme="dark"] .enc-chart-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .enc-chart-card .chart-titulo {
+    color: #e2e8f0;
+}
+
+/* Badges de score (verde/amarillo/rojo claro) */
+[data-bs-theme="dark"] .score-badge-excelente,
+[data-bs-theme="dark"] .score-alto {
+    background: linear-gradient(135deg, #064e3b, #065f46) !important;
+    color: #6ee7b7 !important;
+}
+
+[data-bs-theme="dark"] .score-badge-regular,
+[data-bs-theme="dark"] .score-medio {
+    background: linear-gradient(135deg, #451a03, #713f12) !important;
+    color: #fde68a !important;
+}
+
+[data-bs-theme="dark"] .score-badge-malo,
+[data-bs-theme="dark"] .score-bajo {
+    background: linear-gradient(135deg, #450a0a, #7f1d1d) !important;
+    color: #fca5a5 !important;
+}
+
+[data-bs-theme="dark"] .score-badge-neutro {
+    background: #1e293b !important;
+    color: #94a3b8 !important;
+}
+
+/* Elementos con fondos pastel hardcodeados */
+[data-bs-theme="dark"] [style*="background: #eff6ff"],
+[data-bs-theme="dark"] [style*="background:#eff6ff"],
+[data-bs-theme="dark"] [style*="background: #f9fafb"],
+[data-bs-theme="dark"] [style*="background: #f0f9ff"] {
+    background: #1e293b !important;
+    color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .enc-filtros-card .card-body {
+    background: #1e293b;
+}

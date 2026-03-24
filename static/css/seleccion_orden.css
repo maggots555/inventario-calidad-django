@@ -584,3 +584,58 @@ TÉCNICAS CSS UTILIZADAS:
     outline: 3px solid var(--color-diagnostico);
     outline-offset: 4px;
 }
+
+/* ==========================================================================
+   MODO OSCURO - seleccion_orden.css
+   ========================================================================== */
+
+[data-bs-theme="dark"] {
+    --bg-page: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    --bg-card: #1e293b;
+    --bg-hover: #0f172a;
+    --text-dark: #f1f5f9;
+    --text-medium: #cbd5e1;
+    --text-light: #94a3b8;
+}
+
+/* Caja de ayuda (¿No estás seguro cuál elegir?) */
+[data-bs-theme="dark"] .info-box {
+    background: rgba(30, 41, 59, 0.95) !important;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+[data-bs-theme="dark"] .info-box p {
+    color: var(--text-medium);
+}
+
+[data-bs-theme="dark"] .info-box strong {
+    color: #e2e8f0;
+}
+
+/* Hero: ajustar gradiente del ícono principal */
+[data-bs-theme="dark"] .hero-icon {
+    background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+/* Tarjetas de servicio */
+[data-bs-theme="dark"] .service-card {
+    border-color: #334155;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+[data-bs-theme="dark"] .service-card:hover {
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+
+[data-bs-theme="dark"] .service-card.diagnostico:hover {
+    background: #1e293b;
+    border-color: var(--color-diagnostico-light);
+}
+
+[data-bs-theme="dark"] .service-card.venta-mostrador:hover {
+    background: #1e293b;
+    border-color: var(--color-venta-light);
+}

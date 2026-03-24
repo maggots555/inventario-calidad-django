@@ -246,3 +246,96 @@
     .se-header h1 { font-size: 1.35rem; }
     .kpi-valor { font-size: 1.5rem; }
 }
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+[data-bs-theme="dark"] {
+    --se-bg: #0f172a;
+}
+
+[data-bs-theme="dark"] body {
+    background-color: #0f172a;
+    color: #e2e8f0;
+}
+
+/* El header azul/teal puede mantenerse oscuro, ajustar texto */
+[data-bs-theme="dark"] .se-header {
+    background: linear-gradient(135deg, #0e4d6f 0%, #065f46 100%);
+}
+
+[data-bs-theme="dark"] .se-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .se-card .card-header {
+    background: linear-gradient(135deg, #0e4d6f 0%, #065f46 100%);
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .se-card .card-footer {
+    background: #0f172a;
+    border-top-color: #334155;
+}
+
+[data-bs-theme="dark"] .se-card .card-body {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .se-kpi-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .kpi-label {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .kpi-valor {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .kpi-sub {
+    color: #64748b;
+}
+
+[data-bs-theme="dark"] .se-chart-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .se-chart-titulo {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .se-chart-subtitle {
+    color: #94a3b8;
+}
+
+/* Badges de estado de enlace */
+[data-bs-theme="dark"] .se-estado-activo,
+[data-bs-theme="dark"] .badge-activo {
+    background: #064e3b !important;
+    color: #6ee7b7 !important;
+}
+
+[data-bs-theme="dark"] .se-estado-vencido,
+[data-bs-theme="dark"] .badge-vencido {
+    background: #450a0a !important;
+    color: #fca5a5 !important;
+}
+
+[data-bs-theme="dark"] .se-estado-nuevo,
+[data-bs-theme="dark"] .badge-nuevo {
+    background: #1e3a5f !important;
+    color: #93c5fd !important;
+}
+
+/* Fondo #f8fafc → oscuro */
+[data-bs-theme="dark"] .se-card .card-body[style*="#f8fafc"],
+[data-bs-theme="dark"] .se-empty-msg {
+    background: #0f172a;
+    color: #64748b;
+}

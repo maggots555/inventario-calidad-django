@@ -88,6 +88,23 @@
         background-color: rgba(40, 167, 69, 0.08) !important;
         border-left: 3px solid #28a745;
     }
+    
+    /* Dark mode: fila next-rotation — verde tenue sobre fondo oscuro.
+       Bootstrap 5 dark usa --bs-table-bg (CSS variable), no background-color,
+       por eso hay que sobreescribir la variable Y el background shorthand. */
+    [data-bs-theme="dark"] .table-success {
+        --bs-table-bg: rgba(34, 197, 94, 0.08) !important;
+        --bs-table-striped-bg: rgba(34, 197, 94, 0.10) !important;
+        --bs-table-hover-bg: rgba(34, 197, 94, 0.12) !important;
+        --bs-table-color: #d1fae5 !important;
+        background-color: rgba(34, 197, 94, 0.08) !important;
+        border-left-color: #22c55e !important;
+    }
+
+    /* Clase auxiliar sin Bootstrap — garantiza el override */
+    [data-bs-theme="dark"] .tecnico-siguiente td {
+        background-color: rgba(34, 197, 94, 0.08) !important;
+    }
 </style>
 {% endblock %}
 
@@ -346,7 +363,7 @@
                                     </thead>
                                     <tbody>
                                         {% for tecnico in area_grupo.tecnicos %}
-                                    <tr class="{% if tecnico.es_siguiente_rotacion %}table-success bg-success bg-opacity-10{% endif %}">
+                                    <tr class="{% if tecnico.es_siguiente_rotacion %}table-success tecnico-siguiente{% endif %}">
                                         <!-- Columna: Técnico -->
                                         <td>
                                             <div class="d-flex align-items-center gap-2">

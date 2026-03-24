@@ -1051,3 +1051,118 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================
+   DARK MODE - Seguimiento de cliente
+   ============================================================ */
+[data-bs-theme="dark"] {
+  --st-card-bg: rgba(15, 23, 42, 0.92);
+}
+
+/* Fondo degradado oscuro - ya es oscuro, hacemos más profundo */
+[data-bs-theme="dark"] .st-body {
+  background: linear-gradient(135deg, #0c2340 0%, #0a2a1f 40%, #0a1f26 70%, #0a1f1f 100%);
+  color: #e2e8f0;
+}
+
+/* Card principal - glassmorphism oscuro */
+[data-bs-theme="dark"] .st-card {
+  background: var(--st-card-bg);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Info del equipo - gradiente azul claro → oscuro */
+[data-bs-theme="dark"] .st-equipo-info {
+  background: linear-gradient(135deg, #0c2340 0%, #0d2d40 100%);
+  border-color: rgba(31, 99, 145, 0.15);
+}
+
+[data-bs-theme="dark"] .st-equipo-folio {
+  color: #7dd3fc;
+}
+
+[data-bs-theme="dark"] .st-equipo-nombre {
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .st-equipo-serial,
+[data-bs-theme="dark"] .st-equipo-falla {
+  color: #94a3b8;
+}
+
+/* Timeline */
+[data-bs-theme="dark"] .st-timeline::before {
+  background: linear-gradient(180deg, #334155 0%, #475569 100%);
+}
+
+[data-bs-theme="dark"] .st-timeline-dot {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+[data-bs-theme="dark"] .st-timeline-content {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-bs-theme="dark"] .st-timeline-item--current .st-timeline-content {
+  background: linear-gradient(135deg, #0c2340, #1e3a5f);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-bs-theme="dark"] .st-timeline-nombre {
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .st-timeline-item--current .st-timeline-content .st-timeline-nombre {
+  color: #7dd3fc;
+}
+
+[data-bs-theme="dark"] .st-timeline-fecha {
+  color: #64748b;
+}
+
+[data-bs-theme="dark"] .st-timeline-hace {
+  color: #475569;
+}
+
+/* Banners contextuales */
+[data-bs-theme="dark"] .st-banner--warning {
+  background: linear-gradient(135deg, #451a03, #713f12);
+  border-color: rgba(245, 158, 11, 0.3);
+  border-left-color: #f59e0b;
+}
+
+[data-bs-theme="dark"] .st-banner--success {
+  background: linear-gradient(135deg, #052e16, #064e3b);
+  border-color: rgba(16, 185, 129, 0.3);
+  border-left-color: #10b981;
+}
+
+[data-bs-theme="dark"] .st-banner-text {
+  color: #e2e8f0;
+}
+
+/* Sección de contacto */
+[data-bs-theme="dark"] .st-contacto {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  border-color: #334155;
+}
+
+[data-bs-theme="dark"] .st-contacto-title {
+  color: #64748b;
+}
+
+[data-bs-theme="dark"] .st-contacto-nombre {
+  color: #e2e8f0;
+}
+
+/* Estado badge */
+[data-bs-theme="dark"] .st-estado-badge {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Card body */
+[data-bs-theme="dark"] .st-card-body {
+  background: #0f172a;
+}

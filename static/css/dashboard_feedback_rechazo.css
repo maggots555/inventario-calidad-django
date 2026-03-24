@@ -455,3 +455,107 @@
         height: 250px;
     }
 }
+
+/* ============================================================
+   DARK MODE
+   ============================================================ */
+[data-bs-theme="dark"] body {
+    background-color: #0f172a;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .fbr-dashboard-header {
+    background: linear-gradient(135deg, #7f1d1d 0%, #9a3412 100%);
+}
+
+[data-bs-theme="dark"] .fbr-filtros-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .fbr-filtros-card .card-header {
+    background: linear-gradient(135deg, #7f1d1d 0%, #9a3412 100%);
+}
+
+[data-bs-theme="dark"] .fbr-kpi-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .fbr-kpi-card .kpi-label {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .fbr-kpi-card .kpi-valor {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .fbr-kpi-card .kpi-sub {
+    color: #64748b;
+}
+
+[data-bs-theme="dark"] .fbr-chart-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .fbr-chart-card .chart-titulo {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .fbr-tabla-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .fbr-tabla-card .card-header {
+    background: linear-gradient(135deg, #7f1d1d 0%, #9a3412 100%);
+}
+
+/* Indicadores de severidad (fondos pastel → tonos oscuros) */
+[data-bs-theme="dark"] .severity-high,
+[data-bs-theme="dark"] .fbr-severity-high {
+    background: #450a0a !important;
+    color: #fca5a5 !important;
+}
+
+[data-bs-theme="dark"] .severity-mid,
+[data-bs-theme="dark"] .fbr-severity-mid {
+    background: #713f12 !important;
+    color: #fde68a !important;
+}
+
+[data-bs-theme="dark"] .severity-low,
+[data-bs-theme="dark"] .fbr-severity-low {
+    background: #064e3b !important;
+    color: #6ee7b7 !important;
+}
+
+[data-bs-theme="dark"] .severity-none,
+[data-bs-theme="dark"] .fbr-severity-none {
+    background: #1e293b !important;
+    color: #94a3b8 !important;
+}
+
+/* Filas de tabla */
+[data-bs-theme="dark"] .fbr-tabla-card .table thead th {
+    background: #0f172a;
+    color: #94a3b8;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .fbr-tabla-card .table tbody td {
+    color: #cbd5e1;
+    border-color: #334155;
+}
+
+/* Fondos pastel hardcodeados */
+[data-bs-theme="dark"] .fbr-motivo-item,
+[data-bs-theme="dark"] .motivo-detail-row {
+    background: #0f172a !important;
+    color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .fbr-chart-card .card-body {
+    background: linear-gradient(135deg, rgba(127,29,29,0.1) 0%, transparent 100%);
+}
