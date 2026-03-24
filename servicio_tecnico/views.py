@@ -14567,3 +14567,250 @@ def api_seguimiento_enlaces_tabla(request):
         'tiene_siguiente': page.has_next(),
         'tiene_anterior': page.has_previous(),
     })
+
+
+# ============================================================================
+# MI PERFIL — MÉTRICAS PERSONALES DEL EMPLEADO (Marzo 2026)
+# ============================================================================
+
+@login_required
+def mi_perfil(request):
+    """
+    Página "Mi Perfil" con tarjeta de métricas personales.
+    Muestra métricas personalizadas según el rol del empleado:
+      - Recepcionista: cotizaciones gestionadas, ventas mostrador, encuestas
+      - Técnico: órdenes asignadas, cotizaciones donde participó, RHITSO
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista detecta automáticamente el rol del empleado logueado
+    y calcula métricas relevantes para él, reutilizando datos que
+    ya se calculan en otros dashboards del sistema.
+    """
+    from django.db.models import Avg, Sum, Count, Q
+    from decimal import Decimal
+    from datetime import timedelta
+    from .models import Cotizacion, VentaMostrador, FeedbackCliente
+
+    # =====================================================================
+    # 1. OBTENER EMPLEADO DEL USUARIO LOGUEADO
+    # =====================================================================
+    empleado = getattr(request.user, 'empleado', None)
+    if not empleado:
+        messages.warning(request, 'Tu cuenta no tiene un perfil de empleado asociado.')
+        return redirect('servicio_tecnico:inicio')
+
+    rol = empleado.rol  # 'recepcionista', 'tecnico', etc.
+    ahora = timezone.now()
+    inicio_mes = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    hace_90_dias = ahora - timedelta(days=90)
+
+    # =====================================================================
+    # 2. MÉTRICAS COMUNES A TODOS LOS ROLES
+    # =====================================================================
+    # Órdenes activas donde participan (como técnico O como responsable)
+    ordenes_activas_count = OrdenServicio.objects.filter(
+        Q(tecnico_asignado_actual=empleado) | Q(responsable_seguimiento=empleado)
+    ).exclude(estado__in=['entregado', 'cancelado']).distinct().count()
+
+    # Órdenes entregadas este mes
+    ordenes_entregadas_mes = OrdenServicio.objects.filter(
+        Q(tecnico_asignado_actual=empleado) | Q(responsable_seguimiento=empleado),
+        estado='entregado',
+        fecha_entrega__gte=inicio_mes
+    ).distinct().count()
+
+    # Antigüedad en el sistema
+    dias_en_sistema = (ahora - empleado.fecha_ingreso).days if empleado.fecha_ingreso else 0
+
+    metricas = {
+        'ordenes_activas': ordenes_activas_count,
+        'ordenes_entregadas_mes': ordenes_entregadas_mes,
+        'dias_en_sistema': dias_en_sistema,
+    }
+
+    # =====================================================================
+    # 3. MÉTRICAS PARA RECEPCIONISTA (responsable_seguimiento)
+    # =====================================================================
+    if rol == 'recepcionista':
+        # --- Cotizaciones donde es responsable de seguimiento ---
+        ordenes_con_cotizacion = OrdenServicio.objects.filter(
+            responsable_seguimiento=empleado,
+            cotizacion__isnull=False,
+        ).select_related('cotizacion')
+
+        cotizaciones_ordenes = ordenes_con_cotizacion.filter(
+            cotizacion__fecha_envio__gte=hace_90_dias
+        )
+
+        total_cotizaciones = cotizaciones_ordenes.count()
+        cotizaciones_aceptadas = cotizaciones_ordenes.filter(cotizacion__usuario_acepto=True).count()
+        cotizaciones_rechazadas = cotizaciones_ordenes.filter(cotizacion__usuario_acepto=False).count()
+        cotizaciones_pendientes = cotizaciones_ordenes.filter(cotizacion__usuario_acepto__isnull=True).count()
+
+        tasa_aceptacion = round(
+            (cotizaciones_aceptadas / total_cotizaciones * 100) if total_cotizaciones > 0 else 0, 1
+        )
+
+        # Valor cotizado y valor aceptado (últimos 90 días)
+        valor_cotizado = Decimal('0.00')
+        valor_aceptado = Decimal('0.00')
+        for orden in cotizaciones_ordenes.select_related('cotizacion'):
+            cot = orden.cotizacion
+            valor_cotizado += cot.costo_total
+            if cot.usuario_acepto:
+                valor_aceptado += cot.costo_total_final
+
+        # --- Ventas Mostrador donde es responsable ---
+        ventas_mostrador_qs = OrdenServicio.objects.filter(
+            responsable_seguimiento=empleado,
+            venta_mostrador__isnull=False,
+            venta_mostrador__fecha_venta__gte=hace_90_dias,
+        ).select_related('venta_mostrador')
+
+        total_ventas_mostrador = ventas_mostrador_qs.count()
+        monto_ventas_mostrador = Decimal('0.00')
+        for orden in ventas_mostrador_qs:
+            monto_ventas_mostrador += orden.venta_mostrador.total_venta
+
+        # --- Encuestas de satisfacción (donde es responsable) ---
+        encuestas_qs = FeedbackCliente.objects.filter(
+            tipo='satisfaccion',
+            orden__responsable_seguimiento=empleado,
+            utilizado=True,
+        )
+        total_encuestas_respondidas = encuestas_qs.count()
+        encuestas_avgs = encuestas_qs.aggregate(
+            nps_promedio=Avg('nps'),
+            calificacion_promedio=Avg('calificacion_general'),
+        )
+        nps_promedio = round(encuestas_avgs['nps_promedio'] or 0, 1)
+        calificacion_promedio = round(encuestas_avgs['calificacion_promedio'] or 0, 1)
+
+        # Tasa de recomendación
+        con_recomendacion = encuestas_qs.filter(recomienda__isnull=False).count()
+        recomiendan = encuestas_qs.filter(recomienda=True).count()
+        tasa_recomendacion = round(
+            (recomiendan / con_recomendacion * 100) if con_recomendacion > 0 else 0, 1
+        )
+
+        metricas.update({
+            'total_cotizaciones': total_cotizaciones,
+            'cotizaciones_aceptadas': cotizaciones_aceptadas,
+            'cotizaciones_rechazadas': cotizaciones_rechazadas,
+            'cotizaciones_pendientes': cotizaciones_pendientes,
+            'tasa_aceptacion': tasa_aceptacion,
+            'valor_cotizado': valor_cotizado,
+            'valor_aceptado': valor_aceptado,
+            'total_ventas_mostrador': total_ventas_mostrador,
+            'monto_ventas_mostrador': monto_ventas_mostrador,
+            'total_encuestas_respondidas': total_encuestas_respondidas,
+            'nps_promedio': nps_promedio,
+            'calificacion_promedio': calificacion_promedio,
+            'tasa_recomendacion': tasa_recomendacion,
+        })
+
+    # =====================================================================
+    # 4. MÉTRICAS PARA TÉCNICO (tecnico_asignado_actual)
+    # =====================================================================
+    elif rol == 'tecnico':
+        # Reutilizar método existente del modelo Empleado
+        stats_activas = empleado.obtener_estadisticas_ordenes_activas()
+
+        # --- Cotizaciones donde fue técnico asignado ---
+        ordenes_tecnico_cot = OrdenServicio.objects.filter(
+            tecnico_asignado_actual=empleado,
+            cotizacion__isnull=False,
+            cotizacion__fecha_envio__gte=hace_90_dias,
+        ).select_related('cotizacion')
+
+        total_cotizaciones = ordenes_tecnico_cot.count()
+        cotizaciones_aceptadas = ordenes_tecnico_cot.filter(cotizacion__usuario_acepto=True).count()
+        cotizaciones_rechazadas = ordenes_tecnico_cot.filter(cotizacion__usuario_acepto=False).count()
+
+        tasa_aceptacion = round(
+            (cotizaciones_aceptadas / total_cotizaciones * 100) if total_cotizaciones > 0 else 0, 1
+        )
+
+        valor_cotizado = Decimal('0.00')
+        valor_aceptado = Decimal('0.00')
+        for orden in ordenes_tecnico_cot:
+            cot = orden.cotizacion
+            valor_cotizado += cot.costo_total
+            if cot.usuario_acepto:
+                valor_aceptado += cot.costo_total_final
+
+        # --- Órdenes completadas (entregadas) este mes ---
+        ordenes_completadas_mes = OrdenServicio.objects.filter(
+            tecnico_asignado_actual=empleado,
+            estado='entregado',
+            fecha_entrega__gte=inicio_mes,
+        ).count()
+
+        # --- RHITSO: órdenes donde fue técnico ---
+        ordenes_rhitso = OrdenServicio.objects.filter(
+            tecnico_asignado_actual=empleado,
+            es_candidato_rhitso=True,
+        ).exclude(estado__in=['cancelado']).count()
+
+        # --- Encuestas de satisfacción (como técnico) ---
+        encuestas_qs = FeedbackCliente.objects.filter(
+            tipo='satisfaccion',
+            orden__tecnico_asignado_actual=empleado,
+            utilizado=True,
+        )
+        total_encuestas_respondidas = encuestas_qs.count()
+        encuestas_avgs = encuestas_qs.aggregate(
+            nps_promedio=Avg('nps'),
+            calificacion_promedio=Avg('calificacion_general'),
+        )
+        nps_promedio = round(encuestas_avgs['nps_promedio'] or 0, 1)
+        calificacion_promedio = round(encuestas_avgs['calificacion_promedio'] or 0, 1)
+
+        metricas.update({
+            'ordenes_activas_tecnico': stats_activas['ordenes_activas'],
+            'equipos_no_encienden': stats_activas['equipos_no_encienden'],
+            'tiene_sobrecarga': stats_activas['tiene_sobrecarga'],
+            'total_cotizaciones': total_cotizaciones,
+            'cotizaciones_aceptadas': cotizaciones_aceptadas,
+            'cotizaciones_rechazadas': cotizaciones_rechazadas,
+            'tasa_aceptacion': tasa_aceptacion,
+            'valor_cotizado': valor_cotizado,
+            'valor_aceptado': valor_aceptado,
+            'ordenes_completadas_mes': ordenes_completadas_mes,
+            'ordenes_rhitso': ordenes_rhitso,
+            'total_encuestas_respondidas': total_encuestas_respondidas,
+            'nps_promedio': nps_promedio,
+            'calificacion_promedio': calificacion_promedio,
+        })
+
+    # =====================================================================
+    # 5. RATING GENERAL (cálculo ponderado de desempeño)
+    # =====================================================================
+    # El "rating" es un número de 1-99 basado en indicadores clave.
+    rating = 50  # Base
+
+    if metricas.get('tasa_aceptacion', 0) > 0:
+        # Ponderar tasa de aceptación (máx +30 puntos)
+        rating += min(30, int(metricas['tasa_aceptacion'] * 0.3))
+
+    if metricas.get('calificacion_promedio', 0) > 0:
+        # Ponderar calificación (máx +15 puntos — 5 estrellas = 15 pts)
+        rating += min(15, int(metricas['calificacion_promedio'] * 3))
+
+    if metricas.get('total_ventas_mostrador', 0) > 0:
+        # Ponderar ventas mostrador realizadas (máx +4 puntos)
+        # Cada venta suma 0.5 puntos, hasta 4 puntos máximo
+        rating += min(4, int(metricas['total_ventas_mostrador'] * 0.5))
+
+    # Limitar entre 1 y 99
+    rating = max(1, min(99, rating))
+
+    context = {
+        'empleado': empleado,
+        'rol': rol,
+        'rol_display': dict(empleado.ROL_CHOICES).get(rol, rol),
+        'metricas': metricas,
+        'rating': rating,
+    }
+
+    return render(request, 'servicio_tecnico/mi_perfil.html', context)

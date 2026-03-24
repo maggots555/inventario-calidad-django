@@ -431,8 +431,8 @@
                     {% endif %}
                 </div>
 
-                <!-- Avatar del usuario -->
-                <div class="navbar-user-avatar" title="{{ user.empleado.nombre_completo|default:user.username }}">
+                <!-- Avatar del usuario (link a Mi Perfil) -->
+                <a href="{% url 'servicio_tecnico:mi_perfil' %}" class="navbar-user-avatar" title="Mi Perfil — {{ user.empleado.nombre_completo|default:user.username }}" style="text-decoration:none;color:inherit;">
                     {% if user.empleado and user.empleado.foto_perfil %}
                     <!-- Mostrar foto de perfil si existe -->
                     <img src="{{ user.empleado.foto_perfil.url }}" alt="{{ user.empleado.nombre_completo }}"
@@ -445,7 +445,7 @@
                     <span>{{ user.first_name.0|default:"U" }}{{ user.last_name.0|default:"S" }}</span>
                     {% endif %}
                     {% endif %}
-                </div>
+                </a>
 
                 <!-- Botones de acción -->
                 <div class="navbar-actions">
@@ -672,6 +672,12 @@
                             <a href="{% url 'servicio_tecnico:dashboard_seguimiento_enlaces' %}" class="sidebar-link">
                                 <i class="sidebar-icon bi bi-link-45deg"></i>
                                 <span class="sidebar-text">Seguimiento Clientes</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'servicio_tecnico:mi_perfil' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-person-badge-fill"></i>
+                                <span class="sidebar-text">Mi Perfil</span>
                             </a>
                         </li>
                     </ul>

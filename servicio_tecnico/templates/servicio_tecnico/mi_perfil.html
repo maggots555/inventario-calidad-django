@@ -1,0 +1,334 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mi Perfil — {{ empleado.nombre_completo }}{% endblock %}
+
+{% block extra_css %}
+{# Fuente Oswald para los números del perfil #}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/mi_perfil.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="perfil-page">
+    {# Burbujas animadas de fondo #}
+    <div class="bubbles-container">
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+    </div>
+
+    <div class="perfil-wrapper">
+
+        {# ── Breadcrumb ────────────────────────────────── #}
+        <nav class="perfil-breadcrumb">
+            <a href="{% url 'servicio_tecnico:inicio' %}">Servicio Técnico</a>
+            <span class="sep">/</span>
+            <span class="current">Mi Perfil</span>
+        </nav>
+
+        {# ── ENCABEZADO ── #}
+        <div class="pcard-card">
+
+            <div class="pcard-card-header">
+                {# Rating con tooltip explicativo #}
+                <div class="pcard-rating" title="Rating de desempeño (1-99). Se calcula ponderando: tasa de aceptación de cotizaciones, calificación promedio del cliente y ventas mostrador realizadas.">
+                    <span class="pcard-rating-number">{{ rating }}</span>
+                    <span class="pcard-rating-label">Rating</span>
+                </div>
+
+                {# Avatar #}
+                <div class="pcard-avatar-wrap">
+                    {% if empleado.foto_perfil %}
+                        <img class="pcard-avatar" src="{{ empleado.foto_perfil.url }}"
+                             alt="{{ empleado.nombre_completo }}">
+                    {% else %}
+                        <div class="pcard-avatar-initials">{{ empleado.get_iniciales }}</div>
+                    {% endif %}
+                    <span class="pcard-position-badge">{{ rol_display }}</span>
+                </div>
+
+                {# Info textual #}
+                <div class="pcard-info">
+                    <h1 class="pcard-name">{{ empleado.nombre_completo }}</h1>
+                    <div class="pcard-subtitle">
+                        <span>{{ empleado.cargo }}</span>
+                        {% if empleado.sucursal %}
+                            <span class="dot">•</span>
+                            <span class="gold">{{ empleado.sucursal.nombre }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="pcard-chips">
+                        <span class="pcard-chip">
+                            <i class="bi bi-calendar3"></i>
+                            {{ metricas.dias_en_sistema }} días en el sistema
+                        </span>
+                        <span class="pcard-chip">
+                            <i class="bi bi-person-badge"></i>
+                            {{ empleado.area }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {# ── STATS — RECEPCIONISTA ── #}
+            {% if rol == 'recepcionista' %}
+
+            <div class="pcard-divider"></div>
+            <div class="pcard-stats-section">
+                <div class="pcard-stats-title">
+                    <i class="bi bi-bar-chart-fill" style="color:var(--pcard-gold)"></i>
+                    Cotizaciones &amp; Ventas — últimos 90 días
+                </div>
+                <div class="pcard-stats-grid">
+                    {# 1. Total cotizaciones #}
+                    <div class="pcard-stat-cell" title="Total de cotizaciones gestionadas como responsable en los últimos 90 días">
+                        <div class="pcard-stat-value">{{ metricas.total_cotizaciones }}</div>
+                        <div class="pcard-stat-label">Cotizaciones</div>
+                    </div>
+
+                    {# 2. Aceptadas / Rechazadas #}
+                    <div class="pcard-stat-cell" title="Aceptadas vs Rechazadas">
+                        <div class="pcard-stat-dual">
+                            <span class="val ok">{{ metricas.cotizaciones_aceptadas }}</span>
+                            <span class="divider">/</span>
+                            <span class="val bad">{{ metricas.cotizaciones_rechazadas }}</span>
+                        </div>
+                        <div class="pcard-stat-label">Acept. / Rech.</div>
+                    </div>
+
+                    {# 3. Tasa de aceptación #}
+                    <div class="pcard-stat-cell" title="Porcentaje de cotizaciones aceptadas">
+                        <div class="pcard-stat-value gold">{{ metricas.tasa_aceptacion }}%</div>
+                        <div class="pcard-stat-label">Tasa Aceptación</div>
+                        <div class="pcard-progress-bar">
+                            <div class="pcard-progress-fill gold" style="width:{{ metricas.tasa_aceptacion }}%"></div>
+                        </div>
+                    </div>
+
+                    {# 4. Pendientes de respuesta #}
+                    <div class="pcard-stat-cell" title="Cotizaciones sin respuesta del cliente">
+                        <div class="pcard-stat-value blue">{{ metricas.cotizaciones_pendientes }}</div>
+                        <div class="pcard-stat-label">Pendientes</div>
+                    </div>
+
+                    {# 5. Valor cotizado #}
+                    <div class="pcard-stat-cell" title="Suma total de todas las cotizaciones enviadas">
+                        <div class="pcard-stat-value">${{ metricas.valor_cotizado|floatformat:0 }}</div>
+                        <div class="pcard-stat-label">Valor Cotizado</div>
+                    </div>
+
+                    {# 6. Valor aceptado (ingresos) #}
+                    <div class="pcard-stat-cell" title="Ingresos generados por cotizaciones aceptadas">
+                        <div class="pcard-stat-value green">${{ metricas.valor_aceptado|floatformat:0 }}</div>
+                        <div class="pcard-stat-label">Valor Aceptado</div>
+                    </div>
+
+                    {# 7. Ventas Mostrador #}
+                    <div class="pcard-stat-cell" title="Total de ventas mostrador gestionadas">
+                        <div class="pcard-stat-value purple">{{ metricas.total_ventas_mostrador }}</div>
+                        <div class="pcard-stat-label">Ventas Mostrador</div>
+                    </div>
+
+                    {# 8. Monto Ventas Mostrador #}
+                    <div class="pcard-stat-cell" title="Ingreso total por ventas mostrador">
+                        <div class="pcard-stat-value">${{ metricas.monto_ventas_mostrador|floatformat:0 }}</div>
+                        <div class="pcard-stat-label">$ Venta Mostrador</div>
+                    </div>
+
+                    {# 9. Órdenes activas #}
+                    <div class="pcard-stat-cell" title="Órdenes activas donde eres responsable de seguimiento">
+                        <div class="pcard-stat-value blue">{{ metricas.ordenes_activas }}</div>
+                        <div class="pcard-stat-label">Órdenes Activas</div>
+                    </div>
+                </div>
+            </div>
+
+            {# Encuestas de satisfacción #}
+            {% if metricas.total_encuestas_respondidas > 0 %}
+            <div class="pcard-divider"></div>
+            <div class="pcard-stats-section">
+                <div class="pcard-stats-title">
+                    <i class="bi bi-emoji-smile" style="color:var(--pcard-gold)"></i>
+                    Satisfacción del Cliente
+                </div>
+                <div class="pcard-feedback-row">
+                    <div class="pcard-stat-cell" title="Calificación general promedio de tus clientes (1-5 estrellas)">
+                        <div class="pcard-stat-value gold">{{ metricas.calificacion_promedio }}<small style="font-size:0.5em;opacity:0.6">/5</small></div>
+                        <div class="pcard-stat-label">Calificación</div>
+                    </div>
+                    <div class="pcard-stat-cell" title="NPS promedio de tus clientes (0-10)">
+                        <div class="pcard-stat-value">{{ metricas.nps_promedio }}<small style="font-size:0.5em;opacity:0.6">/10</small></div>
+                        <div class="pcard-stat-label">NPS Promedio</div>
+                    </div>
+                    <div class="pcard-stat-cell" title="Porcentaje de clientes que recomendarían el servicio">
+                        <div class="pcard-stat-value green">{{ metricas.tasa_recomendacion }}%</div>
+                        <div class="pcard-stat-label">Recomiendan</div>
+                        <div class="pcard-progress-bar">
+                            <div class="pcard-progress-fill green" style="width:{{ metricas.tasa_recomendacion }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% endif %}{# /recepcionista #}
+
+
+            {# ── STATS — TÉCNICO ── #}
+            {% if rol == 'tecnico' %}
+
+            <div class="pcard-divider"></div>
+            <div class="pcard-stats-section">
+                <div class="pcard-stats-title">
+                    <i class="bi bi-tools" style="color:var(--pcard-gold)"></i>
+                    Carga de Trabajo Actual
+                </div>
+                <div class="pcard-stats-grid">
+                    {# 1. Órdenes activas (como técnico) #}
+                    <div class="pcard-stat-cell" title="Órdenes activas donde eres técnico asignado">
+                        {% if metricas.tiene_sobrecarga %}<span class="badge-sobrecarga"></span>{% endif %}
+                        <div class="pcard-stat-value blue">{{ metricas.ordenes_activas_tecnico }}</div>
+                        <div class="pcard-stat-label">Órdenes Activas</div>
+                    </div>
+
+                    {# 2. Equipos que no encienden #}
+                    <div class="pcard-stat-cell" title="Equipos que no encienden entre tus órdenes activas">
+                        <div class="pcard-stat-value red">{{ metricas.equipos_no_encienden }}</div>
+                        <div class="pcard-stat-label">No Encienden</div>
+                    </div>
+
+                    {# 3. Completadas este mes #}
+                    <div class="pcard-stat-cell" title="Órdenes entregadas este mes">
+                        <div class="pcard-stat-value green">{{ metricas.ordenes_completadas_mes }}</div>
+                        <div class="pcard-stat-label">Entregadas Mes</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pcard-divider"></div>
+            <div class="pcard-stats-section">
+                <div class="pcard-stats-title">
+                    <i class="bi bi-receipt" style="color:var(--pcard-gold)"></i>
+                    Cotizaciones — últimos 90 días
+                </div>
+                <div class="pcard-stats-grid">
+                    {# 4. Total cotizaciones #}
+                    <div class="pcard-stat-cell" title="Total de cotizaciones donde fuiste técnico asignado">
+                        <div class="pcard-stat-value">{{ metricas.total_cotizaciones }}</div>
+                        <div class="pcard-stat-label">Cotizaciones</div>
+                    </div>
+
+                    {# 5. Aceptadas / Rechazadas #}
+                    <div class="pcard-stat-cell" title="Aceptadas vs Rechazadas">
+                        <div class="pcard-stat-dual">
+                            <span class="val ok">{{ metricas.cotizaciones_aceptadas }}</span>
+                            <span class="divider">/</span>
+                            <span class="val bad">{{ metricas.cotizaciones_rechazadas }}</span>
+                        </div>
+                        <div class="pcard-stat-label">Acept. / Rech.</div>
+                    </div>
+
+                    {# 6. Tasa de aceptación #}
+                    <div class="pcard-stat-cell" title="Porcentaje de cotizaciones aceptadas de tus órdenes">
+                        <div class="pcard-stat-value gold">{{ metricas.tasa_aceptacion }}%</div>
+                        <div class="pcard-stat-label">Tasa Aceptación</div>
+                        <div class="pcard-progress-bar">
+                            <div class="pcard-progress-fill gold" style="width:{{ metricas.tasa_aceptacion }}%"></div>
+                        </div>
+                    </div>
+
+                    {# 7. Valor cotizado #}
+                    <div class="pcard-stat-cell" title="Suma total de cotizaciones enviadas para equipos que reparaste">
+                        <div class="pcard-stat-value">${{ metricas.valor_cotizado|floatformat:0 }}</div>
+                        <div class="pcard-stat-label">Valor Cotizado</div>
+                    </div>
+
+                    {# 8. Valor aceptado #}
+                    <div class="pcard-stat-cell" title="Ingresos generados de cotizaciones aceptadas">
+                        <div class="pcard-stat-value green">${{ metricas.valor_aceptado|floatformat:0 }}</div>
+                        <div class="pcard-stat-label">Valor Aceptado</div>
+                    </div>
+
+                    {# 9. RHITSO #}
+                    <div class="pcard-stat-cell" title="Órdenes que requirieron reparación especializada (RHITSO)">
+                        <div class="pcard-stat-value purple">{{ metricas.ordenes_rhitso }}</div>
+                        <div class="pcard-stat-label">RHITSO</div>
+                    </div>
+                </div>
+            </div>
+
+            {# Encuestas de satisfacción (como técnico) #}
+            {% if metricas.total_encuestas_respondidas > 0 %}
+            <div class="pcard-divider"></div>
+            <div class="pcard-stats-section">
+                <div class="pcard-stats-title">
+                    <i class="bi bi-emoji-smile" style="color:var(--pcard-gold)"></i>
+                    Satisfacción del Cliente
+                </div>
+                <div class="pcard-feedback-row">
+                    <div class="pcard-stat-cell" title="Calificación general promedio de clientes donde fuiste técnico (1-5 estrellas)">
+                        <div class="pcard-stat-value gold">{{ metricas.calificacion_promedio }}<small style="font-size:0.5em;opacity:0.6">/5</small></div>
+                        <div class="pcard-stat-label">Calificación</div>
+                    </div>
+                    <div class="pcard-stat-cell" title="NPS promedio (0-10)">
+                        <div class="pcard-stat-value">{{ metricas.nps_promedio }}<small style="font-size:0.5em;opacity:0.6">/10</small></div>
+                        <div class="pcard-stat-label">NPS Promedio</div>
+                    </div>
+                    <div class="pcard-stat-cell" title="Total de encuestas respondidas por tus clientes">
+                        <div class="pcard-stat-value blue">{{ metricas.total_encuestas_respondidas }}</div>
+                        <div class="pcard-stat-label">Encuestas</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% endif %}{# /tecnico #}
+
+
+            {# ── ROL NO SOPORTADO (otros roles) ── #}
+            {% if rol != 'recepcionista' and rol != 'tecnico' %}
+            <div class="pcard-divider"></div>
+            <div class="pcard-stats-section">
+                <div class="pcard-stats-title">
+                    <i class="bi bi-info-circle" style="color:var(--pcard-gold)"></i>
+                    Resumen General
+                </div>
+                <div class="pcard-stats-grid">
+                    <div class="pcard-stat-cell">
+                        <div class="pcard-stat-value blue">{{ metricas.ordenes_activas }}</div>
+                        <div class="pcard-stat-label">Órdenes Activas</div>
+                    </div>
+                    <div class="pcard-stat-cell">
+                        <div class="pcard-stat-value green">{{ metricas.ordenes_entregadas_mes }}</div>
+                        <div class="pcard-stat-label">Entregadas Mes</div>
+                    </div>
+                    <div class="pcard-stat-cell">
+                        <div class="pcard-stat-value">{{ metricas.dias_en_sistema }}</div>
+                        <div class="pcard-stat-label">Días en Sistema</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+
+            {# ── Footer ─────────────────────────────── #}
+            <div class="pcard-divider"></div>
+            <div class="pcard-card-footer">
+                <span class="periodo">
+                    <i class="bi bi-calendar3"></i> Datos de los últimos 90 días
+                </span>
+                <span class="sigma">SIGMA</span>
+            </div>
+
+        </div>{# /.pcard-card #}
+    </div>{# /.perfil-wrapper #}
+</div>{# /.perfil-page #}
+{% endblock %}

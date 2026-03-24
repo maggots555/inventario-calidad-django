@@ -379,4 +379,7 @@ urlpatterns = [
          views.api_seguimiento_enlaces_top, name='api_seguimiento_enlaces_top'),
     path('seguimiento-enlaces/api/tabla/',
          views.api_seguimiento_enlaces_tabla, name='api_seguimiento_enlaces_tabla'),
+
+    # ── Mi Perfil ──────────────────────
+    path('mi-perfil/', views.mi_perfil, name='mi_perfil'),
 ]

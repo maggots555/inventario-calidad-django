@@ -1,0 +1,639 @@
+/* ===========================================================================
+   MI PERFIL — PROFILE CARD
+   Estética: Luxury card con acabado metálico y canvas texture.
+   =========================================================================== */
+
+/* ── Variables de tema ───────────────────────────────────────────────── */
+:root {
+    --pcard-gold:       #d4a843;
+    --pcard-gold-light: #f0d675;
+    --pcard-gold-dark:  #a07c2e;
+    --pcard-bg-start:   #0b1120;
+    --pcard-bg-end:     #162040;
+    --pcard-surface:    rgba(255, 255, 255, 0.04);
+    --pcard-border:     rgba(212, 168, 67, 0.25);
+    --pcard-text:       #e8e8e8;
+    --pcard-muted:      #8a9ab5;
+    --pcard-glow:       rgba(212, 168, 67, 0.35);
+    --card-radius:     20px;
+    --stat-radius:     12px;
+}
+
+/* ── Canvas de fondo (full-bleed, detrás de todo) ────────────────────── */
+.perfil-page {
+    min-height: 100vh;
+    background:
+        radial-gradient(ellipse 70% 60% at 50% 0%, rgba(22, 42, 90, 0.65), transparent),
+        radial-gradient(ellipse 50% 50% at 80% 90%, rgba(50, 30, 10, 0.45), transparent),
+        linear-gradient(175deg, var(--pcard-bg-start) 0%, var(--pcard-bg-end) 100%);
+    padding: 2rem 1rem 4rem;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* Noise / grain overlay (vía SVG inline) */
+.perfil-page::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Partículas flotantes (burbujas doradas sutiles) */
+.perfil-page::after {
+    content: '';
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: 
+        radial-gradient(circle, rgba(212, 168, 67, 0.08) 1px, transparent 1px),
+        radial-gradient(circle, rgba(240, 214, 117, 0.06) 1px, transparent 1px),
+        radial-gradient(circle, rgba(212, 168, 67, 0.1) 2px, transparent 2px),
+        radial-gradient(circle, rgba(240, 214, 117, 0.05) 1px, transparent 1px),
+        radial-gradient(circle, rgba(212, 168, 67, 0.07) 1px, transparent 1px);
+    background-size: 
+        200px 200px,
+        300px 300px,
+        150px 150px,
+        400px 400px,
+        250px 250px;
+    background-position: 
+        0 0,
+        40px 60px,
+        80px 20px,
+        120px 100px,
+        160px 140px;
+    animation: particles-float 60s linear infinite;
+}
+
+@keyframes particles-float {
+    0% {
+        transform: translate(0, 0);
+    }
+    25% {
+        transform: translate(-15px, -25px);
+    }
+    50% {
+        transform: translate(10px, -50px);
+    }
+    75% {
+        transform: translate(-20px, -75px);
+    }
+    100% {
+        transform: translate(0, -100px);
+    }
+}
+
+/* ── Burbujas animadas flotantes ────────────────────────────────────── */
+.bubbles-container {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.bubble {
+    position: absolute;
+    bottom: -100px;
+    background: radial-gradient(circle, rgba(212, 168, 67, 0.15), rgba(240, 214, 117, 0.05));
+    border-radius: 50%;
+    opacity: 0;
+    animation: bubble-rise 15s infinite ease-in;
+    box-shadow: 
+        0 0 20px rgba(212, 168, 67, 0.2),
+        inset 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.bubble:nth-child(1) {
+    width: 40px;
+    height: 40px;
+    left: 10%;
+    animation-duration: 12s;
+    animation-delay: 0s;
+}
+
+.bubble:nth-child(2) {
+    width: 60px;
+    height: 60px;
+    left: 25%;
+    animation-duration: 16s;
+    animation-delay: 2s;
+}
+
+.bubble:nth-child(3) {
+    width: 30px;
+    height: 30px;
+    left: 40%;
+    animation-duration: 14s;
+    animation-delay: 4s;
+}
+
+.bubble:nth-child(4) {
+    width: 50px;
+    height: 50px;
+    left: 55%;
+    animation-duration: 18s;
+    animation-delay: 1s;
+}
+
+.bubble:nth-child(5) {
+    width: 45px;
+    height: 45px;
+    left: 70%;
+    animation-duration: 13s;
+    animation-delay: 3s;
+}
+
+.bubble:nth-child(6) {
+    width: 35px;
+    height: 35px;
+    left: 85%;
+    animation-duration: 15s;
+    animation-delay: 5s;
+}
+
+.bubble:nth-child(7) {
+    width: 55px;
+    height: 55px;
+    left: 15%;
+    animation-duration: 17s;
+    animation-delay: 6s;
+}
+
+.bubble:nth-child(8) {
+    width: 42px;
+    height: 42px;
+    left: 65%;
+    animation-duration: 14s;
+    animation-delay: 2.5s;
+}
+
+@keyframes bubble-rise {
+    0% {
+        bottom: -100px;
+        opacity: 0;
+        transform: translateX(0) scale(0.8);
+    }
+    10% {
+        opacity: 0.6;
+    }
+    50% {
+        transform: translateX(30px) scale(1);
+    }
+    80% {
+        opacity: 0.4;
+    }
+    100% {
+        bottom: 110vh;
+        opacity: 0;
+        transform: translateX(-20px) scale(1.1);
+    }
+}
+
+.perfil-page > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Layout principal ──────────────────────────────────────────────── */
+.perfil-wrapper {
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+/* ── HEADER: Breadcrumb estilo sutil ─────────────────────────────── */
+.perfil-breadcrumb {
+    margin-bottom: 1.5rem;
+}
+.perfil-breadcrumb a {
+    color: var(--pcard-muted);
+    text-decoration: none;
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    transition: color 0.2s;
+}
+.perfil-breadcrumb a:hover { color: var(--pcard-gold-light); }
+.perfil-breadcrumb .sep { color: rgba(138, 154, 181, 0.4); margin: 0 0.4rem; }
+.perfil-breadcrumb .current { color: var(--pcard-gold); font-weight: 600; }
+
+/* ── TARJETA PRINCIPAL ──────────────────────────────────────────────── */
+.pcard-card {
+    background:
+        linear-gradient(160deg,
+            rgba(212, 168, 67, 0.07) 0%,
+            rgba(22, 32, 64, 0.85) 40%,
+            rgba(11, 17, 32, 0.95) 100%);
+    border: 1px solid var(--pcard-border);
+    border-radius: var(--card-radius);
+    box-shadow:
+        0 0 80px -20px rgba(212, 168, 67, 0.12),
+        0 30px 60px -15px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+    position: relative;
+}
+
+/* Resplandor dorado sutil en la esquina superior */
+.pcard-card::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    left: -20%;
+    width: 80%;
+    height: 80%;
+    background: radial-gradient(circle, rgba(212, 168, 67, 0.08) 0%, transparent 65%);
+    pointer-events: none;
+}
+
+/* ── HEADER DE LA TARJETA (foto + nombre + rating) ───────────────── */
+.pcard-card-header {
+    display: flex;
+    align-items: center;
+    gap: 1.75rem;
+    padding: 2.5rem 2.5rem 1.5rem;
+    position: relative;
+}
+
+/* Rating badge */
+.pcard-rating {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 80px;
+}
+.pcard-rating-number {
+    font-family: 'Oswald', 'Impact', sans-serif;
+    font-size: 4rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--pcard-gold);
+    text-shadow: 0 0 30px rgba(212, 168, 67, 0.4);
+}
+.pcard-rating-label {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: var(--pcard-muted);
+    margin-top: 0.2rem;
+}
+
+/* Avatar del empleado */
+.pcard-avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+.pcard-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--pcard-gold-dark);
+    box-shadow: 0 0 25px rgba(212, 168, 67, 0.25);
+}
+.pcard-avatar-initials {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--pcard-gold-dark), #6a5020);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.05em;
+    border: 3px solid var(--pcard-gold-dark);
+    box-shadow: 0 0 25px rgba(212, 168, 67, 0.25);
+}
+
+/* Indicador de rol */
+.pcard-position-badge {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--pcard-gold);
+    color: var(--pcard-bg-start);
+    font-size: 0.55rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    white-space: nowrap;
+    max-width: 180px;
+    text-align: center;
+}
+
+/* Info textual (nombre, cargo, sucursal) */
+.pcard-info {
+    flex: 1;
+    min-width: 0;
+}
+.pcard-name {
+    font-family: 'Oswald', 'Impact', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.15;
+    margin: 0 0 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+.pcard-subtitle {
+    color: var(--pcard-muted);
+    font-size: 0.8rem;
+    letter-spacing: 0.03em;
+}
+.pcard-subtitle .dot { margin: 0 0.5rem; opacity: 0.5; }
+.pcard-subtitle .gold { color: var(--pcard-gold-light); font-weight: 600; }
+
+/* Bandera / sucursal chips */
+.pcard-chips {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+    flex-wrap: wrap;
+}
+.pcard-chip {
+    background: var(--pcard-surface);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 2px 10px;
+    font-size: 0.7rem;
+    color: var(--pcard-text);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.pcard-chip i { font-size: 0.75rem; opacity: 0.6; }
+
+/* ── DIVIDER DORADO ──────────────────────────────────────────────── */
+.pcard-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--pcard-gold-dark), transparent);
+    margin: 0 2rem;
+    opacity: 0.5;
+}
+
+/* ── GRILLA DE STATS ──────────────────────────────────────────────── */
+.pcard-stats-section {
+    padding: 1.5rem 2rem 2rem;
+}
+.pcard-stats-title {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--pcard-muted);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.pcard-stats-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(138, 154, 181, 0.15);
+}
+
+.pcard-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+/* Cada celda individual */
+.pcard-stat-cell {
+    background: var(--pcard-surface);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--stat-radius);
+    padding: 1rem 0.75rem;
+    text-align: center;
+    position: relative;
+    transition: all 0.3s ease;
+}
+.pcard-stat-cell:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: var(--pcard-border);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.pcard-stat-value {
+    font-family: 'Oswald', 'Impact', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 0.3rem;
+}
+.pcard-stat-value.gold { color: var(--pcard-gold-light); }
+.pcard-stat-value.green { color: #4ade80; }
+.pcard-stat-value.red { color: #f87171; }
+.pcard-stat-value.blue { color: #60a5fa; }
+.pcard-stat-value.purple { color: #c084fc; }
+
+.pcard-stat-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--pcard-muted);
+    line-height: 1.3;
+}
+
+/* Celda con doble valor (ej: aceptadas / rechazadas) */
+.pcard-stat-dual {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+}
+.pcard-stat-dual .val {
+    font-family: 'Oswald', 'Impact', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.pcard-stat-dual .val.ok { color: #4ade80; }
+.pcard-stat-dual .val.bad { color: #f87171; }
+.pcard-stat-dual .divider {
+    color: rgba(255,255,255,0.15);
+    font-weight: 300;
+    font-size: 1.1rem;
+}
+
+/* Barra de progreso compacta dentro de una celda */
+.pcard-progress-bar {
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+}
+.pcard-progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.8s ease-out;
+}
+.pcard-progress-fill.gold { background: linear-gradient(90deg, var(--pcard-gold-dark), var(--pcard-gold-light)); }
+.pcard-progress-fill.green { background: linear-gradient(90deg, #16a34a, #4ade80); }
+
+/* ── SECCIÓN DE ENCUESTAS (mini-row al final) ────────────────────── */
+.pcard-feedback-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+/* ── BADGE DE SOBRECARGA ──────────────────────────────────────────── */
+.badge-sobrecarga {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+    animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.4); }
+}
+
+/* ── FOOTER DE LA TARJETA ─────────────────────────────────────────── */
+.pcard-card-footer {
+    padding: 1rem 2rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.65rem;
+    color: var(--pcard-muted);
+    letter-spacing: 0.04em;
+}
+.pcard-card-footer .periodo {
+    background: var(--pcard-surface);
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 3px 10px;
+    border-radius: 6px;
+}
+.pcard-card-footer .sigma {
+    font-weight: 700;
+    color: var(--pcard-gold-dark);
+    letter-spacing: 0.1em;
+}
+
+/* ── TOOLTIPS PERSONALIZADOS ─────────────────────────────────────── */
+.pcard-stat-cell[title] {
+    cursor: help;
+}
+.pcard-rating[title] {
+    cursor: help;
+}
+
+/* ── RESPONSIVE ──────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .pcard-card-header {
+        flex-direction: column;
+        text-align: center;
+        padding: 2rem 1.5rem 1.25rem;
+        gap: 1rem;
+    }
+    .pcard-rating {
+        order: -1;
+    }
+    .pcard-rating-number {
+        font-size: 3rem;
+    }
+    .pcard-avatar, .pcard-avatar-initials {
+        width: 100px;
+        height: 100px;
+    }
+    .pcard-name {
+        font-size: 1.35rem;
+    }
+    .pcard-chips {
+        justify-content: center;
+    }
+    .pcard-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .pcard-feedback-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .pcard-stats-section {
+        padding: 1.25rem 1.25rem 1.5rem;
+    }
+    .pcard-divider {
+        margin: 0 1.25rem;
+    }
+    .pcard-card-footer {
+        padding: 0.75rem 1.25rem 1.25rem;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+}
+
+@media (max-width: 380px) {
+    .pcard-stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .pcard-stat-value {
+        font-size: 1.3rem;
+    }
+}
+
+/* ── Animación de entrada ────────────────────────────────────────── */
+@keyframes card-enter {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+.pcard-card {
+    animation: card-enter 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes stat-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+.pcard-stat-cell {
+    animation: stat-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    opacity: 0;
+}
+.pcard-stat-cell:nth-child(1) { animation-delay: 0.15s; }
+.pcard-stat-cell:nth-child(2) { animation-delay: 0.22s; }
+.pcard-stat-cell:nth-child(3) { animation-delay: 0.29s; }
+.pcard-stat-cell:nth-child(4) { animation-delay: 0.36s; }
+.pcard-stat-cell:nth-child(5) { animation-delay: 0.43s; }
+.pcard-stat-cell:nth-child(6) { animation-delay: 0.50s; }
+.pcard-stat-cell:nth-child(7) { animation-delay: 0.57s; }
+.pcard-stat-cell:nth-child(8) { animation-delay: 0.64s; }
+.pcard-stat-cell:nth-child(9) { animation-delay: 0.71s; }
