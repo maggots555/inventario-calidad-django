@@ -8,13 +8,42 @@
     .badge-gama-alta { background-color: #198754; }
     .badge-gama-media { background-color: #0d6efd; }
     .badge-gama-baja { background-color: #6c757d; }
-    .table-hover tbody tr:hover { background-color: #f8f9fa; }
-    .filter-card { 
+    .filter-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
     }
+    .filter-card .form-label { color: white; }
     .stats-card {
         border-left: 4px solid #0d6efd;
+    }
+    /* Dark mode */
+    [data-bs-theme="dark"] .filter-card {
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+        border-color: #4338ca;
+    }
+    [data-bs-theme="dark"] .stats-card {
+        background: #1e293b;
+        border-color: #334155;
+    }
+    [data-bs-theme="dark"] .stats-card .card-title {
+        color: #94a3b8 !important;
+    }
+    [data-bs-theme="dark"] .table-hover tbody tr:hover {
+        background-color: rgba(59, 130, 246, 0.06) !important;
+    }
+    [data-bs-theme="dark"] .table-hover tbody tr td a.text-dark {
+        color: #cbd5e1 !important;
+    }
+    [data-bs-theme="dark"] .bg-light {
+        background-color: #1e293b !important;
+    }
+    [data-bs-theme="dark"] .bg-light .card-title,
+    [data-bs-theme="dark"] .bg-light li,
+    [data-bs-theme="dark"] .bg-light p {
+        color: #cbd5e1;
+    }
+    [data-bs-theme="dark"] .table-secondary {
+        --bs-table-bg: rgba(100, 116, 139, 0.12) !important;
     }
 </style>
 {% endblock %}
@@ -135,6 +164,11 @@
     <div class="card shadow-sm">
         <div class="card-body">
             {% if referencias %}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <small class="text-muted">
+                        Mostrando {{ referencias.start_index }}–{{ referencias.end_index }} de {{ total_referencias }} registros
+                    </small>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
@@ -235,6 +269,52 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Paginación -->
+                {% if referencias.has_other_pages %}
+                <nav aria-label="Paginación de referencias" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if referencias.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1&busqueda={{ busqueda }}&marca={{ filtro_marca }}&gama={{ filtro_gama }}&orden={{ orden }}{% if mostrar_inactivos %}&mostrar_inactivos=on{% endif %}">
+                                    <i class="bi bi-chevron-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ referencias.previous_page_number }}&busqueda={{ busqueda }}&marca={{ filtro_marca }}&gama={{ filtro_gama }}&orden={{ orden }}{% if mostrar_inactivos %}&mostrar_inactivos=on{% endif %}">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% for num in referencias.paginator.page_range %}
+                            {% if referencias.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > referencias.number|add:'-3' and num < referencias.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}&busqueda={{ busqueda }}&marca={{ filtro_marca }}&gama={{ filtro_gama }}&orden={{ orden }}{% if mostrar_inactivos %}&mostrar_inactivos=on{% endif %}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if referencias.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ referencias.next_page_number }}&busqueda={{ busqueda }}&marca={{ filtro_marca }}&gama={{ filtro_gama }}&orden={{ orden }}{% if mostrar_inactivos %}&mostrar_inactivos=on{% endif %}">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ referencias.paginator.num_pages }}&busqueda={{ busqueda }}&marca={{ filtro_marca }}&gama={{ filtro_gama }}&orden={{ orden }}{% if mostrar_inactivos %}&mostrar_inactivos=on{% endif %}">
+                                    <i class="bi bi-chevron-double-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+
             {% else %}
                 <div class="alert alert-info text-center" role="alert">
                     <i class="bi bi-info-circle fs-1 d-block mb-2"></i>

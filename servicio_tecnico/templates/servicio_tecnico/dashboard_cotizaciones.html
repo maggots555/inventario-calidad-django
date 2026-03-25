@@ -2124,4 +2124,63 @@
 {% block extra_js %}
 <!-- TypeScript compilado del dashboard -->
 <script src="{% static 'js/dashboard_cotizaciones.js' %}" defer></script>
+
+<script>
+(function aplicarTemaPlotly() {
+    function getTema() {
+        const esDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        return esDark ? {
+            paper_bgcolor: '#1e293b',
+            plot_bgcolor: '#162032',
+            'font.color': '#cbd5e1',
+            'xaxis.gridcolor': '#334155',
+            'xaxis.zerolinecolor': '#334155',
+            'xaxis.tickfont.color': '#94a3b8',
+            'yaxis.gridcolor': '#334155',
+            'yaxis.zerolinecolor': '#334155',
+            'yaxis.tickfont.color': '#94a3b8',
+            'legend.bgcolor': '#1e293b',
+            'legend.font.color': '#cbd5e1'
+        } : {
+            paper_bgcolor: '#ffffff',
+            plot_bgcolor: '#ffffff',
+            'font.color': '#2c3e50',
+            'xaxis.gridcolor': '#e5e7eb',
+            'xaxis.zerolinecolor': '#e5e7eb',
+            'xaxis.tickfont.color': '#6b7280',
+            'yaxis.gridcolor': '#e5e7eb',
+            'yaxis.zerolinecolor': '#e5e7eb',
+            'yaxis.tickfont.color': '#6b7280',
+            'legend.bgcolor': '#ffffff',
+            'legend.font.color': '#2c3e50'
+        };
+    }
+
+    function aplicarATodos() {
+        if (typeof Plotly === 'undefined') return;
+        const tema = getTema();
+        document.querySelectorAll('.js-plotly-plot').forEach(function(div) {
+            try { Plotly.relayout(div, tema); } catch(e) {}
+        });
+    }
+
+    // Aplicar al cargar
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { setTimeout(aplicarATodos, 200); });
+    } else {
+        setTimeout(aplicarATodos, 200);
+    }
+
+    // Re-aplicar al cambiar de pestaña
+    document.addEventListener('shown.bs.tab', function() { setTimeout(aplicarATodos, 100); });
+
+    // Re-aplicar al cambiar tema — con delay para que Bootstrap termine de mutar el DOM
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(m) {
+            if (m.attributeName === 'data-bs-theme') setTimeout(aplicarATodos, 150);
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+})();
+</script>
 {% endblock %}

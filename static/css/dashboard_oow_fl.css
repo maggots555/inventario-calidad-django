@@ -417,7 +417,25 @@ tr.row-rhitso:hover td {
 /* Header de responsable: índigo oscuro en vez de púrpura vibrante */
 [data-bs-theme="dark"] .responsable-header {
     background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%) !important;
+    color: #f1f5f9 !important;
     border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+[data-bs-theme="dark"] .responsable-header * {
+    color: #f1f5f9 !important;
+}
+
+/* card-header.bg-dark en dark mode: asegurar texto blanco */
+[data-bs-theme="dark"] .card-header.bg-dark {
+    background-color: #1e293b !important;
+    color: #f1f5f9 !important;
+}
+
+[data-bs-theme="dark"] .card-header.bg-dark h5,
+[data-bs-theme="dark"] .card-header.bg-dark h6,
+[data-bs-theme="dark"] .card-header.bg-dark span,
+[data-bs-theme="dark"] .card-header.bg-dark i {
+    color: #f1f5f9 !important;
 }
 
 /* Compact states */

@@ -644,3 +644,66 @@
 [data-bs-theme="dark"] .enc-filtros-card .card-body {
     background: #1e293b;
 }
+
+/* Tabla card header y tabs - sin fondo blanco */
+[data-bs-theme="dark"] .enc-tabla-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .enc-tabla-card .card-header {
+    background: #1e293b;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .enc-tabs .nav-link {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .enc-tabs .nav-link:hover {
+    color: #60a5fa;
+    background: #1e3a5f;
+}
+
+[data-bs-theme="dark"] .enc-tabs .nav-link.active {
+    color: #e2e8f0;
+    background: #1e3a8a;
+}
+
+/* Badges de estado */
+[data-bs-theme="dark"] .enc-badge.respondida {
+    background: #064e3b;
+    color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .enc-badge.pendiente {
+    background: #451a03;
+    color: #fde68a;
+}
+
+[data-bs-theme="dark"] .enc-badge.expirada {
+    background: #450a0a;
+    color: #fca5a5;
+}
+
+[data-bs-theme="dark"] .enc-badge.no_enviada {
+    background: #1e293b;
+    color: #94a3b8;
+}
+
+/* Cards de comentarios */
+[data-bs-theme="dark"] .enc-comentario-card {
+    background: #1e293b;
+    border-color: #334155;
+    border-left-color: #3b82f6;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-bs-theme="dark"] .enc-comentario-card .comentario-texto {
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .enc-comentario-card .comentario-meta {
+    color: #64748b;
+    border-top-color: #334155;
+}

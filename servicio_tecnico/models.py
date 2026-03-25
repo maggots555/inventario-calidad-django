@@ -706,21 +706,32 @@ class OrdenServicio(models.Model):
             # como fallback para que el campo nunca quede en blanco.
             numero_para_incidencia = detalle.orden_cliente or self.numero_orden_interno
 
+            # inspector_calidad es NOT NULL en Incidencia — usar responsable_seguimiento
+            # o, como fallback, el usuario que está registrando el reingreso.
+            inspector = self.responsable_seguimiento or usuario
+            if not inspector:
+                # Sin inspector disponible no se puede crear la incidencia
+                return None
+
+            # tecnico_responsable también es NOT NULL — proteger por si no hay técnico asignado.
+            tecnico = self.tecnico_asignado_actual or usuario
+            if not tecnico:
+                return None
+
             incidencia = Incidencia.objects.create(
-                tipo_equipo=detalle.tipo_equipo,
+                tipo_equipo=detalle.tipo_equipo.lower(),
                 marca=detalle.marca,
                 modelo=detalle.modelo,
                 numero_serie=detalle.numero_serie,
                 numero_orden=numero_para_incidencia,
                 sucursal=self.sucursal,
-                tecnico_responsable=self.tecnico_asignado_actual,
-                inspector_calidad=self.responsable_seguimiento,
+                tecnico_responsable=tecnico,
+                inspector_calidad=inspector,
                 area_detectora='recepcion',
                 tipo_incidencia=categoria,
                 categoria_fallo='funcional',
                 grado_severidad='alto',
                 descripcion_incidencia=f"Reingreso de orden {numero_para_incidencia}. Falla: {detalle.falla_principal}",
-                es_reincidencia=True,
                 orden_servicio=self,
             )
             

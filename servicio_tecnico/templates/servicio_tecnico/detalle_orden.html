@@ -2661,7 +2661,7 @@
                     </div>
                     
                     <!-- NUEVO: Selección de piezas específicas -->
-                    <div class="mb-4 p-3" style="background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #17a2b8;">
+                    <div class="mb-4 p-3 seguimiento-piezas-container">
                         <h6 class="mb-3">
                             <i class="bi bi-tools"></i> Piezas a Rastrear
                             <small class="text-muted">(opcional)</small>
@@ -2677,7 +2677,7 @@
                             {% if form_seguimiento.piezas.field.queryset %}
                                 {% for pieza in form_seguimiento.piezas.field.queryset %}
                                 <div class="col-md-6">
-                                    <div class="form-check p-3 border rounded" style="background-color: white;">
+                                    <div class="form-check p-3 border rounded seguimiento-pieza-item">
                                         <input class="form-check-input pieza-checkbox" 
                                                type="checkbox" 
                                                name="piezas" 

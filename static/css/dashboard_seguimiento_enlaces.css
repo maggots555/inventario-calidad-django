@@ -272,6 +272,13 @@
 [data-bs-theme="dark"] .se-card .card-header {
     background: linear-gradient(135deg, #0e4d6f 0%, #065f46 100%);
     border-bottom-color: #334155;
+    color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .se-card .card-header span,
+[data-bs-theme="dark"] .se-card .card-header i,
+[data-bs-theme="dark"] .se-card .card-header * {
+    color: #e2e8f0 !important;
 }
 
 [data-bs-theme="dark"] .se-card .card-footer {

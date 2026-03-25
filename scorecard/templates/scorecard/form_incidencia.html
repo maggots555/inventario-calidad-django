@@ -429,11 +429,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (areaTecnicoInput) {
                             areaTecnicoInput.value = empleado.area;
                             areaTecnicoInput.classList.add('auto-filled');
-                            
-                            // Remover el efecto después de 3 segundos
-                            setTimeout(() => {
-                                areaTecnicoInput.classList.remove('auto-filled');
-                            }, 3000);
                         }
                     }
                     
@@ -449,11 +444,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (sucursalInfo) {
                                 sucursalInfo.innerHTML = `<i class="bi bi-check-circle text-success"></i> Auto-completado desde empleado: ${empleado.sucursal_nombre}`;
                             }
-                            
-                            // Remover el efecto después de 3 segundos
-                            setTimeout(() => {
-                                sucursalSelect.classList.remove('auto-filled');
-                            }, 3000);
                         }
                     }
                 }

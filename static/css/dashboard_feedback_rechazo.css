@@ -559,3 +559,101 @@
 [data-bs-theme="dark"] .fbr-chart-card .card-body {
     background: linear-gradient(135deg, rgba(127,29,29,0.1) 0%, transparent 100%);
 }
+
+/* Tabs de la tabla */
+[data-bs-theme="dark"] .fbr-tabs .nav-link {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .fbr-tabs .nav-link:hover {
+    color: #fca5a5;
+    background: #450a0a;
+}
+
+[data-bs-theme="dark"] .fbr-tabs .nav-link.active {
+    color: #fca5a5;
+    background: #7f1d1d;
+}
+
+/* Encabezado de tabla interna */
+[data-bs-theme="dark"] .fbr-tabla thead th {
+    background: #0f172a;
+    color: #94a3b8;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .fbr-tabla tbody tr:hover {
+    background: rgba(239, 68, 68, 0.06);
+}
+
+[data-bs-theme="dark"] .fbr-tabla .fila-detalle {
+    background: #0f172a;
+    border-left-color: #ef4444;
+}
+
+/* Badges de estado */
+[data-bs-theme="dark"] .fbr-badge.respondido {
+    background: #064e3b;
+    color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .fbr-badge.pendiente {
+    background: #451a03;
+    color: #fde68a;
+}
+
+[data-bs-theme="dark"] .fbr-badge.expirado {
+    background: #450a0a;
+    color: #fca5a5;
+}
+
+[data-bs-theme="dark"] .fbr-badge.no_enviado {
+    background: #1e293b;
+    color: #94a3b8;
+}
+
+/* Badge motivo */
+[data-bs-theme="dark"] .fbr-motivo-badge {
+    background: #451a03;
+    color: #fde68a;
+}
+
+/* Cards de comentarios */
+[data-bs-theme="dark"] .fbr-comentario-card {
+    background: #1e293b;
+    border-color: #334155;
+    border-left-color: #ef4444;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-bs-theme="dark"] .fbr-comentario-card .comentario-texto {
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .fbr-comentario-card .comentario-meta {
+    color: #64748b;
+    border-top-color: #334155;
+}
+
+/* Paginación */
+[data-bs-theme="dark"] .fbr-paginacion .btn-pag {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .fbr-paginacion .btn-pag:hover {
+    background: #450a0a;
+    border-color: #ef4444;
+    color: #fca5a5;
+}
+
+[data-bs-theme="dark"] .fbr-paginacion .btn-pag.active {
+    background: #7f1d1d;
+    border-color: #ef4444;
+    color: #fca5a5;
+}
+
+[data-bs-theme="dark"] .fbr-paginacion .pag-info {
+    color: #64748b;
+}

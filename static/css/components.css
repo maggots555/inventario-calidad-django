@@ -2828,3 +2828,203 @@ input[readonly].form-control:focus {
     }
 }
 
+/* ==========================================================================
+   MODO OSCURO - components.css (Dashboard Inventario)
+   ========================================================================== */
+
+/* KPI cards: fondo blanco → oscuro con gradiente sutil */
+[data-bs-theme="dark"] .kpi-card {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.35);
+}
+
+[data-bs-theme="dark"] .kpi-value {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .kpi-label,
+[data-bs-theme="dark"] .kpi-subtext {
+    color: #94a3b8;
+}
+
+/* Card-dashboard: Bootstrap card body ya oscurece, 
+   pero timeline hover y scrollbar necesitan override */
+[data-bs-theme="dark"] .card-dashboard .timeline-item:hover {
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .card-dashboard .timeline-container::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] .card-dashboard .timeline-container::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
+[data-bs-theme="dark"] .card-dashboard .timeline-container::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+/* Barra de progreso (productos fraccionables) */
+[data-bs-theme="dark"] .progress {
+    background-color: #334155;
+}
+
+/* Lista de fraccionables: hover de list-group-item */
+[data-bs-theme="dark"] .list-group-flush .list-group-item:hover {
+    background-color: #1e293b;
+}
+
+/* Alertas de stock */
+[data-bs-theme="dark"] .alert-stock-item {
+    background-color: transparent;
+}
+
+[data-bs-theme="dark"] .alert-stock-item:hover {
+    background-color: #2d1515;
+    border-left-color: #f87171 !important;
+}
+
+/* Separador de items del timeline */
+[data-bs-theme="dark"] div[style*="border-bottom: 1px solid #e9ecef"] {
+    border-bottom-color: #334155 !important;
+}
+
+/* Indicadores de nivel (fraccionables) */
+[data-bs-theme="dark"] .indicador-nivel.alto {
+    background-color: rgba(52, 211, 153, 0.15);
+    color: #34d399;
+}
+
+[data-bs-theme="dark"] .indicador-nivel.medio {
+    background-color: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+}
+
+[data-bs-theme="dark"] .indicador-nivel.bajo {
+    background-color: rgba(248, 113, 113, 0.15);
+    color: #f87171;
+}
+
+/* Headers con gradiente: versiones atenuadas para dark mode */
+[data-bs-theme="dark"] .bg-gradient-warning {
+    background: linear-gradient(135deg, #92400e, #78350f) !important;
+}
+
+[data-bs-theme="dark"] .bg-gradient-info {
+    background: linear-gradient(135deg, #155e75, #164e63) !important;
+}
+
+[data-bs-theme="dark"] .bg-gradient-primary {
+    background: linear-gradient(135deg, #1e3a8a, #1e40af) !important;
+}
+
+/* =====================================================================
+   MOVIMIENTO FRACCIONARIO - dark mode
+   ===================================================================== */
+
+/* Tarjeta de información del producto fraccionable */
+[data-bs-theme="dark"] .info-fraccionario {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+    border-color: #334155;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+[data-bs-theme="dark"] .info-fraccionario .titulo {
+    color: #f1f5f9;
+    border-bottom-color: #334155;
+}
+
+/* Items del grid de detalles */
+[data-bs-theme="dark"] .info-fraccionario .item,
+[data-bs-theme="dark"] .detalle .item {
+    background: linear-gradient(135deg, #1e293b, #0f172a) !important;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .info-fraccionario .item:hover,
+[data-bs-theme="dark"] .detalle .item:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Etiquetas del grid */
+[data-bs-theme="dark"] .info-fraccionario .label,
+[data-bs-theme="dark"] .detalle .label,
+[data-bs-theme="dark"] #info-producto-content .detalle .label {
+    color: #94a3b8 !important;
+}
+
+/* Sección "Nivel Actual" */
+[data-bs-theme="dark"] .nivel-actual-section {
+    background: linear-gradient(135deg, #0c2a4a, #083344) !important;
+    border-color: #0891b2 !important;
+}
+
+[data-bs-theme="dark"] .nivel-actual-section .form-label {
+    color: #67e8f9 !important;
+}
+
+/* Barra de progreso fraccionaria */
+[data-bs-theme="dark"] .progress-fraccionario {
+    background: linear-gradient(135deg, #1e293b, #334155) !important;
+    border-color: #475569 !important;
+}
+
+/* Info de cantidad dinámica */
+[data-bs-theme="dark"] #info-cantidad {
+    background: linear-gradient(135deg, #1e293b, #0f172a) !important;
+    border-color: #334155 !important;
+    color: #94a3b8 !important;
+}
+
+/* Sección completa del formulario paso a paso */
+[data-bs-theme="dark"] .form-fraccionario {
+    background: linear-gradient(135deg, #0c2a4a 0%, #083344 100%) !important;
+    border-color: #0ea5e9 !important;
+}
+
+[data-bs-theme="dark"] .form-fraccionario .titulo-seccion {
+    color: #7dd3fc !important;
+}
+
+/* Input cantidad fraccionaria */
+[data-bs-theme="dark"] .input-fraccionario {
+    background: rgba(12, 42, 74, 0.6) !important;
+    color: #f1f5f9 !important;
+}
+
+[data-bs-theme="dark"] .input-fraccionario:focus {
+    background: rgba(12, 42, 74, 0.9) !important;
+    color: #f1f5f9 !important;
+}
+
+/* Estados del campo QR durante búsqueda - overrides específicos */
+[data-bs-theme="dark"] .field-searching,
+[data-bs-theme="dark"] #codigo_qr_fraccionario.field-searching {
+    background-color: #1e3a8a !important;
+    color: #bfdbfe !important;
+}
+
+[data-bs-theme="dark"] .field-success,
+[data-bs-theme="dark"] #codigo_qr_fraccionario.field-success,
+[data-bs-theme="dark"] .form-control.is-valid.field-success {
+    background-color: #064e3b !important;
+    color: #6ee7b7 !important;
+    border-color: #10b981 !important;
+}
+
+[data-bs-theme="dark"] .field-error,
+[data-bs-theme="dark"] #codigo_qr_fraccionario.field-error,
+[data-bs-theme="dark"] .form-control.is-invalid.field-error {
+    background-color: #450a0a !important;
+    color: #fca5a5 !important;
+    border-color: #ef4444 !important;
+}
+
+[data-bs-theme="dark"] .field-info,
+[data-bs-theme="dark"] #codigo_qr_fraccionario.field-info {
+    background-color: #083344 !important;
+    color: #67e8f9 !important;
+}
+

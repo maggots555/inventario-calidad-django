@@ -457,15 +457,14 @@ class SelectorOrdenReingreso {
         if (!this.zonaSeleccionada) return;
 
         this.zonaSeleccionada.innerHTML = `
-            <div class="reingreso-chip d-flex align-items-start gap-3 p-3 border rounded"
-                 style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-color: #16a34a !important;">
-                <div class="flex-shrink-0" style="color: #16a34a; font-size: 1.6rem;">
+            <div class="reingreso-chip reingreso-chip-card d-flex align-items-start gap-3 p-3 border rounded">
+                <div class="flex-shrink-0 reingreso-chip-icon">
                     <i class="bi bi-check-circle-fill"></i>
                 </div>
                 <div class="flex-grow-1" style="min-width: 0;">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <div class="fw-bold text-dark" style="font-size: 0.95rem;">
+                            <div class="fw-bold reingreso-chip-titulo">
                                 ${this.escaparHtml(resultado.orden_cliente || resultado.numero_orden_interno)}
                             </div>
                             <div class="text-muted small mt-1">

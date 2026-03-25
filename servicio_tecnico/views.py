@@ -1746,6 +1746,12 @@ def detalle_orden(request, orden_id):
                             request,
                             f'✅ Orden marcada como reingreso. Incidencia creada: {incidencia.folio}'
                         )
+                    else:
+                        messages.warning(
+                            request,
+                            '⚠️ Orden marcada como reingreso, pero no se pudo crear la incidencia de ScoreCard '
+                            'porque no hay inspector de calidad ni técnico asignado. Asigna un responsable y vuelve a guardar.'
+                        )
                 
                 messages.success(request, '✅ Información de reingreso/RHITSO actualizada.')
                 
@@ -3670,6 +3676,7 @@ def lista_referencias_gama(request):
 
     """
     from .models import ReferenciaGamaEquipo
+    from django.core.paginator import Paginator
     
     # Obtener todas las referencias activas primero
     referencias = ReferenciaGamaEquipo.objects.all()
@@ -3704,14 +3711,22 @@ def lista_referencias_gama(request):
     if orden in ['marca', '-marca', 'modelo_base', '-modelo_base', 'gama', '-gama', 'rango_costo_min', '-rango_costo_min']:
         referencias = referencias.order_by(orden)
     
+    # Paginación: 25 registros por página
+    total_referencias = referencias.count()
+    paginator = Paginator(referencias, 25)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
     context = {
-        'referencias': referencias,
+        'referencias': page_obj,
+        'page_obj': page_obj,
         'busqueda': busqueda,
         'filtro_marca': filtro_marca,
         'filtro_gama': filtro_gama,
         'mostrar_inactivos': mostrar_inactivos,
         'marcas_disponibles': marcas_disponibles,
-        'total_referencias': referencias.count(),
+        'total_referencias': total_referencias,
+        'orden': orden,
         'gamas_choices': [
             ('alta', 'Alta'),
             ('media', 'Media'),
@@ -11858,7 +11873,6 @@ def api_buscar_modelos_por_marca(request):
 
 @login_required
 @permission_required_with_message('servicio_tecnico.view_ordenservicio')
-@cache_page_dashboard
 def dashboard_seguimiento_piezas(request):
     """
     Dashboard dedicado para seguimiento de piezas en tránsito.
@@ -11959,7 +11973,10 @@ def dashboard_seguimiento_piezas(request):
             fig_estados.update_layout(
                 height=400,
                 showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='#1e293b',
+                font=dict(color='#e2e8f0')
             )
             graficos['distribucion_estados'] = convertir_figura_a_html(fig_estados)
         except Exception as e:
@@ -11989,7 +12006,10 @@ def dashboard_seguimiento_piezas(request):
                 xaxis_title='Número de Pedidos',
                 yaxis_title='Proveedor',
                 height=500,
-                showlegend=False
+                showlegend=False,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='#1e293b',
+                font=dict(color='#e2e8f0')
             )
             graficos['top_proveedores'] = convertir_figura_a_html(fig_proveedores)
         except Exception as e:
@@ -12017,7 +12037,10 @@ def dashboard_seguimiento_piezas(request):
                 fig_tiempos.update_layout(
                     height=450,
                     showlegend=False,
-                    xaxis_tickangle=-45
+                    xaxis_tickangle=-45,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='#1e293b',
+                    font=dict(color='#e2e8f0')
                 )
                 graficos['tiempos_entrega_proveedor'] = convertir_figura_a_html(fig_tiempos)
             else:
@@ -12092,6 +12115,9 @@ def dashboard_seguimiento_piezas(request):
                     height=600,
                     hovermode='closest',
                     yaxis=dict(autorange="reversed"),  # Más recientes arriba
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='#1e293b',
+                    font=dict(color='#e2e8f0'),
                     shapes=[
                         dict(
                             type="line",
@@ -12100,7 +12126,7 @@ def dashboard_seguimiento_piezas(request):
                             y0=0,
                             y1=1,
                             yref="paper",
-                            line=dict(color="blue", width=2, dash="dash"),
+                            line=dict(color="#38bdf8", width=2, dash="dash"),
                         )
                     ],
                     annotations=[
@@ -12112,8 +12138,8 @@ def dashboard_seguimiento_piezas(request):
                             showarrow=False,
                             xanchor="center",
                             yanchor="bottom",
-                            font=dict(color="blue", size=12, family="Arial Black"),
-                            bgcolor="rgba(173, 216, 230, 0.8)",
+                            font=dict(color="#38bdf8", size=12, family="Arial Black"),
+                            bgcolor="rgba(15, 23, 42, 0.8)",
                         )
                     ]
                 )

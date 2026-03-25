@@ -3878,8 +3878,34 @@ thead.sticky-top {
 
 /* ===== BARRA DE BÚSQUEDA ===== */
 [data-bs-theme="dark"] .search-box {
-    background: #2b3035;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    background: #0f2137;
+    border: 1px solid #1e3a5f;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
+[data-bs-theme="dark"] .search-box .form-label {
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .search-box .form-control {
+    background-color: #0c1929;
+    border-color: #1e3a5f;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .search-box .form-control::placeholder {
+    color: #64748b;
+}
+
+[data-bs-theme="dark"] .search-box .form-control:focus {
+    background-color: #0c1929;
+    border-color: #3b82f6;
+    color: #e2e8f0;
+    box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+}
+
+[data-bs-theme="dark"] .search-box small.text-muted {
+    color: #64748b !important;
 }
 
 /* ===== SECTION CARDS ===== */
@@ -4112,6 +4138,40 @@ thead.sticky-top {
 
 [data-bs-theme="dark"] thead.sticky-top {
     background-color: #2b3035;
+}
+
+/* Table-light (encabezados de tabla) - sin destellos */
+[data-bs-theme="dark"] .table-light {
+    --bs-table-bg: #1e293b;
+    --bs-table-striped-bg: #1e293b;
+    --bs-table-active-bg: #1e293b;
+    background-color: #1e293b !important;
+    box-shadow: none !important;
+}
+
+[data-bs-theme="dark"] .table-light th {
+    background-color: #1e293b !important;
+    color: #93c5fd !important;
+    border-color: #334155 !important;
+    font-weight: 600;
+    box-shadow: none !important;
+}
+
+[data-bs-theme="dark"] .table-light th::after,
+[data-bs-theme="dark"] .table-light th::before {
+    display: none !important;
+}
+
+/* Eliminar cualquier shadow o brillo en table-responsive */
+[data-bs-theme="dark"] .table-responsive {
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* Eliminar efectos en todas las celdas de tabla */
+[data-bs-theme="dark"] .table th,
+[data-bs-theme="dark"] .table td {
+    box-shadow: none !important;
 }
 
 [data-bs-theme="dark"] .alert-light.border-top {
@@ -4399,21 +4459,165 @@ thead.sticky-top {
    ===================================================================== */
 
 /* Card-header principal ("Estadísticas Unificadas") y cabecera de sucursal:
-   el gradiente púrpura vibrante #667eea→#764ba2 se reemplaza por
-   un azul-índigo profundo más apto para fondos oscuros */
+   Colores sólidos oscuros sin gradientes para evitar destellos */
 [data-bs-theme="dark"] .sucursal-header,
 [data-bs-theme="dark"] .card-header[style*="linear-gradient"] {
-    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%) !important;
-    border-bottom-color: #4338ca !important;
-    box-shadow: 0 3px 8px rgba(67, 56, 202, 0.25) !important;
+    background: #1e3a8a !important;
+    border-bottom-color: #3b82f6 !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-bs-theme="dark"] .sucursal-header h5,
+[data-bs-theme="dark"] .sucursal-header *,
+[data-bs-theme="dark"] .card-header[style*="linear-gradient"] h6,
+[data-bs-theme="dark"] .card-header[style*="linear-gradient"] * {
+    color: #e2e8f0 !important;
+    text-shadow: none !important;
 }
 
 /* Encabezados de área (DELL, Lenovo, OOW…):
-   cada marca tiene su propio color vibrante — con filter los atenuamos
-   un 40% de brillo y un 15% de saturación; el texto blanco queda
-   legible (gris claro) y los colores de marca se reconocen */
+   Colores sólidos distintivos sin gradientes */
 [data-bs-theme="dark"] .area-header {
-    filter: brightness(0.6) saturate(0.85);
+    filter: none !important;
+}
+
+/* DELL - Azul corporativo */
+[data-bs-theme="dark"] .area-header[style*="#0076CE"],
+[data-bs-theme="dark"] .area-header[style*="0076CE"] {
+    background: #0c4a6e !important;
+    border-bottom-color: #0ea5e9 !important;
+}
+
+/* LENOVO - Rojo corporativo */
+[data-bs-theme="dark"] .area-header[style*="#E2231A"],
+[data-bs-theme="dark"] .area-header[style*="E2231A"] {
+    background: #7f1d1d !important;
+    border-bottom-color: #ef4444 !important;
+}
+
+/* OOW - Rosa/Magenta */
+[data-bs-theme="dark"] .area-header[style*="#E91E63"],
+[data-bs-theme="dark"] .area-header[style*="E91E63"] {
+    background: #831843 !important;
+    border-bottom-color: #ec4899 !important;
+}
+
+/* Otras áreas - Gris neutro */
+[data-bs-theme="dark"] .area-header[style*="#6c757d"] {
+    background: #374151 !important;
+    border-bottom-color: #6b7280 !important;
+}
+
+/* Asegurar texto legible en todos los area-header */
+[data-bs-theme="dark"] .area-header h6,
+[data-bs-theme="dark"] .area-header strong,
+[data-bs-theme="dark"] .area-header span,
+[data-bs-theme="dark"] .area-header * {
+    color: #e2e8f0 !important;
+}
+
+/* Modal Seguimiento - Piezas a Rastrear */
+.seguimiento-piezas-container {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #17a2b8;
+}
+.seguimiento-pieza-item {
+    background-color: white;
+}
+[data-bs-theme="dark"] .seguimiento-piezas-container {
+    background-color: #0f172a !important;
+    border-left-color: #17a2b8;
+}
+[data-bs-theme="dark"] .seguimiento-pieza-item {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+}
+[data-bs-theme="dark"] .seguimiento-pieza-item label {
+    color: #e2e8f0;
+}
+[data-bs-theme="dark"] .seguimiento-pieza-item .text-muted {
+    color: #64748b !important;
+}
+
+/* Chip de orden seleccionada (Reingreso) */
+.reingreso-chip-card {
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+    border-color: #16a34a !important;
+}
+.reingreso-chip-icon {
+    color: #16a34a;
+    font-size: 1.6rem;
+}
+.reingreso-chip-titulo {
+    font-size: 0.95rem;
+    color: #1a202c;
+}
+[data-bs-theme="dark"] .reingreso-chip-card {
+    background: linear-gradient(135deg, #052e16, #14532d) !important;
+    border-color: #22c55e !important;
+}
+[data-bs-theme="dark"] .reingreso-chip-icon {
+    color: #4ade80 !important;
+}
+[data-bs-theme="dark"] .reingreso-chip-titulo {
+    color: #e2e8f0 !important;
+}
+
+/* ===== DARK MODE — Badges de Estado de Orden ===== */
+[data-bs-theme="dark"] .badge-espera {
+    background-color: #422006;
+    color: #fcd34d;
+}
+[data-bs-theme="dark"] .badge-recepcion {
+    background-color: #1e3a5f;
+    color: #93c5fd;
+}
+[data-bs-theme="dark"] .badge-diagnostico,
+[data-bs-theme="dark"] .badge-equipo_diagnosticado,
+[data-bs-theme="dark"] .badge-diagnostico_enviado_cliente,
+[data-bs-theme="dark"] .badge-cotizacion_recibida_proveedor {
+    background-color: #1e1b4b;
+    color: #a5b4fc;
+}
+[data-bs-theme="dark"] .badge-cotizacion_enviada_proveedor,
+[data-bs-theme="dark"] .badge-partes_solicitadas_proveedor,
+[data-bs-theme="dark"] .badge-esperando_piezas {
+    background-color: #431407;
+    color: #fdba74;
+}
+[data-bs-theme="dark"] .badge-cotizacion {
+    background-color: #500724;
+    color: #f9a8d4;
+}
+[data-bs-theme="dark"] .badge-cliente_acepta_cotizacion,
+[data-bs-theme="dark"] .badge-piezas_recibidas,
+[data-bs-theme="dark"] .badge-finalizado,
+[data-bs-theme="dark"] .badge-entregado {
+    background-color: #052e16;
+    color: #6ee7b7;
+}
+[data-bs-theme="dark"] .badge-rechazada,
+[data-bs-theme="dark"] .badge-doa_pieza_danada {
+    background-color: #450a0a;
+    color: #fca5a5;
+}
+[data-bs-theme="dark"] .badge-wpb_pieza_incorrecta {
+    background-color: #3b2000;
+    color: #fde68a;
+}
+[data-bs-theme="dark"] .badge-pnc_parte_no_disponible,
+[data-bs-theme="dark"] .badge-cancelado {
+    background-color: #1e293b;
+    color: #94a3b8;
+}
+[data-bs-theme="dark"] .badge-reparacion {
+    background-color: #1e1b4b;
+    color: #c4b5fd;
+}
+[data-bs-theme="dark"] .badge-control_calidad {
+    background-color: #3b2200;
+    color: #fef08a;
 }
 
 /* ===== FIN DARK MODE ===== */

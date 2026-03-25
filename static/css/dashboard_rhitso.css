@@ -418,7 +418,7 @@
 }
 
 .table-modern thead th {
-    background: linear-gradient(135deg, var(--gray-100) 0%, var(--gray-50) 100%);
+    background: var(--gray-100);
     color: var(--gray-800);
     font-weight: 700;
     text-transform: uppercase;
@@ -651,4 +651,173 @@
 .form-select:focus {
     border-color: var(--primary-color);
     box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+/* ========================================================================== */
+/* 12. DARK MODE                                                               */
+/* ========================================================================== */
+
+/* Header */
+[data-bs-theme="dark"] .dashboard-header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .dashboard-title {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .dashboard-subtitle {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .update-time {
+    background-color: #0f172a;
+    color: #94a3b8;
+    border: 1px solid #334155;
+}
+
+/* Stat cards */
+[data-bs-theme="dark"] .stat-card {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .stat-icon {
+    background: rgba(15, 23, 42, 0.8);
+}
+
+[data-bs-theme="dark"] .stat-label {
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .stat-description {
+    color: #64748b;
+}
+
+[data-bs-theme="dark"] .stat-trend {
+    background: rgba(15, 23, 42, 0.5);
+}
+
+[data-bs-theme="dark"] .stat-card.stat-secondary .stat-number {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .stat-card.stat-secondary .stat-icon {
+    color: #94a3b8;
+}
+
+/* Contenedor de tabla */
+[data-bs-theme="dark"] .data-table-container {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .table-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .table-heading {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .table-count {
+    color: #94a3b8;
+}
+
+/* Pestañas */
+[data-bs-theme="dark"] .nav-tabs {
+    background-color: #0f172a;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .nav-tabs .nav-link {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .nav-tabs .nav-link:hover {
+    color: #60a5fa;
+    background-color: rgba(59, 130, 246, 0.08);
+}
+
+[data-bs-theme="dark"] .nav-tabs .nav-link.active {
+    color: #60a5fa;
+    background-color: #1e293b;
+    border-bottom-color: #3b82f6;
+}
+
+[data-bs-theme="dark"] .nav-tabs .nav-link.active::after {
+    background: #3b82f6;
+}
+
+/* Tabla moderna */
+[data-bs-theme="dark"] .table-modern thead th {
+    background: #0f172a;
+    color: #94a3b8;
+    border-bottom-color: #334155;
+}
+
+/* Ocultar ícono decorativo y pseudo-elemento en dark mode para evitar superposición */
+[data-bs-theme="dark"] .stat-card::before {
+    opacity: 0;
+}
+
+[data-bs-theme="dark"] .stat-trend {
+    display: none;
+}
+
+[data-bs-theme="dark"] .table-modern tbody tr:hover {
+    background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* DataTables overrides */
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_length label,
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_filter label,
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_info,
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button {
+    color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_length select,
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_filter input {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: #1e3a5f !important;
+    border-color: #334155 !important;
+    color: #60a5fa !important;
+}
+
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+[data-bs-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: #1e3a8a !important;
+    border-color: #3b82f6 !important;
+    color: #ffffff !important;
+}
+
+/* Tabla Bootstrap dentro de DataTables */
+[data-bs-theme="dark"] table.dataTable thead th,
+[data-bs-theme="dark"] table.dataTable thead td {
+    border-bottom-color: #334155 !important;
+}
+
+[data-bs-theme="dark"] table.dataTable.stripe tbody tr.odd,
+[data-bs-theme="dark"] table.dataTable.display tbody tr.odd {
+    background-color: rgba(15, 23, 42, 0.4);
+}
+
+/* form-select en filtros */
+[data-bs-theme="dark"] .form-select {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .form-select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
 }

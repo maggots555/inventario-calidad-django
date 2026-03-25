@@ -438,6 +438,7 @@ body {
 [data-bs-theme="dark"] .filtros-card {
     background: #1e293b;
     border-color: #334155;
+    --bs-card-bg: #1e293b;
 }
 
 [data-bs-theme="dark"] .filtros-card .card-header {
@@ -464,6 +465,7 @@ body {
 [data-bs-theme="dark"] .grafico-card {
     background: #1e293b;
     border-color: #334155;
+    --bs-card-bg: #1e293b;
 }
 
 [data-bs-theme="dark"] .grafico-card .card-header {
@@ -514,5 +516,51 @@ body {
 }
 
 [data-bs-theme="dark"] .card-body.compact {
+    background: #1e293b !important;
+}
+
+/* Barra de pestañas */
+[data-bs-theme="dark"] .nav-tabs {
     background: #1e293b;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+[data-bs-theme="dark"] .nav-tabs .nav-link {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .nav-tabs .nav-link:hover {
+    color: #93c5fd;
+    background: rgba(96, 165, 250, 0.1);
+}
+
+[data-bs-theme="dark"] .nav-tabs .nav-link.active {
+    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+    color: #f1f5f9;
+    box-shadow: 0 3px 10px rgba(30, 58, 138, 0.4);
+}
+
+/* Contenedor de gráficos Plotly — fondo blanco generado por la librería */
+[data-bs-theme="dark"] .grafico-card .card-body .js-plotly-plot,
+[data-bs-theme="dark"] .grafico-card .card-body .plotly-graph-div,
+[data-bs-theme="dark"] .grafico-card .card-body > div {
+    background: transparent !important;
+}
+
+[data-bs-theme="dark"] .grafico-card .card-body {
+    background: #1e293b !important;
+}
+
+/* SVG interno de Plotly: rect.bg es el fondo del área del gráfico */
+[data-bs-theme="dark"] .grafico-card .js-plotly-plot .bg {
+    fill: #1e293b !important;
+}
+
+/* Texto de ejes y títulos de Plotly */
+[data-bs-theme="dark"] .grafico-card .js-plotly-plot .gtitle,
+[data-bs-theme="dark"] .grafico-card .js-plotly-plot .xtitle,
+[data-bs-theme="dark"] .grafico-card .js-plotly-plot .ytitle,
+[data-bs-theme="dark"] .grafico-card .js-plotly-plot .xtick text,
+[data-bs-theme="dark"] .grafico-card .js-plotly-plot .ytick text {
+    fill: #cbd5e1 !important;
 }

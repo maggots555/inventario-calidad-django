@@ -566,3 +566,173 @@
     visibility: visible;
     opacity: 1;
 }
+
+/* ============================================
+   DARK MODE - REPORTES AVANZADOS
+   ============================================ */
+
+/* Sistema de pestañas/tabs */
+[data-bs-theme="dark"] .tabs-container {
+    background: #1e293b;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+[data-bs-theme="dark"] .tabs-nav {
+    background: #0f172a;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .tab-link {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .tab-link:hover {
+    background: rgba(96, 165, 250, 0.08);
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .tab-link.active {
+    color: #60a5fa;
+    border-bottom-color: #60a5fa;
+    background: #1e293b;
+}
+
+[data-bs-theme="dark"] .tab-content-wrapper {
+    background: #1e293b;
+}
+
+/* Filtros */
+[data-bs-theme="dark"] .filter-card {
+    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+}
+
+[data-bs-theme="dark"] .filter-card .form-control,
+[data-bs-theme="dark"] .filter-card .form-select {
+    background: rgba(15, 23, 42, 0.85) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(148, 163, 184, 0.4) !important;
+}
+
+[data-bs-theme="dark"] .filter-card .form-control:focus,
+[data-bs-theme="dark"] .filter-card .form-select:focus {
+    border-color: #93c5fd !important;
+    box-shadow: 0 0 0 0.2rem rgba(147, 197, 253, 0.25) !important;
+}
+
+[data-bs-theme="dark"] .filter-card .btn-primary {
+    background: #1e293b;
+    color: #93c5fd;
+    border: 1px solid #334155;
+}
+
+[data-bs-theme="dark"] .filter-card .btn-primary:hover {
+    background: #0f172a;
+    color: #bfdbfe;
+}
+
+/* Contenedores de gráficos */
+[data-bs-theme="dark"] .chart-container-report {
+    background: #1e293b;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+[data-bs-theme="dark"] .chart-container-report h4 {
+    color: #f1f5f9;
+    border-bottom-color: #334155;
+}
+
+/* Tarjetas de estadísticas */
+[data-bs-theme="dark"] .stat-box {
+    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+}
+
+/* Tabla scorecard */
+[data-bs-theme="dark"] .scorecard-table {
+    background: #1e293b;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+[data-bs-theme="dark"] .scorecard-table tbody tr:nth-child(even) {
+    background: #0f172a;
+}
+
+[data-bs-theme="dark"] .scorecard-table tbody tr:nth-child(even):hover {
+    background: rgba(96, 165, 250, 0.08);
+}
+
+[data-bs-theme="dark"] .scorecard-table tbody tr:hover {
+    background: rgba(96, 165, 250, 0.05);
+}
+
+[data-bs-theme="dark"] .scorecard-table td {
+    border-bottom-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .scorecard-table .tecnico-name {
+    color: #f1f5f9;
+}
+
+/* Badges de puntaje */
+[data-bs-theme="dark"] .score-excelente {
+    background: rgba(52, 211, 153, 0.15);
+    color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .score-bueno {
+    background: rgba(34, 211, 238, 0.15);
+    color: #67e8f9;
+}
+
+[data-bs-theme="dark"] .score-regular {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fde68a;
+}
+
+[data-bs-theme="dark"] .score-atencion {
+    background: rgba(248, 113, 113, 0.15);
+    color: #fca5a5;
+}
+
+/* Tarjetas de justificaciones */
+[data-bs-theme="dark"] .justificacion-card {
+    background: #1e293b;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+[data-bs-theme="dark"] .justificacion-fecha {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .justificacion-tecnico {
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .justificacion-texto {
+    background: #0f172a;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .justificacion-marcador {
+    color: #64748b;
+}
+
+/* Títulos de sección */
+[data-bs-theme="dark"] .report-title {
+    color: #f1f5f9;
+    border-bottom-color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .report-subtitle {
+    color: #cbd5e1;
+}
+
+/* Loading overlay */
+[data-bs-theme="dark"] .loading-overlay {
+    background: rgba(15, 23, 42, 0.9);
+}
+
+[data-bs-theme="dark"] .loading-spinner {
+    border-color: #334155;
+    border-top-color: #60a5fa;
+}

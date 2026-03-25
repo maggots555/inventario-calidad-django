@@ -1752,3 +1752,78 @@
     box-shadow: 0 1px 3px rgba(13, 110, 253, 0.3);
 }
 
+/* ===== DARK MODE — Info Icons ===== */
+[data-bs-theme="dark"] .info-icon {
+    background: #1e3a5f;
+    color: #60a5fa;
+}
+[data-bs-theme="dark"] .info-icon.icon-warning {
+    background: #3d2e0a;
+    color: #fbbf24;
+}
+[data-bs-theme="dark"] .info-icon.icon-success {
+    background: #052e16;
+    color: #4ade80;
+}
+[data-bs-theme="dark"] .info-icon.icon-danger {
+    background: #3b0f0f;
+    color: #f87171;
+}
+[data-bs-theme="dark"] .info-icon.icon-info {
+    background: #0c2a3a;
+    color: #38bdf8;
+}
+[data-bs-theme="dark"] .info-icon.icon-secondary {
+    background: #1e293b;
+    color: #94a3b8;
+}
+
+/* ===== DARK MODE — Card Headers ===== */
+[data-bs-theme="dark"] .acciones-rapidas-card .card-header,
+[data-bs-theme="dark"] .info-card-modern .card-header {
+    background: #0f172a;
+    border-bottom: 1px solid #1e293b;
+}
+[data-bs-theme="dark"] .acciones-rapidas-card .card-header h5,
+[data-bs-theme="dark"] .acciones-rapidas-card .card-header i,
+[data-bs-theme="dark"] .info-card-modern .card-header h5,
+[data-bs-theme="dark"] .info-card-modern .card-header i {
+    color: #e2e8f0 !important;
+}
+[data-bs-theme="dark"] .info-card-modern.card-info .card-header {
+    background: #0c2233;
+    border-bottom: 1px solid #164e63;
+}
+[data-bs-theme="dark"] .info-card-modern.card-warning .card-header {
+    background: #1c1300;
+    border-bottom: 1px solid #78350f;
+}
+[data-bs-theme="dark"] .info-card-modern.card-success .card-header {
+    background: #052e16;
+    border-bottom: 1px solid #14532d;
+}
+
+/* ===== DARK MODE — Action Buttons ===== */
+[data-bs-theme="dark"] .btn-accion-individual {
+    background: #1e293b;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+[data-bs-theme="dark"] .btn-accion-individual:hover {
+    border-color: #60a5fa;
+    color: #60a5fa;
+    background: #1e3a5f;
+}
+
+/* ===== DARK MODE — Info Cards ===== */
+[data-bs-theme="dark"] .info-card-modern {
+    background: #1e293b;
+    border-color: #334155;
+}
+[data-bs-theme="dark"] .info-list-item {
+    background: #1e293b;
+}
+[data-bs-theme="dark"] .info-list-item:hover {
+    background: #263548;
+}
+
