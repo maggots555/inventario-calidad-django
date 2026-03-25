@@ -2688,6 +2688,11 @@ footer::after {
 
 
 /* ===== MENÚ DE NAVEGACIÓN ===== */
+/* Texto completo alternativo (se muestra solo en menú móvil) */
+.menu-text-full {
+    display: none;
+}
+
 .navbar-menu {
     display: flex;
     align-items: center;
@@ -3088,14 +3093,224 @@ footer::after {
     transition: all 0.3s ease;
 }
 
-/* ===== RESPONSIVE DESIGN ===== */
+/* ===== RESPONSIVE DESIGN — BREAKPOINTS INTERMEDIOS ===== */
+
+/* ---------- 1440px: Pantallas 15" ---------- */
+@media (max-width: 1440px) {
+    .navbar-container {
+        padding: 0 1rem;
+        gap: 1rem;
+    }
+
+    .navbar-menu {
+        margin-left: 1rem;
+        gap: 0.25rem;
+    }
+
+    .navbar-menu-link {
+        padding: 0.45rem 0.6rem;
+        font-size: 0.72rem;
+    }
+
+    .navbar-brand-text h1 {
+        font-size: 0.9rem;
+    }
+
+    .navbar-brand-text span {
+        font-size: 0.55rem;
+    }
+
+    .navbar-brand-text span i {
+        font-size: 0.55rem;
+    }
+
+    .navbar-logo,
+    .navbar-logo-svg {
+        width: 55px;
+        height: 55px;
+    }
+
+    .user-name {
+        font-size: 0.85rem;
+        max-width: 150px;
+    }
+
+    .user-role {
+        font-size: 0.7rem;
+    }
+
+    .navbar-user-section {
+        gap: 0.75rem;
+    }
+}
+
+/* ---------- 1280px: Pantallas 14" — ocultar subtítulo del brand ---------- */
+@media (max-width: 1280px) {
+    .navbar-brand-text span {
+        display: none;
+    }
+
+    .navbar-brand-text h1 {
+        font-size: 0.85rem;
+    }
+
+    .navbar-menu {
+        margin-left: 0.75rem;
+        gap: 0.15rem;
+    }
+
+    .navbar-menu-link {
+        padding: 0.4rem 0.5rem;
+        font-size: 0.7rem;
+        gap: 0.3rem;
+    }
+
+    .navbar-menu-link i {
+        font-size: 0.8rem;
+    }
+
+    /* Ocultar el chevron para ahorrar espacio */
+    .navbar-menu-link .menu-chevron {
+        display: none;
+    }
+
+    .navbar-logo,
+    .navbar-logo-svg {
+        width: 50px;
+        height: 50px;
+    }
+
+    .user-name {
+        font-size: 0.8rem;
+        max-width: 120px;
+    }
+
+    .user-role {
+        font-size: 0.65rem;
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .navbar-user-section {
+        gap: 0.5rem;
+    }
+
+    .navbar-user-avatar {
+        width: 40px;
+        height: 40px;
+    }
+
+    .navbar-action-btn {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        min-height: 34px;
+        font-size: 1rem;
+    }
+}
+
+/* ---------- 1100px: Solo iconos en el menú (sin texto) ---------- */
+@media (max-width: 1100px) {
+    /* Ocultar texto, dejar solo iconos */
+    .navbar-menu-link .menu-text {
+        display: none;
+    }
+
+    .navbar-brand-text {
+        display: none;
+    }
+
+    .navbar-menu-link {
+        padding: 0.5rem;
+        font-size: 0;
+        justify-content: center;
+    }
+
+    .navbar-menu-link i:first-child {
+        font-size: 1.1rem;
+    }
+
+    /* Los items del menú actúan como botones de icono */
+    .navbar-menu-item {
+        position: relative;
+    }
+
+    /* Tooltip nativo vía title + mejora visual */
+    .navbar-menu-link {
+        border-radius: 10px;
+        width: 40px;
+        height: 40px;
+    }
+
+    .navbar-menu {
+        margin-left: 0.5rem;
+        gap: 0.25rem;
+    }
+
+    .navbar-logo,
+    .navbar-logo-svg {
+        width: 46px;
+        height: 46px;
+    }
+
+    /* Ajustar mega-menu position para que no se salga */
+    .dropdown-mega {
+        left: auto;
+        right: 0;
+    }
+
+    .dropdown-mega-3col {
+        min-width: 600px;
+        right: -100px;
+    }
+
+    .navbar-user-info {
+        display: none;
+    }
+
+    .navbar-action-btn {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
+        font-size: 0.95rem;
+    }
+
+    .navbar-user-avatar {
+        width: 38px;
+        height: 38px;
+    }
+}
+
+/* ===== RESPONSIVE DESIGN — MÓVIL (hamburger) ===== */
 @media (max-width: 992px) {
     .navbar-container {
         padding: 0 1.5rem;
     }
 
+    /* Restaurar texto del menú en el panel móvil desplegable */
+    .navbar-menu-link .menu-text {
+        display: none;
+    }
+
+    .navbar-menu-link .menu-text-full {
+        display: inline;
+    }
+
+    .navbar-menu-link .menu-chevron {
+        display: inline;
+    }
+
+    .navbar-menu-link {
+        font-size: 0.76rem;
+        width: auto;
+        height: auto;
+    }
+
     /* Ajustar información de usuario en móviles */
     .navbar-user-info {
+        display: flex;
         /* Mantener visible pero más compacto */
         gap: 0.05rem;
     }
@@ -3287,30 +3502,9 @@ footer::after {
         flex-shrink: 1; /* Permitir compresión si es necesario */
     }
     
-    /* Info de usuario optimizada para móvil */
+    /* Ocultar info de usuario en móvil — el avatar ya identifica al usuario */
     .navbar-user-info {
-        gap: 0.05rem;
-        min-width: 80px; /* Mínimo espacio para el nombre */
-    }
-    
-    .user-name {
-        font-size: 0.75rem;
-        max-width: 100px;
-    }
-    
-    .user-role {
-        font-size: 0.6rem;
-        max-width: 120px;
-    }
-    
-    /* Cargo más compacto */
-    .user-cargo::before {
-        width: 4px;
-        height: 4px;
-    }
-    
-    .user-cargo {
-        padding-left: 0.5rem;
+        display: none;
     }
 
     /* Asegurar que navbar no cause overflow */
