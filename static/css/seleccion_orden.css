@@ -97,7 +97,6 @@ TÉCNICAS CSS UTILIZADAS:
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    animation: pulse 2s ease-in-out infinite;
     /* Estilos para cuando contiene imágenes en lugar de iconos de texto */
     display: flex;
     justify-content: center;
@@ -111,8 +110,15 @@ TÉCNICAS CSS UTILIZADAS:
     width: auto;
     height: auto;
     object-fit: contain;
-    /* Remover el gradiente de fondo cuando es una imagen */
     background: none;
+    /* Pulsación directa en la imagen — GPU composited */
+    will-change: transform;
+    animation: pulse-icon 2s ease-in-out infinite;
+}
+
+@keyframes pulse-icon {
+    0%, 100% { transform: scale(1);    }
+    50%       { transform: scale(1.08); }
 }
 
 .hero-title {

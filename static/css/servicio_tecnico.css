@@ -4516,6 +4516,27 @@ thead.sticky-top {
     color: #e2e8f0 !important;
 }
 
+/* Modal Venta Mostrador */
+.venta-mostrador-header {
+    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+}
+.venta-paquete-section {
+    background-color: #fff8e1;
+    border-radius: 8px;
+    border-left: 4px solid #fda085;
+}
+[data-bs-theme="dark"] .venta-mostrador-header {
+    background: linear-gradient(135deg, #78350f 0%, #7c2d12 100%) !important;
+}
+[data-bs-theme="dark"] .venta-paquete-section {
+    background-color: #1c1005 !important;
+    border-left-color: #c2410c !important;
+}
+[data-bs-theme="dark"] .venta-paquete-section h6,
+[data-bs-theme="dark"] .venta-paquete-section label {
+    color: #e2e8f0 !important;
+}
+
 /* Modal Seguimiento - Piezas a Rastrear */
 .seguimiento-piezas-container {
     background-color: #f8f9fa;
@@ -4618,6 +4639,161 @@ thead.sticky-top {
 [data-bs-theme="dark"] .badge-control_calidad {
     background-color: #3b2200;
     color: #fef08a;
+}
+
+/* ============================================================ */
+/* DARK MODE — Section Headers (paneles principales)           */
+/* ============================================================ */
+/*
+   Todos los .section-header usan gradientes vivos como estilo base.
+   En dark mode los reemplazamos por un fondo sólido oscuro uniforme.
+   El !important aquí es NECESARIO porque los section-headers usan
+   style="background: ..." inline en el HTML, y !important en CSS
+   supera a inline styles normales (sin !important) del mismo elemento.
+*/
+[data-bs-theme="dark"] .section-header {
+    background: #1a2540 !important;
+    color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .section-header i,
+[data-bs-theme="dark"] .section-header .badge {
+    color: #e2e8f0 !important;
+}
+
+/* ============================================================ */
+/* DARK MODE — Estado Badge (badge principal de estado)        */
+/* ============================================================ */
+[data-bs-theme="dark"] .estado-badge.bg-success {
+    background: linear-gradient(135deg, #14532d, #166534) !important;
+    color: #86efac !important;
+    border: 1px solid #166534;
+}
+[data-bs-theme="dark"] .estado-badge.bg-warning {
+    background: linear-gradient(135deg, #3b2100, #451a00) !important;
+    color: #fde68a !important;
+    border: 1px solid #78350f;
+}
+[data-bs-theme="dark"] .estado-badge.bg-danger {
+    background: linear-gradient(135deg, #450a0a, #7f1d1d) !important;
+    color: #fca5a5 !important;
+    border: 1px solid #7f1d1d;
+}
+[data-bs-theme="dark"] .estado-badge.bg-info {
+    background: linear-gradient(135deg, #0c2a3a, #0e3a4a) !important;
+    color: #7dd3fc !important;
+    border: 1px solid #0e4a6a;
+}
+
+/* ============================================================ */
+/* DARK MODE — Badges informativos del panel de información    */
+/* (Cotización, Garantía, Email, Gama, Enciende, Tipo Ingreso) */
+/* ============================================================ */
+[data-bs-theme="dark"] .badge.bg-primary {
+    background-color: #1e3a5c !important;
+    color: #93c5fd !important;
+}
+[data-bs-theme="dark"] .badge.bg-success {
+    background-color: #14532d !important;
+    color: #86efac !important;
+}
+[data-bs-theme="dark"] .badge.bg-danger {
+    background-color: #450a0a !important;
+    color: #fca5a5 !important;
+}
+[data-bs-theme="dark"] .badge.bg-warning {
+    background-color: #3b2100 !important;
+    color: #fde68a !important;
+}
+[data-bs-theme="dark"] .badge.bg-secondary {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+}
+[data-bs-theme="dark"] .badge.bg-info {
+    background-color: #0c2a3a !important;
+    color: #7dd3fc !important;
+}
+[data-bs-theme="dark"] .badge.bg-dark {
+    background-color: #0f172a !important;
+    color: #cbd5e1 !important;
+}
+/* text-dark en badges de warning (Bootstrap lo pone negro por defecto) */
+[data-bs-theme="dark"] .badge.bg-warning.text-dark {
+    color: #fde68a !important;
+}
+
+/* ============================================================ */
+/* DARK MODE — Tarjetas de destinatario en modales de email    */
+/* ============================================================ */
+.destinatario-card-success {
+    background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+    border: 2px solid #4caf50 !important;
+}
+.destinatario-card-warning {
+    background: linear-gradient(135deg, #fff3e0 0%, #fce4ec 100%);
+    border: 2px solid #ff9800 !important;
+}
+
+[data-bs-theme="dark"] .destinatario-card-success {
+    background: #0a1f0f !important;
+    border-color: #166534 !important;
+}
+[data-bs-theme="dark"] .destinatario-card-warning {
+    background: #1f1200 !important;
+    border-color: #92400e !important;
+}
+/* Texto oscuro dentro de las tarjetas que necesita invertirse */
+[data-bs-theme="dark"] .destinatario-card-success .text-dark,
+[data-bs-theme="dark"] .destinatario-card-warning .text-dark {
+    color: #e2e8f0 !important;
+}
+
+/* ============================================================ */
+/* DARK MODE — Modal Headers                                    */
+/* ============================================================ */
+
+/* Colores base (modo claro) para cada variante de modal header */
+.modal-header-primary  { background: #0d6efd; }
+.modal-header-info     { background: #0dcaf0; color: #000; }
+.modal-header-success  { background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); }
+.modal-header-warning  { background: #ffc107; color: #000; }
+.modal-header-danger   { background: #dc3545; }
+.modal-header-purple   { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.modal-header-amber    { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+.modal-header-camera   { background: #212529; }
+
+/* Sobreescritura en modo oscuro */
+[data-bs-theme="dark"] .modal-header-primary  { background: #1a3a5c !important; }
+[data-bs-theme="dark"] .modal-header-info     { background: #0c2733 !important; color: #e2e8f0 !important; }
+[data-bs-theme="dark"] .modal-header-success  { background: linear-gradient(135deg, #052e16 0%, #052e16 100%) !important; }
+[data-bs-theme="dark"] .modal-header-warning  { background: #3b2100 !important; color: #e2e8f0 !important; }
+[data-bs-theme="dark"] .modal-header-danger   { background: #450a0a !important; }
+[data-bs-theme="dark"] .modal-header-purple   { background: linear-gradient(135deg, #1e1b4b 0%, #2e1065 100%) !important; }
+[data-bs-theme="dark"] .modal-header-amber    { background: linear-gradient(135deg, #3b2100 0%, #431407 100%) !important; }
+[data-bs-theme="dark"] .modal-header-camera   { background: #0d0d0d !important; }
+
+/* Forzar texto claro en todos los headers en modo oscuro */
+[data-bs-theme="dark"] .modal-header-primary *,
+[data-bs-theme="dark"] .modal-header-info *,
+[data-bs-theme="dark"] .modal-header-success *,
+[data-bs-theme="dark"] .modal-header-danger *,
+[data-bs-theme="dark"] .modal-header-purple *,
+[data-bs-theme="dark"] .modal-header-amber *,
+[data-bs-theme="dark"] .modal-header-camera *,
+[data-bs-theme="dark"] .modal-header-warning * {
+    color: #e2e8f0 !important;
+}
+
+/* btn-close visible en header oscuro */
+[data-bs-theme="dark"] .modal-header-primary .btn-close,
+[data-bs-theme="dark"] .modal-header-info .btn-close,
+[data-bs-theme="dark"] .modal-header-success .btn-close,
+[data-bs-theme="dark"] .modal-header-danger .btn-close,
+[data-bs-theme="dark"] .modal-header-purple .btn-close,
+[data-bs-theme="dark"] .modal-header-amber .btn-close,
+[data-bs-theme="dark"] .modal-header-camera .btn-close,
+[data-bs-theme="dark"] .modal-header-warning .btn-close {
+    filter: invert(1) grayscale(1) !important;
 }
 
 /* ===== FIN DARK MODE ===== */

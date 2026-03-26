@@ -2329,7 +2329,7 @@
 <div class="modal fade" id="modalEditarInfoEquipo" tabindex="-1" aria-labelledby="modalEditarInfoEquipoLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
+            <div class="modal-header modal-header-primary text-white">
                 <h5 class="modal-title" id="modalEditarInfoEquipoLabel">
                     <i class="bi bi-pencil-square"></i> Editar Información del Equipo
                 </h5>
@@ -2509,7 +2509,7 @@
 <div class="modal fade" id="modalPieza" tabindex="-1" aria-labelledby="modalPiezaLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
+            <div class="modal-header modal-header-primary text-white">
                 <h5 class="modal-title" id="modalPiezaLabel">
                     <i class="bi bi-gear"></i> <span id="modalPiezaTitulo">Agregar Pieza</span>
                 </h5>
@@ -2643,7 +2643,7 @@
 <div class="modal fade" id="modalSeguimiento" tabindex="-1" aria-labelledby="modalSeguimientoLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-info text-white">
+            <div class="modal-header modal-header-info text-white">
                 <h5 class="modal-title" id="modalSeguimientoLabel">
                     <i class="bi bi-truck"></i> <span id="modalSeguimientoTitulo">Agregar Seguimiento</span>
                 </h5>
@@ -2827,7 +2827,7 @@
 <div class="modal fade" id="modalVentaMostrador" tabindex="-1" aria-labelledby="modalVentaMostradorLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header text-white" style="background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);">
+            <div class="modal-header text-white venta-mostrador-header">
                 <h5 class="modal-title" id="modalVentaMostradorLabel">
                     <i class="bi bi-shop"></i> <span id="modalVentaMostradorTitulo">Crear Venta Mostrador</span>
                 </h5>
@@ -2844,7 +2844,7 @@
                     </div>
                     
                     <!-- Selección de Paquete -->
-                    <div class="mb-4 p-3" style="background-color: #fff8e1; border-radius: 8px; border-left: 4px solid #fda085;">
+                    <div class="mb-4 p-3 venta-paquete-section">
                         <h6 class="mb-3">
                             <i class="bi bi-box-seam"></i> Selección de Paquete
                         </h6>
@@ -2991,7 +2991,7 @@
 <div class="modal fade" id="modalPiezaVentaMostrador" tabindex="-1" aria-labelledby="modalPiezaVentaMostradorLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
+            <div class="modal-header modal-header-primary text-white">
                 <h5 class="modal-title" id="modalPiezaVentaMostradorLabel">
                     <i class="bi bi-tools"></i> <span id="modalPiezaVentaMostradorTitulo">Agregar Pieza</span>
                 </h5>
@@ -3090,7 +3090,7 @@
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <!-- Encabezado del Modal -->
-            <div class="modal-header text-white" style="background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);">
+            <div class="modal-header modal-header-success text-white">
                 <h5 class="modal-title" id="modalEnviarDiagnosticoLabel">
                     <i class="bi bi-file-earmark-medical"></i> 📋 Enviar Diagnóstico al Cliente
                 </h5>
@@ -3148,9 +3148,8 @@
                         </div>
                         
                         {% if orden.detalle_equipo.email_cliente and orden.detalle_equipo.email_cliente != 'cliente@ejemplo.com' %}
-                        <div class="destinatario-card p-3 border rounded shadow-sm" 
-                             id="cardDestinatarioEmail"
-                             style="background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); border: 2px solid #4caf50 !important;">
+                        <div class="destinatario-card destinatario-card-success p-3 border rounded shadow-sm" 
+                             id="cardDestinatarioEmail">
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-person-check-fill text-success fs-2 me-3 flex-shrink-0"></i>
                                 <div class="flex-grow-1">
@@ -3207,9 +3206,8 @@
                             </div>
                         </div>
                         {% else %}
-                        <div class="destinatario-card p-3 border rounded shadow-sm" 
-                             id="cardDestinatarioEmail"
-                             style="background: linear-gradient(135deg, #fff3e0 0%, #fce4ec 100%); border: 2px solid #ff9800 !important;">
+                        <div class="destinatario-card destinatario-card-warning p-3 border rounded shadow-sm" 
+                             id="cardDestinatarioEmail">
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-exclamation-triangle-fill text-warning fs-2 me-3 flex-shrink-0"></i>
                                 <div class="flex-grow-1">
@@ -3692,7 +3690,7 @@
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <!-- Encabezado del Modal -->
-            <div class="modal-header text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="modal-header modal-header-purple text-white">
                 <h5 class="modal-title" id="modalEnviarImagenesClienteLabel">
                     <i class="bi bi-envelope-paper"></i> 📸 Enviar imágenes del equipo al cliente
                 </h5>
@@ -3751,7 +3749,7 @@
                         </div>
                         {% else %}
                         <!-- Cliente con email válido -->
-                        <div class="destinatario-card p-3 border rounded shadow-sm" style="background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); border: 2px solid #4caf50 !important;">
+                        <div class="destinatario-card destinatario-card-success p-3 border rounded shadow-sm">
                             <div class="d-flex align-items-center">
                                 <input 
                                     class="form-check-input me-3 flex-shrink-0" 
@@ -4135,7 +4133,7 @@
 <div class="modal fade" id="modalCamaraIntegrada" tabindex="-1" aria-labelledby="modalCamaraIntegradaLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-fullscreen">
         <div class="modal-content">
-            <div class="modal-header text-white">
+            <div class="modal-header modal-header-camera text-white">
                 <h5 class="modal-title" id="modalCamaraIntegradaLabel">
                     <i class="bi bi-camera-fill"></i> Capturar Imágenes
                 </h5>
@@ -4221,7 +4219,7 @@
 <div class="modal fade" id="modalConfirmacionSalidaCamara" tabindex="-1" aria-labelledby="modalConfirmacionSalidaCamaraLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
+            <div class="modal-header modal-header-warning">
                 <h5 class="modal-title" id="modalConfirmacionSalidaCamaraLabel">
                     <i class="bi bi-exclamation-triangle-fill"></i> ¿Salir sin guardar?
                 </h5>
@@ -4266,7 +4264,7 @@
 <div class="modal fade" id="modalConfirmarFeedback" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-left: 5px solid #0d6efd;">
-            <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <div class="modal-header modal-header-purple text-white">
                 <h5 class="modal-title">
                     <i class="bi bi-envelope-paper"></i> Enviar Feedback al Cliente
                 </h5>
@@ -4334,8 +4332,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-left: 5px solid #f59e0b;">
 
-            <div class="modal-header"
-                 style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+            <div class="modal-header modal-header-amber text-white">
                 <h5 class="modal-title">
                     <i class="bi bi-star-fill"></i> Enviar Encuesta de Satisfacción
                 </h5>
@@ -4417,7 +4414,7 @@
 <div class="modal fade" id="modalConfirmarVigenciaVencida" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-left: 5px solid #ffc107;">
-            <div class="modal-header bg-warning text-dark">
+            <div class="modal-header modal-header-warning">
                 <h5 class="modal-title">
                     <i class="bi bi-clock-history"></i> Notificar Vigencia Vencida
                 </h5>
@@ -4795,7 +4792,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="modal fade" id="modalEmailInvalido" tabindex="-1" data-bs-backdrop="static">
                                 <div class="modal-dialog modal-dialog-centered">
                                     <div class="modal-content" style="border-left: 5px solid #dc3545;">
-                                        <div class="modal-header bg-danger text-white">
+                                        <div class="modal-header modal-header-danger text-white">
                                             <h5 class="modal-title">
                                                 <i class="bi bi-exclamation-triangle-fill"></i> Email del Cliente Inválido
                                             </h5>
@@ -6216,7 +6213,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="modal fade" id="modalConfirmacionEnvioImagenes" tabindex="-1" aria-hidden="true">
                             <div class="modal-dialog modal-dialog-centered">
                                 <div class="modal-content">
-                                    <div class="modal-header bg-success text-white">
+                                    <div class="modal-header modal-header-success text-white">
                                         <h5 class="modal-title">
                                             <i class="bi bi-send-check"></i> Imágenes en Proceso
                                         </h5>

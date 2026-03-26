@@ -686,3 +686,81 @@ textarea.form-control {
     cursor: none !important;
 }
 
+/* =============================================================================
+   DARK MODE — Inputs, Textareas, Selects
+   forms.css fuerza background-color: white en .form-control, lo que
+   impide que Bootstrap dark mode lo oscurezca. Estos overrides lo corrigen.
+   ============================================================================= */
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select,
+[data-bs-theme="dark"] textarea.form-control {
+    background-color: #1e2533 !important;
+    color: #e2e8f0 !important;
+    border-color: #3a4460 !important;
+}
+
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus,
+[data-bs-theme="dark"] textarea.form-control:focus {
+    background-color: #1e2533 !important;
+    color: #e2e8f0 !important;
+    border-color: #667eea !important;
+    box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.2) !important;
+}
+
+[data-bs-theme="dark"] .form-control::placeholder,
+[data-bs-theme="dark"] textarea.form-control::placeholder {
+    color: #6b7fa0 !important;
+}
+
+[data-bs-theme="dark"] .form-control:hover:not(:focus),
+[data-bs-theme="dark"] .form-select:hover:not(:focus) {
+    border-color: #4a5580 !important;
+}
+
+/* =============================================================================
+   DARK MODE — Card Headers en formularios de creación de órdenes
+   Los formularios form_nueva_orden.html y form_nueva_orden_venta_mostrador.html
+   usan card-header bg-primary/info/success y un gradiente inline (card-header-vm).
+   ============================================================================= */
+
+/* Clase para el header de venta mostrador (reemplaza el gradiente inline) */
+.card-header-vm {
+    background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+}
+
+[data-bs-theme="dark"] .card-header-vm {
+    background: #2a1800 !important;
+    color: #fde68a !important;
+}
+
+[data-bs-theme="dark"] .card-header.bg-primary {
+    background-color: #1a3a5c !important;
+    color: #93c5fd !important;
+}
+[data-bs-theme="dark"] .card-header.bg-info {
+    background-color: #0c2733 !important;
+    color: #7dd3fc !important;
+}
+[data-bs-theme="dark"] .card-header.bg-success {
+    background-color: #14532d !important;
+    color: #86efac !important;
+}
+[data-bs-theme="dark"] .card-header.bg-warning {
+    background-color: #3b2100 !important;
+    color: #fde68a !important;
+}
+[data-bs-theme="dark"] .card-header.bg-danger {
+    background-color: #450a0a !important;
+    color: #fca5a5 !important;
+}
+/* Forzar texto claro en todos los children de card-header en dark mode */
+[data-bs-theme="dark"] .card-header.bg-primary h5,
+[data-bs-theme="dark"] .card-header.bg-info h5,
+[data-bs-theme="dark"] .card-header.bg-success h5,
+[data-bs-theme="dark"] .card-header.bg-warning h5,
+[data-bs-theme="dark"] .card-header.bg-danger h5,
+[data-bs-theme="dark"] .card-header-vm h5 {
+    color: inherit !important;
+}
+

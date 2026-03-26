@@ -371,6 +371,100 @@
     color: #0f172a;
 }
 
+/* Variantes faltantes */
+[data-bs-theme="dark"] .btn-danger {
+    background: linear-gradient(135deg, #7f1d1d, #991b1b);
+    border-color: #991b1b;
+    color: #fca5a5;
+}
+[data-bs-theme="dark"] .btn-danger:hover {
+    background: linear-gradient(135deg, #991b1b, #b91c1c);
+    border-color: #b91c1c;
+}
+
+[data-bs-theme="dark"] .btn-secondary {
+    background-color: #334155;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+[data-bs-theme="dark"] .btn-secondary:hover {
+    background-color: #475569;
+    border-color: #475569;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary {
+    color: #94a3b8;
+    border-color: #475569;
+}
+[data-bs-theme="dark"] .btn-outline-secondary:hover {
+    background-color: #334155;
+    border-color: #475569;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .btn-info {
+    background-color: #0e4a6a;
+    border-color: #0e4a6a;
+    color: #7dd3fc;
+}
+[data-bs-theme="dark"] .btn-info:hover {
+    background-color: #0c3a54;
+    border-color: #0c3a54;
+    color: #bae6fd;
+}
+
+[data-bs-theme="dark"] .btn-outline-info {
+    color: #7dd3fc;
+    border-color: #38bdf8;
+}
+[data-bs-theme="dark"] .btn-outline-info:hover {
+    background-color: #0e4a6a;
+    border-color: #38bdf8;
+    color: #e0f2fe;
+}
+
+[data-bs-theme="dark"] .btn-outline-warning {
+    color: #fbbf24;
+    border-color: #fbbf24;
+}
+[data-bs-theme="dark"] .btn-outline-warning:hover {
+    background-color: #3b2100;
+    border-color: #fbbf24;
+    color: #fde68a;
+}
+
+[data-bs-theme="dark"] .btn-light {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+[data-bs-theme="dark"] .btn-light:hover {
+    background-color: #334155;
+    border-color: #475569;
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .btn-outline-light {
+    color: #cbd5e1;
+    border-color: #475569;
+}
+[data-bs-theme="dark"] .btn-outline-light:hover {
+    background-color: #1e293b;
+    border-color: #64748b;
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .btn-dark {
+    background-color: #e2e8f0;
+    border-color: #e2e8f0;
+    color: #0f172a;
+}
+[data-bs-theme="dark"] .btn-dark:hover {
+    background-color: #f1f5f9;
+    border-color: #f1f5f9;
+}
+
 /* Background utilities */
 [data-bs-theme="dark"] .bg-light {
     background-color: #1e293b !important;
