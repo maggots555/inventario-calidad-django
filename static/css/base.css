@@ -3653,6 +3653,14 @@ footer::after {
         font-size: 0.9rem;
     }
 
+    .dark-mode-toggle {
+        width: 34px;
+        height: 34px;
+        min-width: 34px;
+        min-height: 34px;
+        font-size: 0.9rem;
+    }
+
     /* Avatar compacto */
     .navbar-user-avatar {
         width: 34px;
@@ -3719,6 +3727,14 @@ footer::after {
         font-size: 0.85rem;
     }
 
+    .dark-mode-toggle {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+        font-size: 0.85rem;
+    }
+
     .navbar-user-avatar {
         width: 32px;
         height: 32px;
@@ -3777,6 +3793,14 @@ footer::after {
     }
 
     .navbar-action-btn {
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        min-height: 30px;
+        font-size: 0.8rem;
+    }
+
+    .dark-mode-toggle {
         width: 30px;
         height: 30px;
         min-width: 30px;
@@ -3853,6 +3877,15 @@ footer::after {
         font-size: 0.75rem;
         border-radius: 6px;
         /* Más pequeño */
+    }
+
+    .dark-mode-toggle {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+        font-size: 0.75rem;
+        border-radius: 6px;
     }
 
     .navbar-user-avatar {

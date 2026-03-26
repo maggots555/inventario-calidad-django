@@ -8,6 +8,63 @@
 <!-- Cargar estilos específicos de servicio técnico -->
 <link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}">
 <style>
+    /* Ajustes responsive para botones de acciones en header */
+    .d-flex.gap-2 {
+        flex-wrap: wrap;
+    }
+
+    /* Ajustes para pantallas pequeñas */
+    @media (max-width: 768px) {
+        /* Reducir tamaños de fuente y padding en botones */
+        .d-flex.gap-2 .btn {
+            font-size: 0.85rem;
+            padding: 0.375rem 0.65rem;
+        }
+
+        /* Iconos más pequeños */
+        .d-flex.gap-2 .btn i {
+            font-size: 0.9rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        /* Título y botones stack verticalmente */
+        .d-flex.justify-content-between.align-items-center {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 1rem;
+        }
+
+        /* Botones ocupan ancho disponible y hacen wrap */
+        .d-flex.gap-2 {
+            width: 100%;
+            gap: 0.5rem !important;
+        }
+
+        .d-flex.gap-2 .btn,
+        .d-flex.gap-2 form {
+            flex: 1 1 auto;
+            min-width: fit-content;
+        }
+
+        .d-flex.gap-2 .btn {
+            font-size: 0.8rem;
+            padding: 0.4rem 0.65rem;
+        }
+    }
+
+    @media (max-width: 380px) {
+        /* Ultra compacto */
+        .d-flex.gap-2 .btn {
+            font-size: 0.75rem;
+            padding: 0.375rem 0.5rem;
+        }
+
+        .d-flex.gap-2 .btn i {
+            font-size: 0.85rem;
+        }
+    }
+
     /* Estilos mejorados para la tabla de estadísticas */
     .table-hover tbody tr:hover {
         background-color: rgba(103, 126, 234, 0.05);
