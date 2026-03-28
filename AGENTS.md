@@ -417,6 +417,143 @@ The app is installable on Android and iOS as a native-like app:
 - Touch targets must be at least **44x44px** (iOS HIG standard)
 - Avoid hover-only interactions — use tap/click equivalents
 
+### 🌙 Dark Mode (Modo Oscuro)
+
+El proyecto tiene modo oscuro completamente implementado. **TODO código nuevo DEBE ser compatible.**
+
+#### Cómo funciona la implementación
+
+| Capa | Archivo | Responsabilidad |
+|------|---------|----------------|
+| Atributo HTML | `templates/base.html` → `<html data-bs-theme="light">` | Bootstrap 5.3 lee este atributo para aplicar su tema automáticamente |
+| Anti-flash script | `templates/base.html` → inline `<script>` en `<head>` | Lee `localStorage('theme')` o `prefers-color-scheme` del SO y aplica `data-bs-theme` ANTES del render para evitar parpadeo blanco |
+| Toggle button | `templates/base.html` → `#darkModeToggle` (`.dark-mode-toggle`) | Botón en la navbar con iconos luna/sol (Bootstrap Icons) |
+| Lógica TypeScript | `static/ts/dark_mode.ts` → compilado en `static/js/dark_mode.js` | Click → cambia `data-bs-theme` en `<html>` → guarda en `localStorage` → actualiza `meta[name="theme-color"]` |
+| Variables CSS claras | `static/css/base.css` → bloque `:root {}` | Todos los colores del proyecto como variables CSS |
+| Variables CSS oscuras | `static/css/base.css` → bloque `[data-bs-theme="dark"] {}` | Sobreescribe las variables de `:root` para modo oscuro |
+| Overrides de componentes | `static/css/base.css` → reglas `[data-bs-theme="dark"] .clase {}` | Overrides para elementos con colores hardcodeados (gradientes, etc.) |
+
+#### Paleta de colores — Modo Oscuro
+
+Estos son los valores exactos usados en el proyecto. Usar solo estos para consistencia:
+
+```css
+/* Fondos principales */
+--body-bg:          #0f172a   /* Fondo del <body> */
+--card-bg:          #1e293b   /* Cards, panels, dropdowns */
+--sidebar-bg:       #0f172a → #1e293b (gradient)
+--hover-bg:         #334155   /* Hover en filas, items */
+--border-color:     #334155   /* Bordes de cards, tablas */
+--secondary-bg:     #475569   /* Hover secundario */
+
+/* Texto */
+--text-primary:     #e2e8f0   /* Texto principal */
+--text-secondary:   #cbd5e1   /* Texto secundario */
+
+/* Colores de estado (modo oscuro) */
+--primary:          #60a5fa
+--success:          #34d399
+--danger:           #f87171
+--warning:          #fbbf24
+--info:             #22d3ee
+
+/* Meta theme-color del navegador */
+/* Claro: #1f6391  |  Oscuro: #0f172a */
+```
+
+#### Patrón CSS obligatorio para código nuevo
+
+**Regla de oro**: Si un componente usa colores hardcodeados, SIEMPRE agregar un bloque `[data-bs-theme="dark"]`.
+
+```css
+/* ✅ CORRECTO: Usar variables CSS en modo claro */
+.mi-componente {
+    background-color: var(--gray-100);   /* Se adapta automáticamente */
+    color: var(--gray-900);
+    border: 1px solid var(--gray-200);
+}
+
+/* ✅ CORRECTO: Override para colores hardcodeados */
+.mi-componente-con-gradiente {
+    background: linear-gradient(135deg, #1f6391, #2980b9); /* Color hardcodeado */
+}
+[data-bs-theme="dark"] .mi-componente-con-gradiente {
+    background: linear-gradient(135deg, #1e3a5f, #1e293b); /* Versión oscura */
+}
+
+/* ❌ INCORRECTO: Color hardcodeado sin override para oscuro */
+.mi-componente {
+    background-color: #ffffff;  /* Se verá igual en modo oscuro — MAL */
+    color: #333333;
+}
+```
+
+#### Variables CSS disponibles en `:root` (modo claro → uso obligatorio)
+
+```css
+/* Usar estas variables en vez de hex directos */
+var(--primary-color)     /* Azul principal */
+var(--success-color)     /* Verde */
+var(--danger-color)      /* Rojo */
+var(--warning-color)     /* Amarillo */
+var(--info-color)        /* Cyan */
+var(--gray-50) ... var(--gray-900)  /* Escala de grises */
+var(--white)             /* Blanco en claro, #1a1a2e en oscuro */
+var(--shadow-sm/md/lg/xl)  /* Sombras adaptadas al tema */
+```
+
+#### Reglas críticas para agentes — NUNCA violar
+
+```
+❌ NUNCA usar colores hardcodeados sin override [data-bs-theme="dark"]
+❌ NUNCA modificar el inline <script> anti-flash en base.html
+❌ NUNCA agregar data-bs-theme a elementos que no sean <html>
+❌ NUNCA usar background: white o color: black directamente
+❌ NUNCA olvidar sección [data-bs-theme="dark"] en archivos CSS nuevos
+
+✅ SIEMPRE usar var(--nombre-variable) para colores
+✅ SIEMPRE agregar overrides oscuros para gradientes y colores hardcodeados
+✅ SIEMPRE probar visualmente en ambos modos antes de considerar listo
+✅ SIEMPRE seguir la paleta de modo oscuro documentada arriba
+✅ En TypeScript: leer tema con document.documentElement.getAttribute('data-bs-theme')
+```
+
+#### Estructura en archivos CSS específicos de página
+
+Cada archivo CSS de página debe tener dos secciones claramente separadas:
+
+```css
+/* ============================================================
+   ESTILOS BASE (modo claro — default)
+   ============================================================ */
+.mi-componente {
+    background-color: var(--gray-50);
+    color: var(--gray-900);
+}
+.mi-componente-especial {
+    background: linear-gradient(135deg, #1f6391, #2980b9);
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   ============================================================ */
+[data-bs-theme="dark"] .mi-componente-especial {
+    background: linear-gradient(135deg, #1e3a5f, #0f172a);
+}
+```
+
+#### Archivos clave del modo oscuro
+
+| Archivo | Rol |
+|---------|-----|
+| `templates/base.html` línea 2 | `data-bs-theme="light"` — valor inicial |
+| `templates/base.html` líneas ~60-68 | Script anti-flash (no tocar) |
+| `templates/base.html` línea ~492 | Botón `#darkModeToggle` |
+| `templates/base.html` línea ~981 | `<script src="dark_mode.js">` |
+| `static/ts/dark_mode.ts` | Lógica del toggle (TypeScript fuente) |
+| `static/js/dark_mode.js` | Compilado — no editar |
+| `static/css/base.css` líneas ~144-400+ | Todas las variables y overrides del modo oscuro |
+
 ---
 
 ## 6. ENVIRONMENT VARIABLES
@@ -569,6 +706,8 @@ Consider adding:
 10. **Don't skip TypeScript compilation** - Run `npm run build` before testing
 11. **Don't break PWA compatibility** - Never remove manifest, apple-mobile-web-app tags, or viewport-fit=cover from `base.html`
 12. **Don't use hover-only UI** - All interactions must work on touch screens (mobile-first)
+13. **Don't hardcode colors without dark mode override** - Use CSS variables (`var(--nombre)`) or add `[data-bs-theme="dark"] .clase {}` override. New CSS files MUST have a dark mode section. See Section 5 → Dark Mode.
+14. **Don't touch the anti-flash script in base.html** - The inline `<script>` in `<head>` that sets `data-bs-theme` before render prevents white flash — never modify or remove it.
 
 ---
 
@@ -588,7 +727,7 @@ Consider adding:
 
 ---
 
-**Last Updated**: January 2026  
+**Last Updated**: March 2026  
 **Django Version**: 5.2.5  
 **Python Version**: 3.10+  
 **TypeScript Version**: 5.9.3
