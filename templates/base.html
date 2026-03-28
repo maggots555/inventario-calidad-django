@@ -78,6 +78,15 @@
 </head>
 
 <body class="sidebar-loading">
+
+    <!-- Pre-nav loader: aparece inmediatamente al dar clic en un dashboard pesado,
+         ANTES de que el servidor responda. Se oculta solo cuando la nueva
+         página termina de renderizarse (su propio sigma-loader toma el control). -->
+    <div id="nav-pre-loader" class="nav-pre-loader" aria-hidden="true" aria-label="Cargando dashboard...">
+        <div class="nav-pre-ring"></div>
+        <p class="nav-pre-text">Cargando dashboard…</p>
+    </div>
+
     <!-- Custom Animated Cursor -->
     <div id="tech-cursor" class="tech-cursor">
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -227,10 +236,10 @@
                                 <a href="{% url 'servicio_tecnico:inicio' %}" class="dropdown-item">
                                     <i class="bi bi-house"></i> Inicio Servicio Técnico
                                 </a>
-                                <a href="{% url 'servicio_tecnico:dashboard_seguimiento_oow_fl' %}" class="dropdown-item">
+                                <a href="{% url 'servicio_tecnico:dashboard_seguimiento_oow_fl' %}" class="dropdown-item" data-nav-loader>
                                     <i class="bi bi-graph-up-arrow text-info"></i> Dashboard OOW-/FL-
                                 </a>
-                                <a href="{% url 'servicio_tecnico:dashboard_cotizaciones' %}" class="dropdown-item">
+                                <a href="{% url 'servicio_tecnico:dashboard_cotizaciones' %}" class="dropdown-item" data-nav-loader>
                                     <i class="bi bi-bar-chart-line-fill text-primary"></i> Dashboard Cotizaciones
                                 </a>
                             </div>

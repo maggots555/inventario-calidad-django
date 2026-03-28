@@ -605,4 +605,32 @@ function inicializarCursorPersonalizado() {
         cursor.style.opacity = '1';
     });
 }
+// ============================================================
+// PRE-NAV LOADER
+// Muestra un overlay INMEDIATAMENTE al dar clic en un
+// dashboard pesado, antes de que el servidor responda.
+// ============================================================
+(function iniciarPreNavLoader() {
+    const overlay = document.getElementById('nav-pre-loader');
+    if (!overlay)
+        return;
+    // useCapture=true: se ejecuta en fase de captura, antes
+    // que cualquier handler hijo pueda llamar stopPropagation
+    document.addEventListener('click', (e) => {
+        const link = e.target
+            .closest('a[data-nav-loader]');
+        if (!link)
+            return;
+        // Ctrl/Cmd/Shift/Alt + clic → abrir en nueva pestaña, no interceptar
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey)
+            return;
+        overlay.classList.add('active');
+    }, true);
+    // Restablecer si el usuario vuelve con el botón "Atrás"
+    // (bfcache restaura el DOM con la clase .active todavía presente)
+    window.addEventListener('pageshow', (e) => {
+        if (e.persisted)
+            overlay.classList.remove('active');
+    });
+}());
 //# sourceMappingURL=base.js.map

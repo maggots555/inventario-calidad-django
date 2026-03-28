@@ -3938,3 +3938,53 @@ footer::after {
     "slnt" 0,
     "wdth" 100;
 }
+
+/* ============================================================
+   PRE-NAV LOADER
+   Overlay instantáneo al dar clic en un dashboard pesado,
+   visible MIENTRAS el servidor procesa la respuesta (~5 s).
+   Mismo fondo oscuro (#0f172a) que .sigma-loader para que
+   la transición a la nueva página sea imperceptible.
+   Sin override de modo oscuro: siempre usa fondo oscuro,
+   igual que el splash screen de sigma-loader.
+   ============================================================ */
+.nav-pre-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 99998;         /* justo debajo de .sigma-loader (99999) */
+    background: #0f172a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+}
+
+.nav-pre-loader.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* Anillo giratorio simple — carga instantánea, sin animaciones pesadas */
+.nav-pre-ring {
+    width: 56px;
+    height: 56px;
+    border: 3px solid rgba(96, 165, 250, 0.15);
+    border-top-color: #60a5fa;
+    border-radius: 50%;
+    animation: navPreSpin 0.9s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes navPreSpin {
+    to { transform: rotate(360deg); }
+}
+
+.nav-pre-text {
+    color: #94a3b8;
+    font-size: 0.875rem;
+    letter-spacing: 0.05em;
+    margin: 0;
+}

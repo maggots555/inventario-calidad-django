@@ -119,9 +119,13 @@ class DashboardCotizaciones {
         if (!this.formularioFiltros)
             return;
         this.formularioFiltros.addEventListener('submit', (event) => {
-            // Mostrar loading overlay
-            this.mostrarLoading();
-            // El formulario se envía normalmente (no hacemos preventDefault)
+            // Usar el loader épico si está disponible; fallback al overlay antiguo
+            if (window.sigmaLoader) {
+                window.sigmaLoader.mostrarParaNavegacion();
+            }
+            else {
+                this.mostrarLoading();
+            }
             console.log('📤 Enviando formulario de filtros...');
         });
     }
@@ -232,7 +236,7 @@ class DashboardCotizaciones {
     // MÉTODOS DE UI/UX
     // ============================================
     /**
-     * Muestra el loading overlay
+     * Muestra el loading overlay (fallback para cuando sigmaLoader no existe)
      * Proporciona feedback visual mientras se cargan los datos
      */
     mostrarLoading() {

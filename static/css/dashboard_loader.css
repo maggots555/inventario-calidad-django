@@ -1,0 +1,464 @@
+/* ============================================================
+   DASHBOARD LOADER — Pantalla de carga animada estilo videojuego
+   Se muestra en la carga inicial de dashboards pesados:
+   - Dashboard de Cotizaciones (Plotly, ML)
+   - Dashboard OOW/FL (Chart.js, datos intensivos)
+
+   MODO OSCURO: El loader siempre usa fondo oscuro (#0f172a) —
+   es un splash screen intencional, no requiere override.
+   ============================================================ */
+
+/* ---- Overlay principal ---- */
+.sigma-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0f172a;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+    overflow: hidden;
+    transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.sigma-loader.fadeout {
+    opacity: 0;
+    transform: scale(1.04);
+    pointer-events: none;
+}
+
+.sigma-loader.hidden {
+    display: none !important;
+}
+
+/* ---- Fondo: grid animado ---- */
+.loader-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+.loader-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(96, 165, 250, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(96, 165, 250, 0.035) 1px, transparent 1px);
+    background-size: 55px 55px;
+    animation: gridDrift 24s linear infinite;
+}
+
+@keyframes gridDrift {
+    from { background-position: 0 0; }
+    to   { background-position: 55px 55px; }
+}
+
+/* ---- Partículas flotantes (CSS puro) ---- */
+.loader-particles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.loader-particles span {
+    position: absolute;
+    display: block;
+    border-radius: 50%;
+    animation: particleFloat linear infinite;
+    background: radial-gradient(circle, rgba(96, 165, 250, 0.55), transparent 70%);
+}
+
+/* Cada span tiene posición, tamaño y timing únicos */
+.loader-particles span:nth-child(1)  { width: 6px;  height: 6px;  left: 8%;   animation-duration: 9s;  animation-delay: 0s;    opacity: 0.5; }
+.loader-particles span:nth-child(2)  { width: 4px;  height: 4px;  left: 18%;  animation-duration: 13s; animation-delay: -2.5s; opacity: 0.4; }
+.loader-particles span:nth-child(3)  { width: 8px;  height: 8px;  left: 33%;  animation-duration: 11s; animation-delay: -4s;   opacity: 0.3; }
+.loader-particles span:nth-child(4)  { width: 3px;  height: 3px;  left: 48%;  animation-duration: 16s; animation-delay: -1.5s; opacity: 0.6; }
+.loader-particles span:nth-child(5)  { width: 5px;  height: 5px;  left: 63%;  animation-duration: 8s;  animation-delay: -3s;   opacity: 0.4; }
+.loader-particles span:nth-child(6)  { width: 7px;  height: 7px;  left: 78%;  animation-duration: 12s; animation-delay: -5.5s; opacity: 0.3; }
+.loader-particles span:nth-child(7)  { width: 4px;  height: 4px;  left: 91%;  animation-duration: 15s; animation-delay: -7s;   opacity: 0.5; }
+.loader-particles span:nth-child(8)  { width: 6px;  height: 6px;  left: 14%;  animation-duration: 7s;  animation-delay: -6s;   opacity: 0.4; background: radial-gradient(circle, rgba(34, 211, 238, 0.5), transparent 70%); }
+.loader-particles span:nth-child(9)  { width: 3px;  height: 3px;  left: 43%;  animation-duration: 17s; animation-delay: -8.5s; opacity: 0.6; background: radial-gradient(circle, rgba(34, 211, 238, 0.5), transparent 70%); }
+.loader-particles span:nth-child(10) { width: 5px;  height: 5px;  left: 70%;  animation-duration: 14s; animation-delay: -4.5s; opacity: 0.3; }
+.loader-particles span:nth-child(11) { width: 9px;  height: 9px;  left: 4%;   animation-duration: 19s; animation-delay: -10s;  opacity: 0.2; }
+.loader-particles span:nth-child(12) { width: 4px;  height: 4px;  left: 56%;  animation-duration: 10s; animation-delay: -12s;  opacity: 0.5; background: radial-gradient(circle, rgba(251, 191, 36, 0.4), transparent 70%); }
+
+@keyframes particleFloat {
+    0%   { bottom: -20px; transform: translateX(0px); }
+    25%  { transform: translateX(28px); }
+    50%  { transform: translateX(-18px); }
+    75%  { transform: translateX(14px); }
+    100% { bottom: 110%; transform: translateX(0px); }
+}
+
+/* ---- Centro: contenido principal ---- */
+.loader-center {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.6rem;
+    z-index: 1;
+    max-width: 460px;
+    width: 100%;
+    padding: 0 2rem;
+}
+
+/* ---- Anillos giratorios del logo ---- */
+.loader-logo-ring {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid transparent;
+}
+
+.ring-1 {
+    width: 120px;
+    height: 120px;
+    border-top-color: rgba(96, 165, 250, 0.85);
+    border-right-color: rgba(96, 165, 250, 0.25);
+    animation: spinRing 2s linear infinite;
+}
+
+.ring-2 {
+    width: 88px;
+    height: 88px;
+    border-bottom-color: rgba(34, 211, 238, 0.85);
+    border-left-color: rgba(34, 211, 238, 0.25);
+    animation: spinRing 1.4s linear infinite reverse;
+}
+
+.ring-3 {
+    width: 58px;
+    height: 58px;
+    border-top-color: rgba(251, 191, 36, 0.7);
+    border-right-color: rgba(251, 191, 36, 0.15);
+    animation: spinRing 3.2s linear infinite;
+}
+
+@keyframes spinRing {
+    to { transform: rotate(360deg); }
+}
+
+/* Letra Σ en el centro */
+.loader-sigma {
+    font-size: 2.1rem;
+    font-weight: 700;
+    color: #ffffff;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    animation: sigmaGlow 2.2s ease-in-out infinite alternate;
+    text-shadow:
+        0 0 10px rgba(96, 165, 250, 0.8),
+        0 0 30px rgba(96, 165, 250, 0.4);
+    position: relative;
+    z-index: 1;
+    user-select: none;
+}
+
+@keyframes sigmaGlow {
+    from {
+        text-shadow:
+            0 0 10px rgba(96, 165, 250, 0.8),
+            0 0 30px rgba(96, 165, 250, 0.3);
+    }
+    to {
+        text-shadow:
+            0 0 18px rgba(96, 165, 250, 1),
+            0 0 55px rgba(96, 165, 250, 0.6),
+            0 0 80px rgba(34, 211, 238, 0.3);
+    }
+}
+
+/* ---- Nombre del sistema ---- */
+.loader-brand {
+    text-align: center;
+}
+
+.loader-brand h2 {
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: 0.42em;
+    margin: 0;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #ffffff 0%, #93c5fd 50%, #67e8f9 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.loader-brand p {
+    font-size: 0.7rem;
+    color: #475569;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 0.35rem 0 0;
+}
+
+/* ---- Barra de progreso ---- */
+.loader-progress-section {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.loader-progress-bar {
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 3px;
+    overflow: visible;
+    position: relative;
+}
+
+.loader-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #3b82f6, #22d3ee, #60a5fa);
+    border-radius: 3px;
+    transition: width 0.38s ease;
+    position: relative;
+    box-shadow: 0 0 8px rgba(96, 165, 250, 0.75), 0 0 20px rgba(34, 211, 238, 0.3);
+}
+
+/* Destellito corriendo sobre la barra */
+.loader-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: -1px;
+    right: -2px;
+    width: 55px;
+    height: 5px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+    animation: shimmerBar 1.6s ease-in-out infinite;
+    border-radius: 3px;
+}
+
+@keyframes shimmerBar {
+    from { transform: translateX(-55px); opacity: 0; }
+    40%  { opacity: 1; }
+    to   { transform: translateX(55px); opacity: 0; }
+}
+
+/* Porcentaje y estado en la misma línea */
+.loader-progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.loader-status {
+    font-size: 0.78rem;
+    color: #64748b;
+    letter-spacing: 0.04em;
+    flex: 1;
+    font-family: 'Courier New', 'Consolas', monospace;
+    transition: opacity 0.35s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.loader-status.fade {
+    opacity: 0;
+}
+
+.loader-progress-pct {
+    font-size: 0.7rem;
+    color: #60a5fa;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ---- Subtítulo del dashboard (nombre específico) ---- */
+.loader-dashboard-name {
+    font-size: 0.78rem;
+    color: #334155;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: center;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding-top: 0.8rem;
+    width: 100%;
+}
+
+/* ---- Tip al fondo ---- */
+.loader-tip {
+    position: absolute;
+    bottom: 2.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 88%;
+    max-width: 500px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 0.7rem 1.1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    font-size: 0.74rem;
+    z-index: 1;
+    transition: opacity 0.35s ease;
+}
+
+.loader-tip.fade {
+    opacity: 0;
+}
+
+.tip-label {
+    color: #60a5fa;
+    font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 0.74rem;
+}
+
+.tip-text {
+    color: #64748b;
+    line-height: 1.45;
+}
+
+/* ---- Contenido del dashboard: oculto inicialmente ---- */
+/* NOTA: Se usa opacity para evitar layout shift. El contenido ocupa
+   su lugar en el DOM pero no es visible hasta que el loader termina. */
+.dashboard-content-wrapper {
+    opacity: 0;
+    transition: opacity 0.65s ease 0.1s;
+}
+
+.dashboard-content-wrapper.visible {
+    opacity: 1;
+}
+
+/* ============================================================
+   MODO OSCURO — No se requieren overrides para el loader
+   (siempre tiene fondo oscuro intencional como splash screen)
+
+   Sí se necesita override para el contenido wrapper si tiene
+   estilos propios, pero el wrapper en sí es transparente.
+   ============================================================ */
+
+/* ---- Responsive: pantallas pequeñas ---- */
+@media (max-width: 480px) {
+    .loader-logo-ring {
+        width: 90px;
+        height: 90px;
+    }
+    .ring-1 { width: 90px;  height: 90px; }
+    .ring-2 { width: 66px;  height: 66px; }
+    .ring-3 { width: 44px;  height: 44px; }
+    .loader-sigma { font-size: 1.7rem; }
+    .loader-brand h2 { font-size: 1.4rem; letter-spacing: 0.3em; }
+    .loader-tip { bottom: 1.5rem; }
+}
+
+/* ============================================================
+   MODO PLOTLY — Ocultar barra, porcentaje y texto de estado
+   durante la carga. Solo mostrar "¡Carga completa!" al final.
+   Ocultar tip "💡 Dato:" por completo.
+   ============================================================ */
+
+/* display:none es la ÚNICA forma 100% confiable de ocultar la sección.
+   visibility:hidden hereda pero puede fallar con pseudo-elementos animados. */
+.sigma-loader.plotly-mode .loader-progress-section {
+    display: none;
+}
+
+/* Cuando completar() agrega .carga-lista al overlay,
+   mostrar la sección SOLO con el texto de estado en verde.
+   La barra y el % quedan ocultos con sus propios display:none. */
+.sigma-loader.plotly-mode.carga-lista .loader-progress-section {
+    display: flex;
+}
+.sigma-loader.plotly-mode.carga-lista .loader-progress-bar {
+    display: none;
+}
+.sigma-loader.plotly-mode.carga-lista .loader-progress-pct {
+    display: none;
+}
+.sigma-loader.plotly-mode.carga-lista .loader-progress-info {
+    justify-content: center;
+}
+.sigma-loader.plotly-mode.carga-lista .loader-status {
+    color: #34d399;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-shadow: 0 0 14px rgba(52, 211, 153, 0.6);
+    white-space: normal;
+    flex: none;
+    animation: pulsoVerde 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes pulsoVerde {
+    from { text-shadow: 0 0 8px rgba(52, 211, 153, 0.4); }
+    to   { text-shadow: 0 0 22px rgba(52, 211, 153, 0.9); }
+}
+
+[data-bs-theme="dark"] .sigma-loader.plotly-mode.carga-lista .loader-status {
+    color: #34d399;
+}
+
+/* ---- Mensaje "Cargando..." animado (solo existe en cotizaciones) ---- */
+/* No se oculta por defecto — solo está presente en dashboard_cotizaciones.html */
+.loader-cargando {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-align: center;
+    color: #94a3b8;
+    animation: pulsoCargando 2s ease-in-out infinite;
+}
+
+.loader-cargando .dots {
+    display: inline-block;
+    overflow: hidden;
+    width: 0;
+    white-space: nowrap;
+    vertical-align: bottom;
+    animation: dotsAnim 1.8s steps(4, end) infinite;
+}
+
+@keyframes dotsAnim {
+    0%   { width: 0; }
+    25%  { width: 0.48em; }
+    50%  { width: 0.96em; }
+    75%  { width: 1.44em; }
+    100% { width: 0; }
+}
+
+@keyframes pulsoCargando {
+    0%, 100% { opacity: 0.5; }
+    50%      { opacity: 1; }
+}
+
+/* Ocultar "Cargando..." cuando aparece "¡Carga completa!" */
+.sigma-loader.carga-lista .loader-cargando {
+    display: none;
+}
+
+[data-bs-theme="dark"] .loader-cargando {
+    color: #cbd5e1;
+}
+
+/* Ocultar completamente el tip "💡 Dato:" en plotlyMode */
+.sigma-loader.plotly-mode .loader-tip {
+    display: none;
+}

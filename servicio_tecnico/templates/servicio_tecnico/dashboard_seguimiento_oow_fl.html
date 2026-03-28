@@ -4,12 +4,57 @@
 {% block title %}Dashboard Seguimiento OOW-/FL- - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
+<!-- Loader épico de dashboard -->
+<link rel="stylesheet" href="{% static 'css/dashboard_loader.css' %}">
 <!-- Estilos específicos del dashboard OOW-/FL- -->
 <link rel="stylesheet" href="{% static 'css/dashboard_oow_fl.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+
+<!-- ========================================================================
+     LOADER ÉPICO — visible por defecto, se oculta cuando window.load dispara
+     ======================================================================== -->
+<div id="sigma-loader" class="sigma-loader">
+    <div class="loader-bg">
+        <div class="loader-grid"></div>
+        <div class="loader-particles">
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+        </div>
+    </div>
+    <div class="loader-center">
+        <div class="loader-logo-ring">
+            <div class="ring ring-1"></div>
+            <div class="ring ring-2"></div>
+            <div class="ring ring-3"></div>
+            <div class="loader-sigma">&Sigma;</div>
+        </div>
+        <div class="loader-brand">
+            <h2>SIGMA</h2>
+            <p>Sistema Integral de Gestión</p>
+        </div>
+        <div class="loader-progress-section">
+            <div class="loader-progress-bar">
+                <div class="loader-progress-fill" id="loaderProgressFill"></div>
+            </div>
+            <div class="loader-progress-info">
+                <span class="loader-status" id="loaderStatus">Iniciando dashboard...</span>
+                <span class="loader-progress-pct" id="loaderProgressPct">0%</span>
+            </div>
+        </div>
+        <div class="loader-dashboard-name" id="loaderDashboardName">Dashboard OOW- / FL-</div>
+    </div>
+    <div class="loader-tip">
+        <span class="tip-label">💡 Dato:</span>
+        <span class="tip-text" id="loaderTipText">Cargando...</span>
+    </div>
+</div>
+
+<!-- Contenido del dashboard: oculto hasta que el loader termina -->
+<div id="dashboard-content" class="dashboard-content-wrapper container-fluid mt-4">
     
     <!-- ====================================================================
          ENCABEZADO DEL DASHBOARD
@@ -1780,5 +1825,43 @@ function exportarExcel() {
 document.addEventListener('DOMContentLoaded', function() {
     poblarTableasDesglose();
 });
+</script>
+
+<!-- Loader épico: debe cargarse antes del script de inicialización -->
+<script src="{% static 'js/dashboard_loader.js' %}"></script>
+<script>
+(function() {
+    new DashboardLoader({
+        tituloExtra: 'Dashboard OOW- / FL-',
+        mensajes: [
+            'Consultando órdenes OOW- y FL-...',
+            'Calculando tiempos de resolución...',
+            'Procesando métricas por responsable...',
+            'Generando gráficas de seguimiento...',
+            'Analizando tendencias temporales...',
+            'Calculando alertas y prioridades...',
+            'Construyendo tablas de desglose...',
+        ],
+        tips: [
+            'Las órdenes OOW- son equipos fuera de garantía. Las FL- son garantias de laboratorio externo.',
+            'Usa los filtros de responsable para comparar el rendimiento entre técnicos.',
+            'Las alertas en rojo indican órdenes con más de 15 días sin actualización.',
+            'Puedes exportar el reporte completo a Excel desde el botón superior derecho.',
+            'Los gráficos muestran la distribución de tiempos de respuesta por sucursal.',
+        ],
+        delayExtra: 400,
+    });
+
+    // Chart.js renderiza en DOMContentLoaded; esperamos a window.load
+    // para garantizar que todos los gráficos estén visualmente pintados
+    window.addEventListener('load', function() {
+        // Pequeño delay extra para que Chart.js termine de dibujar en canvas
+        setTimeout(function() {
+            if (window.sigmaLoader) {
+                window.sigmaLoader.completar();
+            }
+        }, 300);
+    });
+})();
 </script>
 {% endblock %}

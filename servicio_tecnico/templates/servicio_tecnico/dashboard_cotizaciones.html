@@ -4,12 +4,59 @@
 {% block title %}Dashboard de Cotizaciones - Analytics{% endblock %}
 
 {% block extra_css %}
+<!-- Loader épico de dashboard -->
+<link rel="stylesheet" href="{% static 'css/dashboard_loader.css' %}">
 <!-- Estilos específicos del Dashboard de Cotizaciones -->
 <link rel="stylesheet" href="{% static 'css/dashboard_cotizaciones.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+
+<!-- ========================================
+     LOADER ÉPICO — visible por defecto,
+     se oculta cuando window.load dispara
+     ======================================== -->
+<div id="sigma-loader" class="sigma-loader plotly-mode">
+    <div class="loader-bg">
+        <div class="loader-grid"></div>
+        <div class="loader-particles">
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+        </div>
+    </div>
+    <div class="loader-center">
+        <div class="loader-logo-ring">
+            <div class="ring ring-1"></div>
+            <div class="ring ring-2"></div>
+            <div class="ring ring-3"></div>
+            <div class="loader-sigma">&Sigma;</div>
+        </div>
+        <div class="loader-brand">
+            <h2>SIGMA</h2>
+            <p>Sistema Integral de Gestión</p>
+        </div>
+        <div class="loader-progress-section">
+            <div class="loader-progress-bar">
+                <div class="loader-progress-fill" id="loaderProgressFill"></div>
+            </div>
+            <div class="loader-progress-info">
+                <span class="loader-status" id="loaderStatus">Iniciando dashboard...</span>
+                <span class="loader-progress-pct" id="loaderProgressPct">0%</span>
+            </div>
+        </div>
+        <div class="loader-cargando">Cargando<span class="dots">...</span></div>
+        <div class="loader-dashboard-name" id="loaderDashboardName">Dashboard de Cotizaciones</div>
+    </div>
+    <div class="loader-tip">
+        <span class="tip-label">💡 Dato:</span>
+        <span class="tip-text" id="loaderTipText">Cargando...</span>
+    </div>
+</div>
+
+<!-- Contenido del dashboard: oculto hasta que el loader termina -->
+<div id="dashboard-content" class="dashboard-content-wrapper container-fluid py-4">
     
     <!-- ========================================
          HEADER DEL DASHBOARD
@@ -2110,20 +2157,48 @@
     
 </div>
 
-<!-- Loading Overlay -->
-<div class="loading-overlay" id="loadingOverlay">
-    <div class="text-center">
-        <div class="spinner-border spinner-border-lg text-primary" role="status">
-            <span class="visually-hidden">Cargando...</span>
-        </div>
-        <p class="mt-3 text-muted">Cargando datos del dashboard...</p>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
+<!-- Loader épico: debe cargarse ANTES que el dashboard TS -->
+<script src="{% static 'js/dashboard_loader.js' %}"></script>
 <!-- TypeScript compilado del dashboard -->
 <script src="{% static 'js/dashboard_cotizaciones.js' %}" defer></script>
+
+<!-- Inicializar el loader con mensajes propios de este dashboard -->
+<script>
+(function() {
+    new DashboardLoader({
+        tituloExtra: 'Dashboard de Cotizaciones',
+        mensajes: [
+            'Consultando base de datos...',
+            'Calculando métricas de aceptación...',
+            'Entrenando modelo de Machine Learning...',
+            'Generando visualizaciones Plotly...',
+            'Procesando predicciones inteligentes...',
+            'Analizando patrones de rechazo...',
+            'Calculando tasas por técnico...',
+            'Optimizando gráficas interactivas...',
+        ],
+        tips: [
+            'El modelo de ML analiza cientos de cotizaciones históricas para predecir aceptaciones.',
+            'Cada gráfica Plotly es interactiva: haz clic o arrastra para explorar los datos.',
+            'Los filtros de fecha afectan todas las métricas y predicciones del dashboard.',
+            'El análisis de rechazo identifica las piezas con mayor impacto en conversiones.',
+            'Puedes exportar cualquier sección a Excel con los botones de exportación.',
+        ],
+        delayExtra: 2800,   // 2.8s visible en 100% — tiempo para leer el tip de cierre
+        plotlyMode: true,   // Plotly genera HTML masivo server-side, bloquea el main thread de JS
+    });
+
+    // Completar el loader cuando todo el contenido haya cargado
+    window.addEventListener('load', function() {
+        if (window.sigmaLoader) {
+            window.sigmaLoader.completar();
+        }
+    });
+})();
+</script>
 
 <script>
 (function aplicarTemaPlotly() {
