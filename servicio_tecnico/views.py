@@ -3210,6 +3210,75 @@ def seguimiento_orden_cliente(request, token):
         ).order_by('tipo', 'fecha_subida')
     ]
 
+    # ── Seguimientos de piezas (solo cuando el estado es 'esperando_piezas') ──
+    # Solo se exponen al cliente: nombre del componente, descripción, timeline y fechas.
+    # No se incluyen: proveedor, número de pedido, notas internas ni costos.
+    seguimientos_piezas = []
+    if estado_orden == 'esperando_piezas':
+        # Flujo normal de estados en orden de progresion visual
+        _PASOS_NORMALES = [
+            ('pedido',     'Pedido'),
+            ('confirmado', 'Confirmado'),
+            ('transito',   'En Tránsito'),
+            ('recibido',   'Recibido'),
+        ]
+        _IDX_NORMAL = {c: i for i, (c, _) in enumerate(_PASOS_NORMALES)}
+        try:
+            for s in orden.cotizacion.seguimientos_piezas.prefetch_related(
+                'piezas__componente'
+            ).order_by('fecha_pedido'):
+                nombres = [p.componente.nombre for p in s.piezas.all()]
+                estado_actual = s.estado
+
+                # Construir timeline visual (lista de pasos con tipo para CSS)
+                # Tipos: 'completado' | 'actual' | 'alerta' | 'pendiente' | 'problema'
+                _timeline = []
+                if estado_actual in ('incorrecto', 'danado'):
+                    # Todos los pasos normales completados + paso final de problema
+                    for _, nombre in _PASOS_NORMALES:
+                        _timeline.append({'nombre': nombre, 'tipo': 'completado'})
+                    _nombres_problema = {
+                        'incorrecto': 'P. Incorrecta',
+                        'danado':     'P. Dañada',
+                    }
+                    _timeline.append({
+                        'nombre': _nombres_problema.get(estado_actual, estado_actual),
+                        'tipo': 'problema',
+                    })
+                elif estado_actual == 'retrasado':
+                    # Pedido/Confirmado completados, Retrasado como alerta, Recibido pendiente
+                    _timeline.extend([
+                        {'nombre': 'Pedido',     'tipo': 'completado'},
+                        {'nombre': 'Confirmado', 'tipo': 'completado'},
+                        {'nombre': 'Retrasado',  'tipo': 'alerta'},
+                        {'nombre': 'Recibido',   'tipo': 'pendiente'},
+                    ])
+                else:
+                    idx_actual = _IDX_NORMAL.get(estado_actual, 0)
+                    # 'recibido' es el último paso y ya está finalizado: todos completados
+                    es_ultimo_completado = (estado_actual == 'recibido')
+                    for i, (_, nombre) in enumerate(_PASOS_NORMALES):
+                        if i < idx_actual or es_ultimo_completado:
+                            tipo = 'completado'
+                        elif i == idx_actual:
+                            tipo = 'actual'
+                        else:
+                            tipo = 'pendiente'
+                        _timeline.append({'nombre': nombre, 'tipo': tipo})
+
+                seguimientos_piezas.append({
+                    'nombre':         ', '.join(nombres) if nombres else '',
+                    'descripcion':    s.descripcion_piezas,
+                    'estado':         estado_actual,
+                    'estado_nombre':  s.get_estado_display(),
+                    'fecha_pedido':   s.fecha_pedido,
+                    'fecha_estimada': s.fecha_entrega_estimada,
+                    'fecha_real':     s.fecha_entrega_real,
+                    'timeline':       _timeline,
+                })
+        except Exception:
+            pass
+
     # ── Construir contexto según estado ──
     context = {
         'orden': orden,
@@ -3223,6 +3292,7 @@ def seguimiento_orden_cliente(request, token):
         'dias_restantes': enlace.dias_restantes,
         'siguiente_paso': siguiente_paso_texto,
         'imagenes_galeria': imagenes_galeria,
+        'seguimientos_piezas': seguimientos_piezas,
     }
 
     if estado_orden == 'entregado':

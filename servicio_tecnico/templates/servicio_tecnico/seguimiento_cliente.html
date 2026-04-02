@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-bs-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -10,10 +10,26 @@
   <title>Seguimiento de Orden — SIC</title>
   <link rel="icon" href="{% static 'images/logos/logo_sic.png' %}">
   <link rel="stylesheet" href="{% static 'css/seguimiento_cliente.css' %}">
+  {# Script anti-flash: aplica el tema ANTES del render para evitar parpadeo blanco #}
+  <script>
+    (function () {
+      var t = localStorage.getItem('theme');
+      if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0f172a');
+      }
+    })();
+  </script>
 </head>
 <body class="st-body">
 
 <canvas id="particles-canvas"></canvas>
+
+{# Botón flotante de modo oscuro #}
+<button id="darkModeToggle" class="st-dark-toggle" type="button" aria-label="Cambiar tema">
+  <span class="st-dark-toggle-icon st-dark-toggle-icon--light">☀️</span>
+  <span class="st-dark-toggle-icon st-dark-toggle-icon--dark">🌙</span>
+</button>
 
 {% if estado == 'invalido' %}
 {# ESTADO INVÁLIDO — Token expirado, cancelado o inexistente #}
@@ -314,6 +330,16 @@
     </div>
     {% endif %}
 
+    {# Botón para consultar estado de piezas (solo cuando hay seguimientos activos) #}
+    {% if seguimientos_piezas %}
+    <div class="st-piezas-btn-wrapper">
+      <button id="btn-ver-piezas" class="st-btn st-btn--piezas" type="button" aria-haspopup="dialog" aria-controls="piezas-modal">
+        <span class="st-btn-icon">📦</span>
+        Ver estado de mis piezas
+      </button>
+    </div>
+    {% endif %}
+
     {# Sección de contacto con responsable #}
     <div class="st-contacto">
       <p class="st-contacto-title">👤 Tu responsable de seguimiento</p>
@@ -365,6 +391,66 @@
     <p class="st-footer-refresh">🔄 Para actualizar el estado, recarga esta página.</p>
   </div>
 
+</div>
+{% endif %}
+
+{# === Modal: Estado de mis piezas === #}
+{% if seguimientos_piezas %}
+<div id="piezas-modal-overlay" class="st-modal-overlay" role="none">
+  <div id="piezas-modal" class="st-modal" role="dialog" aria-modal="true" aria-labelledby="piezas-modal-title" tabindex="-1">
+    <div class="st-modal-header">
+      <span class="st-modal-header-icon">📦</span>
+      <h2 class="st-modal-title" id="piezas-modal-title">Estado de mis piezas</h2>
+      <button id="piezas-modal-close" class="st-modal-close" type="button" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="st-modal-body">
+      {% for pieza in seguimientos_piezas %}
+      <div class="st-pieza-card">
+        {% if pieza.nombre %}
+        <p class="st-pieza-nombre">{{ pieza.nombre }}</p>
+        {% endif %}
+        <p class="st-pieza-desc">{{ pieza.descripcion }}</p>
+
+        {# ── Timeline horizontal de progresion del pedido ── #}
+        <div class="st-pieza-timeline" role="list" aria-label="Progreso del pedido">
+          {% for paso in pieza.timeline %}
+          <div class="st-pieza-tl-step st-pieza-tl-step--{{ paso.tipo }}"
+               role="listitem"
+               style="animation-delay: {{ forloop.counter0 }}00ms;">
+            <div class="st-pieza-tl-dot st-pieza-tl-dot--{{ paso.tipo }}" aria-label="{{ paso.nombre }}: {{ paso.tipo }}">
+              {% if paso.tipo == 'completado' %}<span aria-hidden="true">✓</span>
+              {% elif paso.tipo == 'problema' %}<span aria-hidden="true">✕</span>{% endif %}
+            </div>
+            <span class="st-pieza-tl-label st-pieza-tl-label--{{ paso.tipo }}">{{ paso.nombre }}</span>
+          </div>
+          {% endfor %}
+        </div>
+
+        {# Fechas Pedido → Estimado [→ Entregado] #}
+        <div class="st-pieza-fechas">
+          <span class="st-pieza-fecha-item">
+            <span class="st-pieza-fecha-label">Pedido</span>
+            <span class="st-pieza-fecha-val">{{ pieza.fecha_pedido|date:"d/m/Y" }}</span>
+          </span>
+          <span class="st-pieza-fecha-arrow">→</span>
+          <span class="st-pieza-fecha-item">
+            <span class="st-pieza-fecha-label">Estimado</span>
+            <span class="st-pieza-fecha-val">{{ pieza.fecha_estimada|date:"d/m/Y" }}</span>
+          </span>
+          {% if pieza.fecha_real %}
+          <span class="st-pieza-fecha-arrow">→</span>
+          <span class="st-pieza-fecha-item">
+            <span class="st-pieza-fecha-label">Entregado</span>
+            <span class="st-pieza-fecha-val st-pieza-fecha-val--recibido">{{ pieza.fecha_real|date:"d/m/Y" }}</span>
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <p class="st-pieza-empty">No hay seguimientos de piezas disponibles.</p>
+      {% endfor %}
+    </div>
+  </div>
 </div>
 {% endif %}
 
@@ -498,6 +584,14 @@
 {% if imagenes_galeria %}
 <script src="{% static 'js/galeria_seguimiento.js' %}"></script>
 {% endif %}
+
+{# === Modal de estado de piezas === #}
+{% if seguimientos_piezas %}
+<script src="{% static 'js/piezas_modal.js' %}"></script>
+{% endif %}
+
+{# === Toggle de modo oscuro (persistente vía localStorage) === #}
+<script src="{% static 'js/dark_mode.js' %}"></script>
 
 </body>
 </html>
