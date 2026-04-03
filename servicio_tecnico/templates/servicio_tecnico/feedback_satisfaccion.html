@@ -234,8 +234,15 @@
   <p style="font-size:1.5rem;margin:0 0 1.25rem;">
     {% for i in "12345" %}{% if forloop.counter <= calificacion %}⭐{% else %}☆{% endif %}{% endfor %}
   </p>
-  {% endif %}
+  <a href="https://search.google.com/local/writereview?placeid=ChIJNaTP41kd0oURaxcszDXlAJs"
+     class="fs-estado-btn fs-google-btn"
+     target="_blank" rel="noopener noreferrer">
+    ⭐ Déjanos una reseña en Google
+  </a>
+  <a href="https://sicfix.mx" class="fs-estado-btn fs-estado-btn--secondary">Visitar sicfix.mx</a>
+  {% else %}
   <a href="https://sicfix.mx" class="fs-estado-btn">Visitar sicfix.mx</a>
+  {% endif %}
 </div>
 
 

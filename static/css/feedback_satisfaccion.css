@@ -674,3 +674,39 @@
 [data-bs-theme="dark"] .fs-card-body {
   background: #0f172a;
 }
+
+/* ─── Botón de reseña Google ─────────────────────────────────── */
+.fs-google-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #4285F4;
+  color: #fff !important;
+  font-weight: 600;
+  border-radius: 50px;
+  padding: 0.8rem 1.75rem;
+  text-decoration: none;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 14px rgba(66, 133, 244, 0.45);
+  margin-bottom: 0.75rem;
+}
+.fs-google-btn:hover {
+  background: #3367D6;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(66, 133, 244, 0.55);
+}
+
+/* Botón secundario (visitar web) cuando ya hay botón Google */
+.fs-estado-btn--secondary {
+  background: transparent;
+  color: #7c3aed !important;
+  border: 1.5px solid #7c3aed;
+  box-shadow: none;
+  font-size: 0.85rem;
+  padding: 0.55rem 1.25rem;
+}
+.fs-estado-btn--secondary:hover {
+  background: rgba(124, 58, 237, 0.08);
+  box-shadow: none;
+}
