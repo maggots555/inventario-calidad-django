@@ -183,6 +183,47 @@
                     </div>
                 </div>
             </div>
+
+            {# ── Carrusel de comentarios de clientes ── #}
+            {% if metricas.comentarios_clientes %}
+            <div class="pcard-divider"></div>
+            <div class="pcard-stats-section">
+                <div class="pcard-stats-title">
+                    <i class="bi bi-chat-quote-fill" style="color:var(--pcard-gold)"></i>
+                    Opiniones de Clientes
+                </div>
+                <div class="review-carousel-wrapper" id="reviewCarouselRecepcionista"
+                     data-total="{{ metricas.comentarios_clientes|length }}">
+                    <div class="review-track">
+                        {% for fb in metricas.comentarios_clientes %}
+                        <div class="review-slide"
+                             data-rating="{{ fb.calificacion_general|default:0 }}"
+                             data-recomienda="{{ fb.recomienda|yesno:'1,0,' }}">
+                            <div class="review-top">
+                                <div class="review-stars-display" aria-label="{{ fb.calificacion_general|default:0 }} de 5 estrellas"></div>
+                                {% if fb.recomienda is not None %}
+                                <span class="review-thumb">{% if fb.recomienda %}👍{% else %}👎{% endif %}</span>
+                                {% endif %}
+                            </div>
+                            <p class="review-body">{{ fb.comentario_cliente }}</p>
+                            <div class="review-meta">
+                                <div class="review-meta">
+                                    <span class="review-folio">
+                                        {{ fb.orden.detalle_equipo.orden_cliente|default:fb.orden.numero_orden_interno }}
+                                    </span>
+                                    <span class="review-dot">·</span>
+                                    <span class="review-date">{{ fb.fecha_respuesta|date:"d/m/Y" }}</span>
+                                </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button class="review-nav review-prev" aria-label="Anterior">&#8249;</button>
+                    <button class="review-nav review-next" aria-label="Siguiente">&#8250;</button>
+                    <div class="review-dots-bar"></div>
+                </div>
+            </div>
+            {% endif %}
+
             {% endif %}
 
             {% endif %}{# /recepcionista #}
@@ -337,4 +378,8 @@
         </div>{# /.pcard-card #}
     </div>{# /.perfil-wrapper #}
 </div>{# /.perfil-page #}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/mi_perfil.js' %}"></script>
 {% endblock %}

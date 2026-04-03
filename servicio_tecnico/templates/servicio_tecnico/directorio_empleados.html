@@ -93,6 +93,72 @@
             </a>
             {% endfor %}
         </div>
+
+        {# ── Opiniones de Clientes — Recepcionistas ── #}
+        {% for item in empleados_data %}
+            {% if item.empleado.rol == 'recepcionista' and item.comentarios_clientes %}
+            <div class="pcard-card directorio-review-card">
+                <div class="directorio-review-header">
+                    <div class="directorio-review-avatar">
+                        {% if item.empleado.foto_perfil %}
+                            <img src="{{ item.empleado.get_foto_perfil_url }}"
+                                 alt="{{ item.empleado.nombre_completo }}">
+                        {% else %}
+                            <div class="pcard-avatar-initials" style="width:48px;height:48px;font-size:1rem;">
+                                {{ item.empleado.get_iniciales }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div class="directorio-review-nombre">{{ item.empleado.nombre_completo }}</div>
+                        <div class="directorio-review-rol">{{ item.rol_display }}</div>
+                    </div>
+                    <a href="{% url 'servicio_tecnico:perfil_empleado' item.empleado.pk %}"
+                       class="directorio-review-link">
+                        Ver perfil <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+                <div class="pcard-divider"></div>
+                <div class="pcard-stats-section" style="padding-bottom:1.25rem;">
+                    <div class="pcard-stats-title">
+                        <i class="bi bi-chat-quote-fill" style="color:var(--pcard-gold)"></i>
+                        Opiniones de Clientes
+                    </div>
+                    <div class="review-carousel-wrapper"
+                         id="reviewDir{{ item.empleado.pk }}"
+                         data-total="{{ item.comentarios_clientes|length }}">
+                        <div class="review-track">
+                            {% for fb in item.comentarios_clientes %}
+                            <div class="review-slide"
+                                 data-rating="{{ fb.calificacion_general|default:0 }}"
+                                 data-recomienda="{{ fb.recomienda|yesno:'1,0,' }}">
+                                <div class="review-top">
+                                    <div class="review-stars-display"
+                                         aria-label="{{ fb.calificacion_general|default:0 }} de 5 estrellas"></div>
+                                    {% if fb.recomienda is not None %}
+                                    <span class="review-thumb">{% if fb.recomienda %}👍{% else %}👎{% endif %}</span>
+                                    {% endif %}
+                                </div>
+                                <p class="review-body">{{ fb.comentario_cliente }}</p>
+                                <div class="review-meta">
+                                    <span class="review-folio">
+                                        {{ fb.orden.detalle_equipo.orden_cliente|default:fb.orden.numero_orden_interno }}
+                                    </span>
+                                    <span class="review-dot">·</span>
+                                    <span class="review-date">{{ fb.fecha_respuesta|date:"d/m/Y" }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button class="review-nav review-prev" aria-label="Anterior">&#8249;</button>
+                        <button class="review-nav review-next" aria-label="Siguiente">&#8250;</button>
+                        <div class="review-dots-bar"></div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+
         {% else %}
         <div class="directorio-empty">
             <i class="bi bi-people"></i>
@@ -102,4 +168,8 @@
 
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/mi_perfil.js' %}"></script>
 {% endblock %}

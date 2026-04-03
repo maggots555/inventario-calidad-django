@@ -14763,6 +14763,16 @@ def _calcular_metricas_empleado(empleado):
             (recomiendan / con_recomendacion * 100) if con_recomendacion > 0 else 0, 1
         )
 
+        # Últimos 15 comentarios escritos por clientes (solo si tienen texto)
+        comentarios_clientes = list(
+            FeedbackCliente.objects.filter(
+                tipo='satisfaccion',
+                orden__responsable_seguimiento=empleado,
+                utilizado=True,
+                comentario_cliente__gt='',
+            ).select_related('orden__detalle_equipo').order_by('-fecha_respuesta')[:15]
+        )
+
         metricas.update({
             'total_cotizaciones': total_cotizaciones,
             'cotizaciones_aceptadas': cotizaciones_aceptadas,
@@ -14777,6 +14787,7 @@ def _calcular_metricas_empleado(empleado):
             'nps_promedio': nps_promedio,
             'calificacion_promedio': calificacion_promedio,
             'tasa_recomendacion': tasa_recomendacion,
+            'comentarios_clientes': comentarios_clientes,
         })
 
     # Métricas para técnico
@@ -14977,12 +14988,25 @@ def directorio_empleados(request):
 
     # Calcular rating rápido para cada empleado
     empleados_data = []
+    from .models import FeedbackCliente
     for emp in empleados_qs:
         rating = _calcular_rating_rapido(emp)
+        # Comentarios de clientes — solo para recepcionistas
+        comentarios_clientes = []
+        if emp.rol == 'recepcionista':
+            comentarios_clientes = list(
+                FeedbackCliente.objects.filter(
+                    tipo='satisfaccion',
+                    orden__responsable_seguimiento=emp,
+                    utilizado=True,
+                    comentario_cliente__gt='',
+                ).select_related('orden__detalle_equipo').order_by('-fecha_respuesta')[:15]
+            )
         empleados_data.append({
             'empleado': emp,
             'rating': rating,
             'rol_display': dict(Empleado.ROL_CHOICES).get(emp.rol, emp.rol),
+            'comentarios_clientes': comentarios_clientes,
         })
 
     # Datos para filtros

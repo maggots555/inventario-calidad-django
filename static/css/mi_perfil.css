@@ -637,3 +637,255 @@
 .pcard-stat-cell:nth-child(7) { animation-delay: 0.57s; }
 .pcard-stat-cell:nth-child(8) { animation-delay: 0.64s; }
 .pcard-stat-cell:nth-child(9) { animation-delay: 0.71s; }
+
+/* ===========================================================================
+   CARRUSEL DE OPINIONES DE CLIENTES
+   =========================================================================== */
+
+/* Contenedor externo: posición relativa para anclar flechas */
+.review-carousel-wrapper {
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid rgba(212, 168, 67, 0.15);
+    background: rgba(255, 255, 255, 0.025);
+    padding-bottom: 2.5rem; /* espacio para los puntos */
+}
+
+/* Track deslizante: todos los slides en fila horizontal */
+.review-track {
+    display: flex;
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+}
+
+/* Cada slide ocupa el 100% del wrapper */
+.review-slide {
+    min-width: 100%;
+    padding: 1.5rem 1.75rem 1rem;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Fila superior: estrellas + thumb */
+.review-top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Estrellas (renderizadas por TS) */
+.review-stars-display {
+    display: flex;
+    gap: 2px;
+    line-height: 1;
+}
+.rs-star {
+    font-size: 1.1rem;
+    transition: color 0.2s;
+}
+.rs-filled { color: var(--pcard-gold); text-shadow: 0 0 8px rgba(212, 168, 67, 0.5); }
+.rs-empty  { color: rgba(212, 168, 67, 0.2); }
+
+/* Pulgar (si disponible) */
+.review-thumb {
+    font-size: 0.95rem;
+    line-height: 1;
+    margin-left: auto;
+    opacity: 0.85;
+}
+
+/* Texto del comentario */
+.review-body {
+    font-size: 0.85rem;
+    color: var(--pcard-text);
+    line-height: 1.65;
+    margin: 0;
+    font-style: italic;
+    /* Clampear el texto a 4 líneas para mantener altura uniforme */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+}
+
+/* Meta: folio + fecha */
+.review-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.68rem;
+    color: var(--pcard-muted);
+    letter-spacing: 0.03em;
+}
+.review-folio {
+    color: var(--pcard-gold-light);
+    font-weight: 600;
+}
+.review-dot {
+    opacity: 0.4;
+}
+.review-date { opacity: 0.75; }
+
+/* ── Flechas de navegación ─────────────────────────────────────────── */
+.review-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-60%); /* Centrar en la zona del texto, no en los puntos */
+    background: rgba(212, 168, 67, 0.08);
+    border: 1px solid rgba(212, 168, 67, 0.2);
+    color: var(--pcard-gold);
+    font-size: 1.75rem;
+    line-height: 1;
+    /* Touch target mínimo 44×44px (iOS HIG) */
+    min-width: 44px;
+    min-height: 44px;
+    width: 36px;
+    height: 44px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    z-index: 2;
+    /* Inicialmente muy sutiles, aparecen al hover del wrapper */
+    opacity: 0.35;
+}
+.review-carousel-wrapper:hover .review-nav,
+.review-carousel-wrapper:focus-within .review-nav {
+    opacity: 1;
+}
+.review-nav:hover {
+    background: rgba(212, 168, 67, 0.18);
+    border-color: var(--pcard-gold);
+    color: var(--pcard-gold-light);
+}
+.review-prev { left: 6px; }
+.review-next { right: 6px; }
+
+/* ── Barra de puntos ───────────────────────────────────────────────── */
+.review-dots-bar {
+    position: absolute;
+    bottom: 0.6rem;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    pointer-events: auto;
+}
+.review-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(212, 168, 67, 0.2);
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    /* Touch target ampliado sin cambiar tamaño visual */
+    min-width: 20px;
+    min-height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: background 0.25s, transform 0.25s;
+    /* Sobrescribo el color del review-dot de meta para este contexto */
+    color: transparent;
+    font-size: 0;
+}
+/* El círculo visible como pseudo-elemento para no interferir con el touch target */
+.review-dot::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(212, 168, 67, 0.2);
+    transition: background 0.25s, transform 0.25s;
+    display: block;
+}
+.review-dot.active::before {
+    background: var(--pcard-gold);
+    transform: scale(1.35);
+    box-shadow: 0 0 6px rgba(212, 168, 67, 0.5);
+}
+.review-dot:hover::before {
+    background: rgba(212, 168, 67, 0.5);
+}
+
+/* ── Sección del directorio con encabezado del empleado ────────────── */
+.directorio-review-card {
+    margin-top: 1.5rem;
+}
+.directorio-review-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem 2rem;
+}
+.directorio-review-avatar img,
+.directorio-review-avatar .pcard-avatar-initials {
+    border-radius: 50%;
+    object-fit: cover;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+}
+.directorio-review-nombre {
+    font-family: 'Oswald', 'Impact', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.directorio-review-rol {
+    font-size: 0.68rem;
+    color: var(--pcard-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+.directorio-review-link {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: var(--pcard-gold);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid rgba(212, 168, 67, 0.25);
+    padding: 4px 12px;
+    border-radius: 6px;
+    transition: background 0.2s, border-color 0.2s;
+    white-space: nowrap;
+    min-height: 44px; /* touch target */
+}
+.directorio-review-link:hover {
+    background: rgba(212, 168, 67, 0.08);
+    border-color: var(--pcard-gold);
+    color: var(--pcard-gold-light);
+}
+
+/* ── Responsive del carrusel ───────────────────────────────────────── */
+@media (max-width: 640px) {
+    .review-slide {
+        padding: 1.25rem 2.5rem 0.75rem; /* más padding lateral para las flechas */
+    }
+    .review-body {
+        -webkit-line-clamp: 5;
+    }
+    .directorio-review-header {
+        padding: 1rem 1.25rem;
+        flex-wrap: wrap;
+    }
+    .directorio-review-link {
+        margin-left: 0;
+        width: 100%;
+        justify-content: center;
+    }
+}
+
