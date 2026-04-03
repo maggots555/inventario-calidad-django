@@ -1,12 +1,10 @@
 "use strict";
 /**
  * mi_perfil.ts
- * Lógica del carrusel de opiniones de clientes en "Mi Perfil" y "Directorio".
+ * Carrusel de opiniones de clientes en "Mi Perfil" y "Directorio".
  *
- * Qué hace:
- * - Busca todos los wrappers con clase `.review-carousel-wrapper`
- * - Para cada uno, instancia `ReviewCarousel`
- * - ReviewCarousel dibuja estrellas, puntos de navegación y gestiona el scroll
+ * Enfoque: translateX en PÍXELES (no %) para evitar el bug de porcentaje
+ * relativo al track en lugar de al wrapper.
  */
 // ── Clase principal del carrusel ───────────────────────────────────────────
 class ReviewCarousel {
@@ -14,7 +12,6 @@ class ReviewCarousel {
         this.current = 0;
         this.autoTimer = null;
         this.AUTO_INTERVAL_MS = 4500;
-        // Coordenadas para swipe táctil
         this.touchStartX = 0;
         this.touchStartY = 0;
         this.wrapper = wrapper;
@@ -28,7 +25,6 @@ class ReviewCarousel {
         this.dotsBar = dotsBar;
         this.prevBtn = prevBtn;
         this.nextBtn = nextBtn;
-        // Leer slides del DOM
         this.slides = Array.from(track.querySelectorAll('.review-slide')).map((el) => {
             var _a, _b;
             return ({
@@ -42,7 +38,7 @@ class ReviewCarousel {
         this._renderStars();
         this._buildDots();
         this._updateView();
-        // Botones de navegación (mínimo 44×44 px asegurado en CSS)
+        // Flechas
         prevBtn.addEventListener('click', (e) => {
             e.preventDefault();
             this._goTo(this._prevIndex());
@@ -53,20 +49,21 @@ class ReviewCarousel {
             this._goTo(this._nextIndex());
             this._resetAuto();
         });
-        // Ocultar flechas cuando hay un solo slide
+        // Ocultar flechas si solo hay un slide
         if (this.slides.length <= 1) {
             prevBtn.style.display = 'none';
             nextBtn.style.display = 'none';
         }
+        // Recalcular offsets en px si la ventana cambia de tamaño
+        window.addEventListener('resize', () => this._updateView());
         // Auto-scroll
         this._startAuto();
-        // Pausa en hover (desktop)
+        // Pausa en hover y focus
         this.wrapper.addEventListener('mouseenter', () => this._stopAuto());
         this.wrapper.addEventListener('mouseleave', () => this._startAuto());
-        // Pausa en focus (accesibilidad)
         this.wrapper.addEventListener('focusin', () => this._stopAuto());
         this.wrapper.addEventListener('focusout', () => this._startAuto());
-        // Swipe táctil (mobile)
+        // Swipe táctil
         this.wrapper.addEventListener('touchstart', (e) => {
             this.touchStartX = e.touches[0].clientX;
             this.touchStartY = e.touches[0].clientY;
@@ -74,19 +71,13 @@ class ReviewCarousel {
         this.wrapper.addEventListener('touchend', (e) => {
             const dx = e.changedTouches[0].clientX - this.touchStartX;
             const dy = e.changedTouches[0].clientY - this.touchStartY;
-            // Solo procesar si el gesto es más horizontal que vertical
             if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-                if (dx < 0) {
-                    this._goTo(this._nextIndex());
-                }
-                else {
-                    this._goTo(this._prevIndex());
-                }
+                this._goTo(dx < 0 ? this._nextIndex() : this._prevIndex());
                 this._resetAuto();
             }
         }, { passive: true });
     }
-    // ── Dibujar estrellas en cada slide ───────────────────────────────────
+    // ── Dibujar estrellas ──────────────────────────────────────────────────
     _renderStars() {
         this.slides.forEach(({ element, rating }) => {
             const container = element.querySelector('.review-stars-display');
@@ -120,41 +111,41 @@ class ReviewCarousel {
             this.dotsBar.appendChild(dot);
         });
     }
-    // ── Navegar a un slide específico ─────────────────────────────────────
+    // ── Navegar a slide ───────────────────────────────────────────────────
     _goTo(index) {
         this.current = index;
         this._updateView();
     }
-    // ── Actualizar posición del track y estado activo ────────────────────
+    // ── Actualizar posición usando PÍXELES (no %) ─────────────────────────
+    // EXPLICACIÓN: translateX(%) usa % del elemento mismo (el track),
+    // que mide N veces el wrapper si hay N slides. Por eso usamos px.
     _updateView() {
-        // Mover track con transform para transición suave
-        this.track.style.transform = `translateX(-${this.current * 100}%)`;
+        const slideWidth = this.wrapper.offsetWidth;
+        this.track.style.transform = `translateX(-${this.current * slideWidth}px)`;
         // Actualizar dots
         const dots = this.dotsBar.querySelectorAll('.review-dot');
         dots.forEach((dot, idx) => {
             dot.classList.toggle('active', idx === this.current);
             dot.setAttribute('aria-pressed', String(idx === this.current));
         });
-        // Accesibilidad: marcar slide activo
+        // Accesibilidad
         this.slides.forEach(({ element }, idx) => {
             element.setAttribute('aria-hidden', String(idx !== this.current));
         });
     }
-    // ── Índices de navegación cíclica ─────────────────────────────────────
+    // ── Índices cíclicos ──────────────────────────────────────────────────
     _nextIndex() {
         return (this.current + 1) % this.slides.length;
     }
     _prevIndex() {
         return (this.current - 1 + this.slides.length) % this.slides.length;
     }
-    // ── Control del auto-scroll ───────────────────────────────────────────
+    // ── Auto-scroll ───────────────────────────────────────────────────────
     _startAuto() {
         if (this.slides.length <= 1)
             return;
         this._stopAuto();
-        this.autoTimer = setInterval(() => {
-            this._goTo(this._nextIndex());
-        }, this.AUTO_INTERVAL_MS);
+        this.autoTimer = setInterval(() => this._goTo(this._nextIndex()), this.AUTO_INTERVAL_MS);
     }
     _stopAuto() {
         if (this.autoTimer !== null) {
@@ -167,9 +158,9 @@ class ReviewCarousel {
         this._startAuto();
     }
 }
-// ── Inicialización global ─────────────────────────────────────────────────
+// ── Inicialización ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    const wrappers = document.querySelectorAll('.review-carousel-wrapper');
-    wrappers.forEach((wrapper) => new ReviewCarousel(wrapper));
+    document.querySelectorAll('.review-carousel-wrapper')
+        .forEach((wrapper) => new ReviewCarousel(wrapper));
 });
 //# sourceMappingURL=mi_perfil.js.map

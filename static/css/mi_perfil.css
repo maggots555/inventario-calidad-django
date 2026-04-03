@@ -642,32 +642,33 @@
    CARRUSEL DE OPINIONES DE CLIENTES
    =========================================================================== */
 
-/* Contenedor externo: posición relativa para anclar flechas */
+/* Contenedor externo: recorta todo lo que sobresale horizontalmente */
 .review-carousel-wrapper {
     position: relative;
+    overflow: hidden;          /* CLAVE: clips los slides fuera de vista */
     width: 100%;
-    overflow: hidden;          /* CLAVE: recorta todo lo que se sale */
     border-radius: 14px;
     border: 1px solid rgba(212, 168, 67, 0.15);
     background: rgba(255, 255, 255, 0.025);
     padding-bottom: 2.5rem;    /* espacio para los puntos */
 }
 
-/* Track deslizante: todos los slides en fila horizontal */
+/* Track: fila horizontal con todos los slides uno al lado del otro */
 .review-track {
     display: flex;
-    flex-wrap: nowrap;         /* CLAVE: nunca envolver a la siguiente línea */
-    width: 100%;
+    flex-wrap: nowrap;
     transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;
+    /* Sin width aquí — deja que el contenido dicte el ancho */
 }
 
-/* Cada slide ocupa exactamente el 100% del wrapper, sin crecer ni encoger */
+/* Cada slide: ancho fijo igual al del wrapper, sin crecer ni encoger */
+/* offsetWidth del wrapper se usa en JS para el translateX en px  */
 .review-slide {
-    flex: 0 0 100%;            /* CLAVE: tamaño fijo, no crece ni encoge */
-    min-width: 0;              /* Evita overflow por contenido largo */
-    padding: 1.5rem 3rem 1rem; /* padding lateral amplio para dejar espacio a las flechas */
+    flex: 0 0 auto;            /* No crecer, no encoger, tamaño = width explícito */
+    width: 100%;               /* 100% del contenedor (review-carousel-wrapper) */
     box-sizing: border-box;
+    padding: 1.5rem 3.5rem 1rem; /* lateral amplio para no chocar con las flechas */
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
