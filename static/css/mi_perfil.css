@@ -645,24 +645,28 @@
 /* Contenedor externo: posición relativa para anclar flechas */
 .review-carousel-wrapper {
     position: relative;
-    overflow: hidden;
+    width: 100%;
+    overflow: hidden;          /* CLAVE: recorta todo lo que se sale */
     border-radius: 14px;
     border: 1px solid rgba(212, 168, 67, 0.15);
     background: rgba(255, 255, 255, 0.025);
-    padding-bottom: 2.5rem; /* espacio para los puntos */
+    padding-bottom: 2.5rem;    /* espacio para los puntos */
 }
 
 /* Track deslizante: todos los slides en fila horizontal */
 .review-track {
     display: flex;
+    flex-wrap: nowrap;         /* CLAVE: nunca envolver a la siguiente línea */
+    width: 100%;
     transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;
 }
 
-/* Cada slide ocupa el 100% del wrapper */
+/* Cada slide ocupa exactamente el 100% del wrapper, sin crecer ni encoger */
 .review-slide {
-    min-width: 100%;
-    padding: 1.5rem 1.75rem 1rem;
+    flex: 0 0 100%;            /* CLAVE: tamaño fijo, no crece ni encoge */
+    min-width: 0;              /* Evita overflow por contenido largo */
+    padding: 1.5rem 3rem 1rem; /* padding lateral amplio para dejar espacio a las flechas */
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -873,7 +877,7 @@
 /* ── Responsive del carrusel ───────────────────────────────────────── */
 @media (max-width: 640px) {
     .review-slide {
-        padding: 1.25rem 2.5rem 0.75rem; /* más padding lateral para las flechas */
+        padding: 1.25rem 2.75rem 0.75rem; /* padding lateral para dejar paso a las flechas en móvil */
     }
     .review-body {
         -webkit-line-clamp: 5;
