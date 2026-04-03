@@ -17,14 +17,10 @@ class ReviewCarousel {
         this.wrapper = wrapper;
         const track = wrapper.querySelector('.review-track');
         const dotsBar = wrapper.querySelector('.review-dots-bar');
-        const prevBtn = wrapper.querySelector('.review-prev');
-        const nextBtn = wrapper.querySelector('.review-next');
-        if (!track || !dotsBar || !prevBtn || !nextBtn)
+        if (!track || !dotsBar)
             return;
         this.track = track;
         this.dotsBar = dotsBar;
-        this.prevBtn = prevBtn;
-        this.nextBtn = nextBtn;
         this.slides = Array.from(track.querySelectorAll('.review-slide')).map((el) => {
             var _a, _b;
             return ({
@@ -39,22 +35,6 @@ class ReviewCarousel {
         this._renderStars();
         this._buildDots();
         this._updateView();
-        // Flechas
-        prevBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            this._goTo(this._prevIndex());
-            this._resetAuto();
-        });
-        nextBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            this._goTo(this._nextIndex());
-            this._resetAuto();
-        });
-        // Ocultar flechas si solo hay un slide
-        if (this.slides.length <= 1) {
-            prevBtn.style.display = 'none';
-            nextBtn.style.display = 'none';
-        }
         // Recalcular ancho y posición si la ventana cambia de tamaño
         window.addEventListener('resize', () => {
             this._setSlideDimensions();

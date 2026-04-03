@@ -19,8 +19,6 @@ class ReviewCarousel {
     private track!: HTMLElement;
     private slides!: ReviewSlide[];
     private dotsBar!: HTMLElement;
-    private prevBtn!: HTMLButtonElement;
-    private nextBtn!: HTMLButtonElement;
 
     private current: number = 0;
     private autoTimer: ReturnType<typeof setInterval> | null = null;
@@ -34,15 +32,11 @@ class ReviewCarousel {
 
         const track   = wrapper.querySelector<HTMLElement>('.review-track');
         const dotsBar = wrapper.querySelector<HTMLElement>('.review-dots-bar');
-        const prevBtn = wrapper.querySelector<HTMLButtonElement>('.review-prev');
-        const nextBtn = wrapper.querySelector<HTMLButtonElement>('.review-next');
 
-        if (!track || !dotsBar || !prevBtn || !nextBtn) return;
+        if (!track || !dotsBar) return;
 
         this.track   = track;
         this.dotsBar = dotsBar;
-        this.prevBtn = prevBtn;
-        this.nextBtn = nextBtn;
 
         this.slides = Array.from(
             track.querySelectorAll<HTMLElement>('.review-slide')
@@ -58,24 +52,6 @@ class ReviewCarousel {
         this._renderStars();
         this._buildDots();
         this._updateView();
-
-        // Flechas
-        prevBtn.addEventListener('click', (e: Event) => {
-            e.preventDefault();
-            this._goTo(this._prevIndex());
-            this._resetAuto();
-        });
-        nextBtn.addEventListener('click', (e: Event) => {
-            e.preventDefault();
-            this._goTo(this._nextIndex());
-            this._resetAuto();
-        });
-
-        // Ocultar flechas si solo hay un slide
-        if (this.slides.length <= 1) {
-            prevBtn.style.display = 'none';
-            nextBtn.style.display = 'none';
-        }
 
         // Recalcular ancho y posición si la ventana cambia de tamaño
         window.addEventListener('resize', () => {
