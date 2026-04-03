@@ -207,13 +207,12 @@
                             </div>
                             <p class="review-body">{{ fb.comentario_cliente }}</p>
                             <div class="review-meta">
-                                <div class="review-meta">
-                                    <span class="review-folio">
-                                        {{ fb.orden.detalle_equipo.orden_cliente|default:fb.orden.numero_orden_interno }}
-                                    </span>
-                                    <span class="review-dot">·</span>
-                                    <span class="review-date">{{ fb.fecha_respuesta|date:"d/m/Y" }}</span>
-                                </div>
+                                <span class="review-folio">
+                                    {{ fb.orden.detalle_equipo.orden_cliente|default:fb.orden.numero_orden_interno }}
+                                </span>
+                                <span class="review-dot">·</span>
+                                <span class="review-date">{{ fb.fecha_respuesta|date:"d/m/Y" }}</span>
+                            </div>
                         </div>
                         {% endfor %}
                     </div>
