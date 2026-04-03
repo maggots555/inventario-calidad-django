@@ -54,6 +54,7 @@ class ReviewCarousel {
 
         if (this.slides.length === 0) return;
 
+        this._setSlideDimensions(); // Asignar ancho en px ANTES de todo
         this._renderStars();
         this._buildDots();
         this._updateView();
@@ -76,8 +77,11 @@ class ReviewCarousel {
             nextBtn.style.display = 'none';
         }
 
-        // Recalcular offsets en px si la ventana cambia de tamaño
-        window.addEventListener('resize', () => this._updateView());
+        // Recalcular ancho y posición si la ventana cambia de tamaño
+        window.addEventListener('resize', () => {
+            this._setSlideDimensions();
+            this._updateView();
+        });
 
         // Auto-scroll
         this._startAuto();
@@ -102,6 +106,17 @@ class ReviewCarousel {
                 this._resetAuto();
             }
         }, { passive: true });
+    }
+
+    // ── Asignar ancho exacto a cada slide en píxeles ─────────────────────
+    // EXPLICACIÓN: width:100% en un hijo flex resuelve contra el TRACK
+    // (que mide N × wrapper), no contra el wrapper. Por eso asignamos
+    // el ancho del wrapper directamente como valor px en cada slide.
+    private _setSlideDimensions(): void {
+        const w = this.wrapper.offsetWidth;
+        this.slides.forEach(({ element }) => {
+            element.style.width = `${w}px`;
+        });
     }
 
     // ── Dibujar estrellas ──────────────────────────────────────────────────
