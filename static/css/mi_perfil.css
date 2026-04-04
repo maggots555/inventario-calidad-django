@@ -712,6 +712,7 @@
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 4;
+    line-clamp: 4;
     overflow: hidden;
 }
 
@@ -881,6 +882,7 @@
     }
     .review-body {
         -webkit-line-clamp: 5;
+        line-clamp: 5;
     }
     .directorio-review-header {
         padding: 1rem 1.25rem;
