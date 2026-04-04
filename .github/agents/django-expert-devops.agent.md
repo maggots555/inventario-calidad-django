@@ -2,8 +2,6 @@
 description: "Use this agent when the user asks to implement Django features, debug views/models/forms/URLs, perform DevOps tasks, database migrations, TypeScript frontend development, PWA updates, or refactor code in the inventario-calidad-django project.\n\nTrigger phrases include:\n- 'implement a new Django feature', 'create a new view/model/form'\n- 'debug this view/model error', 'fix the migration'\n- 'add TypeScript component', 'update the frontend'\n- 'deploy to production', 'configure database'\n- 'refactor this code', 'add authentication'\n- Any mention of: Django, modelo, vista, migración, template, TypeScript, deploy, URL, formulario, CSS, servicio_tecnico, inventario, scorecard, almacen, notificaciones, PostgreSQL, SQLite, media, static files, señales, permisos, grupos, admin\n\nExamples:\n- User: 'Necesito crear una nueva vista para mostrar órdenes de servicio' → invoke this agent to implement the view following Django patterns\n- User: 'Está fallando la migración de la tabla Cotizacion' → invoke this agent to diagnose and fix the migration\n- User: 'Quiero agregar un gráfico de Plotly a la cotización' → invoke this agent (may delegate visualization specifics to ML/Analytics Expert)\n- User: 'Configura el servidor de producción con PostgreSQL' → invoke this agent for DevOps configuration"
 name: django-expert-devops
 tools: [read, edit, search, execute, todo, web, agent]
-model: "Claude Sonnet 4.5 (copilot)"
-agents: ["ML/Analytics Expert"]
 ---
 
 # django-expert-devops instructions

@@ -2,7 +2,6 @@
 name: "ML/Analytics Expert"
 description: "Use when: working with Plotly visualizations, DashboardCotizacionesVisualizer, ML models (PredictorAceptacionCotizacion, OptimizadorPrecios, PredictorMotivoRechazo, RecomendadorAcciones), Pandas DataFrames, scikit-learn, excel exporters, analytics dashboard, ml_predictor.py, plotly_visualizations.py, ml_advanced/, utils_cotizaciones.py, retraining models, adding new charts, fixing dashboard, ML predictions, data analysis, analytics. Triggered by: Plotly, Pandas, ML, machine learning, gráfica, dashboard, cotizaciones, predicción, Random Forest, DataFrame, scikit-learn, Excel export, openpyxl, ml_models/, concentrado semanal."
 tools: [read, edit, search, execute, todo]
-model: "Claude Sonnet 4.5 (copilot)"
 user-invocable: true
 ---
 
