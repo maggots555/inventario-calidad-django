@@ -1720,15 +1720,12 @@
                         <div class="card-body">
                             {% if graficos.servicios_vm_distribucion %}
                                 {{ graficos.servicios_vm_distribucion|safe }}
-                                <div class="alert alert-success alert-dashboard mt-3">
-                                    <strong><i class="bi bi-list-check"></i> Servicios Disponibles:</strong>
-                                    <ul class="mb-0 mt-2">
-                                        <li><strong>Limpieza:</strong> Limpieza profunda del equipo</li>
-                                        <li><strong>Reinstalación SO:</strong> Formateo e instalación de sistema</li>
-                                        <li><strong>Respaldo:</strong> Backup de datos del cliente</li>
-                                        <li><strong>Cambio de pieza:</strong> Piezas vendidas directamente</li>
-                                        <li><strong>Kit limpieza:</strong> Kit de mantenimiento</li>
-                                    </ul>
+                                <div class="alert alert-info alert-dashboard mt-3">
+                                    <strong><i class="bi bi-bar-chart-line"></i> Lectura:</strong>
+                                    La barra <strong>verde</strong> muestra el conteo en cotizaciones aceptadas.
+                                    La barra <strong>azul</strong> muestra el total real de todas las VMs del período
+                                    (incluye VMs de cotizaciones rechazadas o sin respuesta).
+                                    Si la barra azul es mayor, hay servicios vendidos fuera del flujo de aceptación.
                                 </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">

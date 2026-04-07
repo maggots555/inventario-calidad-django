@@ -2242,6 +2242,14 @@ def analizar_servicios_vm_aceptadas(df):
     
     total_con_vm = len(df_aceptadas_vm)
     
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # También calculamos el total de TODAS las VMs en el período (sin filtrar por
+    # aceptación de cotización), porque un cliente puede rechazar la cotización
+    # pero igual comprar un servicio VM (ej: cambio de pieza de mostrador).
+    # Esto nos da el "total real" de cada servicio para comparar.
+    df_todas_vm = df[df['tiene_venta_mostrador'] == True].copy()
+    total_todas_vm = len(df_todas_vm)
+    
     # ========================================
     # 1. Distribución de paquetes
     # ========================================
@@ -2273,8 +2281,14 @@ def analizar_servicios_vm_aceptadas(df):
     
     distribucion_servicios = []
     for campo_bool, campo_costo, nombre, icono in servicios_info:
+        # Conteo en cotizaciones aceptadas
         count = int(df_aceptadas_vm[campo_bool].sum())
         ingreso = df_aceptadas_vm[df_aceptadas_vm[campo_bool] == True][campo_costo].sum()
+        
+        # Conteo total real (todas las VMs del período, sin importar estado de cotización)
+        count_total = int(df_todas_vm[campo_bool].sum())
+        ingreso_total_real = df_todas_vm[df_todas_vm[campo_bool] == True][campo_costo].sum()
+        
         distribucion_servicios.append({
             'servicio': nombre,
             'icono': icono,
@@ -2282,6 +2296,13 @@ def analizar_servicios_vm_aceptadas(df):
             'porcentaje': round(count / total_con_vm * 100, 1) if total_con_vm > 0 else 0,
             'ingreso_total': round(ingreso, 2),
             'ingreso_fmt': f"${ingreso:,.2f}",
+            # Datos del total real (todas las VMs)
+            'cantidad_total_real': count_total,
+            'porcentaje_total_real': round(count_total / total_todas_vm * 100, 1) if total_todas_vm > 0 else 0,
+            'ingreso_total_real': round(ingreso_total_real, 2),
+            'ingreso_total_real_fmt': f"${ingreso_total_real:,.2f}",
+            # Diferencia (VMs no vinculadas a cotización aceptada)
+            'cantidad_no_vinculada': count_total - count,
         })
     
     # Ordenar por cantidad descendente
@@ -2364,6 +2385,7 @@ def analizar_servicios_vm_aceptadas(df):
     
     resumen_servicios = {
         'total_aceptadas_con_vm': total_con_vm,
+        'total_todas_vm': total_todas_vm,
         'ingreso_total_vm': round(ingreso_total_vm, 2),
         'ingreso_total_vm_fmt': f"${ingreso_total_vm:,.2f}",
         'ticket_promedio_vm': round(ingreso_total_vm / total_con_vm, 2) if total_con_vm > 0 else 0,

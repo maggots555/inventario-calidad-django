@@ -3150,7 +3150,8 @@ class DashboardCotizacionesVisualizer:
     
     def grafico_servicios_vm_distribucion(self, analisis_vm):
         """
-        Gráfico de barras: Distribución de servicios VM en cotizaciones aceptadas.
+        Gráfico de barras agrupadas: Distribución de servicios VM.
+        Compara "En Cotizaciones Aceptadas" vs "Total Real (todas las VMs)".
         Recibe el resultado de analizar_servicios_vm_aceptadas().
         """
         if not analisis_vm or not analisis_vm.get('tiene_datos'):
@@ -3161,52 +3162,42 @@ class DashboardCotizacionesVisualizer:
             return self._crear_grafico_vacio("Sin servicios registrados")
         
         nombres = [s['servicio'] for s in servicios]
-        cantidades = [s['cantidad'] for s in servicios]
-        ingresos = [s['ingreso_total'] for s in servicios]
+        cantidades_aceptadas = [s['cantidad'] for s in servicios]
+        cantidades_total = [s['cantidad_total_real'] for s in servicios]
         
-        fig = make_subplots(
-            rows=1, cols=2,
-            subplot_titles=('Frecuencia de Servicios', 'Ingreso por Servicio'),
-            column_widths=[0.5, 0.5],
-            specs=[[{"type": "bar"}, {"type": "bar"}]]
-        )
-        
-        colores_servicios = [
-            self.colores['info'],
-            self.colores['primary'],
-            self.colores['teal'],
-            self.colores['purple'],
-            self.colores['orange'],
-        ]
+        fig = go.Figure()
         
         fig.add_trace(go.Bar(
+            name='En Aceptadas',
             y=nombres,
-            x=cantidades,
+            x=cantidades_aceptadas,
             orientation='h',
-            marker_color=colores_servicios[:len(nombres)],
-            text=[f'{c} ventas' for c in cantidades],
+            marker_color=self.colores['success'],
+            text=[str(c) for c in cantidades_aceptadas],
             textposition='auto',
-            hovertemplate='%{y}: %{x} ventas<extra></extra>',
-            showlegend=False,
-        ), row=1, col=1)
+            hovertemplate='%{y}<br>En Aceptadas: %{x}<extra></extra>',
+        ))
         
         fig.add_trace(go.Bar(
+            name='Total Real (todas las VMs)',
             y=nombres,
-            x=ingresos,
+            x=cantidades_total,
             orientation='h',
-            marker_color=colores_servicios[:len(nombres)],
-            text=[f'${i:,.0f}' for i in ingresos],
+            marker_color=self.colores['primary'],
+            text=[str(c) for c in cantidades_total],
             textposition='auto',
-            hovertemplate='%{y}: $%{x:,.2f}<extra></extra>',
-            showlegend=False,
-        ), row=1, col=2)
+            hovertemplate='%{y}<br>Total Real: %{x}<extra></extra>',
+            opacity=0.7,
+        ))
         
         fig.update_layout(
             **LAYOUT_BASE,
-            title=dict(text='Servicios de Venta Mostrador en Aceptadas', font=dict(size=16)),
-            height=400,
+            title=dict(text='Servicios VM: Aceptadas vs. Total Real', font=dict(size=16)),
+            barmode='group',
+            height=420,
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
         )
-        fig.update_layout(margin=dict(l=160, r=50, t=80, b=50))
+        fig.update_layout(margin=dict(l=180, r=50, t=90, b=50))
         
         return fig
     

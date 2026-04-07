@@ -12128,7 +12128,7 @@ def exportar_analisis_aceptaciones(request):
     # ========================================================================
     ws6 = wb.create_sheet('Servicios Adicionales')
     
-    ws6.merge_cells('A1:F1')
+    ws6.merge_cells('A1:H1')
     ws6['A1'] = 'ANÁLISIS DE SERVICIOS ADICIONALES (VM EN ACEPTADAS)'
     ws6['A1'].font = title_font
     ws6['A1'].fill = title_fill
@@ -12154,27 +12154,55 @@ def exportar_analisis_aceptaciones(request):
             cell_i.number_format = number_fmt
             cell_i.border = border_thin
         
-        # Distribución de servicios
+        # Distribución de servicios — DOBLE COLUMNA: aceptadas vs. total real
         fila += 2
+        ws6.merge_cells(f'A{fila}:H{fila}')
         ws6.cell(row=fila, column=1, value='DISTRIBUCIÓN DE SERVICIOS INDIVIDUALES').font = Font(bold=True, size=12)
         ws6.cell(row=fila, column=1).fill = teal_fill
         fila += 1
-        headers_srv = ['Servicio', 'Cantidad', 'Porcentaje', 'Ingreso Total']
+        # Nota explicativa
+        ws6.merge_cells(f'A{fila}:H{fila}')
+        ws6.cell(row=fila, column=1,
+                 value='(*) "En Aceptadas" = VM cuya cotización fue aceptada. '
+                       '"Total Real" = Todas las VM del período (incluye rechazadas y sin respuesta).')
+        ws6.cell(row=fila, column=1).font = Font(italic=True, size=9, color='666666')
+        fila += 1
+        headers_srv = [
+            'Servicio',
+            'En Aceptadas', '% En Aceptadas', 'Ingreso (Aceptadas)',
+            'Total Real', '% Total Real', 'Ingreso (Total Real)',
+            'Dif. No Vinculadas',
+        ]
         for col, h in enumerate(headers_srv, 1):
             ws6.cell(row=fila, column=col, value=h)
         aplicar_estilos_header(ws6, fila, len(headers_srv))
         
+        orange_fill_light = PatternFill(start_color='fff3e0', end_color='fff3e0', fill_type='solid')
         for srv in analisis_vm['distribucion_servicios']:
             fila += 1
             ws6.cell(row=fila, column=1, value=srv['servicio']).border = border_thin
             ws6.cell(row=fila, column=2, value=srv['cantidad']).border = border_thin
             ws6.cell(row=fila, column=3, value=f"{srv['porcentaje']}%").border = border_thin
-            cell_i = ws6.cell(row=fila, column=4, value=srv['ingreso_total'])
-            cell_i.number_format = number_fmt
-            cell_i.border = border_thin
+            cell_ia = ws6.cell(row=fila, column=4, value=srv['ingreso_total'])
+            cell_ia.number_format = number_fmt
+            cell_ia.border = border_thin
+            # Columnas del total real
+            ws6.cell(row=fila, column=5, value=srv['cantidad_total_real']).border = border_thin
+            ws6.cell(row=fila, column=6, value=f"{srv['porcentaje_total_real']}%").border = border_thin
+            cell_ir = ws6.cell(row=fila, column=7, value=srv['ingreso_total_real'])
+            cell_ir.number_format = number_fmt
+            cell_ir.border = border_thin
+            # Diferencia (resaltar si hay VMs no vinculadas)
+            dif = srv['cantidad_no_vinculada']
+            cell_dif = ws6.cell(row=fila, column=8, value=dif)
+            cell_dif.border = border_thin
+            if dif > 0:
+                cell_dif.fill = orange_fill_light
+                cell_dif.font = Font(bold=True, color='e65100')
         
         # Combinaciones más frecuentes
         fila += 2
+        ws6.merge_cells(f'A{fila}:H{fila}')
         ws6.cell(row=fila, column=1, value='COMBINACIONES DE SERVICIOS MÁS FRECUENTES').font = Font(bold=True, size=12)
         ws6.cell(row=fila, column=1).fill = purple_fill
         fila += 1
@@ -12192,6 +12220,7 @@ def exportar_analisis_aceptaciones(request):
         # Top piezas VM
         if analisis_vm.get('top_piezas_vm'):
             fila += 2
+            ws6.merge_cells(f'A{fila}:H{fila}')
             ws6.cell(row=fila, column=1, value='TOP PIEZAS VENDIDAS EN VENTA MOSTRADOR').font = Font(bold=True, size=12)
             ws6.cell(row=fila, column=1).fill = blue_fill
             fila += 1
