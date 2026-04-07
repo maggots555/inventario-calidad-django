@@ -10,6 +10,16 @@
       "source": "anthropics/skills",
       "sourceType": "github",
       "computedHash": "cfbc539377088ca7e44a813b30c306327385bbd973cd7a721e1743f60837dd62"
+    },
+    "power-bi-report-design-consultation": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "computedHash": "12dacbd64cd67369f810c094dc70427d4805788f4ec6b1257e17d8e6aed74cf1"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
     }
   }
 }
