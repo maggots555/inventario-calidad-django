@@ -2201,18 +2201,25 @@ def calcular_kpis_aceptaciones(df):
 # FUNCIÓN: ANALIZAR SERVICIOS VM EN COTIZACIONES ACEPTADAS
 # ============================================================================
 
-def analizar_servicios_vm_aceptadas(df):
+def analizar_servicios_vm_aceptadas(df, fecha_inicio=None, fecha_fin=None,
+                                    sucursal_id=None, tecnico_id=None, gama=None):
     """
-    Analiza los servicios de VentaMostrador asociados a cotizaciones aceptadas.
+    Analiza los servicios de VentaMostrador asociados a cotizaciones aceptadas,
+    comparando contra el total real de TODAS las VMs del período.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Cuando un cliente acepta una cotización, a veces también compra servicios
-    adicionales como limpieza, reinstalación de sistema operativo, respaldo, etc.
-    Esta función desglose qué servicios se vendieron, cuánto generaron,
-    y qué combinaciones son más populares.
+    El DataFrame solo contiene órdenes que tienen Cotizacion. Pero una VentaMostrador
+    puede existir en órdenes FL (venta directa) que NO tienen cotización. Para obtener
+    el conteo real de cada servicio (ej: "Cambio de Pieza"), consultamos VentaMostrador
+    directamente en la base de datos con los mismos filtros de fecha/sucursal.
     
     Args:
         df (DataFrame): DataFrame completo de cotizaciones
+        fecha_inicio: Filtro de fecha inicio (para consulta directa a BD)
+        fecha_fin: Filtro de fecha fin (para consulta directa a BD)
+        sucursal_id: Filtro de sucursal (para consulta directa a BD)
+        tecnico_id: Filtro de técnico (para consulta directa a BD)
+        gama: Filtro de gama (para consulta directa a BD)
     
     Returns:
         dict: Análisis detallado de servicios VM en cotizaciones aceptadas
@@ -2221,9 +2228,11 @@ def analizar_servicios_vm_aceptadas(df):
     resultado_vacio = {
         'tiene_datos': False,
         'total_aceptadas_con_vm': 0,
+        'total_todas_vm': 0,
         'distribucion_paquetes': [],
         'distribucion_servicios': [],
         'combinaciones_frecuentes': [],
+        'combinaciones_frecuentes_total': [],
         'ingreso_por_servicio': [],
         'top_piezas_vm': [],
         'resumen_servicios': {},
@@ -2243,30 +2252,122 @@ def analizar_servicios_vm_aceptadas(df):
     total_con_vm = len(df_aceptadas_vm)
     
     # EXPLICACIÓN PARA PRINCIPIANTES:
-    # También calculamos el total de TODAS las VMs en el período (sin filtrar por
-    # aceptación de cotización), porque un cliente puede rechazar la cotización
-    # pero igual comprar un servicio VM (ej: cambio de pieza de mostrador).
-    # Esto nos da el "total real" de cada servicio para comparar.
-    df_todas_vm = df[df['tiene_venta_mostrador'] == True].copy()
-    total_todas_vm = len(df_todas_vm)
+    # El DataFrame solo contiene órdenes que tienen Cotizacion. Pero hay órdenes
+    # de tipo FL (venta directa) que tienen VentaMostrador pero NUNCA tienen
+    # cotización, así que jamás aparecen en el DataFrame.
+    # Para obtener el "Total Real" correcto (igual al dashboard OOW/FL) debemos
+    # consultar VentaMostrador directamente en la base de datos, usando los mismos
+    # filtros de fecha, sucursal, técnico y gama que se aplicaron al DataFrame.
+    
+    # Normalizar fechas: aceptamos strings ('YYYY-MM-DD'), date o datetime
+    from django.utils import timezone as tz
+    
+    def _normalizar_fecha_inicio(f):
+        if f is None:
+            return None
+        if isinstance(f, str):
+            dt = datetime.strptime(f, '%Y-%m-%d')
+            return tz.make_aware(dt) if tz.is_naive(dt) else dt
+        if isinstance(f, date) and not isinstance(f, datetime):
+            dt = datetime.combine(f, datetime.min.time())
+            return tz.make_aware(dt)
+        return f  # ya es datetime (posiblemente tz-aware del view)
+    
+    def _normalizar_fecha_fin(f):
+        if f is None:
+            return None
+        if isinstance(f, str):
+            dt = datetime.strptime(f, '%Y-%m-%d')
+            dt = datetime.combine(dt, datetime.max.time())
+            return tz.make_aware(dt) if tz.is_naive(dt) else dt
+        if isinstance(f, date) and not isinstance(f, datetime):
+            dt = datetime.combine(f, datetime.max.time())
+            return tz.make_aware(dt)
+        return f
+    
+    fecha_inicio_norm = _normalizar_fecha_inicio(fecha_inicio)
+    fecha_fin_norm = _normalizar_fecha_fin(fecha_fin)
+    
+    qs_todas_vm = VentaMostrador.objects.all()
+    
+    if fecha_inicio_norm:
+        qs_todas_vm = qs_todas_vm.filter(fecha_venta__gte=fecha_inicio_norm)
+    if fecha_fin_norm:
+        qs_todas_vm = qs_todas_vm.filter(fecha_venta__lte=fecha_fin_norm)
+    if sucursal_id:
+        qs_todas_vm = qs_todas_vm.filter(orden__sucursal_id=sucursal_id)
+    if tecnico_id:
+        qs_todas_vm = qs_todas_vm.filter(orden__tecnico_asignado_actual_id=tecnico_id)
+    if gama:
+        qs_todas_vm = qs_todas_vm.filter(orden__detalle_equipo__gama=gama)
+    
+    total_todas_vm = qs_todas_vm.count()
     
     # ========================================
     # 1. Distribución de paquetes
     # ========================================
     paquetes_map = dict(PAQUETES_CHOICES)
     dist_paquetes = df_aceptadas_vm['vm_paquete'].value_counts()
+    
+    # Pre-calcular conteos totales reales por paquete desde la BD directamente
+    # para incluir órdenes FL sin cotización
+    from django.db.models import Count as DbCount
+    paquetes_total_db = {
+        row['paquete']: {'count': row['count'], 'ingreso': float(row['ingreso'] or 0)}
+        for row in qs_todas_vm.values('paquete').annotate(
+            count=DbCount('orden_id'),
+            ingreso=Sum('costo_paquete'),
+        )
+    }
+    total_todas_vm_paquetes = sum(v['count'] for v in paquetes_total_db.values())
+    
     distribucion_paquetes = []
+    # Empezamos por los paquetes que aparecen en aceptadas
+    paquetes_vistos = set()
     for paquete, count in dist_paquetes.items():
+        paquetes_vistos.add(paquete)
         nombre = paquetes_map.get(paquete, paquete.capitalize())
         ingreso = df_aceptadas_vm[df_aceptadas_vm['vm_paquete'] == paquete]['vm_costo_paquete'].sum()
+        db_row = paquetes_total_db.get(paquete, {'count': 0, 'ingreso': 0.0})
+        count_total = db_row['count']
+        ingreso_total_real = db_row['ingreso']
         distribucion_paquetes.append({
             'paquete': paquete,
             'nombre': nombre,
             'cantidad': int(count),
             'porcentaje': round(count / total_con_vm * 100, 1),
-            'ingreso_total': round(ingreso, 2),
+            'ingreso_total': round(float(ingreso), 2),
             'ingreso_fmt': f"${ingreso:,.2f}",
+            # VM del período completo (incluye FL sin cotización)
+            'cantidad_vm_periodo': count_total,
+            'porcentaje_vm_periodo': round(count_total / total_todas_vm_paquetes * 100, 1) if total_todas_vm_paquetes > 0 else 0,
+            'ingreso_vm_periodo': round(ingreso_total_real, 2),
+            'ingreso_vm_periodo_fmt': f"${ingreso_total_real:,.2f}",
+            # VM únicas FL (sin cotización aceptada — ventas directas)
+            'cantidad_vm_unicas': count_total - int(count),
         })
+    # Agregar paquetes que solo existen en FL (no en aceptadas)
+    for paquete, db_row in paquetes_total_db.items():
+        if paquete in paquetes_vistos:
+            continue
+        nombre = paquetes_map.get(paquete, paquete.capitalize())
+        count_total = db_row['count']
+        ingreso_total_real = db_row['ingreso']
+        distribucion_paquetes.append({
+            'paquete': paquete,
+            'nombre': nombre,
+            'cantidad': 0,
+            'porcentaje': 0.0,
+            'ingreso_total': 0.0,
+            'ingreso_fmt': '$0.00',
+            'cantidad_vm_periodo': count_total,
+            'porcentaje_vm_periodo': round(count_total / total_todas_vm_paquetes * 100, 1) if total_todas_vm_paquetes > 0 else 0,
+            'ingreso_vm_periodo': round(ingreso_total_real, 2),
+            'ingreso_vm_periodo_fmt': f"${ingreso_total_real:,.2f}",
+            'cantidad_vm_unicas': count_total,
+        })
+    # Ordenar por vm_periodo descendente
+    distribucion_paquetes.sort(key=lambda x: x['cantidad_vm_periodo'], reverse=True)
     
     # ========================================
     # 2. Distribución de servicios individuales
@@ -2279,30 +2380,46 @@ def analizar_servicios_vm_aceptadas(df):
         ('vm_incluye_kit_limpieza', 'vm_costo_kit', 'Kit de Limpieza', 'bi-box'),
     ]
     
+    # Mapa: campo DF → (campo bool en modelo, campo costo en modelo)
+    campo_modelo_map = {
+        'vm_incluye_limpieza':      ('incluye_limpieza',       'costo_limpieza'),
+        'vm_incluye_reinstalacion': ('incluye_reinstalacion_so', 'costo_reinstalacion'),
+        'vm_incluye_respaldo':      ('incluye_respaldo',        'costo_respaldo'),
+        'vm_incluye_cambio_pieza':  ('incluye_cambio_pieza',    'costo_cambio_pieza'),
+        'vm_incluye_kit_limpieza':  ('incluye_kit_limpieza',    'costo_kit'),
+    }
+    
     distribucion_servicios = []
     for campo_bool, campo_costo, nombre, icono in servicios_info:
-        # Conteo en cotizaciones aceptadas
+        # Conteo en cotizaciones aceptadas (viene del DataFrame — correcto para "aceptadas")
         count = int(df_aceptadas_vm[campo_bool].sum())
         ingreso = df_aceptadas_vm[df_aceptadas_vm[campo_bool] == True][campo_costo].sum()
         
-        # Conteo total real (todas las VMs del período, sin importar estado de cotización)
-        count_total = int(df_todas_vm[campo_bool].sum())
-        ingreso_total_real = df_todas_vm[df_todas_vm[campo_bool] == True][campo_costo].sum()
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Aquí usamos el queryset de BD directamente para contar TODAS las VMs
+        # del período (incluyendo órdenes FL sin cotización), igual que hace el
+        # dashboard OOW/FL. Esto corrige el subconteo anterior.
+        campo_bool_modelo, campo_costo_modelo = campo_modelo_map[campo_bool]
+        qs_servicio = qs_todas_vm.filter(**{campo_bool_modelo: True})
+        count_total = qs_servicio.count()
+        ingreso_total_real = float(
+            qs_servicio.aggregate(total=Sum(campo_costo_modelo))['total'] or 0
+        )
         
         distribucion_servicios.append({
             'servicio': nombre,
             'icono': icono,
             'cantidad': count,
             'porcentaje': round(count / total_con_vm * 100, 1) if total_con_vm > 0 else 0,
-            'ingreso_total': round(ingreso, 2),
+            'ingreso_total': round(float(ingreso), 2),
             'ingreso_fmt': f"${ingreso:,.2f}",
-            # Datos del total real (todas las VMs)
-            'cantidad_total_real': count_total,
-            'porcentaje_total_real': round(count_total / total_todas_vm * 100, 1) if total_todas_vm > 0 else 0,
-            'ingreso_total_real': round(ingreso_total_real, 2),
-            'ingreso_total_real_fmt': f"${ingreso_total_real:,.2f}",
-            # Diferencia (VMs no vinculadas a cotización aceptada)
-            'cantidad_no_vinculada': count_total - count,
+            # Datos del período completo (todas las VMs — incluyendo FL sin cotización)
+            'cantidad_vm_periodo': count_total,
+            'porcentaje_vm_periodo': round(count_total / total_todas_vm * 100, 1) if total_todas_vm > 0 else 0,
+            'ingreso_vm_periodo': round(ingreso_total_real, 2),
+            'ingreso_vm_periodo_fmt': f"${ingreso_total_real:,.2f}",
+            # VM únicas FL (órdenes sin cotización — ventas directas)
+            'cantidad_vm_unicas': count_total - count,
         })
     
     # Ordenar por cantidad descendente
@@ -2339,6 +2456,68 @@ def analizar_servicios_vm_aceptadas(df):
     )[:10]  # Top 10 combinaciones
     
     # ========================================
+    # 3b. Combinaciones frecuentes — Total Real (todas las VMs, incluyendo FL)
+    # ========================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Las órdenes FL son ventas directas sin cotización previa. El técnico
+    # atiende al cliente de mostrador y registra directamente una VentaMostrador.
+    # Estos servicios son igualmente "aceptados" (el cliente los pagó), pero
+    # no pasan por el flujo de cotización, así que no aparecen arriba.
+    # Consultamos los campos boolean directamente desde la BD para construir
+    # las combinaciones de todas las VMs del período.
+    combinaciones_total = {}
+    campos_bool_modelo = [
+        ('paquete',              'Paquete'),           # campo especial — no es bool
+        ('incluye_limpieza',     'Limpieza'),
+        ('incluye_reinstalacion_so', 'Reinstalación SO'),
+        ('incluye_respaldo',     'Respaldo'),
+        ('incluye_cambio_pieza', 'Cambio Pieza'),
+        ('incluye_kit_limpieza', 'Kit Limpieza'),
+    ]
+    
+    # Traer solo los campos necesarios de la BD (más eficiente que traer objetos completos)
+    vm_rows = qs_todas_vm.values(
+        'paquete',
+        'incluye_limpieza',
+        'incluye_reinstalacion_so',
+        'incluye_respaldo',
+        'incluye_cambio_pieza',
+        'incluye_kit_limpieza',
+    )
+    for vm in vm_rows:
+        combo = []
+        if vm.get('paquete', 'ninguno') not in ('ninguno', None, ''):
+            combo.append(f"Paquete {vm['paquete'].capitalize()}")
+        if vm.get('incluye_limpieza'):
+            combo.append('Limpieza')
+        if vm.get('incluye_reinstalacion_so'):
+            combo.append('Reinstalación SO')
+        if vm.get('incluye_respaldo'):
+            combo.append('Respaldo')
+        if vm.get('incluye_cambio_pieza'):
+            combo.append('Cambio Pieza')
+        if vm.get('incluye_kit_limpieza'):
+            combo.append('Kit Limpieza')
+        if combo:
+            clave = ' + '.join(sorted(combo))
+            combinaciones_total[clave] = combinaciones_total.get(clave, 0) + 1
+    
+    # Enriquecer con el conteo en aceptadas para comparar lado a lado
+    conteo_aceptadas_map = {c['combinacion']: c['cantidad'] for c in combinaciones_frecuentes}
+    combinaciones_frecuentes_total = sorted(
+        [{
+            'combinacion': k,
+            'cantidad_total': v,
+            'porcentaje_total': round(v / total_todas_vm * 100, 1) if total_todas_vm > 0 else 0,
+            'cantidad_aceptadas': conteo_aceptadas_map.get(k, 0),
+            'porcentaje_aceptadas': round(conteo_aceptadas_map.get(k, 0) / total_con_vm * 100, 1) if total_con_vm > 0 else 0,
+            'exclusivo_fl': conteo_aceptadas_map.get(k, 0) == 0,  # True si solo aparece en FL
+        } for k, v in combinaciones_total.items()],
+        key=lambda x: x['cantidad_total'],
+        reverse=True
+    )[:10]  # Top 10
+    
+    # ========================================
     # 4. Ingreso total por tipo de servicio
     # ========================================
     ingreso_paquetes = df_aceptadas_vm['vm_costo_paquete'].sum()
@@ -2355,12 +2534,15 @@ def analizar_servicios_vm_aceptadas(df):
     ]
     
     # ========================================
-    # 5. Top piezas vendidas en VentaMostrador de aceptadas
+    # 5. Top piezas vendidas en VentaMostrador (todas las VMs del período)
     # ========================================
-    # Necesitamos ir directo al modelo para obtener detalles de piezas
-    ordenes_aceptadas_con_vm = df_aceptadas_vm['orden_id'].tolist()
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Usamos el queryset directo qs_todas_vm para obtener las piezas de TODAS
+    # las VentaMostrador del período (igual que el dashboard OOW/FL), no solo
+    # las vinculadas a cotizaciones aceptadas. Esto evita el subconteo.
+    ids_todas_vm = list(qs_todas_vm.values_list('orden_id', flat=True))
     piezas_vm = PiezaVentaMostrador.objects.filter(
-        venta_mostrador__orden_id__in=ordenes_aceptadas_con_vm
+        venta_mostrador_id__in=ids_todas_vm
     ).values('descripcion_pieza').annotate(
         total_cantidad=Sum('cantidad'),
         total_ingreso=Sum(F('cantidad') * F('precio_unitario')),
@@ -2398,9 +2580,11 @@ def analizar_servicios_vm_aceptadas(df):
     return {
         'tiene_datos': True,
         'total_aceptadas_con_vm': total_con_vm,
+        'total_todas_vm': total_todas_vm,
         'distribucion_paquetes': distribucion_paquetes,
         'distribucion_servicios': distribucion_servicios,
         'combinaciones_frecuentes': combinaciones_frecuentes,
+        'combinaciones_frecuentes_total': combinaciones_frecuentes_total,
         'ingreso_por_servicio': ingreso_por_servicio,
         'top_piezas_vm': top_piezas_vm,
         'resumen_servicios': resumen_servicios,

@@ -9387,7 +9387,14 @@ def dashboard_cotizaciones(request):
             kpis_aceptaciones = calcular_kpis_aceptaciones(df_cotizaciones)
             print(f"   - KPIs aceptaciones calculados: {kpis_aceptaciones.get('total_aceptadas', 0)} aceptadas")
             
-            analisis_vm = analizar_servicios_vm_aceptadas(df_cotizaciones)
+            analisis_vm = analizar_servicios_vm_aceptadas(
+                df_cotizaciones,
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin,
+                sucursal_id=sucursal_id,
+                tecnico_id=tecnico_id,
+                gama=gama,
+            )
             print(f"   - Análisis VM: {analisis_vm.get('total_con_vm', 0)} con venta mostrador")
             
             analisis_seguimiento = analizar_seguimiento_piezas_aceptadas(df_cotizaciones)
@@ -9420,7 +9427,12 @@ def dashboard_cotizaciones(request):
                 df_metricas_responsables=df_metricas_responsables if not df_metricas_responsables.empty else None,
                 kpis=kpis,
                 ml_predictor=None,  # Lo agregamos después
-                periodo=periodo
+                periodo=periodo,
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin,
+                sucursal_id=sucursal_id,
+                tecnico_id=tecnico_id,
+                gama=gama,
             )
         except Exception as e:
             messages.warning(request, f'Algunos gráficos no se pudieron generar: {str(e)}')
@@ -11627,7 +11639,14 @@ def exportar_analisis_aceptaciones(request):
     kpis_aceptaciones = calcular_kpis_aceptaciones(df_cotizaciones)
     
     # Análisis VM y seguimiento
-    analisis_vm = analizar_servicios_vm_aceptadas(df_cotizaciones)
+    analisis_vm = analizar_servicios_vm_aceptadas(
+        df_cotizaciones,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        sucursal_id=sucursal_id,
+        tecnico_id=tecnico_id,
+        gama=gama,
+    )
     analisis_seguimiento = analizar_seguimiento_piezas_aceptadas(df_cotizaciones)
     
     # Piezas aceptadas
@@ -12129,55 +12148,80 @@ def exportar_analisis_aceptaciones(request):
     ws6 = wb.create_sheet('Servicios Adicionales')
     
     ws6.merge_cells('A1:H1')
-    ws6['A1'] = 'ANÁLISIS DE SERVICIOS ADICIONALES (VM EN ACEPTADAS)'
+    ws6['A1'] = 'ANÁLISIS DE SERVICIOS ADICIONALES — VM EN ACEPTADAS vs. VM PERÍODO COMPLETO'
     ws6['A1'].font = title_font
     ws6['A1'].fill = title_fill
     ws6['A1'].alignment = title_align
-    
-    fila = 3
+
+    # Leyenda de columnas (fila 2)
+    ws6.merge_cells('A2:H2')
+    ws6['A2'] = (
+        'En Aceptadas = VM cuya cotización fue aceptada  |  '
+        'VM Período = Todas las VM del período (incluye órdenes FL sin cotización)  |  '
+        'VM Únicas FL = Diferencia (ventas directas sin cotización previa)'
+    )
+    ws6['A2'].font = Font(italic=True, size=9, color='444444')
+    ws6['A2'].fill = PatternFill(start_color='f0f4f8', end_color='f0f4f8', fill_type='solid')
+
+    fila = 4
     if analisis_vm.get('tiene_datos'):
-        # Distribución de paquetes
+        orange_fill_light = PatternFill(start_color='fff3e0', end_color='fff3e0', fill_type='solid')
+
+        # ----------------------------------------------------------------
+        # SECCIÓN 1: Distribución de paquetes
+        # ----------------------------------------------------------------
+        ws6.merge_cells(f'A{fila}:H{fila}')
         ws6.cell(row=fila, column=1, value='DISTRIBUCIÓN DE PAQUETES').font = Font(bold=True, size=12)
         ws6.cell(row=fila, column=1).fill = blue_fill
         fila += 1
-        headers_paq = ['Paquete', 'Cantidad', 'Porcentaje', 'Ingreso Total']
+        headers_paq = [
+            'Paquete',
+            'En Aceptadas', '% Aceptadas', 'Ingreso (Aceptadas)',
+            'VM Período', '% VM Período', 'Ingreso (VM Período)',
+            'VM Únicas FL',
+        ]
         for col, h in enumerate(headers_paq, 1):
             ws6.cell(row=fila, column=col, value=h)
         aplicar_estilos_header(ws6, fila, len(headers_paq))
-        
+
         for paq in analisis_vm['distribucion_paquetes']:
             fila += 1
             ws6.cell(row=fila, column=1, value=paq['nombre']).border = border_thin
             ws6.cell(row=fila, column=2, value=paq['cantidad']).border = border_thin
             ws6.cell(row=fila, column=3, value=f"{paq['porcentaje']}%").border = border_thin
-            cell_i = ws6.cell(row=fila, column=4, value=paq['ingreso_total'])
-            cell_i.number_format = number_fmt
-            cell_i.border = border_thin
-        
-        # Distribución de servicios — DOBLE COLUMNA: aceptadas vs. total real
+            cell_ia = ws6.cell(row=fila, column=4, value=paq['ingreso_total'])
+            cell_ia.number_format = number_fmt
+            cell_ia.border = border_thin
+            ws6.cell(row=fila, column=5, value=paq['cantidad_vm_periodo']).border = border_thin
+            ws6.cell(row=fila, column=6, value=f"{paq['porcentaje_vm_periodo']}%").border = border_thin
+            cell_ir = ws6.cell(row=fila, column=7, value=paq['ingreso_vm_periodo'])
+            cell_ir.number_format = number_fmt
+            cell_ir.border = border_thin
+            dif = paq['cantidad_vm_unicas']
+            cell_dif = ws6.cell(row=fila, column=8, value=dif)
+            cell_dif.border = border_thin
+            if dif > 0:
+                cell_dif.fill = orange_fill_light
+                cell_dif.font = Font(bold=True, color='e65100')
+
+        # ----------------------------------------------------------------
+        # SECCIÓN 2: Distribución de servicios individuales
+        # ----------------------------------------------------------------
         fila += 2
         ws6.merge_cells(f'A{fila}:H{fila}')
         ws6.cell(row=fila, column=1, value='DISTRIBUCIÓN DE SERVICIOS INDIVIDUALES').font = Font(bold=True, size=12)
         ws6.cell(row=fila, column=1).fill = teal_fill
         fila += 1
-        # Nota explicativa
-        ws6.merge_cells(f'A{fila}:H{fila}')
-        ws6.cell(row=fila, column=1,
-                 value='(*) "En Aceptadas" = VM cuya cotización fue aceptada. '
-                       '"Total Real" = Todas las VM del período (incluye rechazadas y sin respuesta).')
-        ws6.cell(row=fila, column=1).font = Font(italic=True, size=9, color='666666')
-        fila += 1
         headers_srv = [
             'Servicio',
             'En Aceptadas', '% En Aceptadas', 'Ingreso (Aceptadas)',
-            'Total Real', '% Total Real', 'Ingreso (Total Real)',
-            'Dif. No Vinculadas',
+            'VM Período', '% VM Período', 'Ingreso (VM Período)',
+            'VM Únicas FL',
         ]
         for col, h in enumerate(headers_srv, 1):
             ws6.cell(row=fila, column=col, value=h)
         aplicar_estilos_header(ws6, fila, len(headers_srv))
-        
-        orange_fill_light = PatternFill(start_color='fff3e0', end_color='fff3e0', fill_type='solid')
+
         for srv in analisis_vm['distribucion_servicios']:
             fila += 1
             ws6.cell(row=fila, column=1, value=srv['servicio']).border = border_thin
@@ -12186,36 +12230,90 @@ def exportar_analisis_aceptaciones(request):
             cell_ia = ws6.cell(row=fila, column=4, value=srv['ingreso_total'])
             cell_ia.number_format = number_fmt
             cell_ia.border = border_thin
-            # Columnas del total real
-            ws6.cell(row=fila, column=5, value=srv['cantidad_total_real']).border = border_thin
-            ws6.cell(row=fila, column=6, value=f"{srv['porcentaje_total_real']}%").border = border_thin
-            cell_ir = ws6.cell(row=fila, column=7, value=srv['ingreso_total_real'])
+            ws6.cell(row=fila, column=5, value=srv['cantidad_vm_periodo']).border = border_thin
+            ws6.cell(row=fila, column=6, value=f"{srv['porcentaje_vm_periodo']}%").border = border_thin
+            cell_ir = ws6.cell(row=fila, column=7, value=srv['ingreso_vm_periodo'])
             cell_ir.number_format = number_fmt
             cell_ir.border = border_thin
-            # Diferencia (resaltar si hay VMs no vinculadas)
-            dif = srv['cantidad_no_vinculada']
+            dif = srv['cantidad_vm_unicas']
             cell_dif = ws6.cell(row=fila, column=8, value=dif)
             cell_dif.border = border_thin
             if dif > 0:
                 cell_dif.fill = orange_fill_light
                 cell_dif.font = Font(bold=True, color='e65100')
-        
-        # Combinaciones más frecuentes
+
+        # ----------------------------------------------------------------
+        # SECCIÓN 3: Combinaciones — tabla unificada (Aceptadas + FL)
+        # ----------------------------------------------------------------
         fila += 2
         ws6.merge_cells(f'A{fila}:H{fila}')
-        ws6.cell(row=fila, column=1, value='COMBINACIONES DE SERVICIOS MÁS FRECUENTES').font = Font(bold=True, size=12)
+        ws6.cell(row=fila, column=1,
+                 value='COMBINACIONES DE SERVICIOS MÁS FRECUENTES').font = Font(bold=True, size=12)
         ws6.cell(row=fila, column=1).fill = purple_fill
         fila += 1
-        headers_combo = ['Combinación', 'Cantidad', 'Porcentaje']
+        # Nota
+        ws6.merge_cells(f'A{fila}:H{fila}')
+        ws6.cell(row=fila, column=1,
+                 value='Incluye cotizaciones aceptadas + órdenes FL (ventas directas). '
+                       'Origen "Solo FL" = combinación exclusiva de órdenes sin cotización.')
+        ws6.cell(row=fila, column=1).font = Font(italic=True, size=9, color='666666')
+        fila += 1
+        headers_combo = [
+            'Combinación', 'Origen',
+            'VM Período', '% VM Período',
+            'En Aceptadas', '% En Aceptadas',
+            'VM Únicas FL',
+        ]
         for col, h in enumerate(headers_combo, 1):
             ws6.cell(row=fila, column=col, value=h)
         aplicar_estilos_header(ws6, fila, len(headers_combo))
-        
-        for combo in analisis_vm.get('combinaciones_frecuentes', []):
+
+        fl_fill = PatternFill(start_color='ede9fe', end_color='ede9fe', fill_type='solid')
+        fl_font_bold = Font(bold=True, color='5b21b6')
+        for combo_t in analisis_vm.get('combinaciones_frecuentes_total', []):
             fila += 1
-            ws6.cell(row=fila, column=1, value=combo['combinacion']).border = border_thin
-            ws6.cell(row=fila, column=2, value=combo['cantidad']).border = border_thin
-            ws6.cell(row=fila, column=3, value=f"{combo['porcentaje']}%").border = border_thin
+            es_fl = combo_t.get('exclusivo_fl', False)
+            cant_acept = combo_t['cantidad_aceptadas']
+            cant_total = combo_t['cantidad_total']
+            cant_unicas = cant_total - cant_acept
+
+            # Columna 1: Combinación
+            cell_c = ws6.cell(row=fila, column=1, value=combo_t['combinacion'])
+            cell_c.border = border_thin
+            if es_fl:
+                cell_c.fill = fl_fill
+                cell_c.font = fl_font_bold
+
+            # Columna 2: Origen
+            origen_val = 'Solo FL' if es_fl else 'Aceptadas + FL' if cant_unicas > 0 else 'En Aceptadas'
+            cell_o = ws6.cell(row=fila, column=2, value=origen_val)
+            cell_o.border = border_thin
+            if es_fl:
+                cell_o.fill = fl_fill
+                cell_o.font = fl_font_bold
+
+            # Columna 3–4: VM Período
+            cell_vp = ws6.cell(row=fila, column=3, value=cant_total)
+            cell_vp.border = border_thin
+            if es_fl:
+                cell_vp.fill = fl_fill
+            ws6.cell(row=fila, column=4,
+                     value=f"{combo_t['porcentaje_total']}%").border = border_thin
+
+            # Columna 5–6: En Aceptadas
+            cell_a = ws6.cell(row=fila, column=5,
+                              value=cant_acept if cant_acept > 0 else '—')
+            cell_a.border = border_thin
+            ws6.cell(row=fila, column=6,
+                     value=f"{combo_t['porcentaje_aceptadas']}%" if cant_acept > 0 else '—').border = border_thin
+
+            # Columna 7: VM Únicas FL
+            cell_u = ws6.cell(row=fila, column=7,
+                              value=cant_unicas if cant_unicas > 0 else '—')
+            cell_u.border = border_thin
+            if cant_unicas > 0:
+                cell_u.fill = orange_fill_light
+                cell_u.font = Font(bold=True, color='e65100')
         
         # Top piezas VM
         if analisis_vm.get('top_piezas_vm'):

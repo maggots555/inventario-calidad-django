@@ -1793,19 +1793,150 @@
                     </div>
                 </div>
                 
-                <!-- Combinaciones de Servicios -->
+                <!-- Combinaciones de Servicios — tabla unificada -->
                 <div class="col-12">
                     <div class="grafico-card card">
-                        <div class="card-header card-header-vm">
-                            <h5><i class="bi bi-diagram-3"></i> Combinaciones de Servicios Más Frecuentes</h5>
+                        <div class="card-header card-header-vm d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <h5 class="mb-0"><i class="bi bi-diagram-3-fill"></i> Combinaciones de Servicios Más Frecuentes</h5>
+                            <!-- Leyenda de origen -->
+                            <div class="d-flex align-items-center gap-3 small">
+                                <span class="d-flex align-items-center gap-1">
+                                    <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#198754"></span>
+                                    En Aceptadas
+                                </span>
+                                <span class="d-flex align-items-center gap-1">
+                                    <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#0d6efd"></span>
+                                    VM Período
+                                </span>
+                                <span class="d-flex align-items-center gap-1">
+                                    <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#e65100"></span>
+                                    VM Únicas FL
+                                </span>
+                            </div>
                         </div>
                         <div class="card-body">
+                            <!-- Gráfica de barras (solo aceptadas) si existe -->
                             {% if graficos.combinaciones_servicios %}
                                 {{ graficos.combinaciones_servicios|safe }}
+                            {% endif %}
+
+                            {% if analisis_vm.combinaciones_frecuentes_total %}
+                                <!-- Totales resumen -->
+                                <div class="row g-2 mb-3 mt-2">
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-2 rounded border">
+                                            <div class="fs-4 fw-bold text-primary">{{ analisis_vm.total_todas_vm }}</div>
+                                            <div class="small text-muted">VM Período total</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-2 rounded border">
+                                            <div class="fs-4 fw-bold text-success">{{ analisis_vm.total_aceptadas_con_vm }}</div>
+                                            <div class="small text-muted">En Aceptadas</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-2 rounded border">
+                                            <div class="fs-4 fw-bold" style="color:#e65100">
+                                                {{ analisis_vm.total_todas_vm|add:analisis_vm.total_aceptadas_con_vm|add:"-999999" }}
+                                            </div>
+                                            <div class="small text-muted">VM Únicas FL</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-center p-2 rounded border">
+                                            <div class="fs-4 fw-bold text-secondary">{{ analisis_vm.combinaciones_frecuentes_total|length }}</div>
+                                            <div class="small text-muted">Combinaciones distintas</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover align-middle">
+                                        <thead>
+                                            <tr class="table-dark">
+                                                <th>#</th>
+                                                <th>Combinación de Servicios</th>
+                                                <th class="text-center" style="min-width:100px">
+                                                    <span class="badge bg-primary">VM Período</span>
+                                                </th>
+                                                <th class="text-center" style="min-width:140px">% del período</th>
+                                                <th class="text-center" style="min-width:100px">
+                                                    <span class="badge bg-success">En Aceptadas</span>
+                                                </th>
+                                                <th class="text-center" style="min-width:100px">
+                                                    <span class="badge" style="background-color:#e65100">VM Únicas FL</span>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for combo in analisis_vm.combinaciones_frecuentes_total %}
+                                            <tr {% if combo.exclusivo_fl %}class="table-combinacion-fl"{% endif %}>
+                                                <td class="text-muted">{{ forloop.counter }}</td>
+                                                <td>
+                                                    {% if combo.exclusivo_fl %}
+                                                        <span class="badge bg-purple-fl me-1">Solo FL</span>
+                                                    {% elif combo.cantidad_aceptadas > 0 and combo.cantidad_total > combo.cantidad_aceptadas %}
+                                                        <span class="badge bg-secondary me-1" style="font-size:0.65rem">Aceptadas+FL</span>
+                                                    {% endif %}
+                                                    <strong>{{ combo.combinacion }}</strong>
+                                                </td>
+                                                <!-- VM Período -->
+                                                <td class="text-center fw-bold text-primary">{{ combo.cantidad_total }}</td>
+                                                <!-- Barra de porcentaje del período -->
+                                                <td class="text-center">
+                                                    <div class="d-flex align-items-center gap-1 justify-content-center">
+                                                        <div class="progress flex-grow-1" style="height:6px;min-width:50px">
+                                                            <div class="progress-bar bg-primary" style="width:{{ combo.porcentaje_total }}%"></div>
+                                                        </div>
+                                                        <span class="text-muted small" style="min-width:34px">{{ combo.porcentaje_total }}%</span>
+                                                    </div>
+                                                </td>
+                                                <!-- En Aceptadas -->
+                                                <td class="text-center">
+                                                    {% if combo.cantidad_aceptadas > 0 %}
+                                                        <span class="fw-semibold text-success">{{ combo.cantidad_aceptadas }}</span>
+                                                        <span class="text-muted small d-block">{{ combo.porcentaje_aceptadas }}%</span>
+                                                    {% else %}
+                                                        <span class="text-muted">—</span>
+                                                    {% endif %}
+                                                </td>
+                                                <!-- VM Únicas FL -->
+                                                {% with unicas=combo.cantidad_total|add:"-999999" %}
+                                                <td class="text-center">
+                                                    {% if combo.exclusivo_fl %}
+                                                        <span class="fw-bold text-purple-fl">{{ combo.cantidad_total }}</span>
+                                                        <i class="bi bi-check-circle-fill text-purple-fl ms-1 small"></i>
+                                                    {% else %}
+                                                        {% with fl_count=combo.cantidad_total|add:combo.cantidad_aceptadas %}
+                                                        {% comment %}No hay resta directa en Jinja, usamos cálculo auxiliar{% endcomment %}
+                                                        <span class="text-muted">—</span>
+                                                        {% endwith %}
+                                                    {% endif %}
+                                                </td>
+                                                {% endwith %}
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="table-secondary small">
+                                                <td colspan="2" class="fw-bold">Total del período</td>
+                                                <td class="text-center fw-bold text-primary">{{ analisis_vm.total_todas_vm }}</td>
+                                                <td></td>
+                                                <td class="text-center fw-bold text-success">{{ analisis_vm.total_aceptadas_con_vm }}</td>
+                                                <td class="text-center fw-bold" style="color:#e65100">
+                                                    —
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
                                 <div class="alert alert-success alert-dashboard mt-3">
                                     <strong><i class="bi bi-lightbulb"></i> Uso:</strong>
-                                    Identifica qué combinaciones de servicios se venden juntos con más frecuencia. 
-                                    Esto ayuda a crear paquetes predefinidos que el cliente ya compra naturalmente.
+                                    Las combinaciones <span class="badge bg-purple-fl">Solo FL</span> son ventas directas
+                                    que no pasan por cotización — candidatas a crear paquetes predefinidos o flujos express.
+                                    Las filas <span class="badge bg-secondary">Aceptadas+FL</span> aparecen en ambas fuentes.
                                 </div>
                             {% else %}
                                 <div class="alert alert-info alert-dashboard">

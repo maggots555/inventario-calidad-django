@@ -2666,7 +2666,9 @@ class DashboardCotizacionesVisualizer:
     def crear_dashboard_completo(self, df, df_piezas=None, df_seguimientos=None,
                                  df_metricas_tecnicos=None, df_metricas_sucursales=None,
                                  df_metricas_responsables=None,
-                                 kpis=None, ml_predictor=None, periodo='M'):
+                                 kpis=None, ml_predictor=None, periodo='M',
+                                 fecha_inicio=None, fecha_fin=None,
+                                 sucursal_id=None, tecnico_id=None, gama=None):
         """
         Genera TODOS los gráficos del dashboard en un solo llamado.
         
@@ -2908,7 +2910,14 @@ class DashboardCotizacionesVisualizer:
                     analizar_seguimiento_piezas_aceptadas,
                 )
                 
-                analisis_vm = analizar_servicios_vm_aceptadas(df)
+                analisis_vm = analizar_servicios_vm_aceptadas(
+                    df,
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin,
+                    sucursal_id=sucursal_id,
+                    tecnico_id=tecnico_id,
+                    gama=gama,
+                )
                 if analisis_vm.get('tiene_datos'):
                     graficos['servicios_vm_distribucion'] = convertir_figura_a_html(
                         self.grafico_servicios_vm_distribucion(analisis_vm)
@@ -3163,10 +3172,10 @@ class DashboardCotizacionesVisualizer:
         
         nombres = [s['servicio'] for s in servicios]
         cantidades_aceptadas = [s['cantidad'] for s in servicios]
-        cantidades_total = [s['cantidad_total_real'] for s in servicios]
-        
+        cantidades_periodo = [s['cantidad_vm_periodo'] for s in servicios]
+
         fig = go.Figure()
-        
+
         fig.add_trace(go.Bar(
             name='En Aceptadas',
             y=nombres,
@@ -3177,22 +3186,22 @@ class DashboardCotizacionesVisualizer:
             textposition='auto',
             hovertemplate='%{y}<br>En Aceptadas: %{x}<extra></extra>',
         ))
-        
+
         fig.add_trace(go.Bar(
-            name='Total Real (todas las VMs)',
+            name='VM Período (incluye FL)',
             y=nombres,
-            x=cantidades_total,
+            x=cantidades_periodo,
             orientation='h',
             marker_color=self.colores['primary'],
-            text=[str(c) for c in cantidades_total],
+            text=[str(c) for c in cantidades_periodo],
             textposition='auto',
-            hovertemplate='%{y}<br>Total Real: %{x}<extra></extra>',
+            hovertemplate='%{y}<br>VM Período: %{x}<extra></extra>',
             opacity=0.7,
         ))
-        
+
         fig.update_layout(
             **LAYOUT_BASE,
-            title=dict(text='Servicios VM: Aceptadas vs. Total Real', font=dict(size=16)),
+            title=dict(text='Servicios VM: Aceptadas vs. VM Período completo', font=dict(size=16)),
             barmode='group',
             height=420,
             legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
