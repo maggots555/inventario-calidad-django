@@ -420,6 +420,161 @@ body {
 }
 
 /* ============================================================
+   BOTONES DE EXPORTACIÓN ESPECÍFICOS
+   ============================================================ */
+.btn-exportar-rechazos {
+    background: linear-gradient(135deg, #c0392b, #e74c3c);
+    border-color: #c0392b;
+}
+
+.btn-exportar-rechazos:hover {
+    background: linear-gradient(135deg, #a93226, #cb3c33);
+    box-shadow: 0 5px 15px rgba(192, 57, 43, 0.3);
+}
+
+.btn-exportar-aceptaciones {
+    background: linear-gradient(135deg, #0d6efd, #3d8bfd);
+    border-color: #0d6efd;
+}
+
+.btn-exportar-aceptaciones:hover {
+    background: linear-gradient(135deg, #0a58ca, #3174d4);
+    box-shadow: 0 5px 15px rgba(13, 110, 253, 0.3);
+}
+
+/* ============================================================
+   TAB ACEPTACIONES & VENTAS MOSTRADOR — Estilos base (claro)
+   ============================================================ */
+
+/* Grid de KPIs de aceptaciones */
+.aceptaciones-kpis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.kpi-card-acept {
+    background: var(--white, #ffffff);
+    border-radius: var(--border-radius);
+    padding: 1.25rem;
+    box-shadow: var(--card-shadow);
+    border-left: 4px solid;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+}
+
+.kpi-card-acept:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--card-hover-shadow);
+}
+
+.kpi-card-acept::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.08) 0%, transparent 100%);
+    border-radius: 50%;
+    transform: translate(20%, -20%);
+}
+
+.kpi-acept-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+    opacity: 0.8;
+}
+
+.kpi-acept-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--gray-900, #212529);
+    line-height: 1.2;
+}
+
+.kpi-acept-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray-600, #6c757d);
+    margin-top: 0.25rem;
+}
+
+.kpi-acept-sub {
+    font-size: 0.75rem;
+    color: var(--gray-500, #adb5bd);
+    margin-top: 0.15rem;
+}
+
+/* Colores de borde para cada KPI */
+.kpi-acept-total { border-left-color: #0d6efd; }
+.kpi-acept-total .kpi-acept-icon { color: #0d6efd; }
+
+.kpi-acept-valor { border-left-color: #198754; }
+.kpi-acept-valor .kpi-acept-icon { color: #198754; }
+
+.kpi-acept-vm { border-left-color: #6f42c1; }
+.kpi-acept-vm .kpi-acept-icon { color: #6f42c1; }
+
+.kpi-acept-combinado { border-left-color: #fd7e14; }
+.kpi-acept-combinado .kpi-acept-icon { color: #fd7e14; }
+
+.kpi-acept-parcial { border-left-color: #ffc107; }
+.kpi-acept-parcial .kpi-acept-icon { color: #ffc107; }
+
+.kpi-acept-descuento { border-left-color: #20c997; }
+.kpi-acept-descuento .kpi-acept-icon { color: #20c997; }
+
+/* Headers de cards por sección */
+.card-header-aceptaciones {
+    background: linear-gradient(135deg, #e8f4fd 0%, #d1ecf1 100%);
+    border-bottom: 2px solid #bee5eb;
+}
+
+.card-header-aceptaciones h5 {
+    color: #0c5460;
+}
+
+.card-header-vm {
+    background: linear-gradient(135deg, #f0e6ff 0%, #e2d5f8 100%);
+    border-bottom: 2px solid #d5c7f0;
+}
+
+.card-header-vm h5 {
+    color: #4a2880;
+}
+
+.card-header-seguimiento {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+    border-bottom: 2px solid #ffd666;
+}
+
+.card-header-seguimiento h5 {
+    color: #664d03;
+}
+
+/* Responsive para KPIs de aceptaciones */
+@media (max-width: 768px) {
+    .aceptaciones-kpis-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .kpi-acept-value {
+        font-size: 1.4rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .aceptaciones-kpis-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================
    DARK MODE
    ============================================================ */
 [data-bs-theme="dark"] {
@@ -563,4 +718,69 @@ body {
 [data-bs-theme="dark"] .grafico-card .js-plotly-plot .xtick text,
 [data-bs-theme="dark"] .grafico-card .js-plotly-plot .ytick text {
     fill: #cbd5e1 !important;
+}
+
+/* ============================================================
+   DARK MODE — Tab Aceptaciones & Ventas Mostrador
+   ============================================================ */
+
+/* KPI cards de aceptaciones */
+[data-bs-theme="dark"] .kpi-card-acept {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .kpi-card-acept::after {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.08) 0%, transparent 100%);
+}
+
+[data-bs-theme="dark"] .kpi-acept-value {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .kpi-acept-label {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .kpi-acept-sub {
+    color: #64748b;
+}
+
+/* Headers de cards — versión oscura */
+[data-bs-theme="dark"] .card-header-aceptaciones {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.15) 0%, rgba(59, 130, 246, 0.08) 100%);
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .card-header-aceptaciones h5 {
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .card-header-vm {
+    background: linear-gradient(135deg, rgba(111, 66, 193, 0.15) 0%, rgba(139, 92, 246, 0.08) 100%);
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .card-header-vm h5 {
+    color: #c4b5fd;
+}
+
+[data-bs-theme="dark"] .card-header-seguimiento {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.08) 100%);
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .card-header-seguimiento h5 {
+    color: #fbbf24;
+}
+
+/* Botones de exportación en dark mode */
+[data-bs-theme="dark"] .btn-exportar-rechazos {
+    background: linear-gradient(135deg, #991b1b, #b91c1c);
+    border-color: #991b1b;
+}
+
+[data-bs-theme="dark"] .btn-exportar-aceptaciones {
+    background: linear-gradient(135deg, #1e40af, #2563eb);
+    border-color: #1e40af;
 }

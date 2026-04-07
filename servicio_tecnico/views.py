@@ -9229,7 +9229,10 @@ def dashboard_cotizaciones(request):
         analizar_proveedores,
         calcular_metricas_por_tecnico,
         calcular_metricas_por_sucursal,
-        calcular_metricas_por_responsable
+        calcular_metricas_por_responsable,
+        calcular_kpis_aceptaciones,
+        analizar_servicios_vm_aceptadas,
+        analizar_seguimiento_piezas_aceptadas
     )
     from .plotly_visualizations import DashboardCotizacionesVisualizer, convertir_figura_a_html
     from .ml_predictor import PredictorAceptacionCotizacion
@@ -9366,6 +9369,37 @@ def dashboard_cotizaciones(request):
         df_metricas_tecnicos = pd.DataFrame()
         df_metricas_sucursales = pd.DataFrame()
         df_metricas_responsables = pd.DataFrame()
+    
+    # ========================================
+    # 3.5. KPIs DE ACEPTACIONES Y ANÁLISIS VM
+    # ========================================
+    
+    kpis_aceptaciones = {}
+    analisis_vm = {}
+    analisis_seguimiento = {}
+    
+    if not df_cotizaciones.empty:
+        try:
+            print("\n" + "="*50)
+            print("✅ ANÁLISIS DE ACEPTACIONES Y VENTAS MOSTRADOR")
+            print("="*50)
+            
+            kpis_aceptaciones = calcular_kpis_aceptaciones(df_cotizaciones)
+            print(f"   - KPIs aceptaciones calculados: {kpis_aceptaciones.get('total_aceptadas', 0)} aceptadas")
+            
+            analisis_vm = analizar_servicios_vm_aceptadas(df_cotizaciones)
+            print(f"   - Análisis VM: {analisis_vm.get('total_con_vm', 0)} con venta mostrador")
+            
+            analisis_seguimiento = analizar_seguimiento_piezas_aceptadas(df_cotizaciones)
+            print(f"   - Seguimiento piezas: {analisis_seguimiento.get('total_piezas_rastreadas', 0)} piezas rastreadas")
+            
+            print("✅ Análisis de aceptaciones completado")
+            
+        except Exception as e_acept:
+            print(f"⚠️ Error en análisis de aceptaciones: {str(e_acept)}")
+            kpis_aceptaciones = {}
+            analisis_vm = {}
+            analisis_seguimiento = {}
     
     # ========================================
     # 4. GENERAR VISUALIZACIONES
@@ -9914,6 +9948,11 @@ def dashboard_cotizaciones(request):
         
         # Análisis de Diagnósticos Técnicos por Técnico - NUEVO
         'analisis_diagnosticos': analisis_diagnosticos,
+        
+        # Análisis de Aceptaciones y Ventas Mostrador - NUEVO
+        'kpis_aceptaciones': kpis_aceptaciones,
+        'analisis_vm': analisis_vm,
+        'analisis_seguimiento': analisis_seguimiento,
         
         # Filtros activos (para mantener estado en el form)
         'filtros_activos': {
@@ -11510,8 +11549,929 @@ def exportar_analisis_rechazos(request):
 
 
 # ============================================================================
-# API ENDPOINT: AUTOCOMPLETADO DE ÓRDENES PARA BÚSQUEDA INTELIGENTE
+# EXPORTACIÓN EXCEL: ANÁLISIS DE COTIZACIONES ACEPTADAS
 # ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+def exportar_analisis_aceptaciones(request):
+    """
+    Exporta un análisis exhaustivo de cotizaciones aceptadas a Excel con 9 hojas,
+    incluyendo datos cruzados con VentaMostrador (servicios, paquetes, piezas).
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este Excel es el espejo del 'Análisis de Rechazos', pero enfocado en lo positivo:
+    qué se aceptó, cuánto se generó, qué servicios adicionales (VM) se vendieron,
+    y cómo se comportó la cadena de suministro post-aceptación.
+    
+    Hojas:
+        1. Resumen Aceptaciones - KPIs principales de aceptaciones + VM
+        2. Detalle Aceptaciones - Cada cotización aceptada con datos completos
+        3. Piezas Aceptadas - Detalle a nivel pieza individual
+        4. Aceptación Parcial - Cotizaciones con piezas mixtas (aceptadas/rechazadas)
+        5. Ventas Mostrador - VM asociadas a cotizaciones aceptadas
+        6. Servicios Adicionales - Análisis de servicios VM (limpieza, reinstalación, etc.)
+        7. Seguimiento de Piezas - Estado del tracking post-aceptación
+        8. Rendimiento por Técnico - Métricas de aceptación + upsell por técnico
+        9. Rendimiento por Sucursal - Métricas de aceptación + upsell por sucursal
+    
+    Returns:
+        HttpResponse: Archivo Excel (.xlsx) para descargar
+    """
+    
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+    from datetime import datetime
+    import pandas as pd
+    
+    from .utils_cotizaciones import (
+        obtener_dataframe_cotizaciones,
+        calcular_kpis_generales,
+        calcular_kpis_aceptaciones,
+        analizar_piezas_cotizadas,
+        analizar_servicios_vm_aceptadas,
+        analizar_seguimiento_piezas_aceptadas,
+    )
+    
+    # ========================================
+    # OBTENER DATOS CON MISMOS FILTROS QUE EL DASHBOARD
+    # ========================================
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    sucursal_id = request.GET.get('sucursal')
+    tecnico_id = request.GET.get('tecnico')
+    gama = request.GET.get('gama')
+    
+    df_cotizaciones = obtener_dataframe_cotizaciones(
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        sucursal_id=sucursal_id,
+        tecnico_id=tecnico_id,
+        gama=gama
+    )
+    
+    if df_cotizaciones.empty:
+        messages.error(request, 'No hay datos para exportar con los filtros aplicados.')
+        return redirect('servicio_tecnico:dashboard_cotizaciones')
+    
+    # Filtrar solo aceptadas
+    df_aceptadas = df_cotizaciones[df_cotizaciones['aceptada'] == True].copy()
+    
+    if df_aceptadas.empty:
+        messages.warning(request, 'No hay cotizaciones aceptadas en el período seleccionado.')
+        return redirect('servicio_tecnico:dashboard_cotizaciones')
+    
+    # KPIs
+    kpis_generales = calcular_kpis_generales(df_cotizaciones)
+    kpis_aceptaciones = calcular_kpis_aceptaciones(df_cotizaciones)
+    
+    # Análisis VM y seguimiento
+    analisis_vm = analizar_servicios_vm_aceptadas(df_cotizaciones)
+    analisis_seguimiento = analizar_seguimiento_piezas_aceptadas(df_cotizaciones)
+    
+    # Piezas aceptadas
+    cotizacion_ids_aceptadas = df_aceptadas['cotizacion_id'].tolist()
+    
+    from .models import PiezaCotizada, SeguimientoPieza, VentaMostrador, PiezaVentaMostrador
+    piezas_aceptadas_qs = PiezaCotizada.objects.filter(
+        cotizacion_id__in=cotizacion_ids_aceptadas
+    ).select_related(
+        'componente',
+        'cotizacion',
+        'cotizacion__orden',
+        'cotizacion__orden__detalle_equipo'
+    )
+    
+    # ========================================
+    # CREAR WORKBOOK
+    # ========================================
+    wb = Workbook()
+    wb.remove(wb.active)
+    
+    # Estilos reutilizables
+    header_font = Font(bold=True, color='FFFFFF', size=11)
+    header_fill = PatternFill(start_color='198754', end_color='198754', fill_type='solid')  # Verde
+    header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    
+    title_font = Font(bold=True, size=14, color='FFFFFF')
+    title_fill = PatternFill(start_color='212529', end_color='212529', fill_type='solid')
+    title_align = Alignment(horizontal='center', vertical='center')
+    
+    subtitle_font = Font(italic=True, size=10, color='666666')
+    
+    kpi_label_font = Font(bold=True, size=11)
+    kpi_value_font = Font(bold=True, size=12, color='198754')  # Verde para aceptaciones
+    
+    green_fill = PatternFill(start_color='d4edda', end_color='d4edda', fill_type='solid')
+    blue_fill = PatternFill(start_color='d1ecf1', end_color='d1ecf1', fill_type='solid')
+    yellow_fill = PatternFill(start_color='fff3cd', end_color='fff3cd', fill_type='solid')
+    purple_fill = PatternFill(start_color='e2d5f1', end_color='e2d5f1', fill_type='solid')
+    teal_fill = PatternFill(start_color='d1f2eb', end_color='d1f2eb', fill_type='solid')
+    
+    border_thin = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    number_fmt = '#,##0.00'
+    pct_fmt = '0.0%'
+    
+    def aplicar_estilos_header(ws, fila, num_cols):
+        """Aplica estilos a la fila de encabezados."""
+        for col in range(1, num_cols + 1):
+            cell = ws.cell(row=fila, column=col)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_align
+            cell.border = border_thin
+    
+    def auto_ajustar_columnas(ws, max_width=50):
+        """Autoajusta el ancho de las columnas."""
+        for col in ws.columns:
+            max_len = 0
+            col_letter = get_column_letter(col[0].column)
+            for cell in col:
+                if cell.value:
+                    max_len = max(max_len, len(str(cell.value)))
+            ws.column_dimensions[col_letter].width = min(max_len + 3, max_width)
+    
+    # ========================================================================
+    # HOJA 1: RESUMEN ACEPTACIONES
+    # ========================================================================
+    ws1 = wb.create_sheet('Resumen Aceptaciones')
+    
+    # Título
+    ws1.merge_cells('A1:F1')
+    ws1['A1'] = 'ANÁLISIS DE COTIZACIONES ACEPTADAS'
+    ws1['A1'].font = title_font
+    ws1['A1'].fill = title_fill
+    ws1['A1'].alignment = title_align
+    
+    # Subtítulo con filtros
+    filtros_texto = f"Período: {fecha_inicio or 'Inicio'} - {fecha_fin or 'Actual'}"
+    ws1.merge_cells('A2:F2')
+    ws1['A2'] = filtros_texto
+    ws1['A2'].font = subtitle_font
+    ws1['A2'].alignment = Alignment(horizontal='center')
+    
+    # Sección: KPIs principales
+    fila = 4
+    ws1.merge_cells(f'A{fila}:F{fila}')
+    ws1[f'A{fila}'] = 'INDICADORES PRINCIPALES'
+    ws1[f'A{fila}'].font = Font(bold=True, size=12)
+    ws1[f'A{fila}'].fill = green_fill
+    
+    fila += 1
+    headers = ['Métrica', 'Valor', 'Porcentaje', 'Observaciones']
+    for col, h in enumerate(headers, 1):
+        ws1.cell(row=fila, column=col, value=h)
+    aplicar_estilos_header(ws1, fila, len(headers))
+    
+    # Datos de KPIs
+    metricas = [
+        ('Total Cotizaciones', kpis_generales['total_cotizaciones'], '', 'Todas las cotizaciones en el período'),
+        ('Total Aceptadas', kpis_aceptaciones['total_aceptadas'], f"{kpis_generales.get('tasa_aceptacion', 0)}%", 'Tasa de aceptación global'),
+        ('Aceptación Total', kpis_aceptaciones['aceptacion_total_count'], f"{kpis_aceptaciones['aceptacion_total_pct']}%", 'Todas las piezas aceptadas'),
+        ('Aceptación Parcial', kpis_aceptaciones['aceptacion_parcial_count'], f"{kpis_aceptaciones['aceptacion_parcial_pct']}%", 'Algunas piezas rechazadas'),
+        ('Valor Total Aceptado', kpis_aceptaciones['valor_total_aceptado'], f"{kpis_aceptaciones['porcentaje_recuperacion']}% del cotizado", 'Monto final que paga el cliente'),
+        ('Ticket Promedio Aceptado', kpis_aceptaciones['ticket_promedio_aceptado'], '', 'Monto promedio por cotización aceptada'),
+        ('Piezas Promedio por Aceptada', kpis_aceptaciones['piezas_promedio_aceptadas'], '', 'Promedio de piezas aceptadas'),
+        ('Con Descuento Mano de Obra', kpis_aceptaciones['descuento_count'], f"{kpis_aceptaciones['descuento_pct']}%", f"Ahorro total: {kpis_aceptaciones['descuento_monto_total_fmt']}"),
+        ('Tiempo Respuesta Prom. (días)', kpis_aceptaciones['tiempo_respuesta_aceptadas'], '', 'Días promedio hasta respuesta positiva'),
+        ('--- VENTA MOSTRADOR ---', '', '', ''),
+        ('Aceptadas con VM', kpis_aceptaciones['con_vm_count'], f"{kpis_aceptaciones['con_vm_pct']}%", 'Tasa de upsell'),
+        ('Valor VM Complementario', kpis_aceptaciones['valor_vm_complementario'], '', 'Ingreso adicional por VM'),
+        ('Valor Combinado Total', kpis_aceptaciones['valor_combinado_total'], '', 'Cotización + VM'),
+        ('Paquete Más Vendido', kpis_aceptaciones['paquete_mas_vendido'], '', ''),
+        ('Servicio Más Vendido', kpis_aceptaciones['servicio_mas_vendido'], '', ''),
+    ]
+    
+    for metrica, valor, pct, obs in metricas:
+        fila += 1
+        ws1.cell(row=fila, column=1, value=metrica).font = kpi_label_font
+        cell_val = ws1.cell(row=fila, column=2, value=valor)
+        if isinstance(valor, (int, float)) and valor > 100:
+            cell_val.number_format = number_fmt
+        cell_val.font = kpi_value_font
+        ws1.cell(row=fila, column=3, value=pct)
+        ws1.cell(row=fila, column=4, value=obs).font = Font(italic=True, color='666666')
+        for col in range(1, 5):
+            ws1.cell(row=fila, column=col).border = border_thin
+    
+    auto_ajustar_columnas(ws1)
+    
+    # ========================================================================
+    # HOJA 2: DETALLE ACEPTACIONES
+    # ========================================================================
+    ws2 = wb.create_sheet('Detalle Aceptaciones')
+    
+    # Título
+    ws2.merge_cells('A1:Y1')
+    ws2['A1'] = f'DETALLE DE COTIZACIONES ACEPTADAS ({len(df_aceptadas)} registros)'
+    ws2['A1'].font = title_font
+    ws2['A1'].fill = title_fill
+    ws2['A1'].alignment = title_align
+    
+    # Headers
+    headers_detalle = [
+        'Orden Cliente', 'Número Serie', 'Marca', 'Modelo', 'Tipo Equipo',
+        'Gama', 'Sucursal', 'Técnico', 'Responsable',
+        'Fecha Envío', 'Fecha Respuesta', 'Días Respuesta',
+        'Costo Total Cotizado', 'Costo Piezas Aceptadas', 'Costo Piezas Rechazadas',
+        'Costo Mano Obra', 'Descuento MO', 'Costo Total Final',
+        'Total Piezas', 'Piezas Aceptadas', 'Piezas Rechazadas',
+        'Tiene VM', 'Paquete VM', 'Total VM', 'Valor Combinado',
+    ]
+    
+    fila = 3
+    for col, h in enumerate(headers_detalle, 1):
+        ws2.cell(row=fila, column=col, value=h)
+    aplicar_estilos_header(ws2, fila, len(headers_detalle))
+    
+    # Datos
+    for _, row in df_aceptadas.iterrows():
+        fila += 1
+        
+        # Convertir fechas a string para evitar error de openpyxl con timezones
+        # (openpyxl no soporta datetime con tzinfo != None)
+        fecha_envio_str = ''
+        if pd.notna(row.get('fecha_envio')):
+            try:
+                fecha_envio_str = pd.to_datetime(row['fecha_envio']).strftime('%d/%m/%Y')
+            except Exception:
+                fecha_envio_str = str(row['fecha_envio'])
+        
+        fecha_respuesta_str = ''
+        if pd.notna(row.get('fecha_respuesta')):
+            try:
+                fecha_respuesta_str = pd.to_datetime(row['fecha_respuesta']).strftime('%d/%m/%Y')
+            except Exception:
+                fecha_respuesta_str = str(row['fecha_respuesta'])
+        
+        datos = [
+            row.get('orden_cliente', ''),
+            row.get('numero_serie', ''),
+            row.get('marca', ''),
+            row.get('modelo', ''),
+            row.get('tipo_equipo', ''),
+            row.get('gama', ''),
+            row.get('sucursal', ''),
+            row.get('tecnico', ''),
+            row.get('responsable', ''),
+            fecha_envio_str,
+            fecha_respuesta_str,
+            row.get('dias_sin_respuesta', ''),
+            row.get('costo_total', 0),
+            row.get('costo_piezas_aceptadas', 0),
+            row.get('costo_piezas_rechazadas', 0),
+            row.get('costo_mano_obra', 0),
+            row.get('monto_descuento', 0),
+            row.get('costo_total_final', 0),
+            row.get('total_piezas', 0),
+            row.get('piezas_aceptadas', 0),
+            row.get('piezas_rechazadas', 0),
+            'Sí' if row.get('tiene_venta_mostrador', False) else 'No',
+            row.get('vm_paquete', 'ninguno').capitalize() if row.get('tiene_venta_mostrador', False) else '',
+            row.get('vm_total_venta', 0) if row.get('tiene_venta_mostrador', False) else 0,
+            row.get('valor_total_combinado', 0),
+        ]
+        for col, valor in enumerate(datos, 1):
+            cell = ws2.cell(row=fila, column=col, value=valor)
+            cell.border = border_thin
+            if col in (13, 14, 15, 16, 17, 18, 24, 25):
+                cell.number_format = number_fmt
+    
+    auto_ajustar_columnas(ws2)
+    
+    # ========================================================================
+    # HOJA 3: PIEZAS ACEPTADAS
+    # ========================================================================
+    ws3 = wb.create_sheet('Piezas Aceptadas')
+    
+    ws3.merge_cells('A1:L1')
+    ws3['A1'] = 'DETALLE DE PIEZAS EN COTIZACIONES ACEPTADAS'
+    ws3['A1'].font = title_font
+    ws3['A1'].fill = title_fill
+    ws3['A1'].alignment = title_align
+    
+    headers_piezas = [
+        'Orden', 'Componente', 'Descripción', 'Proveedor',
+        'Cantidad', 'Costo Unitario', 'Costo Total',
+        'Es Necesaria', 'Sugerida por Técnico',
+        'Aceptada por Cliente', 'Motivo Rechazo Pieza', 'Prioridad',
+    ]
+    
+    fila = 3
+    for col, h in enumerate(headers_piezas, 1):
+        ws3.cell(row=fila, column=col, value=h)
+    aplicar_estilos_header(ws3, fila, len(headers_piezas))
+    
+    for pieza in piezas_aceptadas_qs:
+        fila += 1
+        detalle = pieza.cotizacion.orden.detalle_equipo if hasattr(pieza.cotizacion.orden, 'detalle_equipo') else None
+        orden_cliente = detalle.orden_cliente if detalle else ''
+        
+        # Determinar aceptación con herencia
+        aceptada = pieza.aceptada_por_cliente
+        if aceptada is None:
+            aceptada = pieza.cotizacion.usuario_acepto
+        
+        datos = [
+            orden_cliente,
+            pieza.componente.nombre if pieza.componente else '',
+            pieza.descripcion_adicional,
+            pieza.proveedor,
+            pieza.cantidad,
+            float(pieza.costo_unitario),
+            float(pieza.costo_total),
+            'Sí' if pieza.es_necesaria else 'No',
+            'Sí' if pieza.sugerida_por_tecnico else 'No',
+            'Sí' if aceptada else ('No' if aceptada is False else 'Pendiente'),
+            pieza.motivo_rechazo_pieza or '',
+            pieza.orden_prioridad,
+        ]
+        for col, valor in enumerate(datos, 1):
+            cell = ws3.cell(row=fila, column=col, value=valor)
+            cell.border = border_thin
+            if col in (6, 7):
+                cell.number_format = number_fmt
+            # Colorear según aceptación
+            if col == 10:
+                if valor == 'Sí':
+                    cell.fill = green_fill
+                elif valor == 'No':
+                    cell.fill = PatternFill(start_color='f8d7da', end_color='f8d7da', fill_type='solid')
+    
+    # Resumen de piezas
+    fila += 2
+    total_piezas_todas = piezas_aceptadas_qs.count()
+    piezas_si = piezas_aceptadas_qs.filter(aceptada_por_cliente=True).count()
+    piezas_no = piezas_aceptadas_qs.filter(aceptada_por_cliente=False).count()
+    piezas_pendientes = total_piezas_todas - piezas_si - piezas_no
+    
+    ws3.cell(row=fila, column=1, value='RESUMEN').font = Font(bold=True, size=12)
+    fila += 1
+    ws3.cell(row=fila, column=1, value='Total piezas:').font = kpi_label_font
+    ws3.cell(row=fila, column=2, value=total_piezas_todas)
+    fila += 1
+    ws3.cell(row=fila, column=1, value='Aceptadas:').font = kpi_label_font
+    ws3.cell(row=fila, column=2, value=piezas_si).fill = green_fill
+    fila += 1
+    ws3.cell(row=fila, column=1, value='Rechazadas:').font = kpi_label_font
+    ws3.cell(row=fila, column=2, value=piezas_no)
+    fila += 1
+    ws3.cell(row=fila, column=1, value='Heredan aceptación:').font = kpi_label_font
+    ws3.cell(row=fila, column=2, value=piezas_pendientes)
+    
+    # Top componentes más aceptados
+    fila += 2
+    ws3.cell(row=fila, column=1, value='TOP COMPONENTES MÁS ACEPTADOS').font = Font(bold=True, size=12)
+    ws3.cell(row=fila, column=1).fill = green_fill
+    fila += 1
+    
+    from django.db.models import Sum as DjSum, Count as DjCount
+    top_comp = piezas_aceptadas_qs.filter(
+        aceptada_por_cliente=True
+    ).values('componente__nombre').annotate(
+        total=DjCount('id'),
+        ingreso=DjSum('costo_unitario'),
+    ).order_by('-total')[:10]
+    
+    headers_top = ['Componente', 'Cantidad', 'Ingreso Total']
+    for col, h in enumerate(headers_top, 1):
+        ws3.cell(row=fila, column=col, value=h)
+    aplicar_estilos_header(ws3, fila, len(headers_top))
+    
+    for comp in top_comp:
+        fila += 1
+        ws3.cell(row=fila, column=1, value=comp['componente__nombre'] or 'Sin nombre').border = border_thin
+        ws3.cell(row=fila, column=2, value=comp['total']).border = border_thin
+        cell_ing = ws3.cell(row=fila, column=3, value=float(comp['ingreso'] or 0))
+        cell_ing.number_format = number_fmt
+        cell_ing.border = border_thin
+    
+    auto_ajustar_columnas(ws3)
+    
+    # ========================================================================
+    # HOJA 4: ACEPTACIÓN PARCIAL
+    # ========================================================================
+    ws4 = wb.create_sheet('Aceptación Parcial')
+    
+    df_parcial = df_aceptadas[
+        (df_aceptadas['piezas_rechazadas'] > 0) & (df_aceptadas['piezas_aceptadas'] > 0)
+    ]
+    
+    ws4.merge_cells('A1:N1')
+    ws4['A1'] = f'COTIZACIONES CON ACEPTACIÓN PARCIAL ({len(df_parcial)} registros)'
+    ws4['A1'].font = title_font
+    ws4['A1'].fill = title_fill
+    ws4['A1'].alignment = title_align
+    
+    ws4.merge_cells('A2:N2')
+    ws4['A2'] = 'Cotizaciones donde el cliente aceptó ALGUNAS piezas pero rechazó otras'
+    ws4['A2'].font = subtitle_font
+    ws4['A2'].alignment = Alignment(horizontal='center')
+    
+    headers_parcial = [
+        'Orden Cliente', 'Marca', 'Modelo', 'Sucursal', 'Técnico',
+        'Total Piezas', 'Piezas Aceptadas', 'Piezas Rechazadas',
+        '% Aceptadas', 'Costo Cotizado', 'Costo Aceptado', 'Costo Rechazado',
+        'Diferencia', 'Tiene VM',
+    ]
+    
+    fila = 4
+    for col, h in enumerate(headers_parcial, 1):
+        ws4.cell(row=fila, column=col, value=h)
+    aplicar_estilos_header(ws4, fila, len(headers_parcial))
+    
+    for _, row in df_parcial.iterrows():
+        fila += 1
+        diferencia = row.get('costo_total', 0) - row.get('costo_total_final', 0)
+        datos = [
+            row.get('orden_cliente', ''),
+            row.get('marca', ''),
+            row.get('modelo', ''),
+            row.get('sucursal', ''),
+            row.get('tecnico', ''),
+            row.get('total_piezas', 0),
+            row.get('piezas_aceptadas', 0),
+            row.get('piezas_rechazadas', 0),
+            row.get('porcentaje_aceptadas', 0),
+            row.get('costo_total', 0),
+            row.get('costo_total_final', 0),
+            row.get('costo_piezas_rechazadas', 0),
+            diferencia,
+            'Sí' if row.get('tiene_venta_mostrador', False) else 'No',
+        ]
+        for col, valor in enumerate(datos, 1):
+            cell = ws4.cell(row=fila, column=col, value=valor)
+            cell.border = border_thin
+            if col in (10, 11, 12, 13):
+                cell.number_format = number_fmt
+    
+    # Resumen
+    if len(df_parcial) > 0:
+        fila += 2
+        ws4.cell(row=fila, column=1, value='RESUMEN DE ACEPTACIÓN PARCIAL').font = Font(bold=True, size=12)
+        ws4.cell(row=fila, column=1).fill = yellow_fill
+        fila += 1
+        valor_perdido = df_parcial['costo_piezas_rechazadas'].sum()
+        ws4.cell(row=fila, column=1, value='Valor perdido por piezas rechazadas en parciales:').font = kpi_label_font
+        cell_vp = ws4.cell(row=fila, column=2, value=float(valor_perdido))
+        cell_vp.number_format = number_fmt
+        cell_vp.font = Font(bold=True, color='c0392c', size=12)
+        fila += 1
+        prom_aceptacion = df_parcial['porcentaje_aceptadas'].mean()
+        ws4.cell(row=fila, column=1, value='% promedio de aceptación en parciales:').font = kpi_label_font
+        ws4.cell(row=fila, column=2, value=f"{prom_aceptacion:.1f}%")
+    
+    auto_ajustar_columnas(ws4)
+    
+    # ========================================================================
+    # HOJA 5: VENTAS MOSTRADOR ASOCIADAS
+    # ========================================================================
+    ws5 = wb.create_sheet('Ventas Mostrador')
+    
+    df_con_vm = df_aceptadas[df_aceptadas['tiene_venta_mostrador'] == True]
+    
+    ws5.merge_cells('A1:R1')
+    ws5['A1'] = f'VENTAS MOSTRADOR EN COTIZACIONES ACEPTADAS ({len(df_con_vm)} registros)'
+    ws5['A1'].font = title_font
+    ws5['A1'].fill = PatternFill(start_color='0dcaf0', end_color='0dcaf0', fill_type='solid')
+    ws5['A1'].alignment = title_align
+    
+    headers_vm = [
+        'Orden Cliente', 'Folio VM', 'Fecha Venta', 'Sucursal', 'Técnico',
+        'Paquete', 'Costo Paquete',
+        'Limpieza', 'Costo Limpieza',
+        'Reinstalación SO', 'Costo Reinstalación',
+        'Respaldo', 'Costo Respaldo',
+        'Cambio Pieza', 'Costo Cambio',
+        'Kit Limpieza', 'Costo Kit',
+        'Total VM',
+    ]
+    
+    fila = 3
+    for col, h in enumerate(headers_vm, 1):
+        ws5.cell(row=fila, column=col, value=h)
+    # Usar fill azul info para headers de VM
+    vm_header_fill = PatternFill(start_color='0dcaf0', end_color='0dcaf0', fill_type='solid')
+    for col in range(1, len(headers_vm) + 1):
+        cell = ws5.cell(row=fila, column=col)
+        cell.font = Font(bold=True, color='000000', size=11)
+        cell.fill = vm_header_fill
+        cell.alignment = header_align
+        cell.border = border_thin
+    
+    for _, row in df_con_vm.iterrows():
+        fila += 1
+        
+        # Convertir fecha de venta a string para evitar error de openpyxl con timezones
+        vm_fecha_venta_str = ''
+        if pd.notna(row.get('vm_fecha_venta')):
+            try:
+                vm_fecha_venta_str = pd.to_datetime(row['vm_fecha_venta']).strftime('%d/%m/%Y')
+            except Exception:
+                vm_fecha_venta_str = str(row['vm_fecha_venta'])
+        
+        datos = [
+            row.get('orden_cliente', ''),
+            row.get('vm_folio', ''),
+            vm_fecha_venta_str,
+            row.get('sucursal', ''),
+            row.get('tecnico', ''),
+            row.get('vm_paquete', 'ninguno').capitalize(),
+            row.get('vm_costo_paquete', 0),
+            'Sí' if row.get('vm_incluye_limpieza', False) else 'No',
+            row.get('vm_costo_limpieza', 0),
+            'Sí' if row.get('vm_incluye_reinstalacion', False) else 'No',
+            row.get('vm_costo_reinstalacion', 0),
+            'Sí' if row.get('vm_incluye_respaldo', False) else 'No',
+            row.get('vm_costo_respaldo', 0),
+            'Sí' if row.get('vm_incluye_cambio_pieza', False) else 'No',
+            row.get('vm_costo_cambio_pieza', 0),
+            'Sí' if row.get('vm_incluye_kit_limpieza', False) else 'No',
+            row.get('vm_costo_kit', 0),
+            row.get('vm_total_venta', 0),
+        ]
+        for col, valor in enumerate(datos, 1):
+            cell = ws5.cell(row=fila, column=col, value=valor)
+            cell.border = border_thin
+            if col in (7, 9, 11, 13, 15, 17, 18):
+                cell.number_format = number_fmt
+            # Colorear servicios activos
+            if col in (8, 10, 12, 14, 16) and valor == 'Sí':
+                cell.fill = teal_fill
+    
+    # Totales
+    if len(df_con_vm) > 0:
+        fila += 1
+        ws5.cell(row=fila, column=1, value='TOTALES').font = Font(bold=True, size=12)
+        ws5.cell(row=fila, column=7, value=float(df_con_vm['vm_costo_paquete'].sum())).number_format = number_fmt
+        ws5.cell(row=fila, column=9, value=float(df_con_vm['vm_costo_limpieza'].sum())).number_format = number_fmt
+        ws5.cell(row=fila, column=11, value=float(df_con_vm['vm_costo_reinstalacion'].sum())).number_format = number_fmt
+        ws5.cell(row=fila, column=13, value=float(df_con_vm['vm_costo_respaldo'].sum())).number_format = number_fmt
+        ws5.cell(row=fila, column=15, value=float(df_con_vm['vm_costo_cambio_pieza'].sum())).number_format = number_fmt
+        ws5.cell(row=fila, column=17, value=float(df_con_vm['vm_costo_kit'].sum())).number_format = number_fmt
+        ws5.cell(row=fila, column=18, value=float(df_con_vm['vm_total_venta'].sum())).number_format = number_fmt
+        for col in range(1, len(headers_vm) + 1):
+            ws5.cell(row=fila, column=col).font = Font(bold=True)
+            ws5.cell(row=fila, column=col).border = border_thin
+    
+    auto_ajustar_columnas(ws5)
+    
+    # ========================================================================
+    # HOJA 6: SERVICIOS ADICIONALES
+    # ========================================================================
+    ws6 = wb.create_sheet('Servicios Adicionales')
+    
+    ws6.merge_cells('A1:F1')
+    ws6['A1'] = 'ANÁLISIS DE SERVICIOS ADICIONALES (VM EN ACEPTADAS)'
+    ws6['A1'].font = title_font
+    ws6['A1'].fill = title_fill
+    ws6['A1'].alignment = title_align
+    
+    fila = 3
+    if analisis_vm.get('tiene_datos'):
+        # Distribución de paquetes
+        ws6.cell(row=fila, column=1, value='DISTRIBUCIÓN DE PAQUETES').font = Font(bold=True, size=12)
+        ws6.cell(row=fila, column=1).fill = blue_fill
+        fila += 1
+        headers_paq = ['Paquete', 'Cantidad', 'Porcentaje', 'Ingreso Total']
+        for col, h in enumerate(headers_paq, 1):
+            ws6.cell(row=fila, column=col, value=h)
+        aplicar_estilos_header(ws6, fila, len(headers_paq))
+        
+        for paq in analisis_vm['distribucion_paquetes']:
+            fila += 1
+            ws6.cell(row=fila, column=1, value=paq['nombre']).border = border_thin
+            ws6.cell(row=fila, column=2, value=paq['cantidad']).border = border_thin
+            ws6.cell(row=fila, column=3, value=f"{paq['porcentaje']}%").border = border_thin
+            cell_i = ws6.cell(row=fila, column=4, value=paq['ingreso_total'])
+            cell_i.number_format = number_fmt
+            cell_i.border = border_thin
+        
+        # Distribución de servicios
+        fila += 2
+        ws6.cell(row=fila, column=1, value='DISTRIBUCIÓN DE SERVICIOS INDIVIDUALES').font = Font(bold=True, size=12)
+        ws6.cell(row=fila, column=1).fill = teal_fill
+        fila += 1
+        headers_srv = ['Servicio', 'Cantidad', 'Porcentaje', 'Ingreso Total']
+        for col, h in enumerate(headers_srv, 1):
+            ws6.cell(row=fila, column=col, value=h)
+        aplicar_estilos_header(ws6, fila, len(headers_srv))
+        
+        for srv in analisis_vm['distribucion_servicios']:
+            fila += 1
+            ws6.cell(row=fila, column=1, value=srv['servicio']).border = border_thin
+            ws6.cell(row=fila, column=2, value=srv['cantidad']).border = border_thin
+            ws6.cell(row=fila, column=3, value=f"{srv['porcentaje']}%").border = border_thin
+            cell_i = ws6.cell(row=fila, column=4, value=srv['ingreso_total'])
+            cell_i.number_format = number_fmt
+            cell_i.border = border_thin
+        
+        # Combinaciones más frecuentes
+        fila += 2
+        ws6.cell(row=fila, column=1, value='COMBINACIONES DE SERVICIOS MÁS FRECUENTES').font = Font(bold=True, size=12)
+        ws6.cell(row=fila, column=1).fill = purple_fill
+        fila += 1
+        headers_combo = ['Combinación', 'Cantidad', 'Porcentaje']
+        for col, h in enumerate(headers_combo, 1):
+            ws6.cell(row=fila, column=col, value=h)
+        aplicar_estilos_header(ws6, fila, len(headers_combo))
+        
+        for combo in analisis_vm.get('combinaciones_frecuentes', []):
+            fila += 1
+            ws6.cell(row=fila, column=1, value=combo['combinacion']).border = border_thin
+            ws6.cell(row=fila, column=2, value=combo['cantidad']).border = border_thin
+            ws6.cell(row=fila, column=3, value=f"{combo['porcentaje']}%").border = border_thin
+        
+        # Top piezas VM
+        if analisis_vm.get('top_piezas_vm'):
+            fila += 2
+            ws6.cell(row=fila, column=1, value='TOP PIEZAS VENDIDAS EN VENTA MOSTRADOR').font = Font(bold=True, size=12)
+            ws6.cell(row=fila, column=1).fill = blue_fill
+            fila += 1
+            headers_tpvm = ['Pieza', 'Cantidad', 'Ingreso Total', 'Núm. Ventas']
+            for col, h in enumerate(headers_tpvm, 1):
+                ws6.cell(row=fila, column=col, value=h)
+            aplicar_estilos_header(ws6, fila, len(headers_tpvm))
+            
+            for pieza in analisis_vm['top_piezas_vm']:
+                fila += 1
+                ws6.cell(row=fila, column=1, value=pieza['descripcion']).border = border_thin
+                ws6.cell(row=fila, column=2, value=pieza['cantidad']).border = border_thin
+                cell_i = ws6.cell(row=fila, column=3, value=pieza['ingreso_total'])
+                cell_i.number_format = number_fmt
+                cell_i.border = border_thin
+                ws6.cell(row=fila, column=4, value=pieza['num_ventas']).border = border_thin
+    else:
+        ws6.cell(row=fila, column=1, value='No hay ventas mostrador asociadas a cotizaciones aceptadas')
+        ws6.cell(row=fila, column=1).font = Font(italic=True, color='999999', size=12)
+    
+    auto_ajustar_columnas(ws6)
+    
+    # ========================================================================
+    # HOJA 7: SEGUIMIENTO DE PIEZAS
+    # ========================================================================
+    ws7 = wb.create_sheet('Seguimiento Piezas')
+    
+    ws7.merge_cells('A1:H1')
+    ws7['A1'] = 'SEGUIMIENTO DE PIEZAS POST-ACEPTACIÓN'
+    ws7['A1'].font = title_font
+    ws7['A1'].fill = title_fill
+    ws7['A1'].alignment = title_align
+    
+    fila = 3
+    if analisis_seguimiento.get('tiene_datos'):
+        # Distribución de estados
+        ws7.cell(row=fila, column=1, value='DISTRIBUCIÓN DE ESTADOS').font = Font(bold=True, size=12)
+        ws7.cell(row=fila, column=1).fill = green_fill
+        fila += 1
+        headers_est = ['Estado', 'Cantidad', 'Porcentaje', 'Tipo']
+        for col, h in enumerate(headers_est, 1):
+            ws7.cell(row=fila, column=col, value=h)
+        aplicar_estilos_header(ws7, fila, len(headers_est))
+        
+        for est in analisis_seguimiento['distribucion_estados']:
+            fila += 1
+            ws7.cell(row=fila, column=1, value=est['label']).border = border_thin
+            ws7.cell(row=fila, column=2, value=est['cantidad']).border = border_thin
+            ws7.cell(row=fila, column=3, value=f"{est['porcentaje']}%").border = border_thin
+            tipo = 'Problemático' if est['es_problematico'] else ('Recibido' if est['es_recibido'] else 'En proceso')
+            cell_tipo = ws7.cell(row=fila, column=4, value=tipo)
+            cell_tipo.border = border_thin
+            if est['es_problematico']:
+                cell_tipo.fill = PatternFill(start_color='f8d7da', end_color='f8d7da', fill_type='solid')
+            elif est['es_recibido']:
+                cell_tipo.fill = green_fill
+            else:
+                cell_tipo.fill = yellow_fill
+        
+        # Tiempos de entrega
+        tiempos = analisis_seguimiento.get('tiempos_entrega', {})
+        if tiempos.get('total_con_fecha', 0) > 0:
+            fila += 2
+            ws7.cell(row=fila, column=1, value='TIEMPOS DE ENTREGA').font = Font(bold=True, size=12)
+            ws7.cell(row=fila, column=1).fill = blue_fill
+            fila += 1
+            metricas_tiempo = [
+                ('Promedio (días)', tiempos.get('promedio', 0)),
+                ('Mediana (días)', tiempos.get('mediana', 0)),
+                ('Mínimo (días)', tiempos.get('minimo', 0)),
+                ('Máximo (días)', tiempos.get('maximo', 0)),
+                ('Con fecha de entrega', tiempos.get('total_con_fecha', 0)),
+                ('Sin fecha aún', tiempos.get('total_sin_fecha', 0)),
+                ('Tasa de cumplimiento', f"{analisis_seguimiento.get('tasa_cumplimiento', 0)}%"),
+            ]
+            for label, valor in metricas_tiempo:
+                fila += 1
+                ws7.cell(row=fila, column=1, value=label).font = kpi_label_font
+                ws7.cell(row=fila, column=1).border = border_thin
+                ws7.cell(row=fila, column=2, value=valor).border = border_thin
+        
+        # Ranking de proveedores
+        proveedores = analisis_seguimiento.get('proveedores_ranking', [])
+        if proveedores:
+            fila += 2
+            ws7.cell(row=fila, column=1, value='RANKING DE PROVEEDORES').font = Font(bold=True, size=12)
+            ws7.cell(row=fila, column=1).fill = teal_fill
+            fila += 1
+            headers_prov = ['Proveedor', 'Total Pedidos', 'Recibidos', 'Problemas', 'Tasa Éxito', 'Tiempo Prom.']
+            for col, h in enumerate(headers_prov, 1):
+                ws7.cell(row=fila, column=col, value=h)
+            aplicar_estilos_header(ws7, fila, len(headers_prov))
+            
+            for prov in proveedores:
+                fila += 1
+                ws7.cell(row=fila, column=1, value=prov['proveedor']).border = border_thin
+                ws7.cell(row=fila, column=2, value=prov['total_pedidos']).border = border_thin
+                ws7.cell(row=fila, column=3, value=prov['recibidos']).border = border_thin
+                ws7.cell(row=fila, column=4, value=prov['problemas']).border = border_thin
+                cell_tasa = ws7.cell(row=fila, column=5, value=f"{prov['tasa_exito']}%")
+                cell_tasa.border = border_thin
+                if prov['tasa_exito'] >= 90:
+                    cell_tasa.fill = green_fill
+                elif prov['tasa_exito'] < 70:
+                    cell_tasa.fill = PatternFill(start_color='f8d7da', end_color='f8d7da', fill_type='solid')
+                tiempo_str = f"{prov['tiempo_promedio']} días" if prov['tiempo_promedio'] else 'Sin datos'
+                ws7.cell(row=fila, column=6, value=tiempo_str).border = border_thin
+        
+        # Problemas
+        problemas = analisis_seguimiento.get('problemas_piezas', {})
+        if problemas.get('total_problemas', 0) > 0:
+            fila += 2
+            ws7.cell(row=fila, column=1, value='PROBLEMAS EN PIEZAS').font = Font(bold=True, size=12)
+            ws7.cell(row=fila, column=1).fill = PatternFill(start_color='f8d7da', end_color='f8d7da', fill_type='solid')
+            fila += 1
+            ws7.cell(row=fila, column=1, value='Piezas incorrectas (WPB):').font = kpi_label_font
+            ws7.cell(row=fila, column=2, value=problemas.get('piezas_incorrectas', 0))
+            fila += 1
+            ws7.cell(row=fila, column=1, value='Piezas dañadas (DOA):').font = kpi_label_font
+            ws7.cell(row=fila, column=2, value=problemas.get('piezas_danadas', 0))
+            fila += 1
+            ws7.cell(row=fila, column=1, value='Tasa de problemas:').font = kpi_label_font
+            ws7.cell(row=fila, column=2, value=f"{problemas.get('tasa_problemas', 0)}%")
+    else:
+        ws7.cell(row=fila, column=1, value='No hay seguimientos de piezas en las cotizaciones aceptadas')
+        ws7.cell(row=fila, column=1).font = Font(italic=True, color='999999', size=12)
+    
+    auto_ajustar_columnas(ws7)
+    
+    # ========================================================================
+    # HOJA 8: RENDIMIENTO POR TÉCNICO
+    # ========================================================================
+    ws8 = wb.create_sheet('Por Técnico')
+    
+    ws8.merge_cells('A1:K1')
+    ws8['A1'] = 'RENDIMIENTO DE ACEPTACIONES POR TÉCNICO'
+    ws8['A1'].font = title_font
+    ws8['A1'].fill = title_fill
+    ws8['A1'].alignment = title_align
+    
+    # Calcular métricas por técnico
+    tec_metrics = df_aceptadas.groupby('tecnico').agg(
+        total_aceptadas=('aceptada', 'count'),
+        valor_aceptado=('costo_total_final', 'sum'),
+        ticket_promedio=('costo_total_final', 'mean'),
+        piezas_promedio=('piezas_aceptadas', 'mean'),
+        con_vm=('tiene_venta_mostrador', 'sum'),
+        valor_vm=('vm_total_venta', 'sum'),
+        valor_combinado=('valor_total_combinado', 'sum'),
+        con_descuento=('descontar_mano_obra', 'sum'),
+        tiempo_resp=('dias_sin_respuesta', 'mean'),
+    ).reset_index()
+    tec_metrics['tasa_upsell'] = (tec_metrics['con_vm'] / tec_metrics['total_aceptadas'] * 100).round(1)
+    tec_metrics = tec_metrics.sort_values('valor_combinado', ascending=False)
+    
+    headers_tec = [
+        'Técnico', 'Aceptadas', 'Valor Aceptado', 'Ticket Promedio',
+        'Piezas Prom.', 'Con VM', 'Tasa Upsell (%)', 'Valor VM',
+        'Valor Combinado', 'Con Descuento MO', 'Tiempo Resp. Prom.',
+    ]
+    
+    fila = 3
+    for col, h in enumerate(headers_tec, 1):
+        ws8.cell(row=fila, column=col, value=h)
+    aplicar_estilos_header(ws8, fila, len(headers_tec))
+    
+    for _, row in tec_metrics.iterrows():
+        fila += 1
+        datos = [
+            row['tecnico'],
+            int(row['total_aceptadas']),
+            round(row['valor_aceptado'], 2),
+            round(row['ticket_promedio'], 2),
+            round(row['piezas_promedio'], 1),
+            int(row['con_vm']),
+            row['tasa_upsell'],
+            round(row['valor_vm'], 2),
+            round(row['valor_combinado'], 2),
+            int(row['con_descuento']),
+            round(row['tiempo_resp'], 1) if not pd.isna(row['tiempo_resp']) else 0,
+        ]
+        for col, valor in enumerate(datos, 1):
+            cell = ws8.cell(row=fila, column=col, value=valor)
+            cell.border = border_thin
+            if col in (3, 4, 8, 9):
+                cell.number_format = number_fmt
+    
+    auto_ajustar_columnas(ws8)
+    
+    # ========================================================================
+    # HOJA 9: RENDIMIENTO POR SUCURSAL
+    # ========================================================================
+    ws9 = wb.create_sheet('Por Sucursal')
+    
+    ws9.merge_cells('A1:K1')
+    ws9['A1'] = 'RENDIMIENTO DE ACEPTACIONES POR SUCURSAL'
+    ws9['A1'].font = title_font
+    ws9['A1'].fill = title_fill
+    ws9['A1'].alignment = title_align
+    
+    # Calcular métricas por sucursal
+    suc_metrics = df_aceptadas.groupby('sucursal').agg(
+        total_aceptadas=('aceptada', 'count'),
+        valor_aceptado=('costo_total_final', 'sum'),
+        ticket_promedio=('costo_total_final', 'mean'),
+        piezas_promedio=('piezas_aceptadas', 'mean'),
+        con_vm=('tiene_venta_mostrador', 'sum'),
+        valor_vm=('vm_total_venta', 'sum'),
+        valor_combinado=('valor_total_combinado', 'sum'),
+        con_descuento=('descontar_mano_obra', 'sum'),
+        tiempo_resp=('dias_sin_respuesta', 'mean'),
+    ).reset_index()
+    suc_metrics['tasa_upsell'] = (suc_metrics['con_vm'] / suc_metrics['total_aceptadas'] * 100).round(1)
+    suc_metrics = suc_metrics.sort_values('valor_combinado', ascending=False)
+    
+    # Agregar tasa de aceptación global por sucursal
+    tasa_por_suc = df_cotizaciones.groupby('sucursal').agg(
+        total_cotizaciones=('aceptada', 'count'),
+        total_aceptadas_global=('aceptada', lambda x: (x == True).sum()),
+    ).reset_index()
+    tasa_por_suc['tasa_aceptacion'] = (tasa_por_suc['total_aceptadas_global'] / tasa_por_suc['total_cotizaciones'] * 100).round(1)
+    suc_metrics = suc_metrics.merge(tasa_por_suc[['sucursal', 'tasa_aceptacion', 'total_cotizaciones']], on='sucursal', how='left')
+    
+    headers_suc = [
+        'Sucursal', 'Total Cotizaciones', 'Aceptadas', 'Tasa Aceptación (%)',
+        'Valor Aceptado', 'Ticket Promedio',
+        'Con VM', 'Tasa Upsell (%)', 'Valor VM',
+        'Valor Combinado', 'Tiempo Resp. Prom.',
+    ]
+    
+    fila = 3
+    for col, h in enumerate(headers_suc, 1):
+        ws9.cell(row=fila, column=col, value=h)
+    aplicar_estilos_header(ws9, fila, len(headers_suc))
+    
+    for _, row in suc_metrics.iterrows():
+        fila += 1
+        datos = [
+            row['sucursal'],
+            int(row.get('total_cotizaciones', 0)),
+            int(row['total_aceptadas']),
+            row.get('tasa_aceptacion', 0),
+            round(row['valor_aceptado'], 2),
+            round(row['ticket_promedio'], 2),
+            int(row['con_vm']),
+            row['tasa_upsell'],
+            round(row['valor_vm'], 2),
+            round(row['valor_combinado'], 2),
+            round(row['tiempo_resp'], 1) if not pd.isna(row['tiempo_resp']) else 0,
+        ]
+        for col, valor in enumerate(datos, 1):
+            cell = ws9.cell(row=fila, column=col, value=valor)
+            cell.border = border_thin
+            if col in (5, 6, 9, 10):
+                cell.number_format = number_fmt
+            # Colorear tasa de aceptación
+            if col == 4:
+                if valor >= 60:
+                    cell.fill = green_fill
+                elif valor < 40:
+                    cell.fill = PatternFill(start_color='f8d7da', end_color='f8d7da', fill_type='solid')
+                else:
+                    cell.fill = yellow_fill
+    
+    auto_ajustar_columnas(ws9)
+    
+    # ========================================
+    # GUARDAR Y RETORNAR RESPUESTA
+    # ========================================
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    nombre_archivo = f'Analisis_Aceptaciones_{timestamp}.xlsx'
+    
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+    
+    wb.save(response)
+    
+    return response
 
 @login_required
 @permission_required_with_message('servicio_tecnico.view_ordenservicio')

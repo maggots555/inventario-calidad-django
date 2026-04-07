@@ -20,13 +20,17 @@ from .models import (
     PiezaCotizada, 
     SeguimientoPieza,
     OrdenServicio,
-    DetalleEquipo
+    DetalleEquipo,
+    VentaMostrador,
+    PiezaVentaMostrador,
 )
 from inventario.models import Empleado, Sucursal
 from config.constants import (
     ESTADOS_PIEZA_RECIBIDOS,
     ESTADOS_PIEZA_PENDIENTES,
-    ESTADOS_PIEZA_PROBLEMATICOS
+    ESTADOS_PIEZA_PROBLEMATICOS,
+    PAQUETES_CHOICES,
+    ESTADO_PIEZA_CHOICES,
 )
 
 
@@ -73,11 +77,13 @@ def obtener_dataframe_cotizaciones(fecha_inicio=None, fecha_fin=None,
         'orden__sucursal',
         'orden__tecnico_asignado_actual',
         'orden__responsable_seguimiento',
-        'orden__detalle_equipo'
+        'orden__detalle_equipo',
+        'orden__venta_mostrador',
     ).prefetch_related(
         'piezas_cotizadas',
         'piezas_cotizadas__componente',
-        'seguimientos_piezas'
+        'seguimientos_piezas',
+        'orden__venta_mostrador__piezas_vendidas',
     )
     
     # ========================================
@@ -130,6 +136,14 @@ def obtener_dataframe_cotizaciones(fecha_inicio=None, fecha_fin=None,
         # Obtener datos relacionados
         orden = cot.orden
         detalle = orden.detalle_equipo if hasattr(orden, 'detalle_equipo') else None
+        
+        # Verificar si existe VentaMostrador asociada a la orden
+        try:
+            vm = orden.venta_mostrador
+            tiene_vm = True
+        except VentaMostrador.DoesNotExist:
+            vm = None
+            tiene_vm = False
         
         # Contar piezas
         total_piezas = cot.piezas_cotizadas.count()
@@ -203,6 +217,41 @@ def obtener_dataframe_cotizaciones(fecha_inicio=None, fecha_fin=None,
             # Seguimientos de piezas
             'tiene_seguimientos': cot.seguimientos_piezas.exists(),
             'num_seguimientos': cot.seguimientos_piezas.count(),
+            
+            # =============================================
+            # DATOS DE VENTA MOSTRADOR ASOCIADA
+            # =============================================
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # Una orden puede tener TANTO cotización como VentaMostrador.
+            # Aquí cruzamos esos datos para analizar qué servicios
+            # adicionales se vendieron junto con la cotización aceptada.
+            'tiene_venta_mostrador': tiene_vm,
+            'vm_folio': vm.folio_venta if tiene_vm else '',
+            'vm_fecha_venta': vm.fecha_venta if tiene_vm else None,
+            'vm_paquete': vm.paquete if tiene_vm else 'ninguno',
+            'vm_costo_paquete': float(vm.costo_paquete) if tiene_vm else 0.0,
+            
+            # Servicios individuales
+            'vm_incluye_limpieza': vm.incluye_limpieza if tiene_vm else False,
+            'vm_costo_limpieza': float(vm.costo_limpieza) if tiene_vm else 0.0,
+            'vm_incluye_reinstalacion': vm.incluye_reinstalacion_so if tiene_vm else False,
+            'vm_costo_reinstalacion': float(vm.costo_reinstalacion) if tiene_vm else 0.0,
+            'vm_incluye_respaldo': vm.incluye_respaldo if tiene_vm else False,
+            'vm_costo_respaldo': float(vm.costo_respaldo) if tiene_vm else 0.0,
+            'vm_incluye_cambio_pieza': vm.incluye_cambio_pieza if tiene_vm else False,
+            'vm_costo_cambio_pieza': float(vm.costo_cambio_pieza) if tiene_vm else 0.0,
+            'vm_incluye_kit_limpieza': vm.incluye_kit_limpieza if tiene_vm else False,
+            'vm_costo_kit': float(vm.costo_kit) if tiene_vm else 0.0,
+            
+            # Totales de VentaMostrador
+            'vm_total_venta': float(vm.total_venta) if tiene_vm else 0.0,
+            'vm_total_piezas_vendidas': float(vm.total_piezas_vendidas) if tiene_vm else 0.0,
+            'vm_num_piezas': vm.piezas_vendidas.count() if tiene_vm else 0,
+            'vm_genera_comision': vm.genera_comision if tiene_vm else False,
+            'vm_notas': vm.notas_adicionales if tiene_vm else '',
+            
+            # Valor combinado (cotización final + VentaMostrador)
+            'valor_total_combinado': float(cot.costo_total_final) + (float(vm.total_venta) if tiene_vm else 0.0),
         }
         
         data.append(fila)
@@ -1965,4 +2014,549 @@ def analizar_diagnosticos_tecnicos(df_ordenes):
         'promedios_globales': promedios_globales,
         'palabras_tecnicas_globales': palabras_tecnicas_globales,
         'insights': insights,
+    }
+
+
+# ============================================================================
+# FUNCIÓN: CALCULAR KPIs DE ACEPTACIONES
+# ============================================================================
+
+def calcular_kpis_aceptaciones(df):
+    """
+    Calcula KPIs específicos para el análisis de cotizaciones aceptadas,
+    incluyendo datos cruzados con VentaMostrador.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta función toma el DataFrame completo de cotizaciones y filtra solo
+    las aceptadas para calcular métricas específicas: cuánto valor se generó,
+    qué servicios adicionales se vendieron, y cuál fue el "upsell" de
+    VentaMostrador junto con la cotización.
+    
+    Args:
+        df (DataFrame): DataFrame completo de cotizaciones (de obtener_dataframe_cotizaciones)
+    
+    Returns:
+        dict: Diccionario con todos los KPIs de aceptaciones
+    """
+    
+    if df.empty:
+        return {
+            'total_aceptadas': 0,
+            'valor_total_aceptado': 0,
+            'ticket_promedio_aceptado': 0,
+            'piezas_promedio_aceptadas': 0,
+            'aceptacion_parcial_count': 0,
+            'aceptacion_parcial_pct': 0,
+            'aceptacion_total_count': 0,
+            'aceptacion_total_pct': 0,
+            'descuento_count': 0,
+            'descuento_monto_total': 0,
+            'tiempo_respuesta_aceptadas': 0,
+            'con_vm_count': 0,
+            'con_vm_pct': 0,
+            'valor_vm_complementario': 0,
+            'valor_combinado_total': 0,
+            'paquete_mas_vendido': 'N/A',
+            'servicio_mas_vendido': 'N/A',
+            'tasa_upsell': 0,
+        }
+    
+    # ========================================
+    # Filtrar solo cotizaciones aceptadas
+    # ========================================
+    df_aceptadas = df[df['aceptada'] == True].copy()
+    total_aceptadas = len(df_aceptadas)
+    
+    if total_aceptadas == 0:
+        return {
+            'total_aceptadas': 0,
+            'valor_total_aceptado': 0,
+            'ticket_promedio_aceptado': 0,
+            'piezas_promedio_aceptadas': 0,
+            'aceptacion_parcial_count': 0,
+            'aceptacion_parcial_pct': 0,
+            'aceptacion_total_count': 0,
+            'aceptacion_total_pct': 0,
+            'descuento_count': 0,
+            'descuento_monto_total': 0,
+            'tiempo_respuesta_aceptadas': 0,
+            'con_vm_count': 0,
+            'con_vm_pct': 0,
+            'valor_vm_complementario': 0,
+            'valor_combinado_total': 0,
+            'paquete_mas_vendido': 'N/A',
+            'servicio_mas_vendido': 'N/A',
+            'tasa_upsell': 0,
+        }
+    
+    # ========================================
+    # KPIs básicos de aceptaciones
+    # ========================================
+    valor_total_aceptado = df_aceptadas['costo_total_final'].sum()
+    ticket_promedio = df_aceptadas['costo_total_final'].mean()
+    piezas_promedio = df_aceptadas['piezas_aceptadas'].mean()
+    
+    # Aceptación parcial vs total
+    # Parcial = cotización aceptada pero con algunas piezas rechazadas
+    df_aceptadas_parcial = df_aceptadas[
+        (df_aceptadas['piezas_rechazadas'] > 0) & (df_aceptadas['piezas_aceptadas'] > 0)
+    ]
+    aceptacion_parcial = len(df_aceptadas_parcial)
+    aceptacion_total = total_aceptadas - aceptacion_parcial
+    
+    # Descuento de mano de obra
+    df_con_descuento = df_aceptadas[df_aceptadas['descontar_mano_obra'] == True]
+    descuento_count = len(df_con_descuento)
+    descuento_monto = df_con_descuento['monto_descuento'].sum()
+    
+    # Tiempo de respuesta de aceptadas
+    tiempo_resp = df_aceptadas['dias_sin_respuesta'].mean()
+    
+    # ========================================
+    # KPIs de VentaMostrador en aceptadas
+    # ========================================
+    df_con_vm = df_aceptadas[df_aceptadas['tiene_venta_mostrador'] == True]
+    con_vm_count = len(df_con_vm)
+    con_vm_pct = (con_vm_count / total_aceptadas * 100) if total_aceptadas > 0 else 0
+    
+    valor_vm = df_con_vm['vm_total_venta'].sum() if con_vm_count > 0 else 0
+    valor_combinado = df_aceptadas['valor_total_combinado'].sum()
+    
+    # Paquete más vendido (excluir 'ninguno')
+    paquete_mas_vendido = 'N/A'
+    if con_vm_count > 0:
+        paquetes = df_con_vm[df_con_vm['vm_paquete'] != 'ninguno']['vm_paquete']
+        if len(paquetes) > 0:
+            paquete_mas_vendido = paquetes.value_counts().index[0].capitalize()
+    
+    # Servicio más vendido
+    servicio_mas_vendido = 'N/A'
+    if con_vm_count > 0:
+        servicios_conteo = {
+            'Limpieza': df_con_vm['vm_incluye_limpieza'].sum(),
+            'Reinstalación SO': df_con_vm['vm_incluye_reinstalacion'].sum(),
+            'Respaldo': df_con_vm['vm_incluye_respaldo'].sum(),
+            'Cambio de Pieza': df_con_vm['vm_incluye_cambio_pieza'].sum(),
+            'Kit Limpieza': df_con_vm['vm_incluye_kit_limpieza'].sum(),
+        }
+        max_servicio = max(servicios_conteo, key=servicios_conteo.get)
+        if servicios_conteo[max_servicio] > 0:
+            servicio_mas_vendido = max_servicio
+    
+    # Tasa de upsell: % de aceptadas que compraron VM adicional
+    tasa_upsell = con_vm_pct
+    
+    # ========================================
+    # Métricas por tipo de aceptación
+    # ========================================
+    # Valor original cotizado vs lo que realmente se aceptó
+    valor_original_cotizado = df_aceptadas['costo_total'].sum()
+    diferencia_valor = valor_original_cotizado - valor_total_aceptado
+    porcentaje_recuperacion = (valor_total_aceptado / valor_original_cotizado * 100) if valor_original_cotizado > 0 else 0
+    
+    return {
+        # Totales básicos
+        'total_aceptadas': total_aceptadas,
+        'valor_total_aceptado': round(valor_total_aceptado, 2),
+        'valor_total_aceptado_fmt': f"${valor_total_aceptado:,.2f}",
+        'ticket_promedio_aceptado': round(ticket_promedio, 2),
+        'ticket_promedio_aceptado_fmt': f"${ticket_promedio:,.2f}",
+        'piezas_promedio_aceptadas': round(piezas_promedio, 1),
+        
+        # Aceptación parcial vs total
+        'aceptacion_parcial_count': aceptacion_parcial,
+        'aceptacion_parcial_pct': round((aceptacion_parcial / total_aceptadas * 100), 1) if total_aceptadas > 0 else 0,
+        'aceptacion_total_count': aceptacion_total,
+        'aceptacion_total_pct': round((aceptacion_total / total_aceptadas * 100), 1) if total_aceptadas > 0 else 0,
+        
+        # Descuento de mano de obra
+        'descuento_count': descuento_count,
+        'descuento_pct': round((descuento_count / total_aceptadas * 100), 1) if total_aceptadas > 0 else 0,
+        'descuento_monto_total': round(descuento_monto, 2),
+        'descuento_monto_total_fmt': f"${descuento_monto:,.2f}",
+        
+        # Tiempo de respuesta
+        'tiempo_respuesta_aceptadas': round(tiempo_resp, 1) if not pd.isna(tiempo_resp) else 0,
+        
+        # VentaMostrador complementaria
+        'con_vm_count': con_vm_count,
+        'con_vm_pct': round(con_vm_pct, 1),
+        'valor_vm_complementario': round(valor_vm, 2),
+        'valor_vm_complementario_fmt': f"${valor_vm:,.2f}",
+        'valor_combinado_total': round(valor_combinado, 2),
+        'valor_combinado_total_fmt': f"${valor_combinado:,.2f}",
+        'paquete_mas_vendido': paquete_mas_vendido,
+        'servicio_mas_vendido': servicio_mas_vendido,
+        'tasa_upsell': round(tasa_upsell, 1),
+        
+        # Recuperación de valor
+        'valor_original_cotizado': round(valor_original_cotizado, 2),
+        'valor_original_cotizado_fmt': f"${valor_original_cotizado:,.2f}",
+        'diferencia_valor': round(diferencia_valor, 2),
+        'porcentaje_recuperacion': round(porcentaje_recuperacion, 1),
+    }
+
+
+# ============================================================================
+# FUNCIÓN: ANALIZAR SERVICIOS VM EN COTIZACIONES ACEPTADAS
+# ============================================================================
+
+def analizar_servicios_vm_aceptadas(df):
+    """
+    Analiza los servicios de VentaMostrador asociados a cotizaciones aceptadas.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cuando un cliente acepta una cotización, a veces también compra servicios
+    adicionales como limpieza, reinstalación de sistema operativo, respaldo, etc.
+    Esta función desglose qué servicios se vendieron, cuánto generaron,
+    y qué combinaciones son más populares.
+    
+    Args:
+        df (DataFrame): DataFrame completo de cotizaciones
+    
+    Returns:
+        dict: Análisis detallado de servicios VM en cotizaciones aceptadas
+    """
+    
+    resultado_vacio = {
+        'tiene_datos': False,
+        'total_aceptadas_con_vm': 0,
+        'distribucion_paquetes': [],
+        'distribucion_servicios': [],
+        'combinaciones_frecuentes': [],
+        'ingreso_por_servicio': [],
+        'top_piezas_vm': [],
+        'resumen_servicios': {},
+    }
+    
+    if df.empty:
+        return resultado_vacio
+    
+    # Filtrar aceptadas con VentaMostrador
+    df_aceptadas_vm = df[
+        (df['aceptada'] == True) & (df['tiene_venta_mostrador'] == True)
+    ].copy()
+    
+    if len(df_aceptadas_vm) == 0:
+        return resultado_vacio
+    
+    total_con_vm = len(df_aceptadas_vm)
+    
+    # ========================================
+    # 1. Distribución de paquetes
+    # ========================================
+    paquetes_map = dict(PAQUETES_CHOICES)
+    dist_paquetes = df_aceptadas_vm['vm_paquete'].value_counts()
+    distribucion_paquetes = []
+    for paquete, count in dist_paquetes.items():
+        nombre = paquetes_map.get(paquete, paquete.capitalize())
+        ingreso = df_aceptadas_vm[df_aceptadas_vm['vm_paquete'] == paquete]['vm_costo_paquete'].sum()
+        distribucion_paquetes.append({
+            'paquete': paquete,
+            'nombre': nombre,
+            'cantidad': int(count),
+            'porcentaje': round(count / total_con_vm * 100, 1),
+            'ingreso_total': round(ingreso, 2),
+            'ingreso_fmt': f"${ingreso:,.2f}",
+        })
+    
+    # ========================================
+    # 2. Distribución de servicios individuales
+    # ========================================
+    servicios_info = [
+        ('vm_incluye_limpieza', 'vm_costo_limpieza', 'Limpieza y Mantenimiento', 'bi-brush'),
+        ('vm_incluye_reinstalacion', 'vm_costo_reinstalacion', 'Reinstalación SO', 'bi-pc-display'),
+        ('vm_incluye_respaldo', 'vm_costo_respaldo', 'Respaldo de Información', 'bi-hdd'),
+        ('vm_incluye_cambio_pieza', 'vm_costo_cambio_pieza', 'Cambio de Pieza', 'bi-wrench'),
+        ('vm_incluye_kit_limpieza', 'vm_costo_kit', 'Kit de Limpieza', 'bi-box'),
+    ]
+    
+    distribucion_servicios = []
+    for campo_bool, campo_costo, nombre, icono in servicios_info:
+        count = int(df_aceptadas_vm[campo_bool].sum())
+        ingreso = df_aceptadas_vm[df_aceptadas_vm[campo_bool] == True][campo_costo].sum()
+        distribucion_servicios.append({
+            'servicio': nombre,
+            'icono': icono,
+            'cantidad': count,
+            'porcentaje': round(count / total_con_vm * 100, 1) if total_con_vm > 0 else 0,
+            'ingreso_total': round(ingreso, 2),
+            'ingreso_fmt': f"${ingreso:,.2f}",
+        })
+    
+    # Ordenar por cantidad descendente
+    distribucion_servicios.sort(key=lambda x: x['cantidad'], reverse=True)
+    
+    # ========================================
+    # 3. Combinaciones más frecuentes de servicios
+    # ========================================
+    combinaciones = {}
+    for _, row in df_aceptadas_vm.iterrows():
+        combo = []
+        if row.get('vm_paquete', 'ninguno') != 'ninguno':
+            combo.append(f"Paquete {row['vm_paquete'].capitalize()}")
+        if row.get('vm_incluye_limpieza', False):
+            combo.append('Limpieza')
+        if row.get('vm_incluye_reinstalacion', False):
+            combo.append('Reinstalación SO')
+        if row.get('vm_incluye_respaldo', False):
+            combo.append('Respaldo')
+        if row.get('vm_incluye_cambio_pieza', False):
+            combo.append('Cambio Pieza')
+        if row.get('vm_incluye_kit_limpieza', False):
+            combo.append('Kit Limpieza')
+        
+        if combo:
+            clave = ' + '.join(sorted(combo))
+            combinaciones[clave] = combinaciones.get(clave, 0) + 1
+    
+    combinaciones_frecuentes = sorted(
+        [{'combinacion': k, 'cantidad': v, 'porcentaje': round(v / total_con_vm * 100, 1)}
+         for k, v in combinaciones.items()],
+        key=lambda x: x['cantidad'],
+        reverse=True
+    )[:10]  # Top 10 combinaciones
+    
+    # ========================================
+    # 4. Ingreso total por tipo de servicio
+    # ========================================
+    ingreso_paquetes = df_aceptadas_vm['vm_costo_paquete'].sum()
+    ingreso_servicios = sum(
+        df_aceptadas_vm[campo_costo].sum()
+        for _, campo_costo, _, _ in servicios_info
+    )
+    ingreso_piezas_vm = df_aceptadas_vm['vm_total_piezas_vendidas'].sum()
+    
+    ingreso_por_servicio = [
+        {'tipo': 'Paquetes', 'ingreso': round(ingreso_paquetes, 2), 'fmt': f"${ingreso_paquetes:,.2f}"},
+        {'tipo': 'Servicios Adicionales', 'ingreso': round(ingreso_servicios, 2), 'fmt': f"${ingreso_servicios:,.2f}"},
+        {'tipo': 'Piezas Individuales VM', 'ingreso': round(ingreso_piezas_vm, 2), 'fmt': f"${ingreso_piezas_vm:,.2f}"},
+    ]
+    
+    # ========================================
+    # 5. Top piezas vendidas en VentaMostrador de aceptadas
+    # ========================================
+    # Necesitamos ir directo al modelo para obtener detalles de piezas
+    ordenes_aceptadas_con_vm = df_aceptadas_vm['orden_id'].tolist()
+    piezas_vm = PiezaVentaMostrador.objects.filter(
+        venta_mostrador__orden_id__in=ordenes_aceptadas_con_vm
+    ).values('descripcion_pieza').annotate(
+        total_cantidad=Sum('cantidad'),
+        total_ingreso=Sum(F('cantidad') * F('precio_unitario')),
+        num_ventas=Count('id'),
+    ).order_by('-total_cantidad')[:10]
+    
+    top_piezas_vm = []
+    for pieza in piezas_vm:
+        ingreso = float(pieza['total_ingreso'] or 0)
+        top_piezas_vm.append({
+            'descripcion': pieza['descripcion_pieza'],
+            'cantidad': pieza['total_cantidad'],
+            'ingreso_total': round(ingreso, 2),
+            'ingreso_fmt': f"${ingreso:,.2f}",
+            'num_ventas': pieza['num_ventas'],
+        })
+    
+    # ========================================
+    # 6. Resumen general
+    # ========================================
+    ingreso_total_vm = df_aceptadas_vm['vm_total_venta'].sum()
+    
+    resumen_servicios = {
+        'total_aceptadas_con_vm': total_con_vm,
+        'ingreso_total_vm': round(ingreso_total_vm, 2),
+        'ingreso_total_vm_fmt': f"${ingreso_total_vm:,.2f}",
+        'ticket_promedio_vm': round(ingreso_total_vm / total_con_vm, 2) if total_con_vm > 0 else 0,
+        'ticket_promedio_vm_fmt': f"${(ingreso_total_vm / total_con_vm):,.2f}" if total_con_vm > 0 else "$0.00",
+        'con_paquete_count': int((df_aceptadas_vm['vm_paquete'] != 'ninguno').sum()),
+        'sin_paquete_count': int((df_aceptadas_vm['vm_paquete'] == 'ninguno').sum()),
+        'con_comision_count': int(df_aceptadas_vm['vm_genera_comision'].sum()),
+    }
+    
+    return {
+        'tiene_datos': True,
+        'total_aceptadas_con_vm': total_con_vm,
+        'distribucion_paquetes': distribucion_paquetes,
+        'distribucion_servicios': distribucion_servicios,
+        'combinaciones_frecuentes': combinaciones_frecuentes,
+        'ingreso_por_servicio': ingreso_por_servicio,
+        'top_piezas_vm': top_piezas_vm,
+        'resumen_servicios': resumen_servicios,
+    }
+
+
+# ============================================================================
+# FUNCIÓN: ANALIZAR SEGUIMIENTO DE PIEZAS POST-ACEPTACIÓN
+# ============================================================================
+
+def analizar_seguimiento_piezas_aceptadas(df):
+    """
+    Analiza el flujo post-aceptación: seguimiento de piezas pedidas a proveedores.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cuando una cotización se acepta, las piezas se piden a proveedores.
+    El modelo SeguimientoPieza registra el estado de cada pedido
+    (pedido, en tránsito, recibido, dañado, etc.).
+    Esta función analiza cuánto tardan, qué proveedores cumplen mejor,
+    y qué problemas surgen en la cadena de suministro.
+    
+    Args:
+        df (DataFrame): DataFrame completo de cotizaciones
+    
+    Returns:
+        dict: Análisis del seguimiento de piezas post-aceptación
+    """
+    
+    resultado_vacio = {
+        'tiene_datos': False,
+        'total_seguimientos': 0,
+        'distribucion_estados': [],
+        'tiempos_entrega': {},
+        'proveedores_ranking': [],
+        'problemas_piezas': {},
+        'tasa_cumplimiento': 0,
+    }
+    
+    if df.empty:
+        return resultado_vacio
+    
+    # Filtrar aceptadas con seguimientos
+    df_aceptadas = df[df['aceptada'] == True]
+    if len(df_aceptadas) == 0:
+        return resultado_vacio
+    
+    cotizacion_ids = df_aceptadas['cotizacion_id'].tolist()
+    
+    # Obtener todos los seguimientos de esas cotizaciones
+    seguimientos = SeguimientoPieza.objects.filter(
+        cotizacion_id__in=cotizacion_ids
+    ).select_related('cotizacion', 'cotizacion__orden')
+    
+    if not seguimientos.exists():
+        return resultado_vacio
+    
+    total_seguimientos = seguimientos.count()
+    
+    # ========================================
+    # 1. Distribución de estados
+    # ========================================
+    estado_labels = dict(ESTADO_PIEZA_CHOICES)
+    
+    estados_conteo = {}
+    for seg in seguimientos:
+        estado = seg.estado
+        estados_conteo[estado] = estados_conteo.get(estado, 0) + 1
+    
+    distribucion_estados = []
+    for estado, count in sorted(estados_conteo.items(), key=lambda x: x[1], reverse=True):
+        label = estado_labels.get(estado, estado.replace('_', ' ').capitalize())
+        es_problematico = estado in ESTADOS_PIEZA_PROBLEMATICOS
+        es_recibido = estado in ESTADOS_PIEZA_RECIBIDOS
+        distribucion_estados.append({
+            'estado': estado,
+            'label': label,
+            'cantidad': count,
+            'porcentaje': round(count / total_seguimientos * 100, 1),
+            'es_problematico': es_problematico,
+            'es_recibido': es_recibido,
+        })
+    
+    # ========================================
+    # 2. Tiempos de entrega
+    # ========================================
+    seg_con_entrega = seguimientos.filter(
+        fecha_entrega_real__isnull=False,
+        fecha_pedido__isnull=False
+    )
+    
+    tiempos = []
+    tiempos_cumplimiento = []
+    for seg in seg_con_entrega:
+        dias_entrega = (seg.fecha_entrega_real - seg.fecha_pedido).days
+        tiempos.append(dias_entrega)
+        if seg.fecha_entrega_estimada:
+            retraso = (seg.fecha_entrega_real - seg.fecha_entrega_estimada).days
+            tiempos_cumplimiento.append({
+                'proveedor': seg.proveedor,
+                'dias_entrega': dias_entrega,
+                'retraso': retraso,
+                'a_tiempo': retraso <= 0,
+            })
+    
+    tiempos_entrega = {
+        'promedio': round(sum(tiempos) / len(tiempos), 1) if tiempos else 0,
+        'minimo': min(tiempos) if tiempos else 0,
+        'maximo': max(tiempos) if tiempos else 0,
+        'mediana': round(sorted(tiempos)[len(tiempos) // 2], 1) if tiempos else 0,
+        'total_con_fecha': len(tiempos),
+        'total_sin_fecha': total_seguimientos - len(tiempos),
+    }
+    
+    # ========================================
+    # 3. Ranking de proveedores
+    # ========================================
+    proveedores_data = {}
+    for seg in seguimientos:
+        prov = seg.proveedor or 'Sin proveedor'
+        if prov not in proveedores_data:
+            proveedores_data[prov] = {
+                'total': 0,
+                'recibidos': 0,
+                'problemas': 0,
+                'tiempos': [],
+            }
+        proveedores_data[prov]['total'] += 1
+        if seg.estado == 'recibido':
+            proveedores_data[prov]['recibidos'] += 1
+        if seg.estado in ('incorrecto', 'danado'):
+            proveedores_data[prov]['problemas'] += 1
+        if seg.fecha_entrega_real and seg.fecha_pedido:
+            dias = (seg.fecha_entrega_real - seg.fecha_pedido).days
+            proveedores_data[prov]['tiempos'].append(dias)
+    
+    proveedores_ranking = []
+    for prov, data in proveedores_data.items():
+        tiempo_prom = round(sum(data['tiempos']) / len(data['tiempos']), 1) if data['tiempos'] else None
+        tasa_exito = round(data['recibidos'] / data['total'] * 100, 1) if data['total'] > 0 else 0
+        proveedores_ranking.append({
+            'proveedor': prov,
+            'total_pedidos': data['total'],
+            'recibidos': data['recibidos'],
+            'problemas': data['problemas'],
+            'tasa_exito': tasa_exito,
+            'tiempo_promedio': tiempo_prom,
+        })
+    
+    # Ordenar por tasa de éxito descendente
+    proveedores_ranking.sort(key=lambda x: x['tasa_exito'], reverse=True)
+    
+    # ========================================
+    # 4. Problemas en piezas
+    # ========================================
+    seg_problematicos = seguimientos.filter(estado__in=['incorrecto', 'danado'])
+    problemas_piezas = {
+        'total_problemas': seg_problematicos.count(),
+        'piezas_incorrectas': seguimientos.filter(estado='incorrecto').count(),
+        'piezas_danadas': seguimientos.filter(estado='danado').count(),
+        'tasa_problemas': round(
+            seg_problematicos.count() / total_seguimientos * 100, 1
+        ) if total_seguimientos > 0 else 0,
+    }
+    
+    # ========================================
+    # 5. Tasa de cumplimiento global
+    # ========================================
+    a_tiempo = sum(1 for t in tiempos_cumplimiento if t['a_tiempo'])
+    tasa_cumplimiento = round(
+        a_tiempo / len(tiempos_cumplimiento) * 100, 1
+    ) if tiempos_cumplimiento else 0
+    
+    return {
+        'tiene_datos': True,
+        'total_seguimientos': total_seguimientos,
+        'distribucion_estados': distribucion_estados,
+        'tiempos_entrega': tiempos_entrega,
+        'proveedores_ranking': proveedores_ranking,
+        'problemas_piezas': problemas_piezas,
+        'tasa_cumplimiento': tasa_cumplimiento,
     }

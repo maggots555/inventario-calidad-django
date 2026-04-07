@@ -68,15 +68,21 @@
                     <h1>📊 Dashboard de Cotizaciones</h1>
                     <p class="mb-0">Análisis completo con Machine Learning y visualizaciones interactivas</p>
                 </div>
-                <div class="col-md-4 text-md-end mt-3 mt-md-0">
-                    <a href="{% url 'servicio_tecnico:exportar_dashboard_cotizaciones' %}?{{ request.GET.urlencode }}" 
-                       class="btn btn-exportar">
-                        <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
-                    </a>
-                    <a href="{% url 'servicio_tecnico:exportar_analisis_rechazos' %}?{{ request.GET.urlencode }}" 
-                       class="btn btn-exportar" style="background: linear-gradient(135deg, #c0392b, #e74c3c); border-color: #c0392b; margin-left: 8px;">
-                        <i class="bi bi-file-earmark-excel"></i> Analisis Rechazos
-                    </a>
+                <div class="col-md-4 mt-3 mt-md-0">
+                    <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                        <a href="{% url 'servicio_tecnico:exportar_dashboard_cotizaciones' %}?{{ request.GET.urlencode }}"
+                           class="btn btn-exportar">
+                            <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
+                        </a>
+                        <a href="{% url 'servicio_tecnico:exportar_analisis_rechazos' %}?{{ request.GET.urlencode }}"
+                           class="btn btn-exportar btn-exportar-rechazos">
+                            <i class="bi bi-file-earmark-excel"></i> Análisis Rechazos
+                        </a>
+                        <a href="{% url 'servicio_tecnico:exportar_analisis_aceptaciones' %}?{{ request.GET.urlencode }}"
+                           class="btn btn-exportar btn-exportar-aceptaciones">
+                            <i class="bi bi-file-earmark-excel"></i> Análisis Aceptaciones
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -327,6 +333,16 @@
                     type="button" 
                     role="tab">
                 <i class="bi bi-person-check-fill"></i> Responsables
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" 
+                    id="aceptaciones-tab" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#aceptaciones" 
+                    type="button" 
+                    role="tab">
+                <i class="bi bi-check2-all"></i> Aceptaciones & VM
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -1516,7 +1532,399 @@
         </div>
         
         <!-- ========================================
-             TAB 7: MACHINE LEARNING
+             TAB 7: ACEPTACIONES & VENTAS MOSTRADOR
+             Análisis detallado de cotizaciones aceptadas
+             cruzado con datos de VentaMostrador
+             ======================================== -->
+        <div class="tab-pane fade" id="aceptaciones" role="tabpanel">
+            <div class="row">
+                
+                {% if kpis_aceptaciones.total_aceptadas %}
+                
+                <!-- ========================================
+                     KPIs DE ACEPTACIONES
+                     ======================================== -->
+                <div class="col-12 mb-4">
+                    <div class="aceptaciones-kpis-grid">
+                        
+                        <div class="kpi-card-acept kpi-acept-total">
+                            <div class="kpi-acept-icon"><i class="bi bi-check2-all"></i></div>
+                            <div class="kpi-acept-value">{{ kpis_aceptaciones.total_aceptadas }}</div>
+                            <div class="kpi-acept-label">Aceptadas</div>
+                            <div class="kpi-acept-sub">{{ kpis_aceptaciones.tasa_aceptacion|floatformat:1 }}% del total</div>
+                        </div>
+                        
+                        <div class="kpi-card-acept kpi-acept-valor">
+                            <div class="kpi-acept-icon"><i class="bi bi-cash-stack"></i></div>
+                            <div class="kpi-acept-value">${{ kpis_aceptaciones.valor_total_aceptado|default:0|floatformat:0 }}</div>
+                            <div class="kpi-acept-label">Valor Aceptado</div>
+                            <div class="kpi-acept-sub">Ingresos cotización</div>
+                        </div>
+                        
+                        <div class="kpi-card-acept kpi-acept-vm">
+                            <div class="kpi-acept-icon"><i class="bi bi-shop"></i></div>
+                            <div class="kpi-acept-value">{{ kpis_aceptaciones.total_con_vm|default:0 }}</div>
+                            <div class="kpi-acept-label">Con Venta Mostrador</div>
+                            <div class="kpi-acept-sub">{{ kpis_aceptaciones.tasa_upsell|default:0|floatformat:1 }}% upsell</div>
+                        </div>
+                        
+                        <div class="kpi-card-acept kpi-acept-combinado">
+                            <div class="kpi-acept-icon"><i class="bi bi-currency-dollar"></i></div>
+                            <div class="kpi-acept-value">${{ kpis_aceptaciones.valor_combinado_total|default:0|floatformat:0 }}</div>
+                            <div class="kpi-acept-label">Valor Combinado</div>
+                            <div class="kpi-acept-sub">Cotización + VM</div>
+                        </div>
+                        
+                        <div class="kpi-card-acept kpi-acept-parcial">
+                            <div class="kpi-acept-icon"><i class="bi bi-pie-chart"></i></div>
+                            <div class="kpi-acept-value">{{ kpis_aceptaciones.aceptacion_parcial|default:0 }}</div>
+                            <div class="kpi-acept-label">Aceptación Parcial</div>
+                            <div class="kpi-acept-sub">{{ kpis_aceptaciones.tasa_parcial|default:0|floatformat:1 }}% parciales</div>
+                        </div>
+                        
+                        <div class="kpi-card-acept kpi-acept-descuento">
+                            <div class="kpi-acept-icon"><i class="bi bi-percent"></i></div>
+                            <div class="kpi-acept-value">{{ kpis_aceptaciones.con_descuento_mo|default:0 }}</div>
+                            <div class="kpi-acept-label">Con Descuento M.O.</div>
+                            <div class="kpi-acept-sub">{{ kpis_aceptaciones.tasa_descuento_mo|default:0|floatformat:1 }}% con desc.</div>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+                <!-- ========================================
+                     GRÁFICOS DE EVOLUCIÓN Y TIPO
+                     ======================================== -->
+                
+                <!-- Evolución de Aceptaciones -->
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-aceptaciones">
+                            <h5><i class="bi bi-graph-up-arrow"></i> Evolución Temporal de Aceptaciones</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.evolucion_aceptaciones %}
+                                {{ graficos.evolucion_aceptaciones|safe }}
+                                <div class="alert alert-success alert-dashboard mt-3">
+                                    <i class="bi bi-info-circle"></i>
+                                    <strong>Lectura:</strong> Muestra la tendencia de aceptaciones totales, parciales y 
+                                    las que incluyeron venta mostrador adicional. Las áreas sombreadas facilitan 
+                                    la comparación de volúmenes.
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos suficientes para la evolución temporal.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Aceptación Parcial vs Total + Valor Aceptado vs Cotizado -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-aceptaciones">
+                            <h5><i class="bi bi-pie-chart-fill"></i> Aceptación Parcial vs Total</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.aceptacion_parcial_vs_total %}
+                                {{ graficos.aceptacion_parcial_vs_total|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos para mostrar distribución.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-aceptaciones">
+                            <h5><i class="bi bi-bar-chart-steps"></i> Valor Aceptado vs Cotizado por Sucursal</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.valor_aceptado_vs_cotizado %}
+                                {{ graficos.valor_aceptado_vs_cotizado|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos por sucursal.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Descuento Mano de Obra + Tasa Upsell -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-aceptaciones">
+                            <h5><i class="bi bi-percent"></i> Impacto del Descuento en Mano de Obra</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.descuento_mano_obra %}
+                                {{ graficos.descuento_mano_obra|safe }}
+                                <div class="alert alert-warning alert-dashboard mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Insight:</strong>
+                                    Compara las cotizaciones que ofrecieron descuento en mano de obra 
+                                    contra las que no, analizando si impacta en la tasa de aceptación.
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de descuento.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-aceptaciones">
+                            <h5><i class="bi bi-arrow-up-right-circle"></i> Tasa de Upsell por Sucursal</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.tasa_upsell %}
+                                {{ graficos.tasa_upsell|safe }}
+                                <div class="alert alert-info alert-dashboard mt-3">
+                                    <strong><i class="bi bi-shop"></i> Upsell:</strong>
+                                    Porcentaje de cotizaciones aceptadas que además generaron una 
+                                    venta mostrador (limpieza, respaldo, reinstalación, etc.)
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de upsell por sucursal.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ========================================
+                     SECCIÓN: VENTAS MOSTRADOR COMPLEMENTARIAS
+                     ======================================== -->
+                <div class="col-12 mt-4">
+                    <hr class="my-3">
+                    <h4 class="mb-3">
+                        <i class="bi bi-shop-window"></i> Ventas Mostrador Complementarias
+                        <small class="text-muted fs-6 ms-2">Servicios adicionales en cotizaciones aceptadas</small>
+                    </h4>
+                </div>
+                
+                <!-- Servicios VM + Paquetes VM -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-vm">
+                            <h5><i class="bi bi-tools"></i> Distribución de Servicios VM</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.servicios_vm_distribucion %}
+                                {{ graficos.servicios_vm_distribucion|safe }}
+                                <div class="alert alert-success alert-dashboard mt-3">
+                                    <strong><i class="bi bi-list-check"></i> Servicios Disponibles:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Limpieza:</strong> Limpieza profunda del equipo</li>
+                                        <li><strong>Reinstalación SO:</strong> Formateo e instalación de sistema</li>
+                                        <li><strong>Respaldo:</strong> Backup de datos del cliente</li>
+                                        <li><strong>Cambio de pieza:</strong> Piezas vendidas directamente</li>
+                                        <li><strong>Kit limpieza:</strong> Kit de mantenimiento</li>
+                                    </ul>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de servicios de venta mostrador.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-vm">
+                            <h5><i class="bi bi-box-seam"></i> Paquetes VM Vendidos</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.paquetes_vm_vendidos %}
+                                {{ graficos.paquetes_vm_vendidos|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de paquetes vendidos.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Valor Combinado + Top Piezas VM -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-vm">
+                            <h5><i class="bi bi-layers"></i> Valor Combinado (Cotización + VM)</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.valor_combinado %}
+                                {{ graficos.valor_combinado|safe }}
+                                <div class="alert alert-info alert-dashboard mt-3">
+                                    <strong><i class="bi bi-stack"></i> Lectura:</strong>
+                                    Barras apiladas muestran cuánto aporta la cotización base y 
+                                    cuánto la venta mostrador adicional al ingreso total por sucursal.
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de valor combinado.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-vm">
+                            <h5><i class="bi bi-trophy"></i> Top 10 Piezas Vendidas en VM</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.top_piezas_vm_aceptadas %}
+                                {{ graficos.top_piezas_vm_aceptadas|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de piezas vendidas en VM.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Combinaciones de Servicios -->
+                <div class="col-12">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-vm">
+                            <h5><i class="bi bi-diagram-3"></i> Combinaciones de Servicios Más Frecuentes</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.combinaciones_servicios %}
+                                {{ graficos.combinaciones_servicios|safe }}
+                                <div class="alert alert-success alert-dashboard mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Uso:</strong>
+                                    Identifica qué combinaciones de servicios se venden juntos con más frecuencia. 
+                                    Esto ayuda a crear paquetes predefinidos que el cliente ya compra naturalmente.
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de combinaciones de servicios.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ========================================
+                     SECCIÓN: SEGUIMIENTO DE PIEZAS
+                     ======================================== -->
+                <div class="col-12 mt-4">
+                    <hr class="my-3">
+                    <h4 class="mb-3">
+                        <i class="bi bi-truck"></i> Seguimiento de Piezas Aceptadas
+                        <small class="text-muted fs-6 ms-2">Estado y tiempos de entrega de piezas cotizadas</small>
+                    </h4>
+                </div>
+                
+                <!-- Estado de Piezas + Tiempos por Proveedor -->
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-seguimiento">
+                            <h5><i class="bi bi-clipboard-check"></i> Estado de Piezas en Seguimiento</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.seguimiento_piezas_estado %}
+                                {{ graficos.seguimiento_piezas_estado|safe }}
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de seguimiento de piezas.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="grafico-card card">
+                        <div class="card-header card-header-seguimiento">
+                            <h5><i class="bi bi-clock-history"></i> Tiempos de Entrega por Proveedor</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if graficos.tiempos_entrega_proveedor %}
+                                {{ graficos.tiempos_entrega_proveedor|safe }}
+                                <div class="alert alert-warning alert-dashboard mt-3">
+                                    <strong><i class="bi bi-truck"></i> Análisis de Proveedores:</strong>
+                                    Tiempos promedio de entrega en días hábiles. Los proveedores con tiempos 
+                                    más largos pueden generar insatisfacción del cliente y afectar futuras aceptaciones.
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info alert-dashboard">
+                                    <i class="bi bi-info-circle"></i> No hay datos de tiempos de entrega.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Resumen de Seguimiento (si hay datos) -->
+                {% if analisis_seguimiento.total_piezas_rastreadas %}
+                <div class="col-12">
+                    <div class="card border-info">
+                        <div class="card-header bg-info bg-opacity-10">
+                            <h6 class="mb-0">
+                                <i class="bi bi-bar-chart-line"></i> Resumen de Seguimiento de Piezas
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-3">
+                                    <h4 class="text-primary mb-1">{{ analisis_seguimiento.total_piezas_rastreadas }}</h4>
+                                    <small class="text-muted">Piezas Rastreadas</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <h4 class="text-success mb-1">{{ analisis_seguimiento.tasa_cumplimiento|default:0|floatformat:1 }}%</h4>
+                                    <small class="text-muted">Tasa de Cumplimiento</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <h4 class="text-warning mb-1">{{ analisis_seguimiento.tiempo_promedio_entrega|default:0|floatformat:1 }}</h4>
+                                    <small class="text-muted">Días Promedio Entrega</small>
+                                </div>
+                                <div class="col-md-3">
+                                    <h4 class="text-danger mb-1">{{ analisis_seguimiento.piezas_con_problemas|default:0 }}</h4>
+                                    <small class="text-muted">Con Problemas</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% else %}
+                
+                <!-- Sin datos de aceptaciones -->
+                <div class="col-12">
+                    <div class="alert alert-info alert-dashboard">
+                        <h5 class="alert-heading">
+                            <i class="bi bi-info-circle"></i> Sin Datos de Aceptaciones
+                        </h5>
+                        <p class="mb-0">
+                            No se encontraron cotizaciones aceptadas en el período seleccionado.
+                            Intenta ampliar el rango de fechas o cambiar los filtros aplicados.
+                        </p>
+                    </div>
+                </div>
+                
+                {% endif %}
+                
+            </div>
+        </div>
+        
+        <!-- ========================================
+             TAB 8: MACHINE LEARNING
              ======================================== -->
         <div class="tab-pane fade" id="ml" role="tabpanel">
             <div class="row">

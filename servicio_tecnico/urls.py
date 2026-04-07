@@ -212,6 +212,14 @@ urlpatterns = [
          views.exportar_analisis_rechazos, 
          name='exportar_analisis_rechazos'),
     
+    # Exportación a Excel: Análisis detallado de aceptaciones + Ventas Mostrador
+    # Genera archivo Excel con 9 hojas: resumen aceptaciones, detalle, piezas,
+    # aceptación parcial, ventas mostrador, servicios adicionales, seguimiento,
+    # por técnico, por sucursal — cruza datos Cotización ↔ VentaMostrador
+    path('cotizaciones/dashboard/exportar-aceptaciones/', 
+         views.exportar_analisis_aceptaciones, 
+         name='exportar_analisis_aceptaciones'),
+    
     # ========================================================================
     # API: BÚSQUEDA DE ÓRDENES (Noviembre 2025)
     # ========================================================================

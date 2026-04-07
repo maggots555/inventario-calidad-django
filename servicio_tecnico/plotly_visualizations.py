@@ -2874,11 +2874,669 @@ class DashboardCotizacionesVisualizer:
                 self.generar_tabla_detalle_cotizaciones(df)
             )
             
+            # ================================================================
+            # ANÁLISIS DE ACEPTACIONES + VENTA MOSTRADOR
+            # ================================================================
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # Estos gráficos muestran información específica de cotizaciones
+            # aceptadas, incluyendo servicios VM, paquetes, seguimientos, etc.
+            
+            try:
+                # Gráficos que usan directamente el DataFrame
+                graficos['evolucion_aceptaciones'] = convertir_figura_a_html(
+                    self.grafico_evolucion_aceptaciones(df, periodo)
+                )
+                graficos['aceptacion_parcial_vs_total'] = convertir_figura_a_html(
+                    self.grafico_aceptacion_parcial_vs_total(df)
+                )
+                graficos['valor_aceptado_vs_cotizado'] = convertir_figura_a_html(
+                    self.grafico_valor_aceptado_vs_cotizado(df)
+                )
+                graficos['descuento_mano_obra'] = convertir_figura_a_html(
+                    self.grafico_descuento_mano_obra(df)
+                )
+                graficos['valor_combinado'] = convertir_figura_a_html(
+                    self.grafico_valor_combinado(df)
+                )
+                graficos['tasa_upsell'] = convertir_figura_a_html(
+                    self.grafico_tasa_upsell(df)
+                )
+                
+                # Gráficos que usan análisis de VM (requiere funciones de utils)
+                from servicio_tecnico.utils_cotizaciones import (
+                    analizar_servicios_vm_aceptadas,
+                    analizar_seguimiento_piezas_aceptadas,
+                )
+                
+                analisis_vm = analizar_servicios_vm_aceptadas(df)
+                if analisis_vm.get('tiene_datos'):
+                    graficos['servicios_vm_distribucion'] = convertir_figura_a_html(
+                        self.grafico_servicios_vm_distribucion(analisis_vm)
+                    )
+                    graficos['paquetes_vm_vendidos'] = convertir_figura_a_html(
+                        self.grafico_paquetes_vm_vendidos(analisis_vm)
+                    )
+                    graficos['top_piezas_vm_aceptadas'] = convertir_figura_a_html(
+                        self.grafico_top_piezas_vm_aceptadas(analisis_vm)
+                    )
+                    graficos['combinaciones_servicios'] = convertir_figura_a_html(
+                        self.grafico_combinaciones_servicios(analisis_vm)
+                    )
+                
+                analisis_seguimiento = analizar_seguimiento_piezas_aceptadas(df)
+                if analisis_seguimiento.get('tiene_datos'):
+                    graficos['seguimiento_piezas_estado'] = convertir_figura_a_html(
+                        self.grafico_seguimiento_piezas_estado(analisis_seguimiento)
+                    )
+                    graficos['tiempos_entrega_proveedor'] = convertir_figura_a_html(
+                        self.grafico_tiempos_entrega_proveedor(analisis_seguimiento)
+                    )
+                    
+            except Exception as e:
+                print(f"Error generando gráficos de aceptaciones: {e}")
+            
         except Exception as e:
             print(f"⚠️ Error generando gráfico: {str(e)}")
             # Continuar con el resto de gráficos
         
         return graficos
+    
+    # ========================================================================
+    # VISUALIZACIONES DE ANÁLISIS DE ACEPTACIONES
+    # ========================================================================
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Estos métodos generan gráficos enfocados exclusivamente en cotizaciones
+    # aceptadas, incluyendo datos cruzados con VentaMostrador (servicios
+    # adicionales como limpieza, reinstalación, paquetes, etc.)
+    
+    def grafico_evolucion_aceptaciones(self, df, periodo='M'):
+        """
+        Gráfico de líneas: Evolución temporal de aceptaciones
+        (total, parcial, con VentaMostrador).
+        """
+        if df.empty or len(df[df['aceptada'] == True]) == 0:
+            return self._crear_grafico_vacio("Sin cotizaciones aceptadas")
+        
+        df_aceptadas = df[df['aceptada'] == True].copy()
+        
+        # Clasificar tipos de aceptación
+        df_aceptadas['tipo_aceptacion'] = df_aceptadas.apply(
+            lambda row: 'Con VM' if row.get('tiene_venta_mostrador', False)
+            else ('Parcial' if row.get('piezas_rechazadas', 0) > 0 else 'Total'),
+            axis=1
+        )
+        
+        freq_map = {'D': 'D', 'W': 'W', 'M': 'MS', 'Q': 'QS', 'Y': 'YS'}
+        freq = freq_map.get(periodo, 'MS')
+        
+        fig = go.Figure()
+        
+        colores_tipo = {
+            'Total': self.colores['success'],
+            'Parcial': self.colores['warning'],
+            'Con VM': self.colores['info'],
+        }
+        
+        for tipo, color in colores_tipo.items():
+            df_tipo = df_aceptadas[df_aceptadas['tipo_aceptacion'] == tipo]
+            if len(df_tipo) > 0:
+                agrupado = df_tipo.set_index('fecha_envio').resample(freq).size()
+                fig.add_trace(go.Scatter(
+                    x=agrupado.index,
+                    y=agrupado.values,
+                    mode='lines+markers',
+                    name=tipo,
+                    line=dict(color=color, width=2),
+                    marker=dict(size=6),
+                    hovertemplate='%{x|%b %Y}<br>%{y} cotizaciones<extra>' + tipo + '</extra>'
+                ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Evolución de Aceptaciones', font=dict(size=16)),
+            xaxis_title='Período',
+            yaxis_title='Cotizaciones Aceptadas',
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+            height=400,
+        )
+        
+        return fig
+    
+    def grafico_aceptacion_parcial_vs_total(self, df):
+        """
+        Gráfico de dona: Proporción de aceptación total vs parcial.
+        """
+        if df.empty or len(df[df['aceptada'] == True]) == 0:
+            return self._crear_grafico_vacio("Sin cotizaciones aceptadas")
+        
+        df_aceptadas = df[df['aceptada'] == True]
+        
+        parcial = len(df_aceptadas[(df_aceptadas['piezas_rechazadas'] > 0) & (df_aceptadas['piezas_aceptadas'] > 0)])
+        total = len(df_aceptadas) - parcial
+        
+        labels = ['Aceptación Total', 'Aceptación Parcial']
+        values = [total, parcial]
+        colors = [self.colores['success'], self.colores['warning']]
+        
+        fig = go.Figure(data=[go.Pie(
+            labels=labels,
+            values=values,
+            hole=0.5,
+            marker_colors=colors,
+            textinfo='label+percent+value',
+            textfont_size=12,
+            hovertemplate='%{label}<br>%{value} cotizaciones (%{percent})<extra></extra>'
+        )])
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Aceptación Total vs Parcial', font=dict(size=16)),
+            height=400,
+            showlegend=True,
+            legend=dict(orientation='h', yanchor='bottom', y=-0.15, xanchor='center', x=0.5),
+        )
+        
+        return fig
+    
+    def grafico_valor_aceptado_vs_cotizado(self, df):
+        """
+        Gráfico de barras agrupadas: Valor original cotizado vs valor aceptado
+        por sucursal.
+        """
+        if df.empty or len(df[df['aceptada'] == True]) == 0:
+            return self._crear_grafico_vacio("Sin cotizaciones aceptadas")
+        
+        df_aceptadas = df[df['aceptada'] == True]
+        
+        por_sucursal = df_aceptadas.groupby('sucursal').agg(
+            valor_cotizado=('costo_total', 'sum'),
+            valor_aceptado=('costo_total_final', 'sum'),
+        ).reset_index().sort_values('valor_cotizado', ascending=False).head(10)
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            name='Valor Cotizado Original',
+            x=por_sucursal['sucursal'],
+            y=por_sucursal['valor_cotizado'],
+            marker_color=self.colores['primary'],
+            text=[f"${v:,.0f}" for v in por_sucursal['valor_cotizado']],
+            textposition='outside',
+            hovertemplate='%{x}<br>Cotizado: $%{y:,.2f}<extra></extra>'
+        ))
+        
+        fig.add_trace(go.Bar(
+            name='Valor Aceptado Final',
+            x=por_sucursal['sucursal'],
+            y=por_sucursal['valor_aceptado'],
+            marker_color=self.colores['success'],
+            text=[f"${v:,.0f}" for v in por_sucursal['valor_aceptado']],
+            textposition='outside',
+            hovertemplate='%{x}<br>Aceptado: $%{y:,.2f}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Valor Cotizado vs Aceptado por Sucursal', font=dict(size=16)),
+            barmode='group',
+            xaxis_title='Sucursal',
+            yaxis_title='Monto ($)',
+            height=450,
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+        )
+        
+        return fig
+    
+    def grafico_descuento_mano_obra(self, df):
+        """
+        Gráfico de barras horizontales: Impacto del descuento de mano de obra
+        en la decisión de aceptar.
+        """
+        if df.empty or len(df[df['aceptada'] == True]) == 0:
+            return self._crear_grafico_vacio("Sin cotizaciones aceptadas")
+        
+        df_aceptadas = df[df['aceptada'] == True]
+        
+        con_descuento = len(df_aceptadas[df_aceptadas['descontar_mano_obra'] == True])
+        sin_descuento = len(df_aceptadas[df_aceptadas['descontar_mano_obra'] == False])
+        
+        monto_descontado = df_aceptadas[df_aceptadas['descontar_mano_obra'] == True]['monto_descuento'].sum()
+        ticket_con = df_aceptadas[df_aceptadas['descontar_mano_obra'] == True]['costo_total_final'].mean()
+        ticket_sin = df_aceptadas[df_aceptadas['descontar_mano_obra'] == False]['costo_total_final'].mean()
+        
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=('Cantidad de Aceptaciones', 'Ticket Promedio'),
+            column_widths=[0.5, 0.5],
+        )
+        
+        # Panel izquierdo: cantidades
+        fig.add_trace(go.Bar(
+            y=['Con Descuento', 'Sin Descuento'],
+            x=[con_descuento, sin_descuento],
+            orientation='h',
+            marker_color=[self.colores['teal'], self.colores['secondary']],
+            text=[f'{con_descuento} ({con_descuento/(con_descuento+sin_descuento)*100:.0f}%)' if (con_descuento+sin_descuento) > 0 else '0',
+                  f'{sin_descuento} ({sin_descuento/(con_descuento+sin_descuento)*100:.0f}%)' if (con_descuento+sin_descuento) > 0 else '0'],
+            textposition='inside',
+            hovertemplate='%{y}: %{x} cotizaciones<extra></extra>',
+            showlegend=False,
+        ), row=1, col=1)
+        
+        # Panel derecho: ticket promedio
+        fig.add_trace(go.Bar(
+            y=['Con Descuento', 'Sin Descuento'],
+            x=[ticket_con if not pd.isna(ticket_con) else 0,
+               ticket_sin if not pd.isna(ticket_sin) else 0],
+            orientation='h',
+            marker_color=[self.colores['teal'], self.colores['secondary']],
+            text=[f"${ticket_con:,.0f}" if not pd.isna(ticket_con) else "$0",
+                  f"${ticket_sin:,.0f}" if not pd.isna(ticket_sin) else "$0"],
+            textposition='inside',
+            hovertemplate='%{y}: $%{x:,.2f}<extra></extra>',
+            showlegend=False,
+        ), row=1, col=2)
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(
+                text=f'Impacto del Descuento de Mano de Obra (Total descontado: ${monto_descontado:,.2f})',
+                font=dict(size=16)
+            ),
+            height=350,
+        )
+        
+        return fig
+    
+    def grafico_servicios_vm_distribucion(self, analisis_vm):
+        """
+        Gráfico de barras: Distribución de servicios VM en cotizaciones aceptadas.
+        Recibe el resultado de analizar_servicios_vm_aceptadas().
+        """
+        if not analisis_vm or not analisis_vm.get('tiene_datos'):
+            return self._crear_grafico_vacio("Sin ventas mostrador en aceptadas")
+        
+        servicios = analisis_vm['distribucion_servicios']
+        if not servicios:
+            return self._crear_grafico_vacio("Sin servicios registrados")
+        
+        nombres = [s['servicio'] for s in servicios]
+        cantidades = [s['cantidad'] for s in servicios]
+        ingresos = [s['ingreso_total'] for s in servicios]
+        
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=('Frecuencia de Servicios', 'Ingreso por Servicio'),
+            column_widths=[0.5, 0.5],
+            specs=[[{"type": "bar"}, {"type": "bar"}]]
+        )
+        
+        colores_servicios = [
+            self.colores['info'],
+            self.colores['primary'],
+            self.colores['teal'],
+            self.colores['purple'],
+            self.colores['orange'],
+        ]
+        
+        fig.add_trace(go.Bar(
+            y=nombres,
+            x=cantidades,
+            orientation='h',
+            marker_color=colores_servicios[:len(nombres)],
+            text=[f'{c} ventas' for c in cantidades],
+            textposition='auto',
+            hovertemplate='%{y}: %{x} ventas<extra></extra>',
+            showlegend=False,
+        ), row=1, col=1)
+        
+        fig.add_trace(go.Bar(
+            y=nombres,
+            x=ingresos,
+            orientation='h',
+            marker_color=colores_servicios[:len(nombres)],
+            text=[f'${i:,.0f}' for i in ingresos],
+            textposition='auto',
+            hovertemplate='%{y}: $%{x:,.2f}<extra></extra>',
+            showlegend=False,
+        ), row=1, col=2)
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Servicios de Venta Mostrador en Aceptadas', font=dict(size=16)),
+            height=400,
+        )
+        fig.update_layout(margin=dict(l=160, r=50, t=80, b=50))
+        
+        return fig
+    
+    def grafico_paquetes_vm_vendidos(self, analisis_vm):
+        """
+        Gráfico de dona: Distribución de paquetes (premium/oro/plata) vendidos
+        en cotizaciones aceptadas con VentaMostrador.
+        """
+        if not analisis_vm or not analisis_vm.get('tiene_datos'):
+            return self._crear_grafico_vacio("Sin ventas mostrador en aceptadas")
+        
+        paquetes = analisis_vm['distribucion_paquetes']
+        if not paquetes:
+            return self._crear_grafico_vacio("Sin datos de paquetes")
+        
+        # Filtrar paquetes con cantidad > 0
+        paquetes = [p for p in paquetes if p['cantidad'] > 0]
+        if not paquetes:
+            return self._crear_grafico_vacio("Sin paquetes vendidos")
+        
+        labels = [p['nombre'] for p in paquetes]
+        values = [p['cantidad'] for p in paquetes]
+        ingresos = [p['ingreso_total'] for p in paquetes]
+        
+        colores_paquetes = {
+            'premium': '#FFD700',     # Dorado
+            'oro': '#FFA500',         # Naranja
+            'plata': '#C0C0C0',       # Plateado
+            'ninguno': self.colores['secondary'],
+        }
+        colors = [colores_paquetes.get(p['paquete'], self.colores['info']) for p in paquetes]
+        
+        fig = go.Figure(data=[go.Pie(
+            labels=labels,
+            values=values,
+            hole=0.45,
+            marker_colors=colors,
+            textinfo='label+percent+value',
+            textfont_size=11,
+            hovertemplate='%{label}<br>%{value} ventas (%{percent})<br>Ingreso: $' + 
+                          '<extra></extra>',
+            customdata=ingresos,
+        )])
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Distribución de Paquetes VM', font=dict(size=16)),
+            height=400,
+            showlegend=True,
+            legend=dict(orientation='h', yanchor='bottom', y=-0.15, xanchor='center', x=0.5),
+        )
+        
+        return fig
+    
+    def grafico_valor_combinado(self, df):
+        """
+        Gráfico de barras apiladas: Valor cotización aceptada + valor VM
+        por sucursal o técnico.
+        """
+        if df.empty or len(df[df['aceptada'] == True]) == 0:
+            return self._crear_grafico_vacio("Sin cotizaciones aceptadas")
+        
+        df_aceptadas = df[df['aceptada'] == True]
+        
+        por_sucursal = df_aceptadas.groupby('sucursal').agg(
+            valor_cotizacion=('costo_total_final', 'sum'),
+            valor_vm=('vm_total_venta', 'sum'),
+        ).reset_index()
+        por_sucursal['valor_total'] = por_sucursal['valor_cotizacion'] + por_sucursal['valor_vm']
+        por_sucursal = por_sucursal.sort_values('valor_total', ascending=True).tail(10)
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            name='Cotización Aceptada',
+            y=por_sucursal['sucursal'],
+            x=por_sucursal['valor_cotizacion'],
+            orientation='h',
+            marker_color=self.colores['success'],
+            text=[f"${v:,.0f}" for v in por_sucursal['valor_cotizacion']],
+            textposition='inside',
+            hovertemplate='%{y}<br>Cotización: $%{x:,.2f}<extra></extra>'
+        ))
+        
+        fig.add_trace(go.Bar(
+            name='Venta Mostrador',
+            y=por_sucursal['sucursal'],
+            x=por_sucursal['valor_vm'],
+            orientation='h',
+            marker_color=self.colores['info'],
+            text=[f"${v:,.0f}" if v > 0 else '' for v in por_sucursal['valor_vm']],
+            textposition='inside',
+            hovertemplate='%{y}<br>Venta Mostrador: $%{x:,.2f}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Valor Combinado: Cotización + Venta Mostrador', font=dict(size=16)),
+            barmode='stack',
+            xaxis_title='Monto ($)',
+            yaxis_title='',
+            height=450,
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+        )
+        fig.update_layout(margin=dict(l=150, r=50, t=80, b=50))
+        
+        return fig
+    
+    def grafico_tasa_upsell(self, df):
+        """
+        Gráfico de barras horizontales: Tasa de upsell (% de aceptadas con VM)
+        por sucursal y técnico.
+        """
+        if df.empty or len(df[df['aceptada'] == True]) == 0:
+            return self._crear_grafico_vacio("Sin cotizaciones aceptadas")
+        
+        df_aceptadas = df[df['aceptada'] == True]
+        
+        # Por sucursal
+        upsell_sucursal = df_aceptadas.groupby('sucursal').agg(
+            total=('aceptada', 'count'),
+            con_vm=('tiene_venta_mostrador', 'sum'),
+        ).reset_index()
+        upsell_sucursal['tasa_upsell'] = (upsell_sucursal['con_vm'] / upsell_sucursal['total'] * 100).round(1)
+        upsell_sucursal = upsell_sucursal.sort_values('tasa_upsell', ascending=True)
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            y=upsell_sucursal['sucursal'],
+            x=upsell_sucursal['tasa_upsell'],
+            orientation='h',
+            marker_color=[
+                self.colores['success'] if t >= 30 
+                else self.colores['warning'] if t >= 15
+                else self.colores['danger']
+                for t in upsell_sucursal['tasa_upsell']
+            ],
+            text=[f'{t:.1f}% ({int(c)}/{int(tot)})' 
+                  for t, c, tot in zip(upsell_sucursal['tasa_upsell'], upsell_sucursal['con_vm'], upsell_sucursal['total'])],
+            textposition='auto',
+            hovertemplate='%{y}<br>Tasa Upsell: %{x:.1f}%<extra></extra>',
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Tasa de Upsell: Aceptadas con Venta Mostrador por Sucursal', font=dict(size=16)),
+            xaxis_title='Tasa de Upsell (%)',
+            yaxis_title='',
+            height=400,
+            showlegend=False,
+        )
+        fig.update_layout(margin=dict(l=150, r=50, t=80, b=50))
+        
+        return fig
+    
+    def grafico_top_piezas_vm_aceptadas(self, analisis_vm):
+        """
+        Gráfico de barras horizontales: Top 10 piezas más vendidas en VM
+        de cotizaciones aceptadas.
+        """
+        if not analisis_vm or not analisis_vm.get('tiene_datos'):
+            return self._crear_grafico_vacio("Sin ventas mostrador en aceptadas")
+        
+        piezas = analisis_vm.get('top_piezas_vm', [])
+        if not piezas:
+            return self._crear_grafico_vacio("Sin piezas vendidas en VM")
+        
+        nombres = [p['descripcion'][:40] for p in piezas]
+        cantidades = [p['cantidad'] for p in piezas]
+        ingresos = [p['ingreso_total'] for p in piezas]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            y=nombres[::-1],
+            x=cantidades[::-1],
+            orientation='h',
+            marker_color=self.colores['info'],
+            text=[f'{c} uds - ${i:,.0f}' for c, i in zip(cantidades[::-1], ingresos[::-1])],
+            textposition='auto',
+            hovertemplate='%{y}<br>Cantidad: %{x}<extra></extra>',
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Top Piezas Vendidas en Venta Mostrador (Aceptadas)', font=dict(size=16)),
+            xaxis_title='Cantidad Vendida',
+            yaxis_title='',
+            height=400,
+            showlegend=False,
+        )
+        fig.update_layout(margin=dict(l=200, r=50, t=80, b=50))
+        
+        return fig
+    
+    def grafico_seguimiento_piezas_estado(self, analisis_seguimiento):
+        """
+        Gráfico de barras: Estado de los seguimientos de piezas post-aceptación.
+        """
+        if not analisis_seguimiento or not analisis_seguimiento.get('tiene_datos'):
+            return self._crear_grafico_vacio("Sin seguimientos de piezas")
+        
+        estados = analisis_seguimiento['distribucion_estados']
+        if not estados:
+            return self._crear_grafico_vacio("Sin datos de estados")
+        
+        labels = [e['label'] for e in estados]
+        valores = [e['cantidad'] for e in estados]
+        colores = []
+        for e in estados:
+            if e['es_problematico']:
+                colores.append(self.colores['danger'])
+            elif e['es_recibido']:
+                colores.append(self.colores['success'])
+            else:
+                colores.append(self.colores['warning'])
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            x=labels,
+            y=valores,
+            marker_color=colores,
+            text=[f'{v} ({v/sum(valores)*100:.0f}%)' for v in valores],
+            textposition='outside',
+            hovertemplate='%{x}: %{y} seguimientos<extra></extra>',
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Estado de Seguimiento de Piezas Post-Aceptación', font=dict(size=16)),
+            xaxis_title='Estado',
+            yaxis_title='Cantidad',
+            height=400,
+            showlegend=False,
+        )
+        
+        return fig
+    
+    def grafico_tiempos_entrega_proveedor(self, analisis_seguimiento):
+        """
+        Gráfico de barras: Tiempo promedio de entrega por proveedor.
+        """
+        if not analisis_seguimiento or not analisis_seguimiento.get('tiene_datos'):
+            return self._crear_grafico_vacio("Sin seguimientos de piezas")
+        
+        proveedores = analisis_seguimiento.get('proveedores_ranking', [])
+        # Solo proveedores con tiempo promedio registrado
+        proveedores = [p for p in proveedores if p['tiempo_promedio'] is not None]
+        if not proveedores:
+            return self._crear_grafico_vacio("Sin datos de tiempo de entrega")
+        
+        # Ordenar por tiempo promedio ascendente (mejores primero)
+        proveedores = sorted(proveedores, key=lambda x: x['tiempo_promedio'])[:15]
+        
+        nombres = [p['proveedor'][:30] for p in proveedores]
+        tiempos = [p['tiempo_promedio'] for p in proveedores]
+        tasas_exito = [p['tasa_exito'] for p in proveedores]
+        totales = [p['total_pedidos'] for p in proveedores]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            y=nombres[::-1],
+            x=tiempos[::-1],
+            orientation='h',
+            marker_color=[
+                self.colores['success'] if t <= 7
+                else self.colores['warning'] if t <= 14
+                else self.colores['danger']
+                for t in tiempos[::-1]
+            ],
+            text=[f'{t:.0f} días ({tot} pedidos, {te:.0f}% éxito)' 
+                  for t, tot, te in zip(tiempos[::-1], totales[::-1], tasas_exito[::-1])],
+            textposition='auto',
+            hovertemplate='%{y}<br>Tiempo: %{x:.1f} días<extra></extra>',
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Tiempo de Entrega por Proveedor (Post-Aceptación)', font=dict(size=16)),
+            xaxis_title='Días Promedio de Entrega',
+            yaxis_title='',
+            height=450,
+            showlegend=False,
+        )
+        fig.update_layout(margin=dict(l=180, r=50, t=80, b=50))
+        
+        return fig
+    
+    def grafico_combinaciones_servicios(self, analisis_vm):
+        """
+        Gráfico de barras horizontales: Combinaciones más frecuentes de servicios
+        vendidos en VentaMostrador de aceptadas.
+        """
+        if not analisis_vm or not analisis_vm.get('tiene_datos'):
+            return self._crear_grafico_vacio("Sin ventas mostrador en aceptadas")
+        
+        combos = analisis_vm.get('combinaciones_frecuentes', [])
+        if not combos:
+            return self._crear_grafico_vacio("Sin combinaciones registradas")
+        
+        nombres = [c['combinacion'][:50] for c in combos[:10]]
+        cantidades = [c['cantidad'] for c in combos[:10]]
+        porcentajes = [c['porcentaje'] for c in combos[:10]]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            y=nombres[::-1],
+            x=cantidades[::-1],
+            orientation='h',
+            marker_color=self.colores['purple'],
+            text=[f'{c} ventas ({p}%)' for c, p in zip(cantidades[::-1], porcentajes[::-1])],
+            textposition='auto',
+            hovertemplate='%{y}<br>%{x} ventas<extra></extra>',
+        ))
+        
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text='Combinaciones de Servicios Más Frecuentes', font=dict(size=16)),
+            xaxis_title='Cantidad',
+            yaxis_title='',
+            height=400,
+            showlegend=False,
+        )
+        fig.update_layout(margin=dict(l=250, r=50, t=80, b=50))
+        
+        return fig
     
     # ========================================================================
     # MÉTODOS AUXILIARES
