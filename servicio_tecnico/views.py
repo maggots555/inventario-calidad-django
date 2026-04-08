@@ -2920,6 +2920,14 @@ def detalle_orden(request, orden_id):
         # ── Encuesta de satisfacción pendiente de confirmar envío ──
         'feedback_satisfaccion_pendiente_id': request.session.pop('feedback_satisfaccion_pendiente_id', None),
         'feedback_satisfaccion_email': request.session.pop('feedback_satisfaccion_email', None),
+
+        # ── Integración Ollama — IA para mejora de diagnósticos SIC ──
+        # Controla si el botón "Mejorar Diag. con IA" aparece en el template.
+        # Se lee desde settings (que a su vez lee desde .env con OLLAMA_ENABLED).
+        'ollama_enabled': getattr(settings, 'OLLAMA_ENABLED', False),
+        # Lista de modelos disponibles para el selector del modal de pruebas.
+        # Se lee desde OLLAMA_MODELS en settings (lista de strings).
+        'ollama_models': getattr(settings, 'OLLAMA_MODELS', []),
     }
     
     return render(request, 'servicio_tecnico/detalle_orden.html', context)
@@ -16557,3 +16565,97 @@ def perfil_empleado(request, empleado_id):
     }
 
     return render(request, 'servicio_tecnico/mi_perfil.html', context)
+
+
+# ============================================================================
+# VISTA AJAX: pulir_diagnostico_sic_ia
+# Endpoint que recibe el diagnóstico escrito por el técnico, lo envía a Ollama
+# y devuelve la versión mejorada para que el técnico decida si la acepta.
+#
+# FLUJO:
+# 1. Frontend hace POST con el diagnóstico original y datos del equipo
+# 2. Esta vista llama a ollama_client.mejorar_diagnostico()
+# 3. Devuelve JSON con el texto mejorado o un mensaje de error
+# 4. El frontend muestra el modal de comparación (antes vs después)
+#
+# NOTA: El técnico siempre tiene la última palabra — puede aceptar, reintentar
+# o descartar la mejora. El campo se guarda solo cuando el técnico hace clic
+# en "Guardar Configuración" en el formulario principal.
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def pulir_diagnostico_sic_ia(request):
+    """
+    API AJAX: Mejora la redacción del diagnóstico SIC usando Ollama.
+
+    Recibe vía POST:
+        - diagnostico_sic (str): Texto original del técnico (mínimo 20 caracteres)
+        - modelo (str, opcional): Modelo de Ollama a usar (override del default en settings)
+        - tipo_equipo (str, opcional): Tipo de equipo (Laptop, PC, AIO...)
+        - marca (str, opcional): Marca del equipo
+        - modelo_equipo (str, opcional): Modelo del equipo
+        - gama (str, opcional): Gama del equipo (alta, media, baja)
+        - equipo_enciende (str, opcional): "true" o "false"
+        - falla_principal (str, opcional): Falla reportada por el cliente
+
+    Devuelve JSON:
+        {'success': True, 'diagnostico_mejorado': '...', 'modelo_usado': '...'}
+        {'success': False, 'error': '...mensaje...'}
+    """
+    from .ollama_client import mejorar_diagnostico
+
+    # Verificar que Ollama está habilitado en este entorno
+    if not getattr(settings, 'OLLAMA_ENABLED', False):
+        return JsonResponse({
+            'success': False,
+            'error': 'La función de IA no está habilitada en este entorno.'
+        }, status=403)
+
+    # Extraer datos del POST
+    diagnostico_sic = request.POST.get('diagnostico_sic', '').strip()
+
+    # Validación mínima de caracteres (también validado en el cliente TypeScript)
+    if len(diagnostico_sic) < 20:
+        return JsonResponse({
+            'success': False,
+            'error': 'El diagnóstico debe tener al menos 20 caracteres para poder mejorarlo.'
+        }, status=400)
+
+    # Modelo seleccionado por el usuario desde el selector del modal
+    # Si viene vacío, ollama_client usará el default de settings (OLLAMA_MODEL)
+    modelo_override = request.POST.get('modelo', '').strip()
+
+    # Datos de contexto del equipo (opcionales — mejoran la calidad del prompt)
+    tipo_equipo = request.POST.get('tipo_equipo', '')
+    marca = request.POST.get('marca', '')
+    modelo_equipo = request.POST.get('modelo_equipo', '')
+    gama = request.POST.get('gama', '')
+    equipo_enciende_raw = request.POST.get('equipo_enciende', 'true').lower()
+    equipo_enciende = equipo_enciende_raw not in ('false', '0', 'no')
+    falla_principal = request.POST.get('falla_principal', '')
+
+    logger.info(
+        f"[OllamaIA] Solicitud de mejora SIC | Usuario: {request.user.username} | "
+        f"Modelo: {modelo_override or 'default'} | "
+        f"Equipo: {marca} {modelo_equipo} | Longitud diagnóstico: {len(diagnostico_sic)} chars"
+    )
+
+    # Llamar al cliente de Ollama
+    resultado = mejorar_diagnostico(
+        diagnostico_sic=diagnostico_sic,
+        tipo_equipo=tipo_equipo,
+        marca=marca,
+        modelo=modelo_equipo,
+        gama=gama,
+        equipo_enciende=equipo_enciende,
+        falla_principal=falla_principal,
+        modelo_override=modelo_override,
+    )
+
+    if resultado['success']:
+        return JsonResponse(resultado)
+    else:
+        # Devolver el error con status 200 para que el frontend lo maneje
+        # (es un error de negocio, no un error HTTP)
+        return JsonResponse(resultado, status=200)

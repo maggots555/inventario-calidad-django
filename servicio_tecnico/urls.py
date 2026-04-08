@@ -265,6 +265,16 @@ urlpatterns = [
     path('api/detalle-equipo/<int:detalle_id>/actualizar-email/', 
          views.actualizar_email_cliente, 
          name='actualizar_email_cliente'),
+
+    # API: MEJORAR DIAGNÓSTICO SIC CON IA — OLLAMA (Abril 2026)
+    # ========================================================================
+    # Endpoint AJAX que recibe el diagnóstico escrito por el técnico y devuelve
+    # una versión con redacción mejorada, usando Ollama vía HTTP local o Tailscale.
+    # Solo disponible si OLLAMA_ENABLED=True en .env (requiere Ollama corriendo).
+    # El técnico siempre decide si acepta, reintenta o descarta la mejora.
+    path('api/pulir-diagnostico-sic/',
+         views.pulir_diagnostico_sic_ia,
+         name='pulir_diagnostico_sic_ia'),
     
     # ========================================================================
     # DASHBOARD DE SEGUIMIENTO DE PIEZAS EN TRÁNSITO (Noviembre 2025)

@@ -750,3 +750,43 @@ RATELIMIT_USE_CACHE = 'default'       # Usar cache de Redis para tracking
 # Maneja X-Forwarded-For con múltiples IPs (Nginx + Gunicorn) y también
 # funciona en desarrollo local donde no hay proxy (usa REMOTE_ADDR).
 RATELIMIT_IP_META_KEY = _get_client_ip
+
+# ============================================================================
+# INTEGRACIÓN CON OLLAMA — IA LOCAL PARA MEJORA DE DIAGNÓSTICOS SIC
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Ollama es un servidor local de modelos de lenguaje (LLM) que corre en tu
+# máquina. Lo usamos para mejorar la redacción de los diagnósticos técnicos
+# que escriben los técnicos, sin cambiar su contenido.
+#
+# OLLAMA_ENABLED:
+#   True  → Habilita el botón "Mejorar Diag. con IA" en el detalle de la orden
+#   False → El botón no aparece en la UI (producción sin GPU, por ejemplo)
+#
+# OLLAMA_BASE_URL:
+#   Desarrollo local con GPU:      http://localhost:11434
+#   Producción via Tailscale:      http://100.64.x.y:11434  (IP de la máquina con GPU)
+#   Sin Ollama:                    No importa (OLLAMA_ENABLED=False)
+#
+# OLLAMA_MODEL:
+#   Modelos recomendados: gemma3:12b (alta calidad), gemma3:4b (más rápido)
+#
+# OLLAMA_TIMEOUT:
+#   Segundos que espera Django antes de abortar la llamada a Ollama.
+#   120 segundos es apropiado para modelos medianos (12B) con GPU dedicada.
+
+OLLAMA_ENABLED = config('OLLAMA_ENABLED', default=False, cast=bool)
+OLLAMA_BASE_URL = config('OLLAMA_BASE_URL', default='http://localhost:11434')
+OLLAMA_MODEL = config('OLLAMA_MODEL', default='gemma3:12b')
+OLLAMA_TIMEOUT = config('OLLAMA_TIMEOUT', default=120, cast=int)
+
+# OLLAMA_MODELS: lista de modelos disponibles para seleccionar en el modal de pruebas.
+# Formato: nombres separados por coma, sin espacios alrededor de las comas.
+# Ejemplo: gemma3:12b,gemma3:4b,qwen2.5-coder:7b
+# Si no se define, se usa OLLAMA_MODEL como única opción.
+_ollama_models_raw = config('OLLAMA_MODELS', default='')
+OLLAMA_MODELS: list[str] = (
+    [m.strip() for m in _ollama_models_raw.split(',') if m.strip()]
+    if _ollama_models_raw.strip()
+    else [OLLAMA_MODEL]
+)

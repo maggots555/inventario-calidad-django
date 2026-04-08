@@ -389,6 +389,31 @@
                             </label>
                             {{ form_config.diagnostico_sic }}
                             <small class="text-muted">{{ form_config.diagnostico_sic.help_text }}</small>
+
+                            {% if ollama_enabled %}
+                            {# Botón "Mejorar Diag. con IA" — solo visible si OLLAMA_ENABLED=True en .env #}
+                            {# Se habilita automáticamente cuando el técnico escribe ≥20 caracteres (TypeScript) #}
+                            <div class="mt-2">
+                                <button type="button"
+                                        id="btnMejorarDiagIA"
+                                        class="btn btn-sm btn-outline-purple w-100"
+                                        disabled
+                                        title="Escribe el diagnóstico primero (mínimo 20 caracteres)"
+                                        data-tipo-equipo="{{ orden.detalle_equipo.tipo_equipo }}"
+                                        data-marca="{{ orden.detalle_equipo.marca }}"
+                                        data-modelo="{{ orden.detalle_equipo.modelo }}"
+                                        data-gama="{{ orden.detalle_equipo.gama }}"
+                                        data-equipo-enciende="{{ orden.detalle_equipo.equipo_enciende|yesno:'true,false' }}"
+                                        data-falla-selector="#id_falla_principal">
+                                    <i class="bi bi-stars"></i>
+                                    Mejorar Diag. con IA
+                                </button>
+                                <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+                                    <i class="bi bi-info-circle"></i>
+                                    Revisa y mejora la redacción de tu diagnóstico sin cambiar el contenido técnico.
+                                </small>
+                            </div>
+                            {% endif %}
                         </div>
                         
                         <!-- ===================================== -->
@@ -6390,5 +6415,253 @@ document.addEventListener('DOMContentLoaded', function() {
     COMPILADO DESDE: static/ts/historial_orden.ts
     ============================================================ -->
 <script src="{% static 'js/historial_orden.js' %}"></script>
+
+{% if ollama_enabled %}
+<!-- ============================================================
+    MODAL: Mejorar Diagnóstico SIC con IA (Ollama)
+    Solo se renderiza si OLLAMA_ENABLED=True en .env
+    ============================================================ -->
+<div class="modal fade" id="modalMejorarDiagIA" tabindex="-1"
+     aria-labelledby="modalMejorarDiagIALabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <!-- Header del modal -->
+            <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <h5 class="modal-title text-white" id="modalMejorarDiagIALabel">
+                    <i class="bi bi-stars"></i>
+                    Mejorar Diagnóstico con IA
+                </h5>
+                <button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <!-- Cuerpo del modal -->
+            <div class="modal-body p-0">
+
+                <!-- Aviso informativo (siempre visible) -->
+                <div class="alert alert-info mb-0 rounded-0 py-2 px-3" style="font-size: 0.85rem; border-left: 4px solid #0dcaf0; border-radius: 0 !important;">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <strong>La IA solo mejora la redacción.</strong>
+                    No cambia el contenido técnico ni agrega información que no hayas escrito.
+                    Tú decides si aceptas el resultado.
+                </div>
+
+                <!-- ======================================================
+                     FASE 1: Configuración (selector de modelo + Generar)
+                     Visible al abrir el modal. Se oculta al generar.
+                     ====================================================== -->
+                <div id="ollamaFaseConfig" class="p-3 border-bottom">
+                    <div class="row align-items-end g-3">
+                        <div class="col-12 col-md-8">
+                            <label for="ollamaModeloSelector" class="form-label fw-semibold mb-1">
+                                <i class="bi bi-cpu"></i> Modelo de IA
+                            </label>
+                            <select id="ollamaModeloSelector" class="form-select">
+                                {% for modelo in ollama_models %}
+                                <option value="{{ modelo }}">{{ modelo }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Selecciona el modelo con el que quieres probar.</small>
+                        </div>
+                        <div class="col-12 col-md-4 d-grid">
+                            <button type="button" id="btnGenerarMejora"
+                                    class="btn btn-outline-purple">
+                                <i class="bi bi-stars"></i> Generar mejora
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================
+                     FASE 2: Resultado (dos paneles, oculto hasta Generar)
+                     ====================================================== -->
+                <div id="ollamaFaseResultado" class="d-none">
+
+                    <!-- Barra de modelo activo + botón cambiar modelo -->
+                    <div class="px-3 py-2 border-bottom d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                        <span class="text-muted">Modelo:</span>
+                        <span id="ollamaModeloActivo" class="badge ollama-badge-ia"></span>
+                        <button type="button" id="btnCambiarModelo"
+                                class="btn btn-sm btn-outline-secondary ms-auto">
+                            <i class="bi bi-arrow-left"></i> Cambiar modelo
+                        </button>
+                    </div>
+
+                    <!-- Contenedor de dos paneles -->
+                    <div class="row g-0" style="min-height: 280px;">
+
+                        <!-- Panel izquierdo: Diagnóstico ORIGINAL -->
+                        <div class="col-12 col-md-6 p-3 border-end">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-secondary me-2">
+                                    <i class="bi bi-person-fill"></i> Tu diagnóstico
+                                </span>
+                            </div>
+                            <div id="diagOriginalTexto"
+                                 class="p-3 rounded h-100 ollama-panel-texto"
+                                 style="white-space: pre-wrap; word-break: break-word; min-height: 200px;
+                                        background-color: var(--gray-50); border: 1px solid var(--gray-200);
+                                        font-size: 0.9rem; line-height: 1.6;">
+                                {# El texto original se inserta aquí por JavaScript #}
+                            </div>
+                        </div>
+
+                        <!-- Panel derecho: Versión MEJORADA -->
+                        <div class="col-12 col-md-6 p-3">
+                            <div class="d-flex align-items-center mb-2 gap-2">
+                                <span class="badge ollama-badge-ia">
+                                    <i class="bi bi-stars"></i> Versión mejorada
+                                </span>
+                                <span id="diagModeloBadge"
+                                      class="badge bg-light text-muted border"
+                                      style="display: none; font-size: 0.7rem;"></span>
+                            </div>
+
+                            <!-- Spinner de carga (oculto por defecto con d-none) -->
+                            <div id="diagMejoradoSpinner"
+                                 class="d-none flex-column align-items-center justify-content-center p-4"
+                                 style="min-height: 200px;">
+                                <div class="spinner-border text-purple mb-3" role="status" style="width: 2.5rem; height: 2.5rem;">
+                                    <span class="visually-hidden">Procesando...</span>
+                                </div>
+                                <p class="text-muted mb-1" style="font-size: 0.9rem;">Analizando y mejorando tu diagnóstico...</p>
+                                <small class="text-muted">Esto puede tardar unos segundos</small>
+                            </div>
+
+                            <!-- Texto mejorado (oculto hasta que Ollama responda) -->
+                            <div id="diagMejoradoContenido"
+                                 class="p-3 rounded ollama-panel-mejorado"
+                                 style="display: none; white-space: pre-wrap; word-break: break-word;
+                                        min-height: 200px; font-size: 0.9rem; line-height: 1.6;
+                                        background-color: var(--gray-50); border: 1px solid var(--gray-200);">
+                            </div>
+
+                            <!-- Alerta de error (oculta hasta que haya un error) -->
+                            <div id="diagErrorAlerta"
+                                 class="alert alert-danger mt-2"
+                                 style="display: none;">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                <strong>Error al procesar:</strong>
+                                <span id="diagErrorTexto"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer del modal: botones de acción -->
+            <div class="modal-footer justify-content-between">
+                <div>
+                    <button type="button" id="btnDescartarMejora"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Descartar
+                    </button>
+                </div>
+                <!-- Botones de resultado (ocultos hasta que haya resultado) -->
+                <div class="d-flex gap-2" id="ollamaBotonesResultado" style="display: none !important;">
+                    <button type="button" id="btnReintentar"
+                            class="btn btn-outline-primary" disabled>
+                        <i class="bi bi-arrow-clockwise"></i> Reintentar
+                    </button>
+                    <button type="button" id="btnAceptarMejora"
+                            class="btn btn-success" disabled>
+                        <i class="bi bi-check-circle"></i> Aceptar y aplicar
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Estilos del modal de IA (dark mode compatible) -->
+<style>
+    /* Botón "Mejorar Diag. con IA" — estilo morado/violeta */
+    .btn-outline-purple {
+        color: #764ba2;
+        border-color: #764ba2;
+        transition: all 0.2s ease;
+    }
+    .btn-outline-purple:hover:not(:disabled) {
+        background-color: #764ba2;
+        border-color: #764ba2;
+        color: #fff;
+    }
+    .btn-outline-purple:disabled {
+        color: #adb5bd;
+        border-color: #dee2e6;
+        cursor: not-allowed;
+        opacity: 0.65;
+    }
+
+    /* Badge de "Versión mejorada" */
+    .ollama-badge-ia {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+    }
+
+    /* Spinner morado */
+    .text-purple { color: #764ba2 !important; }
+
+    /* ================================================================
+       MODO OSCURO — Overrides para [data-bs-theme="dark"]
+       ================================================================ */
+    [data-bs-theme="dark"] .ollama-panel-texto,
+    [data-bs-theme="dark"] .ollama-panel-mejorado {
+        background-color: var(--card-bg) !important;
+        border-color: var(--border-color) !important;
+        color: var(--text-primary);
+    }
+
+    [data-bs-theme="dark"] .btn-outline-purple {
+        color: #a78bfa;
+        border-color: #a78bfa;
+    }
+    [data-bs-theme="dark"] .btn-outline-purple:hover:not(:disabled) {
+        background-color: #7c3aed;
+        border-color: #7c3aed;
+        color: #fff;
+    }
+    [data-bs-theme="dark"] .btn-outline-purple:disabled {
+        color: #6b7280;
+        border-color: #374151;
+    }
+
+    [data-bs-theme="dark"] #diagModeloBadge {
+        background-color: var(--hover-bg) !important;
+        border-color: var(--border-color) !important;
+        color: var(--text-secondary) !important;
+    }
+
+    /* Modal completo — fondo sólido en dark mode */
+    [data-bs-theme="dark"] #modalMejorarDiagIA .modal-content {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: var(--text-primary);
+    }
+    [data-bs-theme="dark"] #modalMejorarDiagIA .modal-body {
+        background-color: #1e293b !important;
+    }
+    [data-bs-theme="dark"] #modalMejorarDiagIA .modal-footer {
+        background-color: #1e293b !important;
+        border-top-color: #334155 !important;
+    }
+    [data-bs-theme="dark"] #modalMejorarDiagIA .border-end {
+        border-color: #334155 !important;
+    }
+    /* Aviso informativo en dark mode */
+    [data-bs-theme="dark"] #modalMejorarDiagIA .alert-info {
+        background-color: #1e3a5f !important;
+        border-color: #1e5a8a !important;
+        color: #93c5fd !important;
+    }
+</style>
+
+<!-- Script de Ollama SIC — compilado desde static/ts/ollama_sic.ts -->
+<script src="{% static 'js/ollama_sic.js' %}"></script>
+{% endif %}
 
 {% endblock %}

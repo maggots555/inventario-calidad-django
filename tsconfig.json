@@ -10,6 +10,7 @@
 
     /* Opciones Clave para Django */
     "outDir": "static/js", // ¡IMPORTANTE! Aquí es donde guardará los .js compilados.
+    "rootDir": "static/ts", // Directorio raíz de los archivos .ts fuente.
     "sourceMap": true, // Crea archivos .map para depurar tu .ts original en el navegador
   },
   /* Dónde buscará TypeScript */
