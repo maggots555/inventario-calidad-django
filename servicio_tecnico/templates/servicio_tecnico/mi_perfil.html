@@ -81,6 +81,16 @@
                             {{ empleado.area }}
                         </span>
                     </div>
+
+                    {# ── Botón de descarga de reporte individual OOW/FL ── #}
+                    {% if not es_vista_directorio %}
+                    <a href="{% url 'servicio_tecnico:exportar_excel_mi_perfil' %}"
+                       class="pcard-download-btn"
+                       title="Descargar reporte Excel con tus órdenes OOW-/FL- (activas y cerradas)">
+                        <i class="bi bi-file-earmark-spreadsheet"></i>
+                        <span>Descargar Reporte OOW/FL</span>
+                    </a>
+                    {% endif %}
                 </div>
             </div>
 

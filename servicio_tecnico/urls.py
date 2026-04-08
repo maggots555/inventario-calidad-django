@@ -390,6 +390,8 @@ urlpatterns = [
 
     # ── Mi Perfil ──────────────────────
     path('mi-perfil/', views.mi_perfil, name='mi_perfil'),
+    # Descarga del reporte Excel individual OOW-/FL- del empleado autenticado
+    path('mi-perfil/exportar-excel/', views.exportar_excel_mi_perfil, name='exportar_excel_mi_perfil'),
 
     # ── Directorio de Empleados (vista gerencial) ──
     path('directorio-empleados/', views.directorio_empleados, name='directorio_empleados'),
