@@ -6552,37 +6552,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 </div>
 
-                <!-- Barra de estadísticas de procesamiento (oculta hasta que haya resultado) -->
+            </div>
+
+            <!-- Footer del modal: estadísticas (izq) + botones (der) -->
+            <div class="modal-footer justify-content-between align-items-center flex-wrap gap-2">
+
+                <!-- Estadísticas de procesamiento (ocultas hasta que haya resultado) -->
                 <div id="diagEstadisticas"
-                     class="px-3 py-2 text-muted align-items-center gap-2"
-                     style="display: none; font-size: 0.78rem;
-                            border-top: 1px solid var(--gray-200);
-                            background-color: var(--gray-100);">
+                     style="display: none;">
                     {# Contenido rellenado por JavaScript: tiempo · chars original → mejorado (±diff) #}
                 </div>
 
-            </div>
-
-            <!-- Footer del modal: botones de acción -->
-            <div class="modal-footer justify-content-between">
-                <div>
+                <!-- Botones -->
+                <div class="d-flex align-items-center gap-2 ms-auto">
                     <button type="button" id="btnDescartarMejora"
                             class="btn btn-outline-secondary"
                             data-bs-dismiss="modal">
                         <i class="bi bi-x-circle"></i> Descartar
                     </button>
+                    <!-- Botones de resultado (ocultos hasta que haya resultado) -->
+                    <div class="d-flex gap-2" id="ollamaBotonesResultado" style="display: none !important;">
+                        <button type="button" id="btnReintentar"
+                                class="btn btn-outline-primary" disabled>
+                            <i class="bi bi-arrow-clockwise"></i> Reintentar
+                        </button>
+                        <button type="button" id="btnAceptarMejora"
+                                class="btn btn-success" disabled>
+                            <i class="bi bi-check-circle"></i> Aceptar y aplicar
+                        </button>
+                    </div>
                 </div>
-                <!-- Botones de resultado (ocultos hasta que haya resultado) -->
-                <div class="d-flex gap-2" id="ollamaBotonesResultado" style="display: none !important;">
-                    <button type="button" id="btnReintentar"
-                            class="btn btn-outline-primary" disabled>
-                        <i class="bi bi-arrow-clockwise"></i> Reintentar
-                    </button>
-                    <button type="button" id="btnAceptarMejora"
-                            class="btn btn-success" disabled>
-                        <i class="bi bi-check-circle"></i> Aceptar y aplicar
-                    </button>
-                </div>
+
             </div>
 
         </div>
@@ -6723,7 +6723,7 @@ document.addEventListener('DOMContentLoaded', function() {
     .text-purple { color: #764ba2 !important; }
 
     /* ================================================================
-       BARRA DE ESTADÍSTICAS — chip técnico
+       BARRA DE ESTADÍSTICAS — chip técnico en el footer
        FIX: NO usar d-flex como clase permanente (Bootstrap lo fuerza
        con !important y rompe el display:none inicial del JS).
        El JS usa style.display='flex'/'none' directamente.
@@ -6732,12 +6732,9 @@ document.addEventListener('DOMContentLoaded', function() {
         /* layout aplicado por JS cuando se muestra */
         align-items: center;
         gap: 0.5rem;
-        padding: 0.4rem 1rem;
         font-size: 0.75rem;
         font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
         letter-spacing: 0.03em;
-        background-color: #f1f5f9;
-        border-top: 1px solid #e2e8f0;
         color: #64748b;
     }
     #diagEstadisticas i {
@@ -6842,8 +6839,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* Barra de estadísticas */
     [data-bs-theme="dark"] #diagEstadisticas {
-        background-color: #0f172a !important;
-        border-top-color: #334155 !important;
         color: #94a3b8 !important;
     }
     [data-bs-theme="dark"] #diagEstadisticas .stat-sep {
