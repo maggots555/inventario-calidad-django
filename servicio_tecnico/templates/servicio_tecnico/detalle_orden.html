@@ -391,7 +391,8 @@
                             <small class="text-muted">{{ form_config.diagnostico_sic.help_text }}</small>
 
                             {% if ollama_enabled %}
-                            {# Botón "Mejorar Diag. con IA" — solo visible si OLLAMA_ENABLED=True en .env #}
+                            {# Botón "Mejorar Diag. con IA" — visible si AI_ENABLED=True en .env #}
+                            {# Disponible con Ollama (local/Tailscale) y/o Google Gemini (nube) #}
                             {# Se habilita automáticamente cuando el técnico escribe ≥20 caracteres (TypeScript) #}
                             <div class="mt-2">
                                 <button type="button"
@@ -6418,8 +6419,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% if ollama_enabled %}
 <!-- ============================================================
-    MODAL: Mejorar Diagnóstico SIC con IA (Ollama)
-    Solo se renderiza si OLLAMA_ENABLED=True en .env
+    MODAL: Mejorar Diagnóstico SIC con IA (Ollama + Gemini)
+    Solo se renderiza si AI_ENABLED=True en .env
+    (al menos un proveedor habilitado: Ollama y/o Gemini)
     ============================================================ -->
 <div class="modal fade" id="modalMejorarDiagIA" tabindex="-1"
      aria-labelledby="modalMejorarDiagIALabel" aria-hidden="true">
@@ -6462,7 +6464,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <option value="{{ modelo }}">{{ modelo }}</option>
                                 {% endfor %}
                             </select>
-                            <small class="text-muted">Selecciona el modelo con el que quieres probar.</small>
+                            <small class="text-muted">Selecciona el modelo — <strong>[Gemini]</strong> usa la API de Google, <strong>[Ollama]</strong> usa el servidor local.</small>
                         </div>
                         <div class="col-12 col-md-4 d-grid">
                             <button type="button" id="btnGenerarMejora"
@@ -6547,6 +6549,16 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                     </div>
+
+                </div>
+
+                <!-- Barra de estadísticas de procesamiento (oculta hasta que haya resultado) -->
+                <div id="diagEstadisticas"
+                     class="px-3 py-2 text-muted align-items-center gap-2"
+                     style="display: none; font-size: 0.78rem;
+                            border-top: 1px solid var(--gray-200);
+                            background-color: var(--gray-100);">
+                    {# Contenido rellenado por JavaScript: tiempo · chars original → mejorado (±diff) #}
                 </div>
 
             </div>
@@ -6579,64 +6591,183 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Estilos del modal de IA (dark mode compatible) -->
 <style>
-    /* Botón "Mejorar Diag. con IA" — estilo morado/violeta */
+    /* ================================================================
+       MODAL IA — Estructura base
+       ================================================================ */
+
+    /* Animar entrada del modal-content */
+    #modalMejorarDiagIA .modal-content {
+        border: none;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+    }
+
+    /* Header con gradiente — sin border-radius inferior */
+    #modalMejorarDiagIA .modal-header {
+        border-radius: 0;
+        padding: 1rem 1.25rem;
+        border-bottom: none;
+    }
+
+    /* ================================================================
+       AVISO INFORMATIVO
+       ================================================================ */
+    #modalMejorarDiagIA .alert-info {
+        border-radius: 0;
+        border-left: 3px solid #0dcaf0;
+        border-right: none;
+        border-top: none;
+        border-bottom: 1px solid rgba(13,202,240,0.2);
+        background-color: #f0faff;
+        color: #0c5460;
+        font-size: 0.82rem;
+        padding: 0.55rem 1rem;
+    }
+
+    /* ================================================================
+       FASE 1 — Selector de modelo
+       ================================================================ */
+    #ollamaFaseConfig {
+        background-color: #fafafa;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    #ollamaFaseConfig .form-select {
+        border-color: #d0d7de;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+        letter-spacing: -0.01em;
+    }
+    #ollamaFaseConfig .form-select:focus {
+        border-color: #764ba2;
+        box-shadow: 0 0 0 3px rgba(118,75,162,0.12);
+    }
+
+    /* ================================================================
+       BOTÓN GENERAR / MEJORAR — estilo morado/violeta
+       ================================================================ */
     .btn-outline-purple {
         color: #764ba2;
         border-color: #764ba2;
-        transition: all 0.2s ease;
+        border-width: 1.5px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        transition: all 0.18s ease;
+        border-radius: 6px;
     }
     .btn-outline-purple:hover:not(:disabled) {
         background-color: #764ba2;
         border-color: #764ba2;
         color: #fff;
+        box-shadow: 0 4px 12px rgba(118,75,162,0.3);
+        transform: translateY(-1px);
+    }
+    .btn-outline-purple:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: none;
     }
     .btn-outline-purple:disabled {
         color: #adb5bd;
         border-color: #dee2e6;
         cursor: not-allowed;
-        opacity: 0.65;
+        opacity: 0.6;
     }
 
-    /* Badge de "Versión mejorada" */
+    /* ================================================================
+       BADGE IA — "Versión mejorada" y modelo activo
+       ================================================================ */
     .ollama-badge-ia {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: #fff;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+    }
+
+    /* ================================================================
+       FASE 2 — Barra de modelo activo
+       ================================================================ */
+    #ollamaFaseResultado > div:first-child {
+        background-color: #f8f6ff;
+        border-bottom: 1px solid #e4daf5;
+    }
+
+    /* ================================================================
+       PANELES — texto original y mejorado
+       ================================================================ */
+    .ollama-panel-texto,
+    .ollama-panel-mejorado {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 0.9rem !important;
+        line-height: 1.7 !important;
+        color: #1e293b;
+    }
+
+    /* Separador vertical entre paneles — más sutil */
+    #ollamaFaseResultado .border-end {
+        border-right: 1px solid #e9ecef !important;
+    }
+
+    /* Badge del modelo usado */
+    #diagModeloBadge {
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        font-size: 0.68rem;
+        letter-spacing: 0.02em;
     }
 
     /* Spinner morado */
     .text-purple { color: #764ba2 !important; }
 
     /* ================================================================
+       BARRA DE ESTADÍSTICAS — chip técnico
+       FIX: NO usar d-flex como clase permanente (Bootstrap lo fuerza
+       con !important y rompe el display:none inicial del JS).
+       El JS usa style.display='flex'/'none' directamente.
+       ================================================================ */
+    #diagEstadisticas {
+        /* layout aplicado por JS cuando se muestra */
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 1rem;
+        font-size: 0.75rem;
+        font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+        letter-spacing: 0.03em;
+        background-color: #f1f5f9;
+        border-top: 1px solid #e2e8f0;
+        color: #64748b;
+    }
+    #diagEstadisticas i {
+        font-size: 0.8rem;
+        opacity: 0.7;
+    }
+    /* Separador decorativo entre métricas */
+    #diagEstadisticas .stat-sep {
+        display: inline-block;
+        width: 1px;
+        height: 12px;
+        background-color: #cbd5e1;
+        margin: 0 0.4rem;
+        vertical-align: middle;
+    }
+
+    /* ================================================================
+       FOOTER
+       ================================================================ */
+    #modalMejorarDiagIA .modal-footer {
+        border-top: 1px solid #e9ecef;
+        background-color: #fafafa;
+        padding: 0.65rem 1.25rem;
+    }
+
+    /* ================================================================
        MODO OSCURO — Overrides para [data-bs-theme="dark"]
        ================================================================ */
-    [data-bs-theme="dark"] .ollama-panel-texto,
-    [data-bs-theme="dark"] .ollama-panel-mejorado {
-        background-color: var(--card-bg) !important;
-        border-color: var(--border-color) !important;
-        color: var(--text-primary);
-    }
 
-    [data-bs-theme="dark"] .btn-outline-purple {
-        color: #a78bfa;
-        border-color: #a78bfa;
-    }
-    [data-bs-theme="dark"] .btn-outline-purple:hover:not(:disabled) {
-        background-color: #7c3aed;
-        border-color: #7c3aed;
-        color: #fff;
-    }
-    [data-bs-theme="dark"] .btn-outline-purple:disabled {
-        color: #6b7280;
-        border-color: #374151;
-    }
-
-    [data-bs-theme="dark"] #diagModeloBadge {
-        background-color: var(--hover-bg) !important;
-        border-color: var(--border-color) !important;
-        color: var(--text-secondary) !important;
-    }
-
-    /* Modal completo — fondo sólido en dark mode */
+    /* Contenido del modal */
     [data-bs-theme="dark"] #modalMejorarDiagIA .modal-content {
         background-color: #1e293b !important;
         border-color: #334155 !important;
@@ -6645,18 +6776,84 @@ document.addEventListener('DOMContentLoaded', function() {
     [data-bs-theme="dark"] #modalMejorarDiagIA .modal-body {
         background-color: #1e293b !important;
     }
-    [data-bs-theme="dark"] #modalMejorarDiagIA .modal-footer {
-        background-color: #1e293b !important;
-        border-top-color: #334155 !important;
-    }
-    [data-bs-theme="dark"] #modalMejorarDiagIA .border-end {
-        border-color: #334155 !important;
-    }
-    /* Aviso informativo en dark mode */
+
+    /* Aviso informativo */
     [data-bs-theme="dark"] #modalMejorarDiagIA .alert-info {
-        background-color: #1e3a5f !important;
-        border-color: #1e5a8a !important;
-        color: #93c5fd !important;
+        background-color: rgba(14,165,233,0.08) !important;
+        border-left-color: #38bdf8 !important;
+        border-bottom-color: rgba(56,189,248,0.15) !important;
+        color: #7dd3fc !important;
+    }
+
+    /* Fase 1 */
+    [data-bs-theme="dark"] #ollamaFaseConfig {
+        background-color: #162032 !important;
+        border-bottom-color: #334155 !important;
+    }
+    [data-bs-theme="dark"] #ollamaFaseConfig .form-select {
+        background-color: #0f172a;
+        border-color: #334155;
+        color: var(--text-primary);
+    }
+    [data-bs-theme="dark"] #ollamaFaseConfig .form-select:focus {
+        border-color: #a78bfa;
+        box-shadow: 0 0 0 3px rgba(167,139,250,0.15);
+    }
+
+    /* Barra de modelo activo (Fase 2) */
+    [data-bs-theme="dark"] #ollamaFaseResultado > div:first-child {
+        background-color: #1a1535 !important;
+        border-bottom-color: #2d2350 !important;
+    }
+
+    /* Botón purple en dark */
+    [data-bs-theme="dark"] .btn-outline-purple {
+        color: #a78bfa;
+        border-color: #a78bfa;
+    }
+    [data-bs-theme="dark"] .btn-outline-purple:hover:not(:disabled) {
+        background-color: #7c3aed;
+        border-color: #7c3aed;
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(124,58,237,0.35);
+    }
+    [data-bs-theme="dark"] .btn-outline-purple:disabled {
+        color: #4b5563;
+        border-color: #374151;
+    }
+
+    /* Paneles de texto */
+    [data-bs-theme="dark"] .ollama-panel-texto,
+    [data-bs-theme="dark"] .ollama-panel-mejorado {
+        background-color: #0f172a !important;
+        border-color: #334155 !important;
+        color: var(--text-primary);
+    }
+    [data-bs-theme="dark"] #ollamaFaseResultado .border-end {
+        border-right-color: #334155 !important;
+    }
+
+    /* Badge modelo usado */
+    [data-bs-theme="dark"] #diagModeloBadge {
+        background-color: var(--hover-bg) !important;
+        border-color: var(--border-color) !important;
+        color: var(--text-secondary) !important;
+    }
+
+    /* Barra de estadísticas */
+    [data-bs-theme="dark"] #diagEstadisticas {
+        background-color: #0f172a !important;
+        border-top-color: #334155 !important;
+        color: #94a3b8 !important;
+    }
+    [data-bs-theme="dark"] #diagEstadisticas .stat-sep {
+        background-color: #334155;
+    }
+
+    /* Footer */
+    [data-bs-theme="dark"] #modalMejorarDiagIA .modal-footer {
+        background-color: #162032 !important;
+        border-top-color: #334155 !important;
     }
 </style>
 

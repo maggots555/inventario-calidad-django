@@ -2921,13 +2921,13 @@ def detalle_orden(request, orden_id):
         'feedback_satisfaccion_pendiente_id': request.session.pop('feedback_satisfaccion_pendiente_id', None),
         'feedback_satisfaccion_email': request.session.pop('feedback_satisfaccion_email', None),
 
-        # ── Integración Ollama — IA para mejora de diagnósticos SIC ──
+        # ── Integración IA — mejora de diagnósticos SIC (Ollama + Gemini) ──
         # Controla si el botón "Mejorar Diag. con IA" aparece en el template.
-        # Se lee desde settings (que a su vez lee desde .env con OLLAMA_ENABLED).
-        'ollama_enabled': getattr(settings, 'OLLAMA_ENABLED', False),
-        # Lista de modelos disponibles para el selector del modal de pruebas.
-        # Se lee desde OLLAMA_MODELS en settings (lista de strings).
-        'ollama_models': getattr(settings, 'OLLAMA_MODELS', []),
+        # AI_ENABLED es True si al menos un proveedor está habilitado en .env.
+        'ollama_enabled': getattr(settings, 'AI_ENABLED', False),
+        # Lista unificada de modelos de todos los proveedores habilitados.
+        # Formato: "[Proveedor] nombre_modelo" — ej: "[Gemini] gemini-2.0-flash"
+        'ollama_models': getattr(settings, 'AI_MODELS', []),
     }
     
     return render(request, 'servicio_tecnico/detalle_orden.html', context)
@@ -16569,14 +16569,18 @@ def perfil_empleado(request, empleado_id):
 
 # ============================================================================
 # VISTA AJAX: pulir_diagnostico_sic_ia
-# Endpoint que recibe el diagnóstico escrito por el técnico, lo envía a Ollama
-# y devuelve la versión mejorada para que el técnico decida si la acepta.
+# Endpoint que recibe el diagnóstico escrito por el técnico, lo envía al
+# proveedor de IA seleccionado (Ollama o Gemini) y devuelve la versión
+# mejorada para que el técnico decida si la acepta.
 #
 # FLUJO:
 # 1. Frontend hace POST con el diagnóstico original y datos del equipo
-# 2. Esta vista llama a ollama_client.mejorar_diagnostico()
-# 3. Devuelve JSON con el texto mejorado o un mensaje de error
-# 4. El frontend muestra el modal de comparación (antes vs después)
+# 2. Esta vista llama a ollama_client.mejorar_diagnostico_dispatch()
+# 3. El dispatcher detecta el proveedor según el nombre del modelo
+#    - "gemini-*"  → llama a gemini_client.mejorar_diagnostico()
+#    - cualquier otro → llama a ollama_client.mejorar_diagnostico()
+# 4. Devuelve JSON con el texto mejorado o un mensaje de error
+# 5. El frontend muestra el modal de comparación (antes vs después)
 #
 # NOTA: El técnico siempre tiene la última palabra — puede aceptar, reintentar
 # o descartar la mejora. El campo se guarda solo cuando el técnico hace clic
@@ -16587,11 +16591,15 @@ def perfil_empleado(request, empleado_id):
 @require_http_methods(["POST"])
 def pulir_diagnostico_sic_ia(request):
     """
-    API AJAX: Mejora la redacción del diagnóstico SIC usando Ollama.
+    API AJAX: Mejora la redacción del diagnóstico SIC usando IA (Ollama o Gemini).
+
+    El proveedor se selecciona automáticamente según el nombre del modelo:
+        - Nombres que empiecen con "gemini" → API de Google Gemini
+        - Cualquier otro nombre → Ollama (local/Tailscale)
 
     Recibe vía POST:
         - diagnostico_sic (str): Texto original del técnico (mínimo 20 caracteres)
-        - modelo (str, opcional): Modelo de Ollama a usar (override del default en settings)
+        - modelo (str, opcional): Modelo a usar (override del default en settings)
         - tipo_equipo (str, opcional): Tipo de equipo (Laptop, PC, AIO...)
         - marca (str, opcional): Marca del equipo
         - modelo_equipo (str, opcional): Modelo del equipo
@@ -16603,10 +16611,10 @@ def pulir_diagnostico_sic_ia(request):
         {'success': True, 'diagnostico_mejorado': '...', 'modelo_usado': '...'}
         {'success': False, 'error': '...mensaje...'}
     """
-    from .ollama_client import mejorar_diagnostico
+    from .ollama_client import mejorar_diagnostico_dispatch
 
-    # Verificar que Ollama está habilitado en este entorno
-    if not getattr(settings, 'OLLAMA_ENABLED', False):
+    # Verificar que al menos un proveedor de IA está habilitado en este entorno
+    if not getattr(settings, 'AI_ENABLED', False):
         return JsonResponse({
             'success': False,
             'error': 'La función de IA no está habilitada en este entorno.'
@@ -16623,7 +16631,7 @@ def pulir_diagnostico_sic_ia(request):
         }, status=400)
 
     # Modelo seleccionado por el usuario desde el selector del modal
-    # Si viene vacío, ollama_client usará el default de settings (OLLAMA_MODEL)
+    # El dispatcher determinará el proveedor según el nombre del modelo
     modelo_override = request.POST.get('modelo', '').strip()
 
     # Datos de contexto del equipo (opcionales — mejoran la calidad del prompt)
@@ -16636,13 +16644,17 @@ def pulir_diagnostico_sic_ia(request):
     falla_principal = request.POST.get('falla_principal', '')
 
     logger.info(
-        f"[OllamaIA] Solicitud de mejora SIC | Usuario: {request.user.username} | "
+        f"[IA-Diag] Solicitud de mejora SIC | Usuario: {request.user.username} | "
         f"Modelo: {modelo_override or 'default'} | "
         f"Equipo: {marca} {modelo_equipo} | Longitud diagnóstico: {len(diagnostico_sic)} chars"
     )
 
-    # Llamar al cliente de Ollama
-    resultado = mejorar_diagnostico(
+    # Medir el tiempo de respuesta del modelo para mostrarlo en la UI
+    import time as _time
+    _t_inicio = _time.monotonic()
+
+    # Llamar al dispatcher — enruta a Gemini u Ollama según el nombre del modelo
+    resultado = mejorar_diagnostico_dispatch(
         diagnostico_sic=diagnostico_sic,
         tipo_equipo=tipo_equipo,
         marca=marca,
@@ -16653,7 +16665,13 @@ def pulir_diagnostico_sic_ia(request):
         modelo_override=modelo_override,
     )
 
+    tiempo_ms = int((_time.monotonic() - _t_inicio) * 1000)
+
     if resultado['success']:
+        # Enriquecer la respuesta con estadísticas para la UI
+        resultado['tiempo_ms'] = tiempo_ms
+        resultado['chars_original'] = len(diagnostico_sic)
+        resultado['chars_mejorado'] = len(resultado.get('diagnostico_mejorado', ''))
         return JsonResponse(resultado)
     else:
         # Devolver el error con status 200 para que el frontend lo maneje

@@ -752,37 +752,38 @@ RATELIMIT_USE_CACHE = 'default'       # Usar cache de Redis para tracking
 RATELIMIT_IP_META_KEY = _get_client_ip
 
 # ============================================================================
-# INTEGRACIÓN CON OLLAMA — IA LOCAL PARA MEJORA DE DIAGNÓSTICOS SIC
+# INTEGRACIÓN CON IA — MEJORA DE DIAGNÓSTICOS SIC
+# Soporta dos proveedores: Ollama (local/Tailscale) y Google Gemini (nube)
 # ============================================================================
+
+# ----------------------------------------------------------------------------
+# PROVEEDOR 1: OLLAMA (modelos locales o remotos via Tailscale)
+# ----------------------------------------------------------------------------
 # EXPLICACIÓN PARA PRINCIPIANTES:
 # Ollama es un servidor local de modelos de lenguaje (LLM) que corre en tu
-# máquina. Lo usamos para mejorar la redacción de los diagnósticos técnicos
-# que escriben los técnicos, sin cambiar su contenido.
+# máquina o en una máquina remota accesible via Tailscale.
 #
 # OLLAMA_ENABLED:
-#   True  → Habilita el botón "Mejorar Diag. con IA" en el detalle de la orden
-#   False → El botón no aparece en la UI (producción sin GPU, por ejemplo)
+#   True  → Habilita modelos Ollama en el selector de IA
+#   False → Los modelos de Ollama no aparecen en la UI
 #
 # OLLAMA_BASE_URL:
 #   Desarrollo local con GPU:      http://localhost:11434
-#   Producción via Tailscale:      http://100.64.x.y:11434  (IP de la máquina con GPU)
-#   Sin Ollama:                    No importa (OLLAMA_ENABLED=False)
+#   Producción via Tailscale:      http://100.64.x.y:11434
 #
 # OLLAMA_MODEL:
-#   Modelos recomendados: gemma3:12b (alta calidad), gemma3:4b (más rápido)
+#   Modelo predeterminado. Recomendados: gemma3:12b (calidad), gemma3:4b (rápido)
 #
 # OLLAMA_TIMEOUT:
-#   Segundos que espera Django antes de abortar la llamada a Ollama.
-#   120 segundos es apropiado para modelos medianos (12B) con GPU dedicada.
+#   Segundos antes de abortar la llamada. 120s es apropiado para modelos 12B con GPU.
 
 OLLAMA_ENABLED = config('OLLAMA_ENABLED', default=False, cast=bool)
 OLLAMA_BASE_URL = config('OLLAMA_BASE_URL', default='http://localhost:11434')
 OLLAMA_MODEL = config('OLLAMA_MODEL', default='gemma3:12b')
 OLLAMA_TIMEOUT = config('OLLAMA_TIMEOUT', default=120, cast=int)
 
-# OLLAMA_MODELS: lista de modelos disponibles para seleccionar en el modal de pruebas.
-# Formato: nombres separados por coma, sin espacios alrededor de las comas.
-# Ejemplo: gemma3:12b,gemma3:4b,qwen2.5-coder:7b
+# OLLAMA_MODELS: lista de modelos Ollama disponibles para el selector.
+# Formato: nombres separados por coma. Ejemplo: gemma3:12b,gemma3:4b
 # Si no se define, se usa OLLAMA_MODEL como única opción.
 _ollama_models_raw = config('OLLAMA_MODELS', default='')
 OLLAMA_MODELS: list[str] = (
@@ -790,3 +791,69 @@ OLLAMA_MODELS: list[str] = (
     if _ollama_models_raw.strip()
     else [OLLAMA_MODEL]
 )
+
+# ----------------------------------------------------------------------------
+# PROVEEDOR 2: GOOGLE GEMINI (API en la nube — Google AI Studio)
+# ----------------------------------------------------------------------------
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Gemini es el modelo de IA de Google, accesible vía API REST en la nube.
+# No requiere GPU local — solo una API Key generada en Google AI Studio.
+# URL para obtener tu API Key: https://aistudio.google.com/app/apikey
+#
+# GEMINI_ENABLED:
+#   True  → Habilita modelos Gemini en el selector de IA
+#   False → Los modelos de Gemini no aparecen en la UI
+#
+# GEMINI_API_KEY:
+#   Clave de API generada en Google AI Studio. Mantén este valor SECRETO.
+#   NUNCA la expongas en código o commits.
+#
+# GEMINI_MODEL:
+#   Modelo predeterminado. Recomendados:
+#     gemini-2.0-flash      → rápido, bajo costo, excelente para corrección de texto
+#     gemini-1.5-pro        → mayor calidad, más lento
+#     gemini-1.5-flash      → balance velocidad/calidad
+#
+# GEMINI_TIMEOUT:
+#   Segundos antes de abortar la llamada. 60s es suficiente para la API de Google.
+
+GEMINI_ENABLED = config('GEMINI_ENABLED', default=False, cast=bool)
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-2.0-flash')
+GEMINI_TIMEOUT = config('GEMINI_TIMEOUT', default=60, cast=int)
+
+# GEMINI_MODELS: lista de modelos Gemini disponibles para el selector.
+# Formato: nombres separados por coma. Ejemplo: gemini-2.0-flash,gemini-1.5-pro
+# Si no se define, se usa GEMINI_MODEL como única opción.
+_gemini_models_raw = config('GEMINI_MODELS', default='')
+GEMINI_MODELS: list[str] = (
+    [m.strip() for m in _gemini_models_raw.split(',') if m.strip()]
+    if _gemini_models_raw.strip()
+    else [GEMINI_MODEL]
+)
+
+# ----------------------------------------------------------------------------
+# LISTA UNIFICADA AI_MODELS — Combina Ollama + Gemini para el selector del modal
+# ----------------------------------------------------------------------------
+# Formato en la UI: "[Proveedor] nombre_modelo"
+# El dispatcher en ollama_client.py detecta el proveedor por el prefijo "gemini" en el nombre.
+# Los prefijos visuales ("[Gemini] ", "[Ollama] ") se remueven antes de llamar a la API.
+#
+# Ejemplo de lista resultante:
+#   ["[Ollama] gemma4:e2b", "[Gemini] gemini-2.0-flash", "[Gemini] gemini-1.5-pro"]
+
+_ai_models: list[str] = []
+
+if OLLAMA_ENABLED:
+    _ai_models.extend([f'[Ollama] {m}' for m in OLLAMA_MODELS])
+
+if GEMINI_ENABLED:
+    _ai_models.extend([f'[Gemini] {m}' for m in GEMINI_MODELS])
+
+# AI_MODELS: lista final que el template usa para el <select> del modal.
+# Si ningún proveedor está habilitado, la lista queda vacía (el botón no aparece).
+AI_MODELS: list[str] = _ai_models
+
+# AI_ENABLED: True si al menos un proveedor está habilitado.
+# El template usa esta variable para mostrar/ocultar el botón "Mejorar Diag. con IA".
+AI_ENABLED: bool = bool(_ai_models)

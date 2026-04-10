@@ -47,6 +47,10 @@ interface OllamaResponse {
     diagnostico_mejorado?: string;
     modelo_usado?: string;
     error?: string;
+    // Estadísticas de procesamiento (agregadas por el backend en views.py)
+    tiempo_ms?: number;
+    chars_original?: number;
+    chars_mejorado?: number;
 }
 
 interface DatosEquipo {
@@ -87,6 +91,7 @@ function iniciarMejorarDiagSIC(
     const alertaError     = modalEl.querySelector('#diagErrorAlerta') as HTMLElement;
     const textoError      = modalEl.querySelector('#diagErrorTexto') as HTMLElement;
     const diagModeloBadge = modalEl.querySelector('#diagModeloBadge') as HTMLElement;
+    const diagEstadisticas = modalEl.querySelector('#diagEstadisticas') as HTMLElement;
 
     // --- Referencias footer ---
     const botonesResultado = modalEl.querySelector('#ollamaBotonesResultado') as HTMLElement;
@@ -98,6 +103,7 @@ function iniciarMejorarDiagSIC(
         !faseResultado || !modeloActivo || !btnCambiarMod ||
         !panelOriginal || !spinnerMejorado || !textMejorado ||
         !alertaError || !textoError || !diagModeloBadge ||
+        !diagEstadisticas ||
         !botonesResultado || !btnAceptar || !btnReintentar) {
         console.warn('[OllamaIA] Faltan elementos del modal — verificar el template.');
         return;
@@ -170,12 +176,13 @@ function iniciarMejorarDiagSIC(
         btnAceptar.disabled = true;
         btnReintentar.disabled = true;
         diagModeloBadge.style.display = 'none';
+        diagEstadisticas.style.display = 'none';
     }
 
     // ========================================================================
     // ESTADO: RESULTADO EXITOSO — Texto mejorado en el panel derecho
     // ========================================================================
-    function mostrarResultado(texto: string, modelo: string): void {
+    function mostrarResultado(texto: string, modelo: string, stats?: Pick<OllamaResponse, 'tiempo_ms' | 'chars_original' | 'chars_mejorado'>): void {
         spinnerMejorado.classList.add('d-none');
         spinnerMejorado.classList.remove('d-flex');
         alertaError.style.display = 'none';
@@ -187,6 +194,23 @@ function iniciarMejorarDiagSIC(
         if (modelo) {
             diagModeloBadge.textContent = `Modelo: ${modelo}`;
             diagModeloBadge.style.display = 'inline-block';
+        }
+
+        // Mostrar barra de estadísticas si el backend las incluye
+        if (stats && stats.tiempo_ms !== undefined && stats.chars_original !== undefined && stats.chars_mejorado !== undefined) {
+            const segs: string = (stats.tiempo_ms / 1000).toFixed(1);
+            const diff: number = stats.chars_mejorado - stats.chars_original;
+            const diffStr: string = diff >= 0 ? `+${diff}` : `${diff}`;
+            const diffColor: string = diff > 0 ? 'color:#16a34a' : diff < 0 ? 'color:#dc2626' : '';
+            diagEstadisticas.innerHTML =
+                `<i class="bi bi-clock" title="Tiempo de procesamiento"></i> ${segs}s` +
+                `<span class="stat-sep"></span>` +
+                `<i class="bi bi-body-text" title="Caracteres"></i> ${stats.chars_original} → ${stats.chars_mejorado}` +
+                `<span class="stat-sep"></span>` +
+                `<span style="${diffColor};font-weight:500;">${diffStr} chars</span>`;
+            diagEstadisticas.style.display = 'flex';
+        } else {
+            diagEstadisticas.style.display = 'none';
         }
     }
 
@@ -202,6 +226,7 @@ function iniciarMejorarDiagSIC(
         btnAceptar.disabled = true;
         btnReintentar.disabled = false;
         diagModeloBadge.style.display = 'none';
+        diagEstadisticas.style.display = 'none';
     }
 
     // ========================================================================
@@ -244,7 +269,11 @@ function iniciarMejorarDiagSIC(
 
             if (data.success && data.diagnostico_mejorado) {
                 textoPropuesto = data.diagnostico_mejorado;
-                mostrarResultado(data.diagnostico_mejorado, data.modelo_usado ?? modeloSeleccionado);
+                mostrarResultado(
+                    data.diagnostico_mejorado,
+                    data.modelo_usado ?? modeloSeleccionado,
+                    { tiempo_ms: data.tiempo_ms, chars_original: data.chars_original, chars_mejorado: data.chars_mejorado }
+                );
             } else {
                 mostrarError(data.error ?? 'Error desconocido al procesar la solicitud.');
             }

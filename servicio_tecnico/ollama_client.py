@@ -165,6 +165,17 @@ def mejorar_diagnostico(
             }
         ],
         "stream": False,
+        # THINKING (razonamiento interno):
+        # Ollama >= 0.7.0 soporta "think": false para desactivar el thinking en
+        # modelos que lo tienen (gemma4, qwq, deepseek-r1, etc.).
+        # Con "think": false el modelo responde más rápido porque omite el
+        # razonamiento interno — ideal para corrección de texto donde no se
+        # necesita pensamiento profundo.
+        #
+        # Tu versión actual de Ollama es 0.20.4 — este campo se ignora
+        # silenciosamente. Cuando actualices a >= 0.7.0 empezará a funcionar
+        # automáticamente sin necesitar más cambios aquí.
+        "think": False,
         "options": {
             # Temperatura baja = respuestas más conservadoras y predecibles
             # Ideal para corrección de texto (no queremos creatividad excesiva)
@@ -275,3 +286,102 @@ def mejorar_diagnostico(
             'success': False,
             'error': f'Error inesperado: {str(e)}'
         }
+
+
+# ============================================================================
+# DISPATCHER — Enruta la solicitud al proveedor correcto según el nombre del modelo
+# ============================================================================
+
+def mejorar_diagnostico_dispatch(
+    diagnostico_sic: str,
+    tipo_equipo: str = "",
+    marca: str = "",
+    modelo: str = "",
+    gama: str = "",
+    equipo_enciende: bool = True,
+    falla_principal: str = "",
+    modelo_override: str = "",
+) -> dict:
+    """
+    Dispatcher central: detecta el proveedor de IA según el nombre del modelo
+    y delega la llamada al cliente correcto (Gemini o Ollama).
+
+    Regla de detección:
+        - Si el modelo empieza con "gemini" (ej: gemini-2.0-flash) → API de Google Gemini
+        - Cualquier otro nombre → Ollama (local o remoto via Tailscale)
+
+    Esto permite al frontend enviar cualquier modelo del selector unificado
+    sin necesidad de saber a qué proveedor pertenece.
+
+    Args:
+        diagnostico_sic: Texto original del técnico
+        tipo_equipo, marca, modelo, gama, equipo_enciende, falla_principal:
+            Datos de contexto del equipo
+        modelo_override: Nombre del modelo seleccionado en la UI
+
+    Returns:
+        dict con estructura estándar:
+            {'success': True, 'diagnostico_mejorado': '...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...mensaje...'}
+    """
+    from django.conf import settings
+
+    # Determinar el nombre limpio del modelo para la detección del proveedor
+    # (puede venir con prefijo visual "[Gemini] " o "[Ollama] " desde la UI)
+    nombre_modelo = modelo_override.strip()
+
+    # Remover prefijos visuales si los trae la UI antes de detectar el proveedor
+    nombre_limpio = nombre_modelo
+    for prefijo in ('[Gemini] ', '[Ollama] '):
+        if nombre_limpio.startswith(prefijo):
+            nombre_limpio = nombre_limpio[len(prefijo):]
+            break
+
+    # ── DETECCIÓN DEL PROVEEDOR ──
+    # Si el nombre del modelo empieza con "gemini", va a la API de Google.
+    # Caso contrario, siempre va a Ollama (modelo local/Tailscale).
+    es_gemini = nombre_limpio.lower().startswith('gemini')
+
+    if es_gemini:
+        # Verificar que Gemini está habilitado antes de llamar al cliente
+        if not getattr(settings, 'GEMINI_ENABLED', False):
+            return {
+                'success': False,
+                'error': (
+                    'El modelo Gemini no está habilitado en este entorno. '
+                    'Activa GEMINI_ENABLED=True en la configuración.'
+                )
+            }
+        from . import gemini_client
+        logger.info(f"[Dispatcher] Modelo '{nombre_limpio}' → Proveedor: Gemini")
+        return gemini_client.mejorar_diagnostico(
+            diagnostico_sic=diagnostico_sic,
+            tipo_equipo=tipo_equipo,
+            marca=marca,
+            modelo=modelo,
+            gama=gama,
+            equipo_enciende=equipo_enciende,
+            falla_principal=falla_principal,
+            modelo_override=nombre_limpio,  # pasamos el nombre limpio (sin prefijo)
+        )
+    else:
+        # Verificar que Ollama está habilitado
+        if not getattr(settings, 'OLLAMA_ENABLED', False):
+            return {
+                'success': False,
+                'error': (
+                    'El servicio de Ollama no está habilitado en este entorno. '
+                    'Activa OLLAMA_ENABLED=True en la configuración.'
+                )
+            }
+        logger.info(f"[Dispatcher] Modelo '{nombre_limpio}' → Proveedor: Ollama")
+        return mejorar_diagnostico(
+            diagnostico_sic=diagnostico_sic,
+            tipo_equipo=tipo_equipo,
+            marca=marca,
+            modelo=modelo,
+            gama=gama,
+            equipo_enciende=equipo_enciende,
+            falla_principal=falla_principal,
+            modelo_override=nombre_limpio,  # pasamos el nombre limpio (sin prefijo)
+        )
