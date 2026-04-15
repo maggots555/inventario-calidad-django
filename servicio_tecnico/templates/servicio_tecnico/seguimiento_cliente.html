@@ -25,12 +25,48 @@
 
 <canvas id="particles-canvas"></canvas>
 
-{# Botón flotante de modo oscuro #}
+{% if estado != 'invalido' %}
+{% comment %}
+CHATBOT DE IA — Solo para estados con datos reales de la orden
+(tracking, finalizado, entregado)
+{% endcomment %}
+
+{# Burbuja flotante: botón para abrir/cerrar el chat #}
+<button id="chat-ia-bubble"
+        class="st-chat-bubble"
+        type="button"
+        aria-label="Abrir asistente virtual"
+        aria-expanded="false"
+        aria-controls="chat-ia-panel"
+        data-chat-endpoint="/seguimiento/{{ token }}/chat/"
+        data-ai-enabled="{{ ai_enabled|yesno:'true,false' }}">
+  <span class="st-chat-bubble-icon st-chat-bubble-icon--open" aria-hidden="true">
+    {# Icono robot IA #}
+    <img src="{% static 'images/utilitys/icon_chat_robot.svg' %}" width="28" height="28" alt="" style="filter: brightness(0) invert(1);">
+  </span>
+  <span class="st-chat-bubble-icon st-chat-bubble-icon--close" aria-hidden="true">
+    {# Icono X para cerrar #}
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </span>
+  {# Badge "Nuevo" visible solo en la primera visita #}
+  <span class="st-chat-bubble-badge" id="chat-ia-badge" aria-hidden="true">Nuevo</span>
+</button>
+
+{# Botón flotante de modo oscuro — va después del chat #}
 <button id="darkModeToggle" class="st-dark-toggle" type="button" aria-label="Cambiar tema">
   <span class="st-dark-toggle-icon st-dark-toggle-icon--light">☀️</span>
   <span class="st-dark-toggle-icon st-dark-toggle-icon--dark">🌙</span>
 </button>
 
+{% else %}
+{# ESTADO INVÁLIDO — sin chat, solo el botón de tema #}
+<button id="darkModeToggle" class="st-dark-toggle" type="button" aria-label="Cambiar tema">
+  <span class="st-dark-toggle-icon st-dark-toggle-icon--light">☀️</span>
+  <span class="st-dark-toggle-icon st-dark-toggle-icon--dark">🌙</span>
+</button>
+{% endif %}
 {% if estado == 'invalido' %}
 {# ESTADO INVÁLIDO — Token expirado, cancelado o inexistente #}
 <div class="st-card">
@@ -592,6 +628,86 @@
 
 {# === Toggle de modo oscuro (persistente vía localStorage) === #}
 <script src="{% static 'js/dark_mode.js' %}"></script>
+
+{% if estado != 'invalido' %}
+{# Panel de chat (se expande al hacer clic en la burbuja) #}
+<div id="chat-ia-panel"
+     class="st-chat-panel"
+     role="dialog"
+     aria-modal="false"
+     aria-label="Asistente virtual de seguimiento"
+     aria-hidden="true">
+
+  {# Header del panel #}
+  <div class="st-chat-panel-header">
+    <div class="st-chat-panel-header-info">
+      <span class="st-chat-panel-avatar" aria-hidden="true">
+        <img src="{% static 'images/utilitys/icon_chat_robot_animated.svg' %}" width="22" height="22" alt="" style="filter: brightness(0) invert(1);">
+      </span>
+      <div>
+        <p class="st-chat-panel-name">SIC Asistente</p>
+        <span class="st-chat-panel-status" id="chat-ia-status-label">IA · Responde al instante</span>
+      </div>
+    </div>
+    <button class="st-chat-panel-close" type="button" aria-label="Cerrar asistente" id="chat-ia-close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+
+  {# Mensajes del chat #}
+  <div class="st-chat-messages" id="chat-ia-messages" role="log" aria-live="polite" aria-relevant="additions">
+    {# Mensaje de bienvenida inicial (hardcoded, no cuenta como turno del historial) #}
+    <div class="st-chat-msg st-chat-msg--bot" data-welcome="1">
+      <div class="st-chat-msg-bubble">
+        👋 Hola, soy el asistente virtual de SIC Fix. Puedo responder preguntas sobre tu equipo en reparación. ¿En qué puedo ayudarte?
+      </div>
+    </div>
+  </div>
+
+  {# Sugerencias rápidas (chips visibles solo al inicio) #}
+  <div class="st-chat-suggestions" id="chat-ia-suggestions" aria-label="Preguntas frecuentes">
+    <button class="st-chat-chip" type="button">¿Cuándo estará listo?</button>
+    <button class="st-chat-chip" type="button">¿Qué le encontraron?</button>
+    <button class="st-chat-chip" type="button">¿Hay piezas pendientes?</button>
+    <button class="st-chat-chip" type="button">¿Puedo pasar a recogerlo?</button>
+  </div>
+
+  {# Input del usuario #}
+  <div class="st-chat-input-area">
+    <div class="st-chat-input-wrapper">
+      <textarea
+        id="chat-ia-input"
+        class="st-chat-input"
+        placeholder="Escribe tu pregunta..."
+        rows="1"
+        maxlength="500"
+        aria-label="Escribe tu pregunta al asistente"
+        autocomplete="off"
+        autocorrect="on"
+        spellcheck="true"></textarea>
+      <button id="chat-ia-send"
+              class="st-chat-send-btn"
+              type="button"
+              aria-label="Enviar pregunta"
+              disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </button>
+    </div>
+    <p class="st-chat-disclaimer">
+      Las respuestas son generadas por IA y pueden no reflejar todos los detalles. Para información crítica, contacta a tu responsable.
+    </p>
+  </div>
+
+</div>
+{# /chat-ia-panel #}
+
+{# Script del chatbot (TypeScript compilado) #}
+<script src="{% static 'js/seguimiento_chat.js' %}"></script>
+{% endif %}
 
 </body>
 </html>

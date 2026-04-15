@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Antena -->
+  <line x1="32" y1="6" x2="32" y2="14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="32" cy="4.5" r="2.5" fill="currentColor"/>
+
+  <!-- Cabeza -->
+  <rect x="14" y="14" width="36" height="26" rx="7" ry="7" fill="currentColor" opacity="0.15"/>
+  <rect x="14" y="14" width="36" height="26" rx="7" ry="7" stroke="currentColor" stroke-width="2.2"/>
+
+  <!-- Ojos -->
+  <circle cx="24" cy="26" r="4" fill="currentColor" opacity="0.2"/>
+  <circle cx="24" cy="26" r="4" stroke="currentColor" stroke-width="2"/>
+  <circle cx="25.2" cy="24.8" r="1.4" fill="currentColor"/>
+
+  <circle cx="40" cy="26" r="4" fill="currentColor" opacity="0.2"/>
+  <circle cx="40" cy="26" r="4" stroke="currentColor" stroke-width="2"/>
+  <circle cx="41.2" cy="24.8" r="1.4" fill="currentColor"/>
+
+  <!-- Boca (sonrisa) -->
+  <path d="M25 32.5 Q32 37 39 32.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+
+  <!-- Orejas / botones laterales -->
+  <rect x="9" y="22" width="5" height="9" rx="2.5" fill="currentColor" opacity="0.5"/>
+  <rect x="50" y="22" width="5" height="9" rx="2.5" fill="currentColor" opacity="0.5"/>
+
+  <!-- Cuerpo -->
+  <rect x="20" y="42" width="24" height="14" rx="5" ry="5" fill="currentColor" opacity="0.15"/>
+  <rect x="20" y="42" width="24" height="14" rx="5" ry="5" stroke="currentColor" stroke-width="2.2"/>
+
+  <!-- Indicador de señal en el cuerpo -->
+  <circle cx="28" cy="49" r="2" fill="currentColor" opacity="0.7"/>
+  <circle cx="36" cy="49" r="2" fill="currentColor" opacity="0.7"/>
+</svg>

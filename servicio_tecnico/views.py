@@ -17,6 +17,7 @@ from django.http import JsonResponse, HttpResponse
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.clickjacking import xframe_options_exempt
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.cache import cache_page
 from django_ratelimit.decorators import ratelimit
 from django.conf import settings
@@ -3301,6 +3302,11 @@ def seguimiento_orden_cliente(request, token):
         'siguiente_paso': siguiente_paso_texto,
         'imagenes_galeria': imagenes_galeria,
         'seguimientos_piezas': seguimientos_piezas,
+        # ── Chat de IA ──
+        # token: lo necesita el template para construir la URL del endpoint AJAX
+        # ai_enabled: controla si se renderiza el widget del chatbot
+        'token': token,
+        'ai_enabled': getattr(settings, 'AI_ENABLED', False),
     }
 
     if estado_orden == 'entregado':
@@ -16677,3 +16683,231 @@ def pulir_diagnostico_sic_ia(request):
         # Devolver el error con status 200 para que el frontend lo maneje
         # (es un error de negocio, no un error HTTP)
         return JsonResponse(resultado, status=200)
+
+
+# ============================================================================
+# VISTA AJAX PÚBLICA: chat_seguimiento_cliente
+# Endpoint del chatbot de IA para la vista de seguimiento del cliente.
+#
+# Esta vista es PÚBLICA (no requiere @login_required) porque la abre el cliente
+# desde su enlace de seguimiento por token. La seguridad se basa en:
+#   1. Validación del token (mismo mecanismo que seguimiento_orden_cliente)
+#   2. Rate limiting estricto por IP (5 req/minuto — más restrictivo que el resto)
+#   3. El contexto del prompt se construye EXCLUSIVAMENTE con los datos de esa orden
+#   4. El prompt prohíbe explícitamente revelar datos de otras órdenes
+#
+# Endpoint: POST /seguimiento/<token>/chat/
+# Formato POST:
+#   - pregunta (str): Pregunta del cliente (máx 500 caracteres)
+#   - historial (str, JSON): Array de {role, content} con los últimos turnos
+#
+# Respuesta JSON exitosa:
+#   {success: true, respuesta: "...", modelo_usado: "..."}
+# Respuesta de error:
+#   {success: false, error: "...mensaje amigable..."}
+# ============================================================================
+
+@csrf_exempt
+@ratelimit(key='ip', rate='5/m', method=['POST'])
+def chat_seguimiento_cliente(request, token):
+    """
+    API AJAX del chatbot de IA en la vista pública de seguimiento del cliente.
+
+    Construye el contexto completo de la orden y lo inyecta en el prompt
+    del sistema para que la IA pueda responder preguntas del cliente de forma
+    precisa y segura, sin revelar datos de otras órdenes ni información interna.
+
+    SEGURIDAD:
+    - Valida el token antes de procesar cualquier pregunta
+    - Rate limit: 5 peticiones/minuto por IP (protección contra abuso)
+    - El contexto del prompt está acotado a los datos de esta orden específica
+    - Prompt con instrucciones explícitas anti-prompt-injection
+    """
+    import json as _json
+    import time as _time
+    from .models import EnlaceSeguimientoCliente
+    from .ollama_client import construir_prompt_seguimiento, chat_seguimiento_dispatch
+    from config.constants import ESTADO_ORDEN_CHOICES
+
+    # ── Verificar que al menos un proveedor de IA está habilitado ──
+    if not getattr(settings, 'AI_ENABLED', False):
+        return JsonResponse({
+            'success': False,
+            'error': 'El asistente no está habilitado en este entorno.'
+        }, status=503)
+
+    # ── Solo aceptar POST ──
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+    # ── Obtener IP del cliente para logging ──
+    _xfwd = request.META.get('HTTP_X_FORWARDED_FOR')
+    _ip = _xfwd.split(',')[0].strip() if _xfwd else request.META.get('REMOTE_ADDR', '?')
+
+    # ── Validar el token (mismo mecanismo que la vista padre) ──
+    try:
+        enlace = EnlaceSeguimientoCliente.objects.select_related(
+            'orden__detalle_equipo',
+            'orden__sucursal',
+            'orden__responsable_seguimiento',
+        ).get(token=token)
+    except EnlaceSeguimientoCliente.DoesNotExist:
+        logger.warning(
+            "[ChatSeg][SEGURIDAD] Token inexistente | IP: %s | token: %s...",
+            _ip, token[:8]
+        )
+        return JsonResponse({'success': False, 'error': 'Enlace de seguimiento no válido.'}, status=404)
+
+    if not enlace.esta_disponible:
+        return JsonResponse({
+            'success': False,
+            'error': 'Este enlace de seguimiento ha expirado.'
+        }, status=410)
+
+    # ── Extraer y validar la pregunta del cliente ──
+    pregunta = request.POST.get('pregunta', '').strip()
+    if not pregunta:
+        return JsonResponse({'success': False, 'error': 'La pregunta no puede estar vacía.'}, status=400)
+
+    if len(pregunta) > 500:
+        return JsonResponse({
+            'success': False,
+            'error': 'La pregunta es demasiado larga. Por favor, sé más específico (máx. 500 caracteres).'
+        }, status=400)
+
+    # ── Parsear el historial de conversación del cliente (enviado como JSON) ──
+    historial_raw = request.POST.get('historial', '[]')
+    try:
+        historial_mensajes: list[dict] = _json.loads(historial_raw)
+        # Validar estructura básica: debe ser lista de dicts con 'role' y 'content'
+        if not isinstance(historial_mensajes, list):
+            historial_mensajes = []
+        else:
+            historial_mensajes = [
+                msg for msg in historial_mensajes
+                if isinstance(msg, dict)
+                and msg.get('role') in ('user', 'assistant')
+                and isinstance(msg.get('content'), str)
+                and len(msg.get('content', '')) <= 2000  # Límite de seguridad por mensaje
+            ]
+    except (_json.JSONDecodeError, ValueError):
+        historial_mensajes = []
+
+    # ── Construir el contexto de la orden para el prompt ──
+    orden = enlace.orden
+    detalle = orden.detalle_equipo
+
+    # Estado actual en texto público amigable (mismo dict que la vista padre)
+    estado_dict = dict(ESTADO_ORDEN_CHOICES)
+    NOMBRES_PUBLICOS = {
+        'cotizacion': 'Cotización enviada, en espera de aprobación',
+        'control_calidad': 'Equipo reparado, en control de calidad',
+        'finalizado': 'Finalizado — pendiente de confirmación de entrega por el responsable de seguimiento',
+    }
+    estado_codigo = orden.estado or ''
+    estado_actual_texto = NOMBRES_PUBLICOS.get(
+        estado_codigo,
+        estado_dict.get(estado_codigo, estado_codigo.replace('_', ' ').title())
+    )
+
+    # Timeline en texto para el prompt (simplificado, sin HTML)
+    historial_estados_qs = HistorialOrden.objects.filter(
+        orden=orden,
+        tipo_evento='cambio_estado',
+    ).order_by('fecha_evento').values('estado_nuevo', 'fecha_evento')
+
+    timeline_lineas = []
+    for h in historial_estados_qs:
+        codigo = h['estado_nuevo']
+        fecha = h['fecha_evento']
+        if not codigo:
+            continue
+        nombre = NOMBRES_PUBLICOS.get(
+            codigo,
+            estado_dict.get(codigo, codigo.replace('_', ' ').title())
+        )
+        fecha_str = fecha.strftime('%d/%m/%Y %H:%M') if fecha else '?'
+        timeline_lineas.append(f"  • {nombre} ({fecha_str})")
+    timeline_texto = "\n".join(timeline_lineas) if timeline_lineas else "  Sin registros aún"
+
+    # Nombre del responsable de seguimiento
+    nombre_responsable = ""
+    if orden.responsable_seguimiento:
+        nombre_responsable = orden.responsable_seguimiento.nombre_completo
+
+    # Estado de piezas en texto (si hay seguimientos activos)
+    piezas_texto = ""
+    from .models import SeguimientoPieza
+    seguimientos_piezas_qs = SeguimientoPieza.objects.filter(
+        cotizacion__orden=orden
+    ).order_by('fecha_pedido')
+    if seguimientos_piezas_qs.exists():
+        piezas_lineas = []
+        ESTADOS_PIEZA = {
+            'pendiente': 'Pedido en camino',
+            'recibido': 'Recibido',
+            'wpb': 'Pieza incorrecta (en gestión)',
+            'doa': 'Pieza dañada (en gestión)',
+            'pnc': 'Pieza no disponible',
+        }
+        for pieza in seguimientos_piezas_qs:
+            estado_pieza = ESTADOS_PIEZA.get(
+                getattr(pieza, 'estado', ''), getattr(pieza, 'estado', 'Desconocido')
+            )
+            desc = getattr(pieza, 'descripcion', '') or ''
+            nombre_pieza = getattr(pieza, 'nombre', '') or ''
+            piezas_lineas.append(
+                f"  • {nombre_pieza or desc or 'Pieza'}: {estado_pieza}"
+            )
+        piezas_texto = "\n".join(piezas_lineas)
+
+    # Folio de la orden (público: orden_cliente del detalle, o número interno como fallback)
+    folio = (detalle.orden_cliente if detalle and detalle.orden_cliente else None) \
+            or orden.numero_orden_interno or str(orden.pk)
+
+    # ── Construir los mensajes para el modelo ──
+    mensajes = construir_prompt_seguimiento(
+        pregunta=pregunta,
+        folio=folio,
+        tipo_equipo=getattr(detalle, 'tipo_equipo', '') or '',
+        marca=getattr(detalle, 'marca', '') or '',
+        modelo_equipo=getattr(detalle, 'modelo', '') or '',
+        numero_serie=getattr(detalle, 'numero_serie', '') or '',
+        falla_principal=getattr(detalle, 'falla_principal', '') or '',
+        diagnostico_sic=getattr(detalle, 'diagnostico_sic', '') or '',
+        estado_actual=estado_actual_texto,
+        timeline_texto=timeline_texto,
+        nombre_responsable=nombre_responsable,
+        piezas_texto=piezas_texto,
+        historial_mensajes=historial_mensajes,
+    )
+
+    logger.info(
+        "[ChatSeg] Pregunta del cliente | Folio: %s | IP: %s | Turns: %d | Pregunta: %.80s...",
+        folio, _ip, len(historial_mensajes) // 2, pregunta
+    )
+
+    # ── Llamar al dispatcher (Ollama o Gemini según el modelo configurado) ──
+    _t_inicio = _time.monotonic()
+    resultado = chat_seguimiento_dispatch(mensajes=mensajes)
+    tiempo_ms = int((_time.monotonic() - _t_inicio) * 1000)
+
+    if resultado['success']:
+        logger.info(
+            "[ChatSeg] Respuesta generada | Folio: %s | Modelo: %s | Tiempo: %dms",
+            folio, resultado.get('modelo_usado', '?'), tiempo_ms
+        )
+        return JsonResponse({
+            'success': True,
+            'respuesta': resultado['respuesta'],
+            'modelo_usado': resultado.get('modelo_usado', ''),
+        })
+    else:
+        logger.warning(
+            "[ChatSeg] Error al generar respuesta | Folio: %s | Error: %s",
+            folio, resultado.get('error', '?')
+        )
+        return JsonResponse({
+            'success': False,
+            'error': resultado.get('error', 'Error desconocido del asistente.')
+        })

@@ -857,3 +857,25 @@ AI_MODELS: list[str] = _ai_models
 # AI_ENABLED: True si al menos un proveedor está habilitado.
 # El template usa esta variable para mostrar/ocultar el botón "Mejorar Diag. con IA".
 AI_ENABLED: bool = bool(_ai_models)
+
+# ----------------------------------------------------------------------------
+# MODELO PARA EL CHAT DE SEGUIMIENTO DEL CLIENTE
+# ----------------------------------------------------------------------------
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# El chatbot de IA en la vista pública de seguimiento usa un modelo separado
+# del mejorador de diagnósticos SIC. Esto permite usar un modelo más pequeño
+# y rápido para el chat (conversación corta) sin afectar la calidad del corrector.
+#
+# CHAT_SEGUIMIENTO_MODEL:
+#   Modelo predeterminado para el chatbot de seguimiento del cliente.
+#   Default: gemma4:e2b  → modelo pequeño y eficiente de Google, ideal para
+#                          conversaciones cortas. No consume tokens de la API
+#                          de Gemini (corre en Ollama local).
+#
+#   Para usar Gemini en el chat: CHAT_SEGUIMIENTO_MODEL=gemini-2.0-flash
+#   Para usar un modelo Ollama diferente: CHAT_SEGUIMIENTO_MODEL=llama3.2:3b
+#
+# NOTA: Si no se configura, se usa 'gemma4:e2b' por defecto (vía Ollama).
+# El dispatcher detecta automáticamente el proveedor por el prefijo "gemini".
+
+CHAT_SEGUIMIENTO_MODEL: str = config('CHAT_SEGUIMIENTO_MODEL', default='gemma4:e2b')

@@ -1,0 +1,347 @@
+"use strict";
+/**
+ * seguimiento_chat.ts — Chatbot de IA en la vista pública de seguimiento del cliente
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Este archivo controla el chat de inteligencia artificial que el cliente ve
+ * en su página de seguimiento de orden. El cliente puede hacer preguntas sobre
+ * su equipo y el asistente responde usando los datos reales de la orden.
+ *
+ * Características:
+ * - Burbuja flotante que se expande en un panel de chat
+ * - Historial de conversación (hasta 6 turnos = 12 mensajes)
+ * - Chips de sugerencias rápidas al inicio
+ * - Animación de "escribiendo..." mientras espera respuesta
+ * - Auto-resize del textarea al escribir
+ * - Compatible con modo oscuro del sistema
+ * - Badge "Nuevo" que desaparece después de la primera apertura
+ * - Sin CSRF token (endpoint público protegido por rate limiting + token de sesión)
+ *
+ * El historial de conversación se guarda SOLO en memoria (no en localStorage
+ * ni en la base de datos). Si el cliente recarga la página, el historial se borra.
+ */
+// ============================================================================
+// CONSTANTES DE CONFIGURACIÓN
+// ============================================================================
+/** Máximo de turnos (pares user/assistant) a mantener en el historial */
+const CHAT_MAX_TURNOS = 6;
+/** Máximo de caracteres por pregunta del usuario */
+const CHAT_MAX_CHARS = 500;
+/** Nombre de la clave en localStorage para recordar si el usuario ya abrió el chat */
+const CHAT_BADGE_KEY = 'sic_chat_opened';
+// ============================================================================
+// MÓDULO PRINCIPAL: SeguimientoChat
+// Encapsula toda la lógica del chatbot en un objeto para evitar variables globales.
+// ============================================================================
+class SeguimientoChat {
+    constructor(bubble, panel, closeBtn, messagesEl, inputEl, sendBtn, suggestEl, badge, statusLabel) {
+        var _a;
+        // Estado interno
+        this.historial = [];
+        this.cargando = false;
+        this.panelAbierto = false;
+        this.bubble = bubble;
+        this.panel = panel;
+        this.closeBtn = closeBtn;
+        this.messagesEl = messagesEl;
+        this.inputEl = inputEl;
+        this.sendBtn = sendBtn;
+        this.suggestEl = suggestEl;
+        this.badge = badge;
+        this.statusLabel = statusLabel;
+        // Leer el endpoint y si la IA está habilitada desde el atributo data-* del botón
+        this.chatEndpoint = (_a = bubble.dataset['chatEndpoint']) !== null && _a !== void 0 ? _a : '';
+        this.aiEnabled = bubble.dataset['aiEnabled'] === 'true';
+        // Gestionar visibilidad del badge "Nuevo"
+        this.inicializarBadge();
+        // Registrar todos los listeners
+        this.registrarEventListeners();
+    }
+    // ========================================================================
+    // INICIALIZACIÓN DEL BADGE "NUEVO"
+    // Se oculta permanentemente una vez que el usuario abre el chat por primera vez.
+    // ========================================================================
+    inicializarBadge() {
+        if (!this.badge)
+            return;
+        const yaAbrio = localStorage.getItem(CHAT_BADGE_KEY);
+        if (yaAbrio) {
+            this.badge.style.display = 'none';
+        }
+    }
+    // ========================================================================
+    // REGISTRO DE EVENT LISTENERS
+    // ========================================================================
+    registrarEventListeners() {
+        // Clic en la burbuja: toggle del panel
+        this.bubble.addEventListener('click', () => this.togglePanel());
+        // Botón de cerrar dentro del panel
+        this.closeBtn.addEventListener('click', () => this.cerrarPanel());
+        // Botón de enviar
+        this.sendBtn.addEventListener('click', () => this.enviarPregunta());
+        // Enter sin Shift en textarea: enviar
+        this.inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!this.cargando)
+                    this.enviarPregunta();
+            }
+        });
+        // Input: habilitar/deshabilitar botón de enviar + auto-resize
+        this.inputEl.addEventListener('input', () => {
+            this.actualizarEstadoBotonEnviar();
+            this.autoResizeTextarea();
+        });
+        // Chips de sugerencias rápidas
+        if (this.suggestEl) {
+            this.suggestEl.querySelectorAll('.st-chat-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    var _a, _b;
+                    const texto = (_b = (_a = chip.textContent) === null || _a === void 0 ? void 0 : _a.trim()) !== null && _b !== void 0 ? _b : '';
+                    if (texto && !this.cargando) {
+                        this.inputEl.value = texto;
+                        this.actualizarEstadoBotonEnviar();
+                        this.enviarPregunta();
+                    }
+                });
+            });
+        }
+        // Cerrar el panel si el usuario toca fuera de él (solo en mobile)
+        document.addEventListener('click', (e) => {
+            if (!this.panelAbierto)
+                return;
+            const target = e.target;
+            if (!this.panel.contains(target) && !this.bubble.contains(target)) {
+                this.cerrarPanel();
+            }
+        });
+        // Ajustar la posición en resize (especialmente al aparecer el teclado en móvil)
+        window.addEventListener('resize', () => this.ajustarPosicion());
+    }
+    // ========================================================================
+    // TOGGLE DEL PANEL
+    // ========================================================================
+    togglePanel() {
+        if (this.panelAbierto) {
+            this.cerrarPanel();
+        }
+        else {
+            this.abrirPanel();
+        }
+    }
+    abrirPanel() {
+        this.panelAbierto = true;
+        this.panel.classList.add('st-chat-panel--visible');
+        this.panel.setAttribute('aria-hidden', 'false');
+        this.bubble.classList.add('st-chat-bubble--active');
+        this.bubble.setAttribute('aria-expanded', 'true');
+        // Ocultar badge "Nuevo" permanentemente
+        if (this.badge) {
+            this.badge.style.display = 'none';
+            localStorage.setItem(CHAT_BADGE_KEY, '1');
+        }
+        // Enfocar el input (con pequeño delay para esperar la animación CSS)
+        setTimeout(() => {
+            this.inputEl.focus();
+        }, 200);
+        // Scroll al final de los mensajes
+        this.scrollAlFinal();
+    }
+    cerrarPanel() {
+        this.panelAbierto = false;
+        this.panel.classList.remove('st-chat-panel--visible');
+        this.panel.setAttribute('aria-hidden', 'true');
+        this.bubble.classList.remove('st-chat-bubble--active');
+        this.bubble.setAttribute('aria-expanded', 'false');
+    }
+    // ========================================================================
+    // AJUSTE DINÁMICO DE POSICIÓN (cuando aparece el teclado en móvil)
+    // ========================================================================
+    ajustarPosicion() {
+        // Si el Visual Viewport API está disponible, lo usamos para detectar
+        // cuánto sube el teclado en pantalla y ajustamos el panel
+        if (window.visualViewport) {
+            const vv = window.visualViewport;
+            const keyboardOffset = window.innerHeight - vv.height - vv.offsetTop;
+            if (keyboardOffset > 100 && this.panelAbierto) {
+                this.panel.style.bottom = `${80 + keyboardOffset}px`;
+            }
+            else {
+                this.panel.style.bottom = '';
+            }
+        }
+    }
+    // ========================================================================
+    // AUTO-RESIZE DEL TEXTAREA
+    // El textarea crece hasta 5 líneas y luego hace scroll.
+    // ========================================================================
+    autoResizeTextarea() {
+        this.inputEl.style.height = 'auto';
+        const maxHeight = 5 * 24; // ~5 líneas de texto
+        this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, maxHeight) + 'px';
+    }
+    // ========================================================================
+    // GESTIÓN DEL BOTÓN DE ENVIAR
+    // ========================================================================
+    actualizarEstadoBotonEnviar() {
+        const texto = this.inputEl.value.trim();
+        this.sendBtn.disabled = texto.length === 0 || this.cargando || !this.aiEnabled;
+    }
+    // ========================================================================
+    // RENDERIZAR UN MENSAJE EN EL CHAT
+    // ========================================================================
+    agregarMensaje(texto, rol) {
+        const msgEl = document.createElement('div');
+        msgEl.classList.add('st-chat-msg', `st-chat-msg--${rol}`);
+        const bubble = document.createElement('div');
+        bubble.classList.add('st-chat-msg-bubble');
+        // Usamos textContent (no innerHTML) para evitar XSS con contenido del LLM
+        bubble.textContent = texto;
+        msgEl.appendChild(bubble);
+        this.messagesEl.appendChild(msgEl);
+        this.scrollAlFinal();
+        return msgEl;
+    }
+    // ========================================================================
+    // MOSTRAR INDICADOR "ESCRIBIENDO..."
+    // ========================================================================
+    mostrarIndicadorEscribiendo() {
+        const msgEl = document.createElement('div');
+        msgEl.classList.add('st-chat-msg', 'st-chat-msg--bot', 'st-chat-msg--typing');
+        msgEl.setAttribute('aria-label', 'El asistente está escribiendo');
+        const bubble = document.createElement('div');
+        bubble.classList.add('st-chat-msg-bubble', 'st-chat-typing-indicator');
+        bubble.innerHTML = '<span></span><span></span><span></span>';
+        msgEl.appendChild(bubble);
+        this.messagesEl.appendChild(msgEl);
+        this.scrollAlFinal();
+        return msgEl;
+    }
+    // ========================================================================
+    // SCROLL AL FINAL DEL HISTORIAL DE MENSAJES
+    // ========================================================================
+    scrollAlFinal() {
+        requestAnimationFrame(() => {
+            this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+        });
+    }
+    // ========================================================================
+    // OCULTAR LOS CHIPS DE SUGERENCIAS (después del primer mensaje)
+    // ========================================================================
+    ocultarSugerencias() {
+        if (this.suggestEl) {
+            this.suggestEl.style.display = 'none';
+        }
+    }
+    // ========================================================================
+    // ACTUALIZAR EL LABEL DE ESTADO EN EL HEADER DEL PANEL
+    // ========================================================================
+    setEstadoLabel(texto, tipo) {
+        if (!this.statusLabel)
+            return;
+        this.statusLabel.textContent = texto;
+        this.statusLabel.className = 'st-chat-panel-status';
+        if (tipo === 'pensando')
+            this.statusLabel.classList.add('st-chat-panel-status--thinking');
+        if (tipo === 'error')
+            this.statusLabel.classList.add('st-chat-panel-status--error');
+    }
+    // ========================================================================
+    // ENVIAR PREGUNTA AL BACKEND Y PROCESAR RESPUESTA
+    // ========================================================================
+    async enviarPregunta() {
+        var _a;
+        const pregunta = this.inputEl.value.trim();
+        if (!pregunta || this.cargando || !this.aiEnabled)
+            return;
+        // Validación de longitud (también validada en el backend)
+        if (pregunta.length > CHAT_MAX_CHARS) {
+            this.agregarMensaje(`La pregunta es demasiado larga (máx. ${CHAT_MAX_CHARS} caracteres).`, 'bot');
+            return;
+        }
+        // Ocultar sugerencias al primer envío
+        this.ocultarSugerencias();
+        // Mostrar el mensaje del usuario en el chat
+        this.agregarMensaje(pregunta, 'user');
+        // Limpiar y resetear el textarea
+        this.inputEl.value = '';
+        this.inputEl.style.height = 'auto';
+        // Bloquear UI mientras se espera la respuesta
+        this.cargando = true;
+        this.actualizarEstadoBotonEnviar();
+        this.setEstadoLabel('Escribiendo...', 'pensando');
+        // Mostrar indicador de "escribiendo"
+        const indicador = this.mostrarIndicadorEscribiendo();
+        // Preparar el historial a enviar (solo los últimos CHAT_MAX_TURNOS turnos)
+        // IMPORTANTE: Solo mandamos los mensajes role:user/assistant del historial
+        // (no el mensaje de bienvenida hardcoded del DOM)
+        const historialParaEnviar = this.historial.slice(-(CHAT_MAX_TURNOS * 2));
+        try {
+            const formData = new FormData();
+            formData.append('pregunta', pregunta);
+            formData.append('historial', JSON.stringify(historialParaEnviar));
+            const response = await fetch(this.chatEndpoint, {
+                method: 'POST',
+                body: formData,
+                // Sin CSRF: endpoint público, protegido por rate limiting + token
+            });
+            const data = await response.json();
+            // Eliminar el indicador de "escribiendo"
+            indicador.remove();
+            if (data.success && data.respuesta) {
+                // Mostrar la respuesta del asistente
+                this.agregarMensaje(data.respuesta, 'bot');
+                // Agregar ambos mensajes al historial en memoria
+                this.historial.push({ role: 'user', content: pregunta });
+                this.historial.push({ role: 'assistant', content: data.respuesta });
+                this.setEstadoLabel('IA · Responde al instante', 'normal');
+            }
+            else {
+                const mensajeError = (_a = data.error) !== null && _a !== void 0 ? _a : 'No pude procesar tu pregunta. Intenta de nuevo.';
+                this.agregarMensaje(mensajeError, 'bot');
+                this.setEstadoLabel('Error al responder', 'error');
+                // Restaurar label normal después de 3 segundos
+                setTimeout(() => this.setEstadoLabel('IA · Responde al instante', 'normal'), 3000);
+            }
+        }
+        catch (err) {
+            indicador.remove();
+            const msgError = err instanceof Error && err.message.includes('fetch')
+                ? 'Sin conexión a internet. Verifica tu red e intenta de nuevo.'
+                : 'Error de conexión. Intenta de nuevo en unos momentos.';
+            this.agregarMensaje(msgError, 'bot');
+            this.setEstadoLabel('Error de conexión', 'error');
+            setTimeout(() => this.setEstadoLabel('IA · Responde al instante', 'normal'), 3000);
+        }
+        finally {
+            this.cargando = false;
+            this.actualizarEstadoBotonEnviar();
+            this.inputEl.focus();
+        }
+    }
+}
+// ============================================================================
+// INICIALIZACIÓN — Ejecutar cuando el DOM esté completamente cargado
+// ============================================================================
+document.addEventListener('DOMContentLoaded', function () {
+    // Verificar que existe el botón de la burbuja (solo se renderiza si ai_enabled=True)
+    const bubble = document.querySelector('#chat-ia-bubble');
+    if (!bubble)
+        return; // La IA no está habilitada o es vista inválida — no hacer nada
+    const panel = document.querySelector('#chat-ia-panel');
+    const closeBtn = document.querySelector('#chat-ia-close');
+    const messagesEl = document.querySelector('#chat-ia-messages');
+    const inputEl = document.querySelector('#chat-ia-input');
+    const sendBtn = document.querySelector('#chat-ia-send');
+    const suggestEl = document.querySelector('#chat-ia-suggestions');
+    const badge = document.querySelector('#chat-ia-badge');
+    const statusLabel = document.querySelector('#chat-ia-status-label');
+    // Guardia de seguridad: si falta cualquier elemento crítico, no inicializar
+    if (!panel || !closeBtn || !messagesEl || !inputEl || !sendBtn) {
+        console.warn('[SeguimientoChat] Faltan elementos del DOM del chatbot. Verificar el template.');
+        return;
+    }
+    // Inicializar el módulo del chat
+    new SeguimientoChat(bubble, panel, closeBtn, messagesEl, inputEl, sendBtn, suggestEl, badge, statusLabel);
+});
+//# sourceMappingURL=seguimiento_chat.js.map

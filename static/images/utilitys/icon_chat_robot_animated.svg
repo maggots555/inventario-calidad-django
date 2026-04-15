@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <style>
+    /* Flotación suave del cuerpo completo */
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-2.5px); }
+    }
+    /* Parpadeo de ojos */
+    @keyframes blink {
+      0%, 90%, 100% { transform: scaleY(1); }
+      95%           { transform: scaleY(0.08); }
+    }
+    /* Pulso de la antena */
+    @keyframes pulse-dot {
+      0%, 100% { r: 2.5; opacity: 1; }
+      50%       { r: 3.8; opacity: 0.6; }
+    }
+    /* Brillo en los ojos */
+    @keyframes eye-glow {
+      0%, 100% { opacity: 0.18; }
+      50%       { opacity: 0.38; }
+    }
+    /* Indicadores del cuerpo */
+    @keyframes dot-blink {
+      0%, 100% { opacity: 0.7; }
+      50%       { opacity: 0.2; }
+    }
+
+    .robot-body  { animation: float 3s ease-in-out infinite; }
+    .eye-left    { transform-origin: 24px 26px; animation: blink 4s ease-in-out infinite; }
+    .eye-right   { transform-origin: 40px 26px; animation: blink 4s ease-in-out infinite 0.15s; }
+    .eye-bg-l    { animation: eye-glow 3s ease-in-out infinite; }
+    .eye-bg-r    { animation: eye-glow 3s ease-in-out infinite 1s; }
+    .antenna-dot { animation: pulse-dot 2s ease-in-out infinite; }
+    .dot-1       { animation: dot-blink 1.6s ease-in-out infinite; }
+    .dot-2       { animation: dot-blink 1.6s ease-in-out infinite 0.8s; }
+  </style>
+
+  <!-- Antena (no flota, queda fija para efecto de separación) -->
+  <line x1="32" y1="6" x2="32" y2="14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <circle class="antenna-dot" cx="32" cy="4.5" r="2.5" fill="currentColor"/>
+
+  <!-- Todo lo demás flota -->
+  <g class="robot-body">
+
+    <!-- Cabeza -->
+    <rect x="14" y="14" width="36" height="26" rx="7" ry="7" fill="currentColor" opacity="0.15"/>
+    <rect x="14" y="14" width="36" height="26" rx="7" ry="7" stroke="currentColor" stroke-width="2.2"/>
+
+    <!-- Ojo izquierdo -->
+    <g class="eye-left">
+      <circle class="eye-bg-l" cx="24" cy="26" r="4" fill="currentColor"/>
+      <circle cx="24" cy="26" r="4" stroke="currentColor" stroke-width="2"/>
+      <circle cx="25.2" cy="24.8" r="1.4" fill="currentColor"/>
+    </g>
+
+    <!-- Ojo derecho -->
+    <g class="eye-right">
+      <circle class="eye-bg-r" cx="40" cy="26" r="4" fill="currentColor"/>
+      <circle cx="40" cy="26" r="4" stroke="currentColor" stroke-width="2"/>
+      <circle cx="41.2" cy="24.8" r="1.4" fill="currentColor"/>
+    </g>
+
+    <!-- Boca (sonrisa) -->
+    <path d="M25 32.5 Q32 37 39 32.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+
+    <!-- Orejas -->
+    <rect x="9" y="22" width="5" height="9" rx="2.5" fill="currentColor" opacity="0.5"/>
+    <rect x="50" y="22" width="5" height="9" rx="2.5" fill="currentColor" opacity="0.5"/>
+
+    <!-- Cuerpo -->
+    <rect x="20" y="42" width="24" height="14" rx="5" ry="5" fill="currentColor" opacity="0.15"/>
+    <rect x="20" y="42" width="24" height="14" rx="5" ry="5" stroke="currentColor" stroke-width="2.2"/>
+
+    <!-- Indicadores del cuerpo -->
+    <circle class="dot-1" cx="28" cy="49" r="2" fill="currentColor"/>
+    <circle class="dot-2" cx="36" cy="49" r="2" fill="currentColor"/>
+
+  </g>
+</svg>

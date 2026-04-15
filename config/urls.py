@@ -21,7 +21,12 @@ from django.conf import settings
 from django.conf.urls.static import static
 from inventario import views as inventario_views
 from config.media_views import serve_media_from_multiple_locations
-from servicio_tecnico.views import feedback_rechazo_view, feedback_satisfaccion_cliente, seguimiento_orden_cliente
+from servicio_tecnico.views import (
+    feedback_rechazo_view,
+    feedback_satisfaccion_cliente,
+    seguimiento_orden_cliente,
+    chat_seguimiento_cliente,
+)
 
 urlpatterns = [
     # Panel de administración (URL personalizada por seguridad)
@@ -60,6 +65,12 @@ urlpatterns = [
     # Muestra timeline del estado, info del equipo y contacto del responsable.
     # Caduca 3 días después de estado 'entregado'. Formato: /seguimiento/<token>/
     path('seguimiento/<str:token>/', seguimiento_orden_cliente, name='seguimiento_orden_publico'),
+
+    # ── URL PÚBLICA: Chat de IA del seguimiento (sin autenticación) ──
+    # Endpoint AJAX del chatbot de IA accesible desde la vista de seguimiento.
+    # Valida el mismo token de la vista padre. Rate limit: 5 req/min por IP.
+    # Formato: POST /seguimiento/<token>/chat/
+    path('seguimiento/<str:token>/chat/', chat_seguimiento_cliente, name='chat_seguimiento_publico'),
 ]
 
 # ============================================================================
