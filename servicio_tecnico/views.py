@@ -16835,7 +16835,7 @@ def chat_seguimiento_cliente(request, token):
     if orden.responsable_seguimiento:
         nombre_responsable = orden.responsable_seguimiento.nombre_completo
 
-    # Estado de piezas en texto (si hay seguimientos activos)
+    # ── Estado de piezas en tránsito (SeguimientoPieza) ──
     piezas_texto = ""
     from .models import SeguimientoPieza
     seguimientos_piezas_qs = SeguimientoPieza.objects.filter(
@@ -16843,23 +16843,163 @@ def chat_seguimiento_cliente(request, token):
     ).order_by('fecha_pedido')
     if seguimientos_piezas_qs.exists():
         piezas_lineas = []
-        ESTADOS_PIEZA = {
-            'pendiente': 'Pedido en camino',
-            'recibido': 'Recibido',
-            'wpb': 'Pieza incorrecta (en gestión)',
-            'doa': 'Pieza dañada (en gestión)',
-            'pnc': 'Pieza no disponible',
+        ESTADOS_PIEZA_CHAT = {
+            'pedido':      'Pedido realizado',
+            'confirmado':  'Confirmado por proveedor',
+            'transito':    'En tránsito',
+            'retrasado':   'Retrasado',
+            'recibido':    'Recibido en taller',
+            'incorrecto':  'Pieza incorrecta (en gestión)',
+            'danado':      'Pieza dañada (en gestión)',
+            # aliases legacy
+            'pendiente':   'Pedido en camino',
+            'wpb':         'Pieza incorrecta (en gestión)',
+            'doa':         'Pieza dañada (en gestión)',
+            'pnc':         'Pieza no disponible',
         }
-        for pieza in seguimientos_piezas_qs:
-            estado_pieza = ESTADOS_PIEZA.get(
-                getattr(pieza, 'estado', ''), getattr(pieza, 'estado', 'Desconocido')
+        for seg in seguimientos_piezas_qs:
+            estado_seg = ESTADOS_PIEZA_CHAT.get(
+                getattr(seg, 'estado', ''), getattr(seg, 'estado', 'Desconocido')
             )
-            desc = getattr(pieza, 'descripcion', '') or ''
-            nombre_pieza = getattr(pieza, 'nombre', '') or ''
-            piezas_lineas.append(
-                f"  • {nombre_pieza or desc or 'Pieza'}: {estado_pieza}"
-            )
+            desc_seg = getattr(seg, 'descripcion_piezas', '') or ''
+            # Intentar obtener nombres de las piezas vinculadas al seguimiento
+            piezas_vinculadas = seg.piezas.all()
+            if piezas_vinculadas.exists():
+                nombres = ', '.join(
+                    p.componente.nombre for p in piezas_vinculadas if p.componente_id
+                )
+                etiqueta = nombres or desc_seg or 'Piezas'
+            else:
+                etiqueta = desc_seg or 'Piezas'
+            # Agregar fechas estimada / real si están disponibles
+            fecha_est = seg.fecha_entrega_estimada.strftime('%d/%m/%Y') if seg.fecha_entrega_estimada else None
+            fecha_real = seg.fecha_entrega_real.strftime('%d/%m/%Y') if seg.fecha_entrega_real else None
+            detalle_fecha = ""
+            if fecha_real:
+                detalle_fecha = f" — Llegó el {fecha_real}"
+            elif fecha_est:
+                detalle_fecha = f" — Estimado: {fecha_est}"
+                if seg.esta_retrasado:
+                    detalle_fecha += f" (retrasado {seg.dias_retraso} días)"
+            piezas_lineas.append(f"  • {etiqueta}: {estado_seg}{detalle_fecha}")
         piezas_texto = "\n".join(piezas_lineas)
+
+    # ── Cotización y piezas cotizadas (PiezaCotizada) ──
+    # Se incluye: nombre, cantidad, si es necesaria, estado de aceptación.
+    # Se EXCLUYE explícitamente: costos, proveedores, motivos de rechazo.
+    cotizacion_texto = ""
+    from .models import Cotizacion, PiezaCotizada
+    try:
+        cotizacion_obj = Cotizacion.objects.get(orden=orden)
+        # Estado global de la cotización
+        if cotizacion_obj.usuario_acepto is True:
+            estado_cot = "Aceptada por el cliente"
+        elif cotizacion_obj.usuario_acepto is False:
+            estado_cot = "Rechazada por el cliente"
+        else:
+            estado_cot = "En espera de respuesta del cliente"
+
+        fecha_envio_cot = (
+            cotizacion_obj.fecha_envio.strftime('%d/%m/%Y')
+            if cotizacion_obj.fecha_envio else 'No registrada'
+        )
+        fecha_resp_cot = (
+            cotizacion_obj.fecha_respuesta.strftime('%d/%m/%Y')
+            if cotizacion_obj.fecha_respuesta else 'Sin respuesta aún'
+        )
+
+        lineas_cot = [
+            f"  Estado: {estado_cot}",
+            f"  Enviada: {fecha_envio_cot}  |  Respuesta: {fecha_resp_cot}",
+            f"  Piezas cotizadas:",
+        ]
+
+        piezas_cotizadas_qs = PiezaCotizada.objects.filter(
+            cotizacion=cotizacion_obj
+        ).select_related('componente').order_by('orden_prioridad', 'fecha_creacion')
+
+        for pc in piezas_cotizadas_qs:
+            nombre_pc = pc.componente.nombre if pc.componente_id else 'Pieza sin nombre'
+            if pc.descripcion_adicional:
+                nombre_pc = f"{nombre_pc} ({pc.descripcion_adicional[:60]})"
+
+            tipo_pc = "Necesaria" if pc.es_necesaria else "Mejora opcional"
+
+            if pc.aceptada_por_cliente is True:
+                estado_pc = "Aceptada ✓"
+            elif pc.aceptada_por_cliente is False:
+                estado_pc = "Rechazada"
+            else:
+                estado_pc = "Pendiente de decisión"
+
+            origen_pc = "sugerida por el técnico" if pc.sugerida_por_tecnico else "solicitada externamente"
+
+            lineas_cot.append(
+                f"    - {nombre_pc} × {pc.cantidad}  [{tipo_pc}]  [{estado_pc}]  ({origen_pc})"
+            )
+
+        if not piezas_cotizadas_qs.exists():
+            lineas_cot.append("    (Sin piezas registradas en la cotización)")
+
+        cotizacion_texto = "\n".join(lineas_cot)
+
+    except Cotizacion.DoesNotExist:
+        # La orden aún no tiene cotización — no se agrega nada
+        pass
+
+    # ── Venta mostrador: servicios y productos adicionales ──
+    # Se incluye: paquete, servicios contratados (bools), piezas vendidas.
+    # Se EXCLUYE explícitamente: costos, precios, totales.
+    venta_mostrador_texto = ""
+    from .models import VentaMostrador
+    try:
+        vm = VentaMostrador.objects.get(orden=orden)
+        lineas_vm = []
+
+        # Paquete contratado (si aplica)
+        if vm.paquete and vm.paquete != 'ninguno':
+            lineas_vm.append(f"  Paquete contratado: {vm.get_paquete_display()}")
+
+        # Servicios individuales contratados
+        servicios_activos = []
+        if vm.incluye_limpieza:
+            servicios_activos.append("Limpieza y mantenimiento")
+        if vm.incluye_reinstalacion_so:
+            servicios_activos.append("Reinstalación de sistema operativo")
+        if vm.incluye_respaldo:
+            servicios_activos.append("Respaldo de información")
+        if vm.incluye_kit_limpieza:
+            servicios_activos.append("Kit de limpieza")
+        if vm.incluye_cambio_pieza:
+            servicios_activos.append("Cambio de pieza (directo, sin diagnóstico)")
+
+        if servicios_activos:
+            lineas_vm.append("  Servicios incluidos:")
+            for svc in servicios_activos:
+                lineas_vm.append(f"    • {svc}")
+
+        # Piezas/productos vendidos directamente (sin precios)
+        piezas_vm_qs = vm.piezas_vendidas.select_related('componente').all()
+        if piezas_vm_qs.exists():
+            lineas_vm.append("  Piezas/productos adquiridos directamente:")
+            for pvm in piezas_vm_qs:
+                nombre_pvm = (
+                    pvm.componente.nombre if pvm.componente_id
+                    else pvm.descripcion_pieza or 'Producto sin nombre'
+                )
+                lineas_vm.append(f"    • {nombre_pvm} × {pvm.cantidad}")
+
+        # Notas adicionales (si hay, truncadas)
+        if vm.notas_adicionales and vm.notas_adicionales.strip():
+            notas_trunc = vm.notas_adicionales.strip()[:120]
+            lineas_vm.append(f"  Notas: {notas_trunc}")
+
+        if lineas_vm:
+            venta_mostrador_texto = "\n".join(lineas_vm)
+
+    except VentaMostrador.DoesNotExist:
+        # La orden no tiene venta mostrador — no se agrega nada
+        pass
 
     # Folio de la orden (público: orden_cliente del detalle, o número interno como fallback)
     folio = (detalle.orden_cliente if detalle and detalle.orden_cliente else None) \
@@ -16880,6 +17020,8 @@ def chat_seguimiento_cliente(request, token):
         nombre_responsable=nombre_responsable,
         piezas_texto=piezas_texto,
         historial_mensajes=historial_mensajes,
+        cotizacion_texto=cotizacion_texto,
+        venta_mostrador_texto=venta_mostrador_texto,
     )
 
     logger.info(

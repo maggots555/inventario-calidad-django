@@ -1910,12 +1910,13 @@
 .st-chat-panel-avatar {
   width: 36px;
   height: 36px;
-  background: rgba(255, 255, 255, 0.2);
+  background: #0c3d5e;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
 }
 
 .st-chat-panel-name {
