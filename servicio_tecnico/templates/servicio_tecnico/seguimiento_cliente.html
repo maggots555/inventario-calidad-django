@@ -67,6 +67,47 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
   <span class="st-dark-toggle-icon st-dark-toggle-icon--dark">🌙</span>
 </button>
 {% endif %}
+
+{# ── Wrapper de layout de 3 columnas: [skyscraper-izq] [card] [skyscraper-der] ── #}
+<div class="st-layout-wrapper">
+
+  {# ── Skyscraper IZQUIERDO (solo desktop) ── #}
+  {% if banners.skyscraper_izq %}
+  <aside class="st-skyscraper st-skyscraper--izq" aria-label="Publicidad">
+    <div class="st-banner-slot st-banner-slot--skyscraper"
+         data-banners="{{ banners.skyscraper_izq|length }}"
+         id="st-banner-skyscraper-izq">
+      {% for banner in banners.skyscraper_izq %}
+      <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+           data-index="{{ forloop.counter0 }}">
+        {% if banner.url_destino %}
+        <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+           class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+        {% endif %}
+          <img src="{{ banner.imagen.url }}"
+               alt="{{ banner.texto_alt|default:banner.titulo }}"
+               class="st-banner-img"
+               loading="lazy">
+        {% if banner.url_destino %}</a>{% endif %}
+      </div>
+      {% endfor %}
+      {% if banners.skyscraper_izq|length > 1 %}
+      <div class="st-banner-dots" aria-hidden="true">
+        {% for banner in banners.skyscraper_izq %}
+        <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </aside>
+  {% else %}
+  {# Placeholder vacío para mantener el grid centrado #}
+  <aside class="st-skyscraper st-skyscraper--izq st-skyscraper--empty" aria-hidden="true"></aside>
+  {% endif %}
+
+  {# ── Card CENTRAL ── #}
+  <div class="st-layout-center">
+
 {% if estado == 'invalido' %}
 {# ESTADO INVÁLIDO — Token expirado, cancelado o inexistente #}
 <div class="st-card">
@@ -124,6 +165,34 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
     <p class="st-header-subtitle">{{ folio_display }}</p>
   </div>
 
+  {# Banner HEADER — debajo del header, antes del contenido (mobile + desktop) #}
+  {% if banners.header %}
+  <div class="st-banner-slot st-banner-slot--horizontal"
+       data-banners="{{ banners.header|length }}"
+       id="st-banner-header-entregado">
+    {% for banner in banners.header %}
+    <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+         data-index="{{ forloop.counter0 }}">
+      {% if banner.url_destino %}
+      <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+         class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+      {% endif %}
+        <img src="{{ banner.imagen.url }}"
+             alt="{{ banner.texto_alt|default:banner.titulo }}"
+             class="st-banner-img" loading="lazy">
+      {% if banner.url_destino %}</a>{% endif %}
+    </div>
+    {% endfor %}
+    {% if banners.header|length > 1 %}
+    <div class="st-banner-dots" aria-hidden="true">
+      {% for banner in banners.header %}
+      <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {# Info del equipo #}
   <div class="st-equipo-info">
     <span class="st-equipo-icon">💻</span>
@@ -180,6 +249,34 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
     {% endif %}
   </div>
 
+  {# Banner MEDIO — entre el agradecimiento y la galería #}
+  {% if banners.medio %}
+  <div class="st-banner-slot st-banner-slot--horizontal st-banner-slot--medio"
+       data-banners="{{ banners.medio|length }}"
+       id="st-banner-medio-entregado">
+    {% for banner in banners.medio %}
+    <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+         data-index="{{ forloop.counter0 }}">
+      {% if banner.url_destino %}
+      <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+         class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+      {% endif %}
+        <img src="{{ banner.imagen.url }}"
+             alt="{{ banner.texto_alt|default:banner.titulo }}"
+             class="st-banner-img" loading="lazy">
+      {% if banner.url_destino %}</a>{% endif %}
+    </div>
+    {% endfor %}
+    {% if banners.medio|length > 1 %}
+    <div class="st-banner-dots" aria-hidden="true">
+      {% for banner in banners.medio %}
+      <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {# Galería de imágenes del equipo (entregado) #}
   {% if imagenes_galeria %}
   <div class="st-galeria" aria-label="Galería de imágenes del equipo">
@@ -230,6 +327,34 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
   </div>
   {% endif %}
 
+  {# Banner FOOTER — antes del footer #}
+  {% if banners.footer %}
+  <div class="st-banner-slot st-banner-slot--horizontal st-banner-slot--footer"
+       data-banners="{{ banners.footer|length }}"
+       id="st-banner-footer-entregado">
+    {% for banner in banners.footer %}
+    <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+         data-index="{{ forloop.counter0 }}">
+      {% if banner.url_destino %}
+      <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+         class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+      {% endif %}
+        <img src="{{ banner.imagen.url }}"
+             alt="{{ banner.texto_alt|default:banner.titulo }}"
+             class="st-banner-img" loading="lazy">
+      {% if banner.url_destino %}</a>{% endif %}
+    </div>
+    {% endfor %}
+    {% if banners.footer|length > 1 %}
+    <div class="st-banner-dots" aria-hidden="true">
+      {% for banner in banners.footer %}
+      <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="st-footer">
     <div class="st-footer-redes">
       <a href="https://sicfix.mx/" class="st-footer-red" target="_blank" rel="noopener" aria-label="Sitio web SIC">
@@ -268,6 +393,34 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
     <h1 class="st-header-title">Seguimiento de Orden</h1>
     <p class="st-header-subtitle">{{ folio_display }}</p>
   </div>
+
+  {# Banner HEADER — debajo del header del card (mobile + desktop) #}
+  {% if banners.header %}
+  <div class="st-banner-slot st-banner-slot--horizontal"
+       data-banners="{{ banners.header|length }}"
+       id="st-banner-header-tracking">
+    {% for banner in banners.header %}
+    <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+         data-index="{{ forloop.counter0 }}">
+      {% if banner.url_destino %}
+      <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+         class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+      {% endif %}
+        <img src="{{ banner.imagen.url }}"
+             alt="{{ banner.texto_alt|default:banner.titulo }}"
+             class="st-banner-img" loading="lazy">
+      {% if banner.url_destino %}</a>{% endif %}
+    </div>
+    {% endfor %}
+    {% if banners.header|length > 1 %}
+    <div class="st-banner-dots" aria-hidden="true">
+      {% for banner in banners.header %}
+      <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
 
   {# Info del equipo #}
   <div class="st-equipo-info">
@@ -341,6 +494,34 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
     </ul>
     {% endif %}
 
+    {# Banner MEDIO — entre timeline y galería/contacto #}
+    {% if banners.medio %}
+    <div class="st-banner-slot st-banner-slot--horizontal st-banner-slot--medio"
+         data-banners="{{ banners.medio|length }}"
+         id="st-banner-medio-tracking">
+      {% for banner in banners.medio %}
+      <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+           data-index="{{ forloop.counter0 }}">
+        {% if banner.url_destino %}
+        <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+           class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+        {% endif %}
+          <img src="{{ banner.imagen.url }}"
+               alt="{{ banner.texto_alt|default:banner.titulo }}"
+               class="st-banner-img" loading="lazy">
+        {% if banner.url_destino %}</a>{% endif %}
+      </div>
+      {% endfor %}
+      {% if banners.medio|length > 1 %}
+      <div class="st-banner-dots" aria-hidden="true">
+        {% for banner in banners.medio %}
+        <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {# Galería de imágenes del equipo (tracking/finalizado) #}
     {% if imagenes_galeria %}
     <div class="st-galeria" aria-label="Galería de imágenes del equipo">
@@ -409,6 +590,34 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
 
   </div>{# /st-card-body #}
 
+  {# Banner FOOTER — antes del footer #}
+  {% if banners.footer %}
+  <div class="st-banner-slot st-banner-slot--horizontal st-banner-slot--footer"
+       data-banners="{{ banners.footer|length }}"
+       id="st-banner-footer-tracking">
+    {% for banner in banners.footer %}
+    <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+         data-index="{{ forloop.counter0 }}">
+      {% if banner.url_destino %}
+      <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+         class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+      {% endif %}
+        <img src="{{ banner.imagen.url }}"
+             alt="{{ banner.texto_alt|default:banner.titulo }}"
+             class="st-banner-img" loading="lazy">
+      {% if banner.url_destino %}</a>{% endif %}
+    </div>
+    {% endfor %}
+    {% if banners.footer|length > 1 %}
+    <div class="st-banner-dots" aria-hidden="true">
+      {% for banner in banners.footer %}
+      <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="st-footer">
     <div class="st-footer-redes">
       <a href="https://sicfix.mx/" class="st-footer-red" target="_blank" rel="noopener" aria-label="Sitio web SIC">
@@ -438,6 +647,44 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
 
 </div>
 {% endif %}
+
+  </div>{# /st-layout-center #}
+
+  {# ── Skyscraper DERECHO (solo desktop) ── #}
+  {% if banners.skyscraper_der %}
+  <aside class="st-skyscraper st-skyscraper--der" aria-label="Publicidad">
+    <div class="st-banner-slot st-banner-slot--skyscraper"
+         data-banners="{{ banners.skyscraper_der|length }}"
+         id="st-banner-skyscraper-der">
+      {% for banner in banners.skyscraper_der %}
+      <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+           data-index="{{ forloop.counter0 }}">
+        {% if banner.url_destino %}
+        <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+           class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+        {% endif %}
+          <img src="{{ banner.imagen.url }}"
+               alt="{{ banner.texto_alt|default:banner.titulo }}"
+               class="st-banner-img"
+               loading="lazy">
+        {% if banner.url_destino %}</a>{% endif %}
+      </div>
+      {% endfor %}
+      {% if banners.skyscraper_der|length > 1 %}
+      <div class="st-banner-dots" aria-hidden="true">
+        {% for banner in banners.skyscraper_der %}
+        <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </aside>
+  {% else %}
+  {# Placeholder vacío para mantener el grid centrado #}
+  <aside class="st-skyscraper st-skyscraper--der st-skyscraper--empty" aria-hidden="true"></aside>
+  {% endif %}
+
+</div>{# /st-layout-wrapper #}
 
 {# === Modal: Estado de mis piezas === #}
 {% if seguimientos_piezas %}
@@ -637,6 +884,11 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
 
 {# === Toggle de modo oscuro (persistente vía localStorage) === #}
 <script src="{% static 'js/dark_mode.js' %}"></script>
+
+{# === Carrusel de banners promocionales (solo si hay banners activos) === #}
+{% if banners %}
+<script src="{% static 'js/banner_carousel.js' %}"></script>
+{% endif %}
 
 {% if estado != 'invalido' %}
 {# Panel de chat (se expande al hacer clic en la burbuja) #}

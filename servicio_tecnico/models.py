@@ -6,6 +6,8 @@ from django.db import models
 from django.utils import timezone
 from django.core.validators import FileExtensionValidator, MinValueValidator
 from decimal import Decimal
+from io import BytesIO
+from PIL import Image as PILImage, ImageOps
 from inventario.models import Sucursal, Empleado
 from scorecard.models import ComponenteEquipo, Incidencia
 from config.constants import (
@@ -2833,5 +2835,298 @@ class EnlaceSeguimientoCliente(models.Model):
         if ip:
             self.ip_ultimo_acceso = ip
         self.save(update_fields=['accesos_count', 'fecha_ultimo_acceso', 'ip_ultimo_acceso'])
+
+
+# ============================================================================
+# BANNERS PROMOCIONALES — Sistema de publicidad dinámica para seguimiento
+# ============================================================================
+
+class BannerPromocional(models.Model):
+    """
+    Banner/flyer promocional administrable desde el Django Admin.
+    Se muestra en la página pública de seguimiento del cliente según posición,
+    fechas de vigencia y estado de la orden, sin tocar código.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este modelo permite subir imágenes promocionales (flyers, ofertas de temporada,
+    descuentos, etc.) desde el panel de administración sin tocar código.
+    Cada banner tiene fechas de inicio/fin para activarse y desactivarse
+    automáticamente. Así marketing puede gestionar campañas sin depender de IT.
+    """
+
+    # ── Opciones de posición en la página de seguimiento ──
+    POSICION_CHOICES = [
+        ('skyscraper_izq', 'Skyscraper izquierdo (solo desktop)'),
+        ('skyscraper_der', 'Skyscraper derecho (solo desktop)'),
+        ('header', 'Cabecera — debajo del header del card'),
+        ('medio', 'Medio — entre timeline y contacto'),
+        ('footer', 'Footer — antes del pie de página'),
+    ]
+
+    # ── En qué estados de la orden se muestra el banner ──
+    ESTADO_VISIBLE_CHOICES = [
+        ('todos', 'Todos los estados (tracking, finalizado y entregado)'),
+        ('tracking', 'Solo en tracking y finalizado'),
+        ('entregado', 'Solo cuando el equipo fue entregado'),
+    ]
+
+    titulo = models.CharField(
+        max_length=200,
+        verbose_name="Título del banner",
+        help_text="Nombre interno para identificar la promoción. No se muestra al cliente."
+    )
+    imagen = models.ImageField(
+        upload_to='banners/%Y/%m/',
+        verbose_name="Imagen del banner",
+        help_text=(
+            "Sube la imagen en JPG, PNG o WebP. "
+            "Se redimensionará automáticamente al tamaño óptimo según la posición elegida. "
+            "Skyscrapers: 480×1200 px | Header: 1456×200 px | Medio: 1456×180 px | Footer: 1456×140 px."
+        )
+    )
+    url_destino = models.URLField(
+        blank=True,
+        verbose_name="URL de destino (opcional)",
+        help_text="Link al que va el cliente al hacer clic. Dejar vacío si el banner es solo visual."
+    )
+    texto_alt = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Texto alternativo (accesibilidad)",
+        help_text="Descripción breve de la imagen para lectores de pantalla. Ejemplo: 'Promoción: 20% off en limpieza de laptop'"
+    )
+    posicion = models.CharField(
+        max_length=20,
+        choices=POSICION_CHOICES,
+        default='footer',
+        verbose_name="Posición en la página",
+        help_text="Dónde aparecerá el banner en la página de seguimiento"
+    )
+    estado_visible = models.CharField(
+        max_length=20,
+        choices=ESTADO_VISIBLE_CHOICES,
+        default='todos',
+        verbose_name="Visible en estado de orden",
+        help_text="Controla en qué etapa del proceso de reparación se muestra el banner"
+    )
+    fecha_inicio = models.DateTimeField(
+        verbose_name="Fecha y hora de inicio",
+        help_text="El banner se activa automáticamente a partir de esta fecha"
+    )
+    fecha_fin = models.DateTimeField(
+        verbose_name="Fecha y hora de fin",
+        help_text="El banner se desactiva automáticamente después de esta fecha"
+    )
+    activo = models.BooleanField(
+        default=True,
+        verbose_name="Activo",
+        help_text="Desmarcar para pausar el banner manualmente sin eliminarlo"
+    )
+    orden_display = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Orden de aparición",
+        help_text="Si hay varios banners en la misma posición, el de menor número aparece primero. Los demás rotan automáticamente."
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de creación")
+    fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name="Última actualización")
+
+    class Meta:
+        verbose_name = "Banner Promocional"
+        verbose_name_plural = "Banners Promocionales"
+        ordering = ['orden_display', '-fecha_creacion']
+
+    def __str__(self):
+        vigencia = "vigente" if self.esta_vigente else "inactivo"
+        return f"{self.titulo} — {self.get_posicion_display()} [{vigencia}]"
+
+    @property
+    def esta_vigente(self):
+        """Retorna True si el banner está activo y dentro de las fechas de vigencia."""
+        now = timezone.now()
+        return self.activo and self.fecha_inicio <= now <= self.fecha_fin
+
+    @classmethod
+    def obtener_vigentes_por_estado(cls, estado_orden):
+        """
+        Retorna dict agrupado por posición con los banners vigentes para el estado dado.
+
+        Args:
+            estado_orden: 'tracking', 'finalizado' o 'entregado'
+
+        Returns:
+            dict: {'skyscraper_izq': [...], 'header': [...], ...}
+                  Solo incluye posiciones que tienen al menos un banner activo.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Filtramos los banners que:
+        1. Tienen activo=True
+        2. Su fecha_inicio ya pasó (ya empezó la campaña)
+        3. Su fecha_fin no ha llegado (la campaña sigue vigente)
+        4. Son compatibles con el estado actual de la orden del cliente
+        Luego los agrupamos por posición para que el template sepa qué mostrar en cada slot.
+        """
+        now = timezone.now()
+
+        # Estados compatibles: 'todos' aplica siempre,
+        # 'tracking' aplica tanto a tracking como a finalizado
+        if estado_orden in ('tracking', 'finalizado'):
+            estados_compatibles = models.Q(estado_visible='todos') | models.Q(estado_visible='tracking')
+        elif estado_orden == 'entregado':
+            estados_compatibles = models.Q(estado_visible='todos') | models.Q(estado_visible='entregado')
+        else:
+            # Estado inválido: no mostrar banners
+            return {}
+
+        banners = cls.objects.filter(
+            activo=True,
+            fecha_inicio__lte=now,
+            fecha_fin__gte=now,
+        ).filter(estados_compatibles).order_by('orden_display', '-fecha_creacion')
+
+        # Agrupar por posición
+        agrupados = {}
+        for banner in banners:
+            agrupados.setdefault(banner.posicion, []).append(banner)
+
+        return agrupados
+
+    # ── Tamaños objetivo por posición (ancho × alto en píxeles) ──
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Cada posición del banner tiene un tamaño ideal. Cuando el personal sube
+    # una imagen de cualquier tamaño, Pillow la recorta y escala automáticamente
+    # al tamaño correcto, centrada, sin deformarla.
+    TAMANOS_POR_POSICION = {
+        'skyscraper_izq': (480, 1200),
+        'skyscraper_der': (480, 1200),
+        'header':         (1456, 200),
+        'medio':          (1456, 180),
+        'footer':         (1456, 140),
+    }
+
+    # Calidad JPEG al comprimir (85 = buen balance calidad/peso)
+    JPEG_QUALITY = 85
+
+    def save(self, *args, **kwargs):
+        """
+        Override de save() para redimensionar la imagen automáticamente.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Cada vez que se guarda un banner (nuevo o editado), este método:
+        1. Revisa si la imagen cambió (no reprocesa si es la misma)
+        2. Abre la imagen con Pillow
+        3. Corrige orientación EXIF (fotos de celular pueden estar rotadas)
+        4. Usa ImageOps.fit() para recortar + escalar al tamaño exacto de la posición
+        5. Guarda la imagen optimizada de vuelta al campo ImageField
+        6. Si es PNG con transparencia, la mantiene. Si no, convierte a JPEG.
+        """
+        import logging
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+
+        logger = logging.getLogger(__name__)
+
+        # ── Paso 1: Detectar si la imagen es nueva o cambió ──
+        # Comparamos con la versión en BD (si existe)
+        imagen_cambio = False
+        if self.pk:
+            try:
+                original = BannerPromocional.objects.get(pk=self.pk)
+                if original.imagen.name != self.imagen.name:
+                    imagen_cambio = True
+            except BannerPromocional.DoesNotExist:
+                imagen_cambio = True
+        else:
+            # Objeto nuevo: siempre procesar
+            imagen_cambio = True
+
+        # ── Paso 2: Procesar solo si hay imagen y cambió ──
+        if imagen_cambio and self.imagen and hasattr(self.imagen, 'file'):
+            tamano_objetivo = self.TAMANOS_POR_POSICION.get(self.posicion)
+            if tamano_objetivo:
+                try:
+                    # Abrir la imagen desde el archivo subido
+                    img = PILImage.open(self.imagen)
+
+                    # Corregir orientación EXIF (fotos de celular rotadas)
+                    img = ImageOps.exif_transpose(img)
+
+                    # ── Paso 3: Determinar formato de salida ──
+                    # Si la imagen tiene canal alpha (transparencia), mantener PNG
+                    # Si no, convertir a JPEG para menor peso
+                    tiene_alpha = img.mode in ('RGBA', 'LA', 'PA')
+                    if tiene_alpha:
+                        formato_salida = 'PNG'
+                        content_type = 'image/png'
+                        extension = '.png'
+                    else:
+                        # Convertir a RGB si es necesario (ej: modo P, L, CMYK)
+                        if img.mode != 'RGB':
+                            img = img.convert('RGB')
+                        formato_salida = 'JPEG'
+                        content_type = 'image/jpeg'
+                        extension = '.jpg'
+
+                    # ── Paso 4: Redimensionar con Image.resize() ──
+                    # resize() escala la imagen al tamaño exacto del objetivo.
+                    # No recorta nada — la imagen completa se muestra tal cual
+                    # fue subida, solo ajustada al área disponible.
+                    # Si las proporciones no coinciden, la imagen se comprime
+                    # ligeramente, pero el contenido completo se preserva.
+                    img_resized = img.resize(
+                        tamano_objetivo,
+                        resample=PILImage.LANCZOS,  # Mejor calidad de resampling
+                    )
+
+                    # ── Paso 5: Guardar en buffer de memoria ──
+                    buffer = BytesIO()
+                    if formato_salida == 'JPEG':
+                        img_resized.save(
+                            buffer,
+                            format='JPEG',
+                            quality=self.JPEG_QUALITY,
+                            optimize=True,
+                        )
+                    else:
+                        img_resized.save(
+                            buffer,
+                            format='PNG',
+                            optimize=True,
+                        )
+                    buffer.seek(0)
+
+                    # ── Paso 6: Generar nombre de archivo limpio ──
+                    import os
+                    nombre_original = os.path.splitext(
+                        os.path.basename(self.imagen.name)
+                    )[0]
+                    nuevo_nombre = f"{nombre_original}_optimizado{extension}"
+
+                    # ── Paso 7: Reemplazar el archivo en el campo imagen ──
+                    self.imagen.save(
+                        nuevo_nombre,
+                        InMemoryUploadedFile(
+                            file=buffer,
+                            field_name='imagen',
+                            name=nuevo_nombre,
+                            content_type=content_type,
+                            size=buffer.getbuffer().nbytes,
+                            charset=None,
+                        ),
+                        save=False,  # IMPORTANTE: save=False para evitar recursión infinita
+                    )
+
+                    logger.info(
+                        f'Banner "{self.titulo}": imagen redimensionada a '
+                        f'{tamano_objetivo[0]}×{tamano_objetivo[1]}px ({formato_salida})'
+                    )
+
+                except Exception as e:
+                    # Si falla el procesamiento, guardar la imagen original sin modificar
+                    logger.warning(
+                        f'Banner "{self.titulo}": no se pudo redimensionar la imagen. '
+                        f'Se guardará el archivo original. Error: {e}'
+                    )
+
+        # Llamar al save() original de Django
+        super().save(*args, **kwargs)
 
 

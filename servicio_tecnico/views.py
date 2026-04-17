@@ -3028,7 +3028,7 @@ def seguimiento_orden_cliente(request, token):
       - 'entregado': Agradecimiento + link a encuesta si existe
       - 'invalido': Token no existe, orden cancelada o link expirado
     """
-    from .models import EnlaceSeguimientoCliente, FeedbackCliente
+    from .models import EnlaceSeguimientoCliente, FeedbackCliente, BannerPromocional
     from config.constants import ESTADO_ORDEN_CHOICES
     from config.paises_config import PAISES_CONFIG
 
@@ -3332,6 +3332,15 @@ def seguimiento_orden_cliente(request, token):
         context['estado'] = 'finalizado'
     else:
         context['estado'] = 'tracking'
+
+    # ── Banners promocionales dinámicos ──
+    # Obtenemos los banners vigentes agrupados por posición.
+    # Si no hay banners activos, el dict estará vacío y el template no renderiza nada.
+    try:
+        banners = BannerPromocional.obtener_vigentes_por_estado(context['estado'])
+    except Exception:
+        banners = {}
+    context['banners'] = banners
 
     return render(request, TEMPLATE, context)
 

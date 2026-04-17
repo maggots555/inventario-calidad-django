@@ -28,6 +28,8 @@ from .models import (
     FeedbackCliente,
     # NUEVO - SEGUIMIENTO PÚBLICO DE ORDEN (Marzo 2026)
     EnlaceSeguimientoCliente,
+    # NUEVO - BANNERS PROMOCIONALES (Abril 2026)
+    BannerPromocional,
 )
 
 
@@ -1833,6 +1835,160 @@ class EnlaceSeguimientoClienteAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+# ============================================================================
+# BANNERS PROMOCIONALES
+# ============================================================================
+
+@admin.register(BannerPromocional)
+class BannerPromocionalAdmin(admin.ModelAdmin):
+    """
+    Admin para gestionar banners promocionales en la página de seguimiento.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta configuración permite al equipo de marketing subir y gestionar banners
+    sin tocar código. Incluye vista previa de la imagen, filtros por posición
+    y un indicador de vigencia en tiempo real.
+    """
+
+    # ── Columnas que aparecen en la lista de banners ──
+    list_display = (
+        'titulo',
+        'preview_imagen',
+        'posicion_badge',
+        'estado_visible',
+        'vigencia_badge',
+        'fecha_inicio',
+        'fecha_fin',
+        'orden_display',
+        'activo',
+    )
+
+    # ── Filtros en la barra lateral derecha ──
+    list_filter = (
+        'activo',
+        'posicion',
+        'estado_visible',
+    )
+
+    # ── Barra de búsqueda ──
+    search_fields = ('titulo', 'texto_alt')
+
+    # ── Ordenamiento por defecto en la lista ──
+    ordering = ('orden_display', '-fecha_creacion')
+
+    # ── Campos que se pueden editar directamente en la lista ──
+    list_editable = ('orden_display', 'activo')
+
+    # ── Organización del formulario de creación/edición ──
+    fieldsets = (
+        ('Contenido del banner', {
+            'fields': ('titulo', 'imagen', 'preview_imagen_admin', 'texto_alt', 'url_destino'),
+        }),
+        ('Configuración de aparición', {
+            'fields': ('posicion', 'estado_visible', 'orden_display'),
+            'description': 'Define dónde y cuándo se muestra el banner en la página de seguimiento.'
+        }),
+        ('Vigencia', {
+            'fields': ('activo', 'fecha_inicio', 'fecha_fin'),
+            'description': 'El banner se activa y desactiva automáticamente según estas fechas. "Activo" permite pausarlo manualmente.'
+        }),
+        ('Metadatos (automáticos)', {
+            'fields': ('fecha_creacion', 'fecha_actualizacion'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    # ── Campos de solo lectura ──
+    readonly_fields = ('preview_imagen_admin', 'fecha_creacion', 'fecha_actualizacion')
+
+    # ── Preview de imagen en la LISTA ──
+    @admin.display(description='Vista previa')
+    def preview_imagen(self, obj):
+        if obj.pk and obj.imagen and obj.imagen.name:
+            try:
+                return format_html(
+                    '<img src="{}" style="height:48px; width:auto; border-radius:6px; '
+                    'object-fit:cover; box-shadow:0 2px 6px rgba(0,0,0,0.15);">',
+                    obj.imagen.url
+                )
+            except Exception:
+                return '(error al cargar)'
+        return '—'
+
+    # ── Preview grande en el FORMULARIO de edición ──
+    @admin.display(description='Vista previa actual')
+    def preview_imagen_admin(self, obj):
+        if obj.pk and obj.imagen and obj.imagen.name:
+            try:
+                return format_html(
+                    '<div style="margin:8px 0;">'
+                    '<img src="{}" style="max-height:200px; max-width:100%; border-radius:10px; '
+                    'object-fit:contain; box-shadow:0 4px 12px rgba(0,0,0,0.15);">'
+                    '<p style="margin:6px 0 0; font-size:12px; color:#6b7280;">'
+                    'Dimensión recomendada según posición: Skyscraper 480×1200px | Header 1456×200px | Medio 1456×180px | Footer 1456×140px</p>'
+                    '</div>',
+                    obj.imagen.url
+                )
+            except Exception:
+                return format_html(
+                    '<p style="color:#ef4444; font-style:italic;">'
+                    'La imagen está registrada pero no se pudo cargar la vista previa. '
+                    'Archivo: {}</p>',
+                    obj.imagen.name
+                )
+        if not obj.pk:
+            return format_html(
+                '<p style="color:#6b7280; font-style:italic;">'
+                'Guarda el banner para ver la vista previa de la imagen.</p>'
+            )
+        return format_html(
+            '<p style="color:#9ca3af; font-style:italic;">Sin imagen cargada aún.</p>'
+        )
+
+    # ── Badge de posición con color ──
+    @admin.display(description='Posición', ordering='posicion')
+    def posicion_badge(self, obj):
+        colores = {
+            'skyscraper_izq': '#6366f1',
+            'skyscraper_der': '#8b5cf6',
+            'header':         '#0ea5e9',
+            'medio':          '#10b981',
+            'footer':         '#f59e0b',
+        }
+        color = colores.get(obj.posicion, '#6b7280')
+        return format_html(
+            '<span style="background:{};color:#fff;padding:2px 8px;border-radius:12px;'
+            'font-size:11px;font-weight:600;">{}</span>',
+            color, obj.get_posicion_display()
+        )
+
+    # ── Badge de vigencia (verde = vigente, rojo = inactivo/expirado) ──
+    @admin.display(description='Estado')
+    def vigencia_badge(self, obj):
+        if obj.esta_vigente:
+            return format_html(
+                '<span style="background:#10b981;color:#fff;padding:2px 10px;'
+                'border-radius:12px;font-size:11px;font-weight:600;">VIGENTE</span>'
+            )
+        elif not obj.activo:
+            return format_html(
+                '<span style="background:#6b7280;color:#fff;padding:2px 10px;'
+                'border-radius:12px;font-size:11px;font-weight:600;">PAUSADO</span>'
+            )
+        else:
+            from django.utils import timezone
+            now = timezone.now()
+            if now < obj.fecha_inicio:
+                return format_html(
+                    '<span style="background:#f59e0b;color:#fff;padding:2px 10px;'
+                    'border-radius:12px;font-size:11px;font-weight:600;">PROGRAMADO</span>'
+                )
+            return format_html(
+                '<span style="background:#ef4444;color:#fff;padding:2px 10px;'
+                'border-radius:12px;font-size:11px;font-weight:600;">EXPIRADO</span>'
+            )
 
 
 # Configuración del sitio admin
