@@ -14391,6 +14391,7 @@ def feedback_satisfaccion_cliente(request, token):
     try:
         feedback = FeedbackCliente.objects.select_related(
             'orden__detalle_equipo',
+            'orden__sucursal',
         ).get(token=token, tipo='satisfaccion')
     except FeedbackCliente.DoesNotExist:
         logger.warning(
@@ -14426,6 +14427,7 @@ def feedback_satisfaccion_cliente(request, token):
                 return render(request, TEMPLATE, {
                     'estado': 'gracias',
                     'calificacion': 5,
+                    'sucursal_nombre': orden.sucursal.nombre,
                 })
 
             feedback.calificacion_general  = d['calificacion_general']
@@ -14482,6 +14484,7 @@ def feedback_satisfaccion_cliente(request, token):
             return render(request, TEMPLATE, {
                 'estado': 'gracias',
                 'calificacion': d['calificacion_general'],
+                'sucursal_nombre': orden.sucursal.nombre,
             })
     else:
         form = FeedbackSatisfaccionClienteForm()
