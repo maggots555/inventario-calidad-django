@@ -2881,7 +2881,7 @@ class BannerPromocional(models.Model):
         help_text=(
             "Sube la imagen en JPG, PNG o WebP. "
             "Se redimensionará automáticamente al tamaño óptimo según la posición elegida. "
-            "Skyscrapers: 480×1200 px | Header: 1456×200 px | Medio: 1456×180 px | Footer: 1456×140 px."
+            "Skyscrapers: 480×1200 px | Header: 1360×200 px | Medio: 1360×180 px | Footer: 1360×140 px."
         )
     )
     url_destino = models.URLField(
@@ -2998,9 +2998,12 @@ class BannerPromocional(models.Model):
     TAMANOS_POR_POSICION = {
         'skyscraper_izq': (480, 1200),
         'skyscraper_der': (480, 1200),
-        'header':         (1456, 200),
-        'medio':          (1456, 180),
-        'footer':         (1456, 140),
+        # 1360 = 680px (max-width del st-layout-center) × 2 (resolución @2x)
+        # Esto garantiza que el ratio de aspecto de la imagen guardada sea
+        # idéntico al del slot visible en CSS, eliminando el recorte de object-fit:cover.
+        'header':         (1360, 200),
+        'medio':          (1360, 180),
+        'footer':         (1360, 140),
     }
 
     # Calidad JPEG al comprimir (85 = buen balance calidad/peso)

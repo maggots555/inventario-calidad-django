@@ -1927,7 +1927,7 @@ class BannerPromocionalAdmin(admin.ModelAdmin):
                     '<img src="{}" style="max-height:200px; max-width:100%; border-radius:10px; '
                     'object-fit:contain; box-shadow:0 4px 12px rgba(0,0,0,0.15);">'
                     '<p style="margin:6px 0 0; font-size:12px; color:#6b7280;">'
-                    'Dimensión recomendada según posición: Skyscraper 480×1200px | Header 1456×200px | Medio 1456×180px | Footer 1456×140px</p>'
+                    'Dimensión recomendada según posición: Skyscraper 480×1200px | Header 1360×200px | Medio 1360×180px | Footer 1360×140px</p>'
                     '</div>',
                     obj.imagen.url
                 )

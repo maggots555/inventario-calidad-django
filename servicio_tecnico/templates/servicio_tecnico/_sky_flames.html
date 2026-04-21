@@ -1,0 +1,42 @@
+{% comment %}
+_sky_flames.html — Marco decorativo SVG de electricidad animada para skyscrapers
+EXPLICACIÓN PARA PRINCIPIANTES:
+La electricidad se crea con <path> y la técnica stroke-dashoffset:
+  - stroke-dasharray define un segmento corto (el "rayo") y un hueco largo
+  - Al animar stroke-dashoffset, el rayo viaja a lo largo del borde
+  - Una segunda animación de opacity crea el parpadeo eléctrico intermitente
+Cada borde tiene dos rayos desfasados medio ciclo para mayor riqueza visual.
+Cada rayo tiene dos capas: glow (grueso, difuso) y core (fino, brillante).
+Animaciones definidas en seguimiento_cliente.css (seTravelDown/Up/Right, seFlickerGlow/Core).
+{% endcomment %}
+<svg class="st-sky-electricity"
+     viewBox="0 0 240 600"
+     preserveAspectRatio="none"
+     xmlns="http://www.w3.org/2000/svg"
+     aria-hidden="true"
+     focusable="false">
+
+  <!-- Borde IZQUIERDO — rayo primario (viaja de arriba hacia abajo)
+       Zigzag alrededor de x=0: puntos negativos salen del slot, positivos entran levemente -->
+  <path class="se-glow se-lft-a" d="M0,0 L-3,40 L5,75 L-7,115 L2,155 L-6,195 L8,235 L-4,270 L7,310 L-5,350 L3,390 L-8,430 L4,470 L-3,510 L6,550 L-2,575 L0,600"/>
+  <path class="se-core se-lft-a" d="M0,0 L-3,40 L5,75 L-7,115 L2,155 L-6,195 L8,235 L-4,270 L7,310 L-5,350 L3,390 L-8,430 L4,470 L-3,510 L6,550 L-2,575 L0,600"/>
+
+  <!-- Borde IZQUIERDO — rayo secundario (desfasado -1.75s = medio ciclo) -->
+  <path class="se-glow se-lft-b" d="M0,15 L-5,55 L3,90 L-4,130 L6,170 L-3,205 L5,245 L-7,285 L2,325 L-4,365 L7,405 L-3,445 L5,485 L-6,525 L2,560 L-3,585 L0,600"/>
+  <path class="se-core se-lft-b" d="M0,15 L-5,55 L3,90 L-4,130 L6,170 L-3,205 L5,245 L-7,285 L2,325 L-4,365 L7,405 L-3,445 L5,485 L-6,525 L2,560 L-3,585 L0,600"/>
+
+  <!-- Borde DERECHO — rayo primario (viaja de abajo hacia arriba — contraste con izquierdo)
+       Zigzag alrededor de x=240: puntos >240 salen del slot, <240 entran levemente -->
+  <path class="se-glow se-rgt-a" d="M240,0 L243,40 L235,75 L247,115 L238,155 L246,195 L232,235 L244,270 L233,310 L245,350 L237,390 L248,430 L236,470 L243,510 L234,550 L242,575 L240,600"/>
+  <path class="se-core se-rgt-a" d="M240,0 L243,40 L235,75 L247,115 L238,155 L246,195 L232,235 L244,270 L233,310 L245,350 L237,390 L248,430 L236,470 L243,510 L234,550 L242,575 L240,600"/>
+
+  <!-- Borde DERECHO — rayo secundario (desfasado -1.9s = medio ciclo) -->
+  <path class="se-glow se-rgt-b" d="M240,15 L245,55 L237,90 L244,130 L234,170 L243,205 L235,245 L247,285 L238,325 L244,365 L233,405 L243,445 L235,485 L246,525 L238,560 L243,585 L240,600"/>
+  <path class="se-core se-rgt-b" d="M240,15 L245,55 L237,90 L244,130 L234,170 L243,205 L235,245 L247,285 L238,325 L244,365 L233,405 L243,445 L235,485 L246,525 L238,560 L243,585 L240,600"/>
+
+  <!-- Borde INFERIOR — rayo (viaja de izquierda a derecha)
+       Zigzag alrededor de y=600: puntos >600 salen del slot hacia abajo -->
+  <path class="se-glow se-bot-a" d="M0,600 L30,597 L60,604 L95,598 L130,603 L165,596 L200,604 L220,598 L240,600"/>
+  <path class="se-core se-bot-a" d="M0,600 L30,597 L60,604 L95,598 L130,603 L165,596 L200,604 L220,598 L240,600"/>
+
+</svg>

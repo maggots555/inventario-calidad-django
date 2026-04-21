@@ -2557,10 +2557,15 @@
   z-index: 3;
 }
 
+/* HEADER (base horizontal): aspect-ratio derivado de TAMANOS_POR_POSICION['header'] = 1360×200.
+   height:auto + aspect-ratio garantizan imagen completa sin recorte en cualquier ancho de contenedor.
+   object-fit:fill rellena exactamente el área calculada (sin zoom ni clip lateral).
+   A 680px de ancho el alto resultante es 680×200/1360 = 100px — idéntico al anterior height fijo. */
 .st-banner-slot--horizontal .st-banner-img {
   width: 100%;
-  height: 100px;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: 1360 / 200;
+  object-fit: fill;
   object-position: center;
   border-radius: 10px;
   display: block;
@@ -2569,14 +2574,20 @@
   filter: drop-shadow(0 2px 8px rgba(31, 99, 145, 0.10));
 }
 
-/* Variante para el slot MEDIO — altura un poco menor */
+/* MEDIO: aspect-ratio de 1360×180. A 680px → alto = 90px (igual al anterior height fijo).
+   object-fit:fill explícito para no heredar cover de la regla base. */
 .st-banner-slot--medio .st-banner-img {
-  height: 90px;
+  height: auto;
+  aspect-ratio: 1360 / 180;
+  object-fit: fill;
 }
 
-/* Variante para el slot FOOTER — más compacto */
+/* FOOTER: aspect-ratio de 1360×140. A 680px → alto = 70px (igual al anterior height fijo).
+   object-fit:fill explícito para no heredar cover de la regla base. */
 .st-banner-slot--footer .st-banner-img {
-  height: 70px;
+  height: auto;
+  aspect-ratio: 1360 / 140;
+  object-fit: fill;
   border-radius: 8px;
 }
 
@@ -2691,37 +2702,343 @@
 
 /* ── Dots del carrusel ── */
 .st-banner-dots {
+  /* Overlay sobre la imagen — esquina inferior centrada */
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 0 2px;
-  position: relative;
+  gap: 4px;
+  /* Cápsula de vidrio esmerilado para legibilidad sobre cualquier imagen */
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 20px;
   z-index: 4;
+  white-space: nowrap;
 }
 
 .st-banner-dot {
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: rgba(31, 99, 145, 0.2);
+  background: rgba(255, 255, 255, 0.5);
   transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   cursor: pointer;
-  border: 1px solid rgba(31, 99, 145, 0.1);
+  flex-shrink: 0;
 }
 
 .st-banner-dot:hover {
-  background: rgba(56, 189, 248, 0.4);
-  transform: scale(1.3);
+  background: rgba(255, 255, 255, 0.85);
+  transform: scale(1.2);
 }
 
 .st-banner-dot--active {
-  background: var(--st-primary);
-  transform: scale(1.4);
-  /* Dot activo se convierte en pastilla alargada */
-  width: 18px;
-  border-radius: 10px;
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
-  border-color: rgba(56, 189, 248, 0.3);
+  /* Pastilla alargada, blanca — visible sobre cualquier fondo */
+  width: 12px;
+  height: 5px;
+  border-radius: 6px;
+  background: #fff;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ============================================================
+   ELECTRICIDAD SVG (se-*) — Marco decorativo animado para skyscrapers
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   La electricidad usa stroke-dashoffset — una técnica SVG donde:
+     · stroke-dasharray define un segmento corto (el "rayo") y un hueco largo
+     · Al animar stroke-dashoffset, el rayo parece viajar a lo largo del path
+   Dos capas por rayo: .se-glow (grueso+difuso = corona) y .se-core (fino+brillante = núcleo)
+   El selector más específico .se-core.se-lft-a sobreescribe al genérico .se-lft-a
+   para que glow y core tengan distintas opacidades de parpadeo.
+   ============================================================ */
+
+/* ── Contenedor SVG ── */
+.st-sky-electricity {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 3;
+}
+
+/* ── Capa GLOW: corona del rayo (trazo grueso y difuso) ── */
+.se-glow {
+  fill: none;
+  stroke: #38bdf8;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 85 750;  /* rayo de 85px, hueco de 750px (solo 1 visible a la vez) */
+  filter: blur(2.5px);
+}
+
+/* ── Capa CORE: núcleo del rayo (trazo fino y brillante) ── */
+.se-core {
+  fill: none;
+  stroke: #e0f2fe;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 85 750;
+}
+
+/* ── Rayos borde IZQUIERDO (viajan hacia abajo)
+   .se-lft-a aplica a glow; .se-core.se-lft-a sobreescribe para core (más opacidad) ── */
+.se-lft-a {
+  animation: seTravelDown 3.5s linear      infinite,
+             seFlickerGlow 2.1s ease-in-out infinite;
+}
+.se-core.se-lft-a {
+  animation: seTravelDown  3.5s linear       infinite,
+             seFlickerCore  2.1s ease-in-out  infinite;
+}
+.se-lft-b {
+  animation: seTravelDown  3.5s linear       infinite -1.75s,
+             seFlickerGlow  1.8s ease-in-out  infinite  0.6s;
+}
+.se-core.se-lft-b {
+  animation: seTravelDown  3.5s linear       infinite -1.75s,
+             seFlickerCore  1.8s ease-in-out  infinite  0.6s;
+}
+
+/* ── Rayos borde DERECHO (viajan hacia arriba — contraste dinámico con izquierdo) ── */
+.se-rgt-a {
+  animation: seTravelUp    3.8s linear       infinite,
+             seFlickerGlow  2.4s ease-in-out  infinite  0.5s;
+}
+.se-core.se-rgt-a {
+  animation: seTravelUp    3.8s linear       infinite,
+             seFlickerCore  2.4s ease-in-out  infinite  0.5s;
+}
+.se-rgt-b {
+  animation: seTravelUp    3.8s linear       infinite -1.9s,
+             seFlickerGlow  2.0s ease-in-out  infinite  1.2s;
+}
+.se-core.se-rgt-b {
+  animation: seTravelUp    3.8s linear       infinite -1.9s,
+             seFlickerCore  2.0s ease-in-out  infinite  1.2s;
+}
+
+/* ── Rayo borde INFERIOR (viaja de izquierda a derecha) ── */
+.se-bot-a {
+  animation: seTravelRight  2.8s linear       infinite,
+             seFlickerGlow   1.9s ease-in-out  infinite  1.1s;
+}
+.se-core.se-bot-a {
+  animation: seTravelRight  2.8s linear       infinite,
+             seFlickerCore   1.9s ease-in-out  infinite  1.1s;
+}
+
+/* ── Keyframes de VIAJE (stroke-dashoffset recorre el path) ── */
+
+/* Borde vertical — rayo viaja de arriba hacia abajo
+   Path ≈ 620px. Rango: inicio 85 (rayo justo fuera del tope) → -705 (sale por el fondo) */
+@keyframes seTravelDown {
+  from { stroke-dashoffset:  85; }
+  to   { stroke-dashoffset: -705; }
+}
+
+/* Borde vertical — rayo viaja de abajo hacia arriba */
+@keyframes seTravelUp {
+  from { stroke-dashoffset: -705; }
+  to   { stroke-dashoffset:  85; }
+}
+
+/* Borde inferior — rayo viaja de izquierda a derecha
+   Path ≈ 248px. Rango: 85 → -333 */
+@keyframes seTravelRight {
+  from { stroke-dashoffset:  85; }
+  to   { stroke-dashoffset: -333; }
+}
+
+/* ── Keyframes de PARPADEO ELÉCTRICO (simula la naturaleza intermitente del rayo) ── */
+
+/* Para capa glow (corona — opacidades bajas para no saturar) */
+@keyframes seFlickerGlow {
+  0%,  100% { opacity: 0.40; }
+  15%        { opacity: 0.08; }
+  16%        { opacity: 0.35; }
+  38%        { opacity: 0.02; }
+  39%        { opacity: 0.38; }
+  62%        { opacity: 0.22; }
+  63%        { opacity: 0.04; }
+  64%        { opacity: 0.32; }
+}
+
+/* Para capa core (núcleo — más brillante) */
+@keyframes seFlickerCore {
+  0%,  100% { opacity: 0.90; }
+  15%        { opacity: 0.20; }
+  16%        { opacity: 0.80; }
+  38%        { opacity: 0.05; }
+  39%        { opacity: 0.85; }
+  62%        { opacity: 0.55; }
+  63%        { opacity: 0.10; }
+  64%        { opacity: 0.75; }
+}
+
+/* ── Accesibilidad: sin animaciones si el usuario lo prefiere ── */
+@media (prefers-reduced-motion: reduce) {
+  .se-glow,
+  .se-core {
+    animation: none;
+    opacity: 0.3;
+  }
+}
+
+/* ── Dark mode: más saturación para mayor visibilidad ── */
+[data-bs-theme="dark"] .st-sky-electricity {
+  filter: brightness(1.3) saturate(1.4);
+}
+
+/* ============================================================
+   ELECTRICIDAD SVG (ste-*) — Marco decorativo animado para banners horizontales
+   EXPLICACIÓN PARA PRINCIPIANTES:
+   Mismo principio que se-* (skyscrapers) pero para forma horizontal.
+   viewBox 0 0 680 90 se estira con preserveAspectRatio="none" para adaptarse
+   a los 3 tamaños reales: header (~100px alto), medio (~90px), footer (~70px).
+   Top edge: 2 rayos viajan izq→der | Bottom edge: 2 rayos viajan der→izq
+   Left/right: 1 rayo corto cada uno, viajan de arriba a abajo
+   ============================================================ */
+
+/* ── Contenedor SVG ── */
+.st-hor-electricity {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 3;
+}
+
+/* ── Capa GLOW: corona del rayo (trazo grueso y difuso) ── */
+.ste-glow {
+  fill: none;
+  stroke: #38bdf8;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 80 800;  /* rayo de 80px, hueco de 800px (path top/bot ≈ 685px) */
+  filter: blur(2.5px);
+}
+
+/* ── Capa CORE: núcleo del rayo (trazo fino y brillante) ── */
+.ste-core {
+  fill: none;
+  stroke: #e0f2fe;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 80 800;
+}
+
+/* ── Bordes cortos left/right (~93px): dasharray más pequeño
+   Mayor especificidad (.ste-core.ste-lft-a) sobreescribe a .ste-core ── */
+.ste-lft-a,
+.ste-core.ste-lft-a,
+.ste-rgt-a,
+.ste-core.ste-rgt-a {
+  stroke-dasharray: 40 150;  /* rayo de 40px, hueco de 150px */
+}
+
+/* ── Rayos borde SUPERIOR (viajan de izquierda a derecha) ── */
+.ste-top-a {
+  animation: steRunRight  3.5s linear      infinite,
+             seFlickerGlow 2.1s ease-in-out infinite;
+}
+.ste-core.ste-top-a {
+  animation: steRunRight  3.5s linear       infinite,
+             seFlickerCore  2.1s ease-in-out  infinite;
+}
+.ste-top-b {
+  animation: steRunRight  3.5s linear       infinite -1.75s,
+             seFlickerGlow  1.8s ease-in-out  infinite  0.6s;
+}
+.ste-core.ste-top-b {
+  animation: steRunRight  3.5s linear       infinite -1.75s,
+             seFlickerCore  1.8s ease-in-out  infinite  0.6s;
+}
+
+/* ── Rayos borde INFERIOR (viajan de derecha a izquierda — contraste dinámico) ── */
+.ste-bot-a {
+  animation: steRunLeft    3.8s linear       infinite,
+             seFlickerGlow  2.4s ease-in-out  infinite  0.5s;
+}
+.ste-core.ste-bot-a {
+  animation: steRunLeft    3.8s linear       infinite,
+             seFlickerCore  2.4s ease-in-out  infinite  0.5s;
+}
+.ste-bot-b {
+  animation: steRunLeft    3.8s linear       infinite -1.9s,
+             seFlickerGlow  2.0s ease-in-out  infinite  1.2s;
+}
+.ste-core.ste-bot-b {
+  animation: steRunLeft    3.8s linear       infinite -1.9s,
+             seFlickerCore  2.0s ease-in-out  infinite  1.2s;
+}
+
+/* ── Rayo borde IZQUIERDO (viaja de arriba hacia abajo) ── */
+.ste-lft-a {
+  animation: steRunVert    2.5s linear       infinite,
+             seFlickerGlow  2.0s ease-in-out  infinite;
+}
+.ste-core.ste-lft-a {
+  animation: steRunVert    2.5s linear       infinite,
+             seFlickerCore  2.0s ease-in-out  infinite;
+}
+
+/* ── Rayo borde DERECHO (viaja de arriba hacia abajo, desfasado -1.25s) ── */
+.ste-rgt-a {
+  animation: steRunVert    2.5s linear       infinite -1.25s,
+             seFlickerGlow  1.8s ease-in-out  infinite  0.7s;
+}
+.ste-core.ste-rgt-a {
+  animation: steRunVert    2.5s linear       infinite -1.25s,
+             seFlickerCore  1.8s ease-in-out  infinite  0.7s;
+}
+
+/* ── Keyframes de VIAJE para banners horizontales ── */
+
+/* Borde top/bottom — rayo viaja de izquierda a derecha
+   Path ≈ 685px. Rango: 80 (rayo justo fuera del inicio) → -765 (sale por la derecha) */
+@keyframes steRunRight {
+  from { stroke-dashoffset:  80; }
+  to   { stroke-dashoffset: -765; }
+}
+
+/* Borde bottom — rayo viaja de derecha a izquierda (dirección inversa) */
+@keyframes steRunLeft {
+  from { stroke-dashoffset: -765; }
+  to   { stroke-dashoffset:  80; }
+}
+
+/* Bordes left/right — rayo viaja de arriba hacia abajo
+   Path ≈ 93px. Rango: 40 (rayo fuera del tope) → -133 (sale por el fondo) */
+@keyframes steRunVert {
+  from { stroke-dashoffset:  40; }
+  to   { stroke-dashoffset: -133; }
+}
+
+/* ── Accesibilidad: sin animaciones si el usuario lo prefiere ── */
+@media (prefers-reduced-motion: reduce) {
+  .ste-glow,
+  .ste-core {
+    animation: none;
+    opacity: 0.3;
+  }
+}
+
+/* ── Dark mode: más saturación para mayor visibilidad ── */
+[data-bs-theme="dark"] .st-hor-electricity {
+  filter: brightness(1.3) saturate(1.4);
 }
 
 /* ── Mostrar skyscrapers en desktop (≥ 1024px) ── */
@@ -2753,16 +3070,9 @@
     max-width: 100%;
     width: 100%;
   }
-  /* Banners horizontales más compactos en mobile */
-  .st-banner-slot--horizontal .st-banner-img {
-    height: 70px;
-  }
-  .st-banner-slot--medio .st-banner-img {
-    height: 60px;
-  }
-  .st-banner-slot--footer .st-banner-img {
-    height: 50px;
-  }
+  /* Banners horizontales: las reglas base ya usan height:auto + aspect-ratio + object-fit:fill,
+     por lo que se escalan correctamente a cualquier ancho sin recorte.
+     No se necesitan overrides adicionales para mobile. */
 }
 
 /* ── Accesibilidad: respetar preferencia de movimiento reducido ── */
@@ -2847,18 +3157,15 @@
 }
 
 [data-bs-theme="dark"] .st-banner-dot {
-  background: rgba(96, 165, 250, 0.15);
-  border-color: rgba(96, 165, 250, 0.1);
+  background: rgba(255, 255, 255, 0.45);
 }
 
 [data-bs-theme="dark"] .st-banner-dot:hover {
-  background: rgba(96, 165, 250, 0.4);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 [data-bs-theme="dark"] .st-banner-dot--active {
-  background: #60a5fa;
-  box-shadow: 0 0 10px rgba(96, 165, 250, 0.45);
-  border-color: rgba(96, 165, 250, 0.4);
+  background: #fff;
 }
 
 [data-bs-theme="dark"] .st-banner-link:hover .st-banner-img,

@@ -1,0 +1,49 @@
+{% comment %}
+_hor_electricity.html — Marco decorativo SVG de electricidad animada para banners horizontales
+EXPLICACIÓN PARA PRINCIPIANTES:
+Mismo principio que _sky_flames.html pero adaptado a forma horizontal.
+  - viewBox "0 0 680 90" se estira al 100% de ancho y alto del banner
+    con preserveAspectRatio="none" para cubrir cualquier tamaño real
+  - Borde top: zigzag alrededor de y=0 (2 rayos, viajan izq→der)
+  - Borde bottom: zigzag alrededor de y=90 (2 rayos, viajan der→izq — contraste)
+  - Borde left: zigzag alrededor de x=0 (1 rayo corto, viaja de arriba a abajo)
+  - Borde right: zigzag alrededor de x=680 (1 rayo corto, desfasado)
+Cada rayo = 2 capas: ste-glow (gruesa+difusa = corona) y ste-core (fina+brillante = núcleo).
+Animaciones definidas en seguimiento_cliente.css (steRunRight/Left/Vert, seFlickerGlow/Core).
+{% endcomment %}
+<svg class="st-hor-electricity"
+     viewBox="0 0 680 90"
+     preserveAspectRatio="none"
+     xmlns="http://www.w3.org/2000/svg"
+     aria-hidden="true"
+     focusable="false">
+
+  <!-- Borde SUPERIOR — rayo primario (viaja de izquierda a derecha)
+       Zigzag alrededor de y=0: puntos negativos salen del slot hacia arriba -->
+  <path class="ste-glow ste-top-a" d="M0,0 L50,-4 L100,4 L160,-5 L220,3 L280,-4 L340,5 L400,-3 L460,4 L520,-5 L580,3 L640,-4 L680,0"/>
+  <path class="ste-core ste-top-a" d="M0,0 L50,-4 L100,4 L160,-5 L220,3 L280,-4 L340,5 L400,-3 L460,4 L520,-5 L580,3 L640,-4 L680,0"/>
+
+  <!-- Borde SUPERIOR — rayo secundario (desfasado -1.75s = medio ciclo) -->
+  <path class="ste-glow ste-top-b" d="M0,2 L60,-3 L120,5 L175,-4 L235,3 L295,-5 L355,4 L415,-3 L475,5 L535,-4 L595,3 L655,-3 L680,2"/>
+  <path class="ste-core ste-top-b" d="M0,2 L60,-3 L120,5 L175,-4 L235,3 L295,-5 L355,4 L415,-3 L475,5 L535,-4 L595,3 L655,-3 L680,2"/>
+
+  <!-- Borde INFERIOR — rayo primario (viaja de derecha a izquierda — contraste con superior)
+       Zigzag alrededor de y=90: puntos >90 salen del slot hacia abajo -->
+  <path class="ste-glow ste-bot-a" d="M0,90 L50,94 L100,86 L160,95 L220,87 L280,94 L340,85 L400,93 L460,86 L520,95 L580,87 L640,94 L680,90"/>
+  <path class="ste-core ste-bot-a" d="M0,90 L50,94 L100,86 L160,95 L220,87 L280,94 L340,85 L400,93 L460,86 L520,95 L580,87 L640,94 L680,90"/>
+
+  <!-- Borde INFERIOR — rayo secundario (desfasado -1.9s = medio ciclo) -->
+  <path class="ste-glow ste-bot-b" d="M0,88 L60,93 L120,85 L175,94 L235,87 L295,95 L355,86 L415,93 L475,85 L535,94 L595,87 L655,93 L680,88"/>
+  <path class="ste-core ste-bot-b" d="M0,88 L60,93 L120,85 L175,94 L235,87 L295,95 L355,86 L415,93 L475,85 L535,94 L595,87 L655,93 L680,88"/>
+
+  <!-- Borde IZQUIERDO — rayo (viaja de arriba hacia abajo)
+       Zigzag alrededor de x=0: puntos negativos salen del slot por la izquierda -->
+  <path class="ste-glow ste-lft-a" d="M0,0 L-3,25 L4,50 L-3,70 L0,90"/>
+  <path class="ste-core ste-lft-a" d="M0,0 L-3,25 L4,50 L-3,70 L0,90"/>
+
+  <!-- Borde DERECHO — rayo (viaja de arriba hacia abajo, desfasado -1.25s)
+       Zigzag alrededor de x=680: puntos >680 salen del slot por la derecha -->
+  <path class="ste-glow ste-rgt-a" d="M680,0 L683,25 L676,50 L683,70 L680,90"/>
+  <path class="ste-core ste-rgt-a" d="M680,0 L683,25 L676,50 L683,70 L680,90"/>
+
+</svg>

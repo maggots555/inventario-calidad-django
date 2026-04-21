@@ -91,6 +91,8 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
         {% if banner.url_destino %}</a>{% endif %}
       </div>
       {% endfor %}
+      {# Marco decorativo: llamas azules SVG animadas (ver _sky_flames.html y seguimiento_cliente.css) #}
+      {% include 'servicio_tecnico/_sky_flames.html' %}
       {% if banners.skyscraper_izq|length > 1 %}
       <div class="st-banner-dots" aria-hidden="true">
         {% for banner in banners.skyscraper_izq %}
@@ -170,20 +172,22 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
   <div class="st-banner-slot st-banner-slot--horizontal"
        data-banners="{{ banners.header|length }}"
        id="st-banner-header-entregado">
-    {% for banner in banners.header %}
-    <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
-         data-index="{{ forloop.counter0 }}">
-      {% if banner.url_destino %}
-      <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
-         class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
-      {% endif %}
-        <img src="{{ banner.imagen.url }}"
-             alt="{{ banner.texto_alt|default:banner.titulo }}"
-             class="st-banner-img" loading="lazy">
-      {% if banner.url_destino %}</a>{% endif %}
-    </div>
-    {% endfor %}
-    {% if banners.header|length > 1 %}
+     {% for banner in banners.header %}
+     <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+          data-index="{{ forloop.counter0 }}">
+       {% if banner.url_destino %}
+       <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+          class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+       {% endif %}
+         <img src="{{ banner.imagen.url }}"
+              alt="{{ banner.texto_alt|default:banner.titulo }}"
+              class="st-banner-img" loading="lazy">
+       {% if banner.url_destino %}</a>{% endif %}
+     </div>
+     {% endfor %}
+     {# Marco decorativo: electricidad SVG animada para banners horizontales #}
+     {% include 'servicio_tecnico/_hor_electricity.html' %}
+     {% if banners.header|length > 1 %}
     <div class="st-banner-dots" aria-hidden="true">
       {% for banner in banners.header %}
       <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
@@ -254,20 +258,22 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
   <div class="st-banner-slot st-banner-slot--horizontal st-banner-slot--medio"
        data-banners="{{ banners.medio|length }}"
        id="st-banner-medio-entregado">
-    {% for banner in banners.medio %}
-    <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
-         data-index="{{ forloop.counter0 }}">
-      {% if banner.url_destino %}
-      <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
-         class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
-      {% endif %}
-        <img src="{{ banner.imagen.url }}"
-             alt="{{ banner.texto_alt|default:banner.titulo }}"
-             class="st-banner-img" loading="lazy">
-      {% if banner.url_destino %}</a>{% endif %}
-    </div>
-    {% endfor %}
-    {% if banners.medio|length > 1 %}
+     {% for banner in banners.medio %}
+     <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+          data-index="{{ forloop.counter0 }}">
+       {% if banner.url_destino %}
+       <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+          class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+       {% endif %}
+         <img src="{{ banner.imagen.url }}"
+              alt="{{ banner.texto_alt|default:banner.titulo }}"
+              class="st-banner-img" loading="lazy">
+       {% if banner.url_destino %}</a>{% endif %}
+     </div>
+     {% endfor %}
+     {# Marco decorativo: electricidad SVG animada para banners horizontales #}
+     {% include 'servicio_tecnico/_hor_electricity.html' %}
+     {% if banners.medio|length > 1 %}
     <div class="st-banner-dots" aria-hidden="true">
       {% for banner in banners.medio %}
       <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
@@ -332,22 +338,24 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
   <div class="st-banner-slot st-banner-slot--horizontal st-banner-slot--footer"
        data-banners="{{ banners.footer|length }}"
        id="st-banner-footer-entregado">
-    {% for banner in banners.footer %}
-    <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
-         data-index="{{ forloop.counter0 }}">
-      {% if banner.url_destino %}
-      <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
-         class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
-      {% endif %}
-        <img src="{{ banner.imagen.url }}"
-             alt="{{ banner.texto_alt|default:banner.titulo }}"
-             class="st-banner-img" loading="lazy">
-      {% if banner.url_destino %}</a>{% endif %}
-    </div>
-    {% endfor %}
-    {% if banners.footer|length > 1 %}
-    <div class="st-banner-dots" aria-hidden="true">
-      {% for banner in banners.footer %}
+     {% for banner in banners.footer %}
+     <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+          data-index="{{ forloop.counter0 }}">
+       {% if banner.url_destino %}
+       <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+          class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+       {% endif %}
+         <img src="{{ banner.imagen.url }}"
+              alt="{{ banner.texto_alt|default:banner.titulo }}"
+              class="st-banner-img" loading="lazy">
+       {% if banner.url_destino %}</a>{% endif %}
+     </div>
+     {% endfor %}
+     {# Marco decorativo: electricidad SVG animada para banners horizontales #}
+     {% include 'servicio_tecnico/_hor_electricity.html' %}
+     {% if banners.footer|length > 1 %}
+     <div class="st-banner-dots" aria-hidden="true">
+       {% for banner in banners.footer %}
       <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
       {% endfor %}
     </div>
@@ -399,20 +407,22 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
   <div class="st-banner-slot st-banner-slot--horizontal"
        data-banners="{{ banners.header|length }}"
        id="st-banner-header-tracking">
-    {% for banner in banners.header %}
-    <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
-         data-index="{{ forloop.counter0 }}">
-      {% if banner.url_destino %}
-      <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
-         class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
-      {% endif %}
-        <img src="{{ banner.imagen.url }}"
-             alt="{{ banner.texto_alt|default:banner.titulo }}"
-             class="st-banner-img" loading="lazy">
-      {% if banner.url_destino %}</a>{% endif %}
-    </div>
-    {% endfor %}
-    {% if banners.header|length > 1 %}
+     {% for banner in banners.header %}
+     <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+          data-index="{{ forloop.counter0 }}">
+       {% if banner.url_destino %}
+       <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+          class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+       {% endif %}
+         <img src="{{ banner.imagen.url }}"
+              alt="{{ banner.texto_alt|default:banner.titulo }}"
+              class="st-banner-img" loading="lazy">
+       {% if banner.url_destino %}</a>{% endif %}
+     </div>
+     {% endfor %}
+     {# Marco decorativo: electricidad SVG animada para banners horizontales #}
+     {% include 'servicio_tecnico/_hor_electricity.html' %}
+     {% if banners.header|length > 1 %}
     <div class="st-banner-dots" aria-hidden="true">
       {% for banner in banners.header %}
       <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
@@ -498,21 +508,23 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
     {% if banners.medio %}
     <div class="st-banner-slot st-banner-slot--horizontal st-banner-slot--medio"
          data-banners="{{ banners.medio|length }}"
-         id="st-banner-medio-tracking">
-      {% for banner in banners.medio %}
-      <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
-           data-index="{{ forloop.counter0 }}">
-        {% if banner.url_destino %}
-        <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
-           class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
-        {% endif %}
-          <img src="{{ banner.imagen.url }}"
-               alt="{{ banner.texto_alt|default:banner.titulo }}"
-               class="st-banner-img" loading="lazy">
-        {% if banner.url_destino %}</a>{% endif %}
-      </div>
-      {% endfor %}
-      {% if banners.medio|length > 1 %}
+          id="st-banner-medio-tracking">
+       {% for banner in banners.medio %}
+       <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+            data-index="{{ forloop.counter0 }}">
+         {% if banner.url_destino %}
+         <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+            class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+         {% endif %}
+           <img src="{{ banner.imagen.url }}"
+                alt="{{ banner.texto_alt|default:banner.titulo }}"
+                class="st-banner-img" loading="lazy">
+         {% if banner.url_destino %}</a>{% endif %}
+       </div>
+       {% endfor %}
+       {# Marco decorativo: electricidad SVG animada para banners horizontales #}
+       {% include 'servicio_tecnico/_hor_electricity.html' %}
+       {% if banners.medio|length > 1 %}
       <div class="st-banner-dots" aria-hidden="true">
         {% for banner in banners.medio %}
         <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
@@ -595,22 +607,24 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
   <div class="st-banner-slot st-banner-slot--horizontal st-banner-slot--footer"
        data-banners="{{ banners.footer|length }}"
        id="st-banner-footer-tracking">
-    {% for banner in banners.footer %}
-    <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
-         data-index="{{ forloop.counter0 }}">
-      {% if banner.url_destino %}
-      <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
-         class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
-      {% endif %}
-        <img src="{{ banner.imagen.url }}"
-             alt="{{ banner.texto_alt|default:banner.titulo }}"
-             class="st-banner-img" loading="lazy">
-      {% if banner.url_destino %}</a>{% endif %}
-    </div>
-    {% endfor %}
-    {% if banners.footer|length > 1 %}
-    <div class="st-banner-dots" aria-hidden="true">
-      {% for banner in banners.footer %}
+     {% for banner in banners.footer %}
+     <div class="st-banner-slide {% if forloop.first %}st-banner-slide--active{% endif %}"
+          data-index="{{ forloop.counter0 }}">
+       {% if banner.url_destino %}
+       <a href="{{ banner.url_destino }}" target="_blank" rel="noopener sponsored"
+          class="st-banner-link" aria-label="{{ banner.texto_alt|default:banner.titulo }}">
+       {% endif %}
+         <img src="{{ banner.imagen.url }}"
+              alt="{{ banner.texto_alt|default:banner.titulo }}"
+              class="st-banner-img" loading="lazy">
+       {% if banner.url_destino %}</a>{% endif %}
+     </div>
+     {% endfor %}
+     {# Marco decorativo: electricidad SVG animada para banners horizontales #}
+     {% include 'servicio_tecnico/_hor_electricity.html' %}
+     {% if banners.footer|length > 1 %}
+     <div class="st-banner-dots" aria-hidden="true">
+       {% for banner in banners.footer %}
       <span class="st-banner-dot {% if forloop.first %}st-banner-dot--active{% endif %}"></span>
       {% endfor %}
     </div>
@@ -670,6 +684,8 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
         {% if banner.url_destino %}</a>{% endif %}
       </div>
       {% endfor %}
+      {# Marco decorativo: llamas azules SVG animadas (ver _sky_flames.html y seguimiento_cliente.css) #}
+      {% include 'servicio_tecnico/_sky_flames.html' %}
       {% if banners.skyscraper_der|length > 1 %}
       <div class="st-banner-dots" aria-hidden="true">
         {% for banner in banners.skyscraper_der %}
