@@ -19,7 +19,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Production-success?style=for-the-badge" alt="Status">
-  <img src="https://img.shields.io/badge/Version-4.0-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-5.0-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/Modules-6-orange?style=for-the-badge" alt="Modules">
 </p>
@@ -118,6 +118,13 @@ Sistema completo de órdenes de servicio técnico con flujo dual:
 - ✅ Venta mostrador con paquetes predefinidos y servicios adicionales
 - ✅ Integración con sistema de calidad para reingresos
 - ✅ **Buscador Inteligente de Reingresos**: Búsqueda de orden original con chip visual
+- ✅ **Mejorador de Diagnóstico con IA**: Corrección y mejora de redacción del diagnóstico técnico usando IA (Ollama local o Google Gemini en la nube), con reglas estrictas que garantizan no modificar el contenido técnico
+- ✅ **Chatbot IA en Portal Público del Cliente**: Asistente flotante en la vista de seguimiento con contexto completo de la orden (cotización, piezas, venta mostrador), seguridad anti-injection y rate limit
+- ✅ **Banners Promocionales**: Carrusel de banners en portal público con panel de administración Django para gestión sin código
+- ✅ **Modal de Estado de Piezas**: Timeline animado por pieza visible al cliente cuando la orden espera piezas, con estados de retraso y daños
+- ✅ **Panel Mi Perfil**: Vista personalizada por rol con estadísticas, comentarios de clientes, descarga de órdenes activas en Excel y métricas de venta mostrador
+- ✅ **Directorio de Empleados**: Panel con estadísticas por empleado consultable por gerencia
+- ✅ **Redes Sociales Dinámicas**: Links de RRSS (Instagram, Facebook, TikTok) configurados por sucursal en páginas públicas
 
 **Estados del flujo:**
 
@@ -256,6 +263,31 @@ SEGUIMIENTO DE ENVÍO → RECEPCIÓN EN ALMACÉN → INGRESO A STOCK
 
 ## 🚀 Funcionalidades Destacadas del Sistema
 
+### 🌙 Modo Oscuro (Dark Mode)
+
+- **Toggle** en la navbar con iconos luna/sol y persistencia en `localStorage`
+- **Sin parpadeo**: Script anti-flash en `<head>` aplica el tema antes del primer render
+- **Bootstrap 5.3**: Integración nativa via `data-bs-theme` en `<html>`
+- **Variables CSS completas**: Paleta oscura coherente para todos los módulos y páginas
+- **Compatibilidad total**: Dashboards, modales, formularios, portales públicos y Dark mode en los chatbots de IA
+- **Módulo TypeScript**: `dark_mode.ts`
+
+### 👤 Panel Mi Perfil
+
+Panel de estadísticas personalizado según el rol del usuario (técnico, inspector, recepción, gerencia):
+
+- **Estadísticas por rol**: Métricas relevantes al puesto (órdenes, incidencias, cotizaciones)
+- **Estadísticas de Venta Mostrador**: Desglose de ventas directas para técnicos
+- **Carrusel de comentarios**: Reseñas de clientes obtenidas de encuestas de satisfacción
+- **Descarga de órdenes activas en Excel**: Exportación filtrada por responsable
+- **Módulo TypeScript**: `mi_perfil.ts`
+
+### 🏢 Directorio de Empleados
+
+- Vista de directorio consultable con estadísticas individuales por empleado
+- Accesible para roles gerenciales desde el menú principal
+- Comentarios de clientes asociados a cada técnico
+
 ### 🔐 Sistema de Autenticación, Permisos y Seguridad
 
 - Login personalizado con usuarios de Django
@@ -307,6 +339,7 @@ El sistema soporta operaciones en múltiples países con bases de datos independ
 - **Almacenamiento Dual**: Sistema configurado para gestión dinámica entre discos (Soporte hasta 1TB)
 - **Cloudflare Tunnel**: Configuración segura para acceso remoto en producción sin apertura de puertos (con validación SSL estricta)
 - **Backup Automatizado**: Scripts mensuales/diarios para PostgreSQL y SQLite
+- **Backup en la Nube con rclone**: Sincronización automática de backups a Google Drive vía rclone (guía de configuración incluida)
 - **Soporte SVG**: Visualización optimizada de gráficos vectoriales en todo el sistema
 - **ManifestStaticFilesStorage**: Cache busting automático de archivos estáticos
 - **PWA (Progressive Web App)**: Instalable en Android e iOS como app nativa con soporte para notch/Dynamic Island
@@ -357,6 +390,52 @@ El sistema integra un módulo completo de Machine Learning con 4 componentes esp
 
 ---
 
+## 🤖 Inteligencia Artificial — Ollama & Google Gemini
+
+### Asistentes IA Integrados (v5.0)
+
+El sistema integra **dos asistentes de IA conversacional** conectados a modelos de lenguaje locales (Ollama) y en la nube (Google Gemini), con un dispatcher unificado configurable vía variables de entorno.
+
+**Módulo**: `servicio_tecnico/ollama_client.py`
+
+#### 1. **Mejorador de Diagnóstico Técnico**
+
+Disponible en la vista detalle de orden para el técnico:
+
+- **Funcionalidad**: Mejora ortografía, gramática y redacción del diagnóstico escrito por el técnico
+- **Reglas estrictas (prompt de sistema)**:
+  - Solo corrige redacción — NUNCA cambia el contenido técnico
+  - NUNCA agrega fallas, síntomas o componentes no mencionados
+  - NUNCA elimina información del técnico
+  - Usa terminología técnica estándar (ej: "cargador" → "adaptador de corriente")
+- **Módulo TypeScript**: `ollama_sic.ts` (387 líneas)
+
+#### 2. **Chatbot en Portal Público de Seguimiento del Cliente**
+
+Asistente flotante en la vista pública (`/servicio/seguimiento/<token>/`):
+
+- **Contexto inteligente**: Conoce el estado de la orden, cotización, venta mostrador, técnico asignado y folio
+- **Seguridad**: Rate limit 5 req/min por IP, anti-injection, anti-leak de instrucciones del sistema, payloads codificados
+- **Conversación**: Historial de 6 turnos en memoria por sesión
+- **UI**: Burbuja flotante con robot SVG animado (float + pulse), chips de sugerencias, badge "Nuevo"
+- **Dark mode completo** en burbuja, panel y todos los estados del chat
+- **Módulo TypeScript**: `seguimiento_chat.ts` (437 líneas)
+
+#### Proveedores Soportados
+
+| Proveedor | Tipo | Variable `.env` | Modelos recomendados |
+|-----------|------|-----------------|----------------------|
+| **Ollama** | Local / Tailscale | `OLLAMA_ENABLED`, `OLLAMA_URL`, `OLLAMA_MODELS` | `llama3.2`, `mistral`, `gemma2` |
+| **Google Gemini** | Nube (API) | `GEMINI_ENABLED`, `GEMINI_API_KEY`, `GEMINI_MODEL` | `gemini-2.0-flash`, `gemini-1.5-flash` |
+
+**Características del dispatcher**:
+- ✅ Selección de proveedor/modelo desde la UI en tiempo real
+- ✅ Fallback configurable entre proveedores
+- ✅ Timeouts independientes por proveedor
+- ✅ Sin dependencias externas en Python (usa solo `urllib` estándar)
+
+---
+
 ## 📊 Dashboard Analytics Avanzado (Tipo Power BI)
 
 ### Sistema de Visualizaciones Interactivas con Plotly
@@ -404,9 +483,9 @@ El sistema utiliza **TypeScript 5.9.3** para desarrollo frontend profesional y m
 - Source maps para debugging
 - Types de Bootstrap incluidos (@types/bootstrap)
 
-**Módulos TypeScript** (30 archivos, ~19,600 líneas):
+**Módulos TypeScript** (36 archivos, ~21,492 líneas):
 
-1. **`base.ts`** (689 líneas) - Funcionalidad base compartida, utilities y helpers
+1. **`base.ts`** (718 líneas) - Funcionalidad base compartida, utilities y helpers
 2. **`camara_integrada.ts`** (1,579 líneas) - Sistema de cámara nativa con selector de lentes y orientación híbrida
 3. **`upload_imagenes_dual.ts`** (2,248 líneas) - Subida de imágenes con reintentos automáticos anti-Cloudflare
 4. **`diagnostico_modal.ts`** (2,458 líneas) - Modal de envío de diagnóstico con PDF y componentes dinámicos
@@ -414,10 +493,10 @@ El sistema utiliza **TypeScript 5.9.3** para desarrollo frontend profesional y m
 6. **`solicitud_baja_form.ts`** (1,086 líneas) - Formularios de solicitud de baja con workflow
 7. **`dashboard_rhitso.ts`** (769 líneas) - Timeline RHITSO, estadísticas en tiempo real
 8. **`dashboard_encuestas.ts`** (774 líneas) - Dashboard de encuestas de satisfacción NPS
-9. **`dashboard_cotizaciones.ts`** (603 líneas) - Dashboard interactivo con filtros dinámicos
+9. **`dashboard_cotizaciones.ts`** (605 líneas) - Dashboard interactivo con filtros dinámicos
 10. **`dashboard_seguimiento_piezas.ts`** (583 líneas) - Tracking WPB, DOA, PNC
-11. **`scorecard_form.ts`** (610 líneas) - Formularios con detección de reincidencias
-12. **`busqueda_reingreso.ts`** (642 líneas) - Buscador inteligente de órdenes originales con chip
+11. **`scorecard_form.ts`** (790 líneas) - Formularios con detección de reincidencias
+12. **`busqueda_reingreso.ts`** (641 líneas) - Buscador inteligente de órdenes originales con chip
 13. **`busqueda_ordenes.ts`** (555 líneas) - Búsqueda con autocompletado y paginación
 14. **`concentrado_semanal.ts`** (584 líneas) - Concentrado CIS con reporte mensual
 15. **`notificaciones.ts`** (570 líneas) - Panel de notificaciones con polling adaptativo
@@ -435,7 +514,14 @@ El sistema utiliza **TypeScript 5.9.3** para desarrollo frontend profesional y m
 27. **`login_particles.ts`** (181 líneas) - Efectos de partículas, canvas interactivo
 28. **`feedback_particles.ts`** (139 líneas) - Partículas animadas en encuestas
 29. **`unidades_agrupadas.ts`** (135 líneas) - Agrupación de unidades de inventario
-30. **`globals.d.ts`** - Declaraciones de tipos globales
+30. **`dark_mode.ts`** (36 líneas) - Toggle de modo oscuro con anti-flash y persistencia *(nuevo v5.0)*
+31. **`dashboard_loader.ts`** (349 líneas) - Vista de carga animada para dashboards pesados *(nuevo v5.0)*
+32. **`piezas_modal.ts`** (98 líneas) - Modal con timeline de estado de piezas para el cliente *(nuevo v5.0)*
+33. **`mi_perfil.ts`** (190 líneas) - Carrusel de comentarios y estadísticas de perfil *(nuevo v5.0)*
+34. **`ollama_sic.ts`** (387 líneas) - Mejorador de diagnóstico con IA (Ollama + Gemini) *(nuevo v5.0)*
+35. **`seguimiento_chat.ts`** (437 líneas) - Chatbot IA flotante en portal público del cliente *(nuevo v5.0)*
+36. **`banner_carousel.ts`** (169 líneas) - Carrusel de banners promocionales en portal público *(nuevo v5.0)*
+37. **`globals.d.ts`** - Declaraciones de tipos globales
 
 **Ventajas del TypeScript:**
 
@@ -483,10 +569,13 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **Concentrado Semanal CIS**: Reporte con exportación Excel mensual
 - **Dashboard de Encuestas NPS**: Análisis de satisfacción del cliente
 - **Distribución Multi-Sucursal**: Vista con exportación Excel
+- **Nuevo Tab de Aceptaciones**: Análisis avanzado de aceptaciones en Dashboard de Cotizaciones
+- **Vista de Carga Animada**: Pantalla de espera para dashboards pesados (cotizaciones, OOW/FL)
 
 ### 📱 Interfaz de Usuario Moderna
 
-- **TypeScript 5.9.3**: Frontend type-safe con 30 módulos (~19,600 líneas)
+- **TypeScript 5.9.3**: Frontend type-safe con 36 módulos (~21,492 líneas)
+- **Modo Oscuro Completo**: Toggle en navbar con anti-flash y persistencia en localStorage
 - **Glassmorphism UI**: Efectos 3D y transparencias modernas
 - **Particle Effects**: Canvas interactivo en login/logout y encuestas
 - Diseño responsivo con Bootstrap 5.3.2
@@ -497,6 +586,7 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **Lightbox Gallery**: Sistema completo con modo inspección y navegación (TypeScript)
 - **PWA Nativa**: Instalable en Android e iOS con soporte para notch/Dynamic Island
 - **Banderas SVG Animadas**: Indicador visual de país en navbar
+- **Redes Sociales Dinámicas**: Links de RRSS (Instagram, Facebook, TikTok) configurados por sucursal
 - Sistema de badges con colores semánticos
 
 ### 🔄 APIs REST Internas
@@ -529,7 +619,7 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 
 ### Frontend Moderno
 
-- **TypeScript 5.9.3** - Type-safe development (30 módulos, ~19,600 líneas)
+- **TypeScript 5.9.3** - Type-safe development (36 módulos, ~21,492 líneas)
 - **Plotly.js** - Dashboards interactivos tipo Power BI
 - **Bootstrap 5.3.2** - Framework CSS responsivo
 - **Bootstrap Icons** - Iconografía consistente
@@ -594,6 +684,7 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **ConfiguracionRHITSO**: Configuración del subsistema RHITSO
 - **FeedbackCliente**: Encuestas de satisfacción NPS con comentarios
 - **EnlaceSeguimientoCliente**: Enlaces de seguimiento público para órdenes OOW/FL
+- **BannerPromocional**: Banners promocionales con carrusel en portal público (gestionados desde admin)
 
 ### Score Card
 
@@ -668,9 +759,13 @@ npm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - `/servicio/concentrado-semanal/` - Concentrado Semanal CIS
 - `/servicio/dashboard-oow/` - Dashboard de seguimiento OOW/FL
 - `/servicio/seguimiento/<token>/` - Seguimiento público para clientes (OOW)
+- `/servicio/seguimiento/<token>/chat/` - Chatbot IA público del cliente *(nuevo v5.0)*
 - `/servicio/encuesta/<token>/` - Encuesta de satisfacción (público)
 - `/servicio/dashboard-encuestas/` - Dashboard de encuestas NPS
 - `/servicio/dashboard-feedback-rechazo/` - Análisis de rechazos
+- `/servicio/mi-perfil/` - Panel de perfil con estadísticas por rol *(nuevo v5.0)*
+- `/servicio/directorio/` - Directorio de empleados *(nuevo v5.0)*
+- `/servicio/<id>/mejorar-diagnostico/` - Mejorador de diagnóstico con IA *(nuevo v5.0)*
 
 ### Score Card
 
@@ -955,6 +1050,9 @@ Ver índice completo en [`docs/README.md`](./docs/README.md)
 - [ ] App móvil para técnicos (seguimiento en campo)
 - [x] ~~Integración con WhatsApp Business API~~ ✅ (WhatsApp dinámico en emails)
 - [ ] Dashboard ejecutivo con métricas financieras
+- [x] ~~Modo oscuro completo~~ ✅ (Dark mode con anti-flash, variables CSS y toggle en navbar)
+- [x] ~~Asistente IA para técnicos~~ ✅ (Mejorador de diagnóstico Ollama + Gemini)
+- [x] ~~Chatbot para clientes en portal público~~ ✅ (Chatbot IA en seguimiento con seguridad y dark mode)
 
 ### Mediano Plazo
 
@@ -990,7 +1088,7 @@ inventario-calidad-django/
 │   ├── media_views.py     # Servicio seguro de media
 │   └── wsgi.py / asgi.py
 ├── servicio_tecnico/      # App principal de servicio técnico
-│   ├── models.py          # 18 modelos
+│   ├── models.py          # 19 modelos
 │   ├── views.py           # Vistas principales
 │   ├── plotly_visualizations.py  # 3,949 líneas - Dashboards Plotly
 │   ├── ml_predictor.py    # Predictor ML
@@ -1003,7 +1101,7 @@ inventario-calidad-django/
 ├── notificaciones/        # App de notificaciones internas (Celery)
 ├── templates/             # Templates globales (base.html)
 ├── static/
-│   ├── ts/                # 30 módulos TypeScript fuente (~19,600 líneas)
+│   ├── ts/                # 36 módulos TypeScript fuente (~21,492 líneas)
 │   ├── js/                # JavaScript compilado (auto-generado)
 │   ├── css/               # CSS organizado (base, components, forms)
 │   └── images/            # Imágenes y SVGs
@@ -1053,7 +1151,7 @@ inventario-calidad-django/
 
 ### Frontend
 
-- **TypeScript 5.9.3** - Type-safe development (30 módulos)
+- **TypeScript 5.9.3** - Type-safe development (36 módulos)
 - **Plotly.js** - Dashboards interactivos tipo Power BI
 - **Bootstrap 5.3.2** - Framework CSS
 - **Bootstrap Icons** - Iconografía
@@ -1129,18 +1227,20 @@ Este sistema integra las mejores prácticas de:
 
 ## 📈 Estado del Proyecto
 
-**Versión Actual**: 4.0 (Marzo 2026)  
-**Estado**: ✅ Producción (6 módulos integrados + ML/Analytics/Multi-País/Celery)  
-**Última Actualización**: Marzo 19, 2026
+**Versión Actual**: 5.0 (Abril 2026)  
+**Estado**: ✅ Producción (6 módulos integrados + ML/Analytics/Multi-País/Celery/IA)  
+**Última Actualización**: Abril 22, 2026
 
 ### Módulos Completados
 
 - ✅ **Inventario** (v1.0) - Sistema base
-- ✅ **Servicio Técnico** (v3.0) - Con RHITSO, cámara integrada, seguimiento OOW/FL, encuestas NPS, diagnóstico PDF
+- ✅ **Servicio Técnico** (v4.0) - Con RHITSO, cámara integrada, seguimiento OOW/FL, encuestas NPS, diagnóstico PDF, mejorador IA, chatbot público, banners, Mi Perfil
 - ✅ **Score Card** (v2.2) - Con reportes avanzados y notificaciones optimizadas
 - ✅ **RHITSO** (v1.5) - Seguimiento externo con motivos detallados
 - ✅ **Almacén Central** (v1.0) - Compras, Cotizaciones y Stock único
 - ✅ **Notificaciones** (v1.0) - Panel campanita con Celery + polling adaptativo
+- ✅ **IA Integrada** (v1.0) - Mejorador de diagnóstico y chatbot público (Ollama + Gemini) *(nuevo v5.0)*
+- ✅ **Modo Oscuro** (v1.0) - Dark mode completo con toggle en navbar y anti-flash *(nuevo v5.0)*
 
 ### Estadísticas del Sistema
 
@@ -1149,15 +1249,16 @@ Este sistema integra las mejores prácticas de:
 - **4 niveles** de severidad de incidencias
 - **7 tabs** de reportes avanzados
 - **50+ visualizaciones** Plotly interactivas tipo Power BI
-- **30 módulos** TypeScript (~19,600 líneas)
+- **36 módulos** TypeScript (~21,492 líneas)
 - **4 sistemas** ML/IA especializados (con soporte para etiquetas nuevas)
+- **2 asistentes IA** conversacionales (Ollama local + Google Gemini)
 - **79 documentos** técnicos
 - **72 scripts** de utilidades
 - **86,000+ líneas** de código Python
-- **19,600+ líneas** de TypeScript
+- **21,492+ líneas** de TypeScript
 - **45,700+ líneas** de templates Django
 - **2 países** en producción (México + Argentina)
-- **18 modelos** en servicio técnico
+- **19 modelos** en servicio técnico
 
 ---
 
