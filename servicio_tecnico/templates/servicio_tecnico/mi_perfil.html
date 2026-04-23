@@ -319,6 +319,113 @@
                 </div>
             </div>
 
+            {# ── Ventas Mostrador del técnico ── #}
+            {% if metricas.total_ventas_mostrador > 0 %}
+            <div class="pcard-divider"></div>
+            <div class="pcard-stats-section">
+                <div class="pcard-stats-title">
+                    <i class="bi bi-shop" style="color:var(--pcard-gold)"></i>
+                    Ventas Mostrador — últimos 90 días
+                </div>
+
+                {# Resumen general: total y monto #}
+                <div class="pcard-stats-grid vm-resumen-grid">
+                    <div class="pcard-stat-cell" title="Total de ventas mostrador realizadas en los últimos 90 días">
+                        <div class="pcard-stat-value purple">{{ metricas.total_ventas_mostrador }}</div>
+                        <div class="pcard-stat-label">Ventas Mostrador</div>
+                    </div>
+                    <div class="pcard-stat-cell" title="Ingreso total generado por tus ventas mostrador">
+                        <div class="pcard-stat-value green">${{ metricas.monto_ventas_mostrador|floatformat:0 }}</div>
+                        <div class="pcard-stat-label">Ingreso Total</div>
+                    </div>
+                </div>
+
+                {# Desglose de servicios realizados #}
+                {% with sv=metricas %}
+                {% if sv.vm_limpiezas or sv.vm_cambios_pieza or sv.vm_kits_limpieza or sv.vm_reinstalaciones or sv.vm_respaldos %}
+                <div class="vm-servicios-titulo">Servicios Realizados</div>
+                <div class="pcard-stats-grid vm-servicios-grid">
+                    {% if sv.vm_limpiezas %}
+                    <div class="pcard-stat-cell vm-servicio-cell" title="Limpiezas y mantenimientos realizados">
+                        <i class="bi bi-stars vm-servicio-icon" style="color:#60a5fa"></i>
+                        <div class="pcard-stat-value">{{ sv.vm_limpiezas }}</div>
+                        <div class="pcard-stat-label">Limpiezas</div>
+                    </div>
+                    {% endif %}
+                    {% if sv.vm_cambios_pieza %}
+                    <div class="pcard-stat-cell vm-servicio-cell" title="Cambios de pieza sin diagnóstico">
+                        <i class="bi bi-cpu vm-servicio-icon" style="color:#f59e0b"></i>
+                        <div class="pcard-stat-value">{{ sv.vm_cambios_pieza }}</div>
+                        <div class="pcard-stat-label">Cambio Pieza</div>
+                    </div>
+                    {% endif %}
+                    {% if sv.vm_kits_limpieza %}
+                    <div class="pcard-stat-cell vm-servicio-cell" title="Kits de limpieza vendidos">
+                        <i class="bi bi-bag vm-servicio-icon" style="color:#34d399"></i>
+                        <div class="pcard-stat-value">{{ sv.vm_kits_limpieza }}</div>
+                        <div class="pcard-stat-label">Kit Limpieza</div>
+                    </div>
+                    {% endif %}
+                    {% if sv.vm_reinstalaciones %}
+                    <div class="pcard-stat-cell vm-servicio-cell" title="Reinstalaciones de sistema operativo">
+                        <i class="bi bi-windows vm-servicio-icon" style="color:#a78bfa"></i>
+                        <div class="pcard-stat-value">{{ sv.vm_reinstalaciones }}</div>
+                        <div class="pcard-stat-label">Reinst. S.O.</div>
+                    </div>
+                    {% endif %}
+                    {% if sv.vm_respaldos %}
+                    <div class="pcard-stat-cell vm-servicio-cell" title="Respaldos de información realizados">
+                        <i class="bi bi-cloud-upload vm-servicio-icon" style="color:#22d3ee"></i>
+                        <div class="pcard-stat-value">{{ sv.vm_respaldos }}</div>
+                        <div class="pcard-stat-label">Respaldos</div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                {# Paquetes vendidos (solo los que tienen al menos 1) #}
+                {% if metricas.vm_paquetes %}
+                <div class="vm-servicios-titulo">Paquetes Vendidos</div>
+                <div class="vm-paquetes-row">
+                    {% if metricas.vm_paquetes.premium %}
+                    <div class="vm-paquete-badge vm-paquete-premium" title="Solución Premium: RAM 16GB DDR5 + SSD 1TB + Kit Limpieza">
+                        <span class="vm-paquete-nombre">Premium</span>
+                        <span class="vm-paquete-count">{{ metricas.vm_paquetes.premium }}</span>
+                    </div>
+                    {% endif %}
+                    {% if metricas.vm_paquetes.oro %}
+                    <div class="vm-paquete-badge vm-paquete-oro" title="Solución Oro: RAM 8GB DDR5 + SSD 1TB">
+                        <span class="vm-paquete-nombre">Oro</span>
+                        <span class="vm-paquete-count">{{ metricas.vm_paquetes.oro }}</span>
+                    </div>
+                    {% endif %}
+                    {% if metricas.vm_paquetes.plata %}
+                    <div class="vm-paquete-badge vm-paquete-plata" title="Solución Plata: SSD 1TB">
+                        <span class="vm-paquete-nombre">Plata</span>
+                        <span class="vm-paquete-count">{{ metricas.vm_paquetes.plata }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {# Top 3 piezas más vendidas #}
+                {% if metricas.vm_top_piezas %}
+                <div class="vm-servicios-titulo">Top Piezas Más Vendidas</div>
+                <div class="vm-top-piezas-list">
+                    {% for pieza in metricas.vm_top_piezas %}
+                    <div class="vm-top-pieza-row">
+                        <span class="vm-top-pieza-rank">{{ forloop.counter }}</span>
+                        <span class="vm-top-pieza-nombre">{{ pieza.descripcion_pieza }}</span>
+                        <span class="vm-top-pieza-count">× {{ pieza.total }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+            </div>
+            {% endif %}{# /ventas_mostrador #}
+
             {# Encuestas de satisfacción (como técnico) #}
             {% if metricas.total_encuestas_respondidas > 0 %}
             <div class="pcard-divider"></div>

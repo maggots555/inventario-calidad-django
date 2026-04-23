@@ -15794,7 +15794,7 @@ def _calcular_metricas_empleado(empleado):
     from django.db.models import Avg, Sum, Count, Q
     from decimal import Decimal
     from datetime import timedelta
-    from .models import Cotizacion, VentaMostrador, FeedbackCliente
+    from .models import Cotizacion, VentaMostrador, PiezaVentaMostrador, FeedbackCliente
 
     rol = empleado.rol
     ahora = timezone.now()
@@ -15955,6 +15955,48 @@ def _calcular_metricas_empleado(empleado):
         nps_promedio = round(encuestas_avgs['nps_promedio'] or 0, 1)
         calificacion_promedio = round(encuestas_avgs['calificacion_promedio'] or 0, 1)
 
+        # ── Ventas Mostrador del técnico — últimos 90 días ──────────────────
+        vm_qs = VentaMostrador.objects.filter(
+            orden__tecnico_asignado_actual=empleado,
+            fecha_venta__gte=hace_90_dias,
+        ).select_related('orden')
+
+        total_vm = vm_qs.count()
+
+        # Monto total: suma la propiedad total_venta de cada instancia
+        monto_vm = Decimal('0.00')
+        if total_vm > 0:
+            for vm_obj in vm_qs:
+                monto_vm += vm_obj.total_venta
+
+        # Desglose por tipo de servicio booleano
+        vm_limpiezas       = vm_qs.filter(incluye_limpieza=True).count()
+        vm_cambios_pieza   = vm_qs.filter(incluye_cambio_pieza=True).count()
+        vm_kits_limpieza   = vm_qs.filter(incluye_kit_limpieza=True).count()
+        vm_reinstalaciones = vm_qs.filter(incluye_reinstalacion_so=True).count()
+        vm_respaldos       = vm_qs.filter(incluye_respaldo=True).count()
+
+        # Distribución de paquetes (solo los que tienen al menos 1 vendido)
+        vm_paquetes_raw = {
+            'premium': vm_qs.filter(paquete='premium').count(),
+            'oro':     vm_qs.filter(paquete='oro').count(),
+            'plata':   vm_qs.filter(paquete='plata').count(),
+        }
+        # Filtramos únicamente los paquetes con conteo > 0
+        vm_paquetes = {k: v for k, v in vm_paquetes_raw.items() if v > 0}
+
+        # Top 3 piezas más vendidas en ventas mostrador del técnico
+        vm_top_piezas = list(
+            PiezaVentaMostrador.objects.filter(
+                venta_mostrador__orden__tecnico_asignado_actual=empleado,
+                venta_mostrador__fecha_venta__gte=hace_90_dias,
+            )
+            .values('descripcion_pieza')
+            .annotate(total=Count('id'))
+            .order_by('-total')[:3]
+        )
+        # ───────────────────────────────────────────────────────────────────
+
         metricas.update({
             'ordenes_activas_tecnico': stats_activas['ordenes_activas'],
             'equipos_no_encienden': stats_activas['equipos_no_encienden'],
@@ -15970,6 +16012,16 @@ def _calcular_metricas_empleado(empleado):
             'total_encuestas_respondidas': total_encuestas_respondidas,
             'nps_promedio': nps_promedio,
             'calificacion_promedio': calificacion_promedio,
+            # Ventas Mostrador
+            'total_ventas_mostrador': total_vm,
+            'monto_ventas_mostrador': monto_vm,
+            'vm_limpiezas': vm_limpiezas,
+            'vm_cambios_pieza': vm_cambios_pieza,
+            'vm_kits_limpieza': vm_kits_limpieza,
+            'vm_reinstalaciones': vm_reinstalaciones,
+            'vm_respaldos': vm_respaldos,
+            'vm_paquetes': vm_paquetes,
+            'vm_top_piezas': vm_top_piezas,
         })
 
     # Rating de desempeño (1-99)

@@ -971,6 +971,189 @@
    y la página se renderice en un contexto diferente al normal
    (ej. vista gerencial de directorio).
 */
+
+/* ============================================================
+   SECCIÓN VENTAS MOSTRADOR — estilos base
+   ============================================================ */
+
+/* Sub-título interno de sección (Servicios Realizados / Paquetes / Top Piezas) */
+.vm-servicios-titulo {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--pcard-gold);
+    opacity: 0.75;
+    margin: 1rem 0 0.5rem 0.1rem;
+}
+
+/* Grid reducido para el resumen (total + monto) */
+.vm-resumen-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    max-width: 340px;
+}
+
+/* Celda de servicio individual con icono arriba */
+.vm-servicio-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.vm-servicio-icon {
+    font-size: 1.35rem;
+    margin-bottom: 0.1rem;
+    display: block;
+}
+
+/* ── Paquetes badges ─────────────────────────────────────── */
+.vm-paquetes-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.25rem;
+}
+
+.vm-paquete-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 2rem;
+    font-weight: 600;
+    font-size: 0.82rem;
+    letter-spacing: 0.03em;
+    border: 2px solid transparent;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    cursor: default;
+}
+
+.vm-paquete-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+}
+
+/* Premium — púrpura */
+.vm-paquete-premium {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.5);
+    color: #a78bfa;
+}
+
+/* Oro — dorado */
+.vm-paquete-oro {
+    background: rgba(212, 168, 67, 0.13);
+    border-color: rgba(212, 168, 67, 0.45);
+    color: var(--pcard-gold);
+}
+
+/* Plata — plateado / gris azulado */
+.vm-paquete-plata {
+    background: rgba(148, 163, 184, 0.13);
+    border-color: rgba(148, 163, 184, 0.45);
+    color: #94a3b8;
+}
+
+.vm-paquete-nombre {
+    font-variant: small-caps;
+}
+
+.vm-paquete-count {
+    background: rgba(255,255,255,0.12);
+    border-radius: 1rem;
+    padding: 0.05rem 0.45rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: 'Oswald', sans-serif;
+}
+
+/* ── Top 3 piezas ────────────────────────────────────────── */
+.vm-top-piezas-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-top: 0.25rem;
+}
+
+.vm-top-pieza-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.65rem;
+    border-radius: 0.5rem;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: background 0.15s;
+}
+
+.vm-top-pieza-row:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.vm-top-pieza-rank {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--pcard-gold);
+    min-width: 1.25rem;
+    text-align: center;
+    opacity: 0.85;
+}
+
+.vm-top-pieza-nombre {
+    flex: 1;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.82);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vm-top-pieza-count {
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.45);
+    white-space: nowrap;
+}
+
+/* ── Responsivo VM ──────────────────────────────────────── */
+@media (max-width: 640px) {
+    .vm-resumen-grid {
+        max-width: 100%;
+    }
+    .vm-paquetes-row {
+        gap: 0.45rem;
+    }
+    .vm-top-pieza-nombre {
+        font-size: 0.75rem;
+    }
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides Ventas Mostrador
+   ============================================================ */
+[data-bs-theme="dark"] .vm-paquete-count {
+    background: rgba(255,255,255,0.08);
+}
+
+[data-bs-theme="dark"] .vm-top-pieza-row {
+    background: rgba(255,255,255,0.03);
+    border-color: rgba(255,255,255,0.06);
+}
+
+[data-bs-theme="dark"] .vm-top-pieza-row:hover {
+    background: rgba(255,255,255,0.07);
+}
+
+[data-bs-theme="dark"] .vm-top-pieza-nombre {
+    color: rgba(226, 232, 240, 0.8);
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides botón descarga (pre-existente)
+   ============================================================ */
 [data-bs-theme="dark"] .pcard-download-btn {
     color: var(--pcard-gold);
     background: rgba(212, 168, 67, 0.07);
