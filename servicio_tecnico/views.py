@@ -12680,6 +12680,8 @@ def api_buscar_ordenes_autocomplete(request):
             'numero_orden_interno': orden.numero_orden_interno or '',
             'marca': detalle.marca or '',
             'modelo': detalle.modelo or '',
+            'tipo_equipo': detalle.tipo_equipo or '',
+            'sucursal_id': orden.sucursal.id if orden.sucursal else 0,
             'estado': orden.get_estado_display(),
             'url_detalle': reverse('servicio_tecnico:detalle_orden', args=[orden.id]),
         })

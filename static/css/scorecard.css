@@ -1827,3 +1827,367 @@
     background: #263548;
 }
 
+/* =============================================================================
+   AUTOCOMPLETADO DE ÓRDENES — Formulario de Incidencias
+   Dropdown de sugerencias que aparece mientras el usuario escribe el service tag
+   o el número de orden del cliente.
+   Clases con prefijo "sc-" para evitar colisión con el autocomplete de
+   lista_ordenes que usa el prefijo sin namespace.
+   ============================================================================= */
+
+/* Contenedor principal del dropdown */
+.sc-autocomplete-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-top: 2px solid #0d6efd;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    max-height: 380px;
+    overflow-y: auto;
+    margin-top: 2px;
+}
+
+/* Lista de resultados */
+.sc-autocomplete-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Cada resultado individual */
+.sc-autocomplete-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background-color 0.15s ease;
+}
+
+.sc-autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.sc-autocomplete-item:hover,
+.sc-autocomplete-item-activo {
+    background-color: #eff6ff;
+}
+
+.sc-autocomplete-item-activo {
+    border-left: 3px solid #0d6efd;
+    padding-left: 13px;
+}
+
+/* Fila principal: orden del cliente + marca */
+.sc-autocomplete-fila-principal {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.sc-autocomplete-orden {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #1e293b;
+}
+
+.sc-autocomplete-marca {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* Fila secundaria: service tag + orden interna + estado */
+.sc-autocomplete-fila-secundaria {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.sc-autocomplete-serie {
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+    color: #4b5563;
+}
+
+.sc-autocomplete-interna {
+    color: #9ca3af;
+    font-size: 0.75rem;
+}
+
+.sc-autocomplete-estado {
+    font-size: 0.65rem !important;
+    padding: 2px 6px !important;
+}
+
+/* Resaltado de coincidencias (texto buscado en amarillo) */
+.sc-autocomplete-item mark {
+    background-color: #fef08a;
+    color: inherit;
+    padding: 0 1px;
+    border-radius: 2px;
+    font-weight: 700;
+}
+
+/* Estado de carga */
+.sc-autocomplete-cargando {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+/* Sin resultados */
+.sc-autocomplete-sin-resultados {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 20px 16px;
+    color: #9ca3af;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.sc-autocomplete-sin-resultados i {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+}
+
+.sc-autocomplete-sin-resultados small {
+    font-size: 0.75rem;
+    color: #d1d5db;
+}
+
+/* Responsive: en móvil, ajustar altura y padding */
+@media (max-width: 768px) {
+    .sc-autocomplete-dropdown {
+        max-height: 280px;
+    }
+
+    .sc-autocomplete-item {
+        padding: 8px 12px;
+    }
+
+    .sc-autocomplete-fila-secundaria {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+}
+
+/* =============================================================================
+   MODO OSCURO — Overrides para el autocompletado de scorecard
+   ============================================================================= */
+
+[data-bs-theme="dark"] .sc-autocomplete-dropdown {
+    background: #1e293b;
+    border-color: #334155;
+    border-top-color: #60a5fa;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-bs-theme="dark"] .sc-autocomplete-item {
+    border-bottom-color: #2d3748;
+}
+
+[data-bs-theme="dark"] .sc-autocomplete-item:hover,
+[data-bs-theme="dark"] .sc-autocomplete-item-activo {
+    background-color: rgba(96, 165, 250, 0.12);
+}
+
+[data-bs-theme="dark"] .sc-autocomplete-item-activo {
+    border-left-color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .sc-autocomplete-orden {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .sc-autocomplete-fila-secundaria {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .sc-autocomplete-serie {
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .sc-autocomplete-interna {
+    color: #64748b;
+}
+
+[data-bs-theme="dark"] .sc-autocomplete-item mark {
+    background-color: rgba(251, 191, 36, 0.25);
+    color: #fde68a;
+}
+
+[data-bs-theme="dark"] .sc-autocomplete-cargando {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .sc-autocomplete-sin-resultados {
+    color: #64748b;
+}
+
+/* =============================================================================
+   PANEL DE CONFIRMACIÓN — Orden vinculada exitosamente
+   Se muestra debajo del formulario cuando el usuario selecciona una orden.
+   Clases con prefijo "sc-" para evitar colisiones con otros módulos.
+   ============================================================================= */
+
+/* Contenedor principal del panel */
+.sc-orden-confirmada {
+    border: 1px solid #86efac;          /* Verde claro — éxito */
+    border-left: 4px solid #16a34a;     /* Acento izquierdo más grueso */
+    border-radius: 8px;
+    background-color: #f0fdf4;
+    margin-top: 12px;
+    overflow: hidden;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Encabezado: "Orden vinculada — #XXXX" + botón Cambiar */
+.sc-orden-confirmada-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    background-color: #dcfce7;
+    border-bottom: 1px solid #bbf7d0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #15803d;
+    flex-wrap: wrap;
+}
+
+/* Cuerpo: datos del equipo (tipo, marca, modelo, service tag, orden) */
+.sc-orden-confirmada-body {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Fila individual de dato */
+.sc-orden-dato {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.875rem;
+    color: #374151;
+}
+
+.sc-orden-dato code {
+    background: #d1fae5;
+    border: 1px solid #a7f3d0;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.8rem;
+    color: #065f46;
+    font-family: 'Courier New', monospace;
+}
+
+/* Pie: nota informativa */
+.sc-orden-confirmada-footer {
+    padding: 8px 16px;
+    background-color: #f0fdf4;
+    border-top: 1px solid #bbf7d0;
+    font-size: 0.78rem;
+    color: #6b7280;
+    font-style: italic;
+}
+
+/* Botón "Cambiar orden" — pequeño y discreto */
+.sc-btn-cambiar-orden {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #15803d;
+    background: transparent;
+    border: 1px solid #16a34a;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.sc-btn-cambiar-orden:hover {
+    background-color: #16a34a;
+    color: #ffffff;
+}
+
+/* Responsive: en móvil apilar header */
+@media (max-width: 576px) {
+    .sc-orden-confirmada-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .sc-btn-cambiar-orden {
+        align-self: flex-end;
+    }
+}
+
+/* =============================================================================
+   MODO OSCURO — Overrides del panel de confirmación
+   ============================================================================= */
+
+[data-bs-theme="dark"] .sc-orden-confirmada {
+    background-color: #052e16;
+    border-color: #166534;
+    border-left-color: #4ade80;
+}
+
+[data-bs-theme="dark"] .sc-orden-confirmada-header {
+    background-color: #064e3b;
+    border-bottom-color: #065f46;
+    color: #4ade80;
+}
+
+[data-bs-theme="dark"] .sc-orden-confirmada-body {
+    /* Hereda background del contenedor principal */
+}
+
+[data-bs-theme="dark"] .sc-orden-dato {
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .sc-orden-dato code {
+    background: #064e3b;
+    border-color: #065f46;
+    color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .sc-orden-confirmada-footer {
+    background-color: #052e16;
+    border-top-color: #065f46;
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .sc-btn-cambiar-orden {
+    color: #4ade80;
+    border-color: #16a34a;
+}
+
+[data-bs-theme="dark"] .sc-btn-cambiar-orden:hover {
+    background-color: #16a34a;
+    color: #ffffff;
+}
+

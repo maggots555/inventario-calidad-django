@@ -222,8 +222,11 @@ class IncidenciaForm(forms.ModelForm):
         # Configurar formato de fecha para input type="date" (yyyy-MM-dd)
         self.fields['fecha_deteccion'].input_formats = ['%Y-%m-%d']
         
-        # Filtrar solo empleados activos
-        self.fields['tecnico_responsable'].queryset = Empleado.objects.filter(activo=True)
+        # Filtrar solo empleados activos con rol de Técnico o Recepcionista
+        self.fields['tecnico_responsable'].queryset = Empleado.objects.filter(
+            activo=True,
+            rol__in=['tecnico', 'recepcionista']
+        )
         
         # Filtrar solo empleados activos del área de Calidad para inspector
         self.fields['inspector_calidad'].queryset = Empleado.objects.filter(
