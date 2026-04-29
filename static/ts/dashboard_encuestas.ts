@@ -1000,13 +1000,19 @@ class DashboardEncuestas {
     /**
      * Obtiene el token CSRF desde la cookie de Django.
      * Django requiere este token en todos los POST que no sean formularios HTML.
+     *
+     * NOTA: En producción (DEBUG=False) Django usa 'sigma_csrftoken' como nombre
+     * de cookie (configurado en settings.py → CSRF_COOKIE_NAME). En desarrollo
+     * usa el nombre por defecto 'csrftoken'. Se intenta primero el de producción.
      */
     private obtenerCsrfToken(): string {
-        const nombre = 'csrftoken';
+        const cookieNames: string[] = ['sigma_csrftoken', 'csrftoken'];
         const cookies = document.cookie.split(';');
-        for (const cookie of cookies) {
-            const [key, val] = cookie.trim().split('=');
-            if (key === nombre) return decodeURIComponent(val);
+        for (const nombre of cookieNames) {
+            const found = cookies.find(row => row.trim().startsWith(nombre + '='));
+            if (found) {
+                return decodeURIComponent(found.trim().substring(nombre.length + 1));
+            }
         }
         return '';
     }
