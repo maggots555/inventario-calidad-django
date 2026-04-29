@@ -30,6 +30,8 @@ from .models import (
     EnlaceSeguimientoCliente,
     # NUEVO - BANNERS PROMOCIONALES (Abril 2026)
     BannerPromocional,
+    # NUEVO - ANÁLISIS DE SENTIMIENTO IA (Abril 2026)
+    AnalisisSentimientoEncuesta,
 )
 
 
@@ -1995,4 +1997,141 @@ class BannerPromocionalAdmin(admin.ModelAdmin):
 admin.site.site_header = "Administración - Servicio Técnico"
 admin.site.site_title = "Servicio Técnico Admin"
 admin.site.index_title = "Panel de Administración"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  ANÁLISIS DE SENTIMIENTO IA — Encuestas de Satisfacción
+# ─────────────────────────────────────────────────────────────────────────────
+
+@admin.register(AnalisisSentimientoEncuesta)
+class AnalisisSentimientoEncuestaAdmin(admin.ModelAdmin):
+    """
+    Admin para visualizar los análisis de sentimiento generados por IA
+    sobre las encuestas de satisfacción de clientes.
+
+    Solo lectura — los registros se crean desde el dashboard, no desde el admin.
+    """
+
+    list_display = (
+        'fecha_analisis',
+        'sentimiento_badge',
+        'total_encuestas',
+        'modelo_usado',
+        'resumen_corto',
+        'cache_hash',
+    )
+    list_filter = ('sentimiento_general', 'modelo_usado')
+    search_fields = ('resumen_ejecutivo', 'recomendacion_ia')
+    readonly_fields = (
+        'sentimiento_general',
+        'resumen_ejecutivo',
+        'temas_positivos',
+        'temas_negativos',
+        'recomendacion_ia',
+        'total_encuestas',
+        'hash_encuestas',
+        'filtros_aplicados',
+        'modelo_usado',
+        'fecha_analisis',
+        'temas_positivos_display',
+        'temas_negativos_display',
+    )
+    ordering = ('-fecha_analisis',)
+    date_hierarchy = 'fecha_analisis'
+
+    fieldsets = (
+        ('Resultado del Análisis', {
+            'fields': (
+                'sentimiento_general',
+                'resumen_ejecutivo',
+                'temas_positivos_display',
+                'temas_negativos_display',
+                'recomendacion_ia',
+            ),
+        }),
+        ('Metadatos del Conjunto Analizado', {
+            'fields': (
+                'total_encuestas',
+                'modelo_usado',
+                'fecha_analisis',
+                'filtros_aplicados',
+            ),
+        }),
+        ('Trazabilidad (Hash)', {
+            'classes': ('collapse',),
+            'fields': ('hash_encuestas',),
+        }),
+    )
+
+    # ── Columnas personalizadas ─────────────────────────────────────────────
+
+    @admin.display(description='Sentimiento', ordering='sentimiento_general')
+    def sentimiento_badge(self, obj):
+        colores = {
+            'positivo': ('#10b981', '#fff', '😊'),
+            'negativo': ('#ef4444', '#fff', '😞'),
+            'mixto':    ('#f59e0b', '#fff', '😐'),
+            'neutral':  ('#6b7280', '#fff', '😶'),
+        }
+        color_bg, color_txt, emoji = colores.get(
+            obj.sentimiento_general, ('#6b7280', '#fff', '❓')
+        )
+        label = obj.get_sentimiento_general_display()
+        return format_html(
+            '<span style="background:{};color:{};padding:3px 12px;'
+            'border-radius:12px;font-size:12px;font-weight:600;">'
+            '{} {}</span>',
+            color_bg, color_txt, emoji, label,
+        )
+
+    @admin.display(description='Resumen')
+    def resumen_corto(self, obj):
+        texto = obj.resumen_ejecutivo or ''
+        if len(texto) > 100:
+            return texto[:100] + '…'
+        return texto
+
+    @admin.display(description='Hash (primeros 12)')
+    def cache_hash(self, obj):
+        return format_html(
+            '<code style="font-size:11px;color:#6b7280;">{}</code>',
+            obj.hash_encuestas[:12] + '…' if obj.hash_encuestas else '—',
+        )
+
+    @admin.display(description='Temas Positivos')
+    def temas_positivos_display(self, obj):
+        temas = obj.temas_positivos or []
+        if not temas:
+            return '—'
+        chips = ''.join(
+            f'<span style="display:inline-block;background:#dcfce7;color:#166534;'
+            f'border:1px solid #bbf7d0;border-radius:12px;padding:2px 10px;'
+            f'margin:2px;font-size:12px;">{tema}</span>'
+            for tema in temas
+        )
+        return format_html(chips)
+
+    @admin.display(description='Temas Negativos')
+    def temas_negativos_display(self, obj):
+        temas = obj.temas_negativos or []
+        if not temas:
+            return '—'
+        chips = ''.join(
+            f'<span style="display:inline-block;background:#ffedd5;color:#9a3412;'
+            f'border:1px solid #fed7aa;border-radius:12px;padding:2px 10px;'
+            f'margin:2px;font-size:12px;">{tema}</span>'
+            for tema in temas
+        )
+        return format_html(chips)
+
+    # ── Deshabilitar creación/edición desde el admin ────────────────────────
+
+    def has_add_permission(self, request):
+        """Los análisis se generan desde el dashboard, no se crean manualmente."""
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        """Solo lectura — los resultados de IA no se editan manualmente."""
+        return False
+
 

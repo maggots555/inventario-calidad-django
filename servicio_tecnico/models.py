@@ -3133,3 +3133,120 @@ class BannerPromocional(models.Model):
         super().save(*args, **kwargs)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  ANÁLISIS DE SENTIMIENTO IA — Encuestas de Satisfacción
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AnalisisSentimientoEncuesta(models.Model):
+    """
+    Cachea el resultado del análisis de sentimiento generado por IA (Ollama)
+    sobre el conjunto de encuestas de satisfacción respondidas.
+
+    Un registro representa UN análisis para UN conjunto de encuestas
+    (identificado por el hash SHA-256 de los datos). Si los datos cambian
+    (nueva encuesta respondida, filtros distintos) se genera un nuevo
+    registro en lugar de sobreescribir el anterior.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Imagina que la IA lee todas las encuestas y escribe un resumen. Este
+    modelo guarda ese resumen para no tener que pedírselo cada vez que
+    alguien abre el dashboard. Si llegan nuevas encuestas el hash cambia
+    y se pide un resumen nuevo.
+    """
+
+    SENTIMIENTO_CHOICES = [
+        ('positivo', 'Positivo'),
+        ('negativo', 'Negativo'),
+        ('mixto',    'Mixto'),
+        ('neutral',  'Neutral'),
+    ]
+
+    # ── Resultado del análisis ──────────────────────────────────────────────
+    sentimiento_general = models.CharField(
+        max_length=10,
+        choices=SENTIMIENTO_CHOICES,
+        default='neutral',
+        verbose_name='Sentimiento General',
+    )
+    resumen_ejecutivo = models.TextField(
+        verbose_name='Resumen Ejecutivo',
+        help_text='Párrafo de resumen generado por la IA para gerencia.',
+    )
+    temas_positivos = models.JSONField(
+        default=list,
+        verbose_name='Temas Positivos',
+        help_text='Lista de aspectos positivos detectados. Ej: ["atención rápida"]',
+    )
+    temas_negativos = models.JSONField(
+        default=list,
+        verbose_name='Temas Negativos',
+        help_text='Lista de aspectos negativos detectados. Ej: ["tiempo de espera"]',
+    )
+    recomendacion_ia = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Recomendación IA',
+        help_text='Acción sugerida por la IA para mejorar la satisfacción.',
+    )
+
+    # ── Metadatos del conjunto analizado ───────────────────────────────────
+    total_encuestas = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Total Encuestas Analizadas',
+    )
+    hash_encuestas = models.CharField(
+        max_length=64,
+        db_index=True,
+        verbose_name='Hash SHA-256 del Conjunto',
+        help_text='Fingerprint del set de encuestas. Cambia si llegan nuevas respuestas.',
+    )
+    filtros_aplicados = models.JSONField(
+        default=dict,
+        verbose_name='Filtros Aplicados',
+        help_text='Filtros activos al momento del análisis (fechas, responsable, sucursal, etc.).',
+    )
+
+    # ── Trazabilidad ────────────────────────────────────────────────────────
+    modelo_usado = models.CharField(
+        max_length=100,
+        default='gemma4:e4b',
+        verbose_name='Modelo IA Usado',
+    )
+    fecha_analisis = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Fecha del Análisis',
+    )
+
+    class Meta:
+        verbose_name = 'Análisis de Sentimiento (Encuestas)'
+        verbose_name_plural = 'Análisis de Sentimiento (Encuestas)'
+        ordering = ['-fecha_analisis']
+
+    def __str__(self) -> str:
+        return (
+            f'Análisis {self.sentimiento_general.upper()} — '
+            f'{self.total_encuestas} encuestas — '
+            f'{self.fecha_analisis.strftime("%d/%m/%Y %H:%M") if self.fecha_analisis else "sin fecha"}'
+        )
+
+    @property
+    def badge_color(self) -> str:
+        """Devuelve la clase Bootstrap del badge según el sentimiento."""
+        return {
+            'positivo': 'success',
+            'negativo': 'danger',
+            'mixto':    'warning',
+            'neutral':  'secondary',
+        }.get(self.sentimiento_general, 'secondary')
+
+    @property
+    def icono(self) -> str:
+        """Devuelve el ícono Bootstrap Icons según el sentimiento."""
+        return {
+            'positivo': 'bi-emoji-smile',
+            'negativo': 'bi-emoji-frown',
+            'mixto':    'bi-emoji-neutral',
+            'neutral':  'bi-emoji-expressionless',
+        }.get(self.sentimiento_general, 'bi-emoji-expressionless')
+
+

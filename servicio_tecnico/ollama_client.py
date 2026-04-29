@@ -818,3 +818,310 @@ def mejorar_diagnostico_dispatch(
             falla_principal=falla_principal,
             modelo_override=nombre_limpio,  # pasamos el nombre limpio (sin prefijo)
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  ANÁLISIS DE SENTIMIENTO — Encuestas de Satisfacción
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Prompt del sistema para el análisis de sentimiento.
+# REGLAS:
+#   - Analizar ÚNICAMENTE los datos recibidos, sin inventar información
+#   - Devolver SIEMPRE un JSON válido con exactamente las 5 claves definidas
+#   - Español formal, orientado a reporte ejecutivo para gerencia
+#   - temas_positivos / temas_negativos: máximo 6 ítems cada uno, frases cortas
+_PROMPT_SENTIMIENTO_SISTEMA = """\
+Eres un analista de experiencia del cliente. Tu tarea es analizar el conjunto \
+de encuestas de satisfacción de un taller de servicio técnico y producir un \
+reporte ejecutivo en español.
+
+INSTRUCCIONES ESTRICTAS:
+1. Analiza ÚNICAMENTE los datos proporcionados.
+2. Devuelve EXCLUSIVAMENTE un objeto JSON válido, sin texto adicional, sin \
+   explicaciones, sin bloques de código markdown.
+3. El JSON debe tener exactamente estas 5 claves:
+   - "sentimiento_general": una de estas palabras exactas: \
+     "positivo", "negativo", "mixto", "neutral"
+   - "resumen_ejecutivo": párrafo de 2-4 oraciones en español para gerencia
+   - "temas_positivos": array de máximo 6 strings cortos (aspectos positivos)
+   - "temas_negativos": array de máximo 6 strings cortos (aspectos negativos)
+   - "recomendacion_ia": 1-2 oraciones con la acción más importante a tomar
+4. Si no hay comentarios de texto libre, basa el análisis en las calificaciones \
+   numéricas y el NPS.
+5. Usa terminología profesional de servicio al cliente y mejora continua.
+"""
+
+_PROMPT_SENTIMIENTO_USUARIO = """\
+Analiza las siguientes {n} encuestas de satisfacción de clientes:
+
+{datos_encuestas}
+
+Genera el análisis de sentimiento siguiendo exactamente el formato JSON \
+especificado en las instrucciones del sistema.
+"""
+
+
+def _formatear_encuesta(enc: dict, idx: int) -> str:
+    """
+    Convierte un dict de encuesta en texto legible para el prompt.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    En vez de mandar un JSON crudo al modelo, lo convertimos a texto natural
+    para que el modelo entienda mejor el contexto de cada encuesta.
+    """
+    recomienda_str = 'Sí' if enc.get('recomienda') else 'No'
+    comentario = enc.get('comentario', '').strip()
+    comentario_str = f'Comentario: "{comentario}"' if comentario else 'Sin comentario escrito.'
+
+    return (
+        f"Encuesta #{idx + 1}:\n"
+        f"  Calificación general: {enc.get('calificacion_general', 'N/D')}/5 estrellas\n"
+        f"  Calificación atención: {enc.get('calificacion_atencion', 'N/D')}/5 estrellas\n"
+        f"  Calificación tiempo de servicio: {enc.get('calificacion_tiempo', 'N/D')}/5 estrellas\n"
+        f"  NPS (recomendación 0-10): {enc.get('nps', 'N/D')}\n"
+        f"  ¿Recomendaría el servicio?: {recomienda_str}\n"
+        f"  {comentario_str}"
+    )
+
+
+def analizar_sentimiento_encuestas(
+    encuestas: list[dict],
+    modelo: str = 'gemma4:e4b',
+) -> dict:
+    """
+    Analiza el sentimiento general del conjunto de encuestas de satisfacción
+    usando el modelo Ollama especificado.
+
+    Args:
+        encuestas: Lista de dicts, cada uno con las claves:
+                   calificacion_general, calificacion_atencion,
+                   calificacion_tiempo, nps, recomienda, comentario
+        modelo:    Nombre del modelo Ollama a usar (default: gemma4:e4b)
+
+    Returns:
+        dict con las claves:
+            success (bool)
+            analisis (dict): sentimiento_general, resumen_ejecutivo,
+                             temas_positivos, temas_negativos, recomendacion_ia
+            modelo_usado (str)
+            error (str) — solo si success=False
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    1. Construimos un mensaje con todas las encuestas en formato legible
+    2. Se lo enviamos al modelo local (gemma4:e4b) vía HTTP
+    3. El modelo responde con un JSON que parseamos
+    4. Si el JSON viene malformado hacemos un fallback con texto plano
+    """
+    if not encuestas:
+        return {
+            'success': False,
+            'error': 'No hay encuestas para analizar.',
+        }
+
+    # Verificar que Ollama está habilitado en settings
+    if not getattr(settings, 'OLLAMA_ENABLED', False):
+        return {
+            'success': False,
+            'error': (
+                'El servicio de Ollama no está habilitado. '
+                'Activa OLLAMA_ENABLED=True en la configuración.'
+            ),
+        }
+
+    ollama_base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434')
+    timeout = getattr(settings, 'OLLAMA_TIMEOUT', 180)  # análisis necesita más tiempo
+
+    # Formatear todas las encuestas como texto legible para el prompt
+    datos_encuestas = '\n\n'.join(
+        _formatear_encuesta(enc, idx) for idx, enc in enumerate(encuestas)
+    )
+
+    prompt_usuario = _PROMPT_SENTIMIENTO_USUARIO.format(
+        n=len(encuestas),
+        datos_encuestas=datos_encuestas,
+    )
+
+    # Construcción del payload para Ollama /api/chat
+    # Usamos el formato multi-mensaje: sistema + usuario (igual que chat_seguimiento)
+    payload = {
+        'model': modelo,
+        'messages': [
+            {'role': 'system', 'content': _PROMPT_SENTIMIENTO_SISTEMA},
+            {'role': 'user',   'content': prompt_usuario},
+        ],
+        'stream': False,
+        'think': False,  # Desactiva thinking interno (Ollama >= 0.7.0)
+        'options': {
+            'temperature': 0.2,   # Muy bajo → análisis consistente y estructurado
+            'top_p': 0.9,
+            'num_predict': 600,   # Suficiente para el JSON de respuesta
+        },
+        'format': 'json',  # Fuerza salida JSON nativa si el modelo lo soporta
+    }
+
+    url = f'{ollama_base_url}/api/chat'
+    payload_bytes = json.dumps(payload).encode('utf-8')
+
+    logger.info(
+        f'[AnalisisSentimiento] Enviando {len(encuestas)} encuestas a Ollama '
+        f'({modelo}) en {url}'
+    )
+
+    try:
+        req = urllib.request.Request(
+            url,
+            data=payload_bytes,
+            headers={'Content-Type': 'application/json'},
+            method='POST',
+        )
+
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode('utf-8')
+
+        response_data = json.loads(raw)
+        contenido = response_data.get('message', {}).get('content', '').strip()
+
+        if not contenido:
+            raise ValueError('Ollama devolvió contenido vacío.')
+
+        logger.info(
+            f'[AnalisisSentimiento] Respuesta recibida ({len(contenido)} chars)'
+        )
+
+        # ── Parseo del JSON de respuesta ──────────────────────────────────
+        # El modelo puede devolver el JSON puro o dentro de bloques ```json...```
+        analisis = _parsear_json_analisis(contenido)
+
+        return {
+            'success': True,
+            'analisis': analisis,
+            'modelo_usado': modelo,
+        }
+
+    except urllib.error.URLError as e:
+        msg = f'No se pudo conectar con Ollama en {ollama_base_url}: {e.reason}'
+        logger.error(f'[AnalisisSentimiento] {msg}')
+        return {'success': False, 'error': msg}
+
+    except urllib.error.HTTPError as e:
+        msg = f'Ollama devolvió error HTTP {e.code}: {e.reason}'
+        logger.error(f'[AnalisisSentimiento] {msg}')
+        return {'success': False, 'error': msg}
+
+    except json.JSONDecodeError as e:
+        msg = f'Error al decodificar la respuesta de Ollama: {e}'
+        logger.error(f'[AnalisisSentimiento] {msg}')
+        return {'success': False, 'error': msg}
+
+    except Exception as e:
+        msg = f'Error inesperado en el análisis de sentimiento: {e}'
+        logger.error(f'[AnalisisSentimiento] {msg}', exc_info=True)
+        return {'success': False, 'error': msg}
+
+
+def _parsear_json_analisis(contenido: str) -> dict:
+    """
+    Parsea el JSON de análisis de sentimiento desde la respuesta del modelo.
+
+    Maneja dos casos:
+    1. JSON puro: {"sentimiento_general": "positivo", ...}
+    2. JSON dentro de bloque markdown: ```json\n{...}\n```
+
+    Si el parseo falla, devuelve un dict de fallback con el texto original
+    en resumen_ejecutivo para no perder la información.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Los modelos de lenguaje a veces envuelven el JSON en bloques de código
+    aunque les pidas que no lo hagan. Este helper limpia esos casos.
+    """
+    CLAVES_REQUERIDAS = {
+        'sentimiento_general', 'resumen_ejecutivo',
+        'temas_positivos', 'temas_negativos', 'recomendacion_ia',
+    }
+    SENTIMIENTOS_VALIDOS = {'positivo', 'negativo', 'mixto', 'neutral'}
+
+    texto = contenido.strip()
+
+    # Intento 1: JSON puro
+    try:
+        data = json.loads(texto)
+        return _validar_analisis(data, CLAVES_REQUERIDAS, SENTIMIENTOS_VALIDOS)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Intento 2: extraer bloque ```json ... ```
+    if '```' in texto:
+        inicio = texto.find('```')
+        fin = texto.rfind('```')
+        if inicio != fin:
+            bloque = texto[inicio:fin + 3]
+            # Quitar la primera línea (```json o ```)
+            lineas = bloque.split('\n')
+            candidato = '\n'.join(lineas[1:]).rstrip('`').strip()
+            try:
+                data = json.loads(candidato)
+                return _validar_analisis(data, CLAVES_REQUERIDAS, SENTIMIENTOS_VALIDOS)
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+    # Intento 3: buscar el primer { ... } en el texto
+    inicio_brace = texto.find('{')
+    fin_brace = texto.rfind('}')
+    if inicio_brace != -1 and fin_brace > inicio_brace:
+        candidato = texto[inicio_brace:fin_brace + 1]
+        try:
+            data = json.loads(candidato)
+            return _validar_analisis(data, CLAVES_REQUERIDAS, SENTIMIENTOS_VALIDOS)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Fallback: devolver estructura mínima con el texto como resumen
+    logger.warning(
+        '[AnalisisSentimiento] No se pudo parsear JSON de la respuesta. '
+        'Usando fallback con texto plano.'
+    )
+    return {
+        'sentimiento_general': 'neutral',
+        'resumen_ejecutivo': texto[:800] if texto else 'No se pudo generar el análisis.',
+        'temas_positivos': [],
+        'temas_negativos': [],
+        'recomendacion_ia': '',
+    }
+
+
+def _validar_analisis(data: dict, claves_requeridas: set, sentimientos_validos: set) -> dict:
+    """
+    Valida y normaliza el dict de análisis recibido del modelo.
+    Rellena claves faltantes con valores por defecto en vez de fallar.
+    """
+    resultado = {}
+
+    # sentimiento_general — normalizar a minúsculas y validar
+    sentimiento = str(data.get('sentimiento_general', 'neutral')).lower().strip()
+    resultado['sentimiento_general'] = (
+        sentimiento if sentimiento in sentimientos_validos else 'neutral'
+    )
+
+    # resumen_ejecutivo — texto plano obligatorio
+    resultado['resumen_ejecutivo'] = str(
+        data.get('resumen_ejecutivo', 'Sin resumen disponible.')
+    ).strip()
+
+    # temas_positivos — lista de strings
+    tp = data.get('temas_positivos', [])
+    resultado['temas_positivos'] = (
+        [str(t).strip() for t in tp[:6]] if isinstance(tp, list) else []
+    )
+
+    # temas_negativos — lista de strings
+    tn = data.get('temas_negativos', [])
+    resultado['temas_negativos'] = (
+        [str(t).strip() for t in tn[:6]] if isinstance(tn, list) else []
+    )
+
+    # recomendacion_ia — texto plano opcional
+    resultado['recomendacion_ia'] = str(
+        data.get('recomendacion_ia', '')
+    ).strip()
+
+    return resultado

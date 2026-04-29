@@ -360,6 +360,14 @@ urlpatterns = [
     path('encuestas/dashboard/exportar-excel/',
          views.exportar_encuestas_excel, name='exportar_encuestas_excel'),
 
+    # Exportación a PDF — Reporte Ejecutivo del dashboard de encuestas
+    path('encuestas/dashboard/exportar-pdf/',
+         views.exportar_encuestas_pdf, name='exportar_encuestas_pdf'),
+
+    # Análisis de Sentimiento IA — Encuestas de Satisfacción (Abril 2026)
+    path('encuestas/analisis-ia/',
+         views.api_analisis_sentimiento_ia, name='api_analisis_sentimiento_ia'),
+
     # ========================================================================
     # DASHBOARD DE FEEDBACK DE RECHAZO (Marzo 2026)
     # ========================================================================

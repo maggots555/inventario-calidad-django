@@ -1,6 +1,6 @@
 /**
  * Dashboard de Encuestas de Satisfacción
- * Lógica cliente: Chart.js, filtros AJAX, tabla paginada y comentarios.
+ * Lógica cliente: Chart.js, filtros AJAX, tabla paginada, comentarios y análisis IA.
  */
 
 interface KPIsData {
@@ -86,6 +86,24 @@ interface ComentarioItem {
     fecha: string;
 }
 
+// ── Análisis de Sentimiento IA ─────────────────────────────────────────────
+
+interface AnalisisIAData {
+    success: boolean;
+    desde_cache?: boolean;
+    sentimiento_general?: 'positivo' | 'negativo' | 'mixto' | 'neutral';
+    resumen_ejecutivo?: string;
+    temas_positivos?: string[];
+    temas_negativos?: string[];
+    recomendacion_ia?: string;
+    total_encuestas?: number;
+    modelo_usado?: string;
+    fecha_analisis?: string;
+    badge_color?: string;
+    icono?: string;
+    error?: string;
+}
+
 class DashboardEncuestas {
     private urls: { [key: string]: string } = {};
     private urlDetalle: string = '';
@@ -109,6 +127,8 @@ class DashboardEncuestas {
             lista: urlsEl.dataset.urlLista || '',
             comentarios: urlsEl.dataset.urlComentarios || '',
             exportar: urlsEl.dataset.urlExportar || '',
+            exportarPdf: urlsEl.dataset.urlExportarPdf || '',
+            analisisIA: urlsEl.dataset.urlAnalisisIa || '',
         };
         this.urlDetalle = (urlsEl.dataset.urlDetalle || '').replace('/0/', '/{id}/');
 
@@ -151,6 +171,37 @@ class DashboardEncuestas {
             e.preventDefault();
             const params = this.obtenerFiltros();
             window.location.href = this.urls.exportar + '?' + params.toString();
+        });
+
+        // Export PDF — Reporte Ejecutivo con los mismos filtros activos
+        document.getElementById('btnExportarPDF')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            const params = this.obtenerFiltros();
+            // Indicar visualmente que se está generando el PDF
+            const btn = e.currentTarget as HTMLAnchorElement;
+            const textoOriginal = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Generando PDF...';
+            btn.classList.add('disabled');
+            // Iniciar descarga — el servidor puede tardar ~3-5s por los gráficos
+            window.location.href = this.urls.exportarPdf + '?' + params.toString();
+            // Restaurar botón después de 6 segundos
+            setTimeout(() => {
+                btn.innerHTML = textoOriginal;
+                btn.classList.remove('disabled');
+            }, 6000);
+        });
+
+        // ── Análisis de Sentimiento IA ────────────────────────────────
+        document.getElementById('btnAnalizarIA')?.addEventListener('click', () => {
+            this.cargarAnalisisIA(false);
+        });
+        document.getElementById('btnRegenerarIA')?.addEventListener('click', () => {
+            if (confirm('¿Regenerar el análisis? Se llamará al modelo de IA nuevamente.')) {
+                this.cargarAnalisisIA(true);
+            }
+        });
+        document.getElementById('btnReintentarIA')?.addEventListener('click', () => {
+            this.cargarAnalisisIA(false);
         });
     }
 
@@ -765,6 +816,170 @@ class DashboardEncuestas {
         const div = document.createElement('div');
         div.textContent = texto;
         return div.innerHTML;
+    }
+
+    // ── Análisis de Sentimiento IA ────────────────────────────────────
+
+    /**
+     * Retorna los filtros activos como objeto JSON para enviar en el body del POST.
+     * Reutiliza los mismos inputs que obtenerFiltros() pero en formato objeto.
+     */
+    private obtenerFiltrosJson(): Record<string, string> {
+        const campos: { [key: string]: string } = {
+            fecha_desde:    'filtroFechaDesde',
+            fecha_hasta:    'filtroFechaHasta',
+            responsable_id: 'filtroResponsable',
+            sucursal_id:    'filtroSucursal',
+            tipo_orden:     'filtroTipoOrden',
+        };
+        const resultado: Record<string, string> = {};
+        for (const [param, id] of Object.entries(campos)) {
+            const val = (document.getElementById(id) as HTMLInputElement)?.value;
+            if (val) resultado[param] = val;
+        }
+        return resultado;
+    }
+
+    /**
+     * Muestra uno de los 4 estados de la tarjeta IA:
+     * 'inicial' | 'cargando' | 'resultado' | 'error'
+     */
+    private mostrarEstadoIA(estado: 'inicial' | 'cargando' | 'resultado' | 'error'): void {
+        const estados: Record<string, string> = {
+            inicial:   'iaEstadoInicial',
+            cargando:  'iaEstadoCargando',
+            resultado: 'iaEstadoResultado',
+            error:     'iaEstadoError',
+        };
+        for (const [key, id] of Object.entries(estados)) {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('d-none', key !== estado);
+        }
+    }
+
+    /**
+     * Llama al endpoint de análisis IA y renderiza la tarjeta con el resultado.
+     * @param forzar - Si true, ignora el caché y solicita un nuevo análisis.
+     */
+    cargarAnalisisIA(forzar: boolean = false): void {
+        if (!this.urls.analisisIA) return;
+
+        this.mostrarEstadoIA('cargando');
+
+        // Obtener el token CSRF del DOM (Django lo pone en un meta tag o en la cookie)
+        const csrfToken = this.obtenerCsrfToken();
+
+        const body = {
+            ...this.obtenerFiltrosJson(),
+            forzar,
+        };
+
+        fetch(this.urls.analisisIA, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify(body),
+        })
+        .then(r => r.json())
+        .then((data: AnalisisIAData) => {
+            if (data.success) {
+                this.renderizarAnalisisIA(data);
+                this.mostrarEstadoIA('resultado');
+            } else {
+                const errEl = document.getElementById('iaErrorMensaje');
+                if (errEl) errEl.textContent = data.error || 'Error al generar el análisis.';
+                this.mostrarEstadoIA('error');
+            }
+        })
+        .catch((err) => {
+            console.error('[AnalisisIA] Error de red:', err);
+            const errEl = document.getElementById('iaErrorMensaje');
+            if (errEl) errEl.textContent = 'No se pudo conectar con el servidor. Verifica que Ollama esté activo.';
+            this.mostrarEstadoIA('error');
+        });
+    }
+
+    /**
+     * Rellena los elementos del DOM con los datos del análisis devueltos por la API.
+     */
+    private renderizarAnalisisIA(data: AnalisisIAData): void {
+        // ── Badge de sentimiento ──────────────────────────────────────
+        const badge = document.getElementById('iaBadgeSentimiento');
+        if (badge) {
+            const sentimientoLabel: Record<string, string> = {
+                positivo: 'Positivo',
+                negativo: 'Negativo',
+                mixto:    'Mixto',
+                neutral:  'Neutral',
+            };
+            const icono = data.icono || 'bi-emoji-expressionless';
+            badge.innerHTML = `<i class="bi ${this.escaparHtml(icono)} me-1"></i>${sentimientoLabel[data.sentimiento_general || 'neutral'] || 'Neutral'}`;
+            // Limpiar clases de color anteriores y aplicar la nueva
+            badge.className = `badge ia-badge-sentimiento ia-sentimiento-${data.sentimiento_general || 'neutral'}`;
+        }
+
+        // ── Resumen ejecutivo ─────────────────────────────────────────
+        const resumen = document.getElementById('iaResumenEjecutivo');
+        if (resumen) resumen.textContent = data.resumen_ejecutivo || '';
+
+        // ── Temas positivos ───────────────────────────────────────────
+        const chiposPositivos = document.getElementById('iaTemasPositivos');
+        if (chiposPositivos) {
+            const temas = data.temas_positivos || [];
+            chiposPositivos.innerHTML = temas.length > 0
+                ? temas.map(t => `<span class="ia-chip ia-chip-positivo">${this.escaparHtml(t)}</span>`).join('')
+                : '<span class="text-muted small fst-italic">Sin aspectos positivos destacados</span>';
+        }
+
+        // ── Temas negativos ───────────────────────────────────────────
+        const chipsNegativos = document.getElementById('iaTemasNegativos');
+        if (chipsNegativos) {
+            const temas = data.temas_negativos || [];
+            chipsNegativos.innerHTML = temas.length > 0
+                ? temas.map(t => `<span class="ia-chip ia-chip-negativo">${this.escaparHtml(t)}</span>`).join('')
+                : '<span class="text-muted small fst-italic">Sin áreas de mejora detectadas</span>';
+        }
+
+        // ── Recomendación ─────────────────────────────────────────────
+        const rec = document.getElementById('iaRecomendacion');
+        if (rec) {
+            if (data.recomendacion_ia) {
+                rec.innerHTML = `<i class="bi bi-lightbulb-fill me-2 text-warning"></i>${this.escaparHtml(data.recomendacion_ia)}`;
+                rec.classList.remove('d-none');
+            } else {
+                rec.classList.add('d-none');
+            }
+        }
+
+        // ── Metadatos del pie ─────────────────────────────────────────
+        const metadatos = document.getElementById('iaMetadatos');
+        if (metadatos) {
+            const cacheLabel = data.desde_cache
+                ? '<span class="ia-cache-badge">caché</span>'
+                : '<span class="ia-cache-badge ia-cache-nuevo">nuevo</span>';
+            metadatos.innerHTML = (
+                `<i class="bi bi-cpu me-1"></i>${this.escaparHtml(data.modelo_usado || 'gemma4:e4b')} ` +
+                `· ${data.total_encuestas || 0} encuestas ` +
+                `· ${this.escaparHtml(data.fecha_analisis || '')} ` +
+                cacheLabel
+            );
+        }
+    }
+
+    /**
+     * Obtiene el token CSRF desde la cookie de Django.
+     * Django requiere este token en todos los POST que no sean formularios HTML.
+     */
+    private obtenerCsrfToken(): string {
+        const nombre = 'csrftoken';
+        const cookies = document.cookie.split(';');
+        for (const cookie of cookies) {
+            const [key, val] = cookie.trim().split('=');
+            if (key === nombre) return decodeURIComponent(val);
+        }
+        return '';
     }
 }
 

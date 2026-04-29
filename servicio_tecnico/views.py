@@ -15086,6 +15086,490 @@ def exportar_encuestas_excel(request):
     return response
 
 
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+def exportar_encuestas_pdf(request):
+    """
+    Genera y descarga el Reporte Ejecutivo PDF del Panel de Encuestas.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista calcula todos los datos necesarios para el reporte ejecutivo
+    (KPIs, tendencia, distribución NPS, ranking por responsable y comentarios),
+    los empaqueta en un diccionario y llama al módulo pdf_encuestas.py para
+    generar el PDF con ReportLab + matplotlib.
+
+    Comportamiento de comentarios:
+      - Si hay filtros activos (fecha, responsable, sucursal o tipo_orden):
+        se incluyen TODOS los comentarios del período filtrado.
+      - Si no hay filtros aplicados:
+        se incluyen solo los últimos 10 comentarios.
+
+    Los mismos parámetros GET que usa el dashboard (fecha_desde, fecha_hasta,
+    responsable_id, sucursal_id, tipo_orden) se aplican aquí para mantener
+    coherencia entre lo que ve el usuario y lo que descarga en PDF.
+    """
+    from django.db.models import Avg, Count, Q
+    from django.db.models.functions import TruncWeek
+    from .pdf_encuestas import generar_pdf_reporte_encuestas
+    from config.paises_config import fecha_local_pais, get_pais_actual
+
+    pais = get_pais_actual()
+    now  = timezone.now()
+
+    # ---- 1. Queryset base con filtros ----
+    qs = _filtrar_encuestas_satisfaccion(request)
+
+    # Detectar si hay filtros activos para decidir el límite de comentarios
+    fecha_desde    = request.GET.get('fecha_desde', '').strip()
+    fecha_hasta    = request.GET.get('fecha_hasta', '').strip()
+    responsable_id = request.GET.get('responsable_id', '').strip()
+    sucursal_id    = request.GET.get('sucursal_id', '').strip()
+    tipo_orden     = request.GET.get('tipo_orden', '').strip()
+
+    hay_filtros = any([fecha_desde, fecha_hasta, responsable_id, sucursal_id, tipo_orden])
+
+    # ---- 2. KPIs globales ----
+    total_enviadas    = qs.filter(correo_enviado=True).count()
+    total_respondidas = qs.filter(utilizado=True).count()
+    total_pendientes  = qs.filter(utilizado=False, correo_enviado=True,
+                                  fecha_expiracion__gte=now).count()
+    total_expiradas   = qs.filter(utilizado=False,
+                                  fecha_expiracion__lt=now).count()
+
+    tasa_respuesta = round(
+        (total_respondidas / total_enviadas * 100) if total_enviadas > 0 else 0, 1
+    )
+
+    respondidas_qs = qs.filter(utilizado=True)
+    avgs = respondidas_qs.aggregate(
+        nps_promedio=Avg('nps'),
+        calificacion_promedio=Avg('calificacion_general'),
+        calificacion_atencion_promedio=Avg('calificacion_atencion'),
+        calificacion_tiempo_promedio=Avg('calificacion_tiempo'),
+    )
+
+    total_con_recomendacion = respondidas_qs.filter(recomienda__isnull=False).count()
+    total_recomiendan       = respondidas_qs.filter(recomienda=True).count()
+    tasa_recomendacion = round(
+        (total_recomiendan / total_con_recomendacion * 100)
+        if total_con_recomendacion > 0 else 0, 1
+    )
+
+    # NPS Score = % Promotores (9-10) − % Detractores (0-6)
+    respondidas_con_nps = respondidas_qs.filter(nps__isnull=False).count()
+    promotores_kpi  = respondidas_qs.filter(nps__gte=9).count()
+    detractores_kpi = respondidas_qs.filter(nps__lte=6).count()
+    nps_score_kpi = round(
+        ((promotores_kpi - detractores_kpi) / respondidas_con_nps * 100)
+        if respondidas_con_nps > 0 else 0, 1
+    )
+
+    kpis = {
+        'total_enviadas': total_enviadas,
+        'total_respondidas': total_respondidas,
+        'total_pendientes': total_pendientes,
+        'total_expiradas': total_expiradas,
+        'tasa_respuesta': tasa_respuesta,
+        'nps_promedio': round(avgs['nps_promedio'] or 0, 1),
+        'calificacion_promedio': round(avgs['calificacion_promedio'] or 0, 1),
+        'calificacion_atencion_promedio': round(avgs['calificacion_atencion_promedio'] or 0, 1),
+        'calificacion_tiempo_promedio': round(avgs['calificacion_tiempo_promedio'] or 0, 1),
+        'tasa_recomendacion': tasa_recomendacion,
+        'nps_score': nps_score_kpi,
+    }
+
+    # ---- 3. Tendencia semanal ----
+    datos_tendencia = (
+        qs.filter(correo_enviado=True)
+        .annotate(semana=TruncWeek('fecha_creacion'))
+        .values('semana')
+        .annotate(
+            total_enviadas_s=Count('id'),
+            total_respondidas_s=Count('id', filter=Q(utilizado=True)),
+            calificacion_promedio_s=Avg('calificacion_general', filter=Q(utilizado=True)),
+        )
+        .order_by('semana')
+    )
+
+    labels_tend = []
+    enviadas_tend = []
+    respondidas_tend = []
+    calificacion_tend = []
+
+    for row in datos_tendencia:
+        labels_tend.append(row['semana'].strftime('%d/%m/%Y'))
+        enviadas_tend.append(row['total_enviadas_s'])
+        respondidas_tend.append(row['total_respondidas_s'])
+        calificacion_tend.append(round(row['calificacion_promedio_s'] or 0, 1))
+
+    tendencia = {
+        'labels': labels_tend,
+        'datasets': {
+            'total_enviadas': enviadas_tend,
+            'total_respondidas': respondidas_tend,
+            'calificacion_promedio': calificacion_tend,
+        },
+    }
+
+    # ---- 4. Distribución NPS ----
+    nps_agg = qs.filter(utilizado=True, nps__isnull=False).aggregate(
+        promotores=Count('id', filter=Q(nps__gte=9)),
+        pasivos=Count('id', filter=Q(nps__gte=7, nps__lte=8)),
+        detractores=Count('id', filter=Q(nps__lte=6)),
+        total=Count('id'),
+    )
+    nps_total = nps_agg['total'] or 0
+    nps_score_dist = round(
+        ((nps_agg['promotores'] - nps_agg['detractores']) / nps_total * 100)
+        if nps_total > 0 else 0, 1
+    )
+    nps_dist = {
+        'promotores': nps_agg['promotores'],
+        'pasivos': nps_agg['pasivos'],
+        'detractores': nps_agg['detractores'],
+        'total': nps_total,
+        'nps_score': nps_score_dist,
+    }
+
+    # ---- 5. Ranking por responsable ----
+    datos_resp = (
+        qs.filter(correo_enviado=True)
+        .values(
+            'orden__responsable_seguimiento__id',
+            'orden__responsable_seguimiento__nombre_completo',
+        )
+        .annotate(
+            total_enviadas_r=Count('id'),
+            total_respondidas_r=Count('id', filter=Q(utilizado=True)),
+            calificacion_promedio=Avg('calificacion_general', filter=Q(utilizado=True)),
+            nps_promedio=Avg('nps', filter=Q(utilizado=True)),
+            total_recomiendan=Count('id', filter=Q(utilizado=True, recomienda=True)),
+            total_con_recomendacion=Count('id', filter=Q(utilizado=True, recomienda__isnull=False)),
+            promotores=Count('id', filter=Q(utilizado=True, nps__gte=9)),
+            detractores=Count('id', filter=Q(utilizado=True, nps__lte=6)),
+            respondidas_con_nps=Count('id', filter=Q(utilizado=True, nps__isnull=False)),
+        )
+        .order_by('-calificacion_promedio')
+    )
+
+    responsables = []
+    for row in datos_resp:
+        nombre = row['orden__responsable_seguimiento__nombre_completo'] or '(Sin responsable)'
+        t_env  = row['total_enviadas_r']
+        t_resp = row['total_respondidas_r']
+        nps_s  = round(
+            ((row['promotores'] - row['detractores']) / row['respondidas_con_nps'] * 100)
+            if row['respondidas_con_nps'] > 0 else 0, 1
+        )
+        tasa_rec = round(
+            (row['total_recomiendan'] / row['total_con_recomendacion'] * 100)
+            if row['total_con_recomendacion'] > 0 else 0, 1
+        )
+        responsables.append({
+            'id': row['orden__responsable_seguimiento__id'],
+            'nombre': nombre,
+            'total_enviadas': t_env,
+            'total_respondidas': t_resp,
+            'calificacion_promedio': round(row['calificacion_promedio'] or 0, 1),
+            'nps_promedio': round(row['nps_promedio'] or 0, 1),
+            'tasa_recomendacion': tasa_rec,
+            'nps_score': nps_s,
+        })
+
+    # ---- 6. Comentarios ----
+    # Con filtros activos → todos; sin filtros → últimos 10
+    comentarios_qs = (
+        qs.filter(utilizado=True)
+        .exclude(comentario_cliente='')
+        .order_by('-fecha_respuesta')
+    )
+    if not hay_filtros:
+        comentarios_qs = comentarios_qs[:10]
+
+    comentarios = []
+    for fb in comentarios_qs:
+        comentarios.append({
+            'orden_numero': (
+                fb.orden.detalle_equipo.orden_cliente
+                if hasattr(fb.orden, 'detalle_equipo') and fb.orden.detalle_equipo.orden_cliente
+                else fb.orden.numero_orden_interno
+            ),
+            'orden_id': fb.orden.id,
+            'responsable': str(fb.orden.responsable_seguimiento) if fb.orden.responsable_seguimiento else '',
+            'calificacion': fb.calificacion_general,
+            'nps': fb.nps,
+            'recomienda': fb.recomienda,
+            'comentario': fb.comentario_cliente,
+            'fecha': fecha_local_pais(fb.fecha_respuesta, pais).strftime('%d/%m/%Y')
+                     if fb.fecha_respuesta else '',
+        })
+
+    # ---- 7. Descripción del período ----
+    partes_periodo = []
+    if fecha_desde:
+        partes_periodo.append(f'Desde: {fecha_desde}')
+    if fecha_hasta:
+        partes_periodo.append(f'Hasta: {fecha_hasta}')
+    if responsable_id:
+        partes_periodo.append('Responsable filtrado')
+    if sucursal_id:
+        partes_periodo.append('Sucursal filtrada')
+    if tipo_orden:
+        partes_periodo.append(f'Tipo: {tipo_orden}')
+    periodo = ' | '.join(partes_periodo) if partes_periodo else 'Todos los registros'
+
+    # ---- 8. Buscar análisis IA cacheado (si existe) ----
+    # Usamos el mismo cálculo de hash SHA-256 que api_analisis_sentimiento_ia
+    # para encontrar el análisis guardado que corresponde exactamente a este
+    # conjunto de encuestas filtradas.
+    analisis_ia = None
+    try:
+        import hashlib
+        import json as _json
+        from .models import AnalisisSentimientoEncuesta
+
+        encuestas_para_hash = list(
+            respondidas_qs
+            .order_by('fecha_respuesta')
+            .values(
+                'calificacion_general',
+                'calificacion_atencion',
+                'calificacion_tiempo',
+                'nps',
+                'recomienda',
+                'comentario_cliente',
+            )
+        )
+        if encuestas_para_hash:
+            hash_input = _json.dumps(encuestas_para_hash, sort_keys=True, ensure_ascii=False)
+            hash_encuestas = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+            analisis_ia = (
+                AnalisisSentimientoEncuesta.objects
+                .filter(hash_encuestas=hash_encuestas)
+                .order_by('-fecha_analisis')
+                .first()
+            )
+    except Exception as _e:
+        logger.warning(f'No se pudo recuperar análisis IA para el PDF: {_e}')
+
+    # ---- 9. Empaquetar y generar PDF ----
+    datos_pdf = {
+        'kpis': kpis,
+        'tendencia': tendencia,
+        'nps_dist': nps_dist,
+        'responsables': responsables,
+        'comentarios': comentarios,
+        'periodo': periodo,
+        'filtros_activos': hay_filtros,
+        'analisis_ia': analisis_ia,   # None si no hay análisis guardado
+    }
+
+    try:
+        pdf_buffer = generar_pdf_reporte_encuestas(datos_pdf)
+    except Exception as exc:
+        logger.error(f'Error generando PDF de encuestas: {exc}', exc_info=True)
+        messages.error(request, f'Error al generar el PDF: {exc}')
+        return redirect('servicio_tecnico:dashboard_encuestas')
+
+    fecha_str = now.strftime('%Y%m%d_%H%M')
+    response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = (
+        f'attachment; filename="Reporte_Encuestas_Satisfaccion_{fecha_str}.pdf"'
+    )
+    return response
+
+
+# ============================================================================
+# ANÁLISIS DE SENTIMIENTO IA — Encuestas de Satisfacción (Abril 2026)
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+@require_http_methods(['POST'])
+def api_analisis_sentimiento_ia(request):
+    """
+    Endpoint AJAX que genera (o devuelve desde caché) el análisis de
+    sentimiento IA sobre el conjunto de encuestas de satisfacción.
+
+    Flujo:
+    1. Aplica los mismos filtros del dashboard (fecha, responsable, sucursal…)
+    2. Obtiene solo las encuestas respondidas (utilizado=True, tipo='satisfaccion')
+    3. Calcula un SHA-256 del conjunto → busca en AnalisisSentimientoEncuesta
+    4. Si existe ese hash y no se pidió forzar → devuelve el análisis cacheado
+    5. Si no existe o forzar=true → llama a Ollama → guarda → devuelve
+
+    Body JSON esperado (todos opcionales):
+        fecha_desde    (str YYYY-MM-DD)
+        fecha_hasta    (str YYYY-MM-DD)
+        responsable_id (int)
+        sucursal_id    (int)
+        tipo_orden     (str: 'diagnostico' | 'venta_mostrador')
+        forzar         (bool: true para regenerar aunque exista caché)
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista es como un "botón de análisis inteligente". Si ya analizamos
+    estos datos antes y no cambiaron, devuelve el resultado guardado al instante.
+    Solo llama a la IA cuando es realmente necesario.
+    """
+    import hashlib
+    import json as json_stdlib
+    from django.conf import settings as django_settings
+    from .models import AnalisisSentimientoEncuesta
+    from .ollama_client import analizar_sentimiento_encuestas
+
+    # ── 0. Verificar que la IA está habilitada ──────────────────────────────
+    if not getattr(django_settings, 'AI_ENABLED', False):
+        return JsonResponse({
+            'success': False,
+            'error': 'La función de IA no está habilitada en este entorno.',
+        }, status=503)
+
+    # ── 1. Parsear el body JSON del POST ────────────────────────────────────
+    try:
+        body = json_stdlib.loads(request.body or '{}')
+    except (json_stdlib.JSONDecodeError, ValueError):
+        body = {}
+
+    forzar = bool(body.get('forzar', False))
+
+    # Inyectar los filtros del body como GET para poder reutilizar
+    # _filtrar_encuestas_satisfaccion que lee de request.GET
+    from django.http import QueryDict
+    get_params = QueryDict(mutable=True)
+    for campo in ('fecha_desde', 'fecha_hasta', 'responsable_id',
+                  'sucursal_id', 'tipo_orden'):
+        valor = body.get(campo)
+        if valor:
+            get_params[campo] = str(valor)
+
+    # Crear un request temporal con los GET params del body
+    request_filtrado = request
+    request_filtrado.GET = get_params  # noqa: temporal override
+
+    # ── 2. Obtener encuestas respondidas ────────────────────────────────────
+    qs = _filtrar_encuestas_satisfaccion(request_filtrado).filter(
+        utilizado=True,  # Solo encuestas donde el cliente ya respondió
+    ).order_by('fecha_respuesta')
+
+    encuestas_qs = list(qs.values(
+        'calificacion_general',
+        'calificacion_atencion',
+        'calificacion_tiempo',
+        'nps',
+        'recomienda',
+        'comentario_cliente',
+    ))
+
+    if not encuestas_qs:
+        return JsonResponse({
+            'success': False,
+            'error': 'No hay encuestas respondidas para analizar con los filtros actuales.',
+        }, status=404)
+
+    # ── 3. Calcular hash SHA-256 del conjunto ───────────────────────────────
+    # Usamos una representación canónica (sorted keys) para que el hash sea
+    # consistente independientemente del orden de las claves en el dict.
+    hash_input = json_stdlib.dumps(encuestas_qs, sort_keys=True, ensure_ascii=False)
+    hash_encuestas = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+
+    # ── 4. Buscar análisis cacheado ─────────────────────────────────────────
+    if not forzar:
+        analisis_existente = (
+            AnalisisSentimientoEncuesta.objects
+            .filter(hash_encuestas=hash_encuestas)
+            .order_by('-fecha_analisis')
+            .first()
+        )
+        if analisis_existente:
+            return JsonResponse({
+                'success': True,
+                'desde_cache': True,
+                'sentimiento_general': analisis_existente.sentimiento_general,
+                'resumen_ejecutivo':   analisis_existente.resumen_ejecutivo,
+                'temas_positivos':     analisis_existente.temas_positivos,
+                'temas_negativos':     analisis_existente.temas_negativos,
+                'recomendacion_ia':    analisis_existente.recomendacion_ia,
+                'total_encuestas':     analisis_existente.total_encuestas,
+                'modelo_usado':        analisis_existente.modelo_usado,
+                'fecha_analisis':      analisis_existente.fecha_analisis.strftime(
+                    '%d/%m/%Y a las %H:%M'
+                ),
+                'badge_color':         analisis_existente.badge_color,
+                'icono':               analisis_existente.icono,
+            })
+
+    # ── 5. Preparar datos para el cliente de IA ─────────────────────────────
+    # Normalizar los nombres de campo: el modelo usa 'comentario_cliente'
+    # pero la función de análisis espera 'comentario'
+    encuestas_para_ia = [
+        {
+            'calificacion_general':  enc.get('calificacion_general'),
+            'calificacion_atencion': enc.get('calificacion_atencion'),
+            'calificacion_tiempo':   enc.get('calificacion_tiempo'),
+            'nps':                   enc.get('nps'),
+            'recomienda':            enc.get('recomienda'),
+            'comentario':            enc.get('comentario_cliente', '') or '',
+        }
+        for enc in encuestas_qs
+    ]
+
+    modelo_ia = 'gemma4:e4b'  # Modelo fijo para análisis de sentimiento
+
+    # ── 6. Llamar a la IA ───────────────────────────────────────────────────
+    logger.info(
+        f'[api_analisis_sentimiento_ia] Llamando a Ollama con {len(encuestas_para_ia)} '
+        f'encuestas. Hash: {hash_encuestas[:12]}… forzar={forzar}'
+    )
+
+    resultado_ia = analizar_sentimiento_encuestas(
+        encuestas=encuestas_para_ia,
+        modelo=modelo_ia,
+    )
+
+    if not resultado_ia.get('success'):
+        return JsonResponse({
+            'success': False,
+            'error': resultado_ia.get('error', 'Error desconocido en el análisis de IA.'),
+        }, status=503)
+
+    analisis = resultado_ia['analisis']
+
+    # ── 7. Guardar en base de datos ─────────────────────────────────────────
+    filtros_aplicados = {
+        k: body.get(k)
+        for k in ('fecha_desde', 'fecha_hasta', 'responsable_id', 'sucursal_id', 'tipo_orden')
+        if body.get(k)
+    }
+
+    registro = AnalisisSentimientoEncuesta.objects.create(
+        sentimiento_general = analisis.get('sentimiento_general', 'neutral'),
+        resumen_ejecutivo   = analisis.get('resumen_ejecutivo', ''),
+        temas_positivos     = analisis.get('temas_positivos', []),
+        temas_negativos     = analisis.get('temas_negativos', []),
+        recomendacion_ia    = analisis.get('recomendacion_ia', ''),
+        total_encuestas     = len(encuestas_qs),
+        hash_encuestas      = hash_encuestas,
+        filtros_aplicados   = filtros_aplicados,
+        modelo_usado        = resultado_ia.get('modelo_usado', modelo_ia),
+    )
+
+    # ── 8. Devolver respuesta ───────────────────────────────────────────────
+    return JsonResponse({
+        'success':            True,
+        'desde_cache':        False,
+        'sentimiento_general': registro.sentimiento_general,
+        'resumen_ejecutivo':  registro.resumen_ejecutivo,
+        'temas_positivos':    registro.temas_positivos,
+        'temas_negativos':    registro.temas_negativos,
+        'recomendacion_ia':   registro.recomendacion_ia,
+        'total_encuestas':    registro.total_encuestas,
+        'modelo_usado':       registro.modelo_usado,
+        'fecha_analisis':     registro.fecha_analisis.strftime('%d/%m/%Y a las %H:%M'),
+        'badge_color':        registro.badge_color,
+        'icono':              registro.icono,
+    })
+
+
 # ============================================================================
 # DASHBOARD DE FEEDBACK DE RECHAZO DE COTIZACIÓN (Marzo 2026)
 # ============================================================================

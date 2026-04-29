@@ -23,6 +23,10 @@
                class="btn btn-light btn-sm" title="Exportar a Excel">
                 <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
             </a>
+            <a href="#" id="btnExportarPDF"
+               class="btn btn-danger btn-sm" title="Exportar Reporte Ejecutivo PDF">
+                <i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF
+            </a>
         </div>
     </div>
 </div>
@@ -352,6 +356,97 @@
     </div>
 </div>
 
+<!-- Análisis de Sentimiento IA -->
+<div class="enc-ia-card mb-4" id="seccionAnalisisIA">
+
+    <!-- Estado: placeholder inicial (antes de analizar) -->
+    <div id="iaEstadoInicial">
+        <div class="ia-placeholder">
+            <div class="ia-placeholder-icono">
+                <i class="bi bi-stars"></i>
+            </div>
+            <div class="ia-placeholder-texto">
+                <h5 class="mb-1">Análisis IA — Voz del Cliente</h5>
+                <p class="text-muted mb-3">
+                    Deja que la IA analice las encuestas respondidas y genere un
+                    resumen ejecutivo del sentimiento general de tus clientes.
+                </p>
+                <button class="btn btn-ia" id="btnAnalizarIA">
+                    <i class="bi bi-cpu me-2"></i>Analizar comentarios con IA
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estado: cargando (spinner durante la llamada a Ollama) -->
+    <div id="iaEstadoCargando" class="d-none">
+        <div class="ia-cargando">
+            <div class="ia-cargando-spinner">
+                <div class="spinner-border text-primary" role="status" style="width:2.5rem;height:2.5rem;"></div>
+            </div>
+            <div>
+                <div class="fw-semibold mb-1">Analizando con IA local…</div>
+                <div class="text-muted small" id="iaProgreso">
+                    Procesando encuestas con <strong>gemma4:e4b</strong>. Esto puede tomar unos segundos.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estado: resultado (se rellena desde TypeScript) -->
+    <div id="iaEstadoResultado" class="d-none">
+        <!-- Cabecera con sentimiento + botón regenerar -->
+        <div class="ia-resultado-header">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="ia-titulo">
+                    <i class="bi bi-stars me-2"></i>Análisis IA — Voz del Cliente
+                </div>
+                <span id="iaBadgeSentimiento" class="badge ia-badge-sentimiento"></span>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <span id="iaMetadatos" class="ia-metadatos"></span>
+                <button class="btn btn-ia-sm" id="btnRegenerarIA" title="Regenerar análisis">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Regenerar
+                </button>
+            </div>
+        </div>
+
+        <!-- Resumen ejecutivo -->
+        <div class="ia-resumen-ejecutivo" id="iaResumenEjecutivo"></div>
+
+        <!-- Temas positivos y negativos -->
+        <div class="ia-temas-grid">
+            <div class="ia-temas-columna ia-temas-positivos">
+                <div class="ia-temas-titulo">
+                    <i class="bi bi-hand-thumbs-up-fill me-1"></i>Aspectos positivos
+                </div>
+                <div class="ia-chips-grupo" id="iaTemasPositivos"></div>
+            </div>
+            <div class="ia-temas-columna ia-temas-negativos">
+                <div class="ia-temas-titulo">
+                    <i class="bi bi-hand-thumbs-down-fill me-1"></i>Áreas de mejora
+                </div>
+                <div class="ia-chips-grupo" id="iaTemasNegativos"></div>
+            </div>
+        </div>
+
+        <!-- Recomendación IA -->
+        <div class="ia-recomendacion" id="iaRecomendacion"></div>
+    </div>
+
+    <!-- Estado: error -->
+    <div id="iaEstadoError" class="d-none">
+        <div class="ia-error">
+            <i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>
+            <span id="iaErrorMensaje">Error al conectar con el servicio de IA.</span>
+            <button class="btn btn-sm btn-outline-secondary ms-3" id="btnReintentarIA">
+                <i class="bi bi-arrow-clockwise me-1"></i>Reintentar
+            </button>
+        </div>
+    </div>
+
+</div>
+
 <!-- Comentarios recientes -->
 <div class="enc-chart-card mb-4">
     <div class="chart-titulo">
@@ -374,6 +469,8 @@
      data-url-lista="{% url 'servicio_tecnico:api_encuestas_lista' %}"
      data-url-comentarios="{% url 'servicio_tecnico:api_encuestas_comentarios' %}"
      data-url-exportar="{% url 'servicio_tecnico:exportar_encuestas_excel' %}"
+     data-url-exportar-pdf="{% url 'servicio_tecnico:exportar_encuestas_pdf' %}"
+     data-url-analisis-ia="{% url 'servicio_tecnico:api_analisis_sentimiento_ia' %}"
      data-url-detalle="{% url 'servicio_tecnico:detalle_orden' orden_id=0 %}"
 ></div>
 {% endblock %}
