@@ -1125,3 +1125,59 @@ def _validar_analisis(data: dict, claves_requeridas: set, sentimientos_validos: 
     ).strip()
 
     return resultado
+
+
+# ===========================================================================
+# DISPATCHER — Análisis de Sentimiento (Ollama o Gemini según prefijo)
+# ===========================================================================
+
+def analizar_sentimiento_dispatch(
+    encuestas: list[dict],
+    modelo_override: str = '',
+) -> dict:
+    """
+    Dispatcher que enruta el análisis de sentimiento a Ollama o Gemini
+    según el prefijo del modelo recibido del frontend.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El frontend envía el modelo con un prefijo visual como "[Gemini] gemini-2.0-flash"
+    o "[Ollama] gemma4:e4b". Esta función quita el prefijo, detecta el proveedor
+    y delega al cliente correcto. Es el mismo patrón que mejorar_diagnostico_dispatch().
+
+    Reglas de detección:
+      - Empieza con "gemini" (después de quitar el prefijo) → Google Gemini
+      - Cualquier otro valor → Ollama local
+
+    Args:
+        encuestas:       Lista de dicts de encuestas (mismo formato que analizar_sentimiento_encuestas)
+        modelo_override: Modelo con prefijo visual, ej: "[Gemini] gemini-2.0-flash"
+                         Si está vacío usa el modelo Ollama por defecto.
+
+    Returns:
+        dict con success, analisis, modelo_usado (o error)
+    """
+    # ── 1. Limpiar prefijos visuales ─────────────────────────────────────────
+    nombre_limpio = modelo_override.strip()
+    for prefijo in ('[Gemini] ', '[Ollama] '):
+        if nombre_limpio.startswith(prefijo):
+            nombre_limpio = nombre_limpio[len(prefijo):]
+            break
+
+    # ── 2. Detectar proveedor por nombre del modelo ──────────────────────────
+    # Regla: si empieza con "gemini" → Google Gemini; cualquier otro → Ollama
+    es_gemini = nombre_limpio.lower().startswith('gemini')
+
+    if es_gemini:
+        logger.info(
+            f'[AnalisisSentimiento][Dispatch] Usando Gemini → {nombre_limpio}'
+        )
+        from .gemini_client import analizar_sentimiento_encuestas as gemini_analizar
+        return gemini_analizar(encuestas=encuestas, modelo=nombre_limpio)
+    else:
+        # Ollama: si no se especificó modelo, usar el default de settings
+        if not nombre_limpio:
+            nombre_limpio = getattr(settings, 'OLLAMA_MODEL', 'gemma4:e4b')
+        logger.info(
+            f'[AnalisisSentimiento][Dispatch] Usando Ollama → {nombre_limpio}'
+        )
+        return analizar_sentimiento_encuestas(encuestas=encuestas, modelo=nombre_limpio)

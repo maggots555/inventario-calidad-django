@@ -14566,12 +14566,16 @@ def dashboard_encuestas(request):
     Vista principal del panel de encuestas de satisfacción.
     Renderiza el template con filtros; la data se carga vía AJAX.
     """
-    empleados = Empleado.objects.filter(activo=True).order_by('nombre_completo')
+    from django.conf import settings as django_settings
+
+    empleados  = Empleado.objects.filter(activo=True).order_by('nombre_completo')
     sucursales = Sucursal.objects.filter(activa=True).order_by('nombre')
 
     return render(request, 'servicio_tecnico/dashboard_encuestas.html', {
-        'empleados': empleados,
-        'sucursales': sucursales,
+        'empleados':   empleados,
+        'sucursales':  sucursales,
+        'ai_enabled':  getattr(django_settings, 'AI_ENABLED', False),
+        'ai_models':   getattr(django_settings, 'AI_MODELS', []),
     })
 
 
@@ -15415,7 +15419,7 @@ def api_analisis_sentimiento_ia(request):
     import json as json_stdlib
     from django.conf import settings as django_settings
     from .models import AnalisisSentimientoEncuesta
-    from .ollama_client import analizar_sentimiento_encuestas
+    from .ollama_client import analizar_sentimiento_dispatch
 
     # ── 0. Verificar que la IA está habilitada ──────────────────────────────
     if not getattr(django_settings, 'AI_ENABLED', False):
@@ -15431,6 +15435,9 @@ def api_analisis_sentimiento_ia(request):
         body = {}
 
     forzar = bool(body.get('forzar', False))
+    # modelo_override: llega con prefijo visual "[Gemini] ..." o "[Ollama] ..."
+    # Si está vacío el dispatcher usa el modelo Ollama por defecto.
+    modelo_override = str(body.get('modelo', '')).strip()
 
     # Inyectar los filtros del body como GET para poder reutilizar
     # _filtrar_encuestas_satisfaccion que lee de request.GET
@@ -15513,17 +15520,17 @@ def api_analisis_sentimiento_ia(request):
         for enc in encuestas_qs
     ]
 
-    modelo_ia = 'gemma4:e4b'  # Modelo fijo para análisis de sentimiento
+    modelo_ia = modelo_override  # Puede ser "[Gemini] gemini-2.0-flash", "[Ollama] gemma4:e4b", etc.
 
-    # ── 6. Llamar a la IA ───────────────────────────────────────────────────
+    # ── 6. Llamar a la IA vía dispatcher (Ollama o Gemini según prefijo) ─────
     logger.info(
-        f'[api_analisis_sentimiento_ia] Llamando a Ollama con {len(encuestas_para_ia)} '
-        f'encuestas. Hash: {hash_encuestas[:12]}… forzar={forzar}'
+        f'[api_analisis_sentimiento_ia] Llamando dispatcher con {len(encuestas_para_ia)} '
+        f'encuestas. Hash: {hash_encuestas[:12]}… forzar={forzar} modelo="{modelo_override or "(default)"}"'
     )
 
-    resultado_ia = analizar_sentimiento_encuestas(
+    resultado_ia = analizar_sentimiento_dispatch(
         encuestas=encuestas_para_ia,
-        modelo=modelo_ia,
+        modelo_override=modelo_override,
     )
 
     if not resultado_ia.get('success'):

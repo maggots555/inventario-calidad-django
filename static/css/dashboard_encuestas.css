@@ -800,6 +800,21 @@
     color: var(--gray-900, #111827);
 }
 
+/* Selector de modelo IA junto al botón Regenerar */
+.ia-modelo-selector {
+    font-size: 0.78rem;
+    padding: 0.3rem 1.8rem 0.3rem 0.6rem;
+    height: auto;
+    min-width: 10rem;
+    max-width: 18rem;
+    border-radius: 6px;
+    border: 1px solid var(--gray-200, #e5e7eb);
+    background-color: var(--gray-50, #f9fafb);
+    color: var(--gray-700, #374151);
+    cursor: pointer;
+    transition: var(--enc-transition);
+}
+
 /* ── Estado: Cargando ────────────────────────────────────── */
 
 .ia-cargando {
@@ -1019,6 +1034,12 @@
 [data-bs-theme="dark"] .btn-ia-sm:hover {
     background: #475569;
     color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .ia-modelo-selector {
+    background-color: #1e293b;
+    color: #cbd5e1;
+    border-color: #475569;
 }
 
 [data-bs-theme="dark"] .ia-resumen-ejecutivo {

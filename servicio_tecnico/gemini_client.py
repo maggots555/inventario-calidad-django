@@ -354,3 +354,202 @@ def mejorar_diagnostico(
             'success': False,
             'error': f'Error inesperado al conectar con Gemini: {str(e)}'
         }
+
+
+# ===========================================================================
+# ANÁLISIS DE SENTIMIENTO IA — Encuestas de Satisfacción (vía Gemini)
+# ===========================================================================
+
+def analizar_sentimiento_encuestas(
+    encuestas: list[dict],
+    modelo: str = 'gemini-2.0-flash',
+) -> dict:
+    """
+    Analiza el sentimiento general del conjunto de encuestas de satisfacción
+    usando Google Gemini vía API REST.
+
+    Usa los mismos prompts y la misma estructura de respuesta que la versión
+    Ollama (`ollama_client.analizar_sentimiento_encuestas`) para garantizar
+    resultados consistentes entre proveedores.
+
+    Args:
+        encuestas: Lista de dicts con claves:
+                   calificacion_general, calificacion_atencion,
+                   calificacion_tiempo, nps, recomienda, comentario
+        modelo:    Nombre del modelo Gemini (default: gemini-2.0-flash)
+
+    Returns:
+        dict con las claves:
+            success (bool)
+            analisis (dict): sentimiento_general, resumen_ejecutivo,
+                             temas_positivos, temas_negativos, recomendacion_ia
+            modelo_usado (str)
+            error (str) — solo si success=False
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Funciona igual que la versión Ollama pero envía los datos a los servidores
+    de Google en lugar de un servidor local. Necesita GEMINI_API_KEY configurada.
+    """
+    # Importamos los helpers de ollama_client para reutilizar prompts y parsers
+    from .ollama_client import (
+        _PROMPT_SENTIMIENTO_SISTEMA,
+        _PROMPT_SENTIMIENTO_USUARIO,
+        _formatear_encuesta,
+        _parsear_json_analisis,
+    )
+
+    if not encuestas:
+        return {
+            'success': False,
+            'error': 'No hay encuestas para analizar.',
+        }
+
+    if not getattr(settings, 'GEMINI_ENABLED', False):
+        return {
+            'success': False,
+            'error': (
+                'Google Gemini no está habilitado. '
+                'Activa GEMINI_ENABLED=True y configura GEMINI_API_KEY.'
+            ),
+        }
+
+    api_key = getattr(settings, 'GEMINI_API_KEY', '')
+    if not api_key:
+        return {
+            'success': False,
+            'error': 'GEMINI_API_KEY no configurada en el entorno.',
+        }
+
+    timeout = getattr(settings, 'GEMINI_TIMEOUT', 120)
+
+    # ── Construir el prompt ──────────────────────────────────────────────────
+    datos_encuestas = '\n\n'.join(
+        _formatear_encuesta(enc, idx) for idx, enc in enumerate(encuestas)
+    )
+    prompt_usuario = _PROMPT_SENTIMIENTO_USUARIO.format(
+        n=len(encuestas),
+        datos_encuestas=datos_encuestas,
+    )
+
+    # ── Payload Gemini generateContent ──────────────────────────────────────
+    # systemInstruction + contents (rol user) + responseMimeType=application/json
+    # para forzar salida JSON nativa (soportado en gemini-1.5+ y gemini-2.x)
+    payload = {
+        'systemInstruction': {
+            'parts': [{'text': _PROMPT_SENTIMIENTO_SISTEMA}],
+        },
+        'contents': [
+            {
+                'role': 'user',
+                'parts': [{'text': prompt_usuario}],
+            }
+        ],
+        'generationConfig': {
+            'temperature': 0.2,
+            'topP': 0.9,
+            'maxOutputTokens': 1024,
+            'responseMimeType': 'application/json',
+            'thinkingConfig': {'thinkingBudget': 0},  # Sin cadena de pensamiento
+        },
+    }
+
+    url = f'{GEMINI_API_BASE}/{modelo}:generateContent?key={api_key}'
+    payload_bytes = json.dumps(payload).encode('utf-8')
+
+    logger.info(
+        f'[AnalisisSentimiento][Gemini] Enviando {len(encuestas)} encuestas '
+        f'al modelo {modelo}'
+    )
+
+    try:
+        ctx = ssl.create_default_context()
+        req = urllib.request.Request(
+            url,
+            data=payload_bytes,
+            headers={'Content-Type': 'application/json'},
+            method='POST',
+        )
+
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            raw = resp.read().decode('utf-8')
+
+        response_data = json.loads(raw)
+
+        # Verificar bloqueo por filtros de seguridad de Google
+        if 'promptFeedback' in response_data:
+            block_reason = response_data['promptFeedback'].get('blockReason', '')
+            if block_reason:
+                msg = f'Gemini bloqueó la solicitud: {block_reason}'
+                logger.warning(f'[AnalisisSentimiento][Gemini] {msg}')
+                return {'success': False, 'error': msg}
+
+        candidates = response_data.get('candidates', [])
+        if not candidates:
+            return {
+                'success': False,
+                'error': 'Gemini no devolvió candidatos en la respuesta.',
+            }
+
+        finish_reason = candidates[0].get('finishReason', 'STOP')
+        if finish_reason == 'SAFETY':
+            return {
+                'success': False,
+                'error': 'Gemini bloqueó la respuesta por políticas de seguridad.',
+            }
+
+        contenido = (
+            candidates[0]
+            .get('content', {})
+            .get('parts', [{}])[0]
+            .get('text', '')
+            .strip()
+        )
+
+        if not contenido:
+            return {
+                'success': False,
+                'error': 'Gemini devolvió una respuesta vacía.',
+            }
+
+        logger.info(
+            f'[AnalisisSentimiento][Gemini] Respuesta recibida '
+            f'({len(contenido)} chars) | finishReason={finish_reason}'
+        )
+
+        analisis = _parsear_json_analisis(contenido)
+
+        return {
+            'success': True,
+            'analisis': analisis,
+            'modelo_usado': modelo,
+        }
+
+    except urllib.error.HTTPError as e:
+        body = ''
+        try:
+            body = e.read().decode('utf-8')[:300]
+        except Exception:
+            pass
+        msg = f'Error HTTP {e.code} de Gemini: {e.reason}. {body}'
+        logger.error(f'[AnalisisSentimiento][Gemini] {msg}')
+        return {'success': False, 'error': msg}
+
+    except urllib.error.URLError as e:
+        msg = f'Error de red al conectar con Gemini: {e.reason}'
+        logger.error(f'[AnalisisSentimiento][Gemini] {msg}')
+        return {'success': False, 'error': msg}
+
+    except TimeoutError:
+        msg = f'Gemini tardó más de {timeout}s en responder. Intenta de nuevo.'
+        logger.error(f'[AnalisisSentimiento][Gemini] Timeout | Modelo: {modelo}')
+        return {'success': False, 'error': msg}
+
+    except json.JSONDecodeError as e:
+        msg = f'Respuesta no válida de Gemini (no es JSON): {e}'
+        logger.error(f'[AnalisisSentimiento][Gemini] {msg}')
+        return {'success': False, 'error': msg}
+
+    except Exception as e:
+        msg = f'Error inesperado en análisis Gemini: {type(e).__name__}: {e}'
+        logger.error(f'[AnalisisSentimiento][Gemini] {msg}', exc_info=True)
+        return {'success': False, 'error': msg}

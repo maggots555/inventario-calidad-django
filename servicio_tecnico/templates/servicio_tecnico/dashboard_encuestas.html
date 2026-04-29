@@ -405,7 +405,14 @@
             </div>
             <div class="d-flex align-items-center gap-2 flex-shrink-0">
                 <span id="iaMetadatos" class="ia-metadatos"></span>
-                <button class="btn btn-ia-sm" id="btnRegenerarIA" title="Regenerar análisis">
+                {% if ai_enabled and ai_models|length > 1 %}
+                <select id="iaModeloSelector" class="form-select form-select-sm ia-modelo-selector" title="Modelo para regenerar">
+                    {% for modelo in ai_models %}
+                    <option value="{{ modelo }}">{{ modelo }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                <button class="btn btn-ia-sm" id="btnRegenerarIA" title="Regenerar análisis con el modelo seleccionado">
                     <i class="bi bi-arrow-clockwise me-1"></i>Regenerar
                 </button>
             </div>
@@ -472,6 +479,8 @@
      data-url-exportar-pdf="{% url 'servicio_tecnico:exportar_encuestas_pdf' %}"
      data-url-analisis-ia="{% url 'servicio_tecnico:api_analisis_sentimiento_ia' %}"
      data-url-detalle="{% url 'servicio_tecnico:detalle_orden' orden_id=0 %}"
+     data-ai-enabled="{{ ai_enabled|yesno:'true,false' }}"
+     data-ai-models="{{ ai_models|join:'||' }}"
 ></div>
 {% endblock %}
 

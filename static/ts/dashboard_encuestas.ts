@@ -114,6 +114,7 @@ class DashboardEncuestas {
     private paginaActual: number = 1;
     private datosResponsables: ResponsableItem[] = [];
     private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private aiModelos: string[] = [];   // Lista de modelos disponibles ([Ollama]/[Gemini])
 
     inicializar(): void {
         const urlsEl = document.getElementById('dashboardUrls');
@@ -131,6 +132,12 @@ class DashboardEncuestas {
             analisisIA: urlsEl.dataset.urlAnalisisIa || '',
         };
         this.urlDetalle = (urlsEl.dataset.urlDetalle || '').replace('/0/', '/{id}/');
+
+        // Leer la lista de modelos IA disponibles (separados por "||" desde Django)
+        const aiModelsRaw = urlsEl.dataset.aiModels || '';
+        this.aiModelos = aiModelsRaw
+            ? aiModelsRaw.split('||').map(m => m.trim()).filter(m => m.length > 0)
+            : [];
 
         this.bindEventos();
         this.cargarTodo();
@@ -196,9 +203,10 @@ class DashboardEncuestas {
             this.cargarAnalisisIA(false);
         });
         document.getElementById('btnRegenerarIA')?.addEventListener('click', () => {
-            if (confirm('¿Regenerar el análisis? Se llamará al modelo de IA nuevamente.')) {
-                this.cargarAnalisisIA(true);
-            }
+            // Leer el modelo elegido en el selector (si existe en el DOM)
+            const selectorEl = document.getElementById('iaModeloSelector') as HTMLSelectElement | null;
+            const modeloElegido = selectorEl ? selectorEl.value : '';
+            this.cargarAnalisisIA(true, modeloElegido);
         });
         document.getElementById('btnReintentarIA')?.addEventListener('click', () => {
             this.cargarAnalisisIA(false);
@@ -859,20 +867,41 @@ class DashboardEncuestas {
 
     /**
      * Llama al endpoint de análisis IA y renderiza la tarjeta con el resultado.
-     * @param forzar - Si true, ignora el caché y solicita un nuevo análisis.
+     * @param forzar        - Si true, ignora el caché y solicita un nuevo análisis.
+     * @param modeloElegido - Modelo con prefijo visual, ej: "[Gemini] gemini-2.0-flash".
+     *                        Si está vacío, el backend usa el modelo por defecto.
      */
-    cargarAnalisisIA(forzar: boolean = false): void {
+    cargarAnalisisIA(forzar: boolean = false, modeloElegido: string = ''): void {
         if (!this.urls.analisisIA) return;
+
+        // Actualizar el texto de "cargando" con el modelo que se está usando
+        const progresoEl = document.getElementById('iaProgreso');
+        if (progresoEl) {
+            const nombreModelo = modeloElegido
+                ? modeloElegido.replace(/^\[Ollama\]\s*|\[Gemini\]\s*/i, '')
+                : (this.aiModelos[0] || 'modelo IA');
+            const esGemini = modeloElegido.toLowerCase().includes('gemini') ||
+                             (!modeloElegido && nombreModelo.toLowerCase().startsWith('gemini'));
+            const proveedor = esGemini ? 'Google Gemini' : 'IA local';
+            progresoEl.innerHTML = (
+                `Procesando encuestas con <strong>${this.escaparHtml(nombreModelo)}</strong> ` +
+                `(${proveedor}). Esto puede tomar unos segundos.`
+            );
+        }
 
         this.mostrarEstadoIA('cargando');
 
         // Obtener el token CSRF del DOM (Django lo pone en un meta tag o en la cookie)
         const csrfToken = this.obtenerCsrfToken();
 
-        const body = {
+        const body: Record<string, unknown> = {
             ...this.obtenerFiltrosJson(),
             forzar,
         };
+        // Solo enviar el modelo si hay uno seleccionado (evita sobrescribir el default)
+        if (modeloElegido) {
+            body['modelo'] = modeloElegido;
+        }
 
         fetch(this.urls.analisisIA, {
             method: 'POST',
@@ -896,7 +925,7 @@ class DashboardEncuestas {
         .catch((err) => {
             console.error('[AnalisisIA] Error de red:', err);
             const errEl = document.getElementById('iaErrorMensaje');
-            if (errEl) errEl.textContent = 'No se pudo conectar con el servidor. Verifica que Ollama esté activo.';
+            if (errEl) errEl.textContent = 'No se pudo conectar con el servidor. Verifica que el servicio de IA esté activo.';
             this.mostrarEstadoIA('error');
         });
     }
