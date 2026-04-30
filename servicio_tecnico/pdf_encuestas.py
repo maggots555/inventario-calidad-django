@@ -934,8 +934,9 @@ def _bloque_comentarios(comentarios: list, estilos: dict) -> list:
             ('BOX', (0, 0), (-1, -1), 0.5, COLOR_GRIS_BORDE),
         ]))
 
-        elementos.append(KeepTogether([info_table, texto_table]))
-        elementos.append(Spacer(1, 2 * mm))
+        elementos.append(info_table)
+        elementos.append(texto_table)
+        elementos.append(Spacer(1, 3 * mm))
 
     return elementos if elementos else [
         Paragraph('No hay comentarios con texto para el período seleccionado.',
@@ -1087,16 +1088,8 @@ def _seccion_analisis_ia(analisis, estilos: dict) -> list:
             return [Paragraph(vacia, st_item)]
         return [Paragraph(f'• {t}', st_item) for t in temas]
 
-    col_pos = (
-        [Paragraph('✓  Aspectos Positivos', st_header_col), Spacer(1, 2 * mm)]
-        + _lista_temas(temas_pos, 'Sin temas positivos identificados.')
-        + [Spacer(1, 3 * mm)]
-    )
-    col_neg = (
-        [Paragraph('⚠  Áreas de Mejora', st_header_col), Spacer(1, 2 * mm)]
-        + _lista_temas(temas_neg, 'Sin áreas de mejora identificadas.')
-        + [Spacer(1, 3 * mm)]
-    )
+    col_pos = [Paragraph('✓  Aspectos Positivos', st_header_col), Spacer(1, 2 * mm)]
+    col_neg = [Paragraph('⚠  Áreas de Mejora', st_header_col), Spacer(1, 2 * mm)]
 
     fila2_tabla = Table(
         [[col_pos, col_neg]],
