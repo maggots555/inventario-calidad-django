@@ -275,6 +275,13 @@ urlpatterns = [
     path('api/pulir-diagnostico-sic/',
          views.pulir_diagnostico_sic_ia,
          name='pulir_diagnostico_sic_ia'),
+
+    # Transcripción de audio a texto para el campo Diagnóstico SIC.
+    # Fallback del servidor cuando Web Speech API no está disponible en el navegador.
+    # Usa Ollama (Whisper) como primer intento y Gemini como respaldo.
+    path('api/transcribir-audio-diagnostico/',
+         views.transcribir_audio_diagnostico,
+         name='transcribir_audio_diagnostico'),
     
     # ========================================================================
     # DASHBOARD DE SEGUIMIENTO DE PIEZAS EN TRÁNSITO (Noviembre 2025)

@@ -774,3 +774,280 @@ def analizar_imagenes_ingreso_gemini(
             exc_info=True,
         )
         return {'success': False, 'error': f'Error inesperado con Gemini: {str(e)}'}
+
+
+# ============================================================================
+# TRANSCRIPCIÓN DE AUDIO — Gemini inline_data
+# ============================================================================
+# Gemini acepta audio como inline_data en el campo "parts" del payload,
+# igual que las imágenes. Se envía en base64 con el MIME type correspondiente.
+# Soporta: audio/wav, audio/webm, audio/mp3, audio/ogg, audio/aac, audio/flac.
+#
+# Modelos compatibles: gemini-2.0-flash, gemini-2.5-flash, gemini-1.5-pro.
+# El modelo recibe el audio y el prompt juntos en el mismo "turn".
+# ============================================================================
+
+import base64 as _base64_audio  # alias para evitar conflicto con import existente
+
+
+def transcribir_audio_gemini(
+    audio_bytes: bytes,
+    audio_content_type: str = "audio/webm",
+    idioma: str = "es",
+    model: str = "",
+) -> dict:
+    """
+    Transcribe audio usando la API de Google Gemini con inline_data.
+
+    Envía el audio como datos base64 incrustados directamente en el payload JSON
+    (inline_data), sin necesidad de subir el archivo a la Files API de Google.
+    Esto mantiene el código simple y sin estado (stateless).
+
+    Args:
+        audio_bytes: Bytes del archivo de audio (WebM, WAV, OGG, MP3)
+        audio_content_type: MIME type del audio (default: audio/webm)
+        idioma: Código de idioma para orientar al modelo (es = español)
+        model: Modelo a usar. Si está vacío, usa GEMINI_MODEL del settings.
+
+    Returns:
+        dict:
+            {'success': True, 'texto': '...transcripción...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...mensaje de error...'}
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Gemini recibe el audio codificado en base64 dentro del payload JSON.
+    El payload tiene esta estructura:
+        contents[0].parts = [
+            {"inline_data": {"mime_type": "audio/webm", "data": "<base64>"}},
+            {"text": "Transcribe este audio al español..."}
+        ]
+    """
+    # ── Verificar configuración ───────────────────────────────────────────────
+    if not getattr(settings, 'GEMINI_ENABLED', False):
+        return {'success': False, 'error': 'Gemini no está habilitado en este entorno.'}
+
+    api_key = getattr(settings, 'GEMINI_API_KEY', '').strip()
+    if not api_key:
+        logger.error("[AudioTranscripcion][Gemini] GEMINI_API_KEY no está configurada.")
+        return {'success': False, 'error': 'La API Key de Gemini no está configurada.'}
+
+    if not audio_bytes:
+        return {'success': False, 'error': 'No se recibieron bytes de audio.'}
+
+    # Usar el modelo recibido como parámetro, o el predeterminado del settings
+    if not model:
+        model = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+    # Si viene con prefijo "[Gemini] ", lo removemos
+    if model.startswith('[Gemini] '):
+        model = model[len('[Gemini] '):]
+
+    timeout = getattr(settings, 'GEMINI_TIMEOUT', 60)
+
+    # ── Codificar audio en base64 ─────────────────────────────────────────────
+    audio_b64 = _base64_audio.b64encode(audio_bytes).decode('utf-8')
+
+    # ── Prompt de transcripción ───────────────────────────────────────────────
+    prompt_transcripcion = (
+        f"Transcribe exactamente lo que se dice en este audio al idioma español (es-MX). "
+        f"Devuelve ÚNICAMENTE el texto transcrito, sin explicaciones, sin comillas, "
+        f"sin encabezados. Si no hay voz, responde con una cadena vacía."
+    )
+
+    # ── Construir el payload JSON ─────────────────────────────────────────────
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "inline_data": {
+                            "mime_type": audio_content_type,
+                            "data": audio_b64,
+                        }
+                    },
+                    {"text": prompt_transcripcion},
+                ]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.0,       # Sin aleatoriedad — transcripción literal
+            "maxOutputTokens": 2048,  # Suficiente para varios minutos de audio
+            "thinkingConfig": {
+                "thinkingBudget": 0   # Sin razonamiento interno para transcripción
+            },
+        },
+    }
+
+    url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
+    url_log = f"{GEMINI_API_BASE}/{model}:generateContent"
+    data = json.dumps(payload).encode('utf-8')
+
+    logger.info(
+        f"[AudioTranscripcion][Gemini] Iniciando transcripción | "
+        f"Modelo: {model} | Audio: {len(audio_bytes)} bytes ({audio_content_type}) | "
+        f"Idioma: {idioma}"
+    )
+
+    try:
+        ctx = ssl.create_default_context()
+        req = urllib.request.Request(
+            url=url,
+            data=data,
+            headers={
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            method='POST',
+        )
+
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as response:
+            response_data = json.loads(response.read().decode('utf-8'))
+
+        # ── Extraer el texto de la respuesta ──────────────────────────────────
+        # Estructura de respuesta Gemini:
+        # response_data['candidates'][0]['content']['parts'][0]['text']
+        candidates = response_data.get('candidates', [])
+        if not candidates:
+            logger.warning(f"[AudioTranscripcion][Gemini] Sin candidatos en respuesta.")
+            return {
+                'success': False,
+                'error': 'Gemini no devolvió ninguna transcripción.',
+            }
+
+        parts = candidates[0].get('content', {}).get('parts', [])
+        texto = ''.join(p.get('text', '') for p in parts).strip()
+
+        if not texto:
+            logger.warning(
+                f"[AudioTranscripcion][Gemini] Transcripción vacía | Modelo: {model}"
+            )
+            return {
+                'success': False,
+                'error': 'Gemini no detectó voz en el audio. '
+                         'Intenta hablar más cerca del micrófono.',
+            }
+
+        logger.info(
+            f"[AudioTranscripcion][Gemini] Transcripción exitosa | "
+            f"Modelo: {model} | Texto: {len(texto)} chars"
+        )
+        return {
+            'success': True,
+            'texto': texto,
+            'modelo_usado': model,
+        }
+
+    except urllib.error.HTTPError as e:
+        try:
+            error_body = e.read().decode('utf-8')
+            error_data = json.loads(error_body)
+            error_msg = error_data.get('error', {}).get('message', error_body)
+        except Exception:
+            error_msg = str(e)
+        logger.error(
+            f"[AudioTranscripcion][Gemini] HTTP {e.code}: {error_msg} | Modelo: {model}"
+        )
+        return {
+            'success': False,
+            'error': f'Gemini devolvió HTTP {e.code}: {error_msg}',
+        }
+
+    except urllib.error.URLError as e:
+        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
+        logger.error(f"[AudioTranscripcion][Gemini] Error de red: {error_msg}")
+        return {
+            'success': False,
+            'error': f'Error de red al conectar con Gemini: {error_msg}',
+        }
+
+    except TimeoutError:
+        logger.error(
+            f"[AudioTranscripcion][Gemini] Timeout después de {timeout}s | Modelo: {model}"
+        )
+        return {
+            'success': False,
+            'error': f'Gemini tardó más de {timeout}s en transcribir el audio.',
+        }
+
+    except json.JSONDecodeError as e:
+        logger.error(f"[AudioTranscripcion][Gemini] Error al parsear JSON: {e}")
+        return {'success': False, 'error': 'Respuesta inválida de la API de Gemini.'}
+
+    except Exception as e:
+        logger.error(
+            f"[AudioTranscripcion][Gemini] Error inesperado: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        return {'success': False, 'error': f'Error inesperado con Gemini: {str(e)}'}
+
+
+def transcribir_audio_gemini_con_fallback(
+    audio_bytes: bytes,
+    audio_content_type: str = "audio/webm",
+    idioma: str = "es",
+) -> dict:
+    """
+    Transcribe audio intentando cada modelo de GEMINI_MODELS en orden hasta que uno funcione.
+
+    Itera sobre la lista GEMINI_MODELS definida en settings (y en el .env).
+    Si un modelo falla por cualquier razón (rate limit, modelo no disponible,
+    error de red, timeout), pasa automáticamente al siguiente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Imagina que tienes varios cajeros en un banco. Si el primero está ocupado o
+    da error, pasas al siguiente. Esto hace el sistema mucho más robusto cuando
+    Gemini tiene picos de tráfico o algún modelo específico está en mantenimiento.
+
+    Args:
+        audio_bytes: Bytes del audio a transcribir
+        audio_content_type: MIME type del audio (audio/webm, audio/wav, etc.)
+        idioma: Código de idioma (es = español)
+
+    Returns:
+        dict con el resultado del primer modelo que respondió con éxito:
+            {'success': True, 'texto': '...', 'modelo_usado': '...', 'intentos': N}
+        O el error del último modelo si todos fallaron:
+            {'success': False, 'error': '...', 'intentos': N}
+    """
+    modelos = getattr(settings, 'GEMINI_MODELS', [])
+
+    # Garantizar que siempre haya al menos el modelo predeterminado
+    if not modelos:
+        modelos = [getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')]
+
+    ultimo_error = 'No hay modelos Gemini configurados en GEMINI_MODELS.'
+    intentos = 0
+
+    for modelo in modelos:
+        intentos += 1
+        logger.info(
+            f"[AudioTranscripcion][Gemini] Intento {intentos}/{len(modelos)} | Modelo: {modelo}"
+        )
+
+        resultado = transcribir_audio_gemini(
+            audio_bytes=audio_bytes,
+            audio_content_type=audio_content_type,
+            idioma=idioma,
+            model=modelo,
+        )
+
+        if resultado['success']:
+            resultado['intentos'] = intentos
+            return resultado
+
+        # Guardar el último error y continuar con el siguiente modelo
+        ultimo_error = resultado.get('error', 'Error desconocido')
+        logger.warning(
+            f"[AudioTranscripcion][Gemini] Modelo '{modelo}' falló "
+            f"({intentos}/{len(modelos)}): {ultimo_error}"
+        )
+
+    # Todos los modelos fallaron
+    logger.error(
+        f"[AudioTranscripcion][Gemini] Todos los modelos fallaron "
+        f"({intentos} intentos). Último error: {ultimo_error}"
+    )
+    return {
+        'success': False,
+        'error': ultimo_error,
+        'intentos': intentos,
+    }

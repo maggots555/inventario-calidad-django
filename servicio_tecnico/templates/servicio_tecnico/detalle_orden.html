@@ -391,15 +391,27 @@
                             <small class="text-muted">{{ form_config.diagnostico_sic.help_text }}</small>
 
                             {% if ollama_enabled %}
-                            {# Botón "Mejorar Diag. con IA" — visible si AI_ENABLED=True en .env #}
-                            {# Disponible con Ollama (local/Tailscale) y/o Google Gemini (nube) #}
-                            {# Se habilita automáticamente cuando el técnico escribe ≥20 caracteres (TypeScript) #}
-                            <div class="mt-2">
+                            {# ── Fila de herramientas IA ─────────────────────────────────────────────── #}
+                            {# Capa 1: Web Speech API (Chrome/Edge/Android) sin backend                  #}
+                            {# Capa 2/3: MediaRecorder → Ollama Whisper / Gemini (fallback)              #}
+                            <div class="mt-2 d-flex gap-2 align-items-stretch" id="vozDiagnosticoWrapper">
+
+                                {# Botón de dictado — ocupa solo lo que necesita #}
+                                <button type="button"
+                                        id="btnVozDiagnostico"
+                                        class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                                        title="Dictar diagnóstico por voz"
+                                        style="min-width: 44px; min-height: 38px; padding: 0 10px;">
+                                    <i class="bi bi-mic"></i>
+                                </button>
+
+                                {# Botón "Mejorar con IA" — ocupa el resto de la fila #}
                                 <button type="button"
                                         id="btnMejorarDiagIA"
-                                        class="btn btn-sm btn-outline-purple w-100"
+                                        class="btn btn-sm btn-outline-purple flex-grow-1"
                                         disabled
                                         title="Escribe el diagnóstico primero (mínimo 20 caracteres)"
+                                        style="min-height: 38px;"
                                         data-tipo-equipo="{{ orden.detalle_equipo.tipo_equipo }}"
                                         data-marca="{{ orden.detalle_equipo.marca }}"
                                         data-modelo="{{ orden.detalle_equipo.modelo }}"
@@ -409,12 +421,28 @@
                                     <i class="bi bi-stars"></i>
                                     Mejorar Diag. con IA
                                 </button>
-                                <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
-                                    <i class="bi bi-info-circle"></i>
-                                    Revisa y mejora la redacción de tu diagnóstico sin cambiar el contenido técnico.
-                                </small>
                             </div>
+
+                            {# Indicador de estado de grabación / errores de voz #}
+                            <small id="vozDiagnosticoIndicador"
+                                   class="text-muted mt-1"
+                                   style="display: none; font-size: 0.78rem;">
+                                Escuchando...
+                            </small>
+
+                            {# Hint del botón Mejorar #}
+                            <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+                                <i class="bi bi-info-circle"></i>
+                                Revisa y mejora la redacción del diagnóstico sin cambiar el contenido técnico.
+                            </small>
                             {% endif %}
+
+                            {# ── Guardar Configuración ───────────────────────────────────────────────── #}
+                            <div class="d-grid mt-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save"></i> Guardar Configuración
+                                </button>
+                            </div>
                         </div>
                         
                         <!-- ===================================== -->
@@ -541,11 +569,6 @@
                             </div>
                         </div>
                         
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-save"></i> Guardar Configuración
-                            </button>
-                        </div>
                     </form>
                     
                     <!-- BOTÓN: Enviar Diagnóstico al Cliente -->
@@ -6878,6 +6901,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Script de Ollama SIC — compilado desde static/ts/ollama_sic.ts -->
 <script src="{% static 'js/ollama_sic.js' %}"></script>
+
+<!-- Script de dictado por voz — compilado desde static/ts/voz_diagnostico.ts -->
+<script src="{% static 'js/voz_diagnostico.js' %}"></script>
 {% endif %}
 
 {% endblock %}

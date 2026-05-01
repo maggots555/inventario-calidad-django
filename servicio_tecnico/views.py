@@ -17614,3 +17614,152 @@ def chat_seguimiento_cliente(request, token):
             'success': False,
             'error': resultado.get('error', 'Error desconocido del asistente.')
         })
+
+
+# ============================================================================
+# VISTA AJAX: transcribir_audio_diagnostico
+# Endpoint que recibe un archivo de audio grabado por el técnico en el campo
+# Diagnóstico SIC y lo transcribe usando IA (Ollama Whisper o Gemini).
+#
+# FLUJO:
+# 1. El navegador graba audio con MediaRecorder (WebM/OGG/MP4 según soporte)
+# 2. Si Web Speech API funcionó en el cliente, NO llega aquí (se maneja en JS)
+# 3. Si Web Speech API no está disponible, el cliente envía el audio aquí
+# 4. Esta vista detecta el proveedor disponible:
+#    - OLLAMA_ENABLED=True  → usa transcribir_audio_ollama() (Whisper vía Ollama)
+#    - GEMINI_ENABLED=True  → usa transcribir_audio_gemini() como fallback
+# 5. Devuelve JSON con el texto transcrito
+#
+# Endpoint: POST /api/transcribir-audio-diagnostico/
+# Recibe:  archivo 'audio' (multipart), campo 'idioma' (opcional, default 'es')
+# Devuelve: {'success': True, 'texto': '...', 'proveedor': '...'}
+#           {'success': False, 'error': '...mensaje...'}
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def transcribir_audio_diagnostico(request):
+    """
+    API AJAX: Transcribe un audio a texto usando Ollama (Whisper) o Gemini.
+
+    Este endpoint es el fallback del lado servidor cuando el navegador no
+    soporta la Web Speech API (principalmente Firefox y algunos Android).
+
+    Recibe vía POST (multipart/form-data):
+        - audio (File): Archivo de audio grabado (WebM, OGG, MP4, WAV)
+        - idioma (str, opcional): Código de idioma (default: 'es')
+
+    Devuelve JSON:
+        {'success': True, 'texto': '...transcripcion...', 'proveedor': 'ollama'|'gemini'}
+        {'success': False, 'error': '...mensaje de error amigable...'}
+    """
+    ollama_enabled = getattr(settings, 'OLLAMA_ENABLED', False)
+    gemini_enabled = getattr(settings, 'GEMINI_ENABLED', False)
+
+    # Verificar que al menos un proveedor de IA está habilitado
+    if not (ollama_enabled or gemini_enabled):
+        return JsonResponse({
+            'success': False,
+            'error': 'La transcripción de audio no está habilitada en este entorno.'
+        }, status=403)
+
+    # Validar que llegó el archivo de audio
+    audio_file = request.FILES.get('audio')
+    if not audio_file:
+        return JsonResponse({
+            'success': False,
+            'error': 'No se recibió ningún archivo de audio.'
+        }, status=400)
+
+    # Límite de tamaño: 25 MB (audios de diagnóstico son cortos, < 2 minutos)
+    MAX_SIZE_BYTES = 25 * 1024 * 1024
+    if audio_file.size > MAX_SIZE_BYTES:
+        return JsonResponse({
+            'success': False,
+            'error': 'El audio es demasiado grande. Máximo permitido: 25 MB.'
+        }, status=400)
+
+    idioma = request.POST.get('idioma', 'es').strip()
+
+    # Leer el contenido binario del archivo
+    audio_bytes = audio_file.read()
+    audio_nombre = audio_file.name or 'audio.webm'
+    audio_content_type = audio_file.content_type or 'audio/webm'
+
+    logger.info(
+        f"[AudioDiag] Solicitud de transcripción | Usuario: {request.user.username} | "
+        f"Archivo: {audio_nombre} | Tamaño: {len(audio_bytes)} bytes | Idioma: {idioma}"
+    )
+
+    import time as _time
+
+    # --- Intento 1: Ollama (Whisper local) ---
+    if ollama_enabled:
+        from .ollama_client import transcribir_audio_ollama
+        _t = _time.monotonic()
+        resultado = transcribir_audio_ollama(
+            audio_bytes=audio_bytes,
+            audio_filename=audio_nombre,
+            audio_content_type=audio_content_type,
+            idioma=idioma,
+        )
+        tiempo_ms = int((_time.monotonic() - _t) * 1000)
+
+        if resultado['success']:
+            logger.info(
+                f"[AudioDiag] Transcripción OK (Ollama) | {tiempo_ms}ms | "
+                f"Chars: {len(resultado.get('texto', ''))}"
+            )
+            return JsonResponse({
+                'success': True,
+                'texto': resultado['texto'],
+                'proveedor': 'ollama',
+                'tiempo_ms': tiempo_ms,
+            })
+        else:
+            # Ollama falló — intentar con Gemini si está disponible
+            logger.warning(
+                f"[AudioDiag] Ollama falló, intentando Gemini | Error: {resultado.get('error')}"
+            )
+
+    # --- Intento 2: Gemini con fallback por modelos (GEMINI_MODELS) ---
+    # Si el primer modelo falla (rate limit, tráfico, mantenimiento),
+    # transcribir_audio_gemini_con_fallback prueba automáticamente cada modelo
+    # de GEMINI_MODELS en orden hasta que uno responda con éxito.
+    if gemini_enabled:
+        from .gemini_client import transcribir_audio_gemini_con_fallback
+        _t = _time.monotonic()
+        resultado = transcribir_audio_gemini_con_fallback(
+            audio_bytes=audio_bytes,
+            audio_content_type=audio_content_type,
+            idioma=idioma,
+        )
+        tiempo_ms = int((_time.monotonic() - _t) * 1000)
+
+        if resultado['success']:
+            logger.info(
+                f"[AudioDiag] Transcripción OK (Gemini/{resultado.get('modelo_usado')}) | "
+                f"{tiempo_ms}ms | Intentos: {resultado.get('intentos', 1)} | "
+                f"Chars: {len(resultado.get('texto', ''))}"
+            )
+            return JsonResponse({
+                'success': True,
+                'texto': resultado['texto'],
+                'proveedor': 'gemini',
+                'tiempo_ms': tiempo_ms,
+            })
+        else:
+            logger.error(
+                f"[AudioDiag] Gemini agotó todos los modelos ({resultado.get('intentos', '?')} intentos) | "
+                f"Error: {resultado.get('error')}"
+            )
+            return JsonResponse({
+                'success': False,
+                'error': resultado.get('error', 'Error al transcribir con Gemini.')
+            })
+
+    # Si Ollama fue el único proveedor y falló, devolvemos su error
+    return JsonResponse({
+        'success': False,
+        'error': 'No se pudo transcribir el audio. Intenta de nuevo o escribe el diagnóstico manualmente.'
+    })

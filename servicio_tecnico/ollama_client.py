@@ -1530,3 +1530,295 @@ def analizar_imagenes_ingreso_dispatch(
         'success': False,
         'error': 'No se pudo conectar con ningún proveedor de IA disponible.',
     }
+
+
+# ============================================================================
+# TRANSCRIPCIÓN DE AUDIO — Endpoint OpenAI-compatible de Ollama
+# ============================================================================
+# Ollama 0.21+ expone /v1/audio/transcriptions compatible con OpenAI Whisper API.
+# Los modelos gemma4:e2b y gemma4:e4b incluyen un encoder de audio (~300M params)
+# que permite transcribir voz directamente sin necesidad de un modelo separado.
+#
+# Flujo:
+#   1. El frontend graba audio con MediaRecorder (audio/webm o audio/wav)
+#   2. Django recibe el blob, lo reenvía a Ollama como multipart/form-data
+#   3. Ollama procesa con el encoder de audio del modelo configurado
+#   4. Se devuelve {"text": "...transcripción..."} al frontend
+# ============================================================================
+
+
+def _convertir_a_wav_con_ffmpeg(
+    audio_bytes: bytes,
+    audio_filename: str,
+) -> tuple:
+    """
+    Convierte audio de cualquier formato (WebM, OGG, MP4) a WAV PCM 16-bit mono
+    usando ffmpeg instalado en el sistema.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    gemma4:e4b acepta solo audio WAV (sin comprimir). Firefox y algunos Android
+    graban en WebM/Opus u OGG/Opus que son formatos comprimidos. Esta función
+    usa ffmpeg para convertir esos bytes en memoria (sin tocar el disco) a WAV.
+
+    Args:
+        audio_bytes: Bytes del audio original (cualquier formato)
+        audio_filename: Nombre original del archivo (para los logs)
+
+    Returns:
+        Tupla (bytes_wav, nombre_wav, content_type_wav).
+        Si la conversión falla, devuelve los bytes originales sin modificar
+        junto con el nombre y content_type originales.
+    """
+    import subprocess
+    import io
+
+    logger.info(
+        f"[AudioTranscripcion][Ollama] Convirtiendo a WAV | "
+        f"Archivo: {audio_filename} | Tamaño original: {len(audio_bytes)} bytes"
+    )
+
+    try:
+        # ffmpeg lee desde stdin (-i pipe:0) y escribe a stdout (pipe:1)
+        # -ar 16000: sample rate de 16 kHz (óptimo para modelos de voz)
+        # -ac 1:     mono (un canal)
+        # -f wav:    forzar formato WAV en la salida
+        # -acodec pcm_s16le: PCM 16-bit little-endian (estándar WAV sin comprimir)
+        # -loglevel error: suprimir mensajes informativos de ffmpeg (solo errores)
+        proceso = subprocess.run(
+            [
+                'ffmpeg',
+                '-loglevel', 'error',
+                '-i', 'pipe:0',       # entrada desde stdin
+                '-ar', '16000',       # 16 kHz
+                '-ac', '1',           # mono
+                '-f', 'wav',
+                '-acodec', 'pcm_s16le',
+                'pipe:1',             # salida a stdout
+            ],
+            input=audio_bytes,
+            capture_output=True,
+            timeout=30,
+        )
+
+        if proceso.returncode != 0:
+            stderr_msg = proceso.stderr.decode('utf-8', errors='replace').strip()
+            logger.warning(
+                f"[AudioTranscripcion][Ollama] ffmpeg falló (código {proceso.returncode}): "
+                f"{stderr_msg[:300]}"
+            )
+            # Devolver el audio original — Ollama intentará procesarlo de todos modos
+            return audio_bytes, audio_filename, 'audio/webm'
+
+        wav_bytes = proceso.stdout
+        if not wav_bytes:
+            logger.warning("[AudioTranscripcion][Ollama] ffmpeg no produjo salida WAV")
+            return audio_bytes, audio_filename, 'audio/webm'
+
+        nombre_wav = audio_filename.rsplit('.', 1)[0] + '.wav'
+        logger.info(
+            f"[AudioTranscripcion][Ollama] Conversión WAV exitosa | "
+            f"{len(audio_bytes)} bytes → {len(wav_bytes)} bytes WAV"
+        )
+        return wav_bytes, nombre_wav, 'audio/wav'
+
+    except subprocess.TimeoutExpired:
+        logger.warning("[AudioTranscripcion][Ollama] ffmpeg tardó más de 30s — usando audio original")
+        return audio_bytes, audio_filename, 'audio/webm'
+
+    except FileNotFoundError:
+        logger.warning("[AudioTranscripcion][Ollama] ffmpeg no está instalado — usando audio original")
+        return audio_bytes, audio_filename, 'audio/webm'
+
+    except Exception as e:
+        logger.warning(
+            f"[AudioTranscripcion][Ollama] Error inesperado en conversión ffmpeg: "
+            f"{type(e).__name__}: {e}"
+        )
+        return audio_bytes, audio_filename, 'audio/webm'
+
+def transcribir_audio_ollama(
+    audio_bytes: bytes,
+    audio_filename: str = "audio.webm",
+    audio_content_type: str = "audio/webm",
+    idioma: str = "es",
+) -> dict:
+    """
+    Transcribe audio usando el endpoint OpenAI-compatible de Ollama.
+
+    Usa el endpoint POST /v1/audio/transcriptions con multipart/form-data,
+    compatible con la especificación de OpenAI Whisper API. Los modelos
+    gemma4:e2b y gemma4:e4b tienen capacidades de audio nativas.
+
+    Args:
+        audio_bytes: Bytes del archivo de audio (WebM, WAV, OGG, MP3)
+        audio_filename: Nombre del archivo para el campo multipart (incluye extensión)
+        audio_content_type: MIME type del audio (audio/webm, audio/wav, etc.)
+        idioma: Código de idioma ISO 639-1 (es = español, default)
+
+    Returns:
+        dict con estructura:
+            {'success': True, 'texto': '...transcripción...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...mensaje de error...'}
+    """
+    import urllib.request
+    import urllib.error
+    import uuid
+
+    # ── Verificar que Ollama está habilitado ──────────────────────────────────
+    if not getattr(settings, 'OLLAMA_ENABLED', False):
+        return {'success': False, 'error': 'Ollama no está habilitado en este entorno.'}
+
+    if not audio_bytes:
+        return {'success': False, 'error': 'No se recibieron bytes de audio.'}
+
+    base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434')
+    model = getattr(settings, 'OLLAMA_MODEL', 'gemma4:e4b')
+    timeout = getattr(settings, 'OLLAMA_TIMEOUT', 120)
+
+    # ── Convertir a WAV si el formato no es WAV ───────────────────────────────
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # gemma4:e4b (el modelo de audio de Ollama) solo acepta audio sin comprimir
+    # en formato WAV (PCM 16-bit). Firefox graba en WebM/Opus y algunos dispositivos
+    # en OGG/Opus o MP4/AAC — todos necesitan convertirse a WAV primero.
+    # Usamos ffmpeg (instalado en el sistema) para hacer la conversión en memoria,
+    # sin guardar ningún archivo en disco.
+    formato_origen = audio_content_type.lower()
+    if 'wav' not in formato_origen and 'x-wav' not in formato_origen:
+        audio_bytes, audio_filename, audio_content_type = _convertir_a_wav_con_ffmpeg(
+            audio_bytes=audio_bytes,
+            audio_filename=audio_filename,
+        )
+        # Si la conversión falló, _convertir_a_wav_con_ffmpeg devuelve los bytes
+        # originales intactos y registra el error — seguimos intentando de todas formas
+
+    # Construir el endpoint compatible con OpenAI Whisper
+    endpoint = f"{base_url.rstrip('/')}/v1/audio/transcriptions"
+
+    # ── Construir multipart/form-data manualmente (sin dependencias externas) ─
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # multipart/form-data es el formato que usan los formularios HTML con archivos.
+    # Cada "campo" del formulario se separa con un boundary (cadena aleatoria única).
+    # Los campos de texto van como texto plano; el archivo va como bytes binarios.
+    boundary = f"------FormBoundary{uuid.uuid4().hex}"
+
+    body_parts = []
+
+    # Campo: model
+    body_parts.append(
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="model"\r\n\r\n'
+        f'{model}\r\n'.encode('utf-8')
+    )
+
+    # Campo: language (código ISO 639-1)
+    body_parts.append(
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="language"\r\n\r\n'
+        f'{idioma}\r\n'.encode('utf-8')
+    )
+
+    # Campo: response_format
+    body_parts.append(
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="response_format"\r\n\r\n'
+        f'json\r\n'.encode('utf-8')
+    )
+
+    # Campo: file (el audio binario)
+    body_parts.append(
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="file"; filename="{audio_filename}"\r\n'
+        f'Content-Type: {audio_content_type}\r\n\r\n'.encode('utf-8')
+        + audio_bytes
+        + b'\r\n'
+    )
+
+    # Cierre del multipart
+    body_parts.append(f'--{boundary}--\r\n'.encode('utf-8'))
+
+    body = b''.join(body_parts)
+
+    headers = {
+        'Content-Type': f'multipart/form-data; boundary={boundary}',
+        'Content-Length': str(len(body)),
+    }
+
+    logger.info(
+        f"[AudioTranscripcion][Ollama] Iniciando transcripción | "
+        f"Modelo: {model} | Audio: {len(audio_bytes)} bytes ({audio_content_type}) | "
+        f"Idioma: {idioma}"
+    )
+
+    try:
+        req = urllib.request.Request(endpoint, data=body, headers=headers, method='POST')
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            respuesta_raw = resp.read().decode('utf-8')
+            datos = json.loads(respuesta_raw)
+
+        # La respuesta es {"text": "...transcripción..."} (formato OpenAI)
+        texto = datos.get('text', '').strip()
+
+        if not texto:
+            logger.warning(
+                f"[AudioTranscripcion][Ollama] Transcripción vacía | "
+                f"Respuesta completa: {respuesta_raw[:200]}"
+            )
+            return {
+                'success': False,
+                'error': 'El modelo no detectó voz en el audio grabado. '
+                         'Intenta hablar más cerca del micrófono o en un lugar silencioso.',
+            }
+
+        logger.info(
+            f"[AudioTranscripcion][Ollama] Transcripción exitosa | "
+            f"Modelo: {model} | Texto: {len(texto)} chars"
+        )
+        return {
+            'success': True,
+            'texto': texto,
+            'modelo_usado': model,
+        }
+
+    except urllib.error.HTTPError as e:
+        try:
+            error_body = e.read().decode('utf-8')
+        except Exception:
+            error_body = str(e)
+        logger.error(
+            f"[AudioTranscripcion][Ollama] HTTP {e.code}: {error_body} | Modelo: {model}"
+        )
+        return {
+            'success': False,
+            'error': f'Ollama devolvió un error HTTP {e.code}. '
+                     f'Verifica que el modelo {model} soporta audio.',
+        }
+
+    except urllib.error.URLError as e:
+        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
+        logger.error(f"[AudioTranscripcion][Ollama] Error de red: {error_msg}")
+        return {
+            'success': False,
+            'error': f'No se pudo conectar con Ollama. '
+                     f'Verifica que el servidor esté corriendo en {base_url}.',
+        }
+
+    except TimeoutError:
+        logger.error(
+            f"[AudioTranscripcion][Ollama] Timeout después de {timeout}s | Modelo: {model}"
+        )
+        return {
+            'success': False,
+            'error': f'Ollama tardó más de {timeout}s en transcribir. '
+                     f'El audio puede ser muy largo o el servidor está ocupado.',
+        }
+
+    except json.JSONDecodeError as e:
+        logger.error(f"[AudioTranscripcion][Ollama] Error al parsear respuesta JSON: {e}")
+        return {'success': False, 'error': 'Respuesta inválida de Ollama al transcribir audio.'}
+
+    except Exception as e:
+        logger.error(
+            f"[AudioTranscripcion][Ollama] Error inesperado: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        return {'success': False, 'error': f'Error inesperado al transcribir con Ollama: {str(e)}'}
