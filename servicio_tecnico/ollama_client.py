@@ -1571,10 +1571,19 @@ def _convertir_a_wav_con_ffmpeg(
     """
     import subprocess
     import io
+    import shutil
+
+    # Resolver la ruta absoluta de ffmpeg.
+    # Cuando Django corre como servicio (gunicorn/systemd), el PATH del proceso
+    # puede ser más restrictivo que el del shell del usuario, por lo que
+    # 'ffmpeg' como nombre simple puede no encontrarse. shutil.which() lo
+    # busca en el PATH real del proceso; si falla, usamos la ruta conocida.
+    ffmpeg_bin = shutil.which('ffmpeg') or '/usr/bin/ffmpeg'
 
     logger.info(
         f"[AudioTranscripcion][Ollama] Convirtiendo a WAV | "
-        f"Archivo: {audio_filename} | Tamaño original: {len(audio_bytes)} bytes"
+        f"Archivo: {audio_filename} | Tamaño original: {len(audio_bytes)} bytes | "
+        f"ffmpeg: {ffmpeg_bin}"
     )
 
     try:
@@ -1586,7 +1595,7 @@ def _convertir_a_wav_con_ffmpeg(
         # -loglevel error: suprimir mensajes informativos de ffmpeg (solo errores)
         proceso = subprocess.run(
             [
-                'ffmpeg',
+                ffmpeg_bin,
                 '-loglevel', 'error',
                 '-i', 'pipe:0',       # entrada desde stdin
                 '-ar', '16000',       # 16 kHz
