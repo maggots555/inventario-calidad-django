@@ -6685,6 +6685,9 @@ def enviar_imagenes_cliente(request, orden_id):
         destinatarios_copia = list(set(copia_empleados + copia_tecnico))
         
         mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
+
+        # Modelo IA elegido en el selector del modal (vacío = automático)
+        modelo_ia_inspeccion = request.POST.get('modelo_ia_inspeccion', '').strip()
         
         # =======================================================================
         # PASO 4: DISPARAR TAREA CELERY EN SEGUNDO PLANO
@@ -6700,6 +6703,7 @@ def enviar_imagenes_cliente(request, orden_id):
             destinatarios_copia=destinatarios_copia,
             mensaje_personalizado=mensaje_personalizado,
             usuario_id=usuario_id,
+            modelo_ia_inspeccion=modelo_ia_inspeccion,
         )
         
         # ── Disparar envío de enlace de seguimiento (solo fuera de garantía) ──

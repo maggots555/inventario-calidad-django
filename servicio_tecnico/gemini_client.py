@@ -553,3 +553,224 @@ def analizar_sentimiento_encuestas(
         msg = f'Error inesperado en análisis Gemini: {type(e).__name__}: {e}'
         logger.error(f'[AnalisisSentimiento][Gemini] {msg}', exc_info=True)
         return {'success': False, 'error': msg}
+
+
+# ===========================================================================
+# INSPECTOR VISUAL DE INGRESO — Análisis estético de imágenes via Gemini
+# ===========================================================================
+#
+# Función equivalente a analizar_imagenes_ingreso_ollama() de ollama_client.py
+# pero usando la API REST de Google Gemini.
+# Se usa como FALLBACK cuando Ollama no está disponible o falla.
+#
+# Gemini soporta visión nativa en todos sus modelos actuales (flash y pro).
+# Las imágenes se envían como inline_data en el campo "parts" del payload.
+#
+# IMPORTANTE: Reutiliza PROMPT_INSPECCION_ESTETICA de ollama_client para
+# garantizar coherencia entre proveedores — mismo prompt, misma calidad.
+
+import base64 as _base64  # alias para no pisar nombres locales
+
+
+def analizar_imagenes_ingreso_gemini(
+    imagenes_bytes: list[bytes],
+    tipo_equipo: str = "",
+    marca: str = "",
+    modelo_equipo: str = "",
+    modelo_override: str = "",
+) -> dict:
+    """
+    Envía imágenes de ingreso a la API de Google Gemini para obtener un análisis
+    consolidado del estado estético del equipo.
+
+    Usa urllib.request (stdlib) — sin SDK externo ni dependencias adicionales.
+    Las imágenes se envían como inline_data en base64 dentro del payload JSON.
+
+    Args:
+        imagenes_bytes: Lista de bytes de imágenes JPEG ya comprimidas por Pillow.
+                        Se toman hasta OLLAMA_MAX_IMAGENES_IA imágenes.
+        tipo_equipo:    Tipo de equipo para contextualizar el prompt.
+        marca:          Marca del equipo.
+        modelo_equipo:  Modelo específico del equipo.
+
+    Returns:
+        dict:
+            {'success': True,  'analisis': '...texto...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...mensaje...'}
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Gemini recibe las imágenes en el campo "parts" del payload. Cada imagen es
+    un objeto {"inline_data": {"mime_type": "image/jpeg", "data": "<base64>"}}
+    junto con el texto del prompt en el mismo array de parts.
+    """
+    # Importar el prompt desde ollama_client para no duplicar la definición.
+    # Mismo prompt → mismo estándar de respuesta entre Ollama y Gemini.
+    from .ollama_client import PROMPT_INSPECCION_ESTETICA
+
+    if not imagenes_bytes:
+        return {'success': False, 'error': 'No se proporcionaron imágenes para analizar.'}
+
+    if not getattr(settings, 'GEMINI_ENABLED', False):
+        return {'success': False, 'error': 'Gemini no está habilitado en este entorno.'}
+
+    api_key = getattr(settings, 'GEMINI_API_KEY', '').strip()
+    if not api_key:
+        logger.error("[InspeccionIA][Gemini] GEMINI_API_KEY no está configurada.")
+        return {'success': False, 'error': 'GEMINI_API_KEY no configurada.'}
+
+    model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+    # Para visión usamos el mismo timeout que Ollama vision: más generoso
+    # porque el payload de imágenes es más grande y la red puede ser el cuello.
+    timeout = getattr(settings, 'OLLAMA_VISION_TIMEOUT', 600)
+    max_imgs = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
+
+    imagenes_limitadas = imagenes_bytes[:max_imgs]
+
+    # Construir prompt con contexto del equipo
+    tipo_eq = tipo_equipo.strip() or 'equipo'
+    marca_eq = marca.strip() or ''
+    modelo_eq = modelo_equipo.strip() or ''
+    prompt_texto = PROMPT_INSPECCION_ESTETICA.format(
+        n_imagenes=len(imagenes_limitadas),
+        tipo_equipo=tipo_eq,
+        marca=marca_eq,
+        modelo_equipo=modelo_eq,
+    ).strip()
+
+    # ── Construir los "parts" del payload ────────────────────────────────────
+    # Gemini recibe: [texto_del_prompt, imagen_1, imagen_2, ..., imagen_N]
+    # Cada imagen es un objeto inline_data con mime_type y data (base64).
+    parts = [{"text": prompt_texto}]
+    for img_bytes in imagenes_limitadas:
+        parts.append({
+            "inline_data": {
+                "mime_type": "image/jpeg",
+                "data": _base64.b64encode(img_bytes).decode('utf-8'),
+            }
+        })
+
+    payload = {
+        "contents": [
+            {
+                "parts": parts,
+            }
+        ],
+        "generationConfig": {
+            # Temperatura muy baja = descripciones objetivas (igual que Ollama)
+            "temperature": 0.15,
+            "topP": 0.9,
+            "maxOutputTokens": 2048,
+            # thinkingBudget=-1: permite al modelo decidir cuánto razonamiento
+            # interno necesita (modo dinámico). Para inspección visual esto es
+            # ideal — el modelo puede tomarse más tiempo examinando cada zona
+            # antes de comprometerse con una descripción. Sin thinking, tiende a
+            # generar descripciones superficiales o asumir detalles no visibles.
+            # (En modelos 2.0 y anteriores este campo se ignora silenciosamente)
+            "thinkingConfig": {"thinkingBudget": -1},
+        },
+    }
+
+    url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
+    url_log = f"{GEMINI_API_BASE}/{model}:generateContent"
+    data = json.dumps(payload).encode('utf-8')
+
+    logger.info(
+        f"[InspeccionIA][Gemini] Iniciando análisis visual | "
+        f"Modelo: {model} | Imágenes: {len(imagenes_limitadas)} | "
+        f"Equipo: {marca_eq} {modelo_eq} | Timeout: {timeout}s | "
+        f"URL: {url_log}"
+    )
+
+    try:
+        ctx = ssl.create_default_context()
+        req = urllib.request.Request(
+            url=url,
+            data=data,
+            headers={
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            method='POST',
+        )
+
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as response:
+            response_data = json.loads(response.read().decode('utf-8'))
+
+        # Verificar bloqueo por safety filters de Google
+        feedback = response_data.get('promptFeedback', {})
+        block_reason = feedback.get('blockReason', '')
+        if block_reason:
+            logger.warning(f"[InspeccionIA][Gemini] Respuesta bloqueada por safety: {block_reason}")
+            return {
+                'success': False,
+                'error': f'Gemini bloqueó la solicitud por filtros de seguridad: {block_reason}',
+            }
+
+        candidates = response_data.get('candidates', [])
+        if not candidates:
+            logger.warning("[InspeccionIA][Gemini] Respuesta vacía — sin candidatos.")
+            return {'success': False, 'error': 'Gemini devolvió una respuesta vacía.'}
+
+        finish_reason = candidates[0].get('finishReason', 'STOP')
+        if finish_reason == 'SAFETY':
+            logger.warning(f"[InspeccionIA][Gemini] finishReason=SAFETY | Modelo: {model}")
+            return {
+                'success': False,
+                'error': 'Gemini bloqueó la respuesta por políticas de seguridad.',
+            }
+
+        analisis = (
+            candidates[0]
+            .get('content', {})
+            .get('parts', [{}])[0]
+            .get('text', '')
+            .strip()
+        )
+
+        if not analisis:
+            logger.warning("[InspeccionIA][Gemini] Texto extraído vacío.")
+            return {'success': False, 'error': 'Gemini devolvió una respuesta vacía.'}
+
+        logger.info(
+            f"[InspeccionIA][Gemini] Análisis completado | "
+            f"{len(analisis)} chars | Modelo: {model} | finishReason: {finish_reason}"
+        )
+        return {
+            'success': True,
+            'analisis': analisis,
+            'modelo_usado': model,
+        }
+
+    except urllib.error.HTTPError as e:
+        error_body = ''
+        try:
+            error_body = e.read().decode('utf-8')
+            error_json = json.loads(error_body)
+            error_msg = error_json.get('error', {}).get('message', str(e))
+        except Exception:
+            error_msg = error_body or str(e)
+        logger.error(f"[InspeccionIA][Gemini] HTTP {e.code}: {error_msg} | Modelo: {model}")
+        return {'success': False, 'error': f'Error HTTP {e.code} de Gemini: {error_msg}'}
+
+    except urllib.error.URLError as e:
+        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
+        logger.error(f"[InspeccionIA][Gemini] Error de red: {error_msg}")
+        return {'success': False, 'error': f'Error de red al conectar con Gemini: {error_msg}'}
+
+    except TimeoutError:
+        logger.error(f"[InspeccionIA][Gemini] Timeout después de {timeout}s | Modelo: {model}")
+        return {
+            'success': False,
+            'error': f'Gemini tardó más de {timeout}s en responder.',
+        }
+
+    except json.JSONDecodeError as e:
+        logger.error(f"[InspeccionIA][Gemini] Error al parsear respuesta JSON: {e}")
+        return {'success': False, 'error': 'Respuesta inválida de la API de Gemini.'}
+
+    except Exception as e:
+        logger.error(
+            f"[InspeccionIA][Gemini] Error inesperado: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        return {'success': False, 'error': f'Error inesperado con Gemini: {str(e)}'}

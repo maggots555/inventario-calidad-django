@@ -1181,3 +1181,352 @@ def analizar_sentimiento_dispatch(
             f'[AnalisisSentimiento][Dispatch] Usando Ollama → {nombre_limpio}'
         )
         return analizar_sentimiento_encuestas(encuestas=encuestas, modelo=nombre_limpio)
+
+
+# ===========================================================================
+# INSPECTOR VISUAL DE INGRESO — Análisis estético de imágenes con IA
+# ===========================================================================
+#
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Esta sección implementa una nueva capacidad: enviar las fotos de ingreso de
+# un equipo al modelo de IA para que describa su condición estética. El análisis
+# se incluye automáticamente en el correo de notificación al cliente.
+#
+# Flujo completo:
+#   1. Celery toma los bytes de las imágenes ya comprimidas por Pillow
+#   2. Los convierte a base64 (formato que entiende Ollama/Gemini)
+#   3. Los envía junto con un prompt de inspección técnica
+#   4. El modelo responde con una descripción consolidada del estado estético
+#   5. Esa descripción se guarda en el historial y se adjunta al correo
+#
+# El análisis es NO CRÍTICO: si falla por cualquier motivo (timeout, modelo
+# ocupado, error de red), el correo se envía igual sin la sección de IA.
+#
+# MODELOS COMPATIBLES:
+#   Ollama: gemma4:e4b, gemma4:e2b (ambos soportan visión de forma nativa)
+#   Gemini: gemini-2.0-flash, gemini-2.5-flash-lite (soporte de visión completo)
+#
+# LÍMITE DE IMÁGENES:
+#   Configurable via OLLAMA_MAX_IMAGENES_IA (default: 8).
+#   gemma4 tiene 128K tokens de contexto — 8 imágenes ≈ 16K tokens (12% del límite).
+
+
+import base64 as _base64  # alias para no pisar posibles nombres locales
+
+# ── Prompt de inspección estética ───────────────────────────────────────────
+# Diseñado para un inspector técnico en un centro de servicio. El prompt es
+# deliberadamente estricto: solo describe lo que VE, nunca especula sobre causas
+# o diagnósticos. El resultado es un párrafo fluido apto para correo corporativo.
+PROMPT_INSPECCION_ESTETICA = """\
+Eres un inspector técnico especializado en recepción de equipos electrónicos \
+en un centro de servicio profesional. Tu función es redactar el reporte de \
+condición estética del equipo al momento de su ingreso al taller.
+
+Se te proporcionan {n_imagenes} fotografía(s) del {tipo_equipo} {marca} {modelo_equipo}.
+
+REGLAS DE OBSERVACIÓN — NUNCA las violes:
+1. Describe ÚNICAMENTE lo que puedes ver con total claridad en las imágenes.
+2. Si algo no se aprecia con certeza, OMÍTELO. Un reporte corto y preciso es \
+superior a uno largo con información dudosa.
+3. NUNCA uses lenguaje de cobertura: prohibido escribir "parece", "aparenta", \
+"podría", "es posible", "parecen", "se observan en su sitio" ni ninguna expresión \
+que indique incertidumbre. Si no lo ves con claridad, no lo escribas.
+4. NUNCA listes ausencias de daños ("no presenta golpes", "sin fisuras visibles", \
+"no se detectan marcas"). Solo documenta lo que SÍ está presente y es observable.
+5. No menciones componentes que se ven en estado normal sin nada notable que \
+reportar. Que las teclas estén en su lugar o que los puertos no tengan daños obvios \
+no aporta valor al reporte — omítelos si no hay nada específico que señalar.
+6. Para cada daño o marca que reportes, especifica: zona exacta del equipo, \
+severidad aproximada (superficial / moderado / severo) y extensión si es apreciable.
+7. Tono formal, tercera persona, lenguaje técnico pero comprensible.
+8. Escribe un único párrafo fluido, sin listas ni encabezados. Puede ser corto \
+si hay pocas observaciones relevantes — la brevedad con precisión es la meta.
+9. Si el equipo presenta buen estado general sin daños notables, indícalo en \
+una sola oración directa y concisa.
+10. Responde ÚNICAMENTE con el párrafo del reporte. Sin prefijos, sin títulos, \
+sin "Reporte:", sin comillas.\
+"""
+
+
+def analizar_imagenes_ingreso_ollama(
+    imagenes_bytes: list[bytes],
+    tipo_equipo: str = "",
+    marca: str = "",
+    modelo_equipo: str = "",
+    modelo_override: str = "",
+) -> dict:
+    """
+    Envía imágenes de ingreso al modelo Ollama con capacidades de visión para
+    obtener un análisis consolidado del estado estético del equipo.
+
+    Usa urllib.request (stdlib) — sin dependencias externas.
+    Compatible con Ollama local y remoto via Tailscale.
+    Requiere un modelo con soporte de visión: gemma4:e4b, gemma4:e2b, llava, etc.
+
+    Args:
+        imagenes_bytes: Lista de bytes de imágenes JPEG ya comprimidas por Pillow.
+                        Se toman hasta OLLAMA_MAX_IMAGENES_IA imágenes.
+        tipo_equipo:    Tipo de equipo (Laptop, PC, Tablet, etc.) para el prompt.
+        marca:          Marca del equipo (Dell, HP, Apple, etc.)
+        modelo_equipo:  Modelo específico del equipo.
+
+    Returns:
+        dict:
+            {'success': True,  'analisis': '...texto...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...mensaje...'}
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    A diferencia de las llamadas de texto, Ollama recibe las imágenes como
+    strings base64 en el campo "images" del mensaje. El modelo las decodifica
+    internamente y las procesa junto con el prompt de texto.
+    """
+    if not imagenes_bytes:
+        return {'success': False, 'error': 'No se proporcionaron imágenes para analizar.'}
+
+    if not getattr(settings, 'OLLAMA_ENABLED', False):
+        return {'success': False, 'error': 'Ollama no está habilitado en este entorno.'}
+
+    base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434')
+    model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'OLLAMA_MODEL', 'gemma4:e4b')
+    # Usar timeout de visión — más alto que el timeout de texto porque el modelo
+    # debe procesar múltiples imágenes y puede esperar en cola de Ollama.
+    timeout = getattr(settings, 'OLLAMA_VISION_TIMEOUT', 600)
+    max_imgs = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
+
+    # Limitar y convertir imágenes a base64 (sin prefijo data:URI — Ollama lo espera crudo)
+    imagenes_limitadas = imagenes_bytes[:max_imgs]
+    imagenes_b64 = [
+        _base64.b64encode(img).decode('utf-8')
+        for img in imagenes_limitadas
+    ]
+
+    # Construir prompt con contexto del equipo
+    tipo_eq = tipo_equipo.strip() or 'equipo'
+    marca_eq = marca.strip() or ''
+    modelo_eq = modelo_equipo.strip() or ''
+    prompt = PROMPT_INSPECCION_ESTETICA.format(
+        n_imagenes=len(imagenes_b64),
+        tipo_equipo=tipo_eq,
+        marca=marca_eq,
+        modelo_equipo=modelo_eq,
+    ).strip()
+
+    # Payload multimodal para /api/chat de Ollama
+    # El campo "images" es exclusivo del endpoint /api/chat (no /api/generate)
+    # Formato: lista de strings base64 sin prefijo data:image/...;base64,
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt,
+                "images": imagenes_b64,
+            }
+        ],
+        "stream": False,
+        # think=True: activa el razonamiento interno del modelo antes de responder.
+        # Para inspección visual es beneficioso — el modelo examina cada zona de
+        # la imagen, evalúa qué puede afirmar con certeza y descarta lo dudoso,
+        # resultando en una descripción más precisa y menos propensa a inventar.
+        # El tiempo adicional de procesamiento es aceptable aquí porque la tarea
+        # corre en background via Celery y OLLAMA_VISION_TIMEOUT ya lo contempla.
+        # (Requiere Ollama >= 0.7.0; en versiones anteriores se ignora silenciosamente)
+        "think": True,
+        "options": {
+            # Temperatura muy baja = descripciones objetivas y repetibles.
+            # No queremos creatividad — queremos precisión observacional.
+            "temperature": 0.15,
+            "top_p": 0.9,
+        },
+    }
+
+    url = f"{base_url.rstrip('/')}/api/chat"
+    data = json.dumps(payload).encode('utf-8')
+
+    logger.info(
+        f"[InspeccionIA][Ollama] Iniciando análisis visual | "
+        f"Modelo: {model} | Imágenes: {len(imagenes_b64)} | "
+        f"Equipo: {marca_eq} {modelo_eq} | Timeout: {timeout}s"
+    )
+
+    try:
+        req = urllib.request.Request(
+            url=url,
+            data=data,
+            headers={
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            method='POST',
+        )
+
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            response_data = json.loads(response.read().decode('utf-8'))
+
+        analisis = (
+            response_data
+            .get('message', {})
+            .get('content', '')
+            .strip()
+        )
+
+        if not analisis:
+            logger.warning("[InspeccionIA][Ollama] El modelo devolvió una respuesta vacía.")
+            return {'success': False, 'error': 'El modelo devolvió una respuesta vacía.'}
+
+        logger.info(
+            f"[InspeccionIA][Ollama] Análisis completado | "
+            f"{len(analisis)} chars | Modelo: {model}"
+        )
+        return {
+            'success': True,
+            'analisis': analisis,
+            'modelo_usado': model,
+        }
+
+    except urllib.error.URLError as e:
+        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
+        logger.error(f"[InspeccionIA][Ollama] Error de conexión: {error_msg} | URL: {url}")
+        return {'success': False, 'error': f'Error de conexión con Ollama: {error_msg}'}
+
+    except TimeoutError:
+        logger.error(
+            f"[InspeccionIA][Ollama] Timeout después de {timeout}s | "
+            f"Modelo: {model} | URL: {url}"
+        )
+        return {
+            'success': False,
+            'error': (
+                f'El modelo tardó más de {timeout}s en responder. '
+                'Es posible que Ollama estuviera ocupado con otra tarea.'
+            ),
+        }
+
+    except json.JSONDecodeError as e:
+        logger.error(f"[InspeccionIA][Ollama] Error al parsear respuesta JSON: {e}")
+        return {'success': False, 'error': 'Respuesta inválida de Ollama.'}
+
+    except Exception as e:
+        logger.error(
+            f"[InspeccionIA][Ollama] Error inesperado: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        return {'success': False, 'error': f'Error inesperado: {str(e)}'}
+
+
+def analizar_imagenes_ingreso_dispatch(
+    imagenes_bytes: list[bytes],
+    tipo_equipo: str = "",
+    marca: str = "",
+    modelo_equipo: str = "",
+    modelo_override: str = "",
+) -> dict:
+    """
+    Dispatcher para el análisis visual de imágenes de ingreso.
+
+    Sin override (modelo_override vacío) — estrategia de fallback automática:
+        1. Intenta Ollama (modelo configurado en OLLAMA_MODEL — debe soportar visión)
+        2. Si Ollama falla o no está habilitado → intenta Gemini
+        3. Si ambos fallan → devuelve {'success': False, 'error': '...'}
+
+    Con override explícito — ruteo directo sin fallback cruzado:
+        - Prefijo "[Gemini]" → va directo a Gemini con el modelo limpio
+        - Cualquier otro valor → va directo a Ollama con ese modelo
+        - Si el proveedor elegido falla, no se intenta el otro
+
+    Esta función es llamada exclusivamente desde tareas Celery en background.
+    Nunca bloquea una petición HTTP — no hay riesgo de timeout de Cloudflare.
+
+    Args:
+        imagenes_bytes:  Lista de bytes JPEG ya comprimidos por Pillow.
+        tipo_equipo:     Tipo de equipo para contextualizar el prompt.
+        marca:           Marca del equipo.
+        modelo_equipo:   Modelo específico del equipo.
+        modelo_override: Modelo elegido en el selector del modal (con o sin prefijo).
+                         Vacío = comportamiento automático con fallback.
+
+    Returns:
+        dict:
+            {'success': True,  'analisis': '...texto...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...mensaje de error...'}
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Intentamos primero con el servidor Ollama local (más privado, sin costo).
+    Si falla, usamos la API de Gemini de Google como respaldo.
+    Si ambos fallan, devolvemos success=False y el correo se envía sin análisis.
+    Nunca lanzamos excepciones hacia afuera — el llamador no debe preocuparse por esto.
+    """
+    kwargs_base = dict(
+        imagenes_bytes=imagenes_bytes,
+        tipo_equipo=tipo_equipo,
+        marca=marca,
+        modelo_equipo=modelo_equipo,
+    )
+
+    # ── Limpiar prefijos visuales del selector ───────────────────────────────
+    nombre_limpio = modelo_override.strip()
+    es_gemini_override = False
+    for prefijo in ('[Gemini] ', '[Ollama] '):
+        if nombre_limpio.startswith(prefijo):
+            nombre_limpio = nombre_limpio[len(prefijo):]
+            es_gemini_override = prefijo == '[Gemini] '
+            break
+    # Si no tiene prefijo, inferir por nombre (ej: "gemini-2.0-flash")
+    if nombre_limpio and not es_gemini_override:
+        es_gemini_override = nombre_limpio.lower().startswith('gemini')
+
+    # ── Ruteo directo cuando el usuario eligió un modelo explícito ────────────
+    if nombre_limpio:
+        if es_gemini_override:
+            logger.info(f"[InspeccionIA][Dispatch] Ruteo directo a Gemini ({nombre_limpio}) por selección del usuario.")
+            try:
+                from .gemini_client import analizar_imagenes_ingreso_gemini
+                return analizar_imagenes_ingreso_gemini(**kwargs_base, modelo_override=nombre_limpio)
+            except Exception as e:
+                logger.error(f"[InspeccionIA][Dispatch] Error al llamar a Gemini directamente: {e}", exc_info=True)
+                return {'success': False, 'error': f'Error al llamar a Gemini: {e}'}
+        else:
+            logger.info(f"[InspeccionIA][Dispatch] Ruteo directo a Ollama ({nombre_limpio}) por selección del usuario.")
+            return analizar_imagenes_ingreso_ollama(**kwargs_base, modelo_override=nombre_limpio)
+
+    # ── Sin preferencia → fallback automático ────────────────────────────────
+    kwargs = kwargs_base
+
+    # ── Intento 1: Ollama ────────────────────────────────────────────────────
+    if getattr(settings, 'OLLAMA_ENABLED', False):
+        logger.info("[InspeccionIA][Dispatch] Intentando con Ollama...")
+        resultado = analizar_imagenes_ingreso_ollama(**kwargs)
+        if resultado.get('success'):
+            return resultado
+        logger.warning(
+            f"[InspeccionIA][Dispatch] Ollama falló: {resultado.get('error')} "
+            f"— Intentando con Gemini como fallback..."
+        )
+    else:
+        logger.info("[InspeccionIA][Dispatch] Ollama deshabilitado, saltando al fallback Gemini.")
+
+    # ── Intento 2: Gemini (fallback) ─────────────────────────────────────────
+    if getattr(settings, 'GEMINI_ENABLED', False):
+        logger.info("[InspeccionIA][Dispatch] Intentando con Gemini...")
+        try:
+            from .gemini_client import analizar_imagenes_ingreso_gemini
+            resultado = analizar_imagenes_ingreso_gemini(**kwargs)
+            if resultado.get('success'):
+                return resultado
+            logger.warning(
+                f"[InspeccionIA][Dispatch] Gemini también falló: {resultado.get('error')}"
+            )
+        except Exception as e:
+            logger.error(f"[InspeccionIA][Dispatch] Error al llamar a Gemini: {e}", exc_info=True)
+    else:
+        logger.info("[InspeccionIA][Dispatch] Gemini deshabilitado.")
+
+    # ── Ambos proveedores fallaron ───────────────────────────────────────────
+    logger.warning(
+        "[InspeccionIA][Dispatch] No se pudo obtener análisis de ningún proveedor. "
+        "El correo se enviará sin sección de análisis IA."
+    )
+    return {
+        'success': False,
+        'error': 'No se pudo conectar con ningún proveedor de IA disponible.',
+    }

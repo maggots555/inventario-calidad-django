@@ -782,6 +782,20 @@ OLLAMA_BASE_URL = config('OLLAMA_BASE_URL', default='http://localhost:11434')
 OLLAMA_MODEL = config('OLLAMA_MODEL', default='gemma3:12b')
 OLLAMA_TIMEOUT = config('OLLAMA_TIMEOUT', default=120, cast=int)
 
+# OLLAMA_VISION_TIMEOUT: timeout específico para tareas de análisis de imágenes.
+# Más alto que OLLAMA_TIMEOUT porque el modelo debe procesar múltiples imágenes
+# y puede estar en cola detrás de otras tareas activas en Ollama.
+# Estas tareas siempre corren en background via Celery, nunca bloquean HTTP.
+# Cloudflare y otros proxies no interfieren — el HTTP request ya terminó antes.
+#   Recomendado: 600s (10 min) cubre hasta ~4 min en cola + ~2 min de inferencia.
+OLLAMA_VISION_TIMEOUT = config('OLLAMA_VISION_TIMEOUT', default=600, cast=int)
+
+# OLLAMA_MAX_IMAGENES_IA: límite de imágenes enviadas al modelo de visión por análisis.
+# gemma4 tiene 128K tokens de contexto — 8 imágenes ≈ 16K tokens (12% del límite).
+# Aumentar este valor es seguro en contexto pero incrementa el payload por red
+# (Tailscale) y el tiempo de inferencia en GPU.
+OLLAMA_MAX_IMAGENES_IA = config('OLLAMA_MAX_IMAGENES_IA', default=15, cast=int)
+
 # OLLAMA_MODELS: lista de modelos Ollama disponibles para el selector.
 # Formato: nombres separados por coma. Ejemplo: gemma3:12b,gemma3:4b
 # Si no se define, se usa OLLAMA_MODEL como única opción.

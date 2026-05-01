@@ -189,6 +189,56 @@
             color: #856404;
             font-size: 14px;
         }
+
+        .ai-analysis-box {
+            background: #f0f7ff;
+            border-left: 4px solid #1f6391;
+            border-radius: 0 8px 8px 0;
+            padding: 22px 24px;
+            margin: 25px 0;
+        }
+
+        .ai-analysis-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #d0e8f8;
+        }
+
+        .ai-analysis-badge {
+            display: inline-block;
+            background: #1f6391;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+
+        .ai-analysis-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1e3a5f;
+            flex: 1;
+        }
+
+        .ai-analysis-body {
+            font-size: 14px;
+            color: #2d3748;
+            line-height: 1.75;
+        }
+
+        .ai-analysis-footer {
+            margin-top: 14px;
+            padding-top: 10px;
+            border-top: 1px solid #d0e8f8;
+            font-size: 11px;
+            color: #6b849e;
+        }
         
         .help-section {
             background: #f8f9fa;
@@ -436,6 +486,23 @@
                     fotografía{{ cantidad_imagenes|pluralize }} adjunta{{ cantidad_imagenes|pluralize }} a este correo
                 </div>
             </div>
+
+            {% if analisis_ia_texto %}
+            <div class="ai-analysis-box">
+                <div class="ai-analysis-header">
+                    <span class="ai-analysis-badge">IA</span>
+                    <span class="ai-analysis-title">Análisis de Condición Estética al Ingreso</span>
+                </div>
+                <div class="ai-analysis-body">
+                    {{ analisis_ia_texto|linebreaksbr }}
+                </div>
+                <div class="ai-analysis-footer">
+                    Análisis generado automáticamente por IA ({{ analisis_ia_modelo }}) a partir de las fotografías de ingreso.
+                    Este reporte documenta el estado físico observable del equipo al momento de su recepción en el taller.
+                    El técnico asignado podrá complementar o ajustar esta descripción durante el proceso de diagnóstico.
+                </div>
+            </div>
+            {% endif %}
             
             <div class="help-section">
                 <div class="help-title">ℹ️ Información Importante</div>

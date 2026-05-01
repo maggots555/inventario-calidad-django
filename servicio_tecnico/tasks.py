@@ -1165,7 +1165,8 @@ def enviar_diagnostico_cliente_task(
 )
 def enviar_imagenes_cliente_task(
     self, orden_id, imagenes_ids, destinatarios_copia,
-    mensaje_personalizado, usuario_id=None
+    mensaje_personalizado, usuario_id=None,
+    modelo_ia_inspeccion='',
 ):
     """
     Tarea Celery: comprime imágenes de ingreso y las envía al cliente por correo.
@@ -1176,6 +1177,7 @@ def enviar_imagenes_cliente_task(
         destinatarios_copia   : Lista de emails en CC
         mensaje_personalizado : Texto personalizado del usuario
         usuario_id            : ID del usuario que disparó la acción
+        modelo_ia_inspeccion  : Modelo IA seleccionado en el modal (vacío = automático)
     """
     import io
     import re
@@ -1269,6 +1271,76 @@ def enviar_imagenes_cliente_task(
         )
 
         # ===================================================================
+        # PASO 2.5: ANÁLISIS DE CONDICIÓN ESTÉTICA CON IA (no crítico)
+        # ===================================================================
+        # Se invoca ANTES de preparar el HTML del correo para poder incluir
+        # el análisis en el contexto del template.
+        #
+        # DISEÑO FAIL-SAFE:
+        #   - Si la IA responde → análisis se guarda en historial + va en el correo
+        #   - Si falla por cualquier motivo → analisis_ia_texto queda None
+        #     y el template simplemente omite la sección (el correo se envía igual)
+        #
+        # TIMEOUT: usa OLLAMA_VISION_TIMEOUT (default 600s) que cubre el tiempo
+        # en cola de Ollama + el tiempo de inferencia con múltiples imágenes.
+        # Celery maneja esto en background — no hay riesgo de timeout HTTP.
+        analisis_ia_texto = None
+        analisis_ia_modelo = None
+
+        try:
+            from .ollama_client import analizar_imagenes_ingreso_dispatch
+
+            max_imgs = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
+            # Reutilizar los bytes ya comprimidos por Pillow — sin releer disco
+            imagenes_bytes_ia = [
+                img_data['contenido']
+                for img_data in imagenes_comprimidas[:max_imgs]
+            ]
+
+            detalle = orden.detalle_equipo
+            resultado_ia = analizar_imagenes_ingreso_dispatch(
+                imagenes_bytes=imagenes_bytes_ia,
+                tipo_equipo=detalle.tipo_equipo if detalle else '',
+                marca=detalle.marca if detalle else '',
+                modelo_equipo=detalle.modelo if detalle else '',
+                modelo_override=modelo_ia_inspeccion,
+            )
+
+            if resultado_ia.get('success'):
+                analisis_ia_texto = resultado_ia['analisis']
+                analisis_ia_modelo = resultado_ia['modelo_usado']
+
+                logger.info(
+                    f"[IMAGENES] Análisis IA completado | "
+                    f"{len(analisis_ia_texto)} chars | Modelo: {analisis_ia_modelo}"
+                )
+
+                # Persistir el análisis en el historial de la orden
+                HistorialOrden.objects.create(
+                    orden=orden,
+                    tipo_evento='inspeccion_ia',
+                    comentario=(
+                        f"🤖 Inspección visual automatizada — {analisis_ia_modelo}\n\n"
+                        f"{analisis_ia_texto}"
+                    ),
+                    es_sistema=True,
+                )
+            else:
+                logger.warning(
+                    f"[IMAGENES] Análisis IA no disponible (no crítico): "
+                    f"{resultado_ia.get('error', 'Sin detalles')} — "
+                    f"El correo se enviará sin sección de análisis."
+                )
+
+        except Exception as e_ia:
+            # Captura cualquier error inesperado del módulo de IA.
+            # El flujo principal no se interrumpe bajo ninguna circunstancia.
+            logger.warning(
+                f"[IMAGENES] Excepción en análisis IA (no crítico, ignorando): "
+                f"{type(e_ia).__name__}: {e_ia}"
+            )
+
+        # ===================================================================
         # PASO 3: PREPARAR HTML DEL CORREO
         # ===================================================================
         from config.paises_config import get_pais_actual, fecha_local_pais
@@ -1311,6 +1383,11 @@ def enviar_imagenes_cliente_task(
             'pais_nombre': _pais_email['nombre'],
             'whatsapp_empleado': whatsapp_empleado,
             'seguimiento_url': seguimiento_url,
+            # Análisis de condición estética generado por IA.
+            # Si la IA no estuvo disponible, ambos quedan en None y el
+            # template omite la sección automáticamente con {% if analisis_ia_texto %}
+            'analisis_ia_texto': analisis_ia_texto,
+            'analisis_ia_modelo': analisis_ia_modelo,
         }
 
         html_content = render_to_string(

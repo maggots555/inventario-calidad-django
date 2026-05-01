@@ -3997,7 +3997,31 @@
                     </div>
                     
                     <hr class="my-4">
-                    
+
+                    <!-- SECCIÓN 3.5: MODELO DE IA PARA ANÁLISIS DE IMÁGENES -->
+                    {% if ollama_enabled %}
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
+                            <i class="bi bi-cpu text-primary fs-5 me-2"></i>
+                            <h6 class="mb-0 text-primary fw-bold">Modelo IA para análisis de imágenes</h6>
+                        </div>
+                        <select name="modelo_ia_inspeccion" class="form-select form-select-sm">
+                            {% for modelo in ollama_models %}
+                            <option value="{{ modelo }}">{{ modelo }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted d-block mt-2">
+                            <i class="bi bi-info-circle"></i>
+                            El modelo analizará las fotografías al enviar el correo.
+                            <strong>[Ollama]</strong> usa el servidor local ·
+                            <strong>[Gemini]</strong> usa la API de Google.
+                            El análisis es opcional — si falla, el correo se envía igual.
+                        </small>
+                    </div>
+
+                    <hr class="my-4">
+                    {% endif %}
+
                     <!-- SECCIÓN 4: MENSAJE PERSONALIZADO -->
                     <div class="mb-4">
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
