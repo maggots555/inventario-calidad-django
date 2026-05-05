@@ -1016,9 +1016,10 @@ def obtener_dataframe_seguimientos_piezas(fecha_inicio=None, fecha_fin=None,
         
         # Calcular días de retraso y días totales de espera
         if seg.fecha_entrega_real:
-            # Si ya llegó, calcular retraso respecto a fecha estimada
+            # Si ya llegó físicamente (recibido, DOA, WPB), calcular cuánto tardó
+            # pero NO marcar como "retrasado actualmente" — el tránsito ya terminó.
             dias_retraso = max(0, (seg.fecha_entrega_real - seg.fecha_entrega_estimada).days)
-            esta_retrasado = dias_retraso > 0
+            esta_retrasado = False  # Ya llegó: no está retrasada en tránsito
             # Días totales: mismo que dias_desde_pedido (ya llegó)
             dias_totales_espera = dias_desde_pedido
         else:
@@ -1036,7 +1037,10 @@ def obtener_dataframe_seguimientos_piezas(fecha_inicio=None, fecha_fin=None,
         dias_hasta_entrega = (seg.fecha_entrega_estimada - hoy).days
         
         # Determinar prioridad visual
-        if esta_retrasado and dias_retraso > 5:
+        # Si ya llegó (con o sin incidencia), no tiene prioridad de urgencia en tránsito
+        if seg.fecha_entrega_real:
+            prioridad = 'normal'
+        elif esta_retrasado and dias_retraso > 5:
             prioridad = 'critico'
         elif esta_retrasado:
             prioridad = 'alto'
@@ -1308,8 +1312,16 @@ def agrupar_seguimientos_por_orden(df):
         # Identificar seguimientos con problemas de calidad (WPB/DOA)
         seguimientos_problematicos = len([p for p in proveedores_activos if p['estado'] in ESTADOS_PIEZA_PROBLEMATICOS])
         
-        tiene_retrasados = any(p['esta_retrasado'] for p in proveedores_activos)
-        dias_maximo_retraso = max([p['dias_retraso'] for p in proveedores_activos], default=0)
+        # Solo considerar "retrasados" los seguimientos que aún están pendientes.
+        # DOA/WPB/recibidos ya llegaron físicamente, no deben activar la alerta de retraso.
+        tiene_retrasados = any(
+            p['esta_retrasado'] for p in proveedores_activos
+            if p['estado'] in ESTADOS_PIEZA_PENDIENTES
+        )
+        dias_maximo_retraso = max(
+            (p['dias_retraso'] for p in proveedores_activos if p['estado'] in ESTADOS_PIEZA_PENDIENTES),
+            default=0
+        )
         
         # Determinar estado general
         if seguimientos_recibidos == total_seguimientos:

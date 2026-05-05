@@ -1050,15 +1050,43 @@ code {
 [data-bs-theme="dark"] .table-danger,
 [data-bs-theme="dark"] .table-danger.orden-row {
     --bs-table-bg: rgba(239, 68, 68, 0.12) !important;
+    --bs-table-color: #e2e8f0 !important;
     --bs-table-border-color: rgba(239, 68, 68, 0.25);
     border-left-color: #ef4444 !important;
+}
+
+/* Override de hover para filas retrasadas en modo oscuro.
+   Sin esto Bootstrap 5.3 genera un rosa/fucsia ilegible
+   mezclando el color "danger" con el modificador de hover. */
+[data-bs-theme="dark"] .table-danger:hover,
+[data-bs-theme="dark"] .table-danger.orden-row:hover {
+    --bs-table-hover-bg: rgba(239, 68, 68, 0.22) !important;
+    --bs-table-hover-color: #e2e8f0 !important;
+    --bs-table-striped-color: #e2e8f0 !important;
+    background-color: rgba(239, 68, 68, 0.22) !important;
+    color: #e2e8f0 !important;
+}
+
+/* Forzar texto legible en todas las celdas de filas peligro en oscuro */
+[data-bs-theme="dark"] .table-danger td,
+[data-bs-theme="dark"] .table-danger th {
+    color: #e2e8f0 !important;
 }
 
 [data-bs-theme="dark"] .table-warning,
 [data-bs-theme="dark"] .table-warning.orden-row {
     --bs-table-bg: rgba(234, 179, 8, 0.10) !important;
+    --bs-table-color: #e2e8f0 !important;
     --bs-table-border-color: rgba(234, 179, 8, 0.25);
     border-left-color: #eab308 !important;
+}
+
+[data-bs-theme="dark"] .table-warning:hover,
+[data-bs-theme="dark"] .table-warning.orden-row:hover {
+    --bs-table-hover-bg: rgba(234, 179, 8, 0.18) !important;
+    --bs-table-hover-color: #e2e8f0 !important;
+    background-color: rgba(234, 179, 8, 0.18) !important;
+    color: #e2e8f0 !important;
 }
 
 /* Alertas del dashboard */
