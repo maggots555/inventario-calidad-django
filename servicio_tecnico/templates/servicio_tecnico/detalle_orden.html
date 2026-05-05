@@ -4021,24 +4021,28 @@
                     
                     <hr class="my-4">
 
-                    <!-- SECCIÓN 3.5: MODELO DE IA PARA ANÁLISIS DE IMÁGENES -->
+                    <!-- SECCIÓN 3.5: INSPECTOR VISUAL CON IA -->
                     {% if ollama_enabled %}
                     <div class="mb-4">
                         <div class="d-flex align-items-center mb-3 pb-2 border-bottom">
-                            <i class="bi bi-cpu text-primary fs-5 me-2"></i>
-                            <h6 class="mb-0 text-primary fw-bold">Modelo IA para análisis de imágenes</h6>
+                            <i class="bi bi-robot text-primary fs-5 me-2"></i>
+                            <h6 class="mb-0 text-primary fw-bold">Inspector visual con IA</h6>
                         </div>
                         <select name="modelo_ia_inspeccion" class="form-select form-select-sm">
+                            <option value="">Automático — cadena completa de fallback (recomendado)</option>
                             {% for modelo in ollama_models %}
                             <option value="{{ modelo }}">{{ modelo }}</option>
                             {% endfor %}
                         </select>
                         <small class="text-muted d-block mt-2">
-                            <i class="bi bi-info-circle"></i>
-                            El modelo analizará las fotografías al enviar el correo.
-                            <strong>[Ollama]</strong> usa el servidor local ·
-                            <strong>[Gemini]</strong> usa la API de Google.
-                            El análisis es opcional — si falla, el correo se envía igual.
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Automático</strong>: recorre todos los modelos
+                            <strong>[Gemini]</strong> en orden; si todos fallan, usa
+                            <strong>[Ollama]</strong> como último recurso.<br>
+                            <i class="bi bi-arrow-right-short"></i>
+                            Si eliges un modelo específico, se intenta primero — los demás actúan como fallback en cascada.<br>
+                            <i class="bi bi-shield-check text-success me-1"></i>
+                            <strong>Fail-safe</strong>: si ningún modelo responde, el correo se envía igual sin análisis IA.
                         </small>
                     </div>
 

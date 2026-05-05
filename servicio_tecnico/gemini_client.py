@@ -561,7 +561,23 @@ def analizar_sentimiento_encuestas(
 #
 # Función equivalente a analizar_imagenes_ingreso_ollama() de ollama_client.py
 # pero usando la API REST de Google Gemini.
-# Se usa como FALLBACK cuando Ollama no está disponible o falla.
+#
+# Es el PROVEEDOR PRIMARIO del inspector visual. Ollama actúa como fallback
+# de último recurso si todos los modelos Gemini fallan.
+#
+# La función devuelve 'error_type' en todos los casos de fallo para que el
+# dispatcher pueda decidir si vale la pena reintentar con otro modelo:
+#
+#   Recuperables (el dispatcher intenta el siguiente modelo):
+#     'rate_limit'    → HTTP 429 — cuota momentáneamente agotada
+#     'server_error'  → HTTP 500/502/503/504 o respuesta vacía — Gemini inestable
+#     'timeout'       → El modelo tardó demasiado
+#     'network_error' → Fallo de conexión de red
+#
+#   Irrecuperables (el dispatcher detiene el ciclo Gemini):
+#     'hard_error'    → HTTP 400/401/403/404 — API key inválida, request malformado
+#     'safety_block'  → Safety filter activo — otro modelo con el mismo prompt fallará igual
+#     'config_error'  → Gemini deshabilitado o sin API key configurada
 #
 # Gemini soporta visión nativa en todos sus modelos actuales (flash y pro).
 # Las imágenes se envían como inline_data en el campo "parts" del payload.
@@ -594,29 +610,45 @@ def analizar_imagenes_ingreso_gemini(
         modelo_equipo:  Modelo específico del equipo.
 
     Returns:
-        dict:
-            {'success': True,  'analisis': '...texto...', 'modelo_usado': '...'}
-            {'success': False, 'error': '...mensaje...'}
+        dict — éxito:
+            {'success': True, 'analisis': '...texto...', 'modelo_usado': '...'}
+
+        dict — error (siempre incluye 'error_type' para que el dispatcher
+                       decida si reintentar con otro modelo):
+            {'success': False, 'error': '...mensaje...', 'error_type': '<tipo>'}
+
+        Tipos de error:
+            'rate_limit'    → HTTP 429, cuota momentáneamente agotada (reintentable)
+            'server_error'  → HTTP 5xx o respuesta vacía (reintentable)
+            'timeout'       → Timeout de red (reintentable)
+            'network_error' → URLError, sin conexión (reintentable)
+            'hard_error'    → HTTP 4xx, API key inválida (no reintentable)
+            'safety_block'  → Filtro de seguridad de Google (no reintentable)
+            'config_error'  → Gemini deshabilitado o sin API key (no reintentable)
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Gemini recibe las imágenes en el campo "parts" del payload. Cada imagen es
     un objeto {"inline_data": {"mime_type": "image/jpeg", "data": "<base64>"}}
     junto con el texto del prompt en el mismo array de parts.
+
+    El campo 'error_type' es leído por analizar_imagenes_ingreso_dispatch()
+    para decidir si tiene sentido probar el siguiente modelo Gemini, o si el
+    error es irrecuperable y conviene saltar directamente a Ollama.
     """
     # Importar el prompt desde ollama_client para no duplicar la definición.
     # Mismo prompt → mismo estándar de respuesta entre Ollama y Gemini.
     from .ollama_client import PROMPT_INSPECCION_ESTETICA
 
     if not imagenes_bytes:
-        return {'success': False, 'error': 'No se proporcionaron imágenes para analizar.'}
+        return {'success': False, 'error': 'No se proporcionaron imágenes para analizar.', 'error_type': 'config_error'}
 
     if not getattr(settings, 'GEMINI_ENABLED', False):
-        return {'success': False, 'error': 'Gemini no está habilitado en este entorno.'}
+        return {'success': False, 'error': 'Gemini no está habilitado en este entorno.', 'error_type': 'config_error'}
 
     api_key = getattr(settings, 'GEMINI_API_KEY', '').strip()
     if not api_key:
         logger.error("[InspeccionIA][Gemini] GEMINI_API_KEY no está configurada.")
-        return {'success': False, 'error': 'GEMINI_API_KEY no configurada.'}
+        return {'success': False, 'error': 'GEMINI_API_KEY no configurada.', 'error_type': 'config_error'}
 
     model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
     # Para visión usamos el mismo timeout que Ollama vision: más generoso
@@ -704,12 +736,13 @@ def analizar_imagenes_ingreso_gemini(
             return {
                 'success': False,
                 'error': f'Gemini bloqueó la solicitud por filtros de seguridad: {block_reason}',
+                'error_type': 'safety_block',
             }
 
         candidates = response_data.get('candidates', [])
         if not candidates:
             logger.warning("[InspeccionIA][Gemini] Respuesta vacía — sin candidatos.")
-            return {'success': False, 'error': 'Gemini devolvió una respuesta vacía.'}
+            return {'success': False, 'error': 'Gemini devolvió una respuesta vacía.', 'error_type': 'server_error'}
 
         finish_reason = candidates[0].get('finishReason', 'STOP')
         if finish_reason == 'SAFETY':
@@ -717,6 +750,7 @@ def analizar_imagenes_ingreso_gemini(
             return {
                 'success': False,
                 'error': 'Gemini bloqueó la respuesta por políticas de seguridad.',
+                'error_type': 'safety_block',
             }
 
         analisis = (
@@ -729,7 +763,7 @@ def analizar_imagenes_ingreso_gemini(
 
         if not analisis:
             logger.warning("[InspeccionIA][Gemini] Texto extraído vacío.")
-            return {'success': False, 'error': 'Gemini devolvió una respuesta vacía.'}
+            return {'success': False, 'error': 'Gemini devolvió una respuesta vacía.', 'error_type': 'server_error'}
 
         logger.info(
             f"[InspeccionIA][Gemini] Análisis completado | "
@@ -750,30 +784,43 @@ def analizar_imagenes_ingreso_gemini(
         except Exception:
             error_msg = error_body or str(e)
         logger.error(f"[InspeccionIA][Gemini] HTTP {e.code}: {error_msg} | Modelo: {model}")
-        return {'success': False, 'error': f'Error HTTP {e.code} de Gemini: {error_msg}'}
+
+        # Clasificar el código HTTP para que el dispatcher sepa si reintentar.
+        # 429 → rate limit (reintentable con otro modelo)
+        # 5xx → servidor inestable (reintentable)
+        # 4xx → error del cliente / API key (irrecuperable)
+        if e.code == 429:
+            error_type = 'rate_limit'
+        elif e.code in (500, 502, 503, 504):
+            error_type = 'server_error'
+        else:
+            error_type = 'hard_error'
+
+        return {'success': False, 'error': f'Error HTTP {e.code} de Gemini: {error_msg}', 'error_type': error_type}
 
     except urllib.error.URLError as e:
         error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
         logger.error(f"[InspeccionIA][Gemini] Error de red: {error_msg}")
-        return {'success': False, 'error': f'Error de red al conectar con Gemini: {error_msg}'}
+        return {'success': False, 'error': f'Error de red al conectar con Gemini: {error_msg}', 'error_type': 'network_error'}
 
     except TimeoutError:
         logger.error(f"[InspeccionIA][Gemini] Timeout después de {timeout}s | Modelo: {model}")
         return {
             'success': False,
             'error': f'Gemini tardó más de {timeout}s en responder.',
+            'error_type': 'timeout',
         }
 
     except json.JSONDecodeError as e:
         logger.error(f"[InspeccionIA][Gemini] Error al parsear respuesta JSON: {e}")
-        return {'success': False, 'error': 'Respuesta inválida de la API de Gemini.'}
+        return {'success': False, 'error': 'Respuesta inválida de la API de Gemini.', 'error_type': 'server_error'}
 
     except Exception as e:
         logger.error(
             f"[InspeccionIA][Gemini] Error inesperado: {type(e).__name__}: {e}",
             exc_info=True,
         )
-        return {'success': False, 'error': f'Error inesperado con Gemini: {str(e)}'}
+        return {'success': False, 'error': f'Error inesperado con Gemini: {str(e)}', 'error_type': 'hard_error'}
 
 
 # ============================================================================

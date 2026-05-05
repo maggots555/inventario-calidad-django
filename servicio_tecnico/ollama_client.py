@@ -1220,7 +1220,8 @@ import base64 as _base64  # alias para no pisar posibles nombres locales
 PROMPT_INSPECCION_ESTETICA = """\
 Eres un inspector técnico especializado en recepción de equipos electrónicos \
 en un centro de servicio profesional. Tu función es redactar el reporte de \
-condición estética del equipo al momento de su ingreso al taller.
+condición estética del equipo al momento de su ingreso al taller. \
+SIEMPRE redactas en español, sin excepción.
 
 Se te proporcionan {n_imagenes} fotografía(s) del {tipo_equipo} {marca} {modelo_equipo}.
 
@@ -1244,7 +1245,10 @@ si hay pocas observaciones relevantes — la brevedad con precisión es la meta.
 9. Si el equipo presenta buen estado general sin daños notables, indícalo en \
 una sola oración directa y concisa.
 10. Responde ÚNICAMENTE con el párrafo del reporte. Sin prefijos, sin títulos, \
-sin "Reporte:", sin comillas.\
+sin "Reporte:", sin comillas.
+11. IDIOMA: el reporte debe estar escrito EXCLUSIVAMENTE en español. \
+Independientemente del idioma que aparezca en el equipo, en etiquetas o en \
+cualquier texto visible en las imágenes, tu respuesta siempre debe ser en español.\
 """
 
 
@@ -1424,15 +1428,25 @@ def analizar_imagenes_ingreso_dispatch(
     """
     Dispatcher para el análisis visual de imágenes de ingreso.
 
-    Sin override (modelo_override vacío) — estrategia de fallback automática:
-        1. Intenta Ollama (modelo configurado en OLLAMA_MODEL — debe soportar visión)
-        2. Si Ollama falla o no está habilitado → intenta Gemini
-        3. Si ambos fallan → devuelve {'success': False, 'error': '...'}
+    ESTRATEGIA (sin override o con override Gemini):
+        1. Ciclo Gemini: intenta cada modelo de GEMINI_MODELS en orden.
+               - Si uno responde bien → retorna inmediatamente.
+               - Si el error es recuperable (rate_limit, server_error, timeout,
+                 network_error) → pasa al siguiente modelo Gemini.
+               - Si el error es irrecuperable (hard_error, safety_block,
+                 config_error) → rompe el ciclo y salta directo a Ollama.
+        2. Fallback Ollama: si ningún modelo Gemini funcionó → intenta Ollama.
+        3. Si Ollama también falla → devuelve {'success': False, 'error': '...'}
 
-    Con override explícito — ruteo directo sin fallback cruzado:
-        - Prefijo "[Gemini]" → va directo a Gemini con el modelo limpio
-        - Cualquier otro valor → va directo a Ollama con ese modelo
-        - Si el proveedor elegido falla, no se intenta el otro
+    Con override Gemini explícito (ej: "[Gemini] gemini-2.5-flash"):
+        - El modelo elegido se intenta primero.
+        - Si falla con error recuperable → se recorren los demás GEMINI_MODELS
+          como fallback (el elegido ya fue intentado, no se repite).
+        - Si todos los Gemini fallan → cae a Ollama igual.
+
+    Con override Ollama explícito (ej: "[Ollama] gemma4:e2b"):
+        - Ruteo directo a Ollama con ese modelo, sin fallback.
+        - Respeta la elección explícita del usuario.
 
     Esta función es llamada exclusivamente desde tareas Celery en background.
     Nunca bloquea una petición HTTP — no hay riesgo de timeout de Cloudflare.
@@ -1443,7 +1457,7 @@ def analizar_imagenes_ingreso_dispatch(
         marca:           Marca del equipo.
         modelo_equipo:   Modelo específico del equipo.
         modelo_override: Modelo elegido en el selector del modal (con o sin prefijo).
-                         Vacío = comportamiento automático con fallback.
+                         Vacío = comportamiento automático con fallback completo.
 
     Returns:
         dict:
@@ -1451,9 +1465,11 @@ def analizar_imagenes_ingreso_dispatch(
             {'success': False, 'error': '...mensaje de error...'}
 
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Intentamos primero con el servidor Ollama local (más privado, sin costo).
-    Si falla, usamos la API de Gemini de Google como respaldo.
-    Si ambos fallan, devolvemos success=False y el correo se envía sin análisis.
+    Gemini es el proveedor principal porque da mejores resultados en visión.
+    Si Gemini falla (rate limit, servidor caído, etc.), automáticamente probamos
+    con el siguiente modelo de la lista antes de rendirnos.
+    Solo si todos los modelos Gemini fallan, usamos Ollama como último recurso.
+    Ollama es local y siempre está disponible, pero es menos potente para visión.
     Nunca lanzamos excepciones hacia afuera — el llamador no debe preocuparse por esto.
     """
     kwargs_base = dict(
@@ -1463,72 +1479,151 @@ def analizar_imagenes_ingreso_dispatch(
         modelo_equipo=modelo_equipo,
     )
 
+    # Errores de Gemini que justifican probar el siguiente modelo de la lista.
+    # Todos los demás (hard_error, safety_block, config_error) son irrecuperables:
+    # no tiene sentido enviar el mismo request a otro modelo si el problema es
+    # estructural (API key inválida, contenido bloqueado, Gemini deshabilitado).
+    ERRORES_REINTENTABLES = {'rate_limit', 'server_error', 'timeout', 'network_error'}
+
     # ── Limpiar prefijos visuales del selector ───────────────────────────────
+    # El selector del modal muestra "[Gemini] gemini-2.5-flash" o "[Ollama] gemma4:e2b".
+    # Aquí separamos el proveedor del nombre real del modelo.
     nombre_limpio = modelo_override.strip()
-    es_gemini_override = False
+    proveedor_override = None  # 'gemini', 'ollama', o None (sin preferencia)
+
     for prefijo in ('[Gemini] ', '[Ollama] '):
         if nombre_limpio.startswith(prefijo):
             nombre_limpio = nombre_limpio[len(prefijo):]
-            es_gemini_override = prefijo == '[Gemini] '
+            proveedor_override = 'gemini' if prefijo == '[Gemini] ' else 'ollama'
             break
-    # Si no tiene prefijo, inferir por nombre (ej: "gemini-2.0-flash")
-    if nombre_limpio and not es_gemini_override:
-        es_gemini_override = nombre_limpio.lower().startswith('gemini')
 
-    # ── Ruteo directo cuando el usuario eligió un modelo explícito ────────────
+    # Si no tiene prefijo de selector, inferir por nombre del modelo
+    # (ej: "gemini-2.5-flash" → Gemini, cualquier otro → Ollama)
+    if nombre_limpio and proveedor_override is None:
+        proveedor_override = 'gemini' if nombre_limpio.lower().startswith('gemini') else 'ollama'
+
+    # ── Ruteo directo a Ollama (sin fallback a Gemini) ───────────────────────
+    # Si el usuario eligió explícitamente Ollama, respetamos esa decisión.
+    # Ollama es local y no tiene rate limits, así que no necesita fallback.
+    if proveedor_override == 'ollama':
+        logger.info(f"[InspeccionIA][Dispatch] Ollama seleccionado explícitamente: {nombre_limpio}")
+        return analizar_imagenes_ingreso_ollama(**kwargs_base, modelo_override=nombre_limpio)
+
+    # ── Construir la lista de modelos Gemini a intentar ──────────────────────
+    # Con override Gemini: el modelo elegido va primero; los demás como fallback.
+    # Sin override: se recorre GEMINI_MODELS completo en orden de configuración.
+    gemini_models_configurados = getattr(settings, 'GEMINI_MODELS', [])
+
     if nombre_limpio:
-        if es_gemini_override:
-            logger.info(f"[InspeccionIA][Dispatch] Ruteo directo a Gemini ({nombre_limpio}) por selección del usuario.")
-            try:
-                from .gemini_client import analizar_imagenes_ingreso_gemini
-                return analizar_imagenes_ingreso_gemini(**kwargs_base, modelo_override=nombre_limpio)
-            except Exception as e:
-                logger.error(f"[InspeccionIA][Dispatch] Error al llamar a Gemini directamente: {e}", exc_info=True)
-                return {'success': False, 'error': f'Error al llamar a Gemini: {e}'}
-        else:
-            logger.info(f"[InspeccionIA][Dispatch] Ruteo directo a Ollama ({nombre_limpio}) por selección del usuario.")
-            return analizar_imagenes_ingreso_ollama(**kwargs_base, modelo_override=nombre_limpio)
-
-    # ── Sin preferencia → fallback automático ────────────────────────────────
-    kwargs = kwargs_base
-
-    # ── Intento 1: Ollama ────────────────────────────────────────────────────
-    if getattr(settings, 'OLLAMA_ENABLED', False):
-        logger.info("[InspeccionIA][Dispatch] Intentando con Ollama...")
-        resultado = analizar_imagenes_ingreso_ollama(**kwargs)
-        if resultado.get('success'):
-            return resultado
-        logger.warning(
-            f"[InspeccionIA][Dispatch] Ollama falló: {resultado.get('error')} "
-            f"— Intentando con Gemini como fallback..."
+        # Override Gemini explícito: el modelo elegido encabeza la lista.
+        # Los restantes sirven de fallback si el elegido falla.
+        restantes = [m for m in gemini_models_configurados if m != nombre_limpio]
+        modelos_a_intentar = [nombre_limpio] + restantes
+        logger.info(
+            f"[InspeccionIA][Dispatch] Override Gemini: {nombre_limpio} (primero), "
+            f"fallback: {restantes or 'ninguno'}"
         )
     else:
-        logger.info("[InspeccionIA][Dispatch] Ollama deshabilitado, saltando al fallback Gemini.")
+        # Sin preferencia: orden completo según GEMINI_MODELS del .env
+        modelos_a_intentar = list(gemini_models_configurados)
+        logger.info(f"[InspeccionIA][Dispatch] Modo automático — modelos Gemini: {modelos_a_intentar}")
 
-    # ── Intento 2: Gemini (fallback) ─────────────────────────────────────────
-    if getattr(settings, 'GEMINI_ENABLED', False):
-        logger.info("[InspeccionIA][Dispatch] Intentando con Gemini...")
+    # ── Ciclo Gemini: intentar cada modelo hasta obtener éxito ───────────────
+    if getattr(settings, 'GEMINI_ENABLED', False) and modelos_a_intentar:
         try:
             from .gemini_client import analizar_imagenes_ingreso_gemini
-            resultado = analizar_imagenes_ingreso_gemini(**kwargs)
+        except ImportError as e:
+            logger.error(f"[InspeccionIA][Dispatch] No se pudo importar gemini_client: {e}")
+            modelos_a_intentar = []  # saltar el ciclo y caer directo a Ollama
+
+        ultimo_error = 'Sin detalles'
+
+        for idx, modelo_gemini in enumerate(modelos_a_intentar, start=1):
+            logger.info(
+                f"[InspeccionIA][Dispatch] Gemini intento {idx}/{len(modelos_a_intentar)}: {modelo_gemini}"
+            )
+
+            try:
+                resultado = analizar_imagenes_ingreso_gemini(
+                    **kwargs_base,
+                    modelo_override=modelo_gemini,
+                )
+            except Exception as e_exc:
+                # Excepción inesperada fuera del flujo normal de la función.
+                # Tratamos como error recuperable — podría ser un glitch puntual.
+                ultimo_error = f'Excepción inesperada: {type(e_exc).__name__}: {e_exc}'
+                logger.error(
+                    f"[InspeccionIA][Dispatch] Excepción con {modelo_gemini}: {ultimo_error}",
+                    exc_info=True,
+                )
+                continue  # probar el siguiente modelo
+
             if resultado.get('success'):
+                logger.info(
+                    f"[InspeccionIA][Dispatch] Éxito con {modelo_gemini} "
+                    f"(intento {idx}/{len(modelos_a_intentar)})"
+                )
                 return resultado
+
+            error_type = resultado.get('error_type', 'hard_error')
+            ultimo_error = resultado.get('error', 'sin detalles')
+
+            if error_type in ERRORES_REINTENTABLES:
+                logger.warning(
+                    f"[InspeccionIA][Dispatch] {modelo_gemini} → [{error_type}] {ultimo_error} "
+                    f"— Probando siguiente modelo Gemini..."
+                )
+                continue  # intentar el siguiente modelo de la lista
+            else:
+                # Error irrecuperable: no tiene sentido probar los demás modelos.
+                # Ejemplos: API key inválida (401), safety block, Gemini deshabilitado.
+                logger.error(
+                    f"[InspeccionIA][Dispatch] {modelo_gemini} → [{error_type}] {ultimo_error} "
+                    f"— Error irrecuperable, deteniendo ciclo Gemini."
+                )
+                break  # salir del ciclo → fallback a Ollama
+        else:
+            # El ciclo terminó normalmente (sin break) = todos los modelos agotados.
             logger.warning(
-                f"[InspeccionIA][Dispatch] Gemini también falló: {resultado.get('error')}"
+                f"[InspeccionIA][Dispatch] Todos los modelos Gemini agotados "
+                f"({len(modelos_a_intentar)} intentos). Último error: {ultimo_error}"
+            )
+    else:
+        if not getattr(settings, 'GEMINI_ENABLED', False):
+            logger.info("[InspeccionIA][Dispatch] Gemini deshabilitado (GEMINI_ENABLED=False).")
+        else:
+            logger.info("[InspeccionIA][Dispatch] GEMINI_MODELS vacío — sin modelos configurados.")
+
+    # ── Fallback final: Ollama ────────────────────────────────────────────────
+    # Se llega aquí cuando: todos los Gemini fallaron, o Gemini está deshabilitado,
+    # o se recibió un error irrecuperable de Gemini.
+    # Ollama siempre está disponible localmente — es la red de seguridad final.
+    if getattr(settings, 'OLLAMA_ENABLED', False):
+        logger.info("[InspeccionIA][Dispatch] Fallback a Ollama (último recurso)...")
+        try:
+            resultado_ollama = analizar_imagenes_ingreso_ollama(**kwargs_base)
+            if resultado_ollama.get('success'):
+                return resultado_ollama
+            logger.warning(
+                f"[InspeccionIA][Dispatch] Ollama también falló: "
+                f"{resultado_ollama.get('error', 'sin detalles')}"
             )
         except Exception as e:
-            logger.error(f"[InspeccionIA][Dispatch] Error al llamar a Gemini: {e}", exc_info=True)
+            logger.error(
+                f"[InspeccionIA][Dispatch] Excepción en fallback Ollama: {e}",
+                exc_info=True,
+            )
     else:
-        logger.info("[InspeccionIA][Dispatch] Gemini deshabilitado.")
+        logger.info("[InspeccionIA][Dispatch] Ollama deshabilitado — sin más opciones.")
 
-    # ── Ambos proveedores fallaron ───────────────────────────────────────────
+    # ── Todos los proveedores fallaron ───────────────────────────────────────
     logger.warning(
-        "[InspeccionIA][Dispatch] No se pudo obtener análisis de ningún proveedor. "
+        "[InspeccionIA][Dispatch] Todos los proveedores de IA fallaron. "
         "El correo se enviará sin sección de análisis IA."
     )
     return {
         'success': False,
-        'error': 'No se pudo conectar con ningún proveedor de IA disponible.',
+        'error': 'No se pudo obtener análisis de ningún proveedor de IA disponible.',
     }
 
 
