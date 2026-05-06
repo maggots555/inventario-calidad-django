@@ -3701,13 +3701,20 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
     tmp_out_path = tmp_in_path + '_out.mp4'
     tmp_thumb_path = tmp_in_path + '_thumb.jpg'
 
+    # Resolver ruta absoluta de ffmpeg igual que en ollama_client.py:
+    # Gunicorn corre con un PATH reducido que puede no incluir el directorio
+    # de ffmpeg. shutil.which() busca en el PATH del proceso; si no lo encuentra,
+    # cae al fallback de ruta absoluta conocida en producción.
+    import shutil
+    ffmpeg_bin = shutil.which('ffmpeg') or '/usr/bin/ffmpeg'
+
     try:
         # =====================================================================
         # COMPRIMIR CON FFMPEG
         # Comando acordado: H.264 + AAC, máx 720p, máx 65 s, CRF 28, fast
         # =====================================================================
         cmd_compress = [
-            'ffmpeg',
+            ffmpeg_bin,
             '-i', tmp_in_path,
             '-vf', (
                 "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
@@ -3744,7 +3751,7 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
         # EXTRAER THUMBNAIL DEL SEGUNDO 1
         # =====================================================================
         cmd_thumb = [
-            'ffmpeg',
+            ffmpeg_bin,
             '-i', tmp_out_path,
             '-ss', '00:00:01',
             '-vframes', '1',
