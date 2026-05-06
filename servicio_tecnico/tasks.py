@@ -2454,11 +2454,539 @@ def enviar_seguimiento_cliente_task(self, orden_id, usuario_id=None):
                     pass
             notificar_error(
                 titulo="Error al enviar enlace de seguimiento",
-                mensaje=f"OrdenServicio ID {orden_id} — {str(exc)[:200]}",
+                 mensaje=f"OrdenServicio ID {orden_id} — {str(exc)[:200]}",
+                 usuario=_usuario_err,
+                 task_id=self.request.id,
+                 app_origen='servicio_tecnico',
+             )
+        except Exception:
+            pass
+        raise self.retry(exc=exc, countdown=60)
+
+
+# ============================================================================
+# TAREA: GENERAR VIDEO RESUMEN DE GALERÍA (Ken Burns + Xfade + Música)
+# ============================================================================
+
+@shared_task(
+    bind=True,
+    max_retries=1,                # Solo 1 reintento (el proceso es muy pesado)
+    default_retry_delay=30,
+    soft_time_limit=900,          # 15 minutos — override del global de 5 min
+    time_limit=1200,              # 20 minutos — override del global de 10 min
+    name='servicio_tecnico.generar_video_resumen',
+)
+def generar_video_resumen_task(self, orden_id, usuario_id):
+    """
+    Tarea Celery: genera un video resumen tipo presentación con todas las fotos
+    de la galería (ingreso, diagnóstico, reparación, egreso) de una orden.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta tarea usa FFmpeg para:
+    1. Tomar cada foto de la galería (tipos principales: ingreso, diagnóstico,
+       reparación, egreso)
+    2. Aplicar efecto Ken Burns a cada foto (zoom + paneo suave cinematográfico)
+    3. Añadir transiciones "fade" entre cada foto con el filtro xfade
+    4. Agregar música de fondo en loop
+    5. Añadir texto de cierre "Gracias por su preferencia, vuelva pronto"
+    6. Guardar el resultado como VideoOrden(tipo='resumen')
+    7. Notificar al usuario cuando termina
+
+    Parámetros:
+        self       : Referencia a la tarea Celery (bind=True)
+        orden_id   : ID de la OrdenServicio
+        usuario_id : ID del usuario que solicitó la generación
+
+    Returns:
+        dict: {'success': True, 'video_id': int, 'orden_id': int}
+
+    Nota de rendimiento:
+        El efecto zoompan de FFmpeg es computacionalmente intensivo.
+        Con 10 fotos: ~2-4 minutos. Con 20 fotos: ~4-8 minutos.
+        Por eso esta tarea tiene límites de tiempo extendidos (15/20 min).
+    """
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+    import traceback
+    import time
+    from pathlib import Path
+
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from django.core.files import File
+    from django.core.files.base import ContentFile
+
+    from .models import OrdenServicio, VideoOrden, ImagenOrden, HistorialOrden
+
+    logger.info(f"[VIDEO-RESUMEN] Iniciando tarea para Orden ID {orden_id}")
+
+    # =========================================================================
+    # CONSTANTES DEL VIDEO
+    # =========================================================================
+    # Duración de cada foto en segundos (antes del fade)
+    DURACION_FOTO = 4
+    # Duración de la transición xfade entre fotos (segundos)
+    DURACION_FADE = 1
+    # Resolución de salida del video
+    RESOLUCION = '1280x720'
+    # Texto de cierre que aparece al final
+    TEXTO_CIERRE = "Gracias por su preferencia, vuelva pronto"
+    # Duración de la pantalla de cierre con el texto (segundos)
+    DURACION_CIERRE = 4
+    # Tipos de foto que se incluyen en el video (en orden del flujo de trabajo)
+    TIPOS_FOTO = ['ingreso', 'diagnostico', 'reparacion', 'egreso']
+
+    # =========================================================================
+    # PATHS TEMPORALES Y DE TRABAJO
+    # =========================================================================
+    ffmpeg_bin = shutil.which('ffmpeg') or '/usr/bin/ffmpeg'
+    tmp_dir = tempfile.mkdtemp(prefix='video_resumen_')
+    tmp_video_out = os.path.join(tmp_dir, 'resumen_final.mp4')
+    tmp_thumb = os.path.join(tmp_dir, 'resumen_thumb.jpg')
+    timestamp = int(time.time() * 1000)
+
+    try:
+        # =====================================================================
+        # PASO 1: OBTENER ORDEN Y USUARIO
+        # =====================================================================
+        try:
+            orden = OrdenServicio.objects.select_related(
+                'detalle_equipo'
+            ).get(pk=orden_id)
+        except OrdenServicio.DoesNotExist:
+            raise ValueError(f"OrdenServicio ID {orden_id} no encontrada")
+
+        User = get_user_model()
+        usuario_obj = None
+        empleado_obj = None
+        if usuario_id:
+            try:
+                usuario_obj = User.objects.get(pk=usuario_id)
+                if hasattr(usuario_obj, 'empleado'):
+                    empleado_obj = usuario_obj.empleado
+            except User.DoesNotExist:
+                logger.warning(f"[VIDEO-RESUMEN] Usuario ID {usuario_id} no encontrado")
+
+        folio = orden.numero_orden_interno
+
+        # =====================================================================
+        # PASO 2: RECOPILAR IMÁGENES EN ORDEN
+        # =====================================================================
+        # Tomamos solo los 4 tipos principales, ordenados por fecha de subida
+        imagenes_qs = ImagenOrden.objects.filter(
+            orden=orden,
+            tipo__in=TIPOS_FOTO,
+        ).order_by('tipo', 'fecha_subida')
+
+        # Ordenar manualmente por el orden lógico del flujo de trabajo
+        # (el ORM no puede hacer esto con el orden arbitrario de TIPOS_FOTO)
+        imagenes_ordenadas = []
+        for tipo in TIPOS_FOTO:
+            for img in imagenes_qs:
+                if img.tipo == tipo:
+                    imagenes_ordenadas.append(img)
+
+        if len(imagenes_ordenadas) < 2:
+            raise ValueError(
+                f"Se necesitan al menos 2 fotos de los tipos principales "
+                f"(ingreso/diagnóstico/reparación/egreso). "
+                f"La orden {folio} tiene {len(imagenes_ordenadas)}."
+            )
+
+        logger.info(
+            f"[VIDEO-RESUMEN] Orden {folio} — {len(imagenes_ordenadas)} fotos encontradas: "
+            + ", ".join(i.tipo for i in imagenes_ordenadas)
+        )
+
+        # =====================================================================
+        # PASO 3: PREPARAR IMÁGENES ESCALADAS (1280x720 con padding negro)
+        # =====================================================================
+        # Cada imagen se escala a 1280x720 con padding negro si no es 16:9.
+        # Se guarda como JPG temporal numerado para el comando FFmpeg.
+        # IMPORTANTE: La ruta absoluta se obtiene con .path o con el campo .imagen
+        foto_paths = []
+
+        for idx, imagen_obj in enumerate(imagenes_ordenadas):
+            # Obtener ruta absoluta del archivo en disco
+            try:
+                ruta_original = imagen_obj.imagen.path
+            except (ValueError, AttributeError):
+                logger.warning(
+                    f"[VIDEO-RESUMEN] Imagen ID {imagen_obj.pk} (tipo={imagen_obj.tipo}) "
+                    f"no tiene ruta válida, se omite."
+                )
+                continue
+
+            if not os.path.isfile(ruta_original):
+                logger.warning(
+                    f"[VIDEO-RESUMEN] Imagen ID {imagen_obj.pk} no existe en disco "
+                    f"({ruta_original}), se omite."
+                )
+                continue
+
+            # Escalar + pad a 1280x720 con negro, guardar en tmp_dir
+            ruta_escalada = os.path.join(tmp_dir, f'foto_{idx:03d}.jpg')
+            cmd_escalar = [
+                ffmpeg_bin,
+                '-i', ruta_original,
+                '-vf', (
+                    "scale=1280:720:force_original_aspect_ratio=decrease,"
+                    "pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=black"
+                ),
+                '-q:v', '2',
+                '-y',
+                ruta_escalada,
+            ]
+            resultado_escalar = subprocess.run(
+                cmd_escalar,
+                capture_output=True, text=True, timeout=60,
+            )
+            if resultado_escalar.returncode != 0 or not os.path.isfile(ruta_escalada):
+                logger.warning(
+                    f"[VIDEO-RESUMEN] No se pudo escalar imagen {idx}: "
+                    f"{resultado_escalar.stderr[-200:]}"
+                )
+                continue
+
+            foto_paths.append(ruta_escalada)
+
+        if len(foto_paths) < 2:
+            raise ValueError(
+                f"Solo se pudieron procesar {len(foto_paths)} imágenes válidas. "
+                f"Se necesitan al menos 2."
+            )
+
+        logger.info(f"[VIDEO-RESUMEN] {len(foto_paths)} imágenes escaladas correctamente")
+
+        # =====================================================================
+        # PASO 4: CONSTRUIR EL FILTERGRAPH DE FFMPEG
+        # Ken Burns (zoompan) + xfade transiciones + pantalla de cierre con texto
+        # =====================================================================
+        #
+        # El filtergraph funciona así:
+        # - Cada imagen de entrada se procesa con "zoompan" (Ken Burns)
+        # - zoompan: hace zoom gradual del 100% al 130% durante toda la duración
+        # - Todas las fotos se encadenan con "xfade=transition=fade"
+        # - Al final se añade una pantalla negra con el texto de cierre
+        #
+        # Cálculo de offsets para xfade:
+        # La primera foto dura DURACION_FOTO segundos.
+        # El segundo xfade empieza en: offset_anterior + DURACION_FOTO - DURACION_FADE
+        #
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # El "filtergraph" es la cadena de filtros que FFmpeg aplica al video.
+        # Cada filtro se conecta al siguiente con ";" y los clips se unen con xfade.
+        # Los identificadores entre corchetes [v0], [v1], etc. son "pads" (conexiones).
+
+        # Total de fotos (sin contar la pantalla de cierre)
+        n_fotos = len(foto_paths)
+
+        # Duración total de cada foto en frames (25 fps)
+        fps = 25
+        frames_por_foto = DURACION_FOTO * fps  # 100 frames a 25fps
+
+        # ── Construir entradas FFmpeg ──
+        # Cada foto se pasa como input con -loop 1 -t DURACION_FOTO
+        cmd_inputs = []
+        for ruta in foto_paths:
+            cmd_inputs += ['-loop', '1', '-t', str(DURACION_FOTO + DURACION_FADE), '-i', ruta]
+
+        # ── Construir filtergraph ──
+        # Filtros zoompan para cada foto
+        filter_parts = []
+        for i in range(n_fotos):
+            # Ken Burns: zoom del 100% al 130%, con paneo suave al centro
+            # La dirección del zoom alterna: pares hacen zoom-in, impares zoom-out
+            if i % 2 == 0:
+                # Zoom in: empieza en 1.0 y crece hasta 1.3
+                zoom_expr = f"'min(zoom+0.0015,1.3)'"
+                x_expr = "'iw/2-(iw/zoom/2)'"
+                y_expr = "'ih/2-(ih/zoom/2)'"
+            else:
+                # Zoom out: empieza en 1.3 y decrece a 1.0 (con max para no pasar de 1)
+                zoom_expr = f"'if(eq(on,1),1.3,max(zoom-0.0015,1.0))'"
+                x_expr = "'iw/2-(iw/zoom/2)'"
+                y_expr = "'ih/2-(ih/zoom/2)'"
+
+            # EXPLICACIÓN: escalar a 2560×1440 ANTES del zoompan elimina el temblor.
+            # El temblor ocurre cuando zoompan tiene que *upscalear* la fuente (1280×720)
+            # para hacer zoom; con una fuente 2× más grande siempre estará *downscaleando*
+            # y los movimientos quedan suaves a nivel sub-píxel.
+            filter_parts.append(
+                f"[{i}:v]scale=2560:1440:flags=lanczos,"
+                f"zoompan=z={zoom_expr}:x={x_expr}:y={y_expr}"
+                f":d={frames_por_foto}:s=1280x720,fps={fps},"
+                f"setsar=1,format=yuv420p[kbv{i}]"
+            )
+
+        # Pantalla negra con texto de cierre
+        # Usamos color=black y drawtext para el mensaje final
+        filter_parts.append(
+            f"color=black:size=1280x720:rate={fps}:duration={DURACION_CIERRE + DURACION_FADE},"
+            f"drawtext="
+            f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"
+            f"text='{TEXTO_CIERRE}':"
+            f"fontcolor=white:"
+            f"fontsize=36:"
+            f"x=(w-text_w)/2:"
+            f"y=(h-text_h)/2:"
+            f"enable='gte(t,1)'"
+            f"[cierre]"
+        )
+
+        # Encadenar clips con xfade
+        # El primer clip es [kbv0], luego [kbv1], ..., [cierre]
+        clips_labels = [f"[kbv{i}]" for i in range(n_fotos)] + ["[cierre]"]
+        total_clips = len(clips_labels)
+
+        # offset_acumulado: cuando empieza el fade entre clip N y N+1
+        # Cada clip aporta (DURACION_FOTO - DURACION_FADE) segundos "netos"
+        offset_acumulado = float(DURACION_FOTO)  # primer clip dura DURACION_FOTO segundos
+        ultimo_label = clips_labels[0]  # Empezamos con el primer clip
+
+        for i in range(1, total_clips):
+            next_label = clips_labels[i]
+            output_label = f"[xf{i}]"
+            # El offset es el momento en que empieza el fade (desde el inicio del video)
+            offset_str = f"{offset_acumulado - DURACION_FADE:.3f}"
+            filter_parts.append(
+                f"{ultimo_label}{next_label}xfade=transition=fade"
+                f":duration={DURACION_FADE}:offset={offset_str}{output_label}"
+            )
+            ultimo_label = output_label
+            # El siguiente offset suma la duración neta del clip actual
+            offset_acumulado += float(DURACION_FOTO)
+
+        # El último label es el video final
+        # Le renombramos a [vout] para mayor claridad
+        filter_parts.append(f"{ultimo_label}null[vout]")
+
+        # Unir todo el filtergraph con ";"
+        filtergraph = ";".join(filter_parts)
+
+        # =====================================================================
+        # PASO 5: ENCONTRAR RUTA DE LA MÚSICA
+        # =====================================================================
+        ruta_musica = finders.find('audio/bg_music.mp3')
+        if not ruta_musica or not os.path.isfile(ruta_musica):
+            # Fallback: buscar directamente en static/
+            ruta_musica_fallback = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                'static', 'audio', 'bg_music.mp3'
+            )
+            if os.path.isfile(ruta_musica_fallback):
+                ruta_musica = ruta_musica_fallback
+            else:
+                ruta_musica = None
+                logger.warning("[VIDEO-RESUMEN] Música bg_music.mp3 no encontrada — video sin audio")
+
+        # =====================================================================
+        # PASO 6: EJECUTAR FFMPEG — GENERAR VIDEO FINAL
+        # =====================================================================
+        cmd_final = (
+            [ffmpeg_bin]
+            + cmd_inputs
+            + (['-stream_loop', '-1', '-i', ruta_musica] if ruta_musica else [])
+            + [
+                '-filter_complex', filtergraph,
+                '-map', '[vout]',
+            ]
+            + (['-map', f'{n_fotos}:a:0'] if ruta_musica else [])
+            + [
+                '-c:v', 'libx264',
+                '-crf', '23',
+                '-preset', 'medium',
+                '-pix_fmt', 'yuv420p',
+                '-profile:v', 'main',
+                '-level', '4.0',
+                '-movflags', '+faststart',
+            ]
+            + (['-c:a', 'aac', '-b:a', '128k', '-shortest'] if ruta_musica else [])
+            + ['-y', tmp_video_out]
+        )
+
+        logger.info(
+            f"[VIDEO-RESUMEN] Ejecutando FFmpeg con {n_fotos} fotos + cierre. "
+            f"Audio: {'sí' if ruta_musica else 'no'}"
+        )
+
+        resultado_video = subprocess.run(
+            cmd_final,
+            capture_output=True,
+            text=True,
+            timeout=850,  # 14 minutos máx para el proceso de FFmpeg
+        )
+
+        if resultado_video.returncode != 0:
+            raise RuntimeError(
+                f"FFmpeg falló (código {resultado_video.returncode}): "
+                f"{resultado_video.stderr[-800:]}"
+            )
+
+        if not os.path.isfile(tmp_video_out) or os.path.getsize(tmp_video_out) < 10240:
+            raise RuntimeError("FFmpeg no generó el archivo de video o está vacío")
+
+        logger.info(
+            f"[VIDEO-RESUMEN] Video generado: "
+            f"{os.path.getsize(tmp_video_out) / (1024*1024):.1f} MB"
+        )
+
+        # =====================================================================
+        # PASO 7: EXTRAER THUMBNAIL (frame del segundo 2)
+        # =====================================================================
+        cmd_thumb = [
+            ffmpeg_bin,
+            '-i', tmp_video_out,
+            '-ss', '00:00:02',
+            '-vframes', '1',
+            '-q:v', '3',
+            '-y',
+            tmp_thumb,
+        ]
+        subprocess.run(cmd_thumb, capture_output=True, timeout=30)
+
+        # =====================================================================
+        # PASO 8: ELIMINAR VIDEO RESUMEN ANTERIOR SI EXISTE
+        # =====================================================================
+        # Solo puede existir UN video resumen por orden
+        videos_anteriores = VideoOrden.objects.filter(orden=orden, tipo='resumen')
+        for video_ant in videos_anteriores:
+            try:
+                if video_ant.video and os.path.isfile(video_ant.video.path):
+                    os.remove(video_ant.video.path)
+                if video_ant.thumbnail and os.path.isfile(video_ant.thumbnail.path):
+                    os.remove(video_ant.thumbnail.path)
+                video_ant.delete()
+                logger.info(f"[VIDEO-RESUMEN] Video resumen anterior eliminado (ID {video_ant.pk})")
+            except Exception as e_del:
+                logger.warning(f"[VIDEO-RESUMEN] Error eliminando video anterior: {e_del}")
+
+        # =====================================================================
+        # PASO 9: CREAR REGISTRO VideoOrden EN LA BASE DE DATOS
+        # =====================================================================
+        tamano_final_mb = round(os.path.getsize(tmp_video_out) / (1024 * 1024), 2)
+        duracion_estimada = (n_fotos * DURACION_FOTO) + DURACION_CIERRE
+
+        # Calcular duración real de imágenes procesadas en MB (usamos tamaño del archivo)
+        tamano_fotos_mb = round(
+            sum(
+                os.path.getsize(img.imagen.path)
+                for img in imagenes_ordenadas
+                if hasattr(img.imagen, 'path') and os.path.isfile(img.imagen.path)
+            ) / (1024 * 1024), 2
+        )
+
+        nombre_video = f"resumen_{timestamp}.mp4"
+        nombre_thumb = f"resumen_{timestamp}_thumb.jpg"
+
+        video_resumen = VideoOrden(
+            orden=orden,
+            tipo='resumen',
+            descripcion=(
+                f"Video resumen automático — {n_fotos} fotos "
+                f"({', '.join(TIPOS_FOTO)}) — generado por Celery"
+            ),
+            subido_por=empleado_obj,
+            tamano_original_mb=tamano_fotos_mb,
+            tamano_final_mb=tamano_final_mb,
+            duracion_segundos=duracion_estimada,
+        )
+
+        # Guardar video usando File() para no cargar todo en RAM
+        with open(tmp_video_out, 'rb') as f_video:
+            video_resumen.video.save(nombre_video, File(f_video), save=False)
+
+        # Guardar thumbnail si se generó
+        if os.path.isfile(tmp_thumb):
+            with open(tmp_thumb, 'rb') as f_thumb:
+                video_resumen.thumbnail.save(
+                    nombre_thumb, ContentFile(f_thumb.read()), save=False
+                )
+
+        video_resumen.save()
+
+        logger.info(
+            f"[VIDEO-RESUMEN] VideoOrden ID {video_resumen.pk} guardado para Orden {folio}"
+        )
+
+        # =====================================================================
+        # PASO 10: REGISTRAR EN HISTORIAL
+        # =====================================================================
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='comentario',
+            comentario=(
+                f"Video resumen generado automáticamente: {n_fotos} fotos "
+                f"({DURACION_FOTO}s/foto + Ken Burns). "
+                f"Tamaño: {tamano_final_mb} MB. "
+                f"Generado por: {usuario_obj.get_full_name() if usuario_obj else 'Sistema'}"
+            ),
+            usuario=empleado_obj,
+            es_sistema=True,
+        )
+
+        # =====================================================================
+        # PASO 11: NOTIFICAR AL USUARIO
+        # =====================================================================
+        try:
+            notificar_exito(
+                titulo="Video resumen generado",
+                mensaje=(
+                    f"Orden {folio} — Video resumen listo. "
+                    f"{n_fotos} fotos procesadas, {tamano_final_mb} MB."
+                ),
+                usuario=usuario_obj,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e_notif:
+            logger.warning(f"[VIDEO-RESUMEN] No se pudo crear notificación: {e_notif}")
+
+        return {
+            'success': True,
+            'video_id': video_resumen.pk,
+            'orden_id': orden_id,
+            'folio': folio,
+            'n_fotos': n_fotos,
+            'tamano_mb': tamano_final_mb,
+        }
+
+    except Exception as exc:
+        logger.error(
+            f"[VIDEO-RESUMEN] Error para Orden ID {orden_id}: {exc}\n"
+            f"{traceback.format_exc()}"
+        )
+        # Notificar error al usuario
+        try:
+            _usuario_err = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo="Error al generar video resumen",
+                mensaje=f"Orden ID {orden_id} — {str(exc)[:300]}",
                 usuario=_usuario_err,
                 task_id=self.request.id,
                 app_origen='servicio_tecnico',
             )
         except Exception:
             pass
-        raise self.retry(exc=exc, countdown=60)
+
+        # Solo reintentamos si es un error transitorio (no de datos)
+        if not isinstance(exc, ValueError):
+            raise self.retry(exc=exc, countdown=30)
+        raise
+
+    finally:
+        # Limpiar directorio temporal siempre, aunque haya errores
+        try:
+            if os.path.isdir(tmp_dir):
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                logger.debug(f"[VIDEO-RESUMEN] Directorio temporal eliminado: {tmp_dir}")
+        except Exception:
+            pass

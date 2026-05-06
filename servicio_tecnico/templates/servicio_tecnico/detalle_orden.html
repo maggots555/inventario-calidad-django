@@ -7,6 +7,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}">
 <link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}">
+<link rel="stylesheet" href="{% static 'css/video_resumen.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -2685,6 +2686,139 @@
             </div><!-- /card -->
         </div><!-- /col-12 -->
     </div><!-- /row -->
+
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 7: VIDEO RESUMEN DE GALERÍA (Ken Burns + Celery)    -->
+    <!-- ============================================================ -->
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card section-card" id="video-resumen-contenedor"
+                 data-url-estado="{% url 'servicio_tecnico:estado_video_resumen' 'TASK_ID_PLACEHOLDER' %}">
+
+                <!-- Header de la sección -->
+                <div class="section-header-resumen d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <span class="d-flex align-items-center gap-2">
+                        <i class="bi bi-film"></i>
+                        <strong>Video Resumen de Galería</strong>
+                        {% if video_resumen %}
+                            <span class="badge-foto-count">Generado</span>
+                        {% endif %}
+                    </span>
+                    <span class="d-flex align-items-center gap-2 flex-wrap">
+                        <!-- Badges indicando qué tipos de foto se incluyen -->
+                        <span class="vr-tipo-badge"><i class="bi bi-circle-fill text-primary" style="font-size:.5rem"></i> Ingreso</span>
+                        <span class="vr-tipo-badge"><i class="bi bi-circle-fill text-warning" style="font-size:.5rem"></i> Diagnóstico</span>
+                        <span class="vr-tipo-badge"><i class="bi bi-circle-fill text-success" style="font-size:.5rem"></i> Reparación</span>
+                        <span class="vr-tipo-badge"><i class="bi bi-circle-fill text-info" style="font-size:.5rem"></i> Egreso</span>
+                    </span>
+                </div>
+
+                <div class="card-body">
+
+                    <!-- ── Panel de botones (estado inicial) ── -->
+                    <div id="vr-panel-botones" {% if video_resumen %}class="d-none"{% endif %}>
+                        {% if n_fotos_para_resumen >= 2 %}
+                            <div class="text-center">
+                                <button type="button"
+                                        id="btn-generar-video-resumen"
+                                        class="btn btn-primary"
+                                        data-orden-id="{{ orden.pk }}"
+                                        data-url-generar="{% url 'servicio_tecnico:generar_video_resumen' orden.pk %}"
+                                        data-tiene-video="false">
+                                    <i class="bi bi-play-circle-fill me-2"></i>
+                                    Generar Video Resumen
+                                </button>
+                                <p class="vr-descripcion mt-2 mb-0">
+                                    Crea una presentación profesional con <strong>{{ n_fotos_para_resumen }} foto{{ n_fotos_para_resumen|pluralize:"s" }}</strong>
+                                    — efecto Ken Burns, transiciones fade y música de fondo.
+                                    El proceso se realiza en segundo plano y puede tardar varios minutos.
+                                </p>
+                            </div>
+                        {% else %}
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-images" style="font-size: 2.5rem; opacity: .4;"></i>
+                                <p class="mt-2 mb-0" style="font-size: .9rem;">
+                                    Se necesitan al menos <strong>2 fotos</strong> de los tipos principales
+                                    (Ingreso, Diagnóstico, Reparación o Egreso) para generar el video resumen.
+                                    <br>
+                                    Actualmente hay <strong>{{ n_fotos_para_resumen }}</strong> foto{{ n_fotos_para_resumen|pluralize:"s" }}.
+                                </p>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- ── Panel de "Generando" (visible durante la tarea Celery) ── -->
+                    <div id="vr-panel-generando" class="d-none">
+                        <div class="vr-spinner-wrapper">
+                            <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                            <span id="vr-msg-generando" class="fw-semibold">
+                                Procesando fotos con efecto Ken Burns...
+                            </span>
+                        </div>
+                        <p id="vr-estado-celery" class="text-center mb-1">En cola, esperando worker...</p>
+                        <p class="vr-tiempo-estimado text-center">Este proceso puede tardar entre 2 y 10 minutos dependiendo de la cantidad de fotos.</p>
+                        <div class="vr-progress mx-auto">
+                            <div class="vr-progress-bar"></div>
+                        </div>
+                    </div>
+
+                    <!-- ── Panel del video listo ── -->
+                    <div id="vr-panel-video" {% if not video_resumen %}class="d-none"{% endif %}>
+                        <div class="vr-video-wrapper mb-3">
+                            <video id="vr-video-player"
+                                   controls
+                                   preload="metadata"
+                                   {% if video_resumen and video_resumen.video %}
+                                   src="{{ video_resumen.video.url }}"
+                                   {% endif %}
+                                   {% if video_resumen and video_resumen.thumbnail %}
+                                   poster="{{ video_resumen.thumbnail.url }}"
+                                   {% endif %}>
+                                Tu navegador no soporta el elemento de video HTML5.
+                            </video>
+                        </div>
+                        <div class="vr-video-actions">
+                            <span id="vr-info-video">
+                                {% if video_resumen %}
+                                    {{ video_resumen.duracion_segundos|default:0 }}s · {{ video_resumen.tamano_final_mb }} MB
+                                {% endif %}
+                            </span>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <!-- Botón Descargar -->
+                                <a id="vr-btn-descargar"
+                                   class="btn btn-sm btn-outline-primary"
+                                   {% if video_resumen and video_resumen.video %}
+                                   href="{{ video_resumen.video.url }}"
+                                   download="video_resumen_{{ orden.numero_orden_interno }}.mp4"
+                                   {% endif %}>
+                                    <i class="bi bi-download me-1"></i> Descargar
+                                </a>
+                                <!-- Botón Regenerar -->
+                                {% if n_fotos_para_resumen >= 2 %}
+                                <button type="button"
+                                        id="btn-regenerar-video-resumen"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        data-orden-id="{{ orden.pk }}"
+                                        data-url-generar="{% url 'servicio_tecnico:generar_video_resumen' orden.pk %}"
+                                        data-tiene-video="true">
+                                    <i class="bi bi-arrow-clockwise me-1"></i> Regenerar
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── Panel de error ── -->
+                    <div id="vr-panel-error" class="alert alert-danger d-none">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="vr-msg-error">Error al generar el video.</span>
+                    </div>
+
+                </div><!-- /card-body -->
+            </div><!-- /card -->
+        </div><!-- /col-12 -->
+    </div><!-- /row (video resumen) -->
 
 </div>
 
@@ -7303,5 +7437,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Script de dictado por voz — compilado desde static/ts/voz_diagnostico.ts -->
 <script src="{% static 'js/voz_diagnostico.js' %}"></script>
 {% endif %}
+
+<!-- Script de Video Resumen — compilado desde static/ts/video_resumen.ts -->
+<script src="{% static 'js/video_resumen.js' %}"></script>
 
 {% endblock %}

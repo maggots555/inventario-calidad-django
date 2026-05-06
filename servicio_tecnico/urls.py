@@ -424,4 +424,12 @@ urlpatterns = [
     # ── Directorio de Empleados (vista gerencial) ──
     path('directorio-empleados/', views.directorio_empleados, name='directorio_empleados'),
     path('directorio-empleados/<int:empleado_id>/', views.perfil_empleado, name='perfil_empleado'),
+
+    # ── Video Resumen de Galería (Celery + FFmpeg Ken Burns) ──
+    # POST: Encola la tarea de generación del video resumen para una orden
+    path('ordenes/<int:orden_id>/video-resumen/generar/',
+         views.generar_video_resumen, name='generar_video_resumen'),
+    # GET: Consulta el estado de una tarea Celery de generación de video resumen
+    path('video-resumen/estado/<str:task_id>/',
+         views.estado_video_resumen, name='estado_video_resumen'),
 ]

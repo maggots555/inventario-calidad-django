@@ -208,6 +208,7 @@ TIPO_VIDEO_CHOICES = [
     ('egreso', 'Egreso - Estado Final'),
     ('autorizacion', 'Autorización/Pass - RHITSO'),
     ('packing', 'Packing'),
+    ('resumen', 'Video Resumen - Galería'),  # Generado automáticamente por Celery
 ]
 
 # ============================================================================

@@ -2784,7 +2784,16 @@ def detalle_orden(request, orden_id):
     }
 
     total_videos = orden.videos.count()
-    
+
+    # ── Video Resumen (generado por Celery — solo puede haber uno por orden) ──
+    # Se pasa al template para mostrar el player si ya fue generado anteriormente
+    video_resumen = orden.videos.filter(tipo='resumen').first()
+
+    # Contar fotos de los tipos principales para saber si el botón debe habilitarse
+    n_fotos_para_resumen = orden.imagenes.filter(
+        tipo__in=['ingreso', 'diagnostico', 'reparacion', 'egreso']
+    ).count()
+
     # Verificar si ya se enviaron correos de imágenes (para el estado de los botones)
     egreso_correo_ya_enviado = orden.historial.filter(
         tipo_evento='email',
@@ -2968,6 +2977,8 @@ def detalle_orden(request, orden_id):
         # Videos
         'videos_por_tipo': videos_por_tipo,
         'total_videos': total_videos,
+        'video_resumen': video_resumen,
+        'n_fotos_para_resumen': n_fotos_para_resumen,
         
         # Empleados para copia en envío de imágenes
         'empleados_copia_imagenes': empleados_copia_imagenes,
@@ -18115,8 +18126,144 @@ def transcribir_audio_diagnostico(request):
                 'error': resultado.get('error', 'Error al transcribir con Gemini.')
             })
 
-    # Si Ollama fue el único proveedor y falló, devolvemos su error
+     # Si Ollama fue el único proveedor y falló, devolvemos su error
     return JsonResponse({
         'success': False,
         'error': 'No se pudo transcribir el audio. Intenta de nuevo o escribe el diagnóstico manualmente.'
     })
+
+
+# ============================================================================
+# VISTAS: GENERAR Y CONSULTAR ESTADO DEL VIDEO RESUMEN
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def generar_video_resumen(request, orden_id):
+    """
+    Vista que encola la tarea Celery para generar el video resumen de galería.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta vista NO genera el video directamente (sería muy lento).
+    Solo encola la tarea en Celery y devuelve el task_id al navegador.
+    El frontend usará ese task_id para consultar el estado cada 3 segundos.
+
+    Método: POST
+    URL: /servicio-tecnico/orden/<orden_id>/video-resumen/generar/
+
+    Returns:
+        JsonResponse:
+            - {'success': True, 'task_id': str}         → tarea encolada
+            - {'success': False, 'error': str}           → error de validación
+    """
+    from .tasks import generar_video_resumen_task
+    from .models import ImagenOrden
+
+    orden = get_object_or_404(OrdenServicio, pk=orden_id)
+
+    # Verificar que hay suficientes fotos para generar el video
+    TIPOS_PRINCIPALES = ['ingreso', 'diagnostico', 'reparacion', 'egreso']
+    n_fotos = ImagenOrden.objects.filter(
+        orden=orden,
+        tipo__in=TIPOS_PRINCIPALES,
+    ).count()
+
+    if n_fotos < 2:
+        return JsonResponse({
+            'success': False,
+            'error': (
+                f'Se necesitan al menos 2 fotos de los tipos principales '
+                f'(ingreso, diagnóstico, reparación, egreso). '
+                f'Esta orden tiene {n_fotos}.'
+            ),
+        }, status=400)
+
+    # Encolar la tarea Celery (responde inmediatamente al usuario)
+    tarea = generar_video_resumen_task.delay(
+        orden_id=orden.pk,
+        usuario_id=request.user.pk,
+    )
+
+    logger.info(
+        f"[VIDEO-RESUMEN] Tarea encolada — Orden {orden.numero_orden_interno} "
+        f"| task_id={tarea.id} | usuario={request.user.username}"
+    )
+
+    return JsonResponse({
+        'success': True,
+        'task_id': tarea.id,
+        'mensaje': (
+            f'Generando video resumen para {n_fotos} fotos. '
+            f'Te avisaremos cuando esté listo.'
+        ),
+        'n_fotos': n_fotos,
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def estado_video_resumen(request, task_id):
+    """
+    Vista de polling: devuelve el estado actual de la tarea Celery de generación
+    de video resumen.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El frontend llama a esta vista cada 3 segundos con el task_id.
+    Aquí consultamos a Redis (el backend de Celery) el estado actual de la tarea.
+    Cuando el estado es SUCCESS o FAILURE, el frontend muestra el resultado.
+
+    Método: GET
+    URL: /servicio-tecnico/video-resumen/estado/<task_id>/
+
+    Estados posibles de Celery:
+        PENDING  : La tarea está en cola o no se ha iniciado aún
+        STARTED  : El worker comenzó a procesar la tarea
+        SUCCESS  : La tarea terminó correctamente
+        FAILURE  : La tarea falló
+        RETRY    : La tarea está reintentando
+
+    Returns:
+        JsonResponse con:
+            estado: 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILURE' | 'RETRY'
+            listo: True si ya terminó (éxito o fallo)
+            video_url: URL del video si terminó con éxito
+            thumbnail_url: URL del thumbnail si terminó con éxito
+            error: Mensaje de error si falló
+    """
+    from celery.result import AsyncResult
+    from .models import VideoOrden
+
+    resultado = AsyncResult(task_id)
+    estado = resultado.state  # 'PENDING', 'STARTED', 'SUCCESS', 'FAILURE', etc.
+
+    respuesta = {
+        'estado': estado,
+        'listo': estado in ('SUCCESS', 'FAILURE'),
+    }
+
+    if estado == 'SUCCESS':
+        # La tarea terminó bien — obtener datos del video generado
+        data = resultado.result or {}
+        video_id = data.get('video_id')
+        if video_id:
+            try:
+                video = VideoOrden.objects.get(pk=video_id)
+                respuesta['video_url'] = video.video.url if video.video else None
+                respuesta['thumbnail_url'] = (
+                    video.thumbnail.url if video.thumbnail else None
+                )
+                respuesta['video_id'] = video_id
+                respuesta['n_fotos'] = data.get('n_fotos', 0)
+                respuesta['tamano_mb'] = data.get('tamano_mb', 0)
+            except VideoOrden.DoesNotExist:
+                respuesta['error'] = 'El video fue generado pero no se encontró en la base de datos.'
+
+    elif estado == 'FAILURE':
+        # La tarea falló — extraer el mensaje de error
+        error = resultado.result
+        if isinstance(error, Exception):
+            respuesta['error'] = str(error)[:300]
+        else:
+            respuesta['error'] = 'Error desconocido al generar el video.'
+
+    return JsonResponse(respuesta)
