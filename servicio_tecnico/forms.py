@@ -1249,6 +1249,57 @@ class SubirVideoForm(forms.Form):
         help_text='Describe brevemente qué muestra el video (ayuda al diagnóstico)',
     )
 
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # El atributo `accept` del <input> es solo una sugerencia del navegador —
+    # cualquier usuario técnico puede ignorarlo y subir cualquier archivo.
+    # Este método clean_video() valida el archivo en el SERVIDOR, que es lo
+    # que realmente importa para la seguridad.
+    TIPOS_MIME_PERMITIDOS = {
+        'video/mp4',
+        'video/quicktime',       # .mov
+        'video/x-msvideo',       # .avi
+        'video/webm',
+        'video/x-matroska',      # .mkv
+        'video/mpeg',
+        'video/3gpp',
+        'video/x-ms-wmv',
+        'application/octet-stream',  # Algunos navegadores/SO reportan este genérico
+    }
+    EXTENSIONES_PERMITIDAS = {'.mp4', '.mov', '.avi', '.webm', '.mkv', '.mpeg', '.mpg', '.3gp', '.wmv'}
+
+    def clean_video(self):
+        video = self.cleaned_data.get('video')
+        if not video:
+            return video
+
+        # Validar tamaño (90 MB máximo)
+        limite_bytes = 90 * 1024 * 1024
+        if video.size > limite_bytes:
+            raise forms.ValidationError(
+                f'El video pesa {video.size / (1024 * 1024):.1f} MB y supera el límite de 90 MB. '
+                'Recorta el video antes de subirlo.'
+            )
+
+        # Validar extensión del nombre de archivo
+        import os
+        extension = os.path.splitext(video.name)[1].lower()
+        if extension not in self.EXTENSIONES_PERMITIDAS:
+            raise forms.ValidationError(
+                f'Extensión "{extension}" no permitida. '
+                f'Formatos válidos: MP4, MOV, AVI, WebM, MKV.'
+            )
+
+        # Validar content-type reportado por el navegador
+        # (doble barrera: extensión + MIME type)
+        content_type = getattr(video, 'content_type', '')
+        if content_type and content_type not in self.TIPOS_MIME_PERMITIDOS:
+            raise forms.ValidationError(
+                f'Tipo de archivo no permitido ({content_type}). '
+                'Solo se aceptan archivos de video.'
+            )
+
+        return video
+
 
 # ============================================================================
 # FORMULARIO 7: Editar Información Principal del Equipo

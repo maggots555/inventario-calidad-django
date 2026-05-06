@@ -2142,20 +2142,7 @@ def detalle_orden(request, orden_id):
                     'error': 'No se recibió ningún archivo de video.',
                 })
 
-            video_file = request.FILES['video']
-
-            # Validar tamaño máximo: 90 MB (bajo el límite de 100 MB de Cloudflare)
-            limite_bytes = 90 * 1024 * 1024
-            if video_file.size > limite_bytes:
-                return JsonResponse({
-                    'success': False,
-                    'error': (
-                        f'El video pesa {video_file.size / (1024*1024):.1f} MB y supera el límite de 90 MB. '
-                        'Recorta el video antes de subirlo.'
-                    ),
-                })
-
-            # Validar formulario
+            # Validar formulario (incluye tamaño, extensión y content-type en clean_video())
             form_video = SubirVideoForm(request.POST, request.FILES)
             if not form_video.is_valid():
                 logger.error(f"❌ Formulario de video inválido: {form_video.errors}")
@@ -2165,8 +2152,9 @@ def detalle_orden(request, orden_id):
                     'form_errors': dict(form_video.errors),
                 })
 
-            tipo_video = form_video.cleaned_data['tipo']
+            tipo_video  = form_video.cleaned_data['tipo']
             descripcion = form_video.cleaned_data.get('descripcion', '')
+            video_file  = form_video.cleaned_data['video']  # ya validado por clean_video()
 
             # Comprimir y guardar (síncrono — FFmpeg corre en el proceso)
             try:
@@ -3770,24 +3758,27 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
         # =====================================================================
         # CREAR REGISTRO VideoOrden
         # =====================================================================
+        tamano_original_mb = round(video_file.size / (1024 * 1024), 2)
+        tamano_final_mb    = round(os.path.getsize(tmp_out_path) / (1024 * 1024), 2)
+
         video_orden = VideoOrden(
             orden=orden,
             tipo=tipo,
             descripcion=descripcion,
             subido_por=empleado,
+            tamano_original_mb=tamano_original_mb,
+            tamano_final_mb=tamano_final_mb,
         )
 
-        # Guardar video comprimido
+        # Guardar video comprimido usando File() para no cargar todo en RAM
+        from django.core.files import File
         with open(tmp_out_path, 'rb') as f_video:
-            video_orden.video.save(nombre_video, ContentFile(f_video.read()), save=False)
+            video_orden.video.save(nombre_video, File(f_video), save=False)
 
-        # Guardar thumbnail (si se generó)
+        # Guardar thumbnail (si se generó) — es pequeño, ContentFile está bien
         if PPath(tmp_thumb_path).exists():
             with open(tmp_thumb_path, 'rb') as f_thumb:
                 video_orden.thumbnail.save(nombre_thumb, ContentFile(f_thumb.read()), save=False)
-
-        # Guardar tamaño original para estadísticas de compresión
-        video_orden.tamano_original = video_file.size
 
         # save() del modelo registra el historial automáticamente
         video_orden.save()
