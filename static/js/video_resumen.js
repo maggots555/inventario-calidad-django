@@ -295,18 +295,18 @@ function mostrarError(mensaje) {
 // ============================================================================
 /**
  * Obtiene el CSRF token de las cookies de Django.
- * Django requiere este token en todos los POSTs para protección CSRF.
+ * Soporta el nombre personalizado del proyecto (sigma_csrftoken) y el estándar (csrftoken).
+ * En producción el proyecto puede usar sigma_csrftoken — igual que en ollama_sic.ts y voz_diagnostico.ts.
  *
  * @returns El valor del CSRF token como string
  */
 function obtenerCsrfToken() {
-    const nombre = 'csrftoken';
-    const cookies = document.cookie.split(';');
-    for (const cookie of cookies) {
-        const [key, value] = cookie.trim().split('=');
-        if (key === nombre) {
-            return decodeURIComponent(value);
-        }
+    const cookieNames = ['sigma_csrftoken', 'csrftoken'];
+    for (const name of cookieNames) {
+        const regex = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`);
+        const match = document.cookie.match(regex);
+        if (match)
+            return decodeURIComponent(match[1]);
     }
     return '';
 }
