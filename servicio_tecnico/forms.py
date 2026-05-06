@@ -15,6 +15,7 @@ from .models import (
     ReferenciaGamaEquipo,
     HistorialOrden,
     ImagenOrden,
+    VideoOrden,
     Cotizacion,
     PiezaCotizada,
     SeguimientoPieza,
@@ -31,7 +32,8 @@ from config.constants import (
     TIPO_EQUIPO_CHOICES, 
     MARCAS_EQUIPOS_CHOICES,  # Nueva constante para dropdown
     MARCAS_EQUIPOS,  # Lista simple (compatibilidad)
-    TIPO_IMAGEN_CHOICES, 
+    TIPO_IMAGEN_CHOICES,
+    TIPO_VIDEO_CHOICES,
     MOTIVO_RECHAZO_COTIZACION,
     ESTADO_PIEZA_CHOICES,
     # RHITSO - Constantes para módulo de seguimiento especializado
@@ -1190,6 +1192,61 @@ class SubirImagenesForm(forms.Form):
         }),
         label='Descripción',
         help_text='Descripción breve opcional',
+    )
+
+
+# ============================================================================
+# FORMULARIO 6.5: Subir Video de Orden
+# ============================================================================
+
+class SubirVideoForm(forms.Form):
+    """
+    Formulario para subir UN video por carga a una orden de servicio.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    A diferencia de imágenes (que se pueden subir en lote), los videos se
+    procesan uno a la vez porque FFmpeg requiere tiempo de CPU considerable.
+    Esto permite mostrar progreso preciso y manejar errores por video.
+
+    Validaciones del formulario:
+    - tipo: campo obligatorio, debe ser uno de TIPO_VIDEO_CHOICES
+    - video: archivo obligatorio, máximo 90MB (bajo el límite de 100MB de Cloudflare)
+    - descripcion: texto libre opcional, hasta 200 caracteres
+
+    La compresión con FFmpeg se realiza en la VISTA, no aquí.
+    El formulario solo valida que el archivo llegue en buen estado.
+    """
+
+    tipo = forms.ChoiceField(
+        choices=[('', '— Selecciona el tipo de video —')] + list(TIPO_VIDEO_CHOICES),
+        widget=forms.Select(attrs={
+            'class': 'form-control form-select',
+        }),
+        label='Tipo de Video',
+        help_text='Selecciona la etapa del servicio que documenta este video',
+    )
+
+    video = forms.FileField(
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            # Formatos que acepta el input en el navegador
+            'accept': 'video/mp4,video/quicktime,video/x-msvideo,video/webm,video/x-matroska',
+            'id': 'inputVideo',
+        }),
+        label='Seleccionar Video',
+        help_text='Máximo 90MB · Hasta 60 segundos · Formatos: MP4, MOV, AVI, WebM, MKV',
+        required=True,
+    )
+
+    descripcion = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Pantalla parpadeando al arranque, falla en teclado...',
+        }),
+        label='Descripción del Video',
+        help_text='Describe brevemente qué muestra el video (ayuda al diagnóstico)',
     )
 
 

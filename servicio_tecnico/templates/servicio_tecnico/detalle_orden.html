@@ -2364,12 +2364,328 @@
                             {% endif %}
                         </div>
                         {% endfor %}
-                    </div>
                 </div>
             </div>
         </div>
     </div>
-    
+</div>
+
+    <!-- ============================================================ -->
+    <!-- SECCIÓN 6.5: GALERÍA DE VIDEOS -->
+    <!-- ============================================================ -->
+
+    <div class="row mt-4">
+        <div class="col-12" id="galeria-videos">
+            <div class="card section-card">
+                <div class="section-header modal-header-video d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <span>
+                        <i class="bi bi-camera-video-fill me-1"></i>
+                        Galería de Videos del Equipo
+                        <span class="badge bg-dark ms-2">{{ total_videos }} video{{ total_videos|pluralize:"s" }}</span>
+                    </span>
+                </div>
+                <div class="card-body">
+
+                    <!-- ── Formulario para subir video ── -->
+                    <div class="border rounded p-3 mb-4 bg-light" id="contenedorFormVideo">
+                        <h6 class="mb-3">
+                            <i class="bi bi-camera-video"></i> Subir Video de Evidencia
+                        </h6>
+
+                        <form method="post" enctype="multipart/form-data"
+                              id="form-subir-video"
+                              action="">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="subir_video">
+
+                            <!-- ════════════════════════════════════════════════════════
+                                 SELECTOR DE TIPO DE VIDEO — Radio cards con colores
+                                 Mismo patrón que las imágenes.
+                                 ════════════════════════════════════════════════════════ -->
+                            <div class="row mb-3">
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold mb-2">
+                                        <i class="bi bi-tag-fill me-1"></i> Tipo de Video
+                                        <span class="text-danger ms-1" title="Obligatorio">*</span>
+                                    </label>
+
+                                    <div class="tipo-imagen-cards" id="tipoVideoCards" role="group" aria-label="Tipo de video">
+
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="vtipo_ingreso"     value="ingreso">
+                                        <label for="vtipo_ingreso"     class="tipo-imagen-card tipo-ingreso">
+                                            <i class="bi bi-box-arrow-in-right"></i>
+                                            <span>Ingreso</span>
+                                        </label>
+
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="vtipo_diagnostico" value="diagnostico">
+                                        <label for="vtipo_diagnostico" class="tipo-imagen-card tipo-diagnostico">
+                                            <i class="bi bi-search"></i>
+                                            <span>Diagnóstico</span>
+                                        </label>
+
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="vtipo_reparacion"  value="reparacion">
+                                        <label for="vtipo_reparacion"  class="tipo-imagen-card tipo-reparacion">
+                                            <i class="bi bi-wrench-adjustable"></i>
+                                            <span>Reparación</span>
+                                        </label>
+
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="vtipo_egreso"      value="egreso">
+                                        <label for="vtipo_egreso"      class="tipo-imagen-card tipo-egreso">
+                                            <i class="bi bi-box-arrow-right"></i>
+                                            <span>Egreso</span>
+                                        </label>
+
+                                        <input type="radio" class="tipo-imagen-radio" name="tipo" id="vtipo_packing" value="packing">
+                                        <label for="vtipo_packing" class="tipo-imagen-card tipo-packing">
+                                            <i class="bi bi-box-seam"></i>
+                                            <span>Packing</span>
+                                        </label>
+
+                                    </div>
+
+                                    <!-- Aviso contextual al seleccionar un tipo -->
+                                    <div id="tipoVideoAviso" class="tipo-imagen-aviso d-none mt-2"></div>
+                                </div>
+                            </div>
+
+                            <div class="row align-items-start">
+                                <div class="col-md-9 mb-3">
+                                    <!-- Botón grande para seleccionar video -->
+                                    <label for="inputVideo"
+                                           class="btn btn-outline-primary w-100 btn-upload-dual"
+                                           style="height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; padding: 0.5rem;"
+                                           id="labelInputVideo">
+                                        <i class="bi bi-camera-video-fill" style="font-size: 1.8rem; line-height: 1;"></i>
+                                        <span style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.2;">Seleccionar<br>Video</span>
+                                    </label>
+                                    <input type="file"
+                                           name="video"
+                                           id="inputVideo"
+                                           class="d-none"
+                                           accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,video/mpeg,video/3gpp,video/x-ms-wmv">
+
+                                    <!-- Preview del archivo seleccionado -->
+                                    <div id="previewVideo" class="preview-container mt-2" style="display: none;">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <small class="text-muted">
+                                                <i class="bi bi-camera-video"></i>
+                                                <span id="nombreArchivoVideo">—</span>
+                                            </small>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" id="btnQuitarVideo">
+                                                <i class="bi bi-x-circle"></i> Quitar
+                                            </button>
+                                        </div>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <span class="badge bg-secondary" id="tamanoArchivoVideo"></span>
+                                            <small class="text-muted">Listo para comprimir con FFmpeg</small>
+                                        </div>
+                                    </div>
+
+                                    <small class="text-muted d-block mt-2">
+                                        <i class="bi bi-info-circle"></i>
+                                        Máximo 90 MB · Duración máx. 60 s · Formatos: MP4, MOV, AVI, MKV, WebM
+                                    </small>
+                                </div>
+
+                                <div class="col-md-3 mb-3">
+                                    <button type="submit"
+                                            class="btn btn-success w-100"
+                                            id="btnSubirVideo"
+                                            style="height: 70px; font-size: 0.95rem;"
+                                            disabled>
+                                        <i class="bi bi-cloud-upload d-block mb-1" style="font-size:1.4rem;"></i>
+                                        Subir Video
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Barra de progreso de subida (oculta por defecto) -->
+                            <div class="row mb-3" id="progresoVideoUpload" style="display: none;">
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1 me-3">
+                                            <div class="progress" style="height: 25px;">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                                     role="progressbar"
+                                                     id="barraProgresoVideo"
+                                                     style="width: 0%">
+                                                    <span id="textoProgresoVideo">Subiendo…</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <span class="badge bg-primary" id="porcentajeProgresoVideo">0%</span>
+                                    </div>
+                                    <small class="text-muted d-block mt-1" id="infoVideoUpload">
+                                        <i class="bi bi-hourglass-split"></i> Enviando video al servidor…
+                                    </small>
+                                </div>
+                            </div>
+
+                            <!-- Estado FFmpeg (spinner de compresión, oculto por defecto) -->
+                            <div class="row mb-2" id="estadoFFmpeg" style="display: none;">
+                                <div class="col-12">
+                                    <div class="alert alert-warning py-2 mb-0 d-flex align-items-center gap-2">
+                                        <div class="spinner-border spinner-border-sm text-warning flex-shrink-0" role="status" aria-hidden="true"></div>
+                                        <div>
+                                            <span class="fw-semibold">Procesando con FFmpeg…</span>
+                                            <small class="d-block text-muted">Esto puede tardar hasta 30 s. No cierres esta página.</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Resultado final -->
+                            <div class="row" id="resultadoVideo" style="display: none;">
+                                <div class="col-12">
+                                    <div id="mensajeResultadoVideo" class="alert py-2 mb-0"></div>
+                                </div>
+                            </div>
+
+                            <!-- Campo de descripción -->
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    {{ form_video.descripcion.errors }}
+                                    <label for="{{ form_video.descripcion.id_for_label }}" class="form-label">
+                                        {{ form_video.descripcion.label }}
+                                    </label>
+                                    {{ form_video.descripcion }}
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- ── Pestañas por tipo de video ── -->
+                    <ul class="nav nav-pills mb-3 flex-wrap gap-1" id="videosTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="v-ingreso-tab" data-bs-toggle="pill" data-bs-target="#v-ingreso" type="button">
+                                <i class="bi bi-arrow-down-circle"></i> Ingreso
+                                <span class="badge bg-primary">{{ videos_por_tipo.ingreso.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="v-diagnostico-tab" data-bs-toggle="pill" data-bs-target="#v-diagnostico" type="button">
+                                <i class="bi bi-search"></i> Diagnóstico
+                                <span class="badge bg-primary">{{ videos_por_tipo.diagnostico.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="v-reparacion-tab" data-bs-toggle="pill" data-bs-target="#v-reparacion" type="button">
+                                <i class="bi bi-tools"></i> Reparación
+                                <span class="badge bg-primary">{{ videos_por_tipo.reparacion.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="v-egreso-tab" data-bs-toggle="pill" data-bs-target="#v-egreso" type="button">
+                                <i class="bi bi-arrow-up-circle"></i> Egreso
+                                <span class="badge bg-primary">{{ videos_por_tipo.egreso.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item d-none" role="presentation">
+                            <button class="nav-link" id="v-autorizacion-tab" data-bs-toggle="pill" data-bs-target="#v-autorizacion" type="button">
+                                <i class="bi bi-shield-check"></i> Autorización
+                                <span class="badge bg-success">{{ videos_por_tipo.autorizacion.count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="v-packing-tab" data-bs-toggle="pill" data-bs-target="#v-packing" type="button">
+                                <i class="bi bi-box-seam"></i> Packing
+                                <span class="badge bg-info text-dark">{{ videos_por_tipo.packing.count }}</span>
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Contenido de los tabs de video -->
+                    <div class="tab-content" id="videosTabContent">
+                        {% for tipo, videos in videos_por_tipo.items %}
+                        <div class="tab-pane fade {% if forloop.first %}show active{% endif %}"
+                             id="v-{{ tipo }}" role="tabpanel">
+                            {% if videos %}
+                            <div class="row g-3">
+                                {% for video in videos %}
+                                <div class="col-md-4 col-sm-6">
+                                    <div class="video-card" data-video-id="{{ video.pk }}">
+
+                                        <!-- Thumbnail / player -->
+                                        <div class="video-thumb-wrapper">
+                                            {% if video.thumbnail %}
+                                                <img src="{{ video.thumbnail.url }}"
+                                                     alt="Thumbnail {{ video.get_tipo_display }}"
+                                                     loading="lazy">
+                                            {% else %}
+                                                <div class="d-flex align-items-center justify-content-center h-100 bg-dark text-white">
+                                                    <i class="bi bi-camera-video fs-1"></i>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+
+                                        <!-- Info del video -->
+                                        <div class="p-2">
+                                            <div class="d-flex align-items-start justify-content-between gap-1 mb-1">
+                                                <span class="video-tipo-badge bg-primary text-white">
+                                                    {{ video.get_tipo_display }}
+                                                </span>
+                                                {% if video.porcentaje_compresion %}
+                                                <span class="badge bg-success" title="Ahorro de espacio tras compresión FFmpeg">
+                                                    -{{ video.porcentaje_compresion }}%
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                            {% if video.descripcion %}
+                                            <p class="small text-muted mb-1 text-truncate" title="{{ video.descripcion }}">
+                                                {{ video.descripcion }}
+                                            </p>
+                                            {% endif %}
+                                            <small class="text-muted d-block">
+                                                <i class="bi bi-person-circle"></i> {{ video.subido_por.nombre_completo }}
+                                            </small>
+                                            <small class="text-muted d-block">
+                                                <i class="bi bi-calendar3"></i> {{ video.fecha_subida|date:"d/m/Y H:i" }}
+                                            </small>
+                                        </div>
+
+                                        <!-- Botones de acción -->
+                                        <div class="d-flex gap-1 p-2 pt-0">
+                                            <!-- Ver video (abre en nueva pestaña) -->
+                                            <a href="{{ video.video.url }}"
+                                               target="_blank"
+                                               class="btn btn-sm btn-outline-primary flex-fill"
+                                               title="Ver video">
+                                                <i class="bi bi-play-circle me-1"></i>Ver
+                                            </a>
+                                            <!-- Eliminar -->
+                                            {% if perms.servicio_tecnico.delete_videoorden %}
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    title="Eliminar video"
+                                                    onclick="eliminarVideo(
+                                                        {{ video.pk }},
+                                                        '{% url 'servicio_tecnico:eliminar_video' video.pk %}',
+                                                        '{{ csrf_token }}'
+                                                    );">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-camera-video" style="font-size: 3rem;"></i>
+                                <p class="mt-2">No hay videos de {{ tipo }} aún.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                </div><!-- /card-body -->
+            </div><!-- /card -->
+        </div><!-- /col-12 -->
+    </div><!-- /row -->
+
 </div>
 
 <!-- ============================================================ -->
@@ -4627,6 +4943,9 @@
 <!-- Sistema dual de subida de imágenes (galería + cámara) -->
 <!-- v6.1: Mejoras en UX del selector de imágenes -->
 <script src="{% static 'js/upload_imagenes_dual.js' %}"></script>
+
+<!-- Subida y eliminación de videos de evidencia -->
+<script src="{% static 'js/upload_video.js' %}"></script>
 
 <!-- Cámara integrada - v6.1: Soporte iOS PWA + mejoras en cámara/galería -->
 <script src="{% static 'js/camara_integrada.js' %}"></script>

@@ -16,6 +16,7 @@ from .models import (
     VentaMostrador,
     PiezaVentaMostrador,  # NUEVO - FASE 2
     ImagenOrden,
+    VideoOrden,
     HistorialOrden,
     # MODELOS RHITSO - Módulo de Reparación Especializada
     EstadoRHITSO,
@@ -957,6 +958,87 @@ class ImagenOrdenAdmin(admin.ModelAdmin):
             )
         return 'No hay imagen'
     preview_imagen.short_description = 'Preview'
+
+
+# ============================================================================
+# ADMIN: VIDEO DE ORDEN
+# ============================================================================
+
+@admin.register(VideoOrden)
+class VideoOrdenAdmin(admin.ModelAdmin):
+    """
+    Administración de videos de evidencia de órdenes de servicio.
+    Permite visualizar metadatos de compresión y el thumbnail.
+    """
+    list_display = (
+        'orden',
+        'tipo',
+        'preview_thumb',
+        'duracion_segundos',
+        'tamano_original_mb',
+        'tamano_final_mb',
+        'porcentaje_ahorro',
+        'descripcion',
+        'subido_por',
+        'fecha_subida',
+    )
+    list_filter = ('tipo', 'fecha_subida')
+    search_fields = ('orden__numero_orden_interno', 'descripcion')
+    date_hierarchy = 'fecha_subida'
+
+    readonly_fields = (
+        'fecha_subida',
+        'preview_thumb_grande',
+        'duracion_segundos',
+        'tamano_original_mb',
+        'tamano_final_mb',
+    )
+
+    fields = (
+        'orden',
+        'tipo',
+        'video',
+        'thumbnail',
+        'preview_thumb_grande',
+        'duracion_segundos',
+        'tamano_original_mb',
+        'tamano_final_mb',
+        'descripcion',
+        'subido_por',
+        'fecha_subida',
+    )
+
+    def preview_thumb(self, obj):
+        """Muestra el thumbnail en la lista del admin."""
+        if obj.thumbnail:
+            return format_html(
+                '<img src="{}" style="width: 60px; height: 45px; object-fit: cover; border-radius: 4px;" />',
+                obj.thumbnail.url
+            )
+        return format_html('<span style="color:#999;">Sin thumb</span>')
+    preview_thumb.short_description = 'Miniatura'
+
+    def preview_thumb_grande(self, obj):
+        """Muestra el thumbnail en el detalle."""
+        if obj.thumbnail:
+            return format_html(
+                '<img src="{}" style="max-width: 320px; border-radius: 6px;" />',
+                obj.thumbnail.url
+            )
+        return 'Sin thumbnail'
+    preview_thumb_grande.short_description = 'Thumbnail'
+
+    def porcentaje_ahorro(self, obj):
+        """Muestra el porcentaje de compresión logrado."""
+        pct = obj.porcentaje_compresion
+        if pct is not None:
+            color = '#28a745' if pct >= 50 else '#ffc107'
+            return format_html(
+                '<span style="color:{}; font-weight:600;">{}%</span>',
+                color, pct
+            )
+        return '—'
+    porcentaje_ahorro.short_description = 'Ahorro %'
 
 
 # ============================================================================

@@ -17,6 +17,7 @@ from config.constants import (
     ESTADO_ORDEN_CHOICES,
     PAQUETES_CHOICES,
     TIPO_IMAGEN_CHOICES,
+    TIPO_VIDEO_CHOICES,
     TIPO_EVENTO_CHOICES,
     MOTIVO_RECHAZO_COTIZACION,
     ESTADO_PIEZA_CHOICES,
@@ -3248,5 +3249,195 @@ class AnalisisSentimientoEncuesta(models.Model):
             'mixto':    'bi-emoji-neutral',
             'neutral':  'bi-emoji-expressionless',
         }.get(self.sentimiento_general, 'bi-emoji-expressionless')
+
+
+# ============================================================================
+# FUNCIONES DE RUTA — VIDEOS
+# ============================================================================
+
+def video_upload_path(instance, filename):
+    """
+    Genera la ruta de almacenamiento para el archivo de video comprimido.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Al igual que las imágenes, los videos se organizan por orden_cliente para
+    mantener todas las evidencias de un equipo en la misma carpeta.
+
+    Estructura resultante:
+    - servicio_tecnico/videos/OS-001-2025/diagnostico_1748000000.mp4
+
+    Args:
+        instance: Instancia de VideoOrden que se está guardando
+        filename: Nombre del archivo (siempre termina en .mp4 tras la compresión)
+
+    Returns:
+        str: Ruta completa donde se guardará el video comprimido
+    """
+    orden_cliente = instance.orden.detalle_equipo.orden_cliente
+    if not orden_cliente or orden_cliente.strip() == '':
+        orden_cliente = instance.orden.numero_orden_interno
+    return f'servicio_tecnico/videos/{orden_cliente}/{filename}'
+
+
+def video_thumbnail_upload_path(instance, filename):
+    """
+    Genera la ruta de almacenamiento para el thumbnail del video.
+
+    Estructura resultante:
+    - servicio_tecnico/videos_thumbs/OS-001-2025/diagnostico_1748000000_thumb.jpg
+
+    Args:
+        instance: Instancia de VideoOrden que se está guardando
+        filename: Nombre del archivo de thumbnail
+
+    Returns:
+        str: Ruta completa donde se guardará el thumbnail
+    """
+    orden_cliente = instance.orden.detalle_equipo.orden_cliente
+    if not orden_cliente or orden_cliente.strip() == '':
+        orden_cliente = instance.orden.numero_orden_interno
+    return f'servicio_tecnico/videos_thumbs/{orden_cliente}/{filename}'
+
+
+# ============================================================================
+# MODELO: VIDEO DE ORDEN
+# ============================================================================
+
+class VideoOrden(models.Model):
+    """
+    Videos de evidencia asociados a una orden de servicio técnico.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este modelo almacena videos cortos (máximo 60 segundos) que los técnicos
+    graban para documentar:
+    - Comportamientos intermitentes difíciles de fotografiar
+    - Fallos en el arranque del equipo
+    - Estado del equipo al ingreso o egreso
+    - Evidencias durante diagnóstico o reparación
+
+    Los videos se comprimen automáticamente con FFmpeg al subirse:
+    - Formato de salida: MP4 (H.264 + AAC)
+    - Resolución máxima: 1280×720
+    - CRF 28 — balance entre calidad diagnóstica y tamaño de archivo
+    - Resultado típico: un video de 80MB queda en 3-10MB
+
+    Solo se guarda UNA versión del video (la comprimida), ya que a diferencia
+    de las imágenes, la "versión original" de un video de 60s puede ser
+    demasiado grande para almacenar dos copias.
+    """
+
+    # ── Relación con la Orden ───────────────────────────────────────────────
+    orden = models.ForeignKey(
+        OrdenServicio,
+        on_delete=models.CASCADE,
+        related_name='videos',
+        help_text="Orden de servicio a la que pertenece este video"
+    )
+
+    # ── Clasificación ───────────────────────────────────────────────────────
+    tipo = models.CharField(
+        max_length=15,
+        choices=TIPO_VIDEO_CHOICES,
+        help_text="Tipo de video según la etapa del servicio"
+    )
+
+    # ── Archivo de Video (versión comprimida con FFmpeg) ────────────────────
+    video = models.FileField(
+        upload_to=video_upload_path,
+        max_length=255,
+        validators=[FileExtensionValidator(['mp4'])],
+        help_text="Archivo de video comprimido (MP4 H.264, máx. 720p)"
+    )
+
+    # ── Thumbnail extraído por FFmpeg (frame en segundo 1) ──────────────────
+    thumbnail = models.ImageField(
+        upload_to=video_thumbnail_upload_path,
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Miniatura del video para la galería (JPG extraído con FFmpeg)"
+    )
+
+    # ── Metadatos técnicos ──────────────────────────────────────────────────
+    duracion_segundos = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Duración del video en segundos (detectada por FFprobe)"
+    )
+    tamano_original_mb = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Tamaño del archivo original antes de comprimir (MB)"
+    )
+    tamano_final_mb = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Tamaño del archivo comprimido (MB)"
+    )
+
+    # ── Descripción ─────────────────────────────────────────────────────────
+    descripcion = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Descripción breve del contenido del video"
+    )
+
+    # ── Metadatos de auditoría ──────────────────────────────────────────────
+    fecha_subida = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Fecha y hora en que se procesó y guardó el video"
+    )
+    subido_por = models.ForeignKey(
+        Empleado,
+        on_delete=models.PROTECT,
+        related_name='videos_subidos_servicio',
+        help_text="Empleado que subió el video"
+    )
+
+    # ── Método de guardado ──────────────────────────────────────────────────
+    def save(self, *args, **kwargs):
+        """Registra en el historial de la orden al subir un video nuevo."""
+        es_nuevo = self.pk is None
+        super().save(*args, **kwargs)
+
+        if es_nuevo:
+            duracion_str = f" ({self.duracion_segundos}s)" if self.duracion_segundos else ""
+            HistorialOrden.objects.create(
+                orden=self.orden,
+                tipo_evento='video',
+                comentario=(
+                    f"Video {self.get_tipo_display()}{duracion_str} subido"
+                    f"{': ' + self.descripcion if self.descripcion else ''}"
+                ),
+                usuario=self.subido_por,
+                es_sistema=True
+            )
+
+    # ── Propiedades de utilidad ─────────────────────────────────────────────
+    @property
+    def nombre_archivo(self):
+        """Retorna solo el nombre del archivo de video."""
+        import os
+        return os.path.basename(self.video.name) if self.video else ''
+
+    @property
+    def porcentaje_compresion(self):
+        """Retorna el porcentaje de reducción de tamaño logrado por FFmpeg."""
+        if self.tamano_original_mb and self.tamano_final_mb and self.tamano_original_mb > 0:
+            reduccion = (1 - self.tamano_final_mb / self.tamano_original_mb) * 100
+            return round(reduccion, 1)
+        return None
+
+    def __str__(self):
+        return f"Video {self.get_tipo_display()} — {self.orden.numero_orden_interno}"
+
+    class Meta:
+        ordering = ['fecha_subida']
+        verbose_name = "Video de Orden"
+        verbose_name_plural = "Videos de Órdenes"
 
 

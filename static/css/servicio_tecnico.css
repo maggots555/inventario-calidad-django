@@ -4797,3 +4797,100 @@ thead.sticky-top {
 }
 
 /* ===== FIN DARK MODE ===== */
+
+/* =============================================================================
+   GALERÍA DE VIDEOS — MODO CLARO
+   ============================================================================= */
+
+/* Contenedor de cada tarjeta de video */
+.video-card {
+    background-color: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.video-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+/* Zona del thumbnail / player */
+.video-card .video-thumb-wrapper {
+    position: relative;
+    background-color: #000;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.video-card .video-thumb-wrapper video,
+.video-card .video-thumb-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Badge de tipo (ingreso, diagnóstico, etc.) */
+.video-tipo-badge {
+    font-size: 0.70rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.55rem;
+    border-radius: 0.4rem;
+}
+
+/* Preview de archivo antes de subir */
+.video-preview-item {
+    background-color: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 0.5rem;
+}
+
+/* Spinner/estado de subida */
+#video-estado-subida .progress {
+    border-radius: 4px;
+    background-color: var(--gray-200);
+}
+
+/* Header del modal de video */
+.modal-header-video {
+    background: linear-gradient(135deg, #1f6391 0%, #16a085 100%);
+    color: #fff;
+}
+.modal-header-video * { color: #fff; }
+.modal-header-video .btn-close { filter: invert(1) grayscale(1); }
+
+/* Tabla de estadísticas de compresión */
+.video-stats-row td:first-child { font-weight: 500; }
+
+/* =============================================================================
+   GALERÍA DE VIDEOS — MODO OSCURO
+   ============================================================================= */
+
+[data-bs-theme="dark"] .video-card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] .video-card:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+[data-bs-theme="dark"] .video-preview-item {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] #video-estado-subida .progress {
+    background-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] .modal-header-video {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0d4a3a 100%);
+}
+
+/* ===== FIN GALERÍA DE VIDEOS ===== */

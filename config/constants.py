@@ -198,6 +198,19 @@ TIPO_IMAGEN_CHOICES = [
 ]
 
 # ============================================================================
+# TIPO DE VIDEOS - Para clasificación de evidencias en video
+# Mismos tipos que imágenes para consistencia de flujo de trabajo
+# ============================================================================
+TIPO_VIDEO_CHOICES = [
+    ('ingreso', 'Ingreso - Estado Inicial'),
+    ('diagnostico', 'Durante Diagnóstico'),
+    ('reparacion', 'Durante Reparación'),
+    ('egreso', 'Egreso - Estado Final'),
+    ('autorizacion', 'Autorización/Pass - RHITSO'),
+    ('packing', 'Packing'),
+]
+
+# ============================================================================
 # TIPO DE EVENTOS EN HISTORIAL - Para tracking de cambios
 # ============================================================================
 TIPO_EVENTO_CHOICES = [
@@ -207,6 +220,7 @@ TIPO_EVENTO_CHOICES = [
     ('comentario', 'Comentario de Usuario'),
     ('sistema', 'Evento del Sistema'),
     ('imagen', 'Subida de Imagen'),
+    ('video', 'Subida de Video'),
     ('cotizacion', 'Evento de Cotización'),
     ('pieza', 'Evento de Pieza'),
 ]

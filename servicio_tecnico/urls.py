@@ -37,6 +37,9 @@ urlpatterns = [
     
     # Eliminar imagen
     path('imagenes/<int:imagen_id>/eliminar/', views.eliminar_imagen, name='eliminar_imagen'),
+
+    # Eliminar video
+    path('videos/<int:video_id>/eliminar/', views.eliminar_video, name='eliminar_video'),
     
     # Listas de órdenes
     path('ordenes/activas/', views.lista_ordenes_activas, name='lista_activas'),

@@ -39,6 +39,7 @@ from .models import (
     DetalleEquipo, 
     HistorialOrden, 
     ImagenOrden,
+    VideoOrden,
     EstadoRHITSO,
     SeguimientoRHITSO,
     IncidenciaRHITSO,
@@ -72,6 +73,7 @@ from .forms import (
     AsignarResponsablesForm,
     ComentarioForm,
     SubirImagenesForm,
+    SubirVideoForm,
     EditarInformacionEquipoForm,
     CrearCotizacionForm,
     GestionarCotizacionForm,
@@ -2126,6 +2128,82 @@ def detalle_orden(request, orden_id):
                 })
         
         # ------------------------------------------------------------------------
+        # FORMULARIO: Subir Video de Evidencia
+        # ------------------------------------------------------------------------
+        elif form_type == 'subir_video':
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"🎥 Inicio procesamiento de video para orden {orden.numero_orden_interno}")
+
+            # Verificar que llegó el archivo
+            if 'video' not in request.FILES:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No se recibió ningún archivo de video.',
+                })
+
+            video_file = request.FILES['video']
+
+            # Validar tamaño máximo: 90 MB (bajo el límite de 100 MB de Cloudflare)
+            limite_bytes = 90 * 1024 * 1024
+            if video_file.size > limite_bytes:
+                return JsonResponse({
+                    'success': False,
+                    'error': (
+                        f'El video pesa {video_file.size / (1024*1024):.1f} MB y supera el límite de 90 MB. '
+                        'Recorta el video antes de subirlo.'
+                    ),
+                })
+
+            # Validar formulario
+            form_video = SubirVideoForm(request.POST, request.FILES)
+            if not form_video.is_valid():
+                logger.error(f"❌ Formulario de video inválido: {form_video.errors}")
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Error en el formulario de video.',
+                    'form_errors': dict(form_video.errors),
+                })
+
+            tipo_video = form_video.cleaned_data['tipo']
+            descripcion = form_video.cleaned_data.get('descripcion', '')
+
+            # Comprimir y guardar (síncrono — FFmpeg corre en el proceso)
+            try:
+                video_orden = comprimir_y_guardar_video(
+                    orden=orden,
+                    video_file=video_file,
+                    tipo=tipo_video,
+                    descripcion=descripcion,
+                    empleado=empleado_actual,
+                )
+                logger.info(f"✅ Video guardado correctamente (ID: {video_orden.pk})")
+
+                return JsonResponse({
+                    'success': True,
+                    'message': f'✅ Video de {video_orden.get_tipo_display()} comprimido y guardado correctamente.',
+                    'video_id': video_orden.pk,
+                    'tipo': tipo_video,
+                    'tamano_original_mb': round(video_file.size / (1024 * 1024), 2),
+                    'porcentaje_compresion': video_orden.porcentaje_compresion,
+                    'thumbnail_url': video_orden.thumbnail.url if video_orden.thumbnail else '',
+                })
+            except RuntimeError as e:
+                logger.error(f"❌ FFmpeg error al procesar video: {str(e)}")
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error al comprimir el video: {str(e)}',
+                }, status=500)
+            except Exception as e:
+                import traceback
+                logger.critical(f"❌ ERROR CRÍTICO AL GUARDAR VIDEO: {traceback.format_exc()}")
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error inesperado al procesar el video: {str(e)}',
+                    'error_type': type(e).__name__,
+                }, status=500)
+
+        # ------------------------------------------------------------------------
         # FORMULARIO 7: Editar Información Principal del Equipo
         # ------------------------------------------------------------------------
         elif form_type == 'editar_info_equipo':
@@ -2669,6 +2747,7 @@ def detalle_orden(request, orden_id):
     form_responsables = AsignarResponsablesForm(instance=orden)
     form_comentario = ComentarioForm()
     form_imagenes = SubirImagenesForm()
+    form_video = SubirVideoForm()
     form_editar_info = EditarInformacionEquipoForm(instance=orden.detalle_equipo)
     
     # Formulario para agregar/editar piezas (usado en el modal)
@@ -2702,6 +2781,21 @@ def detalle_orden(request, orden_id):
     }
     
     total_imagenes = orden.imagenes.count()
+
+    # ========================================================================
+    # ORGANIZAR VIDEOS POR TIPO
+    # ========================================================================
+
+    videos_por_tipo = {
+        'ingreso': orden.videos.filter(tipo='ingreso').order_by('-fecha_subida'),
+        'diagnostico': orden.videos.filter(tipo='diagnostico').order_by('-fecha_subida'),
+        'reparacion': orden.videos.filter(tipo='reparacion').order_by('-fecha_subida'),
+        'egreso': orden.videos.filter(tipo='egreso').order_by('-fecha_subida'),
+        'autorizacion': orden.videos.filter(tipo='autorizacion').order_by('-fecha_subida'),
+        'packing': orden.videos.filter(tipo='packing').order_by('-fecha_subida'),
+    }
+
+    total_videos = orden.videos.count()
     
     # Verificar si ya se enviaron correos de imágenes (para el estado de los botones)
     egreso_correo_ya_enviado = orden.historial.filter(
@@ -2849,6 +2943,7 @@ def detalle_orden(request, orden_id):
         'form_responsables': form_responsables,
         'form_comentario': form_comentario,
         'form_imagenes': form_imagenes,
+        'form_video': form_video,
         'form_editar_info': form_editar_info,
         
         # Formularios de Cotización
@@ -2881,6 +2976,10 @@ def detalle_orden(request, orden_id):
         'total_imagenes': total_imagenes,
         'egreso_correo_ya_enviado': egreso_correo_ya_enviado,
         'ingreso_correo_ya_enviado': ingreso_correo_ya_enviado,
+
+        # Videos
+        'videos_por_tipo': videos_por_tipo,
+        'total_videos': total_videos,
         
         # Empleados para copia en envío de imágenes
         'empleados_copia_imagenes': empleados_copia_imagenes,
@@ -3556,6 +3655,156 @@ def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
 
 
 # ============================================================================
+# FUNCIÓN AUXILIAR: Comprimir y Guardar Video con FFmpeg
+# ============================================================================
+
+def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
+    """
+    Comprime un video usando FFmpeg y guarda el resultado junto a un thumbnail.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Recibe el video crudo del formulario (puede ser .mp4, .mov, .avi, etc.)
+    - Lo comprime a H.264/AAC con FFmpeg al estándar acordado (máx 60 s, CRF 28)
+    - Extrae un thumbnail del segundo 1 del video comprimido
+    - Guarda el VideoOrden en la base de datos (el save() del modelo crea historial)
+
+    Args:
+        orden: OrdenServicio a la que pertenece el video
+        video_file: Archivo de video subido (InMemoryUploadedFile o TemporaryUploadedFile)
+        tipo: Tipo de video (ingreso, diagnostico, reparacion, egreso, autorizacion, packing)
+        descripcion: Descripción opcional del video
+        empleado: Empleado que sube el video
+
+    Returns:
+        VideoOrden: Registro creado con video comprimido y thumbnail
+    
+    Raises:
+        RuntimeError: Si FFmpeg no está disponible o falla la compresión
+    """
+    import subprocess
+    import tempfile
+    import time
+    from django.core.files.base import ContentFile
+    from pathlib import Path as PPath
+
+    # Número de serie del equipo para logging
+    service_tag = orden.detalle_equipo.numero_serie
+
+    # Timestamp único para nombres de archivo
+    timestamp = int(time.time() * 1000)
+
+    # Extensión de entrada (preservar para que FFmpeg detecte el codec de entrada)
+    extension_entrada = os.path.splitext(video_file.name)[1].lower()
+    if not extension_entrada:
+        extension_entrada = '.mp4'
+
+    # Nombre base del archivo de salida (siempre .mp4)
+    nombre_video = f"{tipo}_{timestamp}.mp4"
+    nombre_thumb = f"{tipo}_{timestamp}_thumb.jpg"
+
+    # =========================================================================
+    # ESCRIBIR ARCHIVO TEMPORAL DE ENTRADA
+    # =========================================================================
+    with tempfile.NamedTemporaryFile(suffix=extension_entrada, delete=False) as tmp_in:
+        for chunk in video_file.chunks():
+            tmp_in.write(chunk)
+        tmp_in_path = tmp_in.name
+
+    tmp_out_path = tmp_in_path + '_out.mp4'
+    tmp_thumb_path = tmp_in_path + '_thumb.jpg'
+
+    try:
+        # =====================================================================
+        # COMPRIMIR CON FFMPEG
+        # Comando acordado: H.264 + AAC, máx 720p, máx 65 s, CRF 28, fast
+        # =====================================================================
+        cmd_compress = [
+            'ffmpeg',
+            '-i', tmp_in_path,
+            '-vf', (
+                "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
+                "scale=trunc(iw/2)*2:trunc(ih/2)*2"
+            ),
+            '-c:v', 'libx264',
+            '-crf', '28',
+            '-preset', 'fast',
+            '-pix_fmt', 'yuv420p',
+            '-profile:v', 'main',
+            '-level', '4.0',
+            '-c:a', 'aac',
+            '-b:a', '96k',
+            '-map', '0:v:0',
+            '-map', '0:a:0?',
+            '-movflags', '+faststart',
+            '-t', '65',
+            '-map_metadata', '-1',
+            '-y',
+            tmp_out_path,
+        ]
+        resultado = subprocess.run(
+            cmd_compress,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 minutos máximo
+        )
+        if resultado.returncode != 0:
+            raise RuntimeError(
+                f'FFmpeg falló (código {resultado.returncode}): {resultado.stderr[-500:]}'
+            )
+
+        # =====================================================================
+        # EXTRAER THUMBNAIL DEL SEGUNDO 1
+        # =====================================================================
+        cmd_thumb = [
+            'ffmpeg',
+            '-i', tmp_out_path,
+            '-ss', '00:00:01',
+            '-vframes', '1',
+            '-q:v', '3',
+            '-y',
+            tmp_thumb_path,
+        ]
+        subprocess.run(cmd_thumb, capture_output=True, timeout=30)
+        # Si el thumbnail falla no es crítico; VideoOrden.thumbnail puede quedar vacío
+
+        # =====================================================================
+        # CREAR REGISTRO VideoOrden
+        # =====================================================================
+        video_orden = VideoOrden(
+            orden=orden,
+            tipo=tipo,
+            descripcion=descripcion,
+            subido_por=empleado,
+        )
+
+        # Guardar video comprimido
+        with open(tmp_out_path, 'rb') as f_video:
+            video_orden.video.save(nombre_video, ContentFile(f_video.read()), save=False)
+
+        # Guardar thumbnail (si se generó)
+        if PPath(tmp_thumb_path).exists():
+            with open(tmp_thumb_path, 'rb') as f_thumb:
+                video_orden.thumbnail.save(nombre_thumb, ContentFile(f_thumb.read()), save=False)
+
+        # Guardar tamaño original para estadísticas de compresión
+        video_orden.tamano_original = video_file.size
+
+        # save() del modelo registra el historial automáticamente
+        video_orden.save()
+
+        return video_orden
+
+    finally:
+        # Limpiar archivos temporales siempre, aunque haya error
+        for tmp_path in [tmp_in_path, tmp_out_path, tmp_thumb_path]:
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except Exception:
+                pass
+
+
+# ============================================================================
 # VISTA: Descargar Imagen Original
 # ============================================================================
 
@@ -3754,6 +4003,116 @@ def eliminar_imagen(request, imagen_id):
             'success': False,
             'error': f'Error inesperado al eliminar la imagen: {str(e)}',
             'error_type': type(e).__name__
+        }, status=500)
+
+
+# ============================================================================
+# VISTA: Eliminar Video de Orden
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.delete_videoorden')
+@require_http_methods(["POST"])
+def eliminar_video(request, video_id):
+    """
+    Elimina un video de una orden de servicio.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    - Solo acepta POST (nunca GET, para evitar borrados accidentales con links)
+    - Borra el archivo de video Y el thumbnail del sistema de archivos
+    - Registra el evento en el historial de la orden
+    - Devuelve JSON para que el frontend pueda actualizar la UI sin recargar
+
+    Args:
+        request: Objeto HttpRequest
+        video_id: ID del VideoOrden a eliminar
+    
+    Returns:
+        JsonResponse con éxito o error
+    """
+    # Verificar que el usuario es un empleado activo
+    try:
+        empleado_actual = request.user.empleado
+        if not empleado_actual.activo:
+            return JsonResponse({
+                'success': False,
+                'error': 'No tienes permisos para eliminar videos.'
+            }, status=403)
+    except Exception:
+        return JsonResponse({
+            'success': False,
+            'error': 'Debes ser un empleado activo para eliminar videos.'
+        }, status=403)
+
+    # Obtener el video o retornar error 404
+    try:
+        video = VideoOrden.objects.select_related('orden', 'subido_por').get(pk=video_id)
+    except VideoOrden.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'El video no existe.'
+        }, status=404)
+
+    try:
+        from pathlib import Path
+
+        orden = video.orden
+        tipo_video = video.get_tipo_display()
+        descripcion_video = video.descripcion or video.nombre_archivo
+        archivos_eliminados = []
+
+        # Eliminar archivo de video comprimido
+        if video.video:
+            try:
+                archivo_path = Path(video.video.path)
+                if archivo_path.exists() and archivo_path.is_file():
+                    os.remove(str(archivo_path))
+                    archivos_eliminados.append('video')
+                    print(f"[ELIMINAR VIDEO] ✅ Video eliminado: {archivo_path.name}")
+                else:
+                    print(f"[ELIMINAR VIDEO] ⚠️ Video no encontrado: {archivo_path}")
+            except Exception as e:
+                print(f"[ELIMINAR VIDEO] ⚠️ Error al eliminar archivo de video: {str(e)}")
+
+        # Eliminar thumbnail
+        if video.thumbnail:
+            try:
+                thumb_path = Path(video.thumbnail.path)
+                if thumb_path.exists() and thumb_path.is_file():
+                    os.remove(str(thumb_path))
+                    archivos_eliminados.append('thumbnail')
+                    print(f"[ELIMINAR VIDEO] ✅ Thumbnail eliminado: {thumb_path.name}")
+                else:
+                    print(f"[ELIMINAR VIDEO] ⚠️ Thumbnail no encontrado: {thumb_path}")
+            except Exception as e:
+                print(f"[ELIMINAR VIDEO] ⚠️ Error al eliminar thumbnail: {str(e)}")
+
+        # Eliminar registro de base de datos
+        video.delete()
+
+        # Registrar en historial
+        HistorialOrden.objects.create(
+            orden=orden,
+            tipo_evento='video',
+            comentario=f'Video {tipo_video} eliminado: {descripcion_video} (Eliminado por: {empleado_actual.nombre_completo})',
+            usuario=empleado_actual,
+            es_sistema=False,
+        )
+
+        mensaje_archivos = f" ({', '.join(archivos_eliminados)})" if archivos_eliminados else ""
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Video {tipo_video} eliminado correctamente{mensaje_archivos}.',
+            'video_id': video_id,
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"❌ ERROR AL ELIMINAR VIDEO: {traceback.format_exc()}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Error inesperado al eliminar el video: {str(e)}',
+            'error_type': type(e).__name__,
         }, status=500)
 
 
