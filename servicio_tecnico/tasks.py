@@ -2990,3 +2990,244 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
                 logger.debug(f"[VIDEO-RESUMEN] Directorio temporal eliminado: {tmp_dir}")
         except Exception:
             pass
+
+
+# ============================================================================
+# TAREA CELERY: COMPRIMIR VIDEO RESUMEN PARA DESCARGA
+# ============================================================================
+
+@shared_task(
+    bind=True,
+    name='servicio_tecnico.comprimir_video_resumen_descarga',
+    max_retries=3,
+    soft_time_limit=600,   # 10 minutos soft limit
+    time_limit=720,        # 12 minutos hard limit
+)
+def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int):
+    """
+    Tarea Celery que comprime el video resumen de una orden para su descarga.
+
+    Aplica los mismos parámetros que comprimir_y_guardar_video() en views.py:
+    - Codec: H.264 (libx264), CRF 28, preset fast
+    - Audio: AAC 96k
+    - Resolución máxima: 1280×720 (sin límite de duración)
+    - Resultado: VideoOrden(tipo='resumen_comprimido') ligado a la misma orden
+
+    Si ya existe un 'resumen_comprimido' para la orden, se reemplaza.
+
+    Args:
+        self       : Referencia a la tarea Celery (bind=True)
+        video_id   : ID del VideoOrden(tipo='resumen') original
+        usuario_id : ID del usuario que solicitó la descarga
+    """
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+    import time
+    from pathlib import Path
+
+    from django.contrib.auth import get_user_model
+    from django.core.files import File
+
+    from .models import VideoOrden, HistorialOrden
+
+    logger.info(f"[VIDEO-COMPRESION] Iniciando compresión para VideoOrden ID {video_id}")
+
+    ffmpeg_bin = shutil.which('ffmpeg') or '/usr/bin/ffmpeg'
+    tmp_dir = tempfile.mkdtemp(prefix='video_compresion_')
+    tmp_out = os.path.join(tmp_dir, 'resumen_comprimido.mp4')
+    timestamp = int(time.time() * 1000)
+
+    _usuario_err = None
+
+    try:
+        # =====================================================================
+        # PASO 1: OBTENER VIDEO ORIGINAL Y USUARIO
+        # =====================================================================
+        try:
+            video_original = VideoOrden.objects.select_related(
+                'orden', 'orden__sucursal'
+            ).get(pk=video_id, tipo='resumen')
+        except VideoOrden.DoesNotExist:
+            raise ValueError(
+                f"VideoOrden ID {video_id} de tipo 'resumen' no encontrado."
+            )
+
+        orden = video_original.orden
+
+        User = get_user_model()
+        try:
+            _usuario_err = User.objects.get(pk=usuario_id)
+        except User.DoesNotExist:
+            _usuario_err = None
+
+        # =====================================================================
+        # PASO 2: VERIFICAR QUE EL ARCHIVO FÍSICO EXISTE
+        # =====================================================================
+        if not video_original.video:
+            raise ValueError("El video resumen original no tiene archivo asociado.")
+
+        ruta_original = video_original.video.path
+        if not os.path.isfile(ruta_original):
+            raise FileNotFoundError(
+                f"El archivo del video resumen no existe en disco: {ruta_original}"
+            )
+
+        tamano_original_mb = round(os.path.getsize(ruta_original) / (1024 * 1024), 2)
+        logger.info(
+            f"[VIDEO-COMPRESION] Archivo fuente: {ruta_original} "
+            f"({tamano_original_mb} MB)"
+        )
+
+        # =====================================================================
+        # PASO 3: COMPRIMIR CON FFMPEG
+        # Mismos parámetros que comprimir_y_guardar_video() en views.py:
+        # - CRF 28 (vs CRF 23 del original) — ~30-40% menos peso
+        # - preset fast (vs medium del original) — más rápido
+        # - Sin -t (sin límite de duración)
+        # =====================================================================
+        cmd_comprimir = [
+            ffmpeg_bin,
+            '-i', ruta_original,
+            '-vf', (
+                "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
+                "scale=trunc(iw/2)*2:trunc(ih/2)*2"
+            ),
+            '-c:v',      'libx264',
+            '-crf',      '28',
+            '-preset',   'fast',
+            '-pix_fmt',  'yuv420p',
+            '-profile:v', 'main',
+            '-level',    '4.0',
+            '-c:a',      'aac',
+            '-b:a',      '96k',
+            '-map',      '0:v:0',
+            '-map',      '0:a:0?',   # Audio opcional (no falla si no hay)
+            '-movflags', '+faststart',
+            '-map_metadata', '-1',   # Eliminar metadatos del original
+            '-y',
+            tmp_out,
+        ]
+
+        logger.info(f"[VIDEO-COMPRESION] Ejecutando FFmpeg para orden {orden.numero_orden_interno}")
+
+        resultado = subprocess.run(
+            cmd_comprimir,
+            capture_output=True,
+            text=True,
+            timeout=580,
+        )
+
+        if resultado.returncode != 0:
+            raise RuntimeError(
+                f"FFmpeg falló al comprimir (código {resultado.returncode}): "
+                f"{resultado.stderr[-800:]}"
+            )
+
+        if not os.path.isfile(tmp_out) or os.path.getsize(tmp_out) == 0:
+            raise RuntimeError("FFmpeg no generó el archivo comprimido.")
+
+        tamano_final_mb = round(os.path.getsize(tmp_out) / (1024 * 1024), 2)
+        logger.info(
+            f"[VIDEO-COMPRESION] Compresión completada: "
+            f"{tamano_original_mb} MB → {tamano_final_mb} MB "
+            f"(ahorro: {round((1 - tamano_final_mb / tamano_original_mb) * 100, 1)}%)"
+        )
+
+        # =====================================================================
+        # PASO 4: ELIMINAR COMPRIMIDO ANTERIOR SI EXISTE (REEMPLAZAR)
+        # =====================================================================
+        video_anterior = VideoOrden.objects.filter(
+            orden=orden, tipo='resumen_comprimido'
+        ).first()
+        if video_anterior:
+            try:
+                if video_anterior.video:
+                    video_anterior.video.delete(save=False)
+                video_anterior.delete()
+                logger.info(f"[VIDEO-COMPRESION] Eliminado comprimido anterior para orden {orden.pk}")
+            except Exception as e:
+                logger.warning(f"[VIDEO-COMPRESION] No se pudo eliminar comprimido anterior: {e}")
+
+        # =====================================================================
+        # PASO 5: GUARDAR NUEVO VideoOrden(tipo='resumen_comprimido')
+        # =====================================================================
+        nombre_video = f"resumen_comprimido_{timestamp}.mp4"
+
+        video_comprimido = VideoOrden(
+            orden=orden,
+            tipo='resumen_comprimido',
+            descripcion=(
+                f"Versión comprimida del video resumen — "
+                f"{tamano_original_mb} MB → {tamano_final_mb} MB"
+            ),
+            subido_por=video_original.subido_por,
+            tamano_original_mb=tamano_original_mb,
+            tamano_final_mb=tamano_final_mb,
+        )
+
+        with open(tmp_out, 'rb') as f_video:
+            video_comprimido.video.save(nombre_video, File(f_video), save=False)
+
+        video_comprimido.save()
+
+        # =====================================================================
+        # PASO 6: HISTORIAL
+        # =====================================================================
+        try:
+            HistorialOrden.objects.create(
+                orden=orden,
+                tipo_evento='video',
+                descripcion=(
+                    f"Video resumen comprimido para descarga generado. "
+                    f"Tamaño: {tamano_final_mb} MB "
+                    f"(reducción del "
+                    f"{round((1 - tamano_final_mb / tamano_original_mb) * 100, 1)}%)"
+                ),
+            )
+        except Exception as e:
+            logger.warning(f"[VIDEO-COMPRESION] No se pudo crear historial: {e}")
+
+        logger.info(
+            f"[VIDEO-COMPRESION] ✓ Completado — VideoOrden ID {video_comprimido.pk} "
+            f"| Orden {orden.numero_orden_interno} | {tamano_final_mb} MB"
+        )
+
+        return {
+            'success': True,
+            'video_id': video_comprimido.pk,
+            'video_url': video_comprimido.video.url,
+            'tamano_original_mb': tamano_original_mb,
+            'tamano_final_mb': tamano_final_mb,
+        }
+
+    except Exception as exc:
+        logger.error(
+            f"[VIDEO-COMPRESION] Error para VideoOrden ID {video_id}: {exc}",
+            exc_info=True,
+        )
+
+        try:
+            from notificaciones.utils import notificar_error
+            notificar_error(
+                titulo="Error al comprimir video resumen",
+                mensaje=f"VideoOrden ID {video_id} — {str(exc)[:300]}",
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
+
+        if not isinstance(exc, ValueError):
+            raise self.retry(exc=exc, countdown=30)
+        raise
+
+    finally:
+        try:
+            if os.path.isdir(tmp_dir):
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                logger.debug(f"[VIDEO-COMPRESION] Directorio temporal eliminado: {tmp_dir}")
+        except Exception:
+            pass

@@ -18267,3 +18267,108 @@ def estado_video_resumen(request, task_id):
             respuesta['error'] = 'Error desconocido al generar el video.'
 
     return JsonResponse(respuesta)
+
+
+# ============================================================================
+# VISTAS: COMPRIMIR VIDEO RESUMEN PARA DESCARGA (Celery)
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def comprimir_video_resumen(request, video_id):
+    """
+    Encola la tarea Celery que comprime el video resumen para descarga.
+
+    Recibe el ID del VideoOrden(tipo='resumen') original y devuelve el task_id
+    para que el frontend haga polling del estado.
+
+    Método: POST
+    URL: /servicio-tecnico/video-resumen/<video_id>/comprimir/
+
+    Returns:
+        JsonResponse:
+            - {'success': True, 'task_id': str}
+            - {'success': False, 'error': str}
+    """
+    from .tasks import comprimir_video_resumen_descarga_task
+
+    # Verificar que el video original existe y es de tipo 'resumen'
+    video_original = get_object_or_404(VideoOrden, pk=video_id, tipo='resumen')
+
+    if not video_original.video:
+        return JsonResponse({
+            'success': False,
+            'error': 'El video resumen no tiene archivo asociado.',
+        }, status=400)
+
+    # Encolar la tarea Celery
+    tarea = comprimir_video_resumen_descarga_task.delay(
+        video_id=video_original.pk,
+        usuario_id=request.user.pk,
+    )
+
+    logger.info(
+        f"[VIDEO-COMPRESION] Tarea encolada — VideoOrden {video_original.pk} "
+        f"| Orden {video_original.orden.numero_orden_interno} "
+        f"| task_id={tarea.id} | usuario={request.user.username}"
+    )
+
+    return JsonResponse({
+        'success': True,
+        'task_id': tarea.id,
+        'tamano_original_mb': video_original.tamano_final_mb,
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def estado_compresion_resumen(request, task_id):
+    """
+    Polling del estado de la tarea Celery de compresión para descarga.
+
+    Devuelve el estado actual. Cuando la tarea termina con SUCCESS,
+    incluye la URL del archivo comprimido para que el frontend inicie
+    la descarga automáticamente.
+
+    Método: GET
+    URL: /servicio-tecnico/video-resumen/compresion/estado/<task_id>/
+
+    Returns:
+        JsonResponse:
+            estado       : 'PENDING' | 'STARTED' | 'SUCCESS' | 'FAILURE' | 'RETRY'
+            listo        : True si terminó (éxito o fallo)
+            video_url    : URL del MP4 comprimido (solo en SUCCESS)
+            tamano_final_mb   : Tamaño del archivo comprimido en MB
+            tamano_original_mb: Tamaño del archivo original en MB
+            error        : Mensaje de error (solo en FAILURE)
+    """
+    from celery.result import AsyncResult
+
+    resultado = AsyncResult(task_id)
+    estado = resultado.state
+
+    respuesta = {
+        'estado': estado,
+        'listo': estado in ('SUCCESS', 'FAILURE'),
+    }
+
+    if estado == 'SUCCESS':
+        data = resultado.result or {}
+        video_id = data.get('video_id')
+        if video_id:
+            try:
+                video = VideoOrden.objects.get(pk=video_id, tipo='resumen_comprimido')
+                respuesta['video_url'] = video.video.url if video.video else None
+                respuesta['tamano_final_mb'] = data.get('tamano_final_mb', 0)
+                respuesta['tamano_original_mb'] = data.get('tamano_original_mb', 0)
+            except VideoOrden.DoesNotExist:
+                respuesta['error'] = 'El video comprimido no se encontró en la base de datos.'
+
+    elif estado == 'FAILURE':
+        error = resultado.result
+        if isinstance(error, Exception):
+            respuesta['error'] = str(error)[:300]
+        else:
+            respuesta['error'] = 'Error desconocido al comprimir el video.'
+
+    return JsonResponse(respuesta)

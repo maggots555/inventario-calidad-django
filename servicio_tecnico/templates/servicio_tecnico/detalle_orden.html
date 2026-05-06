@@ -2694,7 +2694,9 @@
     <div class="row mt-4">
         <div class="col-12">
             <div class="card section-card" id="video-resumen-contenedor"
-                 data-url-estado="{% url 'servicio_tecnico:estado_video_resumen' 'TASK_ID_PLACEHOLDER' %}">
+                 data-url-estado="{% url 'servicio_tecnico:estado_video_resumen' 'TASK_ID_PLACEHOLDER' %}"
+                 data-url-compresion-estado="{% url 'servicio_tecnico:estado_compresion_resumen' 'TASK_ID_PLACEHOLDER' %}"
+                 {% if video_resumen %}data-video-id="{{ video_resumen.pk }}"{% endif %}>
 
                 <!-- Header de la sección -->
                 <div class="section-header-resumen d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -2784,28 +2786,30 @@
                                     {{ video_resumen.duracion_segundos|default:0 }}s · {{ video_resumen.tamano_final_mb }} MB
                                 {% endif %}
                             </span>
-                            <div class="d-flex gap-2 flex-wrap">
-                                <!-- Botón Descargar -->
-                                <a id="vr-btn-descargar"
-                                   class="btn btn-sm btn-outline-primary"
-                                   {% if video_resumen and video_resumen.video %}
-                                   href="{{ video_resumen.video.url }}"
-                                   download="video_resumen_{{ orden.numero_orden_interno }}.mp4"
-                                   {% endif %}>
-                                    <i class="bi bi-download me-1"></i> Descargar
-                                </a>
-                                <!-- Botón Regenerar -->
-                                {% if n_fotos_para_resumen >= 2 %}
-                                <button type="button"
-                                        id="btn-regenerar-video-resumen"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        data-orden-id="{{ orden.pk }}"
-                                        data-url-generar="{% url 'servicio_tecnico:generar_video_resumen' orden.pk %}"
-                                        data-tiene-video="true">
-                                    <i class="bi bi-arrow-clockwise me-1"></i> Regenerar
-                                </button>
-                                {% endif %}
-                            </div>
+                             <div class="d-flex gap-2 flex-wrap align-items-center">
+                                 <!-- Botón Descargar comprimido (dispara Celery) -->
+                                 {% if video_resumen and video_resumen.video %}
+                                 <button type="button"
+                                         id="vr-btn-descargar"
+                                         class="btn btn-sm btn-outline-primary"
+                                         data-video-id="{{ video_resumen.pk }}"
+                                         data-url-comprimir="{% url 'servicio_tecnico:comprimir_video_resumen' video_resumen.pk %}">
+                                     <i class="bi bi-download me-1" id="vr-btn-descargar-icon"></i>
+                                     <span id="vr-btn-descargar-texto">Descargar comprimido</span>
+                                 </button>
+                                 {% endif %}
+                                 <!-- Botón Regenerar -->
+                                 {% if n_fotos_para_resumen >= 2 %}
+                                 <button type="button"
+                                         id="btn-regenerar-video-resumen"
+                                         class="btn btn-sm btn-outline-secondary"
+                                         data-orden-id="{{ orden.pk }}"
+                                         data-url-generar="{% url 'servicio_tecnico:generar_video_resumen' orden.pk %}"
+                                         data-tiene-video="true">
+                                     <i class="bi bi-arrow-clockwise me-1"></i> Regenerar
+                                 </button>
+                                 {% endif %}
+                             </div>
                         </div>
                     </div>
 

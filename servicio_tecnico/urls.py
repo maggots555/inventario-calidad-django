@@ -432,4 +432,12 @@ urlpatterns = [
     # GET: Consulta el estado de una tarea Celery de generación de video resumen
     path('video-resumen/estado/<str:task_id>/',
          views.estado_video_resumen, name='estado_video_resumen'),
+
+    # ── Compresión de Video Resumen para Descarga (Celery) ──
+    # POST: Encola la tarea de compresión del video resumen (CRF 28, preset fast)
+    path('video-resumen/<int:video_id>/comprimir/',
+         views.comprimir_video_resumen, name='comprimir_video_resumen'),
+    # GET: Consulta el estado de la tarea Celery de compresión
+    path('video-resumen/compresion/estado/<str:task_id>/',
+         views.estado_compresion_resumen, name='estado_compresion_resumen'),
 ]

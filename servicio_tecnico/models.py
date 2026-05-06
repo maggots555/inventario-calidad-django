@@ -3336,7 +3336,7 @@ class VideoOrden(models.Model):
 
     # ── Clasificación ───────────────────────────────────────────────────────
     tipo = models.CharField(
-        max_length=15,
+        max_length=20,
         choices=TIPO_VIDEO_CHOICES,
         help_text="Tipo de video según la etapa del servicio"
     )
