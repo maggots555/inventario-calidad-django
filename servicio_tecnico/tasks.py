@@ -26,6 +26,7 @@ import traceback
 
 from celery import shared_task
 from notificaciones.utils import notificar_exito, notificar_error
+from config.constants import FFMPEG_DRAWTEXT_FONT
 
 logger = logging.getLogger('servicio_tecnico')
 
@@ -2537,6 +2538,38 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
     DURACION_CIERRE = 4
     # Tipos de foto que se incluyen en el video (en orden del flujo de trabajo)
     TIPOS_FOTO = ['ingreso', 'diagnostico', 'reparacion', 'egreso']
+    # Duración de la pantalla de intro del rewind (logo + datos del equipo)
+    DURACION_INTRO = 4
+    # Duración de cada tarjeta de sección en el rewind (fondo azul + texto)
+    DURACION_SECCION = 2
+    # Textos para las tarjetas de sección del rewind
+    TEXTO_SECCIONES = {
+        'ingreso':     'Así ingresó tu equipo',
+        'diagnostico': 'Fue diagnosticado minuciosamente',
+        'reparacion':  'Así se reparó',
+        'egreso':      'Tu equipo ahora...',
+    }
+
+    # =========================================================================
+    # HELPER: ESCAPADO DE TEXTO PARA DRAWTEXT
+    # =========================================================================
+    def _escape_ffmpeg_text(text: str) -> str:
+        """
+        Escapa caracteres especiales para el filtro drawtext de FFmpeg.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El filtro drawtext de FFmpeg tiene su propio lenguaje de escape.
+        Si el texto contiene apóstrofes, dos puntos o barras invertidas,
+        FFmpeg los interpreta como parte de la sintaxis del filtro y falla.
+        Esta función los escapa para que FFmpeg los trate como texto literal.
+        """
+        if not text:
+            return ''
+        text = text.replace('\\', '\\\\')  # \ → \\ (debe ir primero)
+        text = text.replace("'", "\\'")    # ' → \'
+        text = text.replace(':', '\\:')    # : → \: (separa opciones en FFmpeg)
+        text = text.replace('%', '%%')     # % → %% (expansión de variables drawtext)
+        return text
 
     # =========================================================================
     # PATHS TEMPORALES Y DE TRABAJO
@@ -2607,6 +2640,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
         # Se guarda como JPG temporal numerado para el comando FFmpeg.
         # IMPORTANTE: La ruta absoluta se obtiene con .path o con el campo .imagen
         foto_paths = []
+        imagenes_exitosas = []  # Imágenes que se escalaron correctamente (paralelo a foto_paths)
 
         for idx, imagen_obj in enumerate(imagenes_ordenadas):
             # Obtener ruta absoluta del archivo en disco
@@ -2651,6 +2685,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
                 continue
 
             foto_paths.append(ruta_escalada)
+            imagenes_exitosas.append(imagen_obj)
 
         if len(foto_paths) < 2:
             raise ValueError(
@@ -2661,52 +2696,99 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
         logger.info(f"[VIDEO-RESUMEN] {len(foto_paths)} imágenes escaladas correctamente")
 
         # =====================================================================
+        # PASO 3.5: DETECTAR MODO REWIND
+        # =====================================================================
+        # El modo rewind se activa SOLO si hay al menos 1 foto de cada uno de
+        # los 4 tipos: ingreso, diagnóstico, reparación y egreso.
+        # Si falta algún tipo, se usa el modo simple (comportamiento anterior).
+        fotos_por_tipo_idx = {t: [] for t in TIPOS_FOTO}
+        for path_idx, img in enumerate(imagenes_exitosas):
+            if img.tipo in fotos_por_tipo_idx:
+                fotos_por_tipo_idx[img.tipo].append(path_idx)
+
+        es_rewind = all(len(fotos_por_tipo_idx[t]) > 0 for t in TIPOS_FOTO)
+
+        logger.info(
+            f"[VIDEO-RESUMEN] Modo {'rewind' if es_rewind else 'simple'} — "
+            f"fotos por tipo: { {t: len(v) for t, v in fotos_por_tipo_idx.items()} }"
+        )
+
+        # =====================================================================
         # PASO 4: CONSTRUIR EL FILTERGRAPH DE FFMPEG
         # Ken Burns (zoompan) + xfade transiciones + pantalla de cierre con texto
+        # En modo rewind: también incluye intro con logo y tarjetas de sección.
         # =====================================================================
         #
         # El filtergraph funciona así:
         # - Cada imagen de entrada se procesa con "zoompan" (Ken Burns)
         # - zoompan: hace zoom gradual del 100% al 130% durante toda la duración
-        # - Todas las fotos se encadenan con "xfade=transition=fade"
+        # - Todos los clips se encadenan con "xfade=transition=fade"
         # - Al final se añade una pantalla negra con el texto de cierre
         #
-        # Cálculo de offsets para xfade:
-        # La primera foto dura DURACION_FOTO segundos.
-        # El segundo xfade empieza en: offset_anterior + DURACION_FOTO - DURACION_FADE
+        # MODO REWIND (activado si hay fotos de los 4 tipos):
+        # - Pantalla de intro: logo SIC + folio + tipo/marca/modelo
+        # - Tarjetas de sección (fondo azul #1f6391) antes de cada grupo de fotos
+        # - Secuencia: intro → [sec_ingreso → fotos ingreso] × 4 tipos → cierre
+        #
+        # Cálculo de offsets para xfade (generalizado):
+        # offset_acumulado = suma de duraciones visibles de clips anteriores.
+        # Cada xfade empieza en: offset_acumulado - DURACION_FADE.
         #
         # EXPLICACIÓN PARA PRINCIPIANTES:
         # El "filtergraph" es la cadena de filtros que FFmpeg aplica al video.
         # Cada filtro se conecta al siguiente con ";" y los clips se unen con xfade.
         # Los identificadores entre corchetes [v0], [v1], etc. son "pads" (conexiones).
 
-        # Total de fotos (sin contar la pantalla de cierre)
+        # Total de fotos (sin contar intro, tarjetas ni cierre)
         n_fotos = len(foto_paths)
 
         # Duración total de cada foto en frames (25 fps)
         fps = 25
-        frames_por_foto = DURACION_FOTO * fps  # 100 frames a 25fps
+        frames_por_foto = DURACION_FOTO * fps          # 100 frames — duración visible "neta"
+        frames_clip     = (DURACION_FOTO + DURACION_FADE) * fps  # 125 frames — duración real del clip
+        #
+        # IMPORTANTE — por qué frames_clip y NO frames_por_foto en el parámetro d de zoompan:
+        #
+        # Cada clip se pasa a FFmpeg con -t (DURACION_FOTO + DURACION_FADE) = 5 s = 125 frames,
+        # porque xfade necesita 1 s extra de overlap entre clips adyacentes.
+        #
+        # El parámetro `d` de zoompan indica cuántos frames dura el ciclo del efecto. Cuando
+        # zoompan llega al frame `d`, reinicia el estado de la variable `zoom` desde cero
+        # y comienza un nuevo ciclo con los frames restantes del clip.
+        #
+        # Con d=100 (frames_por_foto):
+        #   - Foto 0 (combined t=0–4 s): el reinicio ocurre en su frame 100 = combined t=4 s,
+        #     exactamente cuando el fade 0→1 TERMINA → clip 0 ya está a 0% de opacidad
+        #     → el reinicio es invisible para la foto 0.
+        #   - Foto 1 en adelante (combined t=3–8 s): el reinicio ocurre en su frame 100
+        #     = combined t=7 s, que coincide con el INICIO del siguiente fade → clip 1
+        #     todavía tiene opacidad plena → el reinicio del zoom se ve como un salto brusco.
+        #
+        # Con d=125 (frames_clip):
+        #   - El ciclo de zoom abarca los 5 s completos del clip, incluyendo el segundo
+        #     de overlap. El zoom nunca se reinicia mientras el clip es visible.
+        #   - El efecto Ken Burns es marginalmente más lento (0.0015 × 125 = 0.1875 unidades
+        #     de zoom en lugar de 0.15), lo que es visualmente idéntico.
 
-        # ── Construir entradas FFmpeg ──
-        # Cada foto se pasa como input con -loop 1 -t DURACION_FOTO
+        # ── Construir entradas FFmpeg (fotos) ──
+        # Cada foto se pasa como input con -loop 1 -t (DURACION_FOTO + DURACION_FADE)
         cmd_inputs = []
         for ruta in foto_paths:
             cmd_inputs += ['-loop', '1', '-t', str(DURACION_FOTO + DURACION_FADE), '-i', ruta]
 
-        # ── Construir filtergraph ──
-        # Filtros zoompan para cada foto
+        # ── Filtros Ken Burns para cada foto (aplica en ambos modos) ──
         filter_parts = []
         for i in range(n_fotos):
             # Ken Burns: zoom del 100% al 130%, con paneo suave al centro
             # La dirección del zoom alterna: pares hacen zoom-in, impares zoom-out
             if i % 2 == 0:
-                # Zoom in: empieza en 1.0 y crece hasta 1.3
-                zoom_expr = f"'min(zoom+0.0015,1.3)'"
+                # Zoom in: empieza en 1.0 y crece hasta ~1.19 en 125 frames
+                zoom_expr = "'min(zoom+0.0015,1.3)'"
                 x_expr = "'iw/2-(iw/zoom/2)'"
                 y_expr = "'ih/2-(ih/zoom/2)'"
             else:
-                # Zoom out: empieza en 1.3 y decrece a 1.0 (con max para no pasar de 1)
-                zoom_expr = f"'if(eq(on,1),1.3,max(zoom-0.0015,1.0))'"
+                # Zoom out: empieza en 1.3 y decrece a ~1.11 en 125 frames
+                zoom_expr = "'if(eq(on,1),1.3,max(zoom-0.0015,1.0))'"
                 x_expr = "'iw/2-(iw/zoom/2)'"
                 y_expr = "'ih/2-(ih/zoom/2)'"
 
@@ -2717,16 +2799,16 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
             filter_parts.append(
                 f"[{i}:v]scale=2560:1440:flags=lanczos,"
                 f"zoompan=z={zoom_expr}:x={x_expr}:y={y_expr}"
-                f":d={frames_por_foto}:s=1280x720,fps={fps},"
+                f":d={frames_clip}:s=1280x720,fps={fps},"
                 f"setsar=1,format=yuv420p[kbv{i}]"
             )
 
-        # Pantalla negra con texto de cierre
+        # ── Pantalla negra de cierre (aplica en ambos modos) ──
         # Usamos color=black y drawtext para el mensaje final
         filter_parts.append(
             f"color=black:size=1280x720:rate={fps}:duration={DURACION_CIERRE + DURACION_FADE},"
             f"drawtext="
-            f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"
+            f"fontfile={FFMPEG_DRAWTEXT_FONT}:"
             f"text='{TEXTO_CIERRE}':"
             f"fontcolor=white:"
             f"fontsize=36:"
@@ -2736,31 +2818,172 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
             f"[cierre]"
         )
 
-        # Encadenar clips con xfade
-        # El primer clip es [kbv0], luego [kbv1], ..., [cierre]
-        clips_labels = [f"[kbv{i}]" for i in range(n_fotos)] + ["[cierre]"]
-        total_clips = len(clips_labels)
+        # ──────────────────────────────────────────────────────────────────────
+        # MODO REWIND: intro con logo + tarjetas de sección
+        # ──────────────────────────────────────────────────────────────────────
+        if es_rewind:
+            # ── Preparar logo para la intro ──
+            # Estrategia (en orden de preferencia):
+            # 1. logo_sic_white.svg → rasterizar con rsvg-convert a PNG temporal
+            #    (logo blanco sobre fondo transparente, queda perfecto sobre #1f6391)
+            # 2. logo_sic.png original → usar con filtro colorkey en FFmpeg para
+            #    eliminar el fondo blanco
+            # 3. Si ninguno existe → degradar a modo simple
+            ruta_logo     = None   # ruta del archivo que pasará a FFmpeg
+            logo_colorkey = False  # True si es el PNG original con fondo blanco
 
-        # offset_acumulado: cuando empieza el fade entre clip N y N+1
-        # Cada clip aporta (DURACION_FOTO - DURACION_FADE) segundos "netos"
-        offset_acumulado = float(DURACION_FOTO)  # primer clip dura DURACION_FOTO segundos
-        ultimo_label = clips_labels[0]  # Empezamos con el primer clip
+            # Paso 1: intentar SVG blanco + rsvg-convert
+            ruta_svg = finders.find('images/logos/logo_sic_white.svg')
+            if not ruta_svg:
+                ruta_svg_fb = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    'static', 'images', 'logos', 'logo_sic_white.svg'
+                )
+                if os.path.isfile(ruta_svg_fb):
+                    ruta_svg = ruta_svg_fb
 
-        for i in range(1, total_clips):
-            next_label = clips_labels[i]
+            if ruta_svg and os.path.isfile(ruta_svg):
+                rsvg_bin = shutil.which('rsvg-convert')
+                if rsvg_bin:
+                    tmp_logo_png = os.path.join(tmp_dir, 'logo_intro.png')
+                    res_svg = subprocess.run(
+                        [rsvg_bin, '-w', '480', ruta_svg, '-o', tmp_logo_png],
+                        capture_output=True, text=True, timeout=15,
+                    )
+                    if res_svg.returncode == 0 and os.path.isfile(tmp_logo_png):
+                        ruta_logo = tmp_logo_png
+                        logger.info(
+                            "[VIDEO-RESUMEN] Logo: SVG blanco rasterizado con rsvg-convert"
+                        )
+                    else:
+                        logger.warning(
+                            f"[VIDEO-RESUMEN] rsvg-convert falló: {res_svg.stderr[:200]}"
+                        )
+
+            # Paso 2: fallback al PNG original con colorkey
+            if not ruta_logo:
+                ruta_png = finders.find('images/logos/logo_sic.png')
+                if not ruta_png:
+                    ruta_png_fb = os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        'static', 'images', 'logos', 'logo_sic.png'
+                    )
+                    if os.path.isfile(ruta_png_fb):
+                        ruta_png = ruta_png_fb
+                if ruta_png and os.path.isfile(ruta_png):
+                    ruta_logo     = ruta_png
+                    logo_colorkey = True
+                    logger.info(
+                        "[VIDEO-RESUMEN] Logo: usando PNG original con colorkey"
+                    )
+
+            if not ruta_logo:
+                logger.warning(
+                    "[VIDEO-RESUMEN] Ningún logo encontrado — "
+                    "degradando a modo simple sin regresión"
+                )
+                es_rewind = False  # degradar silenciosamente al modo simple
+
+        if es_rewind:
+            # El logo es el input adicional al final de las fotos
+            logo_idx = n_fotos
+            cmd_inputs += [
+                '-loop', '1',
+                '-t', str(DURACION_INTRO + DURACION_FADE),
+                '-i', ruta_logo,
+            ]
+
+            # Obtener datos del equipo para mostrar en la intro
+            try:
+                detalle       = orden.detalle_equipo
+                folio_display = detalle.orden_cliente or orden.numero_orden_interno
+                equipo_texto  = f"{detalle.tipo_equipo} {detalle.marca} {detalle.modelo}"
+            except Exception:
+                folio_display = orden.numero_orden_interno
+                equipo_texto  = ''
+
+            folio_esc  = _escape_ffmpeg_text(folio_display)
+            equipo_esc = _escape_ffmpeg_text(equipo_texto)
+
+            # ── Filtro de intro: fondo azul + logo centrado + texto ──
+            # color= genera un clip de fondo sólido azul (color de marca #1f6391)
+            filter_parts.append(
+                f"color=0x1f6391:size=1280x720:rate={fps}"
+                f":duration={DURACION_INTRO + DURACION_FADE}[bg_intro]"
+            )
+            # Escalar logo a 480px de ancho, mantener proporción, preparar alpha.
+            # - SVG rasterizado: ya tiene alpha limpio → solo scale + format=rgba
+            # - PNG original:    fondo blanco → colorkey elimina el blanco primero
+            if logo_colorkey:
+                filter_parts.append(
+                    f"[{logo_idx}:v]scale=480:-1,"
+                    f"colorkey=white:0.2:0.05,"
+                    f"format=rgba[logo_sc]"
+                )
+            else:
+                filter_parts.append(
+                    f"[{logo_idx}:v]scale=480:-1,format=rgba[logo_sc]"
+                )
+            # Superponer logo centrado horizontalmente, desplazado hacia arriba
+            filter_parts.append(
+                f"[bg_intro][logo_sc]overlay=(W-w)/2:(H-h)/2-100[introlog]"
+            )
+            # Texto del folio (número de orden) debajo del logo
+            filter_parts.append(
+                f"[introlog]drawtext=fontfile={FFMPEG_DRAWTEXT_FONT}:"
+                f"text='{folio_esc}':fontcolor=white:fontsize=48:"
+                f"x=(w-text_w)/2:y=(h-text_h)/2+60[introtext1]"
+            )
+            # Texto del equipo (tipo + marca + modelo) debajo del folio
+            filter_parts.append(
+                f"[introtext1]drawtext=fontfile={FFMPEG_DRAWTEXT_FONT}:"
+                f"text='{equipo_esc}':fontcolor=white:fontsize=28:"
+                f"x=(w-text_w)/2:y=(h-text_h)/2+115[intro]"
+            )
+
+            # ── Filtros de tarjetas de sección (fondo azul + texto grande) ──
+            for tipo in TIPOS_FOTO:
+                texto_sec_esc = _escape_ffmpeg_text(TEXTO_SECCIONES[tipo])
+                filter_parts.append(
+                    f"color=0x1f6391:size=1280x720:rate={fps}"
+                    f":duration={DURACION_SECCION + DURACION_FADE},"
+                    f"drawtext=fontfile={FFMPEG_DRAWTEXT_FONT}:"
+                    f"text='{texto_sec_esc}':fontcolor=white:fontsize=40:"
+                    f"x=(w-text_w)/2:y=(h-text_h)/2[sec_{tipo}]"
+                )
+
+            # ── Secuencia de clips rewind ──
+            # (label, duración_visible_en_segundos)
+            clips_sequence = [('[intro]', DURACION_INTRO)]
+            for tipo in TIPOS_FOTO:
+                clips_sequence.append((f'[sec_{tipo}]', DURACION_SECCION))
+                for path_idx in fotos_por_tipo_idx[tipo]:
+                    clips_sequence.append((f'[kbv{path_idx}]', DURACION_FOTO))
+            clips_sequence.append(('[cierre]', DURACION_CIERRE))
+
+        if not es_rewind:
+            # ── Secuencia de clips modo simple (todas las fotos en orden) ──
+            clips_sequence = [(f'[kbv{i}]', DURACION_FOTO) for i in range(n_fotos)]
+            clips_sequence.append(('[cierre]', DURACION_CIERRE))
+
+        # ── Encadenar todos los clips con xfade (generalizado para ambos modos) ──
+        # offset_acumulado = suma de duraciones visibles de los clips ya procesados.
+        # El xfade entre el clip N y N+1 empieza en: offset_acumulado - DURACION_FADE.
+        offset_acumulado = float(clips_sequence[0][1])
+        ultimo_label     = clips_sequence[0][0]
+
+        for i in range(1, len(clips_sequence)):
+            next_label, next_dur = clips_sequence[i]
             output_label = f"[xf{i}]"
-            # El offset es el momento en que empieza el fade (desde el inicio del video)
-            offset_str = f"{offset_acumulado - DURACION_FADE:.3f}"
+            offset_str   = f"{offset_acumulado - DURACION_FADE:.3f}"
             filter_parts.append(
                 f"{ultimo_label}{next_label}xfade=transition=fade"
                 f":duration={DURACION_FADE}:offset={offset_str}{output_label}"
             )
-            ultimo_label = output_label
-            # El siguiente offset suma la duración neta del clip actual
-            offset_acumulado += float(DURACION_FOTO)
+            ultimo_label      = output_label
+            offset_acumulado += float(next_dur)
 
         # El último label es el video final
-        # Le renombramos a [vout] para mayor claridad
         filter_parts.append(f"{ultimo_label}null[vout]")
 
         # Unir todo el filtergraph con ";"
@@ -2785,6 +3008,11 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
         # =====================================================================
         # PASO 6: EJECUTAR FFMPEG — GENERAR VIDEO FINAL
         # =====================================================================
+        # Índice del stream de audio:
+        # - Modo simple:  fotos son inputs 0..n_fotos-1, audio es n_fotos
+        # - Modo rewind:  fotos son 0..n_fotos-1, logo es n_fotos, audio es n_fotos+1
+        audio_stream_idx = n_fotos + (1 if es_rewind else 0)
+
         cmd_final = (
             [ffmpeg_bin]
             + cmd_inputs
@@ -2793,7 +3021,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
                 '-filter_complex', filtergraph,
                 '-map', '[vout]',
             ]
-            + (['-map', f'{n_fotos}:a:0'] if ruta_musica else [])
+            + (['-map', f'{audio_stream_idx}:a:0'] if ruta_musica else [])
             + [
                 '-c:v', 'libx264',
                 '-crf', '23',
@@ -2867,7 +3095,11 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
         # PASO 9: CREAR REGISTRO VideoOrden EN LA BASE DE DATOS
         # =====================================================================
         tamano_final_mb = round(os.path.getsize(tmp_video_out) / (1024 * 1024), 2)
-        duracion_estimada = (n_fotos * DURACION_FOTO) + DURACION_CIERRE
+        # Duración estimada: suma de duraciones visibles menos los solapamientos de xfade
+        duracion_estimada = int(
+            sum(dur for _, dur in clips_sequence)
+            - (len(clips_sequence) - 1) * DURACION_FADE
+        )
 
         # Calcular duración real de imágenes procesadas en MB (usamos tamaño del archivo)
         tamano_fotos_mb = round(
@@ -2918,9 +3150,10 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
             orden=orden,
             tipo_evento='comentario',
             comentario=(
-                f"Video resumen generado automáticamente: {n_fotos} fotos "
-                f"({DURACION_FOTO}s/foto + Ken Burns). "
-                f"Tamaño: {tamano_final_mb} MB. "
+                f"Video resumen {'rewind' if es_rewind else 'simple'} generado automáticamente: "
+                f"{n_fotos} fotos ({DURACION_FOTO}s/foto + Ken Burns"
+                + (f", intro {DURACION_INTRO}s, tarjetas {DURACION_SECCION}s" if es_rewind else "")
+                + f"). Tamaño: {tamano_final_mb} MB. "
                 f"Generado por: {usuario_obj.get_full_name() if usuario_obj else 'Sistema'}"
             ),
             usuario=empleado_obj,
@@ -3179,7 +3412,7 @@ def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int):
             HistorialOrden.objects.create(
                 orden=orden,
                 tipo_evento='video',
-                descripcion=(
+                comentario=(
                     f"Video resumen comprimido para descarga generado. "
                     f"Tamaño: {tamano_final_mb} MB "
                     f"(reducción del "

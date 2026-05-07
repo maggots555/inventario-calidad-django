@@ -804,3 +804,35 @@ def es_unidad_disponible(codigo_disponibilidad):
         bool: True si está disponible
     """
     return codigo_disponibilidad in ESTADOS_UNIDAD_DISPONIBLES
+
+
+# ============================================================================
+# CONFIGURACIÓN DE FFMPEG — Rutas del sistema
+# ============================================================================
+
+# Ruta a la fuente TrueType usada por el filtro drawtext de FFmpeg.
+# Candidatos en orden de preferencia para Ubuntu/Debian.
+# La función _resolver_fuente_ffmpeg() busca la primera que exista en disco.
+_FFMPEG_FONT_CANDIDATES = [
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',        # Ubuntu/Debian estándar
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',  # Alternativa común
+    '/usr/share/fonts/truetype/freefont/FreeSans.ttf',         # freefont-ttf
+    '/usr/share/fonts/dejavu/DejaVuSans.ttf',                  # Algunas distros sin subdirectorio
+]
+
+
+def _resolver_fuente_ffmpeg() -> str:
+    """
+    Devuelve la primera ruta de fuente TTF disponible en disco.
+    Si ninguna existe, devuelve la ruta estándar de Ubuntu como fallback
+    (FFmpeg mostrará un error descriptivo si tampoco existe).
+    """
+    import os
+    for ruta in _FFMPEG_FONT_CANDIDATES:
+        if os.path.isfile(ruta):
+            return ruta
+    return _FFMPEG_FONT_CANDIDATES[0]
+
+
+# Ruta resuelta al iniciar. Se evalúa una sola vez al importar constants.py.
+FFMPEG_DRAWTEXT_FONT = _resolver_fuente_ffmpeg()
