@@ -794,7 +794,7 @@ OLLAMA_VISION_TIMEOUT = config('OLLAMA_VISION_TIMEOUT', default=600, cast=int)
 # gemma4 tiene 128K tokens de contexto — 8 imágenes ≈ 16K tokens (12% del límite).
 # Aumentar este valor es seguro en contexto pero incrementa el payload por red
 # (Tailscale) y el tiempo de inferencia en GPU.
-OLLAMA_MAX_IMAGENES_IA = config('OLLAMA_MAX_IMAGENES_IA', default=15, cast=int)
+OLLAMA_MAX_IMAGENES_IA = config('OLLAMA_MAX_IMAGENES_IA', default=20, cast=int)
 
 # OLLAMA_MODELS: lista de modelos Ollama disponibles para el selector.
 # Formato: nombres separados por coma. Ejemplo: gemma3:12b,gemma3:4b
