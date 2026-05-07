@@ -2824,41 +2824,60 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
         if es_rewind:
             # ── Preparar logo para la intro ──
             # Estrategia (en orden de preferencia):
+            # 0. logo_sic_white.png estático → usar directamente sin conversión
+            #    (generado una vez con rsvg-convert, 480×150 RGBA)
             # 1. logo_sic_white.svg → rasterizar con rsvg-convert a PNG temporal
-            #    (logo blanco sobre fondo transparente, queda perfecto sobre #1f6391)
+            #    (fallback por si el PNG estático no existiera)
             # 2. logo_sic.png original → usar con filtro colorkey en FFmpeg para
             #    eliminar el fondo blanco
             # 3. Si ninguno existe → degradar a modo simple
             ruta_logo     = None   # ruta del archivo que pasará a FFmpeg
             logo_colorkey = False  # True si es el PNG original con fondo blanco
 
-            # Paso 1: intentar SVG blanco + rsvg-convert
-            ruta_svg = finders.find('images/logos/logo_sic_white.svg')
-            if not ruta_svg:
-                ruta_svg_fb = os.path.join(
+            # Paso 0: PNG estático pre-generado (ruta directa, sin dependencia externa)
+            ruta_png_white = finders.find('images/logos/logo_sic_white.png')
+            if not ruta_png_white:
+                ruta_png_white_fb = os.path.join(
                     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                    'static', 'images', 'logos', 'logo_sic_white.svg'
+                    'static', 'images', 'logos', 'logo_sic_white.png'
                 )
-                if os.path.isfile(ruta_svg_fb):
-                    ruta_svg = ruta_svg_fb
+                if os.path.isfile(ruta_png_white_fb):
+                    ruta_png_white = ruta_png_white_fb
 
-            if ruta_svg and os.path.isfile(ruta_svg):
-                rsvg_bin = shutil.which('rsvg-convert')
-                if rsvg_bin:
-                    tmp_logo_png = os.path.join(tmp_dir, 'logo_intro.png')
-                    res_svg = subprocess.run(
-                        [rsvg_bin, '-w', '480', ruta_svg, '-o', tmp_logo_png],
-                        capture_output=True, text=True, timeout=15,
+            if ruta_png_white and os.path.isfile(ruta_png_white):
+                ruta_logo = ruta_png_white
+                logger.info(
+                    "[VIDEO-RESUMEN] Logo: PNG estático logo_sic_white.png encontrado"
+                )
+
+            # Paso 1: fallback — SVG blanco + rsvg-convert (solo si el PNG no existe)
+            if not ruta_logo:
+                ruta_svg = finders.find('images/logos/logo_sic_white.svg')
+                if not ruta_svg:
+                    ruta_svg_fb = os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        'static', 'images', 'logos', 'logo_sic_white.svg'
                     )
-                    if res_svg.returncode == 0 and os.path.isfile(tmp_logo_png):
-                        ruta_logo = tmp_logo_png
-                        logger.info(
-                            "[VIDEO-RESUMEN] Logo: SVG blanco rasterizado con rsvg-convert"
+                    if os.path.isfile(ruta_svg_fb):
+                        ruta_svg = ruta_svg_fb
+
+                if ruta_svg and os.path.isfile(ruta_svg):
+                    rsvg_bin = shutil.which('rsvg-convert')
+                    if rsvg_bin:
+                        tmp_logo_png = os.path.join(tmp_dir, 'logo_intro.png')
+                        res_svg = subprocess.run(
+                            [rsvg_bin, '-w', '480', ruta_svg, '-o', tmp_logo_png],
+                            capture_output=True, text=True, timeout=15,
                         )
-                    else:
-                        logger.warning(
-                            f"[VIDEO-RESUMEN] rsvg-convert falló: {res_svg.stderr[:200]}"
-                        )
+                        if res_svg.returncode == 0 and os.path.isfile(tmp_logo_png):
+                            ruta_logo = tmp_logo_png
+                            logger.info(
+                                "[VIDEO-RESUMEN] Logo: SVG blanco rasterizado con rsvg-convert"
+                            )
+                        else:
+                            logger.warning(
+                                f"[VIDEO-RESUMEN] rsvg-convert falló: {res_svg.stderr[:200]}"
+                            )
 
             # Paso 2: fallback al PNG original con colorkey
             if not ruta_logo:
