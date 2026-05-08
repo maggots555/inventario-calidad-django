@@ -153,6 +153,11 @@ urlpatterns = [
          views.enviar_imagenes_egreso_cliente,
          name='enviar_imagenes_egreso_cliente'),
 
+    # Enviar video rewind de egreso al cliente (chain Celery: generar video → enviar correo)
+    path('orden/<int:orden_id>/enviar-rewind-egreso/',
+         views.enviar_rewind_egreso_cliente,
+         name='enviar_rewind_egreso_cliente'),
+
     # API: obtener destinatarios del historial de ingreso para el modal de egreso
     path('orden/<int:orden_id>/destinatarios-egreso/',
          views.obtener_destinatarios_egreso,

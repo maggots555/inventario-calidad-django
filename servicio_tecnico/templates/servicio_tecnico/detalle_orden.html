@@ -2053,7 +2053,8 @@
                         <form method="post" enctype="multipart/form-data" id="formSubirImagenes"
                               data-descripcion-id="{{ form_imagenes.descripcion.id_for_label }}"
                               data-url-destinatarios-egreso="{% url 'servicio_tecnico:obtener_destinatarios_egreso' orden.id %}"
-                              data-url-enviar-egreso="{% url 'servicio_tecnico:enviar_imagenes_egreso_cliente' orden.id %}">
+                              data-url-enviar-egreso="{% url 'servicio_tecnico:enviar_imagenes_egreso_cliente' orden.id %}"
+                              data-url-enviar-rewind="{% url 'servicio_tecnico:enviar_rewind_egreso_cliente' orden.id %}">
                             {% csrf_token %}
                             <input type="hidden" name="form_type" value="subir_imagenes">
 
@@ -2231,6 +2232,29 @@
                                      {% endif %}
                                  </div>
                              </div>
+
+                             <!-- Botón para enviar video rewind al cliente (solo con 4 tipos) -->
+                             {% if tiene_4_tipos_fotos %}
+                             <div class="row mb-3">
+                                 <div class="col-12">
+                                     <button type="button"
+                                             class="btn w-100 {% if rewind_ya_enviado %}btn-outline-primary{% else %}btn-primary{% endif %}"
+                                             id="btnEnviarRewindEgreso"
+                                             title="{% if rewind_ya_enviado %}Video rewind ya enviado — click para reenviar{% else %}Genera un video resumen rewind del servicio completo y lo envía al cliente{% endif %}">
+                                         {% if rewind_ya_enviado %}
+                                             <i class="bi bi-film me-1"></i> Video rewind ya enviado
+                                             <span class="badge bg-primary bg-opacity-25 text-primary ms-2">reenviar</span>
+                                         {% else %}
+                                             <i class="bi bi-film me-1"></i> Enviar video rewind al cliente
+                                             <span class="badge bg-white bg-opacity-25 ms-2" style="color:rgba(255,255,255,.85);">✨ 4 tipos · automático</span>
+                                         {% endif %}
+                                     </button>
+                                     <small class="text-muted d-block mt-2 text-center">
+                                         <i class="bi bi-info-circle"></i> Genera un video resumen del proceso completo (ingreso → reparación → egreso)
+                                     </small>
+                                 </div>
+                             </div>
+                             {% endif %}
                             
                             <!-- Barra de progreso (oculta por defecto) -->
                             <div class="row mb-3" id="progresoUpload" style="display: none;">

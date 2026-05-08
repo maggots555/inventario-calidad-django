@@ -3010,19 +3010,21 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
 
         # =====================================================================
         # PASO 5: ENCONTRAR RUTA DE LA MÚSICA
+        # Ambos modos (normal y rewind) usan rewind_song.mp3
         # =====================================================================
-        ruta_musica = finders.find('audio/bg_music.mp3')
+        nombre_audio = 'rewind_song.mp3'
+        ruta_musica = finders.find(f'audio/{nombre_audio}')
         if not ruta_musica or not os.path.isfile(ruta_musica):
             # Fallback: buscar directamente en static/
             ruta_musica_fallback = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'static', 'audio', 'bg_music.mp3'
+                'static', 'audio', nombre_audio
             )
             if os.path.isfile(ruta_musica_fallback):
                 ruta_musica = ruta_musica_fallback
             else:
                 ruta_musica = None
-                logger.warning("[VIDEO-RESUMEN] Música bg_music.mp3 no encontrada — video sin audio")
+                logger.warning(f"[VIDEO-RESUMEN] Música {nombre_audio} no encontrada — video sin audio")
 
         # =====================================================================
         # PASO 6: EJECUTAR FFMPEG — GENERAR VIDEO FINAL
@@ -3483,3 +3485,337 @@ def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int):
                 logger.debug(f"[VIDEO-COMPRESION] Directorio temporal eliminado: {tmp_dir}")
         except Exception:
             pass
+
+
+# ============================================================================
+# TAREA CELERY: ENVIAR CORREO REWIND AL CLIENTE (segunda etapa del chain)
+# ============================================================================
+
+@shared_task(
+    bind=True,
+    name='servicio_tecnico.enviar_rewind_egreso_email',
+    max_retries=2,
+    default_retry_delay=30,
+    soft_time_limit=120,
+    time_limit=180,
+)
+def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, destinatarios_copia):
+    """
+    Segunda etapa del chain rewind de egreso.
+
+    Recibe el resultado de generar_video_resumen_task (que incluye video_id y
+    el thumbnail ya guardado en VideoOrden), construye el correo HTML con el
+    thumbnail embebido como imagen inline (cid:thumbnail_video) y un botón CTA
+    que apunta al seguimiento público del cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    En un chain de Celery, el valor de retorno de la primera tarea se pasa
+    automáticamente como primer argumento de la segunda (prev_result).
+    Si la generación del video falló, prev_result['success'] será False y
+    abortamos el envío sin lanzar error.
+
+    Parámetros:
+        prev_result         : Dict retornado por generar_video_resumen_task
+                              {'success': bool, 'video_id': int, ...}
+        orden_id            : ID de la OrdenServicio
+        usuario_id          : ID del usuario que disparó la acción
+        destinatarios_copia : Lista de emails en CC
+    """
+    import io
+    from pathlib import Path
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+
+    from .models import OrdenServicio, VideoOrden, HistorialOrden
+
+    logger.info(f"[REWIND-EMAIL] Iniciando para Orden ID {orden_id}")
+
+    # =========================================================================
+    # PASO 1: VERIFICAR QUE EL PASO ANTERIOR (GENERACIÓN DE VIDEO) TUVO ÉXITO
+    # =========================================================================
+    if not prev_result or not prev_result.get('success'):
+        motivo = (prev_result or {}).get('error', 'Desconocido')
+        logger.error(
+            f"[REWIND-EMAIL] generar_video_resumen_task falló para Orden {orden_id}. "
+            f"Motivo: {motivo} — abortando envío de correo rewind."
+        )
+        # Notificar al usuario del fallo
+        try:
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _u = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    _u = None
+                from notificaciones.utils import notificar_error
+                notificar_error(
+                    titulo="Error en video rewind — correo no enviado",
+                    mensaje=(
+                        f"Orden ID {orden_id} — La generación del video falló antes del envío. "
+                        f"Motivo: {str(motivo)[:200]}"
+                    ),
+                    usuario=_u,
+                    task_id=self.request.id,
+                    app_origen='servicio_tecnico',
+                )
+        except Exception:
+            pass
+        return {'success': False, 'motivo': 'video_fallido', 'orden_id': orden_id}
+
+    video_id = prev_result.get('video_id')
+
+    try:
+        # =====================================================================
+        # PASO 2: CARGAR ORDEN Y VIDEO
+        # =====================================================================
+        try:
+            orden = OrdenServicio.objects.select_related('detalle_equipo').get(pk=orden_id)
+        except OrdenServicio.DoesNotExist:
+            logger.error(f"[REWIND-EMAIL] Orden ID {orden_id} no encontrada.")
+            return {'success': False, 'motivo': 'orden_no_encontrada'}
+
+        email_cliente = orden.detalle_equipo.email_cliente
+
+        # Intentar cargar el VideoOrden para obtener el thumbnail y la URL del video
+        video_obj = None
+        thumbnail_path = None
+        video_url = None
+        if video_id:
+            try:
+                video_obj = VideoOrden.objects.get(pk=video_id)
+                if video_obj.thumbnail and hasattr(video_obj.thumbnail, 'path'):
+                    _thumb_path = video_obj.thumbnail.path
+                    if Path(_thumb_path).is_file():
+                        thumbnail_path = _thumb_path
+                # URL directa al archivo de video para el enlace del correo
+                if video_obj.video:
+                    try:
+                        site_url_vid = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                        video_url = f"{site_url_vid}{video_obj.video.url}"
+                    except Exception:
+                        pass
+            except VideoOrden.DoesNotExist:
+                logger.warning(f"[REWIND-EMAIL] VideoOrden ID {video_id} no encontrado.")
+
+        # =====================================================================
+        # PASO 3: PREPARAR CONTEXTO DEL TEMPLATE
+        # =====================================================================
+        from config.paises_config import get_pais_actual, fecha_local_pais
+        _pais = get_pais_actual()
+
+        whatsapp_empleado = ''
+        if usuario_id:
+            User = get_user_model()
+            try:
+                usuario = User.objects.get(pk=usuario_id)
+                if hasattr(usuario, 'empleado') and usuario.empleado:
+                    numero_local = usuario.empleado.numero_whatsapp
+                    if numero_local:
+                        codigo_tel = _pais.get('codigo_telefonico', '')
+                        whatsapp_empleado = f"{codigo_tel}{numero_local}"
+            except User.DoesNotExist:
+                pass
+
+        ahora_local = fecha_local_pais(timezone.now(), _pais)
+
+        # URL de seguimiento público (igual que en enviar_imagenes_egreso_cliente_task)
+        seguimiento_url = None
+        if orden.es_fuera_garantia:
+            try:
+                enlace = orden.enlace_seguimiento
+                if enlace and enlace.activo:
+                    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                    seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
+            except Exception:
+                pass
+
+        context = {
+            'orden': orden,
+            'detalle': orden.detalle_equipo,
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'empresa_nombre': _pais['empresa_nombre_corto'],
+            'pais_nombre': _pais['nombre'],
+            'whatsapp_empleado': whatsapp_empleado,
+            'seguimiento_url': seguimiento_url,
+            'thumbnail_disponible': thumbnail_path is not None,
+            'video_url': video_url,
+        }
+
+        html_content = render_to_string(
+            'servicio_tecnico/emails/rewind_egreso_cliente.html',
+            context
+        )
+
+        # =====================================================================
+        # PASO 4: CONSTRUIR Y ENVIAR EL CORREO
+        # =====================================================================
+        numero_orden_display = (
+            orden.detalle_equipo.orden_cliente
+            if orden.detalle_equipo.orden_cliente
+            else orden.numero_orden_interno
+        )
+        asunto = f'🎬 Resumen del servicio de tu equipo - Orden {numero_orden_display}'
+
+        import re as _re
+        email_match = _re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente = f"Servicio Técnico System <{email_solo}>"
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=[email_cliente],
+            cc=destinatarios_copia if destinatarios_copia else None,
+        )
+        email_msg.content_subtype = 'html'
+
+        # ── Thumbnail del video (embebido como cid:thumbnail_video) ──────────
+        if thumbnail_path:
+            try:
+                with open(thumbnail_path, 'rb') as f_thumb:
+                    thumb_mime = MIMEImage(f_thumb.read(), _subtype='jpeg')
+                    thumb_mime.add_header('Content-ID', '<thumbnail_video>')
+                    thumb_mime.add_header('Content-Disposition', 'inline', filename='thumbnail_video.jpg')
+                    email_msg.attach(thumb_mime)
+                logger.info(f"[REWIND-EMAIL] Thumbnail adjunto desde {thumbnail_path}")
+            except Exception as e:
+                logger.warning(f"[REWIND-EMAIL] No se pudo adjuntar thumbnail: {e}")
+
+        # ── Logo SIC ─────────────────────────────────────────────────────────
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f"[REWIND-EMAIL] Error al adjuntar logo: {e}")
+
+        # ── Iconos de redes sociales ──────────────────────────────────────────
+        try:
+            iconos_sociales = {
+                'icon_link':      'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook':  'images/utilitys/facebook.png',
+                'icon_whatsapp':  'images/utilitys/whatsapp.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning(f"[REWIND-EMAIL] Error al adjuntar iconos: {e}")
+
+        email_msg.send(fail_silently=False)
+        logger.info(f"[REWIND-EMAIL] Correo rewind enviado a {email_cliente}")
+
+        # =====================================================================
+        # PASO 5: REGISTRAR EN HISTORIAL
+        # El comentario incluye "video rewind" Y "imágenes de egreso" para que
+        # ambos filtros de egreso_correo_ya_enviado y rewind_ya_enviado lo detecten.
+        # =====================================================================
+        try:
+            usuario_empleado = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _u2 = User.objects.get(pk=usuario_id)
+                    if hasattr(_u2, 'empleado'):
+                        usuario_empleado = _u2.empleado
+                except User.DoesNotExist:
+                    pass
+
+            comentario_hist = (
+                f"📧 Video rewind — imágenes de egreso enviadas al cliente ({email_cliente})\n"
+                f"🎬 Modo: Video resumen rewind del servicio completo\n"
+                f"📹 VideoOrden ID: {video_id}"
+            )
+            if destinatarios_copia:
+                comentario_hist += f"\n👥 Copia a: {', '.join(destinatarios_copia)}"
+
+            HistorialOrden.objects.create(
+                orden=orden,
+                tipo_evento='email',
+                comentario=comentario_hist,
+                usuario=usuario_empleado,
+                es_sistema=False,
+            )
+        except Exception as e:
+            logger.warning(f"[REWIND-EMAIL] No se pudo registrar historial: {e}")
+
+        # =====================================================================
+        # PASO 6: NOTIFICAR ÉXITO AL USUARIO
+        # =====================================================================
+        try:
+            _usuario_notif = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _usuario_notif = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            _oc = (
+                orden.detalle_equipo.orden_cliente
+                if orden.detalle_equipo and orden.detalle_equipo.orden_cliente
+                else orden.numero_orden_interno
+            )
+            notificar_exito(
+                titulo="Video rewind enviado al cliente",
+                mensaje=(
+                    f"Orden {_oc} — Correo rewind enviado exitosamente a {email_cliente}."
+                ),
+                usuario=_usuario_notif,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e:
+            logger.warning(f"[REWIND-EMAIL] No se pudo crear notificación de éxito: {e}")
+
+        logger.info(f"[REWIND-EMAIL] Tarea completada para Orden {orden.numero_orden_interno}")
+
+        return {
+            'success': True,
+            'orden': orden.numero_orden_interno,
+            'destinatario': email_cliente,
+            'video_id': video_id,
+        }
+
+    except Exception as exc:
+        logger.error(
+            f"[REWIND-EMAIL] Error para Orden ID {orden_id}: {exc}",
+            exc_info=True,
+        )
+        try:
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    _u_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    _u_err = None
+                from notificaciones.utils import notificar_error
+                notificar_error(
+                    titulo="Error al enviar correo rewind",
+                    mensaje=f"Orden ID {orden_id} — {str(exc)[:300]}",
+                    usuario=_u_err,
+                    task_id=self.request.id,
+                    app_origen='servicio_tecnico',
+                )
+        except Exception:
+            pass
+
+        if not isinstance(exc, ValueError):
+            raise self.retry(exc=exc, countdown=30)
+        raise

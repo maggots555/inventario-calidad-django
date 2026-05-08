@@ -2095,6 +2095,19 @@ def detalle_orden(request, orden_id):
                                 .filter(comentario__icontains='imágenes de egreso')
                                 .exists()
                             ) if tipo_imagen == 'egreso' else False,
+                            # Si la orden ya tiene los 4 tipos de fotos (para disparar modal rewind)
+                            'tiene_4_tipos_fotos': (
+                                {'ingreso', 'diagnostico', 'reparacion', 'egreso'}.issubset(
+                                    set(orden.imagenes.values_list('tipo', flat=True).distinct())
+                                )
+                            ) if tipo_imagen == 'egreso' else False,
+                            # Si el video rewind ya fue enviado al cliente
+                            'rewind_ya_enviado': (
+                                orden.historial.filter(
+                                    tipo_evento='email',
+                                    comentario__icontains='video rewind'
+                                ).exists()
+                            ) if tipo_imagen == 'egreso' else False,
                             'tipo_imagen': tipo_imagen,
                         })
                     else:
@@ -2803,6 +2816,18 @@ def detalle_orden(request, orden_id):
         tipo_evento='email',
         comentario__icontains='imágenes de ingreso'
     ).exists()
+
+    # ── Botón rewind: ¿tiene los 4 tipos de fotos? ──────────────────────────
+    _tipos_fotos_set = set(
+        orden.imagenes.values_list('tipo', flat=True).distinct()
+    )
+    tiene_4_tipos_fotos = {'ingreso', 'diagnostico', 'reparacion', 'egreso'}.issubset(_tipos_fotos_set)
+
+    # ── ¿Ya se envió el correo rewind? ───────────────────────────────────────
+    rewind_ya_enviado = orden.historial.filter(
+        tipo_evento='email',
+        comentario__icontains='video rewind'
+    ).exists()
     
     # ========================================================================
     # DATOS DE COTIZACIÓN (Si existe)
@@ -2973,6 +2998,8 @@ def detalle_orden(request, orden_id):
         'total_imagenes': total_imagenes,
         'egreso_correo_ya_enviado': egreso_correo_ya_enviado,
         'ingreso_correo_ya_enviado': ingreso_correo_ya_enviado,
+        'tiene_4_tipos_fotos': tiene_4_tipos_fotos,
+        'rewind_ya_enviado': rewind_ya_enviado,
 
         # Videos
         'videos_por_tipo': videos_por_tipo,
@@ -7216,6 +7243,166 @@ def enviar_imagenes_egreso_cliente(request, orden_id):
                 'destinatario': email_cliente,
                 'destinatarios_copia': destinatarios_copia,
                 'imagenes_count': imagenes_egreso.count(),
+                'orden': orden.numero_orden_interno,
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error al procesar la solicitud: {str(e)}'
+        }, status=500)
+
+
+# ============================================================================
+# ENVIAR VIDEO REWIND DE EGRESO AL CLIENTE
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@require_http_methods(["POST"])
+def enviar_rewind_egreso_cliente(request, orden_id):
+    """
+    Vista que dispara la cadena Celery para generar el video rewind y enviarlo
+    al cliente por correo electrónico.
+
+    Flujo:
+    1. Valida que la orden exista, tenga email válido e imágenes de egreso.
+    2. Verifica que la orden tenga los 4 tipos de fotos (ingreso, diagnóstico,
+       reparación, egreso). Si no, rechaza la solicitud con un error descriptivo.
+    3. Recupera los destinatarios CC del historial del envío de ingreso previo.
+    4. Lanza un chain Celery:
+           generar_video_resumen_task  →  enviar_rewind_egreso_email_task
+       La primera tarea genera el video y lo guarda; la segunda envía el correo
+       con el thumbnail embebido y el botón CTA de seguimiento.
+    5. Retorna JsonResponse inmediato. El video puede tardar varios minutos.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Un "chain" de Celery es como una tubería: la salida de la primera tarea
+    (el video_id del VideoOrden creado) se pasa automáticamente como primer
+    argumento de la segunda tarea.
+    """
+    import re as _re
+    from django.http import Http404 as _Http404
+
+    # Http404 se trata por separado (orden no encontrada → 404, no 500)
+    try:
+        # ===================================================================
+        # PASO 1: OBTENER Y VALIDAR LA ORDEN
+        # ===================================================================
+        orden = get_object_or_404(
+            OrdenServicio.objects.select_related('detalle_equipo'), pk=orden_id
+        )
+    except _Http404:
+        return JsonResponse({
+            'success': False,
+            'error': '❌ Orden no encontrada.',
+        }, status=404)
+
+    try:
+        # ===================================================================
+        # PASO 2: VALIDAR EMAIL, IMÁGENES Y TIPOS DE FOTOS
+        # ===================================================================
+        email_cliente = orden.detalle_equipo.email_cliente
+        if not email_cliente or email_cliente == 'cliente@ejemplo.com':
+            return JsonResponse({
+                'success': False,
+                'error': (
+                    '❌ El email del cliente no está configurado o es el valor por defecto. '
+                    'Por favor, actualiza el email del cliente antes de enviar.'
+                )
+            }, status=400)
+
+        # ===================================================================
+        # PASO 3: VERIFICAR QUE EXISTAN IMÁGENES DE EGRESO
+        # ===================================================================
+        if not ImagenOrden.objects.filter(orden=orden, tipo='egreso').exists():
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Esta orden no tiene imágenes de egreso registradas.'
+            }, status=400)
+
+        # ===================================================================
+        # PASO 4: VERIFICAR LOS 4 TIPOS DE FOTOS
+        # ===================================================================
+        tipos_presentes = set(
+            ImagenOrden.objects.filter(orden=orden)
+            .values_list('tipo', flat=True)
+            .distinct()
+        )
+        tipos_requeridos = {'ingreso', 'diagnostico', 'reparacion', 'egreso'}
+        tipos_faltantes = tipos_requeridos - tipos_presentes
+
+        if tipos_faltantes:
+            nombres = {
+                'ingreso': 'Ingreso',
+                'diagnostico': 'Diagnóstico',
+                'reparacion': 'Reparación',
+                'egreso': 'Egreso',
+            }
+            faltantes_texto = ', '.join(nombres.get(t, t) for t in sorted(tipos_faltantes))
+            return JsonResponse({
+                'success': False,
+                'error': (
+                    f'❌ Para generar el video rewind se necesitan fotos de los 4 tipos. '
+                    f'Faltan fotos de: {faltantes_texto}.'
+                )
+            }, status=400)
+
+        # ===================================================================
+        # PASO 5: RECUPERAR DESTINATARIOS CC DEL HISTORIAL DE INGRESO
+        # (misma lógica que enviar_imagenes_egreso_cliente)
+        # ===================================================================
+        destinatarios_copia = []
+
+        historial_ingreso = (
+            HistorialOrden.objects
+            .filter(orden=orden, tipo_evento='email')
+            .filter(comentario__icontains='imágenes de ingreso')
+            .order_by('-fecha_evento')
+            .first()
+        )
+
+        if historial_ingreso:
+            match_cc = _re.search(
+                r'Copia a:\s*(.+)',
+                historial_ingreso.comentario,
+                _re.IGNORECASE
+            )
+            if match_cc:
+                raw_cc = match_cc.group(1).strip()
+                destinatarios_copia = [
+                    email.strip()
+                    for email in raw_cc.split(',')
+                    if email.strip() and '@' in email.strip()
+                ]
+
+        # ===================================================================
+        # PASO 6: LANZAR CHAIN CELERY
+        # ===================================================================
+        from celery import chain as celery_chain
+        from .tasks import generar_video_resumen_task, enviar_rewind_egreso_email_task
+
+        usuario_id = request.user.pk if request.user.is_authenticated else None
+
+        cadena = celery_chain(
+            generar_video_resumen_task.s(orden_id, usuario_id),
+            enviar_rewind_egreso_email_task.s(orden_id, usuario_id, destinatarios_copia),
+        )
+        tarea_raiz = cadena.delay()
+
+        return JsonResponse({
+            'success': True,
+            'message': (
+                f'✅ Video rewind en proceso de generación para {email_cliente}. '
+                f'El video y el correo se procesarán en segundo plano — puede tardar varios minutos.'
+            ),
+            'data': {
+                'task_id': str(tarea_raiz.id),
+                'destinatario': email_cliente,
+                'destinatarios_copia': destinatarios_copia,
                 'orden': orden.numero_orden_interno,
             }
         })

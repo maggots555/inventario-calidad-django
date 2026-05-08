@@ -284,6 +284,11 @@ class UploadImagenesDual {
         if (btnEgreso) {
             btnEgreso.addEventListener('click', () => this.mostrarModalEgresoEmail());
         }
+        // Botón de envío de video rewind (solo aparece cuando hay los 4 tipos de fotos)
+        const btnRewind = document.getElementById('btnEnviarRewindEgreso');
+        if (btnRewind) {
+            btnRewind.addEventListener('click', () => this.mostrarModalRewindEmail());
+        }
         console.log('✅ Sistema dual de subida de imágenes v8.0 inicializado');
     }
     // =========================================================================
@@ -659,7 +664,13 @@ class UploadImagenesDual {
                 // Detectar si fue egreso para mostrar modal de correo
                 const esEgreso = resultado.tipoImagen === 'egreso';
                 if (esEgreso && !resultado.egresoCorreoYaEnviado) {
-                    this.mostrarModalEgresoEmail();
+                    if (resultado.tiene4TiposFotos && !resultado.rewindYaEnviado) {
+                        // Prioridad: rewind. Si el usuario lo cancela, mostrar egreso normal.
+                        this.mostrarModalRewindEmail(() => this.mostrarModalEgresoEmail());
+                    }
+                    else {
+                        this.mostrarModalEgresoEmail();
+                    }
                 }
                 else {
                     setTimeout(() => { window.location.reload(); }, 1500);
@@ -813,6 +824,8 @@ class UploadImagenesDual {
                             archivosEnviados: archivos.length,
                             tipoImagen: data.tipo_imagen || '',
                             egresoCorreoYaEnviado: data.egreso_correo_ya_enviado || false,
+                            tiene4TiposFotos: data.tiene_4_tipos_fotos || false,
+                            rewindYaEnviado: data.rewind_ya_enviado || false,
                         });
                     }
                     catch (e) {
@@ -1049,8 +1062,208 @@ class UploadImagenesDual {
         });
     }
     /**
-     * Muestra un countdown visual y recarga la página cuando llega a 0.
+     * Muestra el modal de confirmación para enviar el video rewind al cliente.
      *
+     * FLUJO:
+     * 1. Obtiene destinatarios del mismo endpoint que el modal de egreso normal.
+     * 2. Construye un modal Bootstrap con estilo azul (primario) diferenciado.
+     * 3. Cancel → recarga normal; Aceptar → POST al endpoint de rewind + recarga.
+     *
+     * DIFERENCIAS con mostrarModalEgresoEmail():
+     * - Apunta a data-url-enviar-rewind (endpoint diferente).
+     * - El texto describe la generación del video rewind.
+     * - Muestra una advertencia de que el proceso puede tardar varios minutos.
+     */
+    async mostrarModalRewindEmail(onCancelar) {
+        var _a, _b;
+        const form = this.formElement;
+        if (!form) {
+            window.location.reload();
+            return;
+        }
+        const urlDestinatarios = form.dataset.urlDestinatariosEgreso;
+        const urlEnviarRewind = form.dataset.urlEnviarRewind;
+        if (!urlDestinatarios || !urlEnviarRewind) {
+            window.location.reload();
+            return;
+        }
+        // ── 1. Obtener destinatarios ─────────────────────────────────────────
+        let emailPrincipal = '';
+        let destinatariosCopia = [];
+        let desdeHistorial = false;
+        try {
+            const resp = await fetch(urlDestinatarios, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                emailPrincipal = data.email || '';
+                destinatariosCopia = data.destinatarios_copia || [];
+                desdeHistorial = data.desde_historial || false;
+            }
+        }
+        catch (_) {
+            window.location.reload();
+            return;
+        }
+        // ── 2. Construir HTML del modal ──────────────────────────────────────
+        const modalId = 'modalRewindEmailDinamico';
+        (_a = document.getElementById(modalId)) === null || _a === void 0 ? void 0 : _a.remove();
+        const ccHtml = destinatariosCopia.length > 0
+            ? destinatariosCopia.map(cc => `<li class="list-group-item py-1 px-2 small text-muted">${cc}</li>`).join('')
+            : '<li class="list-group-item py-1 px-2 small text-muted fst-italic">Sin copias</li>';
+        const origenBadge = desdeHistorial
+            ? `<span class="badge bg-success-subtle text-success border border-success-subtle ms-1" title="Obtenido del historial de ingreso">
+                   <i class="bi bi-clock-history"></i> Desde historial
+               </span>`
+            : `<span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-1" title="No se encontró historial de ingreso">
+                   <i class="bi bi-exclamation-triangle"></i> Sin historial
+               </span>`;
+        const modalHtml = `
+        <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}Label" aria-modal="true" role="dialog">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #1f6391 0%, #0d4a6e 100%); color: white;">
+                        <h5 class="modal-title" id="${modalId}Label">
+                            <i class="bi bi-film me-2"></i> ¿Enviar video rewind al cliente?
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-3">
+                            Se <strong>generará un video resumen rewind</strong> del proceso completo
+                            del equipo (ingreso → diagnóstico → reparación → egreso) y se enviará
+                            al cliente cuando esté listo.
+                        </p>
+
+                        <!-- Destinatarios colapsables -->
+                        <div class="mb-3">
+                            <button class="btn btn-sm btn-outline-secondary w-100 d-flex justify-content-between align-items-center"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#rewindDestinatariosCollapse"
+                                    aria-expanded="false"
+                                    aria-controls="rewindDestinatariosCollapse">
+                                <span>
+                                    <i class="bi bi-people me-1"></i>
+                                    Destinatarios ${origenBadge}
+                                </span>
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                            <div class="collapse mt-2" id="rewindDestinatariosCollapse">
+                                <ul class="list-group list-group-flush border rounded">
+                                    <li class="list-group-item py-1 px-2">
+                                        <i class="bi bi-envelope me-1 text-primary"></i>
+                                        <strong class="small">Para:</strong>
+                                        <span class="small ms-1">${emailPrincipal || '(sin correo)'}</span>
+                                    </li>
+                                    ${destinatariosCopia.length > 0 ? `
+                                    <li class="list-group-item py-1 px-2">
+                                        <i class="bi bi-people me-1 text-secondary"></i>
+                                        <strong class="small">CC:</strong>
+                                    </li>
+                                    ${ccHtml}
+                                    ` : ''}
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Aviso de tiempo de procesamiento -->
+                        <div class="alert alert-info py-2 mb-0 small">
+                            <i class="bi bi-hourglass-split me-1"></i>
+                            <strong>Nota:</strong> La generación del video puede tardar
+                            <strong>varios minutos</strong>. El correo se enviará al cliente
+                            automáticamente cuando esté listo — no es necesario esperar en esta pantalla.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="btnRewindModalCancelar">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </button>
+                        <button type="button" class="btn btn-primary" id="btnRewindModalAceptar" ${!emailPrincipal ? 'disabled' : ''}>
+                            <i class="bi bi-film me-1"></i> Sí, generar y enviar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        // ── 3. Mostrar modal ─────────────────────────────────────────────────
+        const modalEl = document.getElementById(modalId);
+        const modal = new window.bootstrap.Modal(modalEl);
+        modal.show();
+        // ── 4. Manejadores ───────────────────────────────────────────────────
+        // Flag: distingue "cancelar" (false) de "aceptar y completar" (true)
+        let enviado = false;
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            modalEl.remove();
+            if (!enviado && onCancelar) {
+                // Usuario canceló y hay un flujo de fallback → mostrar modal egreso
+                onCancelar();
+            }
+            else {
+                window.location.reload();
+            }
+        });
+        (_b = document.getElementById('btnRewindModalAceptar')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', async () => {
+            const btnAceptar = document.getElementById('btnRewindModalAceptar');
+            const btnCancelar = document.getElementById('btnRewindModalCancelar');
+            if (btnAceptar) {
+                btnAceptar.disabled = true;
+                btnAceptar.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Iniciando...';
+            }
+            if (btnCancelar)
+                btnCancelar.disabled = true;
+            try {
+                const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+                const csrfToken = (csrfInput === null || csrfInput === void 0 ? void 0 : csrfInput.value) || '';
+                const resp = await fetch(urlEnviarRewind, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                });
+                if (resp.ok) {
+                    if (btnAceptar) {
+                        btnAceptar.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> ¡En proceso!';
+                        btnAceptar.classList.replace('btn-primary', 'btn-success');
+                    }
+                    enviado = true; // marcar como completado para que hidden.bs.modal recargue en vez de llamar onCancelar
+                    setTimeout(() => { modal.hide(); }, 1400);
+                }
+                else {
+                    // Intentar mostrar el mensaje de error del servidor
+                    let mensajeError = 'Error del servidor';
+                    try {
+                        const errData = await resp.json();
+                        mensajeError = errData.error || mensajeError;
+                    }
+                    catch (_) { /* ignorar */ }
+                    if (btnAceptar) {
+                        btnAceptar.disabled = false;
+                        btnAceptar.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i> Error — reintentar';
+                        btnAceptar.classList.replace('btn-primary', 'btn-danger');
+                        btnAceptar.title = mensajeError;
+                    }
+                    if (btnCancelar)
+                        btnCancelar.disabled = false;
+                }
+            }
+            catch (_) {
+                if (btnAceptar) {
+                    btnAceptar.disabled = false;
+                    btnAceptar.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i> Error de red — reintentar';
+                    btnAceptar.classList.replace('btn-primary', 'btn-danger');
+                }
+                if (btnCancelar)
+                    btnCancelar.disabled = false;
+            }
+        });
+    }
+    /**
      * EXPLICACIÓN PARA PRINCIPIANTES:
      * setInterval() ejecuta una función cada N milisegundos. Aquí la usamos
      * para actualizar el contador visible (5, 4, 3, 2, 1...) y al llegar a 0
