@@ -7114,7 +7114,17 @@ def enviar_imagenes_cliente(request, orden_id):
             usuario_id=usuario_id,
             modelo_ia_inspeccion=modelo_ia_inspeccion,
         )
-        
+
+        # Registrar de inmediato que el envío fue iniciado, para que el botón
+        # muestre "ya enviado / reenviar" en la recarga sin esperar a que
+        # termine la tarea Celery (icontains='imágenes de ingreso').
+        HistorialOrden.objects.create(
+            orden=orden,
+            usuario=getattr(request.user, 'empleado', None),
+            tipo_evento='email',
+            comentario=f'Envío de imágenes de ingreso al cliente iniciado — tarea en segundo plano (task_id: {tarea.id})',
+        )
+
         # ── Disparar envío de enlace de seguimiento (solo fuera de garantía) ──
         if orden.es_fuera_garantia:
             from .tasks import enviar_seguimiento_cliente_task
@@ -7244,6 +7254,16 @@ def enviar_imagenes_egreso_cliente(request, orden_id):
             orden_id=orden_id,
             destinatarios_copia=destinatarios_copia,
             usuario_id=usuario_id,
+        )
+
+        # Registrar de inmediato que el envío fue iniciado, para que el botón
+        # muestre "ya enviado / reenviar" en la recarga sin esperar a que
+        # termine la tarea Celery (icontains='imágenes de egreso').
+        HistorialOrden.objects.create(
+            orden=orden,
+            usuario=getattr(request.user, 'empleado', None),
+            tipo_evento='email',
+            comentario=f'Envío de imágenes de egreso al cliente iniciado — tarea en segundo plano (task_id: {tarea.id})',
         )
 
         return JsonResponse({
@@ -7416,6 +7436,16 @@ def enviar_rewind_egreso_cliente(request, orden_id):
             enviar_rewind_egreso_email_task.s(orden_id, usuario_id, destinatarios_copia),
         )
         tarea_raiz = cadena.delay()
+
+        # Registrar de inmediato que la generación fue iniciada, para que el botón
+        # muestre "ya enviado / reenviar" en la recarga sin esperar a que
+        # termine la cadena Celery (icontains='video rewind').
+        HistorialOrden.objects.create(
+            orden=orden,
+            usuario=getattr(request.user, 'empleado', None),
+            tipo_evento='email',
+            comentario=f'Generación de video rewind al cliente iniciada — tarea en segundo plano (task_id: {tarea_raiz.id})',
+        )
 
         return JsonResponse({
             'success': True,

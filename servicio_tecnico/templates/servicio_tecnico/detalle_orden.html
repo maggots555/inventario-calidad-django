@@ -6893,6 +6893,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Mostrar modal de confirmación
                     modalConfirmacion = new bootstrap.Modal(document.getElementById('modalConfirmacionEnvioImagenes'));
                     modalConfirmacion.show();
+
+                    // Actualizar el botón de ingreso en la página de forma inmediata,
+                    // sin esperar al reload, para que el usuario vea el cambio al instante.
+                    const btnIngreso = document.querySelector('[data-bs-target="#modalEnviarImagenesCliente"]');
+                    if (btnIngreso) {
+                        btnIngreso.classList.remove('btn-primary');
+                        btnIngreso.classList.add('btn-outline-primary');
+                        btnIngreso.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Imágenes de ingreso ya enviadas'
+                            + '<span class="badge bg-primary bg-opacity-25 text-primary ms-2">reenviar</span>';
+                    }
                     
                 } else {
                     // Error del servidor

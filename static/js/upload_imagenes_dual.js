@@ -1036,6 +1036,15 @@ class UploadImagenesDual {
                         btnAceptar.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> ¡Enviado!';
                         btnAceptar.classList.replace('btn-warning', 'btn-success');
                     }
+                    // Actualizar el botón de egreso en la página de forma inmediata,
+                    // sin esperar al reload, para que el usuario vea el cambio al instante.
+                    const btnEgreso = document.getElementById('btnEnviarImagenesEgreso');
+                    if (btnEgreso) {
+                        btnEgreso.classList.remove('btn-warning', 'text-white');
+                        btnEgreso.classList.add('btn-outline-warning');
+                        btnEgreso.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Imágenes de egreso ya enviadas'
+                            + '<span class="badge bg-warning bg-opacity-25 text-warning ms-2">reenviar</span>';
+                    }
                     // Esperar un momento para que el usuario vea el feedback
                     setTimeout(() => {
                         modal.hide();
@@ -1236,6 +1245,15 @@ class UploadImagenesDual {
                     if (btnAceptar) {
                         btnAceptar.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> ¡En proceso!';
                         btnAceptar.classList.replace('btn-primary', 'btn-success');
+                    }
+                    // Actualizar el botón de rewind en la página de forma inmediata,
+                    // sin esperar al reload, para que el usuario vea el cambio al instante.
+                    const btnRewind = document.getElementById('btnEnviarRewindEgreso');
+                    if (btnRewind) {
+                        btnRewind.classList.remove('btn-primary');
+                        btnRewind.classList.add('btn-outline-primary');
+                        btnRewind.innerHTML = '<i class="bi bi-film me-1"></i> Video rewind ya enviado'
+                            + '<span class="badge bg-primary bg-opacity-25 text-primary ms-2">reenviar</span>';
                     }
                     enviado = true; // marcar como completado para que hidden.bs.modal recargue en vez de llamar onCancelar
                     setTimeout(() => { modal.hide(); }, 1400);
