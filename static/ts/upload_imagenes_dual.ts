@@ -120,7 +120,8 @@ interface UploadResult {
     archivosEnviados: number;    // Cantidad de archivos enviados
     tipoImagen: string;          // Tipo de imagen subida ('egreso', 'ingreso', etc.)
     egresoCorreoYaEnviado: boolean; // Si ya existe historial de envío de correo de egreso
-    tiene4TiposFotos: boolean;   // Si la orden tiene los 4 tipos de fotos (post-subida)
+    tiene4TiposFotos: boolean;   // Si la orden tiene los 4 tipos de fotos (diagnóstico)
+    tiene3TiposFotos: boolean;   // Si la orden tiene los 3 tipos de fotos (venta mostrador)
     rewindYaEnviado: boolean;    // Si el video rewind ya fue enviado al cliente
 }
 
@@ -940,7 +941,8 @@ class UploadImagenesDual {
                 // Detectar si fue egreso para mostrar modal de correo
                 const esEgreso = resultado.tipoImagen === 'egreso';
                 if (esEgreso && !resultado.egresoCorreoYaEnviado) {
-                    if (resultado.tiene4TiposFotos && !resultado.rewindYaEnviado) {
+                    const tieneRewind = resultado.tiene4TiposFotos || resultado.tiene3TiposFotos;
+                    if (tieneRewind && !resultado.rewindYaEnviado) {
                         // Prioridad: rewind. Si el usuario lo cancela, mostrar egreso normal.
                         this.mostrarModalRewindEmail(() => this.mostrarModalEgresoEmail());
                     } else {
@@ -1104,6 +1106,7 @@ class UploadImagenesDual {
                             tipoImagen: data.tipo_imagen || '',
                             egresoCorreoYaEnviado: data.egreso_correo_ya_enviado || false,
                             tiene4TiposFotos: data.tiene_4_tipos_fotos || false,
+                            tiene3TiposFotos: data.tiene_3_tipos_fotos || false,
                             rewindYaEnviado: data.rewind_ya_enviado || false,
                         });
                     } catch (e) {
@@ -1376,6 +1379,8 @@ class UploadImagenesDual {
 
         const urlDestinatarios = form.dataset.urlDestinatariosEgreso;
         const urlEnviarRewind  = form.dataset.urlEnviarRewind;
+        const tipoServicio     = form.dataset.tipoServicio ?? 'diagnostico';
+        const esVentaMostrador = tipoServicio === 'venta_mostrador';
 
         if (!urlDestinatarios || !urlEnviarRewind) {
             window.location.reload();
@@ -1433,7 +1438,10 @@ class UploadImagenesDual {
                     <div class="modal-body">
                         <p class="mb-3">
                             Se <strong>generará un video resumen rewind</strong> del proceso completo
-                            del equipo (ingreso → diagnóstico → reparación → egreso) y se enviará
+                            del equipo (${esVentaMostrador
+                                ? 'ingreso → reparación → egreso'
+                                : 'ingreso → diagnóstico → reparación → egreso'
+                            }) y se enviará
                             al cliente cuando esté listo.
                         </p>
 

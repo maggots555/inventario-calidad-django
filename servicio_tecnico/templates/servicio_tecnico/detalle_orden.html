@@ -2054,7 +2054,8 @@
                               data-descripcion-id="{{ form_imagenes.descripcion.id_for_label }}"
                               data-url-destinatarios-egreso="{% url 'servicio_tecnico:obtener_destinatarios_egreso' orden.id %}"
                               data-url-enviar-egreso="{% url 'servicio_tecnico:enviar_imagenes_egreso_cliente' orden.id %}"
-                              data-url-enviar-rewind="{% url 'servicio_tecnico:enviar_rewind_egreso_cliente' orden.id %}">
+                              data-url-enviar-rewind="{% url 'servicio_tecnico:enviar_rewind_egreso_cliente' orden.id %}"
+                              data-tipo-servicio="{{ orden.tipo_servicio }}">
                             {% csrf_token %}
                             <input type="hidden" name="form_type" value="subir_imagenes">
 
@@ -2233,8 +2234,8 @@
                                  </div>
                              </div>
 
-                             <!-- Botón para enviar video rewind al cliente (solo con 4 tipos) -->
-                             {% if tiene_4_tipos_fotos %}
+                             <!-- Botón para enviar video rewind al cliente (4 tipos diagnóstico ó 3 tipos venta mostrador) -->
+                             {% if tiene_4_tipos_fotos or tiene_3_tipos_fotos %}
                              <div class="row mb-3">
                                  <div class="col-12">
                                      <button type="button"
@@ -2246,11 +2247,19 @@
                                              <span class="badge bg-primary bg-opacity-25 text-primary ms-2">reenviar</span>
                                          {% else %}
                                              <i class="bi bi-film me-1"></i> Enviar video rewind al cliente
-                                             <span class="badge bg-white bg-opacity-25 ms-2" style="color:rgba(255,255,255,.85);">✨ 4 tipos · automático</span>
+                                             {% if tiene_3_tipos_fotos %}
+                                                 <span class="badge bg-white bg-opacity-25 ms-2" style="color:rgba(255,255,255,.85);">✨ 3 tipos · automático</span>
+                                             {% else %}
+                                                 <span class="badge bg-white bg-opacity-25 ms-2" style="color:rgba(255,255,255,.85);">✨ 4 tipos · automático</span>
+                                             {% endif %}
                                          {% endif %}
                                      </button>
                                      <small class="text-muted d-block mt-2 text-center">
-                                         <i class="bi bi-info-circle"></i> Genera un video resumen del proceso completo (ingreso → reparación → egreso)
+                                         {% if tiene_3_tipos_fotos %}
+                                             <i class="bi bi-info-circle"></i> Genera un video resumen del servicio (ingreso → reparación → egreso)
+                                         {% else %}
+                                             <i class="bi bi-info-circle"></i> Genera un video resumen del proceso completo (ingreso → diagnóstico → reparación → egreso)
+                                         {% endif %}
                                      </small>
                                  </div>
                              </div>

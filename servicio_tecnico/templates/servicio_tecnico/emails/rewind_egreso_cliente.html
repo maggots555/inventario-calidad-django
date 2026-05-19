@@ -435,9 +435,13 @@
             </div>
 
             <div class="intro-text">
-                El proceso de servicio técnico de su equipo ha concluido y queremos compartir
+                El servicio de su equipo ha concluido y queremos compartir
                 con usted un <strong>resumen visual completo</strong> de todo lo que se realizó:
+                {% if es_venta_mostrador %}
+                desde el estado de ingreso, la reparación, hasta el resultado final.
+                {% else %}
                 desde el estado de ingreso, el diagnóstico, la reparación, hasta el resultado final.
+                {% endif %}
             </div>
 
             <!-- ════════════════════════════════════════════════════════════════
@@ -467,7 +471,11 @@
 
                 <div class="video-preview-desc">
                     Su equipo fue registrado fotográficamente en cada etapa del proceso.
+                    {% if es_venta_mostrador %}
+                    El video reúne ingreso, reparación y egreso en una sola presentación.
+                    {% else %}
                     El video reúne ingreso, diagnóstico, reparación y egreso en una sola presentación.
+                    {% endif %}
                 </div>
 
                 {% if seguimiento_url %}

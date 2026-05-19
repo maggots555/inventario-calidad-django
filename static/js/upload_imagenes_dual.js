@@ -664,7 +664,8 @@ class UploadImagenesDual {
                 // Detectar si fue egreso para mostrar modal de correo
                 const esEgreso = resultado.tipoImagen === 'egreso';
                 if (esEgreso && !resultado.egresoCorreoYaEnviado) {
-                    if (resultado.tiene4TiposFotos && !resultado.rewindYaEnviado) {
+                    const tieneRewind = resultado.tiene4TiposFotos || resultado.tiene3TiposFotos;
+                    if (tieneRewind && !resultado.rewindYaEnviado) {
                         // Prioridad: rewind. Si el usuario lo cancela, mostrar egreso normal.
                         this.mostrarModalRewindEmail(() => this.mostrarModalEgresoEmail());
                     }
@@ -825,6 +826,7 @@ class UploadImagenesDual {
                             tipoImagen: data.tipo_imagen || '',
                             egresoCorreoYaEnviado: data.egreso_correo_ya_enviado || false,
                             tiene4TiposFotos: data.tiene_4_tipos_fotos || false,
+                            tiene3TiposFotos: data.tiene_3_tipos_fotos || false,
                             rewindYaEnviado: data.rewind_ya_enviado || false,
                         });
                     }
@@ -1075,7 +1077,7 @@ class UploadImagenesDual {
      * - Muestra una advertencia de que el proceso puede tardar varios minutos.
      */
     async mostrarModalRewindEmail(onCancelar) {
-        var _a, _b;
+        var _a, _b, _c;
         const form = this.formElement;
         if (!form) {
             window.location.reload();
@@ -1083,6 +1085,8 @@ class UploadImagenesDual {
         }
         const urlDestinatarios = form.dataset.urlDestinatariosEgreso;
         const urlEnviarRewind = form.dataset.urlEnviarRewind;
+        const tipoServicio = (_a = form.dataset.tipoServicio) !== null && _a !== void 0 ? _a : 'diagnostico';
+        const esVentaMostrador = tipoServicio === 'venta_mostrador';
         if (!urlDestinatarios || !urlEnviarRewind) {
             window.location.reload();
             return;
@@ -1108,7 +1112,7 @@ class UploadImagenesDual {
         }
         // ── 2. Construir HTML del modal ──────────────────────────────────────
         const modalId = 'modalRewindEmailDinamico';
-        (_a = document.getElementById(modalId)) === null || _a === void 0 ? void 0 : _a.remove();
+        (_b = document.getElementById(modalId)) === null || _b === void 0 ? void 0 : _b.remove();
         const ccHtml = destinatariosCopia.length > 0
             ? destinatariosCopia.map(cc => `<li class="list-group-item py-1 px-2 small text-muted">${cc}</li>`).join('')
             : '<li class="list-group-item py-1 px-2 small text-muted fst-italic">Sin copias</li>';
@@ -1132,7 +1136,9 @@ class UploadImagenesDual {
                     <div class="modal-body">
                         <p class="mb-3">
                             Se <strong>generará un video resumen rewind</strong> del proceso completo
-                            del equipo (ingreso → diagnóstico → reparación → egreso) y se enviará
+                            del equipo (${esVentaMostrador
+            ? 'ingreso → reparación → egreso'
+            : 'ingreso → diagnóstico → reparación → egreso'}) y se enviará
                             al cliente cuando esté listo.
                         </p>
 
@@ -1205,7 +1211,7 @@ class UploadImagenesDual {
                 window.location.reload();
             }
         });
-        (_b = document.getElementById('btnRewindModalAceptar')) === null || _b === void 0 ? void 0 : _b.addEventListener('click', async () => {
+        (_c = document.getElementById('btnRewindModalAceptar')) === null || _c === void 0 ? void 0 : _c.addEventListener('click', async () => {
             const btnAceptar = document.getElementById('btnRewindModalAceptar');
             const btnCancelar = document.getElementById('btnRewindModalCancelar');
             if (btnAceptar) {

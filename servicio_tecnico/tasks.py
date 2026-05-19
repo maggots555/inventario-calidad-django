@@ -2537,17 +2537,25 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
     # Duración de la pantalla de cierre con el texto (segundos)
     DURACION_CIERRE = 4
     # Tipos de foto que se incluyen en el video (en orden del flujo de trabajo)
+    # NOTA: Esta lista es para diagnóstico (4 tipos). Venta mostrador usa 3 (sin diagnóstico).
+    # La lista activa se calcula como TIPOS_FOTO_ACTIVOS después de cargar la orden.
     TIPOS_FOTO = ['ingreso', 'diagnostico', 'reparacion', 'egreso']
     # Duración de la pantalla de intro del rewind (logo + datos del equipo)
     DURACION_INTRO = 4
     # Duración de cada tarjeta de sección en el rewind (fondo azul + texto)
     DURACION_SECCION = 2
-    # Textos para las tarjetas de sección del rewind
+    # Textos para las tarjetas de sección del rewind (diagnóstico — 4 tipos)
     TEXTO_SECCIONES = {
         'ingreso':     'Así ingresó tu equipo',
         'diagnostico': 'Fue diagnosticado minuciosamente',
         'reparacion':  'Así se reparó',
         'egreso':      'Tu equipo ahora...',
+    }
+    # Textos para venta mostrador (3 tipos, sin diagnóstico)
+    TEXTO_SECCIONES_VM = {
+        'ingreso':    'Así llegó tu equipo',
+        'reparacion': 'Así se realizó el servicio',
+        'egreso':     'Tu equipo ahora...',
     }
 
     # =========================================================================
@@ -2605,18 +2613,36 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
         folio = orden.numero_orden_interno
 
         # =====================================================================
+        # PASO 1.5: DETERMINAR TIPOS ACTIVOS SEGÚN TIPO DE SERVICIO
+        # Venta mostrador no pasa por diagnóstico → solo 3 tipos: ingreso, reparacion, egreso
+        # Diagnóstico estándar → 4 tipos: ingreso, diagnostico, reparacion, egreso
+        # =====================================================================
+        _es_venta_mostrador = orden.tipo_servicio == 'venta_mostrador'
+        if _es_venta_mostrador:
+            TIPOS_FOTO_ACTIVOS = ['ingreso', 'reparacion', 'egreso']
+            TEXTO_SECCIONES_ACTIVO = TEXTO_SECCIONES_VM
+        else:
+            TIPOS_FOTO_ACTIVOS = TIPOS_FOTO
+            TEXTO_SECCIONES_ACTIVO = TEXTO_SECCIONES
+
+        logger.info(
+            f"[VIDEO-RESUMEN] Orden {folio} — tipo_servicio='{orden.tipo_servicio}' "
+            f"→ tipos activos: {TIPOS_FOTO_ACTIVOS}"
+        )
+
+        # =====================================================================
         # PASO 2: RECOPILAR IMÁGENES EN ORDEN
         # =====================================================================
-        # Tomamos solo los 4 tipos principales, ordenados por fecha de subida
+        # Tomamos solo los tipos activos (3 para venta mostrador, 4 para diagnóstico)
         imagenes_qs = ImagenOrden.objects.filter(
             orden=orden,
-            tipo__in=TIPOS_FOTO,
+            tipo__in=TIPOS_FOTO_ACTIVOS,
         ).order_by('tipo', 'fecha_subida')
 
         # Ordenar manualmente por el orden lógico del flujo de trabajo
-        # (el ORM no puede hacer esto con el orden arbitrario de TIPOS_FOTO)
+        # (el ORM no puede hacer esto con el orden arbitrario de TIPOS_FOTO_ACTIVOS)
         imagenes_ordenadas = []
-        for tipo in TIPOS_FOTO:
+        for tipo in TIPOS_FOTO_ACTIVOS:
             for img in imagenes_qs:
                 if img.tipo == tipo:
                     imagenes_ordenadas.append(img)
@@ -2699,14 +2725,14 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
         # PASO 3.5: DETECTAR MODO REWIND
         # =====================================================================
         # El modo rewind se activa SOLO si hay al menos 1 foto de cada uno de
-        # los 4 tipos: ingreso, diagnóstico, reparación y egreso.
+        # los tipos activos (3 para venta mostrador, 4 para diagnóstico).
         # Si falta algún tipo, se usa el modo simple (comportamiento anterior).
-        fotos_por_tipo_idx = {t: [] for t in TIPOS_FOTO}
+        fotos_por_tipo_idx = {t: [] for t in TIPOS_FOTO_ACTIVOS}
         for path_idx, img in enumerate(imagenes_exitosas):
             if img.tipo in fotos_por_tipo_idx:
                 fotos_por_tipo_idx[img.tipo].append(path_idx)
 
-        es_rewind = all(len(fotos_por_tipo_idx[t]) > 0 for t in TIPOS_FOTO)
+        es_rewind = all(len(fotos_por_tipo_idx[t]) > 0 for t in TIPOS_FOTO_ACTIVOS)
 
         logger.info(
             f"[VIDEO-RESUMEN] Modo {'rewind' if es_rewind else 'simple'} — "
@@ -2961,8 +2987,8 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
             )
 
             # ── Filtros de tarjetas de sección (fondo azul + texto grande) ──
-            for tipo in TIPOS_FOTO:
-                texto_sec_esc = _escape_ffmpeg_text(TEXTO_SECCIONES[tipo])
+            for tipo in TIPOS_FOTO_ACTIVOS:
+                texto_sec_esc = _escape_ffmpeg_text(TEXTO_SECCIONES_ACTIVO[tipo])
                 filter_parts.append(
                     f"color=0x1f6391:size=1280x720:rate={fps}"
                     f":duration={DURACION_SECCION + DURACION_FADE},"
@@ -2974,7 +3000,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
             # ── Secuencia de clips rewind ──
             # (label, duración_visible_en_segundos)
             clips_sequence = [('[intro]', DURACION_INTRO)]
-            for tipo in TIPOS_FOTO:
+            for tipo in TIPOS_FOTO_ACTIVOS:
                 clips_sequence.append((f'[sec_{tipo}]', DURACION_SECCION))
                 for path_idx in fotos_por_tipo_idx[tipo]:
                     clips_sequence.append((f'[kbv{path_idx}]', DURACION_FOTO))
@@ -3139,7 +3165,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
             tipo='resumen',
             descripcion=(
                 f"Video resumen automático — {n_fotos} fotos "
-                f"({', '.join(TIPOS_FOTO)}) — generado por Celery"
+                f"({', '.join(TIPOS_FOTO_ACTIVOS)}) — generado por Celery"
             ),
             subido_por=empleado_obj,
             tamano_original_mb=tamano_fotos_mb,
@@ -3645,6 +3671,8 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
             'seguimiento_url': seguimiento_url,
             'thumbnail_disponible': thumbnail_path is not None,
             'video_url': video_url,
+            # Si es venta mostrador, el template omite menciones a diagnóstico
+            'es_venta_mostrador': orden.tipo_servicio == 'venta_mostrador',
         }
 
         html_content = render_to_string(

@@ -2095,9 +2095,16 @@ def detalle_orden(request, orden_id):
                                 .filter(comentario__icontains='imágenes de egreso')
                                 .exists()
                             ) if tipo_imagen == 'egreso' else False,
-                            # Si la orden ya tiene los 4 tipos de fotos (para disparar modal rewind)
+                             # Si la orden ya tiene los 4 tipos de fotos (para disparar modal rewind)
                             'tiene_4_tipos_fotos': (
                                 {'ingreso', 'diagnostico', 'reparacion', 'egreso'}.issubset(
+                                    set(orden.imagenes.values_list('tipo', flat=True).distinct())
+                                )
+                            ) if tipo_imagen == 'egreso' else False,
+                            # Venta mostrador: solo requiere 3 tipos (sin diagnóstico)
+                            'tiene_3_tipos_fotos': (
+                                orden.tipo_servicio == 'venta_mostrador' and
+                                {'ingreso', 'reparacion', 'egreso'}.issubset(
                                     set(orden.imagenes.values_list('tipo', flat=True).distinct())
                                 )
                             ) if tipo_imagen == 'egreso' else False,
@@ -2817,11 +2824,17 @@ def detalle_orden(request, orden_id):
         comentario__icontains='imágenes de ingreso'
     ).exists()
 
-    # ── Botón rewind: ¿tiene los 4 tipos de fotos? ──────────────────────────
+    # ── Botón rewind: ¿tiene los tipos de fotos requeridos? ─────────────────
+    # Diagnóstico: requiere los 4 tipos (ingreso + diagnóstico + reparación + egreso)
+    # Venta mostrador: requiere solo 3 tipos (ingreso + reparación + egreso), sin diagnóstico
     _tipos_fotos_set = set(
         orden.imagenes.values_list('tipo', flat=True).distinct()
     )
     tiene_4_tipos_fotos = {'ingreso', 'diagnostico', 'reparacion', 'egreso'}.issubset(_tipos_fotos_set)
+    tiene_3_tipos_fotos = (
+        orden.tipo_servicio == 'venta_mostrador' and
+        {'ingreso', 'reparacion', 'egreso'}.issubset(_tipos_fotos_set)
+    )
 
     # ── ¿Ya se envió el correo rewind? ───────────────────────────────────────
     rewind_ya_enviado = orden.historial.filter(
@@ -2999,6 +3012,7 @@ def detalle_orden(request, orden_id):
         'egreso_correo_ya_enviado': egreso_correo_ya_enviado,
         'ingreso_correo_ya_enviado': ingreso_correo_ya_enviado,
         'tiene_4_tipos_fotos': tiene_4_tipos_fotos,
+        'tiene_3_tipos_fotos': tiene_3_tipos_fotos,
         'rewind_ya_enviado': rewind_ya_enviado,
 
         # Videos
@@ -7325,14 +7339,23 @@ def enviar_rewind_egreso_cliente(request, orden_id):
             }, status=400)
 
         # ===================================================================
-        # PASO 4: VERIFICAR LOS 4 TIPOS DE FOTOS
+        # PASO 4: VERIFICAR LOS TIPOS DE FOTOS REQUERIDOS
+        # Diagnóstico: requiere 4 tipos (ingreso, diagnóstico, reparación, egreso)
+        # Venta mostrador: requiere 3 tipos (ingreso, reparación, egreso)
         # ===================================================================
+        es_venta_mostrador = orden.tipo_servicio == 'venta_mostrador'
+
         tipos_presentes = set(
             ImagenOrden.objects.filter(orden=orden)
             .values_list('tipo', flat=True)
             .distinct()
         )
-        tipos_requeridos = {'ingreso', 'diagnostico', 'reparacion', 'egreso'}
+
+        if es_venta_mostrador:
+            tipos_requeridos = {'ingreso', 'reparacion', 'egreso'}
+        else:
+            tipos_requeridos = {'ingreso', 'diagnostico', 'reparacion', 'egreso'}
+
         tipos_faltantes = tipos_requeridos - tipos_presentes
 
         if tipos_faltantes:
@@ -7343,10 +7366,11 @@ def enviar_rewind_egreso_cliente(request, orden_id):
                 'egreso': 'Egreso',
             }
             faltantes_texto = ', '.join(nombres.get(t, t) for t in sorted(tipos_faltantes))
+            n_requeridos = len(tipos_requeridos)
             return JsonResponse({
                 'success': False,
                 'error': (
-                    f'❌ Para generar el video rewind se necesitan fotos de los 4 tipos. '
+                    f'❌ Para generar el video rewind se necesitan fotos de los {n_requeridos} tipos. '
                     f'Faltan fotos de: {faltantes_texto}.'
                 )
             }, status=400)
