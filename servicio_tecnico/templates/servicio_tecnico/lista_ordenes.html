@@ -166,7 +166,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="container-fluid mt-4 lista-ordenes-bg">
     <!-- Header con título y botones de acción -->
     <div class="row mb-4">
         <div class="col-12">
@@ -283,13 +283,13 @@
         {% if tecnicos_por_sucursal %}
         <div class="col-lg-12">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header text-white d-flex justify-content-between align-items-center flex-wrap gap-3" 
-                     style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 1rem 1.5rem;">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-3 stats-card-header" 
+                     style="border: none; padding: 1rem 1.5rem;">
                     <div>
                         <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
                             <i class="bi bi-people-fill" style="font-size: 1.3rem;"></i> Estadísticas Unificadas por Técnico
                         </h6>
-                        <small class="text-white opacity-90">Vista completa de carga de trabajo agrupada por sucursal</small>
+                        <small class="opacity-75">Vista completa de carga de trabajo agrupada por sucursal</small>
                     </div>
                     <div class="d-flex gap-2 align-items-center flex-wrap">
                         <!-- Filtro temporal -->
@@ -310,9 +310,9 @@
                     {% for sucursal_grupo in tecnicos_por_sucursal %}
                     <div class="sucursal-grupo">
                         <!-- Encabezado de sucursal mejorado con SVG personalizado -->
-                        <div class="sucursal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.2rem 2rem; border-bottom: 4px solid #5a67d8; box-shadow: 0 3px 8px rgba(102,126,234,0.25);">
+                        <div class="sucursal-header">
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                                <h5 class="mb-0 text-white d-flex align-items-center gap-3" style="font-weight: 800; font-size: 1.4rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                                <h5 class="mb-0 d-flex align-items-center gap-3" style="font-weight: 800; font-size: 1.4rem;">
                                     <!-- SVG personalizado según sucursal -->
                                     {% if 'SATELITE' in sucursal_grupo.sucursal_nombre|upper or 'SATÉLITE' in sucursal_grupo.sucursal_nombre|upper %}
                                         <img src="{% static 'images/utilitys/sucursal_satelite.svg' %}" alt="Satélite" style="width: 48px; height: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
@@ -338,9 +338,9 @@
                         <div class="area-grupo">
                             <!-- Sub-encabezado de área con colores corporativos -->
                             {% if 'DELL' in area_grupo.area_nombre %}
-                                <!-- DELL: Azul y amarillo -->
-                                <div class="area-header" style="background: linear-gradient(135deg, #0076CE 0%, #FFD200 100%); padding: 0.75rem 1.5rem 0.75rem 2.5rem; border-bottom: 3px solid #0076CE; box-shadow: 0 2px 4px rgba(0,118,206,0.15);">
-                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
+                                <!-- DELL: Azul corporativo + acento amarillo -->
+                                <div class="area-header area-header-dell">
+                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem;">
                                         <i class="bi bi-laptop me-2"></i>{{ area_grupo.area_nombre }}
                                         <span class="badge bg-white text-primary ms-2" style="font-size: 0.75rem; font-weight: 600;">
                                             {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
@@ -348,9 +348,9 @@
                                     </h6>
                                 </div>
                             {% elif 'LENOVO' in area_grupo.area_nombre %}
-                                <!-- LENOVO: Naranja y verde -->
-                                <div class="area-header" style="background: linear-gradient(135deg, #E2231A 0%, #00B140 100%); padding: 0.75rem 1.5rem 0.75rem 2.5rem; border-bottom: 3px solid #E2231A; box-shadow: 0 2px 4px rgba(226,35,26,0.15);">
-                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
+                                <!-- LENOVO: Rojo corporativo -->
+                                <div class="area-header area-header-lenovo">
+                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem;">
                                         <i class="bi bi-laptop me-2"></i>{{ area_grupo.area_nombre }}
                                         <span class="badge bg-white text-danger ms-2" style="font-size: 0.75rem; font-weight: 600;">
                                             {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
@@ -358,9 +358,9 @@
                                     </h6>
                                 </div>
                             {% elif 'OOW' in area_grupo.area_nombre %}
-                                <!-- OOW: Rosa/Magenta -->
-                                <div class="area-header" style="background: linear-gradient(135deg, #E91E63 0%, #FF6090 100%); padding: 0.75rem 1.5rem 0.75rem 2.5rem; border-bottom: 3px solid #C2185B; box-shadow: 0 2px 4px rgba(233,30,99,0.15);">
-                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
+                                <!-- OOW: Magenta oscuro -->
+                                <div class="area-header area-header-oow">
+                                    <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem;">
                                         <i class="bi bi-tools me-2"></i>{{ area_grupo.area_nombre }}
                                         <span class="badge bg-white text-danger ms-2" style="font-size: 0.75rem; font-weight: 600;">
                                             {{ area_grupo.tecnicos|length }} técnico{{ area_grupo.tecnicos|length|pluralize }}
@@ -368,8 +368,8 @@
                                     </h6>
                                 </div>
                             {% else %}
-                                <!-- Otras áreas: Gris por defecto -->
-                                <div class="area-header" style="background: linear-gradient(90deg, #6c757d 0%, #95a5a6 100%); padding: 0.75rem 1.5rem 0.75rem 2.5rem; border-bottom: 3px solid #6c757d;">
+                                <!-- Otras áreas: Slate -->
+                                <div class="area-header area-header-default">
                                     <h6 class="mb-0 text-white" style="font-weight: 700; font-size: 1rem;">
                                         <i class="bi bi-tag-fill me-2"></i>{{ area_grupo.area_nombre }}
                                         <span class="badge bg-white text-dark ms-2" style="font-size: 0.75rem; font-weight: 600;">
@@ -555,7 +555,7 @@
                         <!-- Fin de iteración de áreas -->
                     </div>
                     {% if not forloop.last %}
-                        <hr class="m-0" style="border-color: #5a67d8; border-width: 2px;">
+                        <hr class="m-0" style="border-color: #334155; border-width: 1px; opacity: 0.6;">
                     {% endif %}
                     {% endfor %}
                     
@@ -600,13 +600,13 @@
         {% if reasignaciones_hoy %}
         <div class="col-lg-12">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header text-white d-flex justify-content-between align-items-center clickable-header" 
+                <div class="card-header d-flex justify-content-between align-items-center clickable-header reasignaciones-card-header" 
                      data-bs-toggle="collapse" 
                      data-bs-target="#collapseReasignaciones" 
                      aria-expanded="false" 
                      aria-controls="collapseReasignaciones"
                      role="button"
-                     style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border: none; padding: 1rem 1.5rem; cursor: pointer;">
+                     style="border: none; padding: 1rem 1.5rem; cursor: pointer;">
                     <h6 class="card-title mb-0" style="font-weight: 600; font-size: 1.1rem;">
                         <i class="bi bi-arrow-left-right" style="font-size: 1.3rem;"></i> Historial de Reasignaciones del Día
                     </h6>

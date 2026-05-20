@@ -2012,7 +2012,7 @@ form:has(#btnSubirImagenes:disabled) textarea {
         font-size: 0.9rem;
     }
     
-    /* Ajustar headers con degradado en móviles */
+    /* Ajustar headers con degradado inline (legacy — selector de emergencia) */
     .card-header[style*="linear-gradient"] {
         padding: 0.75rem 1rem !important;
     }
@@ -4458,17 +4458,14 @@ thead.sticky-top {
    ENCABEZADOS CON GRADIENTE (inline styles) → DARK MODE
    ===================================================================== */
 
-/* Card-header principal ("Estadísticas Unificadas") y cabecera de sucursal:
-   Colores sólidos oscuros sin gradientes para evitar destellos */
-[data-bs-theme="dark"] .sucursal-header,
+/* Card-header con gradiente inline residual (legacy — ya no aplica en lista_ordenes):
+   Selector de emergencia mantenido por compatibilidad con otros templates */
 [data-bs-theme="dark"] .card-header[style*="linear-gradient"] {
     background: #1e3a8a !important;
     border-bottom-color: #3b82f6 !important;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
 }
 
-[data-bs-theme="dark"] .sucursal-header h5,
-[data-bs-theme="dark"] .sucursal-header *,
 [data-bs-theme="dark"] .card-header[style*="linear-gradient"] h6,
 [data-bs-theme="dark"] .card-header[style*="linear-gradient"] * {
     color: #e2e8f0 !important;
@@ -4891,6 +4888,255 @@ thead.sticky-top {
 
 [data-bs-theme="dark"] .modal-header-video {
     background: linear-gradient(135deg, #1e3a5f 0%, #0d4a3a 100%);
+}
+
+/* =============================================================================
+   LISTA DE ÓRDENES — REDISEÑO DE HEADERS (sin gradientes genéricos)
+   Reemplaza el patrón morado #667eea→#764ba2 que se veía de IA
+   ============================================================================= */
+
+/* ── Header principal de la tabla de estadísticas ── */
+.stats-card-header {
+    background: #f1f5f9;
+    border-bottom: 3px solid #f59e0b !important;
+    color: #1e293b !important;
+}
+
+.stats-card-header h6,
+.stats-card-header h5,
+.stats-card-header span,
+.stats-card-header i {
+    color: #1e293b !important;
+}
+
+[data-bs-theme="dark"] .stats-card-header {
+    background: #0f172a;
+    border-bottom-color: #f59e0b !important;
+    color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .stats-card-header h6,
+[data-bs-theme="dark"] .stats-card-header h5,
+[data-bs-theme="dark"] .stats-card-header span,
+[data-bs-theme="dark"] .stats-card-header i {
+    color: #e2e8f0 !important;
+}
+
+/* ── Header de Sucursal: gris casi blanco + acento ámbar izquierdo ── */
+.sucursal-header {
+    background: #f8fafc;
+    padding: 1.1rem 2rem;
+    border-bottom: 1px solid #e2e8f0;
+    border-left: 5px solid #f59e0b;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.sucursal-header h5,
+.sucursal-header * {
+    color: #1e293b !important;
+    text-shadow: none !important;
+}
+
+[data-bs-theme="dark"] .sucursal-header {
+    background: #020617;
+    border-left-color: #f59e0b;
+    border-bottom-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .sucursal-header h5,
+[data-bs-theme="dark"] .sucursal-header * {
+    color: #e2e8f0 !important;
+}
+
+/* ── Area headers — colores de marca sólidos (sin gradiente) ── */
+.area-header-dell {
+    background: #005fa3;
+    padding: 0.65rem 1.5rem 0.65rem 2.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+    border-left: 4px solid #FFD200;
+}
+
+.area-header-lenovo {
+    background: #C41A1A;
+    padding: 0.65rem 1.5rem 0.65rem 2.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+    border-left: 4px solid rgba(255, 255, 255, 0.3);
+}
+
+.area-header-oow {
+    background: #880e4f;
+    padding: 0.65rem 1.5rem 0.65rem 2.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+    border-left: 4px solid #f48fb1;
+}
+
+.area-header-default {
+    background: #334155;
+    padding: 0.65rem 1.5rem 0.65rem 2.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    border-left: 4px solid #64748b;
+}
+
+/* Dark mode overrides para area headers */
+[data-bs-theme="dark"] .area-header-dell    { background: #003d6b; }
+[data-bs-theme="dark"] .area-header-lenovo  { background: #7a1111; }
+[data-bs-theme="dark"] .area-header-oow     { background: #560b33; }
+[data-bs-theme="dark"] .area-header-default { background: #1e293b; border-left-color: #475569; }
+
+/* ── Header de reasignaciones ── */
+.reasignaciones-card-header {
+    background: #f8fafc;
+    border-left: 4px solid #f87171;
+    border-bottom: 1px solid #e2e8f0;
+    color: #1e293b !important;
+}
+
+.reasignaciones-card-header h6,
+.reasignaciones-card-header h5,
+.reasignaciones-card-header i,
+.reasignaciones-card-header span {
+    color: #1e293b !important;
+    text-shadow: none !important;
+}
+
+[data-bs-theme="dark"] .reasignaciones-card-header {
+    background: #0f172a;
+    border-left-color: #ef4444;
+    border-bottom-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .reasignaciones-card-header h6,
+[data-bs-theme="dark"] .reasignaciones-card-header h5,
+[data-bs-theme="dark"] .reasignaciones-card-header i,
+[data-bs-theme="dark"] .reasignaciones-card-header span {
+    color: #e2e8f0 !important;
+}
+
+/* =============================================================================
+   LISTA DE ÓRDENES — TEXTURA DE FONDO Y VIDA VISUAL
+   ============================================================================= */
+
+/* Textura de puntos sutil (consistente con servicio_tecnico_inicio.css) */
+.lista-ordenes-bg {
+    background-image: radial-gradient(
+        circle,
+        rgba(148, 163, 184, 0.10) 1.5px,
+        transparent 1.5px
+    );
+    background-size: 28px 28px;
+}
+
+[data-bs-theme="dark"] .lista-ordenes-bg {
+    background-image: radial-gradient(
+        circle,
+        rgba(71, 85, 105, 0.15) 1.5px,
+        transparent 1.5px
+    );
+    background-size: 28px 28px;
+}
+
+/* =============================================================================
+   LISTA DE ÓRDENES — ANIMACIÓN DE ENTRADA PARA SERVICE CARDS
+   (Stagger escalonado: efecto de "aparición en cascada")
+   ============================================================================= */
+
+@keyframes cardEntrance {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Stagger para las primeras 20 tarjetas — el resto hereda el delay máximo */
+.row.g-2 > div:nth-child(1)  .service-card { animation: cardEntrance 0.38s ease-out 0.04s both; }
+.row.g-2 > div:nth-child(2)  .service-card { animation: cardEntrance 0.38s ease-out 0.08s both; }
+.row.g-2 > div:nth-child(3)  .service-card { animation: cardEntrance 0.38s ease-out 0.12s both; }
+.row.g-2 > div:nth-child(4)  .service-card { animation: cardEntrance 0.38s ease-out 0.16s both; }
+.row.g-2 > div:nth-child(5)  .service-card { animation: cardEntrance 0.38s ease-out 0.20s both; }
+.row.g-2 > div:nth-child(6)  .service-card { animation: cardEntrance 0.38s ease-out 0.24s both; }
+.row.g-2 > div:nth-child(7)  .service-card { animation: cardEntrance 0.38s ease-out 0.27s both; }
+.row.g-2 > div:nth-child(8)  .service-card { animation: cardEntrance 0.38s ease-out 0.30s both; }
+.row.g-2 > div:nth-child(9)  .service-card { animation: cardEntrance 0.38s ease-out 0.33s both; }
+.row.g-2 > div:nth-child(10) .service-card { animation: cardEntrance 0.38s ease-out 0.36s both; }
+.row.g-2 > div:nth-child(11) .service-card { animation: cardEntrance 0.38s ease-out 0.38s both; }
+.row.g-2 > div:nth-child(12) .service-card { animation: cardEntrance 0.38s ease-out 0.40s both; }
+.row.g-2 > div:nth-child(13) .service-card { animation: cardEntrance 0.38s ease-out 0.41s both; }
+.row.g-2 > div:nth-child(14) .service-card { animation: cardEntrance 0.38s ease-out 0.42s both; }
+.row.g-2 > div:nth-child(15) .service-card { animation: cardEntrance 0.38s ease-out 0.43s both; }
+.row.g-2 > div:nth-child(n+16) .service-card { animation: cardEntrance 0.38s ease-out 0.44s both; }
+
+/* Hover mejorado: glow sutil y elevación */
+.service-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 28px rgba(37, 99, 235, 0.13), 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-color: #3b82f6;
+}
+
+.orden-oow:hover {
+    border-color: #c2185b;
+    box-shadow: 0 10px 28px rgba(136, 14, 79, 0.18);
+}
+
+.orden-fl:hover {
+    border-color: #c75f89;
+    box-shadow: 0 10px 28px rgba(199, 95, 137, 0.20);
+}
+
+.orden-mx-cis:hover {
+    border-color: #7b1fa2;
+    box-shadow: 0 10px 28px rgba(156, 39, 176, 0.18);
+}
+
+/* Accesibilidad: sin animaciones si el usuario prefiere reducir movimiento */
+@media (prefers-reduced-motion: reduce) {
+    .row.g-2 > div .service-card {
+        animation: none !important;
+    }
+}
+
+/* Ajuste responsive para los nuevos card headers */
+@media (max-width: 768px) {
+    .stats-card-header,
+    .reasignaciones-card-header {
+        padding: 0.75rem 1rem !important;
+    }
+
+    .stats-card-header h6,
+    .reasignaciones-card-header h6 {
+        font-size: 0.85rem !important;
+    }
+
+    .stats-card-header i,
+    .reasignaciones-card-header i {
+        font-size: 1rem !important;
+    }
+
+    .sucursal-header {
+        padding: 0.85rem 1.25rem !important;
+        border-left-width: 4px !important;
+    }
+
+    .sucursal-header h5 {
+        font-size: 1rem !important;
+    }
+
+    .area-header-dell,
+    .area-header-lenovo,
+    .area-header-oow,
+    .area-header-default {
+        padding: 0.55rem 1rem 0.55rem 1.25rem !important;
+    }
+
+    .area-header-dell h6,
+    .area-header-lenovo h6,
+    .area-header-oow h6,
+    .area-header-default h6 {
+        font-size: 0.82rem !important;
+    }
 }
 
 /* ===== FIN GALERÍA DE VIDEOS ===== */
