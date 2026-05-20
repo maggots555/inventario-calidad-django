@@ -1,11 +1,13 @@
 /* 
    Login 3D Moderno - Estilos
    Diseño Glassmorphism con efectos de profundidad
+   Actualizado: animaciones de entrada, orbs, shimmer, tilt 3D, alertas diferenciadas
 */
 
 :root {
     --primary-color: #1f6391;
     --primary-hover: #1077bb;
+    --primary-glow: rgba(31, 99, 145, 0.45);
     --bg-gradient-1: #000203e8;
     --bg-gradient-2: #1f6391;
     --glass-bg: rgba(255, 255, 255, 0.08);
@@ -13,6 +15,10 @@
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     --text-main: #f8fafc;
     --text-muted: #adb9ca;
+    /* Orbs de fondo */
+    --orb-1: rgba(31, 99, 145, 0.35);
+    --orb-2: rgba(16, 119, 187, 0.25);
+    --orb-3: rgba(6, 182, 212, 0.15);
 }
 
 body.login-3d-page {
@@ -21,9 +27,8 @@ body.login-3d-page {
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Sora', 'Inter', system-ui, -apple-system, sans-serif;
     background: radial-gradient(circle at center, var(--bg-gradient-2), var(--bg-gradient-1));
-    /* El centrado lo maneja el contenedor Bootstrap, pero aseguramos reset */
 }
 
 /* --- Fondo de Partículas (Canvas) --- */
@@ -36,6 +41,91 @@ body.login-3d-page {
     z-index: 0;
 }
 
+/* ============================================================
+   ORBS ANIMADOS DE FONDO — profundidad y atmósfera
+   ============================================================ */
+.orbs-container {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: orb-drift 12s ease-in-out infinite alternate;
+    will-change: transform;
+}
+
+.orb-1 {
+    width: 500px;
+    height: 500px;
+    background: var(--orb-1);
+    top: -150px;
+    left: -100px;
+    animation-duration: 14s;
+}
+
+.orb-2 {
+    width: 400px;
+    height: 400px;
+    background: var(--orb-2);
+    bottom: -100px;
+    right: -80px;
+    animation-duration: 10s;
+    animation-delay: -4s;
+}
+
+.orb-3 {
+    width: 300px;
+    height: 300px;
+    background: var(--orb-3);
+    top: 40%;
+    left: 60%;
+    animation-duration: 16s;
+    animation-delay: -8s;
+}
+
+@keyframes orb-drift {
+    0%   { transform: translate(0, 0) scale(1); }
+    33%  { transform: translate(40px, -30px) scale(1.05); }
+    66%  { transform: translate(-20px, 50px) scale(0.95); }
+    100% { transform: translate(30px, 20px) scale(1.02); }
+}
+
+/* ============================================================
+   ANIMACIONES DE ENTRADA — stagger orquestado
+   ============================================================ */
+@keyframes card-enter {
+    from {
+        opacity: 0;
+        transform: translateY(32px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
 /* --- Tarjeta Glassmorphism --- */
 .login-card-3d {
     position: relative;
@@ -44,16 +134,18 @@ body.login-3d-page {
     max-width: 420px;
     padding: 3rem 2.5rem;
     background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--glass-border);
     border-radius: 24px;
-    box-shadow: var(--glass-shadow);
+    box-shadow: var(--glass-shadow), 0 0 0 1px rgba(255,255,255,0.04) inset;
     transform-style: preserve-3d;
-    transition: transform 0.1s ease-out;
+    transition: transform 0.08s ease-out, box-shadow 0.08s ease-out;
+    /* Entrada animada */
+    animation: card-enter 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Efecto de brillo al mover */
+/* Brillo interior sutil (pseudo-elemento) */
 .login-card-3d::before {
     content: '';
     position: absolute;
@@ -67,6 +159,36 @@ body.login-3d-page {
     z-index: 1;
 }
 
+/* Borde animado (pseudo gradiente rotante) */
+.login-card-3d::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 25px;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        rgba(31, 99, 145, 0.6) 60deg,
+        rgba(16, 119, 187, 0.8) 120deg,
+        rgba(6, 182, 212, 0.6) 180deg,
+        transparent 240deg,
+        transparent 360deg
+    );
+    z-index: -1;
+    animation: border-rotate 6s linear infinite;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.login-card-3d:hover::after {
+    opacity: 1;
+}
+
+@keyframes border-rotate {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
 /* Contenido interno con profundidad */
 .card-content {
     transform: translateZ(20px);
@@ -74,33 +196,48 @@ body.login-3d-page {
     z-index: 2;
 }
 
-/* --- Elementos del Formulario --- */
+/* ============================================================
+   ELEMENTOS DEL FORMULARIO — stagger de entrada
+   ============================================================ */
+
+/* Logo */
 .login-logo-3d {
     font-size: 3rem;
     color: var(--text-main);
     margin-bottom: 1rem;
     text-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     display: inline-block;
+    animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
 }
 
+/* Título */
 .login-title-3d {
     color: var(--text-main);
     font-weight: 700;
     margin-bottom: 0.5rem;
     font-size: 1.75rem;
+    letter-spacing: -0.02em;
+    animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
 }
 
+/* Subtítulo */
 .login-subtitle-3d {
     color: var(--text-muted);
     margin-bottom: 2rem;
     font-weight: 300;
+    animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
 }
 
 /* Inputs Modernos */
 .input-group-3d {
     position: relative;
     margin-bottom: 1.5rem;
+    animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* Delay escalonado para cada input */
+.input-group-3d:nth-of-type(1) { animation-delay: 0.45s; }
+.input-group-3d:nth-of-type(2) { animation-delay: 0.52s; }
 
 .input-group-3d i {
     position: absolute;
@@ -122,15 +259,16 @@ body.login-3d-page {
     transition: all 0.3s ease;
 }
 
+/* CORREGIDO: glow de focus en azul primario (era índigo/morado) */
 .form-control-3d:focus {
     background: rgba(15, 23, 42, 0.8);
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
+    box-shadow: 0 0 0 4px var(--primary-glow);
     outline: none;
     color: white;
 }
 
-.form-control-3d:focus+i {
+.form-control-3d:focus + i {
     color: var(--primary-color);
 }
 
@@ -157,8 +295,12 @@ body.login-3d-page {
     opacity: 1 !important;
 }
 
-/* Botón con gradiente */
+/* ============================================================
+   BOTÓN LOGIN — gradiente + shimmer deslizante en hover
+   ============================================================ */
 .btn-login-3d {
+    position: relative;
+    overflow: hidden;
     width: 100%;
     padding: 12px;
     background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
@@ -170,11 +312,34 @@ body.login-3d-page {
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     box-shadow: 0 4px 15px rgba(70, 165, 229, 0.4);
+    animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.6s both;
+}
+
+/* Shimmer — barra de luz deslizante */
+.btn-login-3d::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(
+        120deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.25) 50%,
+        transparent 100%
+    );
+    transition: left 0.5s ease;
+    pointer-events: none;
+}
+
+.btn-login-3d:hover::before {
+    left: 140%;
 }
 
 .btn-login-3d:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(70, 152, 229, 0.6);
+    box-shadow: 0 8px 24px rgba(31, 99, 145, 0.55);
 }
 
 .btn-login-3d:active {
@@ -188,6 +353,7 @@ body.login-3d-page {
     font-size: 0.85rem;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     padding-top: 1.5rem;
+    animation: fade-in 0.6s ease 0.8s both;
 }
 
 .footer-credits strong {
@@ -201,18 +367,13 @@ body.login-3d-page {
 }
 
 @keyframes beat {
-
-    0%,
-    100% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.2);
-    }
+    0%,  100% { transform: scale(1); }
+    50%        { transform: scale(1.2); }
 }
 
-/* Botón — Estado de carga (después de hacer clic en "Iniciar Sesión") */
+/* ============================================================
+   BOTÓN — Estado de carga (spinner)
+   ============================================================ */
 .btn-login-3d:disabled,
 .btn-login-3d--loading {
     opacity: 0.75;
@@ -220,6 +381,11 @@ body.login-3d-page {
     transform: none !important;
     box-shadow: none !important;
     background: linear-gradient(135deg, #4a7a9b, #3a6a8a);
+}
+
+/* Shimmer desactivado cuando está cargando */
+.btn-login-3d--loading::before {
+    display: none;
 }
 
 /* Spinner animado dentro del botón */
@@ -239,15 +405,39 @@ body.login-3d-page {
     to { transform: rotate(360deg); }
 }
 
-/* Alertas */
+/* ============================================================
+   ALERTAS DIFERENCIADAS — error (rojo) vs info (azul)
+   ============================================================ */
+
+/* Base compartida */
 .alert-3d {
-    background: rgba(239, 68, 68, 0.2);
-    border: 1px solid rgba(239, 68, 68, 0.4);
-    color: #fca5a5;
     border-radius: 12px;
     padding: 1rem;
     margin-bottom: 1.5rem;
     font-size: 0.9rem;
     display: flex;
     align-items: center;
+    animation: fade-up 0.4s ease both;
 }
+
+/* Error — credenciales incorrectas */
+.alert-3d--error,
+.alert-3d:not(.alert-3d--info) {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+}
+
+/* Info — mensajes de sistema (logout, sesión expirada, etc.) */
+.alert-3d--info {
+    background: rgba(31, 99, 145, 0.25);
+    border: 1px solid rgba(16, 119, 187, 0.45);
+    color: #93c5fd;
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   (No aplica a esta página standalone, pero incluido para
+   consistencia si se migra a extender base.html en el futuro)
+   ============================================================ */
+/* La página ya es oscura por defecto — no requiere overrides */

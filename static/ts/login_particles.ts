@@ -1,6 +1,7 @@
 /**
  * Script para Fondo de Partículas Interactivas (Canvas)
- * Crea un efecto de constelación que reacciona al mouse.
+ * Crea un efecto de constelación que reacciona al mouse/touch.
+ * + Efecto de tilt 3D en la tarjeta de login al mover el cursor.
  */
 
 const canvas = document.getElementById('particles-canvas') as HTMLCanvasElement;
@@ -12,16 +13,34 @@ let particlesArray: Particle[] = [];
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Manejo del mouse
+// Manejo del mouse (y touch)
 const mouse = {
     x: null as number | null,
     y: null as number | null,
-    radius: 150 // Radio de interacción
+    radius: 150 // Radio de interacción con partículas
 }
 
+// Soporte mouse
 window.addEventListener('mousemove', (event) => {
-    mouse.x = event.x;
-    mouse.y = event.y;
+    mouse.x = event.clientX;
+    mouse.y = event.clientY;
+});
+
+// ── Soporte touch (móvil) ──────────────────────────────────────
+// EXPLICACIÓN PARA PRINCIPIANTES:
+// En dispositivos táctiles no existe 'mousemove', solo 'touchmove'.
+// Con esto las partículas reaccionan al dedo igual que al cursor.
+window.addEventListener('touchmove', (event) => {
+    // Tomamos el primer punto de contacto
+    if (event.touches.length > 0) {
+        mouse.x = event.touches[0].clientX;
+        mouse.y = event.touches[0].clientY;
+    }
+}, { passive: true });
+
+window.addEventListener('touchend', () => {
+    mouse.x = null;
+    mouse.y = null;
 });
 
 // Clase Partícula
@@ -39,7 +58,7 @@ class Particle {
         this.y = Math.random() * (canvas.height - this.size * 2) + this.size * 2;
         this.directionX = (Math.random() * 2) - 1; // Velocidad aleatoria X
         this.directionY = (Math.random() * 2) - 1; // Velocidad aleatoria Y
-        this.color = '#1897c9ff'; // Color base (indigo suave)
+        this.color = '#1897c9ff'; // Color base (azul sistema)
     }
 
     // Dibujar partícula
@@ -69,21 +88,17 @@ class Particle {
 
             // Solo aplicar repulsión si está dentro del radio de interacción
             if (distance < mouse.radius) {
-                // Normalizar el vector de dirección
                 let forceDirectionX = dx / distance;
                 let forceDirectionY = dy / distance;
 
-                // Calcular la fuerza de repulsión (más fuerte cuando está más cerca)
-                // Usamos una curva suave para evitar cambios bruscos
+                // Fuerza de repulsión más suave cerca del radio
                 let forceMagnitude = (mouse.radius - distance) / mouse.radius;
-                let force = forceMagnitude * 0.5; // Factor de suavizado
+                let force = forceMagnitude * 0.5;
 
-                // Aplicar la fuerza a la velocidad (no directamente a la posición)
-                // Esto permite que la partícula mantenga su inercia natural
                 this.directionX -= forceDirectionX * force;
                 this.directionY -= forceDirectionY * force;
 
-                // Limitar la velocidad máxima para evitar aceleraciones infinitas
+                // Limitar velocidad máxima
                 let speed = Math.sqrt(this.directionX * this.directionX + this.directionY * this.directionY);
                 let maxSpeed = 3;
                 if (speed > maxSpeed) {
@@ -93,11 +108,8 @@ class Particle {
             }
         }
 
-        // Mover partícula
         this.x += this.directionX;
         this.y += this.directionY;
-
-        // Dibujar
         this.draw();
     }
 }
@@ -105,7 +117,7 @@ class Particle {
 // Inicializar arreglo de partículas
 function init() {
     particlesArray = [];
-    let numberOfParticles = (canvas.height * canvas.width) / 9000; // Densidad de partículas
+    let numberOfParticles = (canvas.height * canvas.width) / 9000;
     for (let i = 0; i < numberOfParticles; i++) {
         particlesArray.push(new Particle());
     }
@@ -152,19 +164,21 @@ window.addEventListener('resize', () => {
     init();
 });
 
-// Reset mouse al salir
+// Reset mouse al salir del viewport
 window.addEventListener('mouseout', () => {
     mouse.x = null;
     mouse.y = null;
-})
+});
 
 init();
 animate();
 
-// Toggle Password y protección contra doble envío del formulario
+// ═══════════════════════════════════════════════════════════════
+// DOMContentLoaded — lógica de UI
+// ═══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
 
-    // ── Toggle contraseña (ver/ocultar) ──
+    // ── Toggle contraseña (ver/ocultar) ────────────────────────
     const toggleBtn = document.querySelector('.password-toggle-btn');
     const passwordInput = document.querySelector('input[name="password"]') as HTMLInputElement;
 
@@ -181,32 +195,70 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ── Protección contra doble clic en el botón de login ──
+    // ── Protección contra doble clic en submit ────────────────
     // EXPLICACIÓN PARA PRINCIPIANTES:
-    // Cuando el usuario hace clic dos veces rápido, Django procesa el primer envío,
-    // rota el token CSRF por seguridad y el segundo clic llega con el token viejo → error.
-    // Solución: deshabilitar el botón en cuanto se hace el primer clic y mostrar un spinner,
-    // así el segundo clic no tiene efecto. Si algo falla (ej. error de red), re-habilitamos
-    // el botón después de 10 segundos para que el usuario pueda intentarlo de nuevo.
+    // Si el usuario hace clic dos veces rápido, Django rota el token CSRF
+    // después del primer envío y el segundo llega con token viejo → error 403.
+    // Solución: deshabilitar el botón inmediatamente y mostrar spinner.
+    // Si algo falla (error de red), lo re-habilitamos a los 10 segundos.
     const loginForm = document.querySelector<HTMLFormElement>('form[action]');
     const submitBtn = document.querySelector<HTMLButtonElement>('.btn-login-3d');
 
     if (loginForm && submitBtn) {
         loginForm.addEventListener('submit', () => {
-            // 1. Deshabilitar el botón inmediatamente para bloquear dobles clics
             submitBtn.disabled = true;
             submitBtn.classList.add('btn-login-3d--loading');
-
-            // 2. Reemplazar el texto con un spinner visual
             submitBtn.innerHTML = '<span class="btn-login-spinner"></span>Iniciando sesión...';
 
-            // 3. Failsafe: si después de 10 segundos la página no navegó
-            //    (ej. error de red), re-habilitar para que el usuario pueda reintentar.
             setTimeout(() => {
                 submitBtn.disabled = false;
                 submitBtn.classList.remove('btn-login-3d--loading');
                 submitBtn.innerHTML = 'Iniciar Sesión';
             }, 10000);
         });
+    }
+
+    // ── Efecto Tilt 3D en la tarjeta ──────────────────────────
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // El CSS define 'transform-style: preserve-3d' en .login-card-3d
+    // pero necesita JavaScript para calcular cuánto rotar según donde
+    // está el mouse relativo al centro de la tarjeta.
+    // Resultado: la tarjeta se inclina suavemente siguiendo el cursor,
+    // dando una sensación de profundidad y dimensión real.
+    const card = document.querySelector<HTMLElement>('.login-card-3d');
+
+    if (card) {
+        // Intensidad máxima del tilt en grados
+        const MAX_TILT = 8;
+
+        document.addEventListener('mousemove', (e: MouseEvent) => {
+            const rect = card.getBoundingClientRect();
+
+            // Posición del mouse relativa al centro de la tarjeta (valores -1 a 1)
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const relX = (e.clientX - centerX) / (window.innerWidth / 2);
+            const relY = (e.clientY - centerY) / (window.innerHeight / 2);
+
+            // Clampear para evitar rotaciones extremas fuera de la tarjeta
+            const tiltX = Math.max(-1, Math.min(1, relY)) * MAX_TILT;  // inclinación vertical
+            const tiltY = Math.max(-1, Math.min(1, relX)) * -MAX_TILT; // inclinación horizontal
+
+            card.style.transform = `perspective(1000px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+        });
+
+        // Restaurar posición al salir con transición suave
+        document.addEventListener('mouseleave', () => {
+            card.style.transition = 'transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)';
+            card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg)';
+
+            // Volver a la transición rápida para la siguiente interacción
+            setTimeout(() => {
+                card.style.transition = 'transform 0.08s ease-out, box-shadow 0.08s ease-out';
+            }, 500);
+        });
+
+        // En touch: no hay tilt (evitar comportamiento raro en móvil)
+        // El efecto es exclusivo para pointer devices
     }
 });
