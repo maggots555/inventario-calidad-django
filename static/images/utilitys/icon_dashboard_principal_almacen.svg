@@ -1,19 +1,195 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
-	 viewBox="0 0 512 512" xml:space="preserve">
-<polygon style="fill:#FF9800;" points="411.826,0 411.826,333.913 345.043,333.913 345.043,100.174 66.783,100.174 66.783,333.913 
-	0,333.913 0,478.609 33.391,478.609 33.391,512 111.304,512 111.304,478.609 144.696,478.609 144.696,400.696 300.522,400.696 
-	300.522,478.609 333.913,478.609 333.913,512 411.826,512 411.826,478.609 445.217,478.609 445.217,33.391 512,33.391 512,0 "/>
-<g>
-	<polygon style="fill:#57565C;" points="144.696,400.696 111.304,400.696 111.304,367.304 33.391,367.304 33.391,400.696 0,400.696 
-		0,478.609 33.391,478.609 33.391,512 111.304,512 111.304,478.609 144.696,478.609 	"/>
-	<polygon style="fill:#57565C;" points="445.217,400.696 411.826,400.696 411.826,367.304 333.913,367.304 333.913,400.696 
-		300.522,400.696 300.522,478.609 333.913,478.609 333.913,512 411.826,512 411.826,478.609 445.217,478.609 	"/>
-</g>
-<rect x="133.565" y="166.957" width="144.696" height="33.391"/>
-<path d="M411.826,0v333.913h-66.783V100.174H66.783v233.739H0v144.696h33.391v-77.913h77.913v77.913h33.391v-77.913h155.826v77.913
-	h33.391v-77.913h77.913v77.913h33.391V33.391H512V0H411.826z M100.174,133.565h211.478v200.348H100.174V133.565z"/>
-<rect x="33.391" y="478.609" width="77.913" height="33.391"/>
-<rect x="333.913" y="478.609" width="77.913" height="33.391"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <!-- Gradiente violeta - rack -->
+    <linearGradient id="al_violet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#A78BFA"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <!-- Gradiente violeta - cajas tipo A -->
+    <linearGradient id="al_box_v" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#C4B5FD"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <!-- Gradiente cyan - cajas tipo B -->
+    <linearGradient id="al_box_c" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#67E8F9"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+    <!-- Gradiente ambar - cajas tipo C -->
+    <linearGradient id="al_box_a" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <!-- Gradiente coral - forklift heroe -->
+    <linearGradient id="al_coral" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#EF4444"/>
+    </linearGradient>
+    <!-- Gradiente scan vertical cyan -->
+    <linearGradient id="al_scan" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#22D3EE" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="#22D3EE" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Glow violeta para el halo -->
+    <filter id="al_glow_violet" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#7C3AED" flood-opacity="0.35"/>
+    </filter>
+    <!-- Glow coral para el forklift -->
+    <filter id="al_glow_forklift" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#EF4444" flood-opacity="0.60"/>
+    </filter>
+    <!-- Clip para contenido del rack -->
+    <clipPath id="al_rack_clip">
+      <rect x="22" y="17" width="76" height="86" rx="2"/>
+    </clipPath>
+  </defs>
+
+  <style>
+    .al-ring-glow { animation: al-ring-pulse 3s ease-in-out infinite; }
+    .al-scan      { animation: al-sweep 3s ease-in-out infinite; }
+    .al-trace     { stroke-dasharray: 5 4; animation: al-flow 1.4s linear infinite; }
+    .al-trace-r   { stroke-dasharray: 5 4; animation: al-flow 1.4s linear infinite; animation-delay: -0.7s; }
+    .al-node      { animation: al-blink 2s ease-in-out infinite; }
+    .al-node-d    { animation: al-blink 2s ease-in-out infinite; animation-delay: -1s; }
+    .al-forklift  { transform-origin: 86px 79px; animation: al-float 3.5s ease-in-out infinite; }
+    .al-box-a     { animation: al-box-pulse 2.5s ease-in-out infinite; }
+    .al-box-b     { animation: al-box-pulse 2.5s ease-in-out infinite; animation-delay: -0.8s; }
+    .al-box-c     { animation: al-box-pulse 2.5s ease-in-out infinite; animation-delay: -1.6s; }
+
+    @keyframes al-ring-pulse {
+      0%, 100% { opacity: 0.08; r: 54px; }
+      50%       { opacity: 0.18; r: 56px; }
+    }
+    @keyframes al-sweep {
+      0%   { transform: translateY(0px);   opacity: 0; }
+      8%   { opacity: 1; }
+      92%  { opacity: 0.9; }
+      100% { transform: translateY(80px);  opacity: 0; }
+    }
+    @keyframes al-flow { to { stroke-dashoffset: -18; } }
+    @keyframes al-blink {
+      0%, 100% { opacity: 0.5; }
+      50%       { opacity: 1; }
+    }
+    @keyframes al-float {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-5px); }
+    }
+    @keyframes al-box-pulse {
+      0%, 100% { opacity: 0.55; }
+      50%       { opacity: 0.90; }
+    }
+  </style>
+
+  <!-- Halo violeta -->
+  <circle class="al-ring-glow" cx="60" cy="60" r="54"
+          fill="#7C3AED" opacity="0.08" filter="url(#al_glow_violet)"/>
+
+  <!-- ====================================================== -->
+  <!-- RACK / ESTANTERIA                                      -->
+  <!-- ====================================================== -->
+  <rect x="22" y="17" width="76" height="86" rx="5"
+        fill="#1E1B2E" opacity="0.85"
+        stroke="url(#al_violet)" stroke-width="2.5"/>
+  <!-- Postes verticales -->
+  <rect x="28" y="19" width="5" height="82" rx="2" fill="#4C1D95" opacity="0.60"/>
+  <rect x="87" y="19" width="5" height="82" rx="2" fill="#4C1D95" opacity="0.60"/>
+  <!-- Estante 1 (superior) -->
+  <rect x="28" y="37" width="64" height="4" rx="1.5" fill="url(#al_violet)" opacity="0.60"/>
+  <!-- Estante 2 (medio) -->
+  <rect x="28" y="63" width="64" height="4" rx="1.5" fill="url(#al_violet)" opacity="0.60"/>
+  <!-- Estante 3 (inferior) -->
+  <rect x="28" y="89" width="64" height="4" rx="1.5" fill="url(#al_violet)" opacity="0.60"/>
+
+  <!-- ====================================================== -->
+  <!-- CAJAS MULTICOLOR EN ESTANTES (clipeado)               -->
+  <!-- ====================================================== -->
+  <g clip-path="url(#al_rack_clip)">
+
+    <!-- Estante Superior (y=19-37) -->
+    <!-- Caja violeta grande -->
+    <rect class="al-box-a" x="33" y="20" width="20" height="15" rx="2"
+          fill="url(#al_box_v)" opacity="0.80"/>
+    <line x1="43" y1="20" x2="43" y2="35" stroke="#EDE9FE" stroke-width="1" opacity="0.40"/>
+    <line x1="33" y1="28" x2="53" y2="28" stroke="#EDE9FE" stroke-width="1" opacity="0.40"/>
+    <!-- Caja cyan mediana -->
+    <rect class="al-box-b" x="56" y="22" width="15" height="13" rx="2"
+          fill="url(#al_box_c)" opacity="0.80" stroke="#67E8F9" stroke-width="1"/>
+    <!-- Caja ambar pequena -->
+    <rect class="al-box-c" x="74" y="24" width="14" height="11" rx="2"
+          fill="url(#al_box_a)" opacity="0.80"/>
+
+    <!-- Estante Medio (y=41-63) -->
+    <!-- Caja cyan grande -->
+    <rect class="al-box-b" x="33" y="41" width="22" height="20" rx="2"
+          fill="url(#al_box_c)" opacity="0.78" stroke="#22D3EE" stroke-width="1"/>
+    <line x1="44" y1="41" x2="44" y2="61" stroke="#CFFAFE" stroke-width="1" opacity="0.35"/>
+    <!-- Caja ambar mediana -->
+    <rect class="al-box-c" x="58" y="43" width="14" height="18" rx="2"
+          fill="url(#al_box_a)" opacity="0.78"/>
+    <!-- Caja violeta alta -->
+    <rect class="al-box-a" x="75" y="41" width="14" height="20" rx="2"
+          fill="url(#al_box_v)" opacity="0.78" stroke="#A78BFA" stroke-width="1"/>
+
+    <!-- Estante Inferior (y=67-89) -->
+    <!-- Caja ambar -->
+    <rect class="al-box-c" x="33" y="67" width="16" height="20" rx="2"
+          fill="url(#al_box_a)" opacity="0.82"/>
+    <!-- Caja violeta -->
+    <rect class="al-box-a" x="52" y="69" width="13" height="18" rx="2"
+          fill="#6D28D9" opacity="0.80" stroke="#A78BFA" stroke-width="1"/>
+    <!-- Caja cyan grande -->
+    <rect class="al-box-b" x="68" y="67" width="20" height="20" rx="2"
+          fill="url(#al_box_c)" opacity="0.75"/>
+    <line x1="78" y1="67" x2="78" y2="87" stroke="#CFFAFE" stroke-width="1" opacity="0.35"/>
+    <line x1="68" y1="77" x2="88" y2="77" stroke="#CFFAFE" stroke-width="1" opacity="0.35"/>
+
+    <!-- Trazas cyan -->
+    <path class="al-trace"
+          d="M22 50 L30 50 L30 56 L38 56"
+          stroke="#22D3EE" stroke-width="1.3" opacity="0.75"/>
+    <path class="al-trace-r"
+          d="M98 50 L90 50 L90 56 L82 56"
+          stroke="#22D3EE" stroke-width="1.3" opacity="0.75"/>
+    <!-- Trazas purple -->
+    <path class="al-trace"
+          d="M22 75 L30 75 L30 69 L38 69"
+          stroke="#A78BFA" stroke-width="1.2" opacity="0.60"/>
+    <path class="al-trace-r"
+          d="M98 75 L90 75 L90 69 L82 69"
+          stroke="#A78BFA" stroke-width="1.2" opacity="0.60"/>
+
+    <circle class="al-node"   cx="30" cy="50" r="2" fill="#22D3EE"/>
+    <circle class="al-node-d" cx="90" cy="50" r="2" fill="#22D3EE"/>
+    <circle class="al-node"   cx="30" cy="75" r="2" fill="#A78BFA"/>
+    <circle class="al-node-d" cx="90" cy="75" r="2" fill="#A78BFA"/>
+
+    <!-- Linea de escaneo cyan -->
+    <rect class="al-scan" x="22" y="17" width="76" height="9"
+          fill="url(#al_scan)"/>
+  </g>
+
+  <!-- ====================================================== -->
+  <!-- FORKLIFT CORAL - heroe flotante, fuera del clip        -->
+  <!-- ====================================================== -->
+  <g class="al-forklift" filter="url(#al_glow_forklift)">
+    <!-- Mastil vertical -->
+    <rect x="78" y="62" width="4" height="22" rx="1.5" fill="url(#al_coral)" opacity="0.85"/>
+    <!-- Cabina del forklift -->
+    <rect x="80" y="70" width="16" height="13" rx="3"
+          fill="url(#al_coral)" opacity="0.90"/>
+    <!-- Ventana de la cabina -->
+    <rect x="83" y="72" width="10" height="7" rx="1.5"
+          fill="#0F172A" opacity="0.60"/>
+    <!-- Horquillas (forks) - dos barras horizontales -->
+    <rect x="62" y="80" width="18" height="3" rx="1" fill="#FCA5A5" opacity="0.85"/>
+    <rect x="62" y="85" width="18" height="3" rx="1" fill="#FCA5A5" opacity="0.85"/>
+    <!-- Rueda trasera -->
+    <circle cx="92" cy="86" r="4.5" fill="#1C1410" stroke="#FB923C" stroke-width="1.5"/>
+    <circle cx="92" cy="86" r="1.5" fill="#FB923C" opacity="0.70"/>
+    <!-- Rueda delantera -->
+    <circle cx="80" cy="86" r="4.5" fill="#1C1410" stroke="#FB923C" stroke-width="1.5"/>
+    <circle cx="80" cy="86" r="1.5" fill="#FB923C" opacity="0.70"/>
+  </g>
 </svg>

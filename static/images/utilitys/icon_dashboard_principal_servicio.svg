@@ -1,43 +1,179 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
-	 viewBox="0 0 512 512" xml:space="preserve">
-<path d="M0,304.096V28.544c0-4.896,4.184-8.888,9.288-8.888h436.536c5.104,0,9.288,4,9.288,8.888v275.552H0z"/>
-<g>
-	<path style="fill:#999999;" d="M455.112,304.096v37.92c0,5.216-4.184,9.488-9.288,9.488H9.288C4.184,351.512,0,347.24,0,342.032
-		v-37.92L455.112,304.096L455.112,304.096z"/>
-	<polygon style="fill:#999999;" points="161.184,417.88 293.92,417.88 284.448,351.512 170.664,351.512 	"/>
-</g>
-<g>
-	<polygon style="fill:#636363;" points="284.448,351.512 170.664,351.512 164.76,392.872 286.656,366.976 	"/>
-	<rect x="128" y="417.84" style="fill:#636363;" width="199.112" height="9.48"/>
-</g>
-<g>
-	<rect x="105.496" y="212.856" style="fill:#FFFFFF;" width="244.12" height="9.48"/>
-	<rect x="55.512" y="242.48" style="fill:#FFFFFF;" width="344.08" height="9.48"/>
-</g>
-<circle style="fill:#E50914;" cx="98.744" cy="120.16" r="47.528"/>
-<polygon style="fill:#FFFFFF;" points="95.192,141.328 77.392,123.52 84.096,116.816 94.416,127.144 114.616,101.992 122,107.92 "/>
-<circle style="fill:#999999;" cx="225.68" cy="120.16" r="47.528"/>
-<polygon points="222.16,141.328 204.352,123.52 211.056,116.816 221.384,127.144 241.576,101.992 248.968,107.92 "/>
-<circle style="fill:#E50914;" cx="356.368" cy="120.16" r="47.528"/>
-<polygon style="fill:#FFFFFF;" points="352.816,141.328 335.008,123.52 341.712,116.816 352.04,127.144 372.232,101.992 
-	379.624,107.92 "/>
-<path d="M503.216,492.344H356.8c-4.832,0-8.784-3.952-8.784-8.784V208.296c0-4.832,3.952-8.784,8.784-8.784h146.416
-	c4.832,0,8.784,3.952,8.784,8.784V483.56C512,488.392,508.048,492.344,503.216,492.344z"/>
-<rect x="356.8" y="222.944" width="146.416" height="234.24"/>
-<g>
-	<path style="fill:#999999;" d="M447.424,214.16h-35.136c-1.608,0-2.928-1.32-2.928-2.928l0,0c0-1.608,1.32-2.928,2.928-2.928
-		h35.136c1.608,0,2.928,1.32,2.928,2.928l0,0C450.352,212.84,449.032,214.16,447.424,214.16z"/>
-	<path style="fill:#999999;" d="M447.576,474.776H412.44c-1.608,0-2.928-1.32-2.928-2.928l0,0c0-1.608,1.32-2.928,2.928-2.928
-		h35.136c1.608,0,2.928,1.32,2.928,2.928l0,0C450.504,473.456,449.184,474.776,447.576,474.776z"/>
-</g>
-<circle style="fill:#E50914;" cx="429.856" cy="266.08" r="30.968"/>
-<polygon style="fill:#FFFFFF;" points="427.544,279.88 415.936,268.272 420.304,263.904 427.032,270.632 440.192,254.24 
-	445.008,258.104 "/>
-<circle style="fill:#999999;" cx="429.856" cy="340.072" r="30.968"/>
-<polygon points="427.544,353.864 415.936,342.256 420.304,337.888 427.032,344.616 440.192,328.224 445.008,332.088 "/>
-<circle style="fill:#E50914;" cx="429.856" cy="414.056" r="30.968"/>
-<polygon style="fill:#FFFFFF;" points="427.544,427.848 415.936,416.248 420.304,411.88 427.032,418.6 440.192,402.208 
-	445.008,406.072 "/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <!-- Gradiente ambar - tablet -->
+    <linearGradient id="sv_amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <!-- Gradiente coral - llave inglesa heroe -->
+    <linearGradient id="sv_coral" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#EF4444"/>
+    </linearGradient>
+    <!-- Gradiente scan vertical cyan -->
+    <linearGradient id="sv_scan" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#22D3EE" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="#22D3EE" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Glow ambar para el halo -->
+    <filter id="sv_glow_amber" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#F59E0B" flood-opacity="0.35"/>
+    </filter>
+    <!-- Glow coral para la llave heroe -->
+    <filter id="sv_glow_wrench" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#EF4444" flood-opacity="0.65"/>
+    </filter>
+    <!-- Clip para pantalla de la tablet -->
+    <clipPath id="sv_screen_clip">
+      <rect x="31" y="22" width="58" height="74" rx="2"/>
+    </clipPath>
+  </defs>
+
+  <style>
+    .sv-ring-glow { animation: sv-ring-pulse 3s ease-in-out infinite; }
+    .sv-scan      { animation: sv-sweep 2.8s ease-in-out infinite; }
+    .sv-trace     { stroke-dasharray: 5 4; animation: sv-flow 1.4s linear infinite; }
+    .sv-trace-r   { stroke-dasharray: 5 4; animation: sv-flow 1.4s linear infinite; animation-delay: -0.7s; }
+    .sv-node      { animation: sv-blink 2s ease-in-out infinite; }
+    .sv-node-d    { animation: sv-blink 2s ease-in-out infinite; animation-delay: -1s; }
+    .sv-wrench    { transform-origin: 86px 79px; animation: sv-swing 3s ease-in-out infinite; }
+    .sv-status    { animation: sv-status-blink 1.5s ease-in-out infinite; }
+    .sv-line1     { animation: sv-line-fade 2s ease-in-out infinite; }
+    .sv-line2     { animation: sv-line-fade 2s ease-in-out infinite; animation-delay: -0.7s; }
+    .sv-line3     { animation: sv-line-fade 2s ease-in-out infinite; animation-delay: -1.4s; }
+
+    @keyframes sv-ring-pulse {
+      0%, 100% { opacity: 0.08; r: 54px; }
+      50%       { opacity: 0.18; r: 56px; }
+    }
+    @keyframes sv-sweep {
+      0%   { transform: translateY(0px);   opacity: 0; }
+      8%   { opacity: 1; }
+      92%  { opacity: 0.9; }
+      100% { transform: translateY(68px);  opacity: 0; }
+    }
+    @keyframes sv-flow { to { stroke-dashoffset: -18; } }
+    @keyframes sv-blink {
+      0%, 100% { opacity: 0.5; }
+      50%       { opacity: 1; }
+    }
+    @keyframes sv-swing {
+      0%, 100% { transform: rotate(-12deg); }
+      50%       { transform: rotate(12deg); }
+    }
+    @keyframes sv-status-blink {
+      0%, 100% { opacity: 0.5; r: 3px; }
+      50%       { opacity: 1;   r: 4.5px; }
+    }
+    @keyframes sv-line-fade {
+      0%, 100% { opacity: 0.30; }
+      50%       { opacity: 0.80; }
+    }
+  </style>
+
+  <!-- Halo ambar -->
+  <circle class="sv-ring-glow" cx="60" cy="60" r="54"
+          fill="#F59E0B" opacity="0.08" filter="url(#sv_glow_amber)"/>
+
+  <!-- ====================================================== -->
+  <!-- TABLET / DISPOSITIVO                                   -->
+  <!-- ====================================================== -->
+  <rect x="26" y="14" width="68" height="92" rx="8"
+        fill="#1C1410" opacity="0.85"
+        stroke="url(#sv_amber)" stroke-width="2.5"/>
+  <!-- Pantalla interior -->
+  <rect x="31" y="22" width="58" height="74" rx="3"
+        fill="#0F172A" opacity="0.95"/>
+  <!-- Camara frontal -->
+  <circle cx="60" cy="17.5" r="2" fill="#F59E0B" opacity="0.55"/>
+  <!-- Boton home inferior -->
+  <rect x="53" y="99" width="14" height="4" rx="2" fill="#F59E0B" opacity="0.35"/>
+  <!-- Boton lateral -->
+  <rect x="94" y="34" width="2" height="10" rx="1" fill="#F59E0B" opacity="0.45"/>
+  <rect x="94" y="49" width="2" height="7"  rx="1" fill="#F59E0B" opacity="0.45"/>
+
+  <!-- ====================================================== -->
+  <!-- CONTENIDO PANTALLA (clipeado)                         -->
+  <!-- ====================================================== -->
+  <g clip-path="url(#sv_screen_clip)">
+    <!-- Header barra -->
+    <rect x="31" y="22" width="58" height="13" rx="0"
+          fill="#271D0E" opacity="0.90"/>
+    <!-- Titulo orden -->
+    <rect x="36" y="26" width="32" height="3" rx="1.5" fill="#FCD34D" opacity="0.70"/>
+    <!-- Numero de orden -->
+    <rect x="71" y="26" width="12" height="3" rx="1.5" fill="#F59E0B" opacity="0.50"/>
+    <!-- Status dot verde pulsante -->
+    <circle class="sv-status" cx="83" cy="27.5" r="3" fill="#34D399"/>
+
+    <!-- Trazas CYAN (primarias) -->
+    <path class="sv-trace"
+          d="M31 39 L41 39 L41 45 L51 45"
+          stroke="#22D3EE" stroke-width="1.3" opacity="0.75"/>
+    <path class="sv-trace-r"
+          d="M89 39 L79 39 L79 45 L69 45"
+          stroke="#22D3EE" stroke-width="1.3" opacity="0.75"/>
+    <!-- Trazas purple (secundarias) -->
+    <path class="sv-trace"
+          d="M31 84 L41 84 L41 78 L51 78"
+          stroke="#A78BFA" stroke-width="1.2" opacity="0.60"/>
+    <path class="sv-trace-r"
+          d="M89 84 L79 84 L79 78 L69 78"
+          stroke="#A78BFA" stroke-width="1.2" opacity="0.60"/>
+
+    <circle class="sv-node"   cx="41" cy="39" r="2" fill="#22D3EE"/>
+    <circle class="sv-node-d" cx="79" cy="39" r="2" fill="#22D3EE"/>
+    <circle class="sv-node"   cx="41" cy="84" r="2" fill="#A78BFA"/>
+    <circle class="sv-node-d" cx="79" cy="84" r="2" fill="#A78BFA"/>
+
+    <!-- Descripcion -->
+    <rect x="36" y="49" width="16" height="2.5" rx="1.2" fill="#F59E0B" opacity="0.65"/>
+    <rect class="sv-line1" x="36" y="54" width="44" height="2" rx="1" fill="#FCD34D" opacity="0.35"/>
+    <rect class="sv-line2" x="36" y="58" width="36" height="2" rx="1" fill="#FCD34D" opacity="0.28"/>
+    <rect class="sv-line3" x="36" y="62" width="40" height="2" rx="1" fill="#FCD34D" opacity="0.22"/>
+
+    <!-- Separador -->
+    <line x1="36" y1="67" x2="84" y2="67" stroke="#F59E0B" stroke-width="0.8" opacity="0.30"/>
+
+    <!-- Tecnico -->
+    <rect x="36" y="70" width="20" height="2.5" rx="1.2" fill="#F59E0B" opacity="0.65"/>
+    <circle cx="40" cy="80" r="5.5" fill="#271D0E" stroke="#F59E0B" stroke-width="1"/>
+    <circle cx="40" cy="78" r="2"   fill="#FCD34D" opacity="0.65"/>
+    <rect class="sv-line1" x="49" y="77" width="26" height="2" rx="1" fill="#FCD34D" opacity="0.35"/>
+    <rect class="sv-line2" x="49" y="81" width="18" height="2" rx="1" fill="#FCD34D" opacity="0.25"/>
+
+    <!-- Separador -->
+    <line x1="36" y1="88" x2="84" y2="88" stroke="#F59E0B" stroke-width="0.8" opacity="0.30"/>
+
+    <!-- Estado -->
+    <rect x="36" y="91" width="22" height="5" rx="2.5"
+          fill="#F59E0B" opacity="0.20" stroke="#F59E0B" stroke-width="0.8"/>
+    <rect x="41" y="92.5" width="12" height="2" rx="1" fill="#FCD34D" opacity="0.60"/>
+
+    <!-- Linea de escaneo cyan -->
+    <rect class="sv-scan" x="31" y="22" width="58" height="9"
+          fill="url(#sv_scan)"/>
+  </g>
+
+  <!-- ====================================================== -->
+  <!-- LLAVE INGLESA CORAL - heroe grande, fuera del clip     -->
+  <!-- ====================================================== -->
+  <g class="sv-wrench" filter="url(#sv_glow_wrench)">
+    <!-- Mango largo coral -->
+    <rect x="81" y="68" width="9" height="24" rx="4"
+          fill="url(#sv_coral)" opacity="0.92"
+          transform="rotate(-38 86 80)"/>
+    <!-- Vastago -->
+    <rect x="84" y="65" width="4" height="28" rx="2"
+          fill="#FCA5A5" opacity="0.65"
+          transform="rotate(-38 86 80)"/>
+    <!-- Cabeza con abertura (C-shape) -->
+    <path d="M79 63 Q75 57 80.5 54 Q86 51 88.5 56 L86 58 Q85 55 81.5 56 Q78.5 57.5 79.5 62 Z"
+          fill="url(#sv_coral)" opacity="0.90"/>
+    <!-- Tuerca hexagonal -->
+    <polygon points="80,57  84,55  88,57  88,62  84,64  80,62"
+             fill="#0F172A" stroke="#FB923C" stroke-width="1.3" opacity="0.90"/>
+    <circle cx="84" cy="59.5" r="1.8" fill="#FB923C" opacity="0.70"/>
+  </g>
 </svg>

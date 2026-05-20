@@ -63,6 +63,14 @@ CARACTERÍSTICAS:
     min-height: 100vh;
     background: linear-gradient(135deg, #F9FAFB 0%, #E5E7EB 100%);
     padding: 3rem 0;
+    position: relative;   /* Necesario para posicionar los blobs hijos */
+    overflow: hidden;     /* Oculta blobs que se salgan del contenedor */
+}
+
+/* El container Bootstrap debe quedar por encima de los blobs decorativos */
+.dp-container {
+    position: relative;
+    z-index: 1;
 }
 
 /* ============================================================================
@@ -74,14 +82,36 @@ CARACTERÍSTICAS:
     animation: fadeInDown 0.6s ease-out;
 }
 
-.hero-icon {
+/* Saludo dinámico ("Buenos días, Usuario") */
+.hero-greeting {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 120px; /* Aumentado para que luzca mejor sin fondo */
-    height: 120px;
-    background: transparent; /* Fondo transparente */
-    margin-bottom: 1.5rem;
+    gap: 0.25rem;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    padding: 0.6rem 1.6rem;
+    border-radius: 999px;
+    font-size: 1.15rem;
+    color: var(--color-text-gray);
+    margin-bottom: 1.25rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.greeting-name {
+    color: var(--color-text-dark);
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+.hero-icon {
+    display: block;
+    width: 155px;
+    height: 155px;
+    background: transparent;
+    margin: 0 auto 1rem;
     animation: float 3s ease-in-out infinite;
 }
 
@@ -114,7 +144,7 @@ CARACTERÍSTICAS:
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 1.5rem;
     margin-bottom: 3rem;
-    animation: fadeInUp 0.8s ease-out 0.2s backwards;
+    /* Animación removida del contenedor — cada card tiene la suya con stagger */
 }
 
 /* ============================================================================
@@ -130,7 +160,21 @@ CARACTERÍSTICAS:
     position: relative;
     overflow: hidden;
     border: 2px solid transparent;
+    /* Animación escalonada: cada card entra con su propio delay */
+    animation: cardFadeIn 0.55s ease-out backwards;
 }
+
+/* Stagger — cada tarjeta entra con un delay incremental */
+.modules-container .module-card:nth-child(1) { animation-delay: 0.05s; }
+.modules-container .module-card:nth-child(2) { animation-delay: 0.15s; }
+.modules-container .module-card:nth-child(3) { animation-delay: 0.25s; }
+.modules-container .module-card:nth-child(4) { animation-delay: 0.35s; }
+
+/* Strip de color en la parte superior de cada card (identidad visual inmediata) */
+.module-card.inventario { border-top: 4px solid var(--color-inventario); }
+.module-card.scorecard  { border-top: 4px solid var(--color-scorecard); }
+.module-card.servicio   { border-top: 4px solid var(--color-servicio); }
+.module-card.almacen    { border-top: 4px solid var(--color-almacen); }
 
 /* Efecto de brillo animado en hover */
 .module-card::before {
@@ -158,18 +202,22 @@ CARACTERÍSTICAS:
 /* Colores específicos por módulo */
 .module-card.inventario:hover {
     border-color: var(--color-inventario-light);
+    box-shadow: 0 20px 40px rgba(79, 70, 229, 0.22), var(--shadow-md);
 }
 
 .module-card.scorecard:hover {
     border-color: var(--color-scorecard-light);
+    box-shadow: 0 20px 40px rgba(16, 185, 129, 0.22), var(--shadow-md);
 }
 
 .module-card.servicio:hover {
     border-color: var(--color-servicio-light);
+    box-shadow: 0 20px 40px rgba(245, 158, 11, 0.22), var(--shadow-md);
 }
 
 .module-card.almacen:hover {
     border-color: var(--color-almacen-light);
+    box-shadow: 0 20px 40px rgba(139, 92, 246, 0.22), var(--shadow-md);
 }
 
 /* ============================================================================
@@ -185,8 +233,8 @@ CARACTERÍSTICAS:
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 56px;
-    height: 56px;
+    width: 80px;
+    height: 80px;
     border-radius: 14px;
     margin-bottom: 1.25rem;
     box-shadow: transparent;
@@ -232,6 +280,8 @@ CARACTERÍSTICAS:
 }
 
 .module-icon img {
+    width: 100%;
+    height: 100%;
     transition: filter 0.3s ease; /* Transición suave para efectos de imagen */
 }
 
@@ -364,6 +414,153 @@ CARACTERÍSTICAS:
     animation: fadeInUp 1s ease-out 0.4s backwards;
 }
 
+/* ============================================================================
+   BADGE DE ATAJO DE TECLADO
+   Aparece en la esquina superior derecha de cada card.
+   Solo visible en pantallas >= 768px (no tiene sentido en móvil).
+   ============================================================================ */
+.kbd-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-light);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-text-gray);
+    font-family: monospace;
+    letter-spacing: 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    transition: all var(--transition-fast);
+    z-index: 2;
+}
+
+.module-card:hover .kbd-badge {
+    background: white;
+    color: var(--color-text-dark);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+/* Ocultar en móvil — los atajos no aplican en touch */
+@media (max-width: 767px) {
+    .kbd-badge { display: none; }
+}
+
+/* ============================================================================
+   STATUS DOT - Indicador visual de alerta junto a labels de stats
+   ============================================================================ */
+.status-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 3px;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+    flex-shrink: 0;
+}
+
+/* Dot amarillo: advertencia (stock bajo, pendientes) */
+.status-dot.dot-warning {
+    background-color: #F59E0B;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+    animation: dotPulse 2s ease-in-out infinite;
+}
+
+/* Dot rojo: peligro (incidencias críticas, bajas) */
+.status-dot.dot-danger {
+    background-color: #EF4444;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+    animation: dotPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2); }
+    50%       { box-shadow: 0 0 0 5px rgba(245, 158, 11, 0); }
+}
+.status-dot.dot-danger {
+    animation: dotPulseDanger 1.5s ease-in-out infinite;
+}
+@keyframes dotPulseDanger {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2); }
+    50%       { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
+}
+
+/* ============================================================================
+   MINI PROGRESS BAR - Debajo de cada stat-label
+   ============================================================================ */
+.stat-progress {
+    height: 3px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 99px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+}
+
+.stat-progress-fill {
+    height: 100%;
+    width: 0%;   /* El JS lo anima al valor correcto */
+    border-radius: 99px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Color de fill según el módulo padre */
+.module-card.inventario .stat-progress-fill { background: var(--color-inventario); }
+.module-card.scorecard  .stat-progress-fill { background: var(--color-scorecard); }
+.module-card.servicio   .stat-progress-fill { background: var(--color-servicio); }
+.module-card.almacen    .stat-progress-fill { background: var(--color-almacen); }
+
+/* ============================================================================
+   ELEMENTOS DECORATIVOS DE FONDO (blobs de color con blur)
+   ============================================================================ */
+.bg-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.07;
+}
+
+.bg-blob-1 {
+    width: 450px;
+    height: 450px;
+    background: var(--color-inventario);
+    top: -120px;
+    right: -80px;
+}
+
+.bg-blob-2 {
+    width: 320px;
+    height: 320px;
+    background: var(--color-scorecard);
+    bottom: 15%;
+    left: -80px;
+}
+
+.bg-blob-3 {
+    width: 280px;
+    height: 280px;
+    background: var(--color-servicio);
+    top: 35%;
+    right: 8%;
+}
+
+.bg-blob-4 {
+    width: 220px;
+    height: 220px;
+    background: var(--color-almacen);
+    bottom: 3%;
+    right: 30%;
+}
+
 .info-box {
     background: white;
     padding: 2rem;
@@ -413,6 +610,18 @@ CARACTERÍSTICAS:
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+/* Animación de entrada de cards con escala + deslizamiento */
+@keyframes cardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(28px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
     }
 }
 
@@ -579,8 +788,8 @@ CARACTERÍSTICAS:
     }
     
     .hero-icon {
-        width: 60px;
-        height: 60px;
+        width: 80px;
+        height: 80px;
     }
     
     .hero-icon i {
@@ -760,6 +969,56 @@ CARACTERÍSTICAS:
 }
 
 /* Colores específicos de botones ya están definidos por variables que se cambian arriba */
+
+/* ============================================================================
+   DARK MODE — Overrides para nuevos elementos
+   ============================================================================ */
+
+/* Saludo dinámico */
+[data-bs-theme="dark"] .hero-greeting {
+    background: rgba(30, 41, 59, 0.85);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+[data-bs-theme="dark"] .greeting-name {
+    color: #e2e8f0;
+}
+
+/* KBD badge */
+[data-bs-theme="dark"] .kbd-badge {
+    background: #0f172a;
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+}
+[data-bs-theme="dark"] .module-card:hover .kbd-badge {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+/* Progress bar fondo */
+[data-bs-theme="dark"] .stat-progress {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+/* Blobs más notorios en dark mode */
+[data-bs-theme="dark"] .bg-blob {
+    opacity: 0.09;
+}
+
+/* Sombras coloreadas en dark mode — más intensas */
+[data-bs-theme="dark"] .module-card.inventario:hover {
+    box-shadow: 0 20px 40px rgba(129, 140, 248, 0.3), 0 4px 6px rgba(0,0,0,0.4);
+}
+[data-bs-theme="dark"] .module-card.scorecard:hover {
+    box-shadow: 0 20px 40px rgba(52, 211, 153, 0.3), 0 4px 6px rgba(0,0,0,0.4);
+}
+[data-bs-theme="dark"] .module-card.servicio:hover {
+    box-shadow: 0 20px 40px rgba(251, 191, 36, 0.3), 0 4px 6px rgba(0,0,0,0.4);
+}
+[data-bs-theme="dark"] .module-card.almacen:hover {
+    box-shadow: 0 20px 40px rgba(167, 139, 250, 0.3), 0 4px 6px rgba(0,0,0,0.4);
+}
 
 /* ============================================================================
    MEJORAS DE ACCESIBILIDAD

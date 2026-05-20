@@ -15,11 +15,18 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
 
 -->
 <div class="dashboard-principal-wrapper">
-  <div class="container">
+  <!-- Elementos decorativos de fondo (blobs de color con blur) -->
+  <div class="bg-blob bg-blob-1" aria-hidden="true"></div>
+  <div class="bg-blob bg-blob-2" aria-hidden="true"></div>
+  <div class="bg-blob bg-blob-3" aria-hidden="true"></div>
+  <div class="bg-blob bg-blob-4" aria-hidden="true"></div>
+
+  <div class="container dp-container">
     <!-- ================================================================ -->
     <!-- SECCIÓN HERO: Encabezado principal con ícono animado             -->
     <!-- ================================================================ -->
     <div class="hero-section">
+      <!-- Ícono animado arriba -->
       <div class="hero-icon">
         <img
           src="{% static 'images/utilitys/incon_dashboard_principal.svg' %}"
@@ -27,6 +34,12 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
           style="width: 100%; height: 100%; object-fit: contain"
         />
       </div>
+
+      <!-- Saludo dinámico debajo del ícono — tamaño prominente -->
+      <div class="hero-greeting">
+        <span id="greeting-time">Bienvenido</span>{% if request.user.is_authenticated %}<span class="greeting-name">, {{ request.user.first_name|default:request.user.username }}</span>{% endif %}
+      </div>
+
       <h1 class="hero-title tiktok-sans-regular">
         Sistema Integral de Gestión
       </h1>
@@ -46,12 +59,13 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
         class="module-card inventario"
         onclick="window.location.href='{% url 'dashboard_inventario' %}'"
       >
+        <span class="kbd-badge" title="Atajo de teclado: tecla 1">1</span>
         <div class="module-content">
           <!-- Ícono representativo del módulo -->
           <div class="module-icon">
             <img
-              src="{% static 'images/utilitys/icon_dashboard_principal_almacen.svg' %}"
-              alt="icono de almacen"
+              src="{% static 'images/utilitys/icon_dashboard_principal_inventario.svg' %}"
+              alt="icono de inventario"
               style="width: 100%; height: 100%; object-fit: contain"
             />
           </div>
@@ -68,22 +82,27 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
           <!-- Estadísticas clave del módulo -->
           <div class="module-stats">
             <div class="stat-item">
-              <span class="stat-number">{{ total_productos }}</span>
+              <span class="stat-number" data-target="{{ total_productos }}">{{ total_productos }}</span>
               <span class="stat-label">Productos</span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">{{ productos_stock_bajo }}</span>
-              <span class="stat-label">Stock Bajo</span>
+              <span class="stat-number" data-target="{{ productos_stock_bajo }}">{{ productos_stock_bajo }}</span>
+              <span class="stat-label">
+                {% if productos_stock_bajo > 0 %}<span class="status-dot dot-warning" title="Stock bajo — requiere atención"></span>{% endif %}
+                Stock Bajo
+              </span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">{{ movimientos_hoy }}</span>
+              <span class="stat-number" data-target="{{ movimientos_hoy }}">{{ movimientos_hoy }}</span>
               <span class="stat-label">Movimientos Hoy</span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number"
-                >${{ valor_inventario|floatformat:0 }}</span
-              >
+              <span class="stat-number" data-target="${{ valor_inventario|floatformat:0 }}">${{ valor_inventario|floatformat:0 }}</span>
               <span class="stat-label">Valor Total</span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
           </div>
 
@@ -102,6 +121,7 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
         class="module-card scorecard"
         onclick="window.location.href='{% url 'scorecard:dashboard' %}'"
       >
+        <span class="kbd-badge" title="Atajo de teclado: tecla 2">2</span>
         <div class="module-content">
           <!-- Ícono representativo del módulo -->
           <div class="module-icon">
@@ -124,20 +144,30 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
           <!-- Estadísticas clave del módulo -->
           <div class="module-stats">
             <div class="stat-item">
-              <span class="stat-number">{{ incidencias_totales }}</span>
+              <span class="stat-number" data-target="{{ incidencias_totales }}">{{ incidencias_totales }}</span>
               <span class="stat-label">Incidencias</span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">{{ incidencias_abiertas }}</span>
-              <span class="stat-label">Abiertas</span>
+              <span class="stat-number" data-target="{{ incidencias_abiertas }}">{{ incidencias_abiertas }}</span>
+              <span class="stat-label">
+                {% if incidencias_abiertas > 0 %}<span class="status-dot dot-warning" title="Incidencias abiertas"></span>{% endif %}
+                Abiertas
+              </span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">{{ incidencias_criticas }}</span>
-              <span class="stat-label">Críticas</span>
+              <span class="stat-number" data-target="{{ incidencias_criticas }}">{{ incidencias_criticas }}</span>
+              <span class="stat-label">
+                {% if incidencias_criticas > 0 %}<span class="status-dot dot-danger" title="Incidencias críticas activas"></span>{% endif %}
+                Críticas
+              </span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">{{ tasa_exito }}%</span>
+              <span class="stat-number" data-target="{{ tasa_exito }}%">{{ tasa_exito }}%</span>
               <span class="stat-label">Tasa Éxito</span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
           </div>
 
@@ -156,6 +186,7 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
         class="module-card servicio"
         onclick="window.location.href='{% url 'servicio_tecnico:inicio' %}'"
       >
+        <span class="kbd-badge" title="Atajo de teclado: tecla 3">3</span>
         <div class="module-content">
           <!-- Ícono representativo del módulo -->
           <div class="module-icon">
@@ -178,20 +209,27 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
           <!-- Estadísticas clave del módulo -->
           <div class="module-stats">
             <div class="stat-item">
-              <span class="stat-number">{{ ordenes_activas }}</span>
+              <span class="stat-number" data-target="{{ ordenes_activas }}">{{ ordenes_activas }}</span>
               <span class="stat-label">Órdenes Activas</span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">{{ ordenes_pendientes }}</span>
-              <span class="stat-label">Pendientes</span>
+              <span class="stat-number" data-target="{{ ordenes_pendientes }}">{{ ordenes_pendientes }}</span>
+              <span class="stat-label">
+                {% if ordenes_pendientes > 0 %}<span class="status-dot dot-warning" title="Órdenes pendientes de atención"></span>{% endif %}
+                Pendientes
+              </span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">{{ ordenes_hoy }}</span>
+              <span class="stat-number" data-target="{{ ordenes_hoy }}">{{ ordenes_hoy }}</span>
               <span class="stat-label">Hoy</span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">{{ ordenes_completadas }}</span>
+              <span class="stat-number" data-target="{{ ordenes_completadas }}">{{ ordenes_completadas }}</span>
               <span class="stat-label">Completadas</span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
           </div>
 
@@ -210,6 +248,7 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
         class="module-card almacen"
         onclick="window.location.href='{% url 'almacen:dashboard' %}'"
       >
+        <span class="kbd-badge" title="Atajo de teclado: tecla 4">4</span>
         <div class="module-content">
           <!-- Ícono representativo del módulo -->
           <div class="module-icon">
@@ -231,20 +270,30 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
           <!-- Estadísticas clave del módulo -->
           <div class="module-stats">
             <div class="stat-item">
-              <span class="stat-number">{{ total_almacen }}</span>
+              <span class="stat-number" data-target="{{ total_almacen }}">{{ total_almacen }}</span>
               <span class="stat-label">Modelos</span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">{{ compras_pendientes }}</span>
-              <span class="stat-label">Compras/Cotiz.</span>
+              <span class="stat-number" data-target="{{ compras_pendientes }}">{{ compras_pendientes }}</span>
+              <span class="stat-label">
+                {% if compras_pendientes > 0 %}<span class="status-dot dot-warning" title="Compras o cotizaciones pendientes"></span>{% endif %}
+                Compras/Cotiz.
+              </span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">{{ bajas_pendientes }}</span>
-              <span class="stat-label">Bajas Pend.</span>
+              <span class="stat-number" data-target="{{ bajas_pendientes }}">{{ bajas_pendientes }}</span>
+              <span class="stat-label">
+                {% if bajas_pendientes > 0 %}<span class="status-dot dot-danger" title="Bajas pendientes de autorización"></span>{% endif %}
+                Bajas Pend.
+              </span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
             <div class="stat-item">
-              <span class="stat-number">${{ valor_almacen|floatformat:0 }}</span>
+              <span class="stat-number" data-target="${{ valor_almacen|floatformat:0 }}">${{ valor_almacen|floatformat:0 }}</span>
               <span class="stat-label">Valor Stock</span>
+              <div class="stat-progress"><div class="stat-progress-fill"></div></div>
             </div>
           </div>
 
@@ -290,78 +339,144 @@ Este script agrega funcionalidades adicionales:
 ================================================================================
 -->
 <script>
-  // ============================================================================
-  // Esperar a que el DOM esté completamente cargado antes de ejecutar
-  // ============================================================================
   document.addEventListener("DOMContentLoaded", function () {
+
+    // ========================================================================
+    // SALUDO DINÁMICO según hora del día
+    // ========================================================================
+    const greetingTimeEl = document.getElementById("greeting-time");
+    if (greetingTimeEl) {
+      const hour = new Date().getHours();
+      if (hour >= 5 && hour < 12) {
+        greetingTimeEl.textContent = "Buenos días";
+      } else if (hour >= 12 && hour < 19) {
+        greetingTimeEl.textContent = "Buenas tardes";
+      } else {
+        greetingTimeEl.textContent = "Buenas noches";
+      }
+    }
+
+    // ========================================================================
+    // COUNT-UP ANIMATION - Los números cuentan desde 0 hasta su valor real
+    // EXPLICACIÓN: Usamos requestAnimationFrame para animar suavemente.
+    // Detecta si el valor tiene prefijo "$" o sufijo "%" y los conserva.
+    // ========================================================================
+    function animateCountUp(el) {
+      const rawTarget = el.dataset.target;
+      if (!rawTarget) return;
+
+      const prefix = rawTarget.startsWith("$") ? "$" : "";
+      const suffix = rawTarget.endsWith("%") ? "%" : "";
+      const numericValue = parseFloat(rawTarget.replace(/[^0-9.]/g, ""));
+
+      // Si el valor es 0 o no numérico, no animamos
+      if (isNaN(numericValue) || numericValue === 0) return;
+
+      const duration = 900; // milisegundos
+      const startTime = performance.now();
+
+      function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Ease-out cúbico: empieza rápido y desacelera al final
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(numericValue * eased);
+        el.textContent = prefix + current.toLocaleString("es-MX") + suffix;
+
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        } else {
+          // Restaurar el valor exacto original al terminar
+          el.textContent = rawTarget;
+        }
+      }
+
+      requestAnimationFrame(update);
+    }
+
+    // ========================================================================
+    // PROGRESS BARS - Calcula el ancho relativo dentro de cada card
+    // EXPLICACIÓN: El stat con mayor valor recibe 100% de ancho.
+    // Los demás reciben un porcentaje proporcional. Esto crea un
+    // contexto visual sin necesitar un "máximo" externo.
+    // ========================================================================
+    function initProgressBars(card) {
+      const statNumbers = card.querySelectorAll(".stat-number[data-target]");
+      const fills = card.querySelectorAll(".stat-progress-fill");
+
+      if (!fills.length) return;
+
+      // Encontrar el valor máximo dentro del card
+      let maxVal = 0;
+      statNumbers.forEach(function (el) {
+        const val = parseFloat(el.dataset.target.replace(/[^0-9.]/g, ""));
+        if (!isNaN(val) && val > maxVal) maxVal = val;
+      });
+
+      if (maxVal === 0) return;
+
+      // Asignar ancho proporcional con transición CSS
+      statNumbers.forEach(function (el, i) {
+        if (fills[i]) {
+          const val = parseFloat(el.dataset.target.replace(/[^0-9.]/g, ""));
+          const pct = isNaN(val) ? 0 : Math.min((val / maxVal) * 100, 100);
+          // Pequeño delay para que la transición sea visible
+          setTimeout(function () {
+            fills[i].style.width = pct + "%";
+          }, 300);
+        }
+      });
+    }
+
+    // ========================================================================
+    // INTERSECTION OBSERVER - Dispara animaciones cuando el card es visible
+    // EXPLICACIÓN: Esto hace que las animaciones ocurran al entrar al viewport,
+    // no solo al cargar la página. Es útil en móvil al hacer scroll.
+    // ========================================================================
+    const observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            const card = entry.target;
+            // Animar números
+            card.querySelectorAll(".stat-number[data-target]").forEach(animateCountUp);
+            // Inicializar barras de progreso
+            initProgressBars(card);
+            // Dejar de observar — solo animamos una vez
+            observer.unobserve(card);
+          }
+        });
+      },
+      { threshold: 0.25 }
+    );
+
+    document.querySelectorAll(".module-card").forEach(function (card) {
+      observer.observe(card);
+    });
+
     // ========================================================================
     // ATAJOS DE TECLADO - Navegación rápida para usuarios avanzados
     // ========================================================================
     document.addEventListener("keydown", function (e) {
-      // Tecla "1" = Inventario
-      if (e.key === "1") {
-        e.preventDefault();
-        window.location.href = "{% url 'dashboard_inventario' %}";
-      }
+      // Solo si no hay un input/textarea enfocado
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
 
-      // Tecla "2" = Scorecard (Control de Calidad)
-      if (e.key === "2") {
-        e.preventDefault();
-        window.location.href = "{% url 'scorecard:dashboard' %}";
-      }
-
-      // Tecla "3" = Servicio Técnico
-      if (e.key === "3") {
-        e.preventDefault();
-        window.location.href = "{% url 'servicio_tecnico:inicio' %}";
-      }
-
-      // Tecla "4" = Almacén Central
-      if (e.key === "4") {
-        e.preventDefault();
-        window.location.href = "{% url 'almacen:dashboard' %}";
-      }
+      if (e.key === "1") { e.preventDefault(); window.location.href = "{% url 'dashboard_inventario' %}"; }
+      if (e.key === "2") { e.preventDefault(); window.location.href = "{% url 'scorecard:dashboard' %}"; }
+      if (e.key === "3") { e.preventDefault(); window.location.href = "{% url 'servicio_tecnico:inicio' %}"; }
+      if (e.key === "4") { e.preventDefault(); window.location.href = "{% url 'almacen:dashboard' %}"; }
     });
 
     // ========================================================================
     // PREVENIR DOBLE CLICK EN CARDS
-    // Evita que el click en el botón y en el card navegue dos veces
     // ========================================================================
-    const moduleButtons = document.querySelectorAll(".module-button");
-
-    moduleButtons.forEach(function (button) {
+    document.querySelectorAll(".module-button").forEach(function (button) {
       button.addEventListener("click", function (e) {
         e.stopPropagation();
       });
     });
 
-    // ========================================================================
-    // MENSAJE DE CONSOLA PARA DESARROLLADORES
-    // ========================================================================
-    console.log(
-      "%c🚀 Dashboard Principal Cargado",
-      "color: #4F46E5; font-size: 16px; font-weight: bold;"
-    );
-    console.log(
-      "%cAtajos de teclado disponibles:",
-      "color: #6B7280; font-size: 12px;"
-    );
-    console.log(
-      '%c  • Presiona "1" para Inventario',
-      "color: #4F46E5; font-size: 12px;"
-    );
-    console.log(
-      '%c  • Presiona "2" para Scorecard',
-      "color: #10B981; font-size: 12px;"
-    );
-    console.log(
-      '%c  • Presiona "3" para Servicio Técnico',
-      "color: #F59E0B; font-size: 12px;"
-    );
-    console.log(
-      '%c  • Presiona "4" para Almacén Central',
-      "color: #8B5CF6; font-size: 12px;"
-    );
+    console.log("%c Dashboard Principal — SIGMA", "color: #1f6391; font-size: 14px; font-weight: bold;");
   });
 </script>
 {% endblock %}

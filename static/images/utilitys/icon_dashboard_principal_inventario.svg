@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <!-- Gradiente indigo principal -->
+    <linearGradient id="iv_indigo" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#818CF8"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+    <!-- Gradiente ambar - chip heroe -->
+    <linearGradient id="iv_amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <!-- Gradiente scan horizontal cyan -->
+    <linearGradient id="iv_scan" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#22D3EE" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="#22D3EE" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Glow indigo para el halo -->
+    <filter id="iv_glow_indigo" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#6366F1" flood-opacity="0.35"/>
+    </filter>
+    <!-- Glow ambar para el chip heroe -->
+    <filter id="iv_glow_amber" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#F59E0B" flood-opacity="0.65"/>
+    </filter>
+    <!-- Clip interior de la caja -->
+    <clipPath id="iv_box_clip">
+      <rect x="26" y="48" width="68" height="44" rx="2"/>
+    </clipPath>
+  </defs>
+
+  <style>
+    .iv-ring-glow { animation: iv-ring-pulse 3s ease-in-out infinite; }
+    .iv-chip      { transform-origin: 60px 40px; animation: iv-spin 9s linear infinite; }
+    .iv-chip-dot  { transform-origin: 60px 40px; animation: iv-pulse-dot 2s ease-in-out infinite; }
+    .iv-scan      { animation: iv-sweep 2.4s ease-in-out infinite; }
+    .iv-trace     { stroke-dasharray: 5 4; animation: iv-flow 1.4s linear infinite; }
+    .iv-trace-r   { stroke-dasharray: 5 4; animation: iv-flow 1.4s linear infinite; animation-delay: -0.7s; }
+    .iv-node      { animation: iv-blink 2s ease-in-out infinite; }
+    .iv-node-d    { animation: iv-blink 2s ease-in-out infinite; animation-delay: -1s; }
+    .iv-tag       { transform-origin: 89px 27px; animation: iv-swing 3s ease-in-out infinite; }
+    .iv-bar1 { animation: iv-bar-fade 1.8s ease-in-out infinite; }
+    .iv-bar2 { animation: iv-bar-fade 1.8s ease-in-out infinite; animation-delay: -0.4s; }
+    .iv-bar3 { animation: iv-bar-fade 1.8s ease-in-out infinite; animation-delay: -0.8s; }
+    .iv-bar4 { animation: iv-bar-fade 1.8s ease-in-out infinite; animation-delay: -1.2s; }
+    .iv-bar5 { animation: iv-bar-fade 1.8s ease-in-out infinite; animation-delay: -1.6s; }
+
+    @keyframes iv-ring-pulse {
+      0%, 100% { opacity: 0.08; r: 54px; }
+      50%       { opacity: 0.18; r: 56px; }
+    }
+    @keyframes iv-spin { to { transform: rotate(360deg); } }
+    @keyframes iv-pulse-dot {
+      0%, 100% { opacity: 1;   r: 3px; }
+      50%       { opacity: 0.4; r: 5px; }
+    }
+    @keyframes iv-sweep {
+      0%   { transform: translateY(0px);   opacity: 0; }
+      8%   { opacity: 1; }
+      92%  { opacity: 0.9; }
+      100% { transform: translateY(38px);  opacity: 0; }
+    }
+    @keyframes iv-flow { to { stroke-dashoffset: -18; } }
+    @keyframes iv-blink {
+      0%, 100% { opacity: 0.5; }
+      50%       { opacity: 1; }
+    }
+    @keyframes iv-swing {
+      0%, 100% { transform: rotate(-6deg); }
+      50%       { transform: rotate(6deg); }
+    }
+    @keyframes iv-bar-fade {
+      0%, 100% { opacity: 0.5; }
+      50%       { opacity: 1; }
+    }
+  </style>
+
+  <!-- Halo indigo -->
+  <circle class="iv-ring-glow" cx="60" cy="60" r="54"
+          fill="#6366F1" opacity="0.08" filter="url(#iv_glow_indigo)"/>
+
+  <!-- ====================================================== -->
+  <!-- CAJA 3D                                                -->
+  <!-- ====================================================== -->
+  <!-- Tapa de la caja -->
+  <path d="M26 48 L60 37 L94 48"
+        fill="#3730A3" opacity="0.70"
+        stroke="url(#iv_indigo)" stroke-width="1.5"/>
+  <!-- Diagonal central de la tapa -->
+  <line x1="60" y1="37" x2="60" y2="48"
+        stroke="#818CF8" stroke-width="1.5" opacity="0.60"/>
+  <!-- Cuerpo principal de la caja -->
+  <rect x="26" y="48" width="68" height="44" rx="3"
+        fill="#1E1B4B" opacity="0.85"
+        stroke="url(#iv_indigo)" stroke-width="2.5"/>
+  <!-- Banda horizontal -->
+  <rect x="26" y="63" width="68" height="4" fill="#4F46E5" opacity="0.30"/>
+  <!-- Banda vertical -->
+  <rect x="57" y="48" width="6" height="44" fill="#4F46E5" opacity="0.20"/>
+
+  <!-- ====================================================== -->
+  <!-- BARCODE + TRAZAS CYAN/PURPLE (clipeado)               -->
+  <!-- ====================================================== -->
+  <g clip-path="url(#iv_box_clip)">
+    <!-- Barras del codigo: cyan / blanco / indigo -->
+    <rect class="iv-bar1" x="32"  y="70" width="3"   height="14" rx="0.5" fill="#22D3EE" opacity="0.90"/>
+    <rect class="iv-bar2" x="37"  y="68" width="1.5" height="18" rx="0.5" fill="#E0F2FE" opacity="0.80"/>
+    <rect class="iv-bar3" x="41"  y="70" width="4"   height="14" rx="0.5" fill="#818CF8" opacity="0.70"/>
+    <rect               x="47"  y="68" width="1.5" height="18" rx="0.5" fill="#22D3EE"  opacity="0.60"/>
+    <rect class="iv-bar4" x="51"  y="70" width="2.5" height="14" rx="0.5" fill="#E0F2FE" opacity="0.90"/>
+    <rect               x="55"  y="68" width="4"   height="18" rx="0.5" fill="#818CF8"  opacity="0.50"/>
+    <rect class="iv-bar5" x="61"  y="70" width="1.5" height="14" rx="0.5" fill="#22D3EE" opacity="0.80"/>
+    <rect               x="65"  y="68" width="3"   height="18" rx="0.5" fill="#E0F2FE"  opacity="0.70"/>
+    <rect class="iv-bar1" x="70"  y="70" width="2"   height="14" rx="0.5" fill="#818CF8" opacity="0.90"/>
+    <rect class="iv-bar3" x="74"  y="68" width="4"   height="18" rx="0.5" fill="#22D3EE" opacity="0.60"/>
+    <rect class="iv-bar2" x="80"  y="70" width="1.5" height="14" rx="0.5" fill="#E0F2FE" opacity="0.80"/>
+    <rect               x="84"  y="68" width="3"   height="18" rx="0.5" fill="#818CF8"  opacity="0.50"/>
+
+    <!-- Trazas cyan -->
+    <path class="iv-trace"
+          d="M26 55 L35 55 L35 61 L45 61"
+          stroke="#22D3EE" stroke-width="1.3" opacity="0.80"/>
+    <path class="iv-trace-r"
+          d="M94 55 L85 55 L85 61 L75 61"
+          stroke="#22D3EE" stroke-width="1.3" opacity="0.80"/>
+    <!-- Trazas purple -->
+    <path class="iv-trace"
+          d="M26 85 L35 85 L35 79 L45 79"
+          stroke="#A78BFA" stroke-width="1.3" opacity="0.65"/>
+    <path class="iv-trace-r"
+          d="M94 85 L85 85 L85 79 L75 79"
+          stroke="#A78BFA" stroke-width="1.3" opacity="0.65"/>
+
+    <!-- Nodos -->
+    <circle class="iv-node"   cx="35" cy="55" r="2" fill="#22D3EE"/>
+    <circle class="iv-node-d" cx="85" cy="55" r="2" fill="#22D3EE"/>
+    <circle class="iv-node"   cx="35" cy="85" r="2" fill="#A78BFA"/>
+    <circle class="iv-node-d" cx="85" cy="85" r="2" fill="#A78BFA"/>
+
+    <!-- Linea de escaneo cyan horizontal -->
+    <rect class="iv-scan" x="26" y="48" width="68" height="7"
+          fill="url(#iv_scan)"/>
+  </g>
+
+  <!-- ====================================================== -->
+  <!-- CHIP HEXAGONAL AMBAR - heroe, fuera del clip           -->
+  <!-- ====================================================== -->
+  <g class="iv-chip" filter="url(#iv_glow_amber)">
+    <!-- 6 dientes del chip (rects rotados desde centro 60,40) -->
+    <rect x="57.5" y="26" width="5" height="8" rx="1.5" fill="url(#iv_amber)"/>
+    <rect x="57.5" y="26" width="5" height="8" rx="1.5" fill="url(#iv_amber)" transform="rotate(60  60 40)"/>
+    <rect x="57.5" y="26" width="5" height="8" rx="1.5" fill="url(#iv_amber)" transform="rotate(120 60 40)"/>
+    <rect x="57.5" y="26" width="5" height="8" rx="1.5" fill="url(#iv_amber)" transform="rotate(180 60 40)"/>
+    <rect x="57.5" y="26" width="5" height="8" rx="1.5" fill="url(#iv_amber)" transform="rotate(240 60 40)"/>
+    <rect x="57.5" y="26" width="5" height="8" rx="1.5" fill="url(#iv_amber)" transform="rotate(300 60 40)"/>
+    <!-- Aro del chip -->
+    <circle cx="60" cy="40" r="10" fill="none" stroke="url(#iv_amber)" stroke-width="2" opacity="0.70"/>
+    <!-- Interior oscuro -->
+    <circle cx="60" cy="40" r="4.5" fill="#0F172A"/>
+  </g>
+  <!-- Punto central pulsante -->
+  <circle class="iv-chip-dot" cx="60" cy="40" r="3" fill="#FFFFFF"/>
+
+  <!-- ====================================================== -->
+  <!-- TAG AMBAR - esquina superior derecha, swing           -->
+  <!-- ====================================================== -->
+  <g class="iv-tag">
+    <rect x="80" y="20" width="22" height="14" rx="3"
+          fill="#451A03" opacity="0.90"
+          stroke="url(#iv_amber)" stroke-width="1.5"/>
+    <rect x="83" y="24" width="13" height="2" rx="1" fill="#FCD34D" opacity="0.85"/>
+    <rect x="83" y="28" width="8"  height="1.5" rx="0.75" fill="#F59E0B" opacity="0.60"/>
+    <rect x="83" y="31" width="10" height="1.5" rx="0.75" fill="#F59E0B" opacity="0.40"/>
+    <!-- Agujero de la etiqueta -->
+    <circle cx="81.5" cy="27" r="2.2" fill="none" stroke="url(#iv_amber)" stroke-width="1.2"/>
+  </g>
+</svg>
