@@ -2,18 +2,25 @@
 
 {% block title %}{{ titulo|default:"Nueva Venta Mostrador" }} - {{ block.super }}{% endblock %}
 
+{% block extra_css %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/form_orden.css' %}">
+{% endblock %}
+
 {% block content %}
+<div class="form-orden-bg form-vm">
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-lg-10">
-            <!-- HEADER DEL FORMULARIO -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
+
+            <!-- HEADER DE PÁGINA -->
+            <div class="form-page-header">
                 <div>
-                    <h1 class="h3">
+                    <h1 class="form-page-title">
                         <i class="bi bi-shop"></i> {{ titulo|default:"Nueva Venta Mostrador" }}
                     </h1>
                     {% if subtitulo %}
-                        <p class="text-muted mb-0">{{ subtitulo }}</p>
+                        <p class="text-muted mb-0 mt-1">{{ subtitulo }}</p>
                     {% endif %}
                 </div>
                 <a href="{% url 'servicio_tecnico:inicio' %}" class="btn btn-outline-secondary">
@@ -47,10 +54,13 @@
             <!-- FORMULARIO PRINCIPAL -->
             <form method="post" id="formNuevaOrdenVentaMostrador">
                 {% csrf_token %}
-                
-                <!-- SECCIÓN 1: INFORMACIÓN DEL EQUIPO -->
-                <div class="card mb-4">
-                    <div class="card-header card-header-vm text-white">
+                <div class="form-steps-wrapper">
+
+                <!-- =====================================================
+                     SECCIÓN 1: INFORMACIÓN DEL EQUIPO
+                     ===================================================== -->
+                <div class="card form-card form-card-vm-main mb-4">
+                    <div class="card-header form-card-header">
                         <h5 class="mb-0">
                             <i class="bi bi-pc-display"></i> Información del Equipo
                         </h5>
@@ -92,12 +102,6 @@
                                         <i class="bi bi-search"></i> Autocompletado
                                     </span>
                                 </label>
-                                <!-- 
-                                    CAMPO MODELO CON AUTOCOMPLETADO
-                                    EXPLICACIÓN: Este campo usa Select2 para autocompletar modelos
-                                    - data-api-url: URL del endpoint API para buscar modelos
-                                    - El campo se convierte en un select que permite búsqueda y valores personalizados
-                                -->
                                 <select 
                                     id="id_modelo" 
                                     name="modelo" 
@@ -196,9 +200,11 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN 2: ACCESORIOS -->
-                <div class="card mb-4">
-                    <div class="card-header bg-info text-white">
+                <!-- =====================================================
+                     SECCIÓN 2: ACCESORIOS
+                     ===================================================== -->
+                <div class="card form-card form-card-accesorios mb-4">
+                    <div class="card-header form-card-header">
                         <h5 class="mb-0">
                             <i class="bi bi-plug"></i> Accesorios
                         </h5>
@@ -215,11 +221,6 @@
                                 <div class="form-text">{{ form.tiene_cargador.help_text }}</div>
                             </div>
                             
-                            <!-- 
-                                CAMPO CONDICIONAL - NÚMERO DE SERIE DEL CARGADOR
-                                EXPLICACIÓN: Este div se muestra/oculta con JavaScript
-                                             cuando el usuario marca/desmarca "tiene_cargador"
-                            -->
                             <div class="col-md-6 mb-3" id="div_numero_serie_cargador" style="display: none;">
                                 <label for="{{ form.numero_serie_cargador.id_for_label }}" class="form-label">
                                     <i class="bi bi-upc"></i> Número de Serie del Cargador
@@ -237,9 +238,11 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN 3: DESCRIPCIÓN DEL SERVICIO -->
-                <div class="card mb-4">
-                    <div class="card-header bg-success text-white">
+                <!-- =====================================================
+                     SECCIÓN 3: DESCRIPCIÓN DEL SERVICIO
+                     ===================================================== -->
+                <div class="card form-card form-card-servicio mb-4">
+                    <div class="card-header form-card-header">
                         <h5 class="mb-0">
                             <i class="bi bi-list-check"></i> Descripción del Servicio
                         </h5>
@@ -259,9 +262,11 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN 4: UBICACIÓN -->
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
+                <!-- =====================================================
+                     SECCIÓN 4: UBICACIÓN
+                     ===================================================== -->
+                <div class="card form-card form-card-ubicacion mb-4">
+                    <div class="card-header form-card-header">
                         <h5 class="mb-0">
                             <i class="bi bi-geo-alt"></i> Ubicación
                         </h5>
@@ -284,25 +289,22 @@
                     </div>
                 </div>
 
+                </div>{# /form-steps-wrapper #}
+
                 <!-- BOTONES DE ACCIÓN -->
-                <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-5">
+                <div class="form-actions-card">
                     <a href="{% url 'servicio_tecnico:inicio' %}" class="btn btn-outline-secondary">
                         <i class="bi bi-x-circle"></i> Cancelar
                     </a>
-                    <button type="submit" class="btn btn-warning btn-lg">
+                    <button type="submit" class="btn-form-submit btn">
                         <i class="bi bi-check-circle"></i> Crear Venta Mostrador
                     </button>
                 </div>
-            </form>
-        </div>
-    </div>
-</div>
 
-<!-- NOTA INFORMATIVA AL FINAL -->
-<div class="container mb-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <div class="alert alert-light border">
+            </form>
+
+            <!-- NOTA INFORMATIVA AL FINAL -->
+            <div class="form-info-alert mb-5">
                 <h6><i class="bi bi-lightbulb"></i> Próximos Pasos:</h6>
                 <ol class="mb-0">
                     <li>Al crear la orden, serás redirigido al detalle de la orden</li>
@@ -312,9 +314,11 @@
                     <li>Entrega el equipo al cliente</li>
                 </ol>
             </div>
+
         </div>
     </div>
 </div>
+</div>{# /form-orden-bg #}
 {% endblock %}
 
 {% block extra_js %}

@@ -477,6 +477,11 @@ textarea.form-control {
     vertical-align: middle;
 }
 
+/* Label con badges en línea: anula display:block para permitir flex */
+.form-label.d-flex {
+    display: flex !important;
+}
+
 /* Switches personalizados */
 .form-check-input:checked {
     background-color: var(--success-color, #27ae60);

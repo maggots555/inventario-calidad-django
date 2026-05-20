@@ -1,0 +1,483 @@
+/*
+================================================================================
+FORMULARIOS DE NUEVA ORDEN — form_orden.css
+================================================================================
+
+Compartido por:
+  - form_nueva_orden.html          (OOW — Servicio con Diagnóstico)
+  - form_nueva_orden_venta_mostrador.html  (FL — Venta Mostrador)
+
+PRINCIPIOS DE DISEÑO (consistentes con el resto del módulo):
+  - Fondo gris casi blanco + textura de puntos (misma que seleccion_orden.css)
+  - Headers de sección: #f8fafc con borde izquierdo de acento por sección
+  - Sin gradientes genéricos
+  - Contador de pasos automático via CSS counters
+  - Focus glow de inputs hereda el color de la sección (CSS variable)
+  - Animaciones de entrada escalonadas
+  - Separador visual entre secciones (línea izquierda conectora)
+  - Dark mode: fondos oscuros, texto claro
+================================================================================
+*/
+
+/* ============================================================
+   1. VARIABLES POR SECCIÓN
+   ============================================================ */
+:root {
+    --form-accent-equipo:     #3B82F6;   /* Azul      — Información del Equipo */
+    --form-accent-accesorios: #06b6d4;   /* Cyan      — Accesorios */
+    --form-accent-ubicacion:  #10B981;   /* Verde     — Ubicación / Opciones */
+    --form-accent-servicio:   #10B981;   /* Verde     — Descripción del Servicio */
+    --form-accent-vm:         #F59E0B;   /* Ámbar     — Header principal VM */
+    --form-accent-oow:        #4F46E5;   /* Índigo    — Header principal OOW */
+
+    --form-header-bg:    #f8fafc;
+    --form-header-text:  #1e293b;
+    --form-header-sub:   #64748b;
+    --form-card-bg:      #ffffff;
+    --form-card-border:  #e2e8f0;
+    --form-card-shadow:  0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --form-card-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.09), 0 2px 6px rgba(0, 0, 0, 0.05);
+    --form-step-size:    1.75rem;
+}
+
+/* ============================================================
+   2. FONDO DE PÁGINA — textura de puntos (igual que seleccion_orden)
+   ============================================================ */
+.form-orden-bg {
+    min-height: calc(100vh - 80px);
+    background-color: #f1f5f9;
+    background-image: radial-gradient(
+        circle,
+        rgba(148, 163, 184, 0.12) 1.5px,
+        transparent 1.5px
+    );
+    background-size: 28px 28px;
+    padding: 2rem 0 3rem;
+}
+
+/* ============================================================
+   3. HEADER DE PÁGINA (título + botón volver)
+   ============================================================ */
+.form-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 2px solid #e2e8f0;
+    position: relative;
+}
+
+/* Línea de acento bajo el título de página */
+.form-page-header::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 60px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--form-accent-page, #4F46E5);
+}
+
+.form-page-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+}
+
+.form-page-title i {
+    margin-right: 0.5rem;
+    color: var(--form-accent-page, #4F46E5);
+}
+
+/* Variante OOW (índigo) */
+.form-orden-bg.form-oow {
+    --form-accent-page: #4F46E5;
+}
+
+/* Variante VM (ámbar) */
+.form-orden-bg.form-vm {
+    --form-accent-page: #F59E0B;
+}
+
+/* ============================================================
+   4. CONTADOR DE PASOS CSS (automático — sin cambios en HTML)
+   ============================================================ */
+.form-orden-bg {
+    counter-reset: form-step;
+}
+
+.form-card-header {
+    counter-increment: form-step;
+}
+
+/* El número aparece como badge antes del icono */
+.form-card-header::before {
+    content: counter(form-step);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--form-step-size);
+    height: var(--form-step-size);
+    border-radius: 50%;
+    background: var(--section-accent, #64748b);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+}
+
+/* ============================================================
+   5. TARJETA DE FORMULARIO (base)
+   ============================================================ */
+.form-card {
+    background: var(--form-card-bg);
+    border: 1px solid var(--form-card-border);
+    border-radius: 0.75rem;
+    box-shadow: var(--form-card-shadow);
+    margin-bottom: 1.5rem;
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+    overflow: hidden;
+
+    /* Animación de entrada escalonada */
+    animation: formCardIn 0.4s ease-out both;
+}
+
+.form-card:hover {
+    box-shadow: var(--form-card-shadow-hover);
+    transform: translateY(-2px);
+}
+
+/* Stagger para las primeras 6 cards */
+.form-card:nth-of-type(1) { animation-delay: 0.05s; }
+.form-card:nth-of-type(2) { animation-delay: 0.12s; }
+.form-card:nth-of-type(3) { animation-delay: 0.19s; }
+.form-card:nth-of-type(4) { animation-delay: 0.26s; }
+.form-card:nth-of-type(5) { animation-delay: 0.32s; }
+.form-card:nth-of-type(6) { animation-delay: 0.36s; }
+
+@keyframes formCardIn {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================================
+   6. HEADER DE SECCIÓN
+   ============================================================ */
+.form-card-header {
+    display: flex;
+    align-items: center;
+    background: var(--form-header-bg);
+    border-bottom: 1px solid var(--form-card-border);
+    border-left: 5px solid var(--section-accent, #64748b);
+    padding: 0.9rem 1.5rem;
+    /* Sobreescribir Bootstrap */
+    border-top-left-radius: calc(0.75rem - 1px) !important;
+    border-top-right-radius: calc(0.75rem - 1px) !important;
+}
+
+.form-card-header h5 {
+    color: var(--form-header-text);
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-card-header h5 i {
+    color: var(--section-accent, #64748b);
+    font-size: 1.1rem;
+}
+
+/* ============================================================
+   7. COLORES POR SECCIÓN (solo fijan --section-accent)
+   ============================================================ */
+.form-card-equipo     { --section-accent: var(--form-accent-equipo);     }
+.form-card-accesorios { --section-accent: var(--form-accent-accesorios); }
+.form-card-ubicacion  { --section-accent: var(--form-accent-ubicacion);  }
+.form-card-servicio   { --section-accent: var(--form-accent-servicio);   }
+.form-card-vm-main    { --section-accent: var(--form-accent-vm);         }
+
+/* ============================================================
+   8. FOCUS GLOW DE INPUTS — hereda el acento de la sección
+   ============================================================ */
+.form-card .form-control:focus,
+.form-card .form-select:focus {
+    border-color: var(--section-accent, #3B82F6);
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--section-accent, #3B82F6) 20%, transparent);
+    outline: none;
+}
+
+/* Switch / checkbox focus */
+.form-card .form-check-input:focus {
+    border-color: var(--section-accent, #3B82F6);
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--section-accent, #3B82F6) 20%, transparent);
+}
+
+.form-card .form-check-input:checked {
+    background-color: var(--section-accent, #3B82F6);
+    border-color: var(--section-accent, #3B82F6);
+}
+
+/* ============================================================
+   9. ÁREA DE BOTONES DE ACCIÓN
+   ============================================================ */
+.form-actions-card {
+    background: var(--form-card-bg);
+    border: 1px solid var(--form-card-border);
+    border-radius: 0.75rem;
+    box-shadow: var(--form-card-shadow);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+
+    animation: formCardIn 0.4s ease-out 0.38s both;
+}
+
+/* Botón principal de submit — sin gradiente, sólido + hover oscuro */
+.btn-form-submit {
+    padding: 0.75rem 2rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #fff;
+    background: var(--form-accent-page, #4F46E5);
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--form-accent-page, #4F46E5) 35%, transparent);
+    transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+.btn-form-submit:hover {
+    filter: brightness(0.88);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--form-accent-page, #4F46E5) 45%, transparent);
+    color: #fff;
+}
+
+.btn-form-submit:active {
+    transform: translateY(0);
+    filter: brightness(0.80);
+}
+
+/* ============================================================
+   10. LÍNEA IZQUIERDA CONECTORA — efecto "timeline" entre tarjetas
+       (pseudo-elemento en el wrapper de formulario)
+   ============================================================ */
+.form-steps-wrapper {
+    position: relative;
+}
+
+.form-steps-wrapper::before {
+    content: '';
+    position: absolute;
+    left: -1.25rem;
+    top: 2rem;
+    bottom: 4rem;
+    width: 2px;
+    background: linear-gradient(
+        to bottom,
+        var(--form-accent-page, #4F46E5) 0%,
+        transparent 100%
+    );
+    opacity: 0.2;
+}
+
+/* ============================================================
+   11. ALERT INFORMATIVA AL PIE — estilo más refinado
+   ============================================================ */
+.form-info-alert {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid var(--form-accent-page, #4F46E5);
+    border-radius: 0.5rem;
+    padding: 1.25rem 1.5rem;
+    animation: formCardIn 0.4s ease-out 0.45s both;
+}
+
+.form-info-alert h6 {
+    color: #1e293b;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.form-info-alert i {
+    color: var(--form-accent-page, #4F46E5);
+}
+
+.form-info-alert li {
+    color: #475569;
+    font-size: 0.9rem;
+    line-height: 1.7;
+}
+
+/* ============================================================
+   12. CARDS OPCIONES ESPECIALES (reingreso / rhitso)
+   ============================================================ */
+.form-option-card {
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background: #fafafa;
+    border: 1px solid #e2e8f0;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.form-option-card:has(.form-check-input:checked) {
+    border-color: var(--section-accent, #64748b);
+    background: color-mix(in srgb, var(--section-accent, #64748b) 6%, white);
+}
+
+/* ============================================================
+   13. BADGE ACCESORIO — se adapta al acento de sección
+   ============================================================ */
+.form-card .badge-autocompletado {
+    background: color-mix(in srgb, var(--section-accent, #3B82F6) 15%, white);
+    color: var(--section-accent, #3B82F6);
+    border: 1px solid color-mix(in srgb, var(--section-accent, #3B82F6) 30%, white);
+}
+
+/* ============================================================
+   14. ACCESIBILIDAD
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    .form-card,
+    .form-actions-card,
+    .form-info-alert {
+        animation: none !important;
+    }
+    .form-card:hover {
+        transform: none;
+    }
+    .btn-form-submit:hover {
+        transform: none;
+    }
+}
+
+/* ============================================================
+   15. RESPONSIVE — móviles
+   ============================================================ */
+@media (max-width: 768px) {
+    .form-orden-bg {
+        padding: 1rem 0 2rem;
+    }
+
+    .form-page-title {
+        font-size: 1.3rem;
+    }
+
+    .form-card-header {
+        padding: 0.75rem 1rem;
+    }
+
+    .form-card-header h5 {
+        font-size: 0.9rem;
+    }
+
+    .form-card-header::before {
+        width: 1.5rem;
+        height: 1.5rem;
+        font-size: 0.72rem;
+        margin-right: 0.5rem;
+    }
+
+    .form-actions-card {
+        flex-direction: column;
+    }
+
+    .btn-form-submit {
+        width: 100%;
+        text-align: center;
+    }
+
+    .form-steps-wrapper::before {
+        display: none;
+    }
+}
+
+/* ============================================================
+   16. MODO OSCURO
+   ============================================================ */
+[data-bs-theme="dark"] .form-orden-bg {
+    background-color: #0f172a;
+    background-image: radial-gradient(
+        circle,
+        rgba(71, 85, 105, 0.18) 1.5px,
+        transparent 1.5px
+    );
+    background-size: 28px 28px;
+}
+
+[data-bs-theme="dark"] {
+    --form-header-bg:   #1e293b;
+    --form-header-text: #e2e8f0;
+    --form-header-sub:  #94a3b8;
+    --form-card-bg:     #1e293b;
+    --form-card-border: #334155;
+    --form-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --form-card-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+[data-bs-theme="dark"] .form-page-header {
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .form-page-title {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .form-card-header {
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .form-card-header h5 {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .form-actions-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .form-info-alert {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .form-info-alert h6 {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .form-info-alert li {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .form-option-card {
+    background: #0f172a;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .form-option-card:has(.form-check-input:checked) {
+    background: color-mix(in srgb, var(--section-accent, #64748b) 12%, #0f172a);
+}
+
+/* Focus en dark mode — color más visible */
+[data-bs-theme="dark"] .form-card .form-control:focus,
+[data-bs-theme="dark"] .form-card .form-select:focus {
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--section-accent, #3B82F6) 30%, transparent);
+}
