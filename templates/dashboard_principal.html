@@ -49,6 +49,25 @@ DASHBOARD PRINCIPAL - SISTEMA INTEGRAL DE GESTIÓN
     </div>
 
     <!-- ================================================================ -->
+    <!-- CITA DIARIA — Reflexión sobre nihilismo optimista generada por IA -->
+    <!-- La cita se genera una vez al día con Ollama y se cachea 24 horas  -->
+    <!-- ================================================================ -->
+    {% if cita_diaria %}
+    <div class="cita-diaria-wrapper">
+      <div class="cita-diaria">
+        <i class="fas fa-quote-left cita-diaria-icon" aria-hidden="true"></i>
+        <div class="cita-diaria-body">
+          <p class="cita-diaria-texto">{{ cita_diaria }}</p>
+          <span class="cita-diaria-meta">
+            <i class="fas fa-sparkles" aria-hidden="true"></i>
+            Reflexión del día &middot; generada con IA
+          </span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================ -->
     <!-- CONTENEDOR DE MÓDULOS: Grid de 3 tarjetas principales            -->
     <!-- ================================================================ -->
     <div class="modules-container">

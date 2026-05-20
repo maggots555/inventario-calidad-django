@@ -11,8 +11,13 @@ from functools import wraps
 from .models import Producto, Movimiento, Sucursal, Empleado
 from .forms import ProductoForm, MovimientoForm, SucursalForm, MovimientoRapidoForm, EmpleadoForm, MovimientoFraccionarioForm
 import openpyxl
+import json
+import ssl
+import urllib.request
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
+from django.core.cache import cache
+from django.conf import settings
 
 
 # ===== DECORADORES DE PERMISOS =====
@@ -96,6 +101,129 @@ def fecha_local(fecha_utc):
     from config.paises_config import get_pais_actual, fecha_local_pais
     pais = get_pais_actual()
     return fecha_local_pais(fecha_utc, pais)
+
+# ===== CITA DIARIA — NIHILISMO OPTIMISTA (IA) =====
+
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Esta lista contiene citas de respaldo que se usan cuando Ollama no está
+# disponible. Se elige una diferente cada día según el número del día del año,
+# así el usuario siempre ve algo distinto aunque la IA no responda.
+_CITAS_NIHILISMO_RESPALDO = [
+    "El universo no necesita tener sentido para que tu vida lo tenga. Tú eres el arquitecto de tu propio significado.",
+    "Saber que nada importa por sí solo es liberador: de esa nada puedes construir exactamente lo que quieras.",
+    "La ausencia de un propósito cósmico no es un vacío — es un lienzo en blanco que solo tú puedes pintar.",
+    "El nihilismo optimista no dice que la vida no vale nada; dice que vale lo que tú decidas darle.",
+    "Somos polvo de estrellas con la extraña capacidad de decidir qué nos importa. Eso ya es suficiente.",
+    "No necesitas la aprobación del universo para vivir con intensidad. El universo ni siquiera sabe que existes — y eso está bien.",
+    "La falta de sentido inherente es una invitación, no una condena: crea, ama, persiste, aunque sea solo por hoy.",
+    "Si el cosmos es indiferente, entonces somos libres. No hay un guión equivocado — solo el que tú eliges escribir.",
+    "La consciencia en un universo sin propósito es el mayor accidente y la mayor fortuna al mismo tiempo.",
+    "Que la vida no tenga significado predefinido significa que cualquier significado que elijas es completamente válido.",
+    "El vacío no es una amenaza — es el espacio donde nace todo lo que importa.",
+    "Aceptar que somos efímeros no nos hace pequeños; nos hace precisamente lo único que tiene el privilegio de decidir.",
+]
+
+
+def obtener_cita_nihilismo_diaria():
+    """
+    Genera o recupera una cita diaria sobre nihilismo optimista usando Google Gemini.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta función hace tres cosas en orden:
+      1. Revisa el caché de Django → si ya hay una cita guardada para hoy, la devuelve
+         de inmediato (sin llamar a la IA, muy rápido).
+      2. Si no hay cita en caché y Gemini está habilitado → llama a la API de Google
+         para generar una nueva cita. La guarda en caché por 24 horas.
+      3. Si Gemini no está disponible o falla → usa una cita de la lista de respaldo,
+         elegida de forma determinista según el día del año (siempre distinta cada día).
+
+    Returns:
+        str: Texto de la cita para mostrar en el dashboard.
+    """
+    # ── Clave única por fecha ──────────────────────────────────────────────────
+    clave_cache = f"cita_nihilismo_{date.today().isoformat()}"
+
+    # ── 1. Intentar recuperar del caché ───────────────────────────────────────
+    cita_cacheada = cache.get(clave_cache)
+    if cita_cacheada:
+        return cita_cacheada
+
+    # ── Helper: seleccionar cita de respaldo según día del año ────────────────
+    def _cita_respaldo():
+        idx = date.today().timetuple().tm_yday % len(_CITAS_NIHILISMO_RESPALDO)
+        return _CITAS_NIHILISMO_RESPALDO[idx]
+
+    # ── 2. Verificar que Gemini esté habilitado y con API key ─────────────────
+    gemini_habilitado = getattr(settings, 'GEMINI_ENABLED', False)
+    api_key = getattr(settings, 'GEMINI_API_KEY', '').strip()
+
+    if not gemini_habilitado or not api_key:
+        cita = _cita_respaldo()
+        cache.set(clave_cache, cita, 86400)  # 24 horas
+        return cita
+
+    # ── 3. Llamar a la API de Gemini para generar la cita ────────────────────
+    try:
+        model = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+        timeout = min(getattr(settings, 'GEMINI_TIMEOUT', 60), 15)
+
+        prompt = (
+            "Genera una cita breve e inspiradora sobre el nihilismo optimista. "
+            "La cita debe: estar en español, tener entre 1 y 3 oraciones cortas, "
+            "ser reflexiva y motivadora, transmitir que la falta de significado "
+            "inherente en el universo es una libertad para crear el propio significado. "
+            "Responde ÚNICAMENTE con el texto de la cita. "
+            "Sin comillas, sin guiones, sin 'Aquí tienes:', sin ningún prefacio."
+        )
+
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.9,
+                "maxOutputTokens": 150,
+                "thinkingConfig": {"thinkingBudget": 0},
+            },
+        }).encode("utf-8")
+
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models"
+            f"/{model}:generateContent?key={api_key}"
+        )
+
+        req = urllib.request.Request(
+            url=url,
+            data=payload,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            method="POST",
+        )
+
+        ctx = ssl.create_default_context()
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        # Extraer texto: candidates[0].content.parts[0].text
+        cita = (
+            data.get("candidates", [{}])[0]
+            .get("content", {})
+            .get("parts", [{}])[0]
+            .get("text", "")
+            .strip()
+        )
+
+        if not cita:
+            raise ValueError("Gemini devolvió una respuesta vacía.")
+
+        # Éxito → cachear por 24 horas
+        cache.set(clave_cache, cita, 86400)
+        return cita
+
+    except Exception:
+        # Cualquier fallo (red, quota, timeout) → usar respaldo
+        # Se cachea 1 hora para que el siguiente visitante reintente con Gemini
+        cita = _cita_respaldo()
+        cache.set(clave_cache, cita, 3600)
+        return cita
+
 
 # ===== DASHBOARD PRINCIPAL UNIFICADO =====
 @login_required
@@ -213,6 +341,10 @@ def dashboard_principal(request):
     else:
         tasa_exito = 100
     
+    # ========== CITA DIARIA DE NIHILISMO OPTIMISTA ==========
+    # Genera o recupera del caché la cita del día (ver función arriba)
+    cita_diaria = obtener_cita_nihilismo_diaria()
+
     context = {
         # Inventario
         'total_productos': total_productos,
@@ -246,6 +378,9 @@ def dashboard_principal(request):
         'tasa_exito': tasa_exito,
         'movimientos_recientes': movimientos_recientes,
         'scorecard_disponible': SCORECARD_AVAILABLE,
+
+        # Cita diaria de nihilismo optimista (generada por IA con Ollama)
+        'cita_diaria': cita_diaria,
     }
     
     return render(request, 'dashboard_principal.html', context)
