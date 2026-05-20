@@ -81,6 +81,21 @@ if not DEBUG:
     # Nota: NO activamos SECURE_SSL_REDIRECT porque Cloudflare maneja la redirección
     # El tráfico entre Cloudflare y Nginx es HTTP, pero el usuario siempre ve HTTPS
     # SECURE_SSL_REDIRECT = False  # Cloudflare ya redirige HTTP → HTTPS
+
+    # ── Proxy SSL: Decirle a Django que confíe en el header X-Forwarded-Proto ──
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # El tráfico llega así: Usuario → HTTPS → Cloudflare → HTTPS → Nginx → HTTP interno → Django
+    # Django solo "ve" la conexión HTTP interna de Nginx y cree que todo es HTTP.
+    # Nginx ya envía el header "X-Forwarded-Proto: https" (configurado en nginx.conf).
+    # Con esta línea, Django lee ese header y sabe que la petición original fue HTTPS.
+    # Sin esto: request.is_secure() = False, URLs generadas con http://, CSRF inconsistente.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Nginx también envía el header "Host" original del cliente.
+    # Con USE_X_FORWARDED_HOST=True, Django lo usa para construir URLs absolutas correctas
+    # (ej. https://mexico.sigmasystem.work/... en lugar de http://localhost/...).
+    USE_X_FORWARDED_HOST = True
     
     # ── NUEVO (Multi-País): Aislamiento de cookies por subdominio ──
     # EXPLICACIÓN PARA PRINCIPIANTES:
