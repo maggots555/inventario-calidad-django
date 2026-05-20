@@ -161,8 +161,10 @@ window.addEventListener('mouseout', () => {
 init();
 animate();
 
-// Toggle Password (mantenido)
+// Toggle Password y protección contra doble envío del formulario
 document.addEventListener('DOMContentLoaded', () => {
+
+    // ── Toggle contraseña (ver/ocultar) ──
     const toggleBtn = document.querySelector('.password-toggle-btn');
     const passwordInput = document.querySelector('input[name="password"]') as HTMLInputElement;
 
@@ -176,6 +178,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon.classList.toggle('bi-eye-fill');
                 icon.classList.toggle('bi-eye-slash-fill');
             }
+        });
+    }
+
+    // ── Protección contra doble clic en el botón de login ──
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Cuando el usuario hace clic dos veces rápido, Django procesa el primer envío,
+    // rota el token CSRF por seguridad y el segundo clic llega con el token viejo → error.
+    // Solución: deshabilitar el botón en cuanto se hace el primer clic y mostrar un spinner,
+    // así el segundo clic no tiene efecto. Si algo falla (ej. error de red), re-habilitamos
+    // el botón después de 10 segundos para que el usuario pueda intentarlo de nuevo.
+    const loginForm = document.querySelector<HTMLFormElement>('form[action]');
+    const submitBtn = document.querySelector<HTMLButtonElement>('.btn-login-3d');
+
+    if (loginForm && submitBtn) {
+        loginForm.addEventListener('submit', () => {
+            // 1. Deshabilitar el botón inmediatamente para bloquear dobles clics
+            submitBtn.disabled = true;
+            submitBtn.classList.add('btn-login-3d--loading');
+
+            // 2. Reemplazar el texto con un spinner visual
+            submitBtn.innerHTML = '<span class="btn-login-spinner"></span>Iniciando sesión...';
+
+            // 3. Failsafe: si después de 10 segundos la página no navegó
+            //    (ej. error de red), re-habilitar para que el usuario pueda reintentar.
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('btn-login-3d--loading');
+                submitBtn.innerHTML = 'Iniciar Sesión';
+            }, 10000);
         });
     }
 });

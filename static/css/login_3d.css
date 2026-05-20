@@ -212,6 +212,33 @@ body.login-3d-page {
     }
 }
 
+/* Botón — Estado de carga (después de hacer clic en "Iniciar Sesión") */
+.btn-login-3d:disabled,
+.btn-login-3d--loading {
+    opacity: 0.75;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+    background: linear-gradient(135deg, #4a7a9b, #3a6a8a);
+}
+
+/* Spinner animado dentro del botón */
+.btn-login-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spinner-rotate 0.7s linear infinite;
+    vertical-align: -3px;
+    margin-right: 8px;
+}
+
+@keyframes spinner-rotate {
+    to { transform: rotate(360deg); }
+}
+
 /* Alertas */
 .alert-3d {
     background: rgba(239, 68, 68, 0.2);
