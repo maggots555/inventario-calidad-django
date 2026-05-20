@@ -1,0 +1,202 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <!-- Gradiente azul — laptop/marco -->
+    <linearGradient id="st_blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+    <!-- Gradiente ámbar — engrane -->
+    <linearGradient id="st_amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <!-- Gradiente verde — línea de escaneo -->
+    <linearGradient id="st_green" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#34D399" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="#34D399" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#34D399" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Gradiente coral — destornillador -->
+    <linearGradient id="st_coral" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#EF4444"/>
+    </linearGradient>
+    <!-- Glow azul para el halo -->
+    <filter id="st_glow_blue" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#3B82F6" flood-opacity="0.35"/>
+    </filter>
+    <!-- Glow ámbar para el engrane -->
+    <filter id="st_glow_amber" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#F59E0B" flood-opacity="0.6"/>
+    </filter>
+    <!-- Clip pantalla -->
+    <clipPath id="st_screen_clip">
+      <rect x="28" y="22" width="64" height="42" rx="2"/>
+    </clipPath>
+  </defs>
+
+  <style>
+    .st-gear {
+      transform-origin: 60px 43px;
+      animation: st-spin 7s linear infinite;
+    }
+    .st-center-dot {
+      transform-origin: 60px 43px;
+      animation: st-pulse-dot 2s ease-in-out infinite;
+    }
+    .st-scan {
+      animation: st-sweep 2.8s ease-in-out infinite;
+    }
+    .st-trace-cyan {
+      stroke-dasharray: 5 4;
+      animation: st-flow 1.4s linear infinite;
+    }
+    .st-trace-cyan-r {
+      stroke-dasharray: 5 4;
+      animation: st-flow 1.4s linear infinite;
+      animation-delay: -0.7s;
+    }
+    .st-driver {
+      transform-origin: 96px 82px;
+      animation: st-swing 3s ease-in-out infinite;
+    }
+    .st-ring-glow {
+      animation: st-ring-pulse 3s ease-in-out infinite;
+    }
+    .st-node {
+      animation: st-node-blink 2s ease-in-out infinite;
+    }
+    .st-node-delay {
+      animation: st-node-blink 2s ease-in-out infinite;
+      animation-delay: -1s;
+    }
+
+    @keyframes st-spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes st-pulse-dot {
+      0%, 100% { opacity: 1;   r: 3.5px; }
+      50%       { opacity: 0.4; r: 5.5px; }
+    }
+    @keyframes st-sweep {
+      0%   { transform: translateY(0px);   opacity: 0; }
+      8%   { opacity: 1; }
+      92%  { opacity: 0.9; }
+      100% { transform: translateY(36px);  opacity: 0; }
+    }
+    @keyframes st-flow {
+      to { stroke-dashoffset: -18; }
+    }
+    @keyframes st-swing {
+      0%, 100% { transform: rotate(-8deg); }
+      50%       { transform: rotate(8deg); }
+    }
+    @keyframes st-ring-pulse {
+      0%, 100% { opacity: 0.08; r: 54px; }
+      50%       { opacity: 0.18; r: 56px; }
+    }
+    @keyframes st-node-blink {
+      0%, 100% { opacity: 0.5; }
+      50%       { opacity: 1; }
+    }
+  </style>
+
+  <!-- Halo de fondo azul -->
+  <circle class="st-ring-glow" cx="60" cy="60" r="54"
+          fill="#3B82F6" opacity="0.08" filter="url(#st_glow_blue)"/>
+
+  <!-- ====================================================== -->
+  <!-- BASE DEL LAPTOP                                        -->
+  <!-- ====================================================== -->
+  <!-- Cuerpo del teclado -->
+  <rect x="14" y="70" width="92" height="16" rx="5"
+        fill="url(#st_blue)" opacity="0.70"/>
+  <!-- Labio inferior -->
+  <rect x="18" y="83" width="84" height="4" rx="2"
+        fill="#1D4ED8" opacity="0.45"/>
+  <!-- Trackpad -->
+  <rect x="43" y="72" width="34" height="10" rx="2.5"
+        fill="#BFDBFE" opacity="0.20"/>
+  <!-- Bisagra -->
+  <rect x="22" y="68" width="76" height="3.5" rx="1.5"
+        fill="#93C5FD" opacity="0.55"/>
+
+  <!-- ====================================================== -->
+  <!-- MARCO DE LA PANTALLA                                   -->
+  <!-- ====================================================== -->
+  <rect x="22" y="17" width="76" height="53" rx="6"
+        fill="#1E3A5F" opacity="0.85"
+        stroke="url(#st_blue)" stroke-width="2.5"/>
+  <!-- Pantalla interior — fondo oscuro -->
+  <rect x="28" y="22" width="64" height="42" rx="2.5"
+        fill="#0F172A" opacity="0.95"/>
+  <!-- Cámara -->
+  <circle cx="60" cy="19.5" r="2" fill="#60A5FA" opacity="0.70"/>
+
+  <!-- ====================================================== -->
+  <!-- TRAZAS DE CIRCUITO — color cyan                       -->
+  <!-- ====================================================== -->
+  <g clip-path="url(#st_screen_clip)">
+    <path class="st-trace-cyan"
+          d="M30 31 L42 31 L42 37 L52 37"
+          stroke="#22D3EE" stroke-width="1.5" opacity="0.80"/>
+    <path class="st-trace-cyan-r"
+          d="M90 31 L78 31 L78 37 L68 37"
+          stroke="#22D3EE" stroke-width="1.5" opacity="0.80"/>
+    <path class="st-trace-cyan"
+          d="M30 55 L42 55 L42 50 L52 50"
+          stroke="#A78BFA" stroke-width="1.5" opacity="0.65"/>
+    <path class="st-trace-cyan-r"
+          d="M90 55 L78 55 L78 50 L68 50"
+          stroke="#A78BFA" stroke-width="1.5" opacity="0.65"/>
+
+    <!-- Nodos con parpadeo -->
+    <circle class="st-node"       cx="42" cy="37" r="2.5" fill="#22D3EE"/>
+    <circle class="st-node-delay" cx="78" cy="37" r="2.5" fill="#22D3EE"/>
+    <circle class="st-node"       cx="42" cy="50" r="2.5" fill="#A78BFA"/>
+    <circle class="st-node-delay" cx="78" cy="50" r="2.5" fill="#A78BFA"/>
+
+    <!-- Línea de escaneo verde -->
+    <rect class="st-scan" x="28" y="22" width="64" height="9"
+          fill="url(#st_green)"/>
+  </g>
+
+  <!-- ====================================================== -->
+  <!-- ENGRANE ámbar — gira en el centro de la pantalla      -->
+  <!-- ====================================================== -->
+  <g class="st-gear" filter="url(#st_glow_amber)">
+    <rect x="57.5" y="28" width="5" height="7" rx="1.5" fill="url(#st_amber)"/>
+    <rect x="57.5" y="28" width="5" height="7" rx="1.5" fill="url(#st_amber)" transform="rotate(45  60 43)"/>
+    <rect x="57.5" y="28" width="5" height="7" rx="1.5" fill="url(#st_amber)" transform="rotate(90  60 43)"/>
+    <rect x="57.5" y="28" width="5" height="7" rx="1.5" fill="url(#st_amber)" transform="rotate(135 60 43)"/>
+    <rect x="57.5" y="28" width="5" height="7" rx="1.5" fill="url(#st_amber)" transform="rotate(180 60 43)"/>
+    <rect x="57.5" y="28" width="5" height="7" rx="1.5" fill="url(#st_amber)" transform="rotate(225 60 43)"/>
+    <rect x="57.5" y="28" width="5" height="7" rx="1.5" fill="url(#st_amber)" transform="rotate(270 60 43)"/>
+    <rect x="57.5" y="28" width="5" height="7" rx="1.5" fill="url(#st_amber)" transform="rotate(315 60 43)"/>
+    <!-- Aro del engrane -->
+    <circle cx="60" cy="43" r="10" fill="none" stroke="url(#st_amber)" stroke-width="2.5" opacity="0.70"/>
+    <!-- Agujero interior oscuro -->
+    <circle cx="60" cy="43" r="4.5" fill="#0F172A"/>
+  </g>
+  <!-- Punto central blanco pulsante -->
+  <circle class="st-center-dot" cx="60" cy="43" r="3.5" fill="#FFFFFF"/>
+
+  <!-- ====================================================== -->
+  <!-- DESTORNILLADOR coral/rojo — esquina inf-derecha        -->
+  <!-- ====================================================== -->
+  <g class="st-driver">
+    <!-- Mango -->
+    <rect x="88" y="72" width="10" height="16" rx="4"
+          fill="url(#st_coral)" opacity="0.90"
+          transform="rotate(-40 93 80)"/>
+    <!-- Vástago -->
+    <rect x="91" y="70" width="3.5" height="22" rx="1.5"
+          fill="#FCA5A5" opacity="0.75"
+          transform="rotate(-40 93 80)"/>
+    <!-- Punta -->
+    <rect x="91.5" y="88" width="3" height="5" rx="0.5"
+          fill="#FECACA" opacity="0.95"
+          transform="rotate(-40 93 80)"/>
+  </g>
+
+</svg>

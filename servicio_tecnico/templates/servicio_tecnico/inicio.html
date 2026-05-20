@@ -5,41 +5,24 @@
 {% block title %}Servicio Técnico - {{ block.super }}{% endblock %}
 
 {% block extra_css %}
-<!-- Font Awesome 6 - Iconos profesionales -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-<!-- CSS personalizado para Servicio Técnico - Diseño moderno y minimalista -->
 <link rel="stylesheet" href="{% static 'css/servicio_tecnico_inicio.css' %}">
 {% endblock %}
 
 {% block content %}
-<!--
-================================================================================
-SERVICIO TÉCNICO - DASHBOARD PRINCIPAL
-================================================================================
-
-EXPLICACIÓN PARA PRINCIPIANTES:
-Este es el dashboard principal del módulo de Servicio Técnico.
-Muestra información clave sobre las órdenes de servicio:
-- Distribución por estado
-- Equipos por gama
-- Carga de trabajo por técnico
-- Órdenes sin actualización reciente
-
-El diseño es moderno, minimalista y fácil de navegar.
-================================================================================
--->
-
 
 <div class="st-dashboard-wrapper">
     <div class="container">
-        
+
         <!-- ================================================================ -->
         <!-- SECCIÓN HERO: Encabezado principal con ícono animado             -->
         <!-- ================================================================ -->
         <div class="st-hero-section">
             <div class="st-hero-icon">
-                <i class="fas fa-screwdriver-wrench"></i>
+                <img src="{% static 'images/servicio_tecnico_icon.svg' %}"
+                     alt="Servicio Técnico"
+                     width="60" height="60"
+                     aria-hidden="true">
             </div>
             <h1 class="st-hero-title">Dashboard de Servicio Técnico</h1>
             <p class="st-hero-subtitle">
@@ -48,10 +31,54 @@ El diseño es moderno, minimalista y fácil de navegar.
         </div>
 
         <!-- ================================================================ -->
-        <!-- BOTÓN DE ACCIÓN: Ver Órdenes Activas                             -->
+        <!-- KPI CARDS — 4 métricas clave visibles de inmediato               -->
         <!-- ================================================================ -->
-        <div class="st-action-section">
-            <a href="{% url 'servicio_tecnico:lista_activas' %}" class="st-btn-main">
+        <div class="st-kpi-row">
+
+            <!-- Órdenes Activas -->
+            <div class="st-kpi-card st-kpi-card--activas">
+                <div class="st-kpi-icon"><i class="fas fa-clipboard-list"></i></div>
+                <div class="st-kpi-number" data-count="{{ ordenes_activas }}">{{ ordenes_activas }}</div>
+                <div class="st-kpi-label">Órdenes Activas</div>
+                <div class="st-kpi-sub">{{ total_ordenes }} en total histórico</div>
+            </div>
+
+            <!-- Órdenes Retrasadas -->
+            <div class="st-kpi-card st-kpi-card--retrasadas">
+                <div class="st-kpi-icon"><i class="fas fa-triangle-exclamation"></i></div>
+                <div class="st-kpi-number" data-count="{{ ordenes_retrasadas }}">{{ ordenes_retrasadas }}</div>
+                <div class="st-kpi-label">Retrasadas</div>
+                <div class="st-kpi-sub">Más de 15 días sin entregar</div>
+            </div>
+
+            <!-- Técnicos en taller -->
+            <div class="st-kpi-card st-kpi-card--tecnicos">
+                <div class="st-kpi-icon"><i class="fas fa-users-gear"></i></div>
+                <div class="st-kpi-number" data-count="{{ ordenes_por_tecnico|length }}">{{ ordenes_por_tecnico|length }}</div>
+                <div class="st-kpi-label">Técnicos Activos</div>
+                <div class="st-kpi-sub">Con órdenes asignadas</div>
+            </div>
+
+            <!-- Días promedio de servicio -->
+            <div class="st-kpi-card st-kpi-card--tiempo">
+                <div class="st-kpi-icon"><i class="fas fa-gauge-high"></i></div>
+                <div class="st-kpi-number" data-count="{{ tiempo_promedio_servicio }}">{{ tiempo_promedio_servicio }}</div>
+                <div class="st-kpi-label">Días Promedio</div>
+                <div class="st-kpi-sub">Tiempo de resolución</div>
+            </div>
+
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- QUICK ACTIONS — Acciones frecuentes al alcance                   -->
+        <!-- ================================================================ -->
+        <div class="st-quick-actions">
+            <a href="{% url 'servicio_tecnico:seleccionar_tipo_orden' %}" class="st-action-btn st-action-btn--primary">
+                <i class="fas fa-plus"></i>
+                <span>Nueva Orden</span>
+                <i class="fas fa-arrow-right"></i>
+            </a>
+            <a href="{% url 'servicio_tecnico:lista_activas' %}" class="st-action-btn st-action-btn--secondary">
                 <i class="fas fa-eye"></i>
                 <span>Ver Órdenes Activas</span>
                 <i class="fas fa-arrow-right"></i>
@@ -59,50 +86,12 @@ El diseño es moderno, minimalista y fácil de navegar.
         </div>
 
         <!-- ================================================================ -->
-        <!-- ROW 1: Distribución por Estado y Equipos por Gama                -->
+        <!-- ROW 1: Equipos por Gama y Distribución por Sucursal              -->
         <!-- ================================================================ -->
         <div class="row g-4 mb-4">
-            
-            <!-- DISTRIBUCIÓN POR ESTADO -->
-            <div class="col-lg-6">
-                <div class="st-content-section">
-                    <div class="st-section-header">
-                        <h2 class="st-section-title">
-                            <i class="fas fa-chart-bar"></i>
-                            Distribución por Estado
-                        </h2>
-                    </div>
-                    
-                    {% if ordenes_por_estado %}
-                    <div class="st-estado-list">
-                        {% for item in ordenes_por_estado %}
-                        <div class="st-estado-item">
-                            <div class="st-estado-badge">
-                                <span class="badge bg-{{ item.estado|color_estado_orden }}">
-                                    {{ item.estado_display }}
-                                </span>
-                            </div>
-                            
-                            <div class="st-estado-progress">
-                                {% widthratio item.total total_ordenes 100 as porcentaje %}
-                                <div class="st-estado-progress-fill" style="width: {{ porcentaje }}%;"></div>
-                            </div>
-                            
-                            <div class="st-estado-count">{{ item.total }}</div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <div class="st-empty-state">
-                        <i class="fas fa-inbox"></i>
-                        <p>No hay órdenes registradas aún</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
 
             <!-- EQUIPOS POR GAMA -->
-            <div class="col-lg-6">
+            <div class="col-lg-8">
                 <div class="st-content-section">
                     <div class="st-section-header">
                         <h2 class="st-section-title">
@@ -110,37 +99,37 @@ El diseño es moderno, minimalista y fácil de navegar.
                             Equipos por Gama (Activos)
                         </h2>
                     </div>
-                    
+
                     <div class="st-gama-grid">
                         <div class="st-gama-item alta">
                             <i class="fas fa-star st-gama-icon"></i>
-                            <div class="st-gama-number">{{ ordenes_gama_alta }}</div>
+                            <div class="st-gama-number" data-count="{{ ordenes_gama_alta }}">{{ ordenes_gama_alta }}</div>
                             <div class="st-gama-label">Gama Alta</div>
                         </div>
-                        
                         <div class="st-gama-item media">
                             <i class="fas fa-star-half-stroke st-gama-icon"></i>
-                            <div class="st-gama-number">{{ ordenes_gama_media }}</div>
+                            <div class="st-gama-number" data-count="{{ ordenes_gama_media }}">{{ ordenes_gama_media }}</div>
                             <div class="st-gama-label">Gama Media</div>
                         </div>
-                        
                         <div class="st-gama-item baja">
                             <i class="far fa-star st-gama-icon"></i>
-                            <div class="st-gama-number">{{ ordenes_gama_baja }}</div>
+                            <div class="st-gama-number" data-count="{{ ordenes_gama_baja }}">{{ ordenes_gama_baja }}</div>
                             <div class="st-gama-label">Gama Baja</div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- DISTRIBUCIÓN POR SUCURSAL -->
-                <div class="st-content-section mt-4">
+            </div>
+
+            <!-- DISTRIBUCIÓN POR SUCURSAL -->
+            <div class="col-lg-4">
+                <div class="st-content-section h-100">
                     <div class="st-section-header">
                         <h2 class="st-section-title">
                             <i class="fas fa-building"></i>
-                            Distribución por Sucursal
+                            Por Sucursal
                         </h2>
                     </div>
-                    
+
                     {% if ordenes_por_sucursal %}
                     <div class="st-sucursal-list">
                         {% for item in ordenes_por_sucursal %}
@@ -173,10 +162,10 @@ El diseño es moderno, minimalista y fácil de navegar.
                     {{ ordenes_por_tecnico|length }} técnico{{ ordenes_por_tecnico|length|pluralize }}
                 </span>
             </div>
-            
+
             <div class="st-tecnicos-grid">
                 {% for tecnico in ordenes_por_tecnico %}
-                <div class="st-tecnico-card">
+                <div class="st-tecnico-card" data-ordenes="{{ tecnico.total_ordenes }}">
                     <div class="st-tecnico-avatar">
                         {% if tecnico.foto_url %}
                             <img src="{{ tecnico.foto_url }}" alt="{{ tecnico.tecnico_nombre }}">
@@ -187,8 +176,12 @@ El diseño es moderno, minimalista y fácil de navegar.
                         {% endif %}
                     </div>
                     <div class="st-tecnico-name">{{ tecnico.tecnico_nombre }}</div>
-                    <div class="st-tecnico-orders">{{ tecnico.total_ordenes }}</div>
+                    <div class="st-tecnico-orders" data-count="{{ tecnico.total_ordenes }}">{{ tecnico.total_ordenes }}</div>
                     <div class="st-tecnico-label">Órdenes Activas</div>
+                    <!-- Barra de carga relativa — llenada por JS según el máximo del grupo -->
+                    <div class="st-tecnico-workload-track">
+                        <div class="st-tecnico-workload-bar"></div>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -196,7 +189,7 @@ El diseño es moderno, minimalista y fácil de navegar.
         {% endif %}
 
         <!-- ================================================================ -->
-        <!-- ÓRDENES SIN ACTUALIZACIÓN (Top 10)                               -->
+        <!-- ÓRDENES SIN ACTUALIZACIÓN (Top 10) — urgencia dinámica          -->
         <!-- ================================================================ -->
         <div class="st-content-section">
             <div class="st-section-header">
@@ -208,13 +201,13 @@ El diseño es moderno, minimalista y fácil de navegar.
                     Ver Todas <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
-            
+
             {% if ordenes_sin_actualizacion %}
             <div class="st-ordenes-list">
                 {% for orden in ordenes_sin_actualizacion %}
-                <div class="st-orden-card">
+                <div class="st-orden-card {% if orden.dias_sin_actualizacion >= 7 %}st-orden-card--critical{% elif orden.dias_sin_actualizacion >= 3 %}st-orden-card--warning{% endif %}">
                     <div class="st-orden-header">
-                        <a href="{% url 'servicio_tecnico:detalle_orden' orden.pk %}" 
+                        <a href="{% url 'servicio_tecnico:detalle_orden' orden.pk %}"
                            class="st-orden-numero">
                             {% if orden.orden_cliente %}
                                 {{ orden.orden_cliente }}
@@ -224,7 +217,7 @@ El diseño es moderno, minimalista y fácil de navegar.
                         </a>
                         <span class="st-orden-fecha">
                             <i class="far fa-calendar"></i>
-                            Última actualización: {{ orden.fecha_ultimo_estado|date:"d/m/Y H:i" }}
+                            {{ orden.fecha_ultimo_estado|date:"d/m/Y H:i" }}
                         </span>
                     </div>
 
@@ -241,12 +234,12 @@ El diseño es moderno, minimalista y fácil de navegar.
                             <i class="fas fa-user-gear"></i>
                             {{ orden.tecnico_nombre }}
                         </div>
-                        <div>
-                            <span class="badge bg-secondary">{{ orden.estado_display }}</span>
-                        </div>
-                        <div class="st-orden-dias">
+                        <span class="badge bg-secondary">{{ orden.estado_display }}</span>
+                        <!-- Badge de días con color de urgencia -->
+                        <span class="st-orden-dias-badge {% if orden.dias_sin_actualizacion >= 7 %}st-orden-dias-badge--critical{% elif orden.dias_sin_actualizacion >= 3 %}st-orden-dias-badge--warning{% else %}st-orden-dias-badge--normal{% endif %}">
+                            <i class="{% if orden.dias_sin_actualizacion >= 7 %}fas fa-fire{% elif orden.dias_sin_actualizacion >= 3 %}fas fa-exclamation-circle{% else %}fas fa-clock{% endif %}"></i>
                             {{ orden.dias_sin_actualizacion }} día{{ orden.dias_sin_actualizacion|pluralize }} sin cambios
-                        </div>
+                        </span>
                     </div>
                 </div>
                 {% endfor %}
@@ -264,42 +257,97 @@ El diseño es moderno, minimalista y fácil de navegar.
 {% endblock %}
 
 {% block extra_js %}
-<!--
-================================================================================
-JAVASCRIPT PARA INTERACTIVIDAD MEJORADA
-================================================================================
-
-EXPLICACIÓN PARA PRINCIPIANTES:
-Este script agrega funcionalidades adicionales:
-- Atajos de teclado para navegación rápida
-- Efectos de hover mejorados
-- Mensajes de consola para desarrolladores
-================================================================================
--->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    
+document.addEventListener('DOMContentLoaded', function () {
+
     // ========================================================================
-    // ATAJO DE TECLADO - Tecla "A" para Ver Órdenes Activas
+    // COUNT-UP ANIMATION — números que cuentan al cargar la página
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Toma todos los elementos con data-count="N", y los hace contar desde
+    // 0 hasta N en ~800ms usando requestAnimationFrame (animación fluida).
+    // Funciona también con decimales (ej: 4.5 días promedio).
     // ========================================================================
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'a' || e.key === 'A') {
-            if (!e.ctrlKey && !e.altKey && !e.metaKey) {
-                const activeElement = document.activeElement;
-                if (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA') {
-                    e.preventDefault();
-                    window.location.href = "{% url 'servicio_tecnico:lista_activas' %}";
-                }
+    function animateCount(el) {
+        const raw    = parseFloat(el.dataset.count) || 0;
+        const isFloat= raw % 1 !== 0;
+        const duration = 800; // ms
+        const start    = performance.now();
+
+        function step(now) {
+            const elapsed  = Math.min(now - start, duration);
+            const progress = elapsed / duration;
+            // Ease-out: desacelera al final para un efecto más natural
+            const eased    = 1 - Math.pow(1 - progress, 3);
+            const current  = raw * eased;
+            el.textContent = isFloat ? current.toFixed(1) : Math.round(current);
+            if (elapsed < duration) requestAnimationFrame(step);
+            else el.textContent = isFloat ? raw.toFixed(1) : raw;
+        }
+
+        requestAnimationFrame(step);
+    }
+
+    // Disparar count-up cuando el elemento entra al viewport (Intersection Observer)
+    const countEls = document.querySelectorAll('[data-count]');
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                animateCount(entry.target);
+                observer.unobserve(entry.target); // Solo una vez
             }
+        });
+    }, { threshold: 0.3 });
+
+    countEls.forEach(el => observer.observe(el));
+
+    // ========================================================================
+    // WORKLOAD BARS — barras de carga relativa en tarjetas de técnico
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Busca todas las tarjetas de técnico, obtiene el máximo de órdenes
+    // del grupo, y asigna a cada barra un % proporcional a ese máximo.
+    // El técnico con más carga recibe la clase --max-carga (barra roja).
+    // ========================================================================
+    const tecnicoCards = document.querySelectorAll('.st-tecnico-card[data-ordenes]');
+    if (tecnicoCards.length > 0) {
+        const counts = Array.from(tecnicoCards).map(c => parseInt(c.dataset.ordenes) || 0);
+        const maxCount = Math.max(...counts);
+
+        tecnicoCards.forEach(card => {
+            const ordenes = parseInt(card.dataset.ordenes) || 0;
+            const bar     = card.querySelector('.st-tecnico-workload-bar');
+            if (!bar) return;
+
+            const pct = maxCount > 0 ? (ordenes / maxCount) * 100 : 0;
+            // Delay para que la animación CSS de la barra se dispare después del render
+            setTimeout(() => { bar.style.width = pct + '%'; }, 100);
+
+            // Marcar al técnico con más carga
+            if (ordenes === maxCount && maxCount > 0) {
+                card.classList.add('st-tecnico-card--max-carga');
+            }
+        });
+    }
+
+    // ========================================================================
+    // ATAJO DE TECLADO — "A" para Ver Órdenes Activas, "N" para Nueva Orden
+    // ========================================================================
+    document.addEventListener('keydown', function (e) {
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
+        const tag = document.activeElement.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+        if (e.key === 'a' || e.key === 'A') {
+            e.preventDefault();
+            window.location.href = "{% url 'servicio_tecnico:lista_activas' %}";
+        }
+        if (e.key === 'n' || e.key === 'N') {
+            e.preventDefault();
+            window.location.href = "{% url 'servicio_tecnico:seleccionar_tipo_orden' %}";
         }
     });
-    
-    // ========================================================================
-    // MENSAJE DE CONSOLA PARA DESARROLLADORES
-    // ========================================================================
-    console.log('%c🔧 Dashboard de Servicio Técnico Cargado', 'color: #F59E0B; font-size: 16px; font-weight: bold;');
-    console.log('%cAtajo de teclado disponible:', 'color: #6B7280; font-size: 12px;');
-    console.log('%c  • Presiona "A" para Ver Órdenes Activas', 'color: #F59E0B; font-size: 12px;');
+
+    console.log('%c🔧 Dashboard de Servicio Técnico', 'color: #F59E0B; font-size: 14px; font-weight: bold;');
+    console.log('%cAtajos: A → Ver Activas  |  N → Nueva Orden', 'color: #6B7280; font-size: 11px;');
 });
 </script>
 {% endblock %}
