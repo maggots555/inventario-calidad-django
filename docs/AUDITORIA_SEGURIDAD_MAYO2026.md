@@ -57,6 +57,25 @@
 | 10 | Procesamiento de video (FFmpeg) | Restricción de protocolos habilitados en todos los puntos de invocación | ✅ |
 | 11 | Subida de archivos | Validación de extensión y tamaño máximo implementada en todos los campos de imagen sin restricciones previas; migraciones aplicadas | ✅ |
 
+### Base de datos
+
+| # | Área | Acción | Estado |
+|---|---|---|---|
+| 12 | Rol PostgreSQL `sic_system` | Rol con login activo y contraseña configurada, sin uso por la aplicación y sin grants sobre objetos. Eliminado para reducir superficie de ataque | ✅ |
+
+### Protección de dependencias
+
+| # | Área | Acción | Estado |
+|---|---|---|---|
+| 13 | Paquetes Python | Actualización de dependencias con vulnerabilidades conocidas: Django 5.2.14, Pillow 12.2.0, sqlparse 0.5.4, fonttools, pip | ✅ |
+| 14 | fail2ban | Instalación y configuración de jail SSH: bloqueo tras 5 intentos fallidos en 10 minutos, ban de 1 hora | ✅ |
+
+### Mantenimiento operativo
+
+| # | Área | Acción | Estado |
+|---|---|---|---|
+| 15 | Rotación de logs | Configuración de logrotate para todos los archivos de log de la aplicación (Celery Worker, Celery Beat, Django, backups): rotación diaria, retención 14 días, compresión gzip | ✅ |
+
 ---
 
 ## Archivos modificados
@@ -68,9 +87,12 @@
 /etc/systemd/system/gunicorn.service
 /etc/systemd/system/celery-worker.service
 /etc/systemd/system/celery-beat.service
+/etc/fail2ban/jail.local                             (nuevo)
+/etc/logrotate.d/django-app                          (nuevo)
 
 /var/www/inventario-django/inventario-calidad-django/
   .env
+  requirements.txt
   config/validators.py                               (nuevo)
   servicio_tecnico/views.py
   servicio_tecnico/tasks.py
