@@ -5141,3 +5141,30 @@ thead.sticky-top {
 }
 
 /* ===== FIN GALERÍA DE VIDEOS ===== */
+
+/* ============================================================
+   DOT GRID — Fondo de cuadrícula de puntos en detalle_orden
+   ============================================================ */
+
+/* Modo claro: puntos sutiles sobre fondo gris claro */
+.detalle-orden-page {
+    min-height: 100vh;
+    background-color: #F8FAFC;
+    background-image: radial-gradient(
+        circle,
+        rgba(148, 163, 184, 0.18) 1.5px,
+        transparent 1.5px
+    );
+    background-size: 28px 28px;
+}
+
+/* Modo oscuro: puntos navy sutiles */
+[data-bs-theme="dark"] .detalle-orden-page {
+    background-color: #0f172a;
+    background-image: radial-gradient(
+        circle,
+        rgba(71, 85, 105, 0.18) 1.5px,
+        transparent 1.5px
+    );
+    background-size: 28px 28px;
+}
