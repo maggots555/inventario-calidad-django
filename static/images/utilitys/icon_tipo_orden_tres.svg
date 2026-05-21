@@ -1,35 +1,277 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<svg height="800px" width="800px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
-	 viewBox="0 0 392.533 392.533" xml:space="preserve">
-<path style="fill:#FFFFFF;" d="M196.267,21.786c-96.194,0-174.481,78.287-174.481,174.481c0,15.321,2.004,30.19,5.689,44.347h114.23
-	c5.107-25.406,27.604-44.671,54.497-44.671c7.046,0,13.77,1.293,19.911,3.685l51.459-82.23c3.168-5.107,9.891-6.659,14.998-3.491
-	s6.659,9.891,3.491,14.998l-51.459,82.36c8.145,7.758,13.834,17.842,16.162,29.22h114.23c3.685-14.222,5.689-29.026,5.689-44.347
-	C370.747,100.073,292.461,21.786,196.267,21.786z"/>
-<path style="fill:#FFC10D;" d="M345.406,200.339c0,13.77-2.004,27.087-5.495,39.758h-89.277
-	c-2.327-11.184-8.081-21.139-16.032-28.768l51.523-82.295c0.323-0.453,0.517-1.034,0.776-1.552
-	c13.511,17.648,21.657,39.24,21.657,62.642c0,6.012,4.848,10.861,10.925,10.861c6.012,0,10.925-4.848,10.925-10.861
-	c0-70.788-60.121-128.453-134.077-128.453S62.19,119.337,62.19,190.19c0,6.012,4.848,10.861,10.925,10.861
-	c6.012,0,10.925-4.848,10.925-10.861c0-58.828,50.36-106.537,112.291-106.537c29.931,0,57.018,11.184,77.188,29.35
-	c-2.327,0.776-4.396,2.327-5.818,4.525l-51.394,82.23c-6.206-2.392-12.929-3.685-19.911-3.685
-	c-26.699,0-49.131,18.941-54.368,44.154H52.622c-3.491-12.671-5.495-25.988-5.495-39.758c0-82.36,66.78-149.139,149.139-149.139
-	S345.406,117.98,345.406,200.339z"/>
-<path style="fill:#FFFFFF;" d="M196.267,217.729c-14.804,0-27.41,9.568-32,22.885h63.935
-	C223.677,227.426,211.135,217.729,196.267,217.729z"/>
-<path style="fill:#56ACE0;" d="M34.909,262.465c26.117,63.418,88.566,108.283,161.358,108.283s135.24-44.8,161.358-108.283
-	L34.909,262.465L34.909,262.465z"/>
-<g>
-	<path style="fill:#194F82;" d="M196.267,0C87.984,0,0,87.984,0,196.267s87.984,196.267,196.267,196.267
-		s196.267-87.984,196.267-196.267S304.549,0,196.267,0z M196.267,370.747c-72.792,0-135.24-44.8-161.358-108.283h322.78
-		C331.507,325.947,269.059,370.747,196.267,370.747z M164.267,240.614c4.59-13.317,17.131-22.885,32-22.885
-		c14.869,0,27.41,9.568,31.935,22.885H164.267z M250.764,240.614c-2.263-11.378-8.016-21.463-16.162-29.22l51.523-82.36
-		c0.323-0.453,0.517-1.034,0.776-1.552c13.511,17.648,21.657,39.24,21.657,62.642c0,6.012,4.848,10.925,10.925,10.925
-		c6.077,0,10.925-4.848,10.925-10.925c0-70.788-60.121-128.453-134.077-128.453S62.19,119.273,62.19,190.19
-		c0,6.012,4.848,10.925,10.925,10.925s10.925-4.848,10.925-10.925c0-58.828,50.36-106.537,112.291-106.537
-		c29.931,0,57.018,11.184,77.188,29.35c-2.327,0.776-4.396,2.327-5.818,4.59l-51.394,82.166c-6.206-2.392-12.929-3.685-19.911-3.685
-		c-26.893,0-49.455,19.265-54.497,44.671H27.604c-3.685-14.222-5.689-29.026-5.689-44.347
-		C21.851,100.137,100.137,21.85,196.331,21.85s174.416,78.222,174.416,174.416c0,15.321-2.004,30.19-5.689,44.347H250.764z"/>
-	<path style="fill:#194F82;" d="M131.62,321.358h129.293c6.012,0,10.925-4.848,10.925-10.925c0-6.012-4.848-10.925-10.925-10.925
-		H131.62c-6.012,0-10.925,4.848-10.925,10.925S125.543,321.358,131.62,321.358z"/>
-</g>
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  icon_tipo_orden_tres.svg  —  Venta Mostrador (FL-)
+  Concept : Shopping bag tech con checkmark draw-in
+  Palette : #194F82 (navy) · #10B981 (verde) · #FFC10D (amber) · #56ACE0 (sky blue)
+  Anims   : 1) Anillos girando (opuestos)
+            2) Bag flotando
+            3) Checkmark draw-in
+            4) Cursor parpadeando
+            5) Nodos ámbar en cascada
+            6) Puntos de señal viajando (4 trazos)
+            7) Scan line barriendo el bag
+            8) Flare pulsando
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="800px" height="800px">
+
+  <!-- ═══════════════════════  DEFINICIONES  ═══════════════════════ -->
+  <defs>
+
+    <radialGradient id="bg3" cx="42%" cy="38%" r="65%">
+      <stop offset="0%"   stop-color="#1e5c99"/>
+      <stop offset="100%" stop-color="#0a2545"/>
+    </radialGradient>
+
+    <radialGradient id="bagGlow3" cx="38%" cy="32%" r="65%">
+      <stop offset="0%"   stop-color="#0d2b1f"/>
+      <stop offset="100%" stop-color="#060e1f"/>
+    </radialGradient>
+
+    <filter id="glow3" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <filter id="lensGlow3" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur stdDeviation="1.0" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Paths de señal para animateMotion (desde bordes del bag hacia afuera) -->
+    <path id="t3-top"    d="M50,25 L50,7"/>
+    <path id="t3-right"  d="M77,50 L93,50"/>
+    <path id="t3-bottom" d="M50,80 L50,93"/>
+    <path id="t3-left"   d="M23,50 L7,50"/>
+
+    <!-- Clip para contenido interior del bag -->
+    <clipPath id="c3-bag">
+      <rect x="24" y="26" width="52" height="53" rx="3"/>
+    </clipPath>
+
+  </defs>
+
+  <!-- ═══════════════════════  ANIMACIONES CSS  ════════════════════ -->
+  <style>
+    /* 1. ANILLOS: giran en sentidos opuestos */
+    #r3-outer {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: r3cw 14s linear infinite;
+    }
+    #r3-inner {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: r3ccw 22s linear infinite;
+    }
+    @keyframes r3cw  { to { transform: rotate(360deg);  } }
+    @keyframes r3ccw { to { transform: rotate(-360deg); } }
+
+    /* 2. BAG: flota suavemente */
+    #bag3 {
+      transform-box: fill-box;
+      transform-origin: center;
+      will-change: transform;
+      animation: bag3float 4.2s ease-in-out infinite;
+    }
+    @keyframes bag3float {
+      0%, 100% { transform: translate3d(0, 0, 0);      }
+      50%       { transform: translate3d(0, -2.5px, 0); }
+    }
+
+    /* 3. CHECKMARK glow: pulso de opacidad */
+    #check3-glow { will-change: opacity; animation: check3pulse 1.8s ease-in-out infinite; }
+    @keyframes check3pulse {
+      0%, 100% { opacity: 0.65; }
+      50%       { opacity: 0.20; }
+    }
+
+    /* 4. CURSOR parpadeando al final del checkmark */
+    #cur3 {
+      will-change: opacity;
+      animation: cur3blink 1.1s ease-in-out infinite;
+    }
+    @keyframes cur3blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+
+    /* 5. NODOS ámbar: parpadeo escalonado */
+    .n3 { will-change: opacity; animation: n3fade 2s ease-in-out infinite; }
+    #n3t { animation-delay: 0s;    }
+    #n3r { animation-delay: 0.5s;  }
+    #n3b { animation-delay: 1s;    }
+    #n3l { animation-delay: 1.5s;  }
+    @keyframes n3fade {
+      0%, 100% { opacity: 0.9;  }
+      50%       { opacity: 0.15; }
+    }
+
+    /* 8. FLARE del bag */
+    #flare3 {
+      will-change: opacity;
+      animation: flare3pulse 5s ease-in-out infinite;
+      animation-delay: -2s;
+    }
+    @keyframes flare3pulse {
+      0%, 60%, 100% { opacity: 0;    }
+      30%            { opacity: 0.50; }
+    }
+  </style>
+
+  <!-- ═══════════════════  FONDO CIRCULAR  ════════════════════════ -->
+  <circle cx="50" cy="50" r="50" fill="url(#bg3)"/>
+
+  <!-- ═══════════════════  ANILLOS (solo rotan)  ══════════════════ -->
+  <circle id="r3-outer" cx="50" cy="50" r="46.5" fill="none"
+          stroke="#56ACE0" stroke-width="0.5" stroke-dasharray="5 3.5" opacity="0.35"/>
+  <circle id="r3-inner" cx="50" cy="50" r="42" fill="none"
+          stroke="#56ACE0" stroke-width="0.3" opacity="0.15"/>
+
+  <!-- ═══════════  GRUPO PRINCIPAL — todo flota junto  ════════════ -->
+  <g id="bag3">
+
+    <!-- ── Trazos SUPERIORES (desde borde del bag y≈25, hacia arriba) ── -->
+    <line x1="38" y1="25" x2="38" y2="9"  stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <line x1="50" y1="25" x2="50" y2="7"  stroke="#FFC10D" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="62" y1="25" x2="62" y2="9"  stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="38" cy="9"  r="1.8" fill="#56ACE0" opacity="0.65"/>
+    <circle id="n3t" cx="50" cy="7"  r="2.2" fill="#FFC10D" class="n3"/>
+    <circle cx="62" cy="9"  r="1.8" fill="#56ACE0" opacity="0.65"/>
+
+    <!-- ── Trazos INFERIORES (desde y≈80 hacia abajo) ── -->
+    <line x1="38" y1="80" x2="38" y2="91" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <line x1="50" y1="80" x2="50" y2="93" stroke="#FFC10D" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="62" y1="80" x2="62" y2="91" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="38" cy="91" r="1.8" fill="#56ACE0" opacity="0.65"/>
+    <circle id="n3b" cx="50" cy="93" r="2.2" fill="#FFC10D" class="n3"/>
+    <circle cx="62" cy="91" r="1.8" fill="#56ACE0" opacity="0.65"/>
+
+    <!-- ── Trazos IZQUIERDOS (desde x≈23 hacia izquierda) ── -->
+    <line x1="23" y1="38" x2="9"  y2="38" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <line x1="23" y1="50" x2="7"  y2="50" stroke="#FFC10D" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="23" y1="62" x2="9"  y2="62" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="9"  cy="38" r="1.8" fill="#56ACE0" opacity="0.65"/>
+    <circle id="n3l" cx="7"  cy="50" r="2.2" fill="#FFC10D" class="n3"/>
+    <circle cx="9"  cy="62" r="1.8" fill="#56ACE0" opacity="0.65"/>
+
+    <!-- ── Trazos DERECHOS (desde x≈77 hacia derecha) ── -->
+    <line x1="77" y1="38" x2="91" y2="38" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <line x1="77" y1="50" x2="93" y2="50" stroke="#FFC10D" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="77" y1="62" x2="91" y2="62" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="91" cy="38" r="1.8" fill="#56ACE0" opacity="0.65"/>
+    <circle id="n3r" cx="93" cy="50" r="2.2" fill="#FFC10D" class="n3"/>
+    <circle cx="91" cy="62" r="1.8" fill="#56ACE0" opacity="0.65"/>
+
+    <!-- ── Señales viajando (puntos blancos con animateMotion) ── -->
+    <circle r="1.4" fill="#fffbe6" opacity="0">
+      <animateMotion dur="1.8s" begin="0s" repeatCount="indefinite" calcMode="linear">
+        <mpath href="#t3-top"/>
+      </animateMotion>
+      <animate attributeName="opacity" values="0;0.95;0.95;0"
+               keyTimes="0;0.07;0.87;1" dur="1.8s" begin="0s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="1.4" fill="#fffbe6" opacity="0">
+      <animateMotion dur="1.8s" begin="0.45s" repeatCount="indefinite" calcMode="linear">
+        <mpath href="#t3-right"/>
+      </animateMotion>
+      <animate attributeName="opacity" values="0;0.95;0.95;0"
+               keyTimes="0;0.07;0.87;1" dur="1.8s" begin="0.45s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="1.4" fill="#fffbe6" opacity="0">
+      <animateMotion dur="1.8s" begin="0.9s" repeatCount="indefinite" calcMode="linear">
+        <mpath href="#t3-bottom"/>
+      </animateMotion>
+      <animate attributeName="opacity" values="0;0.95;0.95;0"
+               keyTimes="0;0.07;0.87;1" dur="1.8s" begin="0.9s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="1.4" fill="#fffbe6" opacity="0">
+      <animateMotion dur="1.8s" begin="1.35s" repeatCount="indefinite" calcMode="linear">
+        <mpath href="#t3-left"/>
+      </animateMotion>
+      <animate attributeName="opacity" values="0;0.95;0.95;0"
+               keyTimes="0;0.07;0.87;1" dur="1.8s" begin="1.35s" repeatCount="indefinite"/>
+    </circle>
+
+    <!-- ══════════════════════  SHOPPING BAG  ══════════════════════ -->
+
+    <!-- Sombra del cuerpo -->
+    <rect x="24" y="27" width="52" height="53" rx="4" ry="4"
+          fill="#060e1f" opacity="0.45"/>
+
+    <!-- Cuerpo del bag (fill + stroke con glow) -->
+    <rect x="23" y="25" width="54" height="55" rx="4" ry="4"
+          fill="url(#bagGlow3)"
+          stroke="#10B981" stroke-width="2.5"
+          filter="url(#lensGlow3)" opacity="0.96"/>
+
+    <!-- Anillo/borde interior decorativo -->
+    <rect x="25.5" y="27.5" width="49" height="50" rx="3" ry="3"
+          fill="none" stroke="#56ACE0" stroke-width="0.4" opacity="0.20"/>
+
+    <!-- Handle (asa) ámbar — arco superior saliendo del cuerpo -->
+    <path d="M34,26 Q34,10 50,10 Q66,10 66,26"
+          fill="none" stroke="#FFC10D" stroke-width="3.5"
+          stroke-linecap="round" opacity="0.95"/>
+    <!-- Reflejo del handle -->
+    <path d="M36,23 Q36,13 50,13 Q64,13 64,23"
+          fill="none" stroke="white" stroke-width="1.0"
+          stroke-linecap="round" opacity="0.20"/>
+
+    <!-- Pliegue / fold decorativo en la parte superior del bag -->
+    <line x1="23" y1="37" x2="77" y2="37"
+          stroke="#10B981" stroke-width="0.8" opacity="0.35"/>
+
+    <!-- ── Contenido clipeado dentro del bag ── -->
+    <g clip-path="url(#c3-bag)">
+
+      <!-- Crosshairs sutiles -->
+      <line x1="23" y1="52" x2="77" y2="52" stroke="#10B981" stroke-width="0.5" opacity="0.15"/>
+      <line x1="50" y1="26" x2="50" y2="80" stroke="#10B981" stroke-width="0.5" opacity="0.15"/>
+
+      <!-- CHECKMARK — capa de glow estática (pulsa en opacidad) -->
+      <g id="check3-glow" filter="url(#glow3)">
+        <polyline
+          points="32,55 44,67 68,40"
+          fill="none" stroke="#10B981" stroke-width="5"
+          stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+
+      <!-- CHECKMARK — capa principal con draw-in animado -->
+      <polyline
+        points="32,55 44,67 68,40"
+        fill="none" stroke="#10B981" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"
+        stroke-dasharray="56">
+        <animate attributeName="stroke-dashoffset"
+                 values="56;0;0;56"
+                 keyTimes="0;0.60;0.85;1"
+                 dur="3s" repeatCount="indefinite"
+                 calcMode="spline"
+                 keySplines="0.4 0 0.6 1;0 0 1 1;0 0 1 1"/>
+      </polyline>
+
+      <!-- Cursor — punto parpadeante al final del checkmark (punta derecha) -->
+      <circle id="cur3" cx="68" cy="40" r="2.5" fill="#10B981"/>
+
+      <!-- Scan line horizontal animada (SMIL) -->
+      <line x1="24" x2="76" stroke="#56ACE0" stroke-width="1.3" opacity="0">
+        <animate attributeName="y1" from="26" to="79" dur="3.5s"
+                 repeatCount="indefinite" calcMode="spline"
+                 keySplines="0.37 0 0.63 1"/>
+        <animate attributeName="y2" from="26" to="79" dur="3.5s"
+                 repeatCount="indefinite" calcMode="spline"
+                 keySplines="0.37 0 0.63 1"/>
+        <animate attributeName="opacity"
+                 values="0;0.55;0.55;0" keyTimes="0;0.05;0.88;1"
+                 dur="3.5s" repeatCount="indefinite"/>
+      </line>
+
+      <!-- Flare (destello — esquina superior izquierda del bag) -->
+      <ellipse id="flare3" cx="33" cy="34" rx="6" ry="2.5"
+               fill="white" opacity="0" transform="rotate(-35 33 34)"/>
+
+    </g><!-- /clip bag -->
+
+  </g><!-- /bag3 -->
+
 </svg>

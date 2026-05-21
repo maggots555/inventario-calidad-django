@@ -1,35 +1,273 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<svg height="800px" width="800px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
-	 viewBox="0 0 392.598 392.598" xml:space="preserve">
-<g>
-	<path style="fill:#FFFFFF;" d="M370.78,32.711c0-6.012-4.848-10.925-10.925-10.925H32.743c-6.012,0-10.925,4.848-10.925,10.925
-		v203.636H370.78L370.78,32.711L370.78,32.711z"/>
-	<path style="fill:#FFFFFF;" d="M21.818,283.152c0,6.012,4.848,10.925,10.925,10.925h255.935v-7.628
-		c0-6.012,4.848-10.925,10.925-10.925c6.012,0,10.925,4.848,10.925,10.925v7.628h18.747v-7.628c0-6.012,4.848-10.925,10.925-10.925
-		c6.012,0,10.925,4.848,10.925,10.925v7.628h8.727c6.012,0,10.925-4.849,10.925-10.925v-24.954H21.818V283.152z"/>
-</g>
-<path style="fill:#FFC10D;" d="M281.309,354.198c-4.331,0-8.275-2.521-10.02-6.594l-13.77-31.741H135.014l-13.77,31.741
-	c-1.681,4.008-5.624,6.594-10.02,6.594H82.457l-4.719,16.549h236.929l-4.719-16.549H281.309z"/>
-<path style="fill:#194F82;" d="M359.855,0H32.743C14.707,0,0.032,14.675,0.032,32.711v250.44c0,18.036,14.675,32.711,32.711,32.711
-	h78.61l-7.111,16.549H74.311c-4.848,0-9.115,3.232-10.537,7.887l-10.925,38.4c-1.939,5.883,2.651,13.899,10.537,13.899h265.826
-	c7.37,0,12.541-6.594,10.537-13.899l-10.925-38.4c-1.293-4.719-5.624-7.887-10.537-7.887h-29.802l-7.111-16.549h78.481
-	c18.036,0,32.711-14.675,32.711-32.711V32.711C392.566,14.675,377.891,0,359.855,0z M370.78,283.152
-	c0,6.012-4.848,10.925-10.925,10.925h-8.857v-7.628c0-6.012-4.848-10.925-10.925-10.925s-10.925,4.848-10.925,10.925v7.628h-18.683
-	v-7.628c0-6.012-4.848-10.925-10.925-10.925c-6.012,0-10.925,4.848-10.925,10.925v7.628H32.743c-6.012,0-10.925-4.849-10.925-10.925
-	v-24.954H370.78L370.78,283.152L370.78,283.152z M77.867,370.747l4.719-16.549h28.768c4.331,0,8.275-2.521,10.02-6.594l13.77-31.741
-	h122.57l13.77,31.741c1.681,4.008,5.624,6.594,10.02,6.594h28.768l4.719,16.549H77.867z M21.818,32.711
-	c0-6.012,4.848-10.925,10.925-10.925h327.111c6.012,0,10.925,4.848,10.925,10.925v203.636H21.818V32.711z"/>
-<path style="fill:#56ACE0;" d="M43.604,43.572v5.107h34.844c6.012,0,10.925,4.848,10.925,10.925c0,6.012-4.848,10.925-10.925,10.925
-	H43.604v14.545h13.059c6.012,0,10.925,4.848,10.925,10.925c0,6.012-4.848,10.925-10.925,10.925H43.604v107.701h305.325V43.572
-	H43.604z"/>
-<path style="fill:#194F82;" d="M166.756,214.432c-0.129,0-0.323,0-0.453,0c-5.172-0.259-9.438-4.008-10.279-9.115l-17.39-105.244
-	l-28.574,44.154c-2.004,3.103-5.495,4.913-9.115,4.913H62.028c-6.012,0-10.925-4.848-10.925-10.925
-	c0-6.012,4.848-10.925,10.925-10.925h32.97l40.727-62.836c2.457-3.814,6.982-5.624,11.378-4.719
-	c4.396,0.905,7.822,4.461,8.469,8.857l13.446,81.519l16.485-64.905c1.164-4.719,5.301-8.016,10.214-8.21
-	c4.848-0.129,9.18,2.844,10.731,7.499l19.135,58.311l27.41-86.497c1.487-4.719,6.012-7.887,10.925-7.564
-	c4.913,0.259,9.115,3.814,10.149,8.598l15.063,70.465h41.438c6.012,0,10.925,4.848,10.925,10.925
-	c0,6.012-4.849,10.925-10.925,10.925h-50.23c-5.172,0-9.568-3.556-10.667-8.663l-8.339-38.853l-25.212,79.451
-	c-1.487,4.461-5.624,7.564-10.343,7.564c0,0,0,0-0.065,0c-4.719,0-8.857-3.038-10.343-7.499l-18.036-54.756l-20.105,79.127
-	C176.129,211.135,171.798,214.432,166.756,214.432z"/>
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  icon_tipo_orden_dos.svg  —  Servicio con Diagnóstico (OOW-)
+  Concept : Lupa de diagnóstico técnico con señal EKG animada
+  Palette : #194F82 (navy) · #56ACE0 (sky blue) · #FFC10D (amber) · #22D3EE (cyan)
+  Anims   : 1) Anillos girando (opuestos)
+            2) Lupa flotando
+            3) Waveform EKG trazándose (draw-in)
+            4) Cursor EKG parpadeando
+            5) Nodos ámbar en cascada
+            6) Puntos de señal viajando (4 trazos)
+            7) Scan line barriendo el lente
+            8) Flare pulsando en el lente
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="800px" height="800px">
+
+  <!-- ═══════════════════════  DEFINICIONES  ═══════════════════════ -->
+  <defs>
+
+    <radialGradient id="bg2" cx="42%" cy="38%" r="65%">
+      <stop offset="0%"   stop-color="#1e5c99"/>
+      <stop offset="100%" stop-color="#0a2545"/>
+    </radialGradient>
+
+    <radialGradient id="lens2" cx="38%" cy="32%" r="65%">
+      <stop offset="0%"   stop-color="#162d4f"/>
+      <stop offset="100%" stop-color="#060e1f"/>
+    </radialGradient>
+
+    <filter id="glow2" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <filter id="lensGlow2" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur stdDeviation="1.0" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Paths de señal para animateMotion (del lente hacia afuera) -->
+    <path id="t2-top"    d="M50,29 L50,7"/>
+    <path id="t2-right"  d="M71,50 L93,50"/>
+    <path id="t2-bottom" d="M50,71 L50,93"/>
+    <path id="t2-left"   d="M29,50 L7,50"/>
+
+    <!-- Clip para contenido interior del lente -->
+    <clipPath id="c2-lens">
+      <circle cx="50" cy="50" r="19"/>
+    </clipPath>
+
+  </defs>
+
+  <!-- ═══════════════════════  ANIMACIONES CSS  ════════════════════ -->
+  <style>
+    /* 1. ANILLOS: giran en sentidos opuestos */
+    #r2-outer {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: r2cw 14s linear infinite;
+    }
+    #r2-inner {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: r2ccw 22s linear infinite;
+    }
+    @keyframes r2cw  { to { transform: rotate(360deg);  } }
+    @keyframes r2ccw { to { transform: rotate(-360deg); } }
+
+    /* 2. LUPA: flota suavemente */
+    #mag2 {
+      transform-box: fill-box;
+      transform-origin: center;
+      will-change: transform;
+      animation: mag2float 4.2s ease-in-out infinite;
+    }
+    @keyframes mag2float {
+      0%, 100% { transform: translate3d(0, 0, 0);       }
+      50%       { transform: translate3d(0, -2.5px, 0);  }
+    }
+
+    /* 3. WAVEFORM EKG: pulso de opacidad sobre la onda estática de glow */
+    #wave2-glow { will-change: opacity; animation: wave2pulse 1.8s ease-in-out infinite; }
+    @keyframes wave2pulse {
+      0%, 100% { opacity: 0.65; }
+      50%       { opacity: 0.20; }
+    }
+
+    /* 4. CURSOR EKG: parpadea al final de la onda */
+    #cur2 {
+      will-change: opacity;
+      animation: cur2blink 1.1s ease-in-out infinite;
+    }
+    @keyframes cur2blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+
+    /* 5. NODOS ámbar: parpadeo escalonado */
+    .n2 { will-change: opacity; animation: n2fade 2s ease-in-out infinite; }
+    #n2t { animation-delay: 0s;    }
+    #n2r { animation-delay: 0.5s;  }
+    #n2b { animation-delay: 1s;    }
+    #n2l { animation-delay: 1.5s;  }
+    @keyframes n2fade {
+      0%, 100% { opacity: 0.9; }
+      50%       { opacity: 0.15; }
+    }
+
+    /* 8. FLARE del lente */
+    #flare2 {
+      will-change: opacity;
+      animation: flare2pulse 5s ease-in-out infinite;
+      animation-delay: -1.5s;
+    }
+    @keyframes flare2pulse {
+      0%, 60%, 100% { opacity: 0; }
+      30%            { opacity: 0.55; }
+    }
+  </style>
+
+  <!-- ═══════════════════  FONDO CIRCULAR  ════════════════════════ -->
+  <circle cx="50" cy="50" r="50" fill="url(#bg2)"/>
+
+  <!-- ═══════════════════  ANILLOS (solo rotan)  ══════════════════ -->
+  <circle id="r2-outer" cx="50" cy="50" r="46.5" fill="none"
+          stroke="#56ACE0" stroke-width="0.5" stroke-dasharray="5 3.5" opacity="0.35"/>
+  <circle id="r2-inner" cx="50" cy="50" r="42" fill="none"
+          stroke="#56ACE0" stroke-width="0.3" opacity="0.15"/>
+
+  <!-- ═══════════  GRUPO PRINCIPAL — todo flota junto  ════════════ -->
+  <g id="mag2">
+
+    <!-- ── Trazos SUPERIORES (desde borde del lente, y≈29, hacia arriba) ── -->
+    <line x1="38" y1="29" x2="38" y2="9"  stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <line x1="50" y1="29" x2="50" y2="7"  stroke="#FFC10D" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="62" y1="29" x2="62" y2="9"  stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="38" cy="9"  r="1.8" fill="#56ACE0" opacity="0.65"/>
+    <circle id="n2t" cx="50" cy="7"  r="2.2" fill="#FFC10D" class="n2"/>
+    <circle cx="62" cy="9"  r="1.8" fill="#56ACE0" opacity="0.65"/>
+
+    <!-- ── Trazos INFERIORES (desde y≈71 hacia abajo) ── -->
+    <line x1="38" y1="71" x2="38" y2="91" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <line x1="50" y1="71" x2="50" y2="93" stroke="#FFC10D" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="62" y1="71" x2="62" y2="91" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="38" cy="91" r="1.8" fill="#56ACE0" opacity="0.65"/>
+    <circle id="n2b" cx="50" cy="93" r="2.2" fill="#FFC10D" class="n2"/>
+    <circle cx="62" cy="91" r="1.8" fill="#56ACE0" opacity="0.65"/>
+
+    <!-- ── Trazos IZQUIERDOS (desde x≈29 hacia izquierda) ── -->
+    <line x1="29" y1="38" x2="9"  y2="38" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <line x1="29" y1="50" x2="7"  y2="50" stroke="#FFC10D" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="29" y1="62" x2="9"  y2="62" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="9"  cy="38" r="1.8" fill="#56ACE0" opacity="0.65"/>
+    <circle id="n2l" cx="7"  cy="50" r="2.2" fill="#FFC10D" class="n2"/>
+    <circle cx="9"  cy="62" r="1.8" fill="#56ACE0" opacity="0.65"/>
+
+    <!-- ── Trazos DERECHOS (desde x≈71 hacia derecha) ── -->
+    <line x1="71" y1="38" x2="91" y2="38" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <line x1="71" y1="50" x2="93" y2="50" stroke="#FFC10D" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+    <line x1="71" y1="62" x2="91" y2="62" stroke="#56ACE0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+    <circle cx="91" cy="38" r="1.8" fill="#56ACE0" opacity="0.65"/>
+    <circle id="n2r" cx="93" cy="50" r="2.2" fill="#FFC10D" class="n2"/>
+    <circle cx="91" cy="62" r="1.8" fill="#56ACE0" opacity="0.65"/>
+
+    <!-- ── Señales viajando (puntos blancos con animateMotion) ── -->
+    <circle r="1.4" fill="#fffbe6" opacity="0">
+      <animateMotion dur="1.8s" begin="0s" repeatCount="indefinite" calcMode="linear">
+        <mpath href="#t2-top"/>
+      </animateMotion>
+      <animate attributeName="opacity" values="0;0.95;0.95;0"
+               keyTimes="0;0.07;0.87;1" dur="1.8s" begin="0s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="1.4" fill="#fffbe6" opacity="0">
+      <animateMotion dur="1.8s" begin="0.45s" repeatCount="indefinite" calcMode="linear">
+        <mpath href="#t2-right"/>
+      </animateMotion>
+      <animate attributeName="opacity" values="0;0.95;0.95;0"
+               keyTimes="0;0.07;0.87;1" dur="1.8s" begin="0.45s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="1.4" fill="#fffbe6" opacity="0">
+      <animateMotion dur="1.8s" begin="0.9s" repeatCount="indefinite" calcMode="linear">
+        <mpath href="#t2-bottom"/>
+      </animateMotion>
+      <animate attributeName="opacity" values="0;0.95;0.95;0"
+               keyTimes="0;0.07;0.87;1" dur="1.8s" begin="0.9s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="1.4" fill="#fffbe6" opacity="0">
+      <animateMotion dur="1.8s" begin="1.35s" repeatCount="indefinite" calcMode="linear">
+        <mpath href="#t2-left"/>
+      </animateMotion>
+      <animate attributeName="opacity" values="0;0.95;0.95;0"
+               keyTimes="0;0.07;0.87;1" dur="1.8s" begin="1.35s" repeatCount="indefinite"/>
+    </circle>
+
+    <!-- ══════════════════════  LUPA  ══════════════════════════════ -->
+
+    <!-- Cuerpo del lente (fill + stroke con glow) -->
+    <circle cx="50" cy="50" r="21" fill="url(#lens2)"
+            stroke="#56ACE0" stroke-width="2.8"
+            filter="url(#lensGlow2)" opacity="0.96"/>
+
+    <!-- Anillo interior decorativo -->
+    <circle cx="50" cy="50" r="18" fill="none"
+            stroke="#22D3EE" stroke-width="0.5" opacity="0.22"/>
+
+    <!-- ── Contenido clipeado dentro del lente ── -->
+    <g clip-path="url(#c2-lens)">
+
+      <!-- Crosshairs sutiles -->
+      <line x1="31" y1="50" x2="69" y2="50" stroke="#56ACE0" stroke-width="0.5" opacity="0.20"/>
+      <line x1="50" y1="31" x2="50" y2="69" stroke="#56ACE0" stroke-width="0.5" opacity="0.20"/>
+
+      <!-- EKG WAVEFORM — capa de glow estática (pulsa en opacidad) -->
+      <g id="wave2-glow" filter="url(#glow2)">
+        <polyline
+          points="33,50 38,50 39.5,47 41,50 42,52 43,35 44,58 45.5,50 48,50 50.5,46 53,50 68,50"
+          fill="none" stroke="#FFC10D" stroke-width="1.7"
+          stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+
+      <!-- EKG WAVEFORM — capa principal con draw-in animado -->
+      <polyline
+        points="33,50 38,50 39.5,47 41,50 42,52 43,35 44,58 45.5,50 48,50 50.5,46 53,50 68,50"
+        fill="none" stroke="#FFC10D" stroke-width="1.7"
+        stroke-linecap="round" stroke-linejoin="round"
+        stroke-dasharray="92">
+        <animate attributeName="stroke-dashoffset"
+                 values="92;0;0;92"
+                 keyTimes="0;0.60;0.85;1"
+                 dur="3s" repeatCount="indefinite"
+                 calcMode="spline"
+                 keySplines="0.4 0 0.6 1;0 0 1 1;0 0 1 1"/>
+      </polyline>
+
+      <!-- Cursor EKG — punto parpadeante al final de la onda -->
+      <circle id="cur2" cx="68" cy="50" r="2.2" fill="#FFC10D"/>
+
+      <!-- Scan line horizontal animada (SMIL) -->
+      <line x1="31" x2="69" stroke="#22D3EE" stroke-width="1.3" opacity="0">
+        <animate attributeName="y1" from="31" to="69" dur="3.5s"
+                 repeatCount="indefinite" calcMode="spline"
+                 keySplines="0.37 0 0.63 1"/>
+        <animate attributeName="y2" from="31" to="69" dur="3.5s"
+                 repeatCount="indefinite" calcMode="spline"
+                 keySplines="0.37 0 0.63 1"/>
+        <animate attributeName="opacity"
+                 values="0;0.55;0.55;0" keyTimes="0;0.05;0.88;1"
+                 dur="3.5s" repeatCount="indefinite"/>
+      </line>
+
+      <!-- Flare (destello del lente — esquina superior izquierda) -->
+      <ellipse id="flare2" cx="40" cy="38" rx="6" ry="2.5"
+               fill="white" opacity="0" transform="rotate(-35 40 38)"/>
+
+    </g><!-- /clip lente -->
+
+    <!-- ── HANDLE (mango) ── -->
+    <!-- Sombra del mango -->
+    <line x1="65" y1="65" x2="81" y2="81"
+          stroke="#060e1f" stroke-width="8" stroke-linecap="round" opacity="0.55"/>
+    <!-- Mango principal ámbar -->
+    <line x1="65" y1="65" x2="81" y2="81"
+          stroke="#FFC10D" stroke-width="5.5" stroke-linecap="round"/>
+    <!-- Reflejo del mango -->
+    <line x1="65.5" y1="65" x2="79.5" y2="78"
+          stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.22"/>
+    <!-- Conector (joint) lente–mango -->
+    <circle cx="65" cy="65" r="4" fill="#194F82" stroke="#FFC10D" stroke-width="1.8"/>
+    <circle cx="65" cy="65" r="1.6" fill="#56ACE0" opacity="0.85"/>
+
+  </g><!-- /mag2 -->
+
 </svg>
