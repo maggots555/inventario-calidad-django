@@ -2690,6 +2690,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
             ruta_escalada = os.path.join(tmp_dir, f'foto_{idx:03d}.jpg')
             cmd_escalar = [
                 ffmpeg_bin,
+                '-protocol_whitelist', 'file,pipe,fd',
                 '-i', ruta_original,
                 '-vf', (
                     "scale=1280:720:force_original_aspect_ratio=decrease,"
@@ -3061,7 +3062,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
         audio_stream_idx = n_fotos + (1 if es_rewind else 0)
 
         cmd_final = (
-            [ffmpeg_bin]
+            [ffmpeg_bin, '-protocol_whitelist', 'file,pipe,fd']
             + cmd_inputs
             + (['-stream_loop', '-1', '-i', ruta_musica] if ruta_musica else [])
             + [
@@ -3113,6 +3114,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
         # =====================================================================
         cmd_thumb = [
             ffmpeg_bin,
+            '-protocol_whitelist', 'file,pipe,fd',
             '-i', tmp_video_out,
             '-ss', '00:00:02',
             '-vframes', '1',
@@ -3369,6 +3371,7 @@ def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int):
         # =====================================================================
         cmd_comprimir = [
             ffmpeg_bin,
+            '-protocol_whitelist', 'file,pipe,fd',
             '-i', ruta_original,
             '-vf', (
                 "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"

@@ -5,6 +5,7 @@ Gestiona el ciclo completo de reparación de equipos de cómputo
 from django.db import models
 from django.utils import timezone
 from django.core.validators import FileExtensionValidator, MinValueValidator
+from config.validators import FileSizeValidator
 from decimal import Decimal
 from io import BytesIO
 from PIL import Image as PILImage, ImageOps
@@ -2878,9 +2879,10 @@ class BannerPromocional(models.Model):
     )
     imagen = models.ImageField(
         upload_to='banners/%Y/%m/',
+        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif', 'webp']), FileSizeValidator(10)],
         verbose_name="Imagen del banner",
         help_text=(
-            "Sube la imagen en JPG, PNG o WebP. "
+            "Sube la imagen en JPG, PNG, GIF o WebP. Máx 10 MB. "
             "Se redimensionará automáticamente al tamaño óptimo según la posición elegida. "
             "Skyscrapers: 480×1200 px | Header: 1360×200 px | Medio: 1360×180 px | Footer: 1360×140 px."
         )

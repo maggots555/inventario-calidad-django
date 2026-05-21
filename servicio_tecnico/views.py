@@ -3767,6 +3767,7 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
         # =====================================================================
         cmd_compress = [
             ffmpeg_bin,
+            '-protocol_whitelist', 'file,pipe,fd',
             '-i', tmp_in_path,
             '-vf', (
                 "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
@@ -3804,6 +3805,7 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
         # =====================================================================
         cmd_thumb = [
             ffmpeg_bin,
+            '-protocol_whitelist', 'file,pipe,fd',
             '-i', tmp_out_path,
             '-ss', '00:00:01',
             '-vframes', '1',

@@ -22,6 +22,7 @@ Agregado: Diciembre 2025
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, FileExtensionValidator
+from config.validators import FileSizeValidator
 from django.utils import timezone
 from PIL import Image
 import io
@@ -462,8 +463,9 @@ class ProductoAlmacen(models.Model):
         max_length=255,  # Límite ampliado para soportar rutas largas
         blank=True,
         null=True,
+        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif', 'webp']), FileSizeValidator(10)],
         verbose_name='Imagen del Producto',
-        help_text='Foto del producto para identificación visual'
+        help_text='Foto del producto para identificación visual (JPG, PNG, GIF, WebP). Máx 10 MB.'
     )
     qr_code = models.ImageField(
         upload_to='almacen/qr_codes/',
@@ -2224,8 +2226,9 @@ class DiferenciaAuditoria(models.Model):
         max_length=255,  # Límite ampliado para soportar rutas largas
         blank=True,
         null=True,
+        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif', 'webp']), FileSizeValidator(10)],
         verbose_name='Evidencia Fotográfica',
-        help_text='Foto de la situación encontrada'
+        help_text='Foto de la situación encontrada (JPG, PNG, GIF, WebP). Máx 10 MB.'
     )
     
     # ========== AJUSTE ==========

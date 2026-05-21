@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.core.validators import FileExtensionValidator
+from config.validators import FileSizeValidator
 import uuid
 import qrcode
 from io import BytesIO
@@ -549,8 +551,9 @@ class Empleado(models.Model):
         max_length=255,  # Límite ampliado para soportar rutas largas
         blank=True,
         null=True,
+        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif', 'webp']), FileSizeValidator(10)],
         verbose_name='Foto de Perfil',
-        help_text='Foto del empleado para mostrar en el sistema (formatos: JPG, PNG, GIF)'
+        help_text='Foto del empleado para mostrar en el sistema (JPG, PNG, GIF, WebP). Máx 10 MB.'
     )
     
     activo = models.BooleanField(default=True, help_text="Empleado activo en la empresa")
