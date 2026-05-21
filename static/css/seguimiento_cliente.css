@@ -4,8 +4,8 @@
    Abril 2026 — Sistema SIGMA
    ============================================================================= */
 
-/* === Google Fonts: Outfit (headings) + DM Sans (body) === */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+/* === Google Fonts: Plus Jakarta Sans === */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
 
 /* === Variables de diseño === */
 :root {
@@ -23,8 +23,8 @@
                       0 32px 80px rgba(0, 0, 0, 0.08);
   --st-spring:        all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   --st-ease:          all 0.25s ease;
-  --st-font-heading:  'Outfit', 'SF Pro Display', -apple-system, sans-serif;
-  --st-font:          'DM Sans', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+  --st-font-heading:  'Plus Jakarta Sans', 'SF Pro Display', -apple-system, sans-serif;
+  --st-font:          'Plus Jakarta Sans', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
   --st-glow-primary:  0 0 20px rgba(56, 189, 248, 0.25), 0 0 60px rgba(31, 99, 145, 0.10);
   --st-glow-accent:   0 0 20px rgba(16, 185, 129, 0.30), 0 0 60px rgba(16, 185, 129, 0.10);
 }
@@ -137,7 +137,7 @@
 }
 
 .st-header-subtitle {
-  font-family: 'DM Mono', var(--st-font);
+  font-family: var(--font-mono), var(--st-font);
   font-size: 0.82rem;
   opacity: 0.75;
   margin: 0.5rem 0 0;

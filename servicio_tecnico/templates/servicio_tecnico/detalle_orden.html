@@ -96,7 +96,7 @@
     {% if orden.es_candidato_rhitso %}
     <div class="row mb-4">
         <div class="col-12">
-            <div class="alert alert-info shadow-sm" role="alert" style="border-left: 5px solid #0d6efd; border-radius: 10px; background: linear-gradient(to right, #e8f4fd, #ffffff);">
+            <div class="alert alert-info shadow-sm" role="alert" style="border-left: 5px solid #0d6efd; border-radius: 10px;">
                 <div class="d-flex align-items-center justify-content-between">
                     <div class="flex-grow-1">
                         <h5 class="alert-heading mb-2" style="color: #0d6efd;">
@@ -365,7 +365,7 @@
         <!-- Panel Lateral Derecho (5 columnas) - Configuración Adicional -->
         <div class="col-lg-5">
             <div class="card section-card">
-                <div class="section-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="section-header" style="background: #1f6391;">
                     <i class="bi bi-gear-fill"></i>
                     Configuración Adicional
                 </div>
@@ -616,7 +616,7 @@
     <div class="row">
         <div class="col-12">
             <div class="card section-card">
-                <div class="section-header" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                <div class="section-header" style="background: #92400e;">
                     <i class="bi bi-arrow-repeat"></i>
                     Reingreso y RHITSO (Reparación Especializada)
                 </div>
@@ -742,7 +742,7 @@
     <div class="row">
         <div class="col-12">
             <div class="card section-card">
-                <div class="section-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="section-header" style="background: #065f46;">
                     <i class="bi bi-currency-dollar"></i>
                     Gestión de Cotización
                 </div>
@@ -1460,7 +1460,7 @@
         <div class="col-12">
             <div class="card section-card">
                 <!-- HEADER CONTEXTUAL: Cambia color y texto según tipo de orden -->
-                <div class="section-header" style="background: {% if orden.tipo_servicio == 'diagnostico' %}linear-gradient(135deg, #667eea 0%, #764ba2 100%){% else %}linear-gradient(135deg, #f6d365 0%, #fda085 100%){% endif %};">
+                <div class="section-header" style="background: {% if orden.tipo_servicio == 'diagnostico' %}#1e40af{% else %}#9a3412{% endif %};">
                     {% if orden.tipo_servicio == 'diagnostico' %}
                         <!-- UI para DIAGNÓSTICO: Ventas adicionales (complemento) -->
                         <div class="d-flex justify-content-between align-items-center w-100">
@@ -1782,7 +1782,7 @@
         <!-- SUBSECCIÓN 4.1: Cambiar Estado -->
         <div class="col-lg-6">
             <div class="card section-card">
-                <div class="section-header" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
+                <div class="section-header" style="background: #0f3460;">
                     <i class="bi bi-activity"></i>
                     Cambiar Estado de la Orden
                 </div>
@@ -1833,13 +1833,13 @@
         <!-- SUBSECCIÓN 4.2: Asignar Responsables -->
         <div class="col-lg-6">
             <div class="card section-card">
-                <div class="section-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="section-header" style="background: #1e3a5f;">
                     <i class="bi bi-people-fill"></i>
                     Responsables de la Orden
                 </div>
                 <div class="card-body">
                     <!-- Cuadro informativo con responsables actuales -->
-                    <div class="alert alert-info d-flex align-items-start mb-3" style="background: linear-gradient(135deg, #e0f7fa 0%, #e1f5fe 100%); border: none;">
+                    <div class="alert alert-info d-flex align-items-start mb-3">
                         <i class="bi bi-info-circle-fill fs-4 me-3" style="color: #0288d1;"></i>
                         <div>
                             <h6 class="mb-2" style="color: #01579b;">Configuración Actual:</h6>
@@ -1901,7 +1901,7 @@
         <!-- Historial Automático (Izquierda) -->
         <div class="col-lg-6">
             <div class="card section-card">
-                <div class="section-header" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="section-header" style="background: #0c4a6e;">
                     <i class="bi bi-clock-history"></i>
                     Historial Automático
                     {% if total_eventos_historial %}
@@ -1981,7 +1981,7 @@
         <!-- Comentarios (Derecha) -->
         <div class="col-lg-6">
             <div class="card section-card">
-                <div class="section-header" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
+                <div class="section-header" style="background: #334155;">
                     <i class="bi bi-chat-dots"></i>
                     Comentarios
                 </div>
@@ -2037,7 +2037,7 @@
     <div class="row">
         <div class="col-12" id="galeria-imagenes">
             <div class="card section-card">
-                <div class="section-header" style="background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%); color: #333;">
+                <div class="section-header" style="background: #374151;">
                     <i class="bi bi-images"></i>
                     Galería de Imágenes del Equipo
                     <span class="badge bg-dark ms-2">{{ total_imagenes }} imagen{{ total_imagenes|pluralize:"es" }}</span>
@@ -3913,15 +3913,15 @@
                                 <div class="mt-2">
                                     <label class="destinatario-card p-3 border rounded border-primary border-2 d-block mb-0 cursor-pointer" 
                                            for="diag_emp_current_user"
-                                           id="label_emp_{{ request.user.empleado.id }}"
-                                           style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 50%, #e8f5e9 100%);">
+                           id="label_emp_{{ request.user.empleado.id }}"
+                                           style="background-color: rgba(13, 110, 253, 0.05);">
                                         <div class="d-flex align-items-center">
-                                            <input class="form-check-input me-3 flex-shrink-0 checkbox-cc-empleado" 
-                                                   type="checkbox" name="copia_empleados" 
-                                                   value="{{ request.user.empleado.email }}" 
-                                                   data-empleado-id="{{ request.user.empleado.id }}"
-                                                   id="diag_emp_current_user"
-                                                   checked disabled>
+                                             <input class="form-check-input me-3 flex-shrink-0 checkbox-cc-empleado" 
+                                                    type="checkbox" name="copia_empleados" 
+                                                    value="{{ request.user.empleado.email }}" 
+                                                    data-empleado-id="{{ request.user.empleado.id }}"
+                                                    id="diag_emp_current_user"
+                                                    checked disabled>
                                             <input type="hidden" name="copia_empleados" value="{{ request.user.empleado.email }}">
                                             
                                             {% if request.user.empleado.foto_perfil %}
@@ -4462,14 +4462,14 @@
                                     <label class="destinatario-card p-3 border rounded border-primary border-2 d-block mb-0 cursor-pointer"
                                            for="img_emp_current_user"
                                            id="label_img_emp_{{ request.user.empleado.id }}"
-                                           style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 50%, #e8f5e9 100%);">
-                                        <div class="d-flex align-items-center">
-                                            <input class="form-check-input me-3 flex-shrink-0"
-                                                   type="checkbox" name="copia_empleados"
-                                                   value="{{ request.user.empleado.email }}"
-                                                   data-empleado-id="{{ request.user.empleado.id }}"
-                                                   id="img_emp_current_user"
-                                                   checked disabled>
+                                           style="background-color: rgba(13, 110, 253, 0.05);">
+                                         <div class="d-flex align-items-center">
+                                             <input class="form-check-input me-3 flex-shrink-0"
+                                                    type="checkbox" name="copia_empleados"
+                                                    value="{{ request.user.empleado.email }}"
+                                                    data-empleado-id="{{ request.user.empleado.id }}"
+                                                    id="img_emp_current_user"
+                                                    checked disabled>
                                             <input type="hidden" name="copia_empleados" value="{{ request.user.empleado.email }}">
 
                                             {% if request.user.empleado.foto_perfil %}
@@ -7055,7 +7055,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="modal-content">
 
             <!-- Header del modal -->
-            <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="modal-header" style="background: #1f6391;">
                 <h5 class="modal-title text-white" id="modalMejorarDiagIALabel">
                     <i class="bi bi-stars"></i>
                     Mejorar Diagnóstico con IA
@@ -7305,7 +7305,7 @@ document.addEventListener('DOMContentLoaded', function() {
        BADGE IA — "Versión mejorada" y modelo activo
        ================================================================ */
     .ollama-badge-ia {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #1f6391;
         color: #fff;
         font-weight: 500;
         letter-spacing: 0.02em;

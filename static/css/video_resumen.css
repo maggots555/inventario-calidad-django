@@ -14,7 +14,7 @@
 
 /* ── Header de la sección ── */
 .section-header-resumen {
-    background: linear-gradient(135deg, #1f6391, #2980b9);
+    background: #1f6391;
     color: #fff;
     border-radius: 0.375rem 0.375rem 0 0;
     padding: 0.85rem 1.25rem;

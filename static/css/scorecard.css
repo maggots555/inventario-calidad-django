@@ -1913,7 +1913,7 @@
 }
 
 .sc-autocomplete-serie {
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-mono);
     font-weight: 500;
     color: #4b5563;
 }
@@ -2096,7 +2096,7 @@
     padding: 1px 6px;
     font-size: 0.8rem;
     color: #065f46;
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-mono);
 }
 
 /* Pie: nota informativa */
