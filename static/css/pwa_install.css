@@ -1,0 +1,200 @@
+/* =============================================================================
+   pwa_install.css — Estilos del banner de instalación PWA
+   =============================================================================
+   El banner aparece fijo en la parte inferior de la pantalla y se desliza
+   hacia arriba con una animación suave cuando es visible.
+   ============================================================================= */
+
+/* ── Banner contenedor ─────────────────────────────────────────────────────── */
+
+.pwa-install-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1060; /* Por encima de modales Bootstrap (z-index: 1055) */
+
+    background-color: var(--white, #ffffff);
+    border-top: 1px solid var(--gray-200, #e5e7eb);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
+
+    padding: 0.875rem 1rem;
+
+    /* Slide-up: empieza oculto debajo de la pantalla */
+    transform: translateY(105%);
+    transition: transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
+    will-change: transform;
+}
+
+.pwa-install-banner.is-visible {
+    transform: translateY(0);
+}
+
+/* ── Fila principal (ícono + texto + botones) ──────────────────────────────── */
+
+.pwa-install-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+/* ── Ícono de la app ───────────────────────────────────────────────────────── */
+
+.pwa-install-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    object-fit: contain;
+}
+
+/* ── Texto (título + subtítulo) ────────────────────────────────────────────── */
+
+.pwa-install-text {
+    flex: 1;
+    min-width: 0; /* Evita overflow en textos largos */
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    line-height: 1.3;
+}
+
+.pwa-install-text strong {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--gray-900, #111827);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pwa-install-text span {
+    font-size: 0.78rem;
+    color: var(--gray-500, #6b7280);
+}
+
+/* ── Botón "Instalar" ──────────────────────────────────────────────────────── */
+
+.pwa-install-accept-btn {
+    flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 8px;
+    background-color: #1f6391;
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.15s ease;
+    white-space: nowrap;
+}
+
+.pwa-install-accept-btn:hover {
+    background-color: #1a5278;
+}
+
+.pwa-install-accept-btn:active {
+    transform: scale(0.96);
+}
+
+/* ── Botón cerrar "✕" ──────────────────────────────────────────────────────── */
+
+.pwa-install-dismiss-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    min-width: 44px;  /* touch target mínimo iOS */
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--gray-400, #9ca3af);
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    margin-right: -0.25rem;
+}
+
+.pwa-install-dismiss-btn:hover {
+    background-color: var(--gray-100, #f3f4f6);
+    color: var(--gray-600, #4b5563);
+}
+
+/* ── Instrucciones iOS ─────────────────────────────────────────────────────── */
+
+.pwa-ios-instructions {
+    display: none; /* JS lo muestra solo en iOS */
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.625rem;
+    padding: 0.5rem 0.625rem;
+    background-color: var(--gray-50, #f9fafb);
+    border-radius: 8px;
+    font-size: 0.78rem;
+    color: var(--gray-600, #4b5563);
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+    flex-wrap: wrap;
+    line-height: 1.4;
+}
+
+.pwa-ios-instructions i {
+    font-size: 1rem;
+    color: #1f6391;
+}
+
+.pwa-ios-instructions strong {
+    color: var(--gray-800, #1f2937);
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   ============================================================ */
+
+[data-bs-theme="dark"] .pwa-install-banner {
+    background-color: #1e293b;
+    border-top-color: #334155;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
+}
+
+[data-bs-theme="dark"] .pwa-install-text strong {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .pwa-install-text span {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .pwa-install-accept-btn {
+    background-color: #2563eb;
+}
+
+[data-bs-theme="dark"] .pwa-install-accept-btn:hover {
+    background-color: #1d4ed8;
+}
+
+[data-bs-theme="dark"] .pwa-install-dismiss-btn {
+    color: #64748b;
+}
+
+[data-bs-theme="dark"] .pwa-install-dismiss-btn:hover {
+    background-color: #334155;
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .pwa-ios-instructions {
+    background-color: #0f172a;
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .pwa-ios-instructions strong {
+    color: #e2e8f0;
+}

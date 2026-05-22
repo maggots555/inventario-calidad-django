@@ -47,6 +47,7 @@
     <!-- CSS personalizado - Carga los archivos estáticos de Django -->
     {% load static %}
     <link rel="stylesheet" type="text/css" href="{% static 'css/base.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/pwa_install.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/components.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/forms.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/scorecard.css' %}">
@@ -1026,6 +1027,42 @@
             });
         }
     </script>
+
+    <!-- ================================================================
+         PWA: Banner de instalación
+         ================================================================
+         Muestra un banner en la parte inferior invitando al usuario a
+         instalar la app. Solo se muestra a usuarios autenticados.
+         - Android/Chrome/Edge: botón nativo via beforeinstallprompt
+         - iOS Safari: instrucciones manuales (compartir → agregar a inicio)
+         - Ya instalada: no se muestra
+         - Rechazada: no vuelve por 7 días (localStorage)
+    -->
+    {% if user.is_authenticated %}
+    <div id="pwa-install-banner" class="pwa-install-banner" role="dialog" aria-label="Instalar aplicación SIGMA" style="display:none;">
+        <div class="pwa-install-content">
+            <img src="{% static 'images/favicon.svg' %}" alt="SIGMA" class="pwa-install-icon">
+            <div class="pwa-install-text">
+                <strong>Instalar SIGMA</strong>
+                <span>Accede más rápido desde tu pantalla de inicio</span>
+            </div>
+            <div id="pwa-android-btn-wrapper">
+                <button id="pwa-install-btn" class="pwa-install-accept-btn" type="button">
+                    Instalar
+                </button>
+            </div>
+            <button id="pwa-dismiss-btn" class="pwa-install-dismiss-btn" type="button" aria-label="Cerrar">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div id="pwa-ios-instructions" class="pwa-ios-instructions">
+            <i class="bi bi-box-arrow-up"></i>
+            <span>Toca <strong>Compartir</strong> y luego <strong>"Agregar a pantalla de inicio"</strong> para instalar SIGMA.</span>
+        </div>
+    </div>
+    <script src="{% static 'js/pwa_install.js' %}"></script>
+    {% endif %}
+
 </body>
 
 </html>
