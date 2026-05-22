@@ -21,6 +21,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from inventario import views as inventario_views
 from config.media_views import serve_media_from_multiple_locations
+from config.pwa_views import service_worker_view, offline_view
 from servicio_tecnico.views import (
     feedback_rechazo_view,
     feedback_satisfaccion_cliente,
@@ -29,6 +30,16 @@ from servicio_tecnico.views import (
 )
 
 urlpatterns = [
+    # ── PWA: Service Worker (debe estar en la raíz para tener scope global) ──
+    # El SW intercepta peticiones de todo el sitio. Si estuviera en /static/js/
+    # solo controlaría esa sub-ruta, que no sirve de nada.
+    path('service_worker.js', service_worker_view, name='service_worker'),
+
+    # ── PWA: Página offline ──
+    # El SW muestra esta página cuando el usuario no tiene conexión.
+    # No requiere login: si no hay red, el usuario tampoco puede autenticarse.
+    path('offline/', offline_view, name='offline'),
+
     # Panel de administración (URL personalizada por seguridad)
     path('sic-gestion-sistema/', admin.site.urls),
     

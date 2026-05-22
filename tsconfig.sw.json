@@ -1,0 +1,21 @@
+{
+  // Configuración TypeScript EXCLUSIVA para el Service Worker.
+  // NO mezclar con tsconfig.json principal porque los Service Workers
+  // corren en un contexto diferente al navegador: no tienen window ni document,
+  // sino ServiceWorkerGlobalScope, FetchEvent, CacheStorage, etc.
+  "compilerOptions": {
+    "target": "ES2019",
+    "lib": ["ES2019", "WebWorker"], // WebWorker: tipado correcto para SW
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "outDir": "static/js",      // Mismo destino que el resto de archivos JS
+    "rootDir": "static/ts",     // Mismo origen
+    "sourceMap": true
+  },
+  "include": [
+    "static/ts/service_worker.ts" // Solo el SW, nada más
+  ]
+}

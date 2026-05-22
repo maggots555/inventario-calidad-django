@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Sin conexión — SIGMA</title>
+    <!--
+        IMPORTANTE: Esta página es completamente autónoma.
+        NO usa Bootstrap, NO usa CDNs, NO importa archivos externos.
+        Todo el CSS y JS está inline para que funcione sin ninguna conexión
+        de red. Es la única página que el Service Worker puede garantizar
+        que siempre esté disponible.
+    -->
+    <style>
+        /* ============================================================
+           VARIABLES — Paleta SIGMA
+           ============================================================ */
+        :root {
+            --brand:        #1f6391;
+            --brand-light:  #2980b9;
+            --brand-dark:   #1a5276;
+
+            --bg:           #f0f4f8;
+            --surface:      #ffffff;
+            --border:       #dde3ea;
+            --text-main:    #1e293b;
+            --text-sub:     #64748b;
+            --text-muted:   #94a3b8;
+
+            --success:      #10b981;
+            --danger:       #ef4444;
+
+            --radius:       16px;
+            --shadow:       0 8px 40px rgba(31, 99, 145, 0.12),
+                            0 2px 8px  rgba(0, 0, 0, 0.06);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg:        #0f172a;
+                --surface:   #1e293b;
+                --border:    #334155;
+                --text-main: #e2e8f0;
+                --text-sub:  #cbd5e1;
+                --text-muted:#64748b;
+                --shadow:    0 8px 40px rgba(0, 0, 0, 0.5),
+                             0 2px 8px  rgba(0, 0, 0, 0.3);
+            }
+        }
+
+        /* ============================================================
+           RESET Y BASE
+           ============================================================ */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100dvh;
+            padding: env(safe-area-inset-top, 24px)
+                     env(safe-area-inset-right, 24px)
+                     env(safe-area-inset-bottom, 24px)
+                     env(safe-area-inset-left, 24px);
+            padding-top: max(env(safe-area-inset-top), 24px);
+            padding-bottom: max(env(safe-area-inset-bottom), 24px);
+            overflow: hidden;
+        }
+
+        /* ============================================================
+           FONDO — Patrón de puntos sutil
+           ============================================================ */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(
+                circle,
+                color-mix(in srgb, var(--brand) 8%, transparent) 1px,
+                transparent 1px
+            );
+            background-size: 28px 28px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ============================================================
+           CARD PRINCIPAL
+           ============================================================ */
+        .card {
+            position: relative;
+            z-index: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 48px 40px 40px;
+            max-width: 440px;
+            width: 100%;
+            text-align: center;
+            animation: cardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes cardIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.97);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* ============================================================
+           ÍCONO DE SEÑAL — Animado
+           ============================================================ */
+        .icon-wrap {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 28px;
+        }
+
+        .signal-icon {
+            position: relative;
+            width: 72px;
+            height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Círculo pulsante de fondo */
+        .signal-icon::before {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            background: color-mix(in srgb, var(--brand) 10%, transparent);
+            animation: pulse 2.4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1);   opacity: 1;   }
+            50%       { transform: scale(1.15); opacity: 0.5; }
+        }
+
+        /* SVG inline del ícono wifi-off */
+        .signal-icon svg {
+            width: 40px;
+            height: 40px;
+            stroke: var(--brand);
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ============================================================
+           LOGO / MARCA
+           ============================================================ */
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .brand-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--brand);
+            flex-shrink: 0;
+        }
+
+        .brand-name {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--brand);
+            opacity: 0.75;
+        }
+
+        /* ============================================================
+           TEXTO
+           ============================================================ */
+        h1 {
+            font-size: clamp(22px, 5vw, 26px);
+            font-weight: 700;
+            line-height: 1.2;
+            color: var(--text-main);
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 15px;
+            color: var(--text-sub);
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        /* ============================================================
+           INDICADOR DE ESTADO
+           ============================================================ */
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: color-mix(in srgb, var(--danger) 8%, transparent);
+            border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
+            border-radius: 100px;
+            padding: 8px 16px;
+            margin-bottom: 28px;
+            font-size: 13px;
+            color: var(--danger);
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--danger);
+            animation: blink 1.6s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.25; }
+        }
+
+        /* ============================================================
+           BOTÓN DE REINTENTAR
+           ============================================================ */
+        .btn-retry {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: var(--brand);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            padding: 13px 32px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+            box-shadow: 0 4px 16px color-mix(in srgb, var(--brand) 35%, transparent);
+            width: 100%;
+            min-height: 48px; /* iOS HIG: 44px mínimo para touch targets */
+            letter-spacing: 0.01em;
+        }
+
+        .btn-retry:hover {
+            background: var(--brand-light);
+            box-shadow: 0 6px 20px color-mix(in srgb, var(--brand) 45%, transparent);
+        }
+
+        .btn-retry:active {
+            transform: scale(0.97);
+        }
+
+        /* Ícono de flecha en el botón */
+        .btn-retry svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .btn-retry:hover svg {
+            transform: rotate(180deg);
+        }
+
+        /* ============================================================
+           TIPS — Qué hacer sin conexión
+           ============================================================ */
+        .tips {
+            margin-top: 28px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .tips-title {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+        }
+
+        .tips-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            text-align: left;
+        }
+
+        .tips-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-sub);
+            line-height: 1.5;
+        }
+
+        .tip-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            border-radius: 6px;
+            background: color-mix(in srgb, var(--brand) 12%, transparent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1px;
+        }
+
+        .tip-icon svg {
+            width: 12px;
+            height: 12px;
+            stroke: var(--brand);
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* ============================================================
+           FOOTER
+           ============================================================ */
+        .footer {
+            position: relative;
+            z-index: 1;
+            margin-top: 20px;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        /* ============================================================
+           ESTADO: Reintentando
+           ============================================================ */
+        .btn-retry.loading {
+            background: var(--brand-dark);
+            pointer-events: none;
+        }
+
+        .btn-retry.loading svg {
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+        /* ============================================================
+           ESTADO: Conexión recuperada
+           ============================================================ */
+        .status-bar.online {
+            background: color-mix(in srgb, var(--success) 10%, transparent);
+            border-color: color-mix(in srgb, var(--success) 25%, transparent);
+            color: var(--success);
+        }
+
+        .status-bar.online .status-dot {
+            background: var(--success);
+            animation: none;
+        }
+
+        /* ============================================================
+           RESPONSIVE
+           ============================================================ */
+        @media (max-width: 480px) {
+            .card {
+                padding: 36px 24px 32px;
+                border-radius: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+
+        <!-- Marca SIGMA -->
+        <div class="brand">
+            <span class="brand-dot"></span>
+            <span class="brand-name">SIGMA</span>
+            <span class="brand-dot"></span>
+        </div>
+
+        <!-- Ícono animado -->
+        <div class="icon-wrap">
+            <div class="signal-icon">
+                <!-- SVG: wifi-off (Feather Icons style) -->
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                    <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+                    <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+                    <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+                    <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                    <line x1="12" y1="20" x2="12.01" y2="20"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Título -->
+        <h1>Sin conexión a internet</h1>
+
+        <p class="subtitle">
+            No se puede conectar con el sistema. Por favor verifica
+            tu conexión de red e intenta de nuevo.
+        </p>
+
+        <!-- Indicador de estado -->
+        <div class="status-bar" id="statusBar">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Sin conexión</span>
+        </div>
+
+        <!-- Botón reintentar -->
+        <button class="btn-retry" id="btnRetry" onclick="reintentar()">
+            <!-- SVG: refresh-cw -->
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="23 4 23 10 17 10"/>
+                <polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            Reintentar conexión
+        </button>
+
+        <!-- Tips -->
+        <div class="tips">
+            <p class="tips-title">Mientras tanto, puedes</p>
+            <ul class="tips-list">
+                <li>
+                    <span class="tip-icon">
+                        <svg viewBox="0 0 24 24"><path d="M1 6s4-6 11-6 11 6 11 6"/><path d="M1 12s4-6 11-6 11 6 11 6"/><circle cx="12" cy="18" r="2"/></svg>
+                    </span>
+                    Verificar que tu Wi-Fi o datos móviles estén activos
+                </li>
+                <li>
+                    <span class="tip-icon">
+                        <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    </span>
+                    Activar y desactivar el modo avión para restablecer la conexión
+                </li>
+                <li>
+                    <span class="tip-icon">
+                        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    </span>
+                    Intentar recargar la página en unos segundos
+                </li>
+            </ul>
+        </div>
+
+    </div>
+
+    <p class="footer">
+        Sistema Integral de Gestión &mdash; SIGMA
+    </p>
+
+    <script>
+        /**
+         * Lógica de la página offline.
+         *
+         * Escucha el evento 'online' del navegador: cuando se recupera
+         * la conexión, actualiza el indicador de estado y redirige
+         * automáticamente al usuario de vuelta al sistema.
+         */
+
+        const statusBar  = document.getElementById('statusBar');
+        const statusDot  = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const btnRetry   = document.getElementById('btnRetry');
+
+        // Escuchar recuperación de conexión automáticamente
+        window.addEventListener('online', function () {
+            if (statusBar)  { statusBar.classList.add('online'); }
+            if (statusText) { statusText.textContent = 'Conexión recuperada — redirigiendo...'; }
+            if (btnRetry)   { btnRetry.classList.add('loading'); }
+
+            // Pequeña pausa para que el usuario vea el feedback antes de redirigir
+            setTimeout(function () {
+                window.location.href = '/';
+            }, 1200);
+        });
+
+        /**
+         * Botón "Reintentar conexión".
+         * Muestra estado de carga y vuelve a intentar navegar al inicio.
+         */
+        function reintentar() {
+            if (!btnRetry) return;
+
+            btnRetry.classList.add('loading');
+
+            // Verificar si hay conexión antes de navegar
+            if (navigator.onLine) {
+                window.location.href = '/';
+            } else {
+                // Sigue sin conexión — mostrar feedback y restaurar botón
+                setTimeout(function () {
+                    if (btnRetry) btnRetry.classList.remove('loading');
+                }, 1000);
+            }
+        }
+    </script>
+
+</body>
+</html>

@@ -997,6 +997,35 @@
     <!-- JavaScript específico por página (opcional) -->
     {% block extra_js %}
     {% endblock %}
+
+    <!-- ================================================================
+         PWA: Registro del Service Worker
+         ================================================================
+         EXPLICACIÓN PARA PRINCIPIANTES:
+         Este script le dice al navegador que registre nuestro Service Worker.
+         El SW se carga desde /service_worker.js (raíz del dominio) para que
+         tenga control sobre TODAS las páginas del sitio (scope: '/').
+
+         'serviceWorker' in navigator → verificamos que el navegador lo soporte.
+         Todos los navegadores modernos lo soportan (Chrome, Firefox, Safari, Edge).
+
+         window.addEventListener('load') → esperamos a que la página termine
+         de cargar para no interferir con el render inicial.
+    -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker
+                    .register('/service_worker.js', { scope: '/' })
+                    .then(function (registration) {
+                        console.log('[SIGMA SW] Registrado correctamente. Scope:', registration.scope);
+                    })
+                    .catch(function (error) {
+                        console.warn('[SIGMA SW] Error al registrar:', error);
+                    });
+            });
+        }
+    </script>
 </body>
 
 </html>
