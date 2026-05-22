@@ -27,6 +27,7 @@ Este archivo contiene 2 signals principales:
 
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.urls import reverse
 from django.utils import timezone
 from .models import (
     OrdenServicio,
@@ -326,6 +327,10 @@ def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwarg
     # Importamos aquí (lazy) para evitar import circular al cargar el módulo
     from notificaciones.push_service import enviar_push_a_usuario  # noqa
 
+    # URL de destino al tocar la notificación — generada con reverse()
+    # para que nunca se desincronice si cambia el prefijo de la app.
+    url_orden = reverse('servicio_tecnico:detalle_orden', kwargs={'orden_id': orden.pk})
+
     # Etiqueta legible de la orden: usar orden_cliente si existe,
     # sino el número interno del sistema (fallback).
     # La relación es: OrdenServicio → detalle_equipo (related_name) → orden_cliente
@@ -344,7 +349,7 @@ def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwarg
                 usuario=tecnico.user,
                 titulo=f'Orden {etiqueta_orden}',
                 mensaje=f'Estado actualizado → {estado_nuevo_label}',
-                url=f'/ordenes/{orden.pk}/',
+                url=url_orden,
             )
 
     # ── CAMBIO DE TÉCNICO ────────────────────────────────────────────────────
@@ -357,7 +362,7 @@ def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwarg
                 usuario=tecnico_nuevo.user,
                 titulo=f'Te asignaron la orden {etiqueta_orden}',
                 mensaje='Ahora eres el técnico responsable de esta orden.',
-                url=f'/ordenes/{orden.pk}/',
+                url=url_orden,
             )
 
         # Técnico anterior → notificación de remoción
@@ -368,7 +373,7 @@ def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwarg
                 usuario=tecnico_anterior.user,
                 titulo=f'Orden {etiqueta_orden}',
                 mensaje='Fuiste removido como técnico de esta orden.',
-                url=f'/ordenes/{orden.pk}/',
+                url=url_orden,
             )
 
     # ── NUEVO COMENTARIO ─────────────────────────────────────────────────────
@@ -386,7 +391,7 @@ def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwarg
                 usuario=tecnico.user,
                 titulo=f'Nuevo comentario en {etiqueta_orden}',
                 mensaje=f'{autor} dejó un comentario en tu orden.',
-                url=f'/ordenes/{orden.pk}/',
+                url=url_orden,
             )
 
 
