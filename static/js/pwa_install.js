@@ -31,7 +31,7 @@ const DISMISSED_KEY = 'pwa_install_dismissed_at';
 /** Días de cooldown tras cerrar el banner */
 const COOLDOWN_DIAS = 7;
 /** Milisegundos de espera antes de mostrar el banner (no mostrar de inmediato) */
-const DELAY_MOSTRAR_MS = 20000; // 20 segundos
+const DELAY_MOSTRAR_MS = 7000; // 7 segundos
 // ── Helpers de detección ───────────────────────────────────────────────────────
 /**
  * Devuelve true si la app ya está instalada y corriendo en modo standalone.

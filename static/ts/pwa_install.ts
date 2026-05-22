@@ -51,7 +51,7 @@ const DISMISSED_KEY = 'pwa_install_dismissed_at';
 const COOLDOWN_DIAS = 7;
 
 /** Milisegundos de espera antes de mostrar el banner (no mostrar de inmediato) */
-const DELAY_MOSTRAR_MS = 20_000; // 20 segundos
+const DELAY_MOSTRAR_MS = 7_000; // 7 segundos
 
 // ── Helpers de detección ───────────────────────────────────────────────────────
 
