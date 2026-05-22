@@ -283,3 +283,127 @@ POSIBLES MEJORAS A IMPLEMENTAR:
    - Registrar IP del usuario que hace el cambio
    - Guardar snapshot completo del objeto antes del cambio
 """
+
+
+# ============================================================================
+# SIGNAL 3: NOTIFICACIONES WEB PUSH — TÉCNICO ASIGNADO
+# ============================================================================
+
+import logging
+
+logger_push = logging.getLogger('notificaciones')
+
+
+@receiver(post_save, sender=HistorialOrden)
+def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwargs):
+    """
+    Envía una notificación push al técnico asignado cuando:
+      - Cambia el estado de su orden
+      - Es reasignado (nuevo técnico) o removido (técnico anterior)
+      - Alguien comenta en una orden que tiene asignada
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta señal se dispara cada vez que se crea un nuevo registro en HistorialOrden.
+    HistorialOrden registra todos los eventos de una orden: cambios de estado,
+    cambios de técnico, comentarios, etc.
+
+    Por qué usar post_save de HistorialOrden en vez de tocar OrdenServicio.save():
+    - Evita importar 'notificaciones' desde 'servicio_tecnico/models.py'
+      (lo que causaría un "import circular" que rompe Django al iniciar)
+    - HistorialOrden ya tiene TODA la info que necesitamos (tipo_evento,
+      tecnico_anterior, tecnico_nuevo, orden con su técnico asignado)
+    - El código queda en un solo lugar y no hay que modificar models.py
+
+    Solo se procesa si la fila fue CREADA (created=True).
+    Las actualizaciones de HistorialOrden existentes no disparan push.
+    """
+    if not created:
+        return
+
+    tipo = instance.tipo_evento
+    orden = instance.orden
+
+    # Importamos aquí (lazy) para evitar import circular al cargar el módulo
+    from notificaciones.push_service import enviar_push_a_usuario  # noqa
+
+    # Etiqueta legible de la orden: usar orden_cliente si existe,
+    # sino el número interno del sistema (fallback).
+    # La relación es: OrdenServicio → detalle_equipo (related_name) → orden_cliente
+    try:
+        etiqueta_orden = orden.detalle_equipo.orden_cliente or orden.numero_orden_interno
+    except Exception:
+        etiqueta_orden = orden.numero_orden_interno
+
+    # ── CAMBIO DE ESTADO ─────────────────────────────────────────────────────
+    if tipo == 'cambio_estado':
+        tecnico = orden.tecnico_asignado_actual
+        if tecnico and tecnico.user:
+            estado_nuevo_label = instance.estado_nuevo or orden.estado
+            _push_seguro(
+                enviar_push_a_usuario,
+                usuario=tecnico.user,
+                titulo=f'Orden {etiqueta_orden}',
+                mensaje=f'Estado actualizado → {estado_nuevo_label}',
+                url=f'/ordenes/{orden.pk}/',
+            )
+
+    # ── CAMBIO DE TÉCNICO ────────────────────────────────────────────────────
+    elif tipo == 'cambio_tecnico':
+        # Técnico nuevo → notificación de asignación
+        tecnico_nuevo = instance.tecnico_nuevo
+        if tecnico_nuevo and tecnico_nuevo.user:
+            _push_seguro(
+                enviar_push_a_usuario,
+                usuario=tecnico_nuevo.user,
+                titulo=f'Te asignaron la orden {etiqueta_orden}',
+                mensaje='Ahora eres el técnico responsable de esta orden.',
+                url=f'/ordenes/{orden.pk}/',
+            )
+
+        # Técnico anterior → notificación de remoción
+        tecnico_anterior = instance.tecnico_anterior
+        if tecnico_anterior and tecnico_anterior.user:
+            _push_seguro(
+                enviar_push_a_usuario,
+                usuario=tecnico_anterior.user,
+                titulo=f'Orden {etiqueta_orden}',
+                mensaje='Fuiste removido como técnico de esta orden.',
+                url=f'/ordenes/{orden.pk}/',
+            )
+
+    # ── NUEVO COMENTARIO ─────────────────────────────────────────────────────
+    elif tipo == 'comentario':
+        tecnico = orden.tecnico_asignado_actual
+        if tecnico and tecnico.user:
+            # No notificar al técnico si él mismo fue quien comentó
+            comentarista = instance.usuario
+            if comentarista and comentarista.pk == tecnico.pk:
+                return
+
+            autor = comentarista.nombre_completo if comentarista else 'Alguien'
+            _push_seguro(
+                enviar_push_a_usuario,
+                usuario=tecnico.user,
+                titulo=f'Nuevo comentario en {etiqueta_orden}',
+                mensaje=f'{autor} dejó un comentario en tu orden.',
+                url=f'/ordenes/{orden.pk}/',
+            )
+
+
+def _push_seguro(fn, **kwargs):
+    """
+    Llama a enviar_push_a_usuario envuelto en try/except para que
+    un error de push nunca rompa el flujo principal de la aplicación.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Si el servidor de push de Google está caído o hay un error de red,
+    no queremos que eso haga fallar el guardado de la orden. Por eso
+    capturamos cualquier error aquí y solo lo registramos en el log.
+    """
+    try:
+        fn(**kwargs)
+    except Exception as exc:
+        logger_push.error(
+            f'[PUSH] Error en _push_seguro: {exc}',
+            exc_info=True,
+        )

@@ -908,3 +908,27 @@ AI_ENABLED: bool = bool(_ai_models)
 # El dispatcher detecta automáticamente el proveedor por el prefijo "gemini".
 
 CHAT_SEGUIMIENTO_MODEL: str = config('CHAT_SEGUIMIENTO_MODEL', default='gemma4:e2b')
+
+# ----------------------------------------------------------------------------
+# WEB PUSH — VAPID KEYS
+# ----------------------------------------------------------------------------
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# VAPID (Voluntary Application Server Identification) es un estándar de seguridad
+# para notificaciones push. El servidor genera un par de llaves:
+#   - VAPID_PRIVATE_KEY : Llave secreta (NUNCA compartir, solo en el servidor)
+#   - VAPID_PUBLIC_KEY  : Llave pública (se envía al navegador para identificar
+#                         quién manda las notificaciones)
+#   - VAPID_CLAIMS_EMAIL: Email del administrador (requerido por el estándar)
+#
+# Para regenerar las llaves (solo si es necesario, invalida suscripciones activas):
+#   python -c "
+#   from py_vapid import Vapid; import base64
+#   from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
+#   v = Vapid(); v.generate_keys()
+#   priv = base64.urlsafe_b64encode(v._private_key.private_bytes(Encoding.DER, PrivateFormat.PKCS8, NoEncryption())).rstrip(b'=').decode()
+#   pub = base64.urlsafe_b64encode(v._private_key.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)).rstrip(b'=').decode()
+#   print('PRIVATE:', priv); print('PUBLIC:', pub)"
+
+VAPID_PRIVATE_KEY: str = config('VAPID_PRIVATE_KEY', default='')
+VAPID_PUBLIC_KEY:  str = config('VAPID_PUBLIC_KEY',  default='')
+VAPID_CLAIMS_EMAIL: str = config('VAPID_CLAIMS_EMAIL', default='admin@sigma.local')

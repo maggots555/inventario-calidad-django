@@ -1166,3 +1166,152 @@
     color: var(--pcard-gold-light);
 }
 
+/* ============================================================
+   BOTÓN TOGGLE NOTIFICACIONES PUSH (Mi Perfil)
+   Comparte la estética gold outline del pcard-download-btn,
+   con variantes de color según estado: inactivo / activo / bloqueado
+   ============================================================ */
+
+.pcard-push-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    margin-top: 0.5rem;
+
+    padding: 0.45rem 1.1rem;
+    border-radius: 8px;
+    min-height: 44px;
+
+    /* Estado por defecto: igual que download btn (dorado) */
+    color: var(--pcard-gold);
+    background: rgba(212, 168, 67, 0.06);
+    border: 1px solid rgba(212, 168, 67, 0.30);
+
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+
+    transition: background 0.22s ease, border-color 0.22s ease,
+                color 0.22s ease, box-shadow 0.22s ease, transform 0.18s ease;
+}
+.pcard-push-btn i {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.pcard-push-btn:hover:not(:disabled),
+.pcard-push-btn:focus-visible:not(:disabled) {
+    background: rgba(212, 168, 67, 0.14);
+    border-color: var(--pcard-gold);
+    color: var(--pcard-gold-light);
+    box-shadow: 0 0 14px rgba(212, 168, 67, 0.18);
+    transform: translateY(-1px);
+    outline: none;
+}
+.pcard-push-btn:active:not(:disabled) {
+    transform: translateY(0);
+    background: rgba(212, 168, 67, 0.20);
+}
+.pcard-push-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Variante activa (push encendido) — verde */
+.pcard-push-btn.is-active {
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.07);
+    border-color: rgba(74, 222, 128, 0.35);
+}
+.pcard-push-btn.is-active:hover:not(:disabled),
+.pcard-push-btn.is-active:focus-visible:not(:disabled) {
+    background: rgba(74, 222, 128, 0.14);
+    border-color: #4ade80;
+    box-shadow: 0 0 14px rgba(74, 222, 128, 0.18);
+}
+
+/* Variante bloqueado — rojo apagado */
+.pcard-push-btn.is-blocked {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.07);
+    border-color: rgba(248, 113, 113, 0.30);
+    cursor: not-allowed;
+    opacity: 0.75;
+}
+
+/* Badge de estado */
+.pcard-push-badge {
+    display: inline-block;
+    padding: 0.2em 0.6em;
+    border-radius: 20px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1px solid currentColor;
+}
+.pcard-push-badge.is-active  { color: #4ade80; }
+.pcard-push-badge.is-inactive { color: var(--pcard-gold); opacity: 0.7; }
+.pcard-push-badge.is-blocked  { color: #f87171; }
+.pcard-push-badge.is-loading  { color: var(--pcard-text-muted, #94a3b8); }
+
+/* Texto descriptivo */
+.pcard-push-label {
+    font-size: 0.74rem;
+    color: var(--pcard-text-muted, #94a3b8);
+    margin-bottom: 0.1rem;
+}
+
+/* Tooltip bloqueado */
+.pcard-push-denied {
+    margin-top: 0.85rem;
+    padding: 0.85rem 1rem;
+    border-radius: 8px;
+    background: rgba(248, 113, 113, 0.08);
+    border: 1px solid rgba(248, 113, 113, 0.25);
+    font-size: 0.74rem;
+    color: #fca5a5;
+    line-height: 1.55;
+}
+.pcard-push-denied strong {
+    color: #f87171;
+    display: block;
+    margin-bottom: 0.4rem;
+}
+.pcard-push-denied ol {
+    padding-left: 1.1rem;
+    margin: 0.4rem 0 0.5rem;
+}
+.pcard-push-denied li + li {
+    margin-top: 0.3rem;
+}
+.pcard-push-denied .note {
+    opacity: 0.7;
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+}
+
+/* ── Dark mode overrides ────────────────────────────────────────── */
+[data-bs-theme="dark"] .pcard-push-btn {
+    color: var(--pcard-gold);
+    background: rgba(212, 168, 67, 0.07);
+    border-color: rgba(212, 168, 67, 0.28);
+}
+[data-bs-theme="dark"] .pcard-push-btn.is-active {
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.08);
+    border-color: rgba(74, 222, 128, 0.30);
+}
+[data-bs-theme="dark"] .pcard-push-btn.is-blocked {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.08);
+}
+[data-bs-theme="dark"] .pcard-push-denied {
+    background: rgba(248, 113, 113, 0.10);
+    border-color: rgba(248, 113, 113, 0.22);
+    color: #fca5a5;
+}
+

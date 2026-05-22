@@ -14,22 +14,30 @@ La vista de listar usa cache de Redis (10 segundos) para evitar consultas
 a la base de datos en cada polling. Las vistas de escritura (marcar, eliminar)
 invalidan el cache automáticamente para que el próximo polling refleje los cambios.
 
-Endpoints disponibles:
+Endpoints disponibles (campanita 🔔):
     GET  /notificaciones/api/listar/           → Lista últimas 20 notificaciones
     POST /notificaciones/api/marcar/<id>/      → Marca una como leída
     POST /notificaciones/api/marcar-todas/     → Marca todas como leídas
     POST /notificaciones/api/eliminar/<id>/    → Elimina una notificación
     POST /notificaciones/api/eliminar-todas/   → Elimina todas las notificaciones
+
+Endpoints Web Push:
+    GET  /notificaciones/push/vapid-key/       → Devuelve la llave pública VAPID
+    POST /notificaciones/push/suscribir/       → Guarda una suscripción push
+    POST /notificaciones/push/cancelar/        → Desactiva suscripción push
 """
 
+import json
 import logging
 
+from django.conf import settings
 from django.core.cache import cache
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
 
-from .models import Notificacion
+from .models import Notificacion, PushSubscription
 
 logger = logging.getLogger('notificaciones')
 
@@ -220,3 +228,129 @@ def eliminar_todas(request):
     )
 
     return JsonResponse({'ok': True, 'eliminadas': eliminadas})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WEB PUSH — Endpoints de suscripción
+# ══════════════════════════════════════════════════════════════════════════════
+
+@login_required
+@require_GET
+def vapid_public_key(request):
+    """
+    Devuelve la llave pública VAPID al navegador.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Antes de suscribirse a push, el navegador necesita conocer la llave pública
+    del servidor para poder cifrar los mensajes. Esta vista se la entrega.
+    Es como darle la dirección de tu buzón de correo al cartero.
+
+    La llave está en settings.py (leída desde .env) y es segura de publicar.
+    """
+    return JsonResponse({'vapid_public_key': settings.VAPID_PUBLIC_KEY})
+
+
+@login_required
+@require_POST
+def suscribir_push(request):
+    """
+    Guarda o reactiva la suscripción push de un usuario.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cuando el usuario acepta las notificaciones, el navegador nos da tres datos:
+    - endpoint : URL del servidor push del navegador
+    - p256dh   : Clave pública del navegador (para cifrar)
+    - auth     : Token secreto del navegador (para autenticar)
+
+    Guardamos esos datos en PushSubscription para poder enviar notificaciones
+    después. Si ya existe una suscripción para ese endpoint (mismo dispositivo),
+    la reactivamos en vez de crear una nueva.
+
+    Body esperado (JSON):
+    {
+        "endpoint": "https://...",
+        "keys": { "p256dh": "...", "auth": "..." }
+    }
+    """
+    try:
+        data = json.loads(request.body)
+        endpoint = data.get('endpoint', '').strip()
+        keys     = data.get('keys', {})
+        p256dh   = keys.get('p256dh', '').strip()
+        auth     = keys.get('auth', '').strip()
+
+        if not all([endpoint, p256dh, auth]):
+            return JsonResponse(
+                {'ok': False, 'error': 'Datos de suscripción incompletos'},
+                status=400
+            )
+
+        user_agent = request.META.get('HTTP_USER_AGENT', '')[:300]
+
+        # update_or_create: si ya existe ese endpoint para este usuario,
+        # lo reactiva; si no existe, lo crea nuevo.
+        suscripcion, creada = PushSubscription.objects.update_or_create(
+            usuario=request.user,
+            endpoint=endpoint,
+            defaults={
+                'p256dh':     p256dh,
+                'auth':       auth,
+                'activa':     True,
+                'user_agent': user_agent,
+            }
+        )
+
+        accion = 'creada' if creada else 'reactivada'
+        logger.info(
+            f'[PUSH] Suscripción {accion} para {request.user.username} '
+            f'(id={suscripcion.pk})'
+        )
+
+        return JsonResponse({'ok': True, 'accion': accion})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+    except Exception as exc:
+        logger.error(f'[PUSH] Error al guardar suscripción: {exc}', exc_info=True)
+        return JsonResponse({'ok': False, 'error': 'Error interno'}, status=500)
+
+
+@login_required
+@require_POST
+def cancelar_push(request):
+    """
+    Desactiva la suscripción push de un usuario para un endpoint específico.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cuando el usuario desactiva las notificaciones desde su perfil,
+    marcamos su suscripción como inactiva (no la borramos, por si la reactiva).
+
+    Body esperado (JSON):
+    { "endpoint": "https://..." }
+    """
+    try:
+        data     = json.loads(request.body)
+        endpoint = data.get('endpoint', '').strip()
+
+        if not endpoint:
+            # Si no viene endpoint, desactivar TODAS las suscripciones del usuario
+            desactivadas = PushSubscription.objects.filter(
+                usuario=request.user, activa=True
+            ).update(activa=False)
+        else:
+            desactivadas = PushSubscription.objects.filter(
+                usuario=request.user, endpoint=endpoint, activa=True
+            ).update(activa=False)
+
+        logger.info(
+            f'[PUSH] {desactivadas} suscripción(es) desactivada(s) '
+            f'para {request.user.username}'
+        )
+
+        return JsonResponse({'ok': True, 'desactivadas': desactivadas})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+    except Exception as exc:
+        logger.error(f'[PUSH] Error al cancelar suscripción: {exc}', exc_info=True)
+        return JsonResponse({'ok': False, 'error': 'Error interno'}, status=500)

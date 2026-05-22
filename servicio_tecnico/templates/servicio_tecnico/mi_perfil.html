@@ -480,6 +480,64 @@
             {% endif %}
 
 
+            {# ── Notificaciones Push ─────────────────── #}
+            {% if not es_vista_directorio %}
+            <div class="pcard-divider"></div>
+            <div class="pcard-stats-section">
+                <div class="pcard-stats-title">
+                    <i class="bi bi-bell" style="color:var(--pcard-gold)"></i>
+                    Notificaciones Push
+                </div>
+
+                <div id="push-toggle-wrapper">
+
+                    {# ── Estado visual ── #}
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span id="push-toggle-badge" class="pcard-push-badge is-loading">Cargando</span>
+                        <span id="push-toggle-label" class="pcard-push-label">
+                            Verificando estado del navegador...
+                        </span>
+                    </div>
+
+                    {# ── Botón toggle ── #}
+                    <button id="push-toggle-btn"
+                            type="button"
+                            class="pcard-push-btn"
+                            disabled>
+                        <span class="spinner-border spinner-border-sm"></span>
+                        Cargando...
+                    </button>
+
+                    {# ── Aviso cuando el permiso está BLOQUEADO ── #}
+                    {# Solo se muestra via JS cuando Notification.permission === 'denied' #}
+                    <div id="push-denied-tooltip" class="pcard-push-denied" style="display:none;" role="alert">
+                        <strong><i class="bi bi-shield-exclamation me-1"></i>Notificaciones bloqueadas por el navegador</strong>
+                        Bloqueaste las notificaciones en este navegador. Para desbloquearlas:
+                        <ol>
+                            <li>
+                                <strong>Chrome / Edge (Android y escritorio):</strong>
+                                Toca el candado <i class="bi bi-lock"></i> en la barra de direcciones →
+                                <em>Permisos del sitio</em> → <em>Notificaciones</em> → <strong>Permitir</strong>.
+                            </li>
+                            <li>
+                                <strong>Firefox:</strong>
+                                Toca el escudo o candado → <em>Más información</em> →
+                                <em>Permisos</em> → <em>Enviar notificaciones</em> → <strong>Permitir</strong>.
+                            </li>
+                            <li>
+                                <strong>Safari (iPhone / iPad):</strong>
+                                Configuración → Safari → <em>Notificaciones</em> →
+                                busca este sitio → <strong>Permitir</strong>.
+                            </li>
+                        </ol>
+                        <p class="note">Después de desbloquear, recarga la página y activa las notificaciones.</p>
+                    </div>
+
+                </div>{# /#push-toggle-wrapper #}
+            </div>
+            {% endif %}{# /not es_vista_directorio #}
+
+
             {# ── Footer ─────────────────────────────── #}
             <div class="pcard-divider"></div>
             <div class="pcard-card-footer">
@@ -496,4 +554,7 @@
 
 {% block extra_js %}
 <script src="{% static 'js/mi_perfil.js' %}"></script>
+{% if not es_vista_directorio %}
+<script src="{% static 'js/push_notifications.js' %}"></script>
+{% endif %}
 {% endblock %}

@@ -223,4 +223,74 @@ async function estrategiaNavigacion(request) {
         });
     }
 }
+// ══════════════════════════════════════════════════════════════════════════════
+// WEB PUSH — Recibir y mostrar notificaciones
+// ══════════════════════════════════════════════════════════════════════════════
+/**
+ * Evento 'push': se dispara cuando el servidor envía una notificación push.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Cuando Django llama a pywebpush, el navegador entrega el mensaje aquí
+ * aunque el usuario no tenga el sitio abierto. El SW es quien recibe
+ * el mensaje y llama a showNotification() para que el SO muestre la
+ * notificación nativa del dispositivo.
+ *
+ * El payload que llega es el JSON que mandamos desde push_service.py:
+ * { "titulo": "...", "mensaje": "...", "url": "..." }
+ */
+sw.addEventListener('push', (event) => {
+    var _a, _b, _c;
+    // Estructura por defecto si el payload viene vacío o malformado
+    let titulo = 'SIGMA';
+    let mensaje = 'Tienes una nueva notificación.';
+    let url = '/';
+    if (event.data) {
+        try {
+            const data = event.data.json();
+            titulo = (_a = data.titulo) !== null && _a !== void 0 ? _a : titulo;
+            mensaje = (_b = data.mensaje) !== null && _b !== void 0 ? _b : mensaje;
+            url = (_c = data.url) !== null && _c !== void 0 ? _c : url;
+        }
+        catch {
+            console.warn('[SIGMA SW] No se pudo parsear el payload push.');
+        }
+    }
+    const opciones = {
+        body: mensaje,
+        icon: '/static/images/favicon.svg',
+        badge: '/static/images/favicon.svg',
+        tag: url, // Agrupar notificaciones del mismo url (evita duplicados)
+        data: { url }, // Pasar la URL al evento notificationclick
+    };
+    // waitUntil garantiza que el SW no se duerma antes de mostrar la notificación
+    event.waitUntil(sw.registration.showNotification(titulo, opciones));
+});
+/**
+ * Evento 'notificationclick': se dispara cuando el usuario toca la notificación.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Cuando el usuario toca la notificación en su teléfono o computadora,
+ * este evento se activa. Aquí decidimos qué hacer:
+ * 1. Cerrar la notificación.
+ * 2. Si ya hay una pestaña abierta del sitio → enfocarla y navegar.
+ * 3. Si no hay pestaña abierta → abrir una nueva.
+ */
+sw.addEventListener('notificationclick', (event) => {
+    var _a, _b;
+    event.notification.close();
+    const urlDestino = (_b = (_a = event.notification.data) === null || _a === void 0 ? void 0 : _a.url) !== null && _b !== void 0 ? _b : '/';
+    event.waitUntil(sw.clients
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then((clientList) => {
+        // Buscar una pestaña existente del sitio
+        for (const client of clientList) {
+            if ('focus' in client) {
+                client.navigate(urlDestino);
+                return client.focus();
+            }
+        }
+        // No hay pestaña → abrir nueva
+        return sw.clients.openWindow(urlDestino);
+    }));
+});
 //# sourceMappingURL=service_worker.js.map
