@@ -68,6 +68,10 @@ def _enviar_una_suscripcion(suscripcion, payload: dict) -> bool:
             vapid_private_key=settings.VAPID_PRIVATE_KEY,
             vapid_claims=vapid_claims,
             content_encoding="aes128gcm",
+            ttl=86400,  # 24 horas: el servidor push reintenta la entrega si el dispositivo
+                        # no está conectado en el momento del envío. Sin este parámetro
+                        # (TTL=0 por defecto) el mensaje se descarta inmediatamente si
+                        # el dispositivo está offline, lo que causa entregas intermitentes.
         )
         return True
 
