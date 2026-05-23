@@ -442,6 +442,15 @@ def notificar_dispatchers_ingreso(sender, instance: DetalleEquipo, created: bool
     if not created:
         return
 
+    # Solo notificar para órdenes EN GARANTÍA.
+    # No podemos leer instance.orden.es_fuera_garantia porque ese campo se
+    # sincroniza DESPUÉS de que este signal se dispara (en DetalleEquipo.save()
+    # la actualización ocurre tras super().save()). Replicamos la misma lógica
+    # del modelo: prefijo OOW- o FL- = fuera de garantía.
+    orden_cliente_upper = (instance.orden_cliente or '').upper().strip()
+    if orden_cliente_upper.startswith('OOW-') or orden_cliente_upper.startswith('FL-'):
+        return
+
     from notificaciones.push_service import enviar_push_a_usuario  # noqa
     from inventario.models import Empleado                          # noqa
 
@@ -486,6 +495,10 @@ def notificar_dispatchers_finalizacion(sender, instance: OrdenServicio, created:
     notificar_dispatchers_ingreso sobre DetalleEquipo.
     """
     if created:
+        return
+
+    # Solo notificar para órdenes EN GARANTÍA
+    if instance.es_fuera_garantia:
         return
 
     estado_anterior = getattr(instance, '_estado_anterior', None)
