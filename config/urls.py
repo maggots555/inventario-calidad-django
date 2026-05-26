@@ -19,6 +19,8 @@ from django.contrib.auth import views as auth_views
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic.base import RedirectView
+from django.templatetags.static import static as static_file
 from inventario import views as inventario_views
 from config.media_views import serve_media_from_multiple_locations
 from config.pwa_views import service_worker_view, offline_view
@@ -30,6 +32,16 @@ from servicio_tecnico.views import (
 )
 
 urlpatterns = [
+    # ── Favicons e iconos en la raíz ──
+    # iOS Safari y todos los navegadores buscan estos archivos automáticamente en /,
+    # no en /static/. Redireccionamos permanentemente a los archivos estáticos reales.
+    path('favicon.ico', RedirectView.as_view(url=static_file('images/favicon.ico'), permanent=True), name='favicon'),
+    path('apple-touch-icon.png', RedirectView.as_view(url=static_file('images/apple-touch-icon.png'), permanent=True), name='apple_touch_icon'),
+    path('apple-touch-icon-precomposed.png', RedirectView.as_view(url=static_file('images/apple-touch-icon-precomposed.png'), permanent=True), name='apple_touch_icon_precomposed'),
+    path('apple-touch-icon-120x120.png', RedirectView.as_view(url=static_file('images/apple-touch-icon-120x120.png'), permanent=True), name='apple_touch_icon_120'),
+    path('apple-touch-icon-120x120-precomposed.png', RedirectView.as_view(url=static_file('images/apple-touch-icon-120x120-precomposed.png'), permanent=True), name='apple_touch_icon_120_precomposed'),
+    path('apple-touch-icon-152x152.png', RedirectView.as_view(url=static_file('images/apple-touch-icon-152x152.png'), permanent=True), name='apple_touch_icon_152'),
+
     # ── PWA: Service Worker (debe estar en la raíz para tener scope global) ──
     # El SW intercepta peticiones de todo el sitio. Si estuviera en /static/js/
     # solo controlaría esa sub-ruta, que no sirve de nada.
