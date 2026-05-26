@@ -563,6 +563,7 @@ class UploadImagenesDual {
      * EXPLICACIÓN PARA PRINCIPIANTES:
      * Cada tipo de imagen tiene una implicación diferente en el flujo de trabajo:
      * - ingreso    → cambia la orden a "En Diagnóstico" automáticamente
+     * - reparacion → cambia la orden a "Control de Calidad" automáticamente
      * - egreso     → cambia la orden a "Finalizado" automáticamente (¡irreversible!)
      * - los demás  → solo agregan fotos, sin cambio de estado
      * Informamos al usuario antes de que suba para que tome la decisión consciente.
@@ -576,7 +577,7 @@ class UploadImagenesDual {
         const avisos: Record<string, AvisoConfig> = {
             ingreso:      { clase: 'aviso-ingreso',      icono: 'bi-info-circle-fill',      texto: 'Subir como <strong>Ingreso</strong> cambiará el estado de la orden a <strong>En Diagnóstico</strong>.' },
             diagnostico:  { clase: 'aviso-diagnostico',  icono: 'bi-search',                texto: 'Fotos tomadas durante el <strong>diagnóstico</strong> del equipo. No cambia el estado de la orden.' },
-            reparacion:   { clase: 'aviso-reparacion',   icono: 'bi-wrench-adjustable',     texto: 'Fotos del proceso de <strong>reparación</strong>. No cambia el estado de la orden.' },
+            reparacion:   { clase: 'aviso-reparacion',   icono: 'bi-wrench-adjustable',     texto: 'Subir como <strong>Reparación</strong> cambiará el estado de la orden a <strong>Control de Calidad</strong> y notificará a los inspectores.' },
             egreso:       { clase: 'aviso-egreso',       icono: 'bi-exclamation-triangle-fill', texto: '<strong>¡Atención!</strong> Subir como <strong>Egreso</strong> marcará la orden como <strong>Finalizada - Lista para Entrega</strong>.' },
             autorizacion: { clase: 'aviso-autorizacion', icono: 'bi-patch-check',           texto: 'Evidencia de <strong>autorización RHITSO</strong>. No cambia el estado de la orden.' },
             packing:      { clase: 'aviso-packing',      icono: 'bi-box-seam',               texto: 'Fotos del proceso de <strong>packing</strong> del equipo. No cambia el estado de la orden.' },

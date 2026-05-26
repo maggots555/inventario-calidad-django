@@ -2053,6 +2053,22 @@ def detalle_orden(request, orden_id):
                                     es_sistema=True
                                 )
                         
+                        # Si se suben imágenes de REPARACIÓN → Cambiar a "Control de Calidad"
+                        # Aplica a todos los tipos de orden (garantía, OOW, diagnóstico, venta mostrador)
+                        elif tipo_imagen == 'reparacion' and estado_anterior != 'control_calidad':
+                            orden.estado = 'control_calidad'
+                            cambio_realizado = True
+                            mensaje_estado = f'Estado actualizado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Control de Calidad'
+
+                            # Registrar cambio automático en historial
+                            HistorialOrden.objects.create(
+                                orden=orden,
+                                tipo_evento='estado',
+                                comentario=f'Cambio automático de estado: {dict(ESTADO_ORDEN_CHOICES).get(estado_anterior)} → Control de Calidad (imágenes de reparación cargadas)',
+                                usuario=empleado_actual,
+                                es_sistema=True
+                            )
+
                         # Si se suben imágenes de EGRESO → Cambiar a "Finalizado - Listo para Entrega"
                         elif tipo_imagen == 'egreso' and estado_anterior != 'finalizado':
                             from django.utils import timezone as tz_module

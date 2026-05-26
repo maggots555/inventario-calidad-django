@@ -532,3 +532,57 @@ def notificar_dispatchers_finalizacion(sender, instance: OrdenServicio, created:
                 mensaje=f'La orden {etiqueta_orden} ha finalizado y está lista para entrega. Service Tag: {service_tag}',
                 url=url_orden,
             )
+
+
+@receiver(post_save, sender=OrdenServicio)
+def notificar_inspectores_control_calidad(sender, instance: OrdenServicio, created: bool, **kwargs):
+    """
+    Notifica a todos los inspectores cuando el estado de una orden
+    cambia a 'control_calidad'.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Este signal se dispara automáticamente cada vez que se guarda un
+    OrdenServicio. Usamos instance._estado_anterior (guardado por el
+    pre_save guardar_estado_rhitso_anterior) para detectar si el estado
+    acaba de cambiar A 'control_calidad'.
+
+    A diferencia de los dispatchers, este push aplica a TODAS las órdenes
+    sin importar si son en garantía o fuera de garantía (OOW/FL), ya que
+    el control de calidad es un proceso interno del taller que aplica
+    a cualquier tipo de reparación.
+    """
+    if created:
+        return
+
+    estado_anterior = getattr(instance, '_estado_anterior', None)
+
+    if instance.estado == 'control_calidad' and estado_anterior != 'control_calidad':
+        from notificaciones.push_service import enviar_push_a_usuario  # noqa
+        from inventario.models import Empleado                          # noqa
+
+        inspectores = Empleado.objects.filter(
+            rol='inspector',
+            user__is_active=True,
+        ).select_related('user')
+
+        if not inspectores.exists():
+            return
+
+        url_orden = reverse('servicio_tecnico:detalle_orden', kwargs={'orden_id': instance.pk})
+
+        try:
+            etiqueta_orden = instance.detalle_equipo.orden_cliente or instance.numero_orden_interno
+            service_tag = instance.detalle_equipo.numero_serie or 'S/N no registrado'
+        except Exception:
+            etiqueta_orden = instance.numero_orden_interno
+            service_tag = 'S/N no registrado'
+
+        for inspector in inspectores:
+            _push_seguro(
+                enviar_push_a_usuario,
+                usuario=inspector.user,
+                titulo=f'🔍 Control de calidad: {etiqueta_orden}',
+                mensaje=f'La reparación del equipo {etiqueta_orden} (S/T: {service_tag}) ha concluido. El equipo está listo para su inspección de calidad.',
+                url=url_orden,
+            )

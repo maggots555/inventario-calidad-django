@@ -26,6 +26,16 @@
     {% load static %}
     <link rel="manifest" href="{% static 'manifest.json' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'css/login_3d.css' %}">
+
+    <!-- PWA: suprimir el prompt nativo de instalación en el login.
+         El banner personalizado solo debe aparecer una vez autenticado.
+         Capturamos beforeinstallprompt y lo cancelamos aquí — el evento
+         se vuelve a disparar normalmente dentro de la app (base.html). -->
+    <script>
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+        });
+    </script>
 </head>
 
 <body class="login-3d-page auth-page">
