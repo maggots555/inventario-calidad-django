@@ -154,7 +154,7 @@ Basado en las pruebas automatizadas, deberías ver:
 1. Copia el error exacto
 2. Verifica que TypeScript se compiló correctamente:
    ```bash
-   npm run build
+   pnpm run build
    ```
 3. Refresca la página (Ctrl+F5 para forzar recarga)
 

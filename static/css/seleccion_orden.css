@@ -8,8 +8,8 @@ Este archivo CSS define el aspecto visual de la página de selección de tipo
 de orden de servicio. Usa una paleta de colores profesional y efectos modernos.
 
 PALETA DE COLORES PROFESIONAL:
-- Diagnóstico (OOW-): Azules/Índigo (#4F46E5, #6366F1)
-- Venta Mostrador (FL-): Naranjas/Ámbar (#F59E0B, #F97316)
+- Diagnóstico (OOW-): Azules del proyecto (#1f6391, #3498db)
+- Venta Mostrador (FL-): Teal/Verde-azulado (#0d9488, #14b8a6)
 - Fondos: Grises suaves (#F9FAFB, #F3F4F6)
 - Texto: Grises oscuros (#111827, #374151)
 
@@ -28,13 +28,13 @@ TÉCNICAS CSS UTILIZADAS:
 /* ========================================================================== */
 :root {
     /* Colores Primarios */
-    --color-diagnostico: #4F46E5;        /* Índigo para diagnóstico */
-    --color-diagnostico-light: #6366F1;  /* Índigo claro */
-    --color-diagnostico-dark: #4338CA;   /* Índigo oscuro */
+    --color-diagnostico: #1f6391;        /* Azul primario del proyecto */
+    --color-diagnostico-light: #3498db;  /* Azul claro */
+    --color-diagnostico-dark: #2980b9;   /* Azul oscuro */
     
-    --color-venta: #F59E0B;              /* Ámbar para venta mostrador */
-    --color-venta-light: #FBBF24;        /* Ámbar claro */
-    --color-venta-dark: #D97706;         /* Ámbar oscuro */
+    --color-venta: #0d9488;              /* Teal para venta mostrador */
+    --color-venta-light: #14b8a6;        /* Teal claro */
+    --color-venta-dark: #0f766e;         /* Teal oscuro */
     
     /* Colores de Fondo */
     --bg-page: #f1f5f9;
@@ -199,7 +199,7 @@ TÉCNICAS CSS UTILIZADAS:
 
 /* Card de Diagnóstico */
 .service-card.diagnostico::before {
-    background: linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%);
+    background: linear-gradient(135deg, rgba(31, 99, 145, 0.05) 0%, rgba(52, 152, 219, 0.05) 100%);
 }
 
 .service-card.diagnostico:hover {
@@ -208,7 +208,7 @@ TÉCNICAS CSS UTILIZADAS:
 
 /* Card de Venta Mostrador */
 .service-card.venta-mostrador::before {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(249, 115, 22, 0.05) 100%);
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.05) 0%, rgba(20, 184, 166, 0.05) 100%);
 }
 
 .service-card.venta-mostrador:hover {
@@ -278,13 +278,13 @@ TÉCNICAS CSS UTILIZADAS:
 .service-card.diagnostico .service-prefix {
     background: var(--color-diagnostico);
     color: white;
-    box-shadow: 0 3px 8px rgba(79, 70, 229, 0.25);
+    box-shadow: 0 3px 8px rgba(31, 99, 145, 0.25);
 }
 
 .service-card.venta-mostrador .service-prefix {
     background: var(--color-venta);
     color: white;
-    box-shadow: 0 3px 8px rgba(245, 158, 11, 0.25);
+    box-shadow: 0 3px 8px rgba(13, 148, 136, 0.25);
 }
 
 /* Lista de Características */
@@ -361,24 +361,24 @@ TÉCNICAS CSS UTILIZADAS:
 
 .service-card.diagnostico .service-button {
     background: var(--color-diagnostico);
-    box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3);
+    box-shadow: 0 4px 6px rgba(31, 99, 145, 0.3);
 }
 
 .service-card.diagnostico .service-button:hover {
     background: var(--color-diagnostico-dark);
     transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(79, 70, 229, 0.4);
+    box-shadow: 0 6px 12px rgba(31, 99, 145, 0.4);
 }
 
 .service-card.venta-mostrador .service-button {
     background: var(--color-venta);
-    box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3);
+    box-shadow: 0 4px 6px rgba(13, 148, 136, 0.3);
 }
 
 .service-card.venta-mostrador .service-button:hover {
     background: var(--color-venta-dark);
     transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(245, 158, 11, 0.4);
+    box-shadow: 0 6px 12px rgba(13, 148, 136, 0.4);
 }
 
 .service-button i {

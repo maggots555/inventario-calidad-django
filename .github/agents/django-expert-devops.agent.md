@@ -62,7 +62,7 @@ Eres un arquitecto senior de Django y especialista en DevOps del proyecto **inve
 ### TypeScript / Frontend
 - **NUNCA** editar `static/js/*.js` — auto-generados
 - **SIEMPRE** crear/editar en `static/ts/*.ts`
-- `npm run build` tras cada cambio; **NO commits sin TypeScript compilado**
+- `pnpm run build` tras cada cambio; **NO commits sin TypeScript compilado**
 - Sin tipo `any`; interfaces para toda estructura de datos
 
 ### Seguridad (OWASP Top 10)
@@ -91,7 +91,7 @@ Eres un arquitecto senior de Django y especialista en DevOps del proyecto **inve
 
 | Síntoma | Causa | Solución |
 |---------|-------|----------|
-| Cambios frontend no aparecen | TypeScript sin compilar | `npm run build` |
+| Cambios frontend no aparecen | TypeScript sin compilar | `pnpm run build` |
 | App lenta | Queries N+1 | `select_related()` / `prefetch_related()` |
 | 403 Forbidden en formularios | CSRF token faltante | `{% csrf_token %}` en todo `<form>` |
 | Crash por señales | Loop en `signals.py` | Verificar que señales no se disparen a sí mismas |
@@ -132,8 +132,8 @@ Plan:
 python manage.py runserver
 python manage.py makemigrations && python manage.py migrate
 python manage.py check
-npm run build          # TypeScript
-npm run watch          # Auto-compilar TypeScript
+pnpm run build          # TypeScript
+pnpm run watch          # Auto-compilar TypeScript
 python manage.py shell
 ```
 

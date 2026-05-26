@@ -22,6 +22,12 @@
       "sourceType": "github",
       "computedHash": "12dacbd64cd67369f810c094dc70427d4805788f4ec6b1257e17d8e6aed74cf1"
     },
+    "pretext-text-measurement": {
+      "source": "aradotso/trending-skills",
+      "sourceType": "github",
+      "skillPath": "skills/pretext-text-measurement/SKILL.md",
+      "computedHash": "c3d2c184cafa7227ce457095c603f1a2e0aa5d3786d201b01d86db0f528bdcc7"
+    },
     "web-design-guidelines": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",

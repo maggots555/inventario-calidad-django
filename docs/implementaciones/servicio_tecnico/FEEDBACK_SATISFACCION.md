@@ -181,7 +181,7 @@ Cuando una orden cambia a estado 'entregado':
 - Resaltar selección de NPS
 - Validar antes de submit
 
-**Compilar**: `npm run build`
+**Compilar**: `pnpm run build`
 
 ---
 
@@ -370,7 +370,7 @@ path('feedback-satisfaccion/<str:token>/',
 - [ ] Se registra en `HistorialOrden`
 - [ ] CC al jefe de calidad se envía
 - [ ] Admin de Django muestra calificaciones
-- [ ] CSS/TypeScript compilado (`npm run build`)
+- [ ] CSS/TypeScript compilado (`pnpm run build`)
 - [ ] Testing completo de flujo
 - [ ] Celery reiniciado después de cambios
 

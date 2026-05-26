@@ -12,9 +12,9 @@ barra de carga relativa en técnicos, textura de fondo, stagger de animaciones.
    ============================================================================ */
 :root {
     /* Colores principales del módulo */
-    --st-primary:       #F59E0B;
-    --st-primary-light: #FBBF24;
-    --st-primary-dark:  #D97706;
+    --st-primary:       #0d9488;
+    --st-primary-light: #14b8a6;
+    --st-primary-dark:  #0f766e;
 
     /* Colores secundarios */
     --st-info:    #3B82F6;
@@ -223,11 +223,11 @@ barra de carga relativa en técnicos, textura de fondo, stagger de animaciones.
 .st-action-btn--primary {
     background: linear-gradient(135deg, var(--st-primary), var(--st-primary-dark));
     color: white;
-    box-shadow: 0 4px 14px rgba(245,158,11,0.45);
+    box-shadow: 0 4px 14px rgba(13,148,136,0.45);
 }
 .st-action-btn--primary:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(245,158,11,0.55);
+    box-shadow: 0 8px 24px rgba(13,148,136,0.55);
     color: white;
 }
 
@@ -496,7 +496,7 @@ barra de carga relativa en técnicos, textura de fondo, stagger de animaciones.
     font-weight: 700;
 }
 
-.st-orden-dias-badge--normal   { background: rgba(245,158,11,0.15); color: #D97706; }
+.st-orden-dias-badge--normal   { background: rgba(13,148,136,0.12); color: #0f766e; }
 .st-orden-dias-badge--warning  { background: rgba(249,115,22,0.15); color: #EA580C; }
 .st-orden-dias-badge--critical { background: rgba(239,68,68,0.15);  color: #DC2626; }
 
@@ -638,6 +638,9 @@ barra de carga relativa en técnicos, textura de fondo, stagger de animaciones.
     --st-text-dark: #f1f5f9;
     --st-text-gray: #cbd5e1;
     --st-text-light:#94a3b8;
+    --st-primary:       #2dd4bf;
+    --st-primary-light: #5eead4;
+    --st-primary-dark:  #0d9488;
     --st-shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.3);
     --st-shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.3);
     --st-shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5), 0 4px 6px -2px rgba(0,0,0,0.3);
@@ -647,7 +650,7 @@ barra de carga relativa en técnicos, textura de fondo, stagger de animaciones.
 [data-bs-theme="dark"] .st-dashboard-wrapper {
     background-color: #0f172a;
     background-image:
-        radial-gradient(circle, rgba(245,158,11,0.08) 1.5px, transparent 1.5px),
+        radial-gradient(circle, rgba(13,148,136,0.08) 1.5px, transparent 1.5px),
         linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
 }
 
@@ -712,3 +715,6 @@ barra de carga relativa en técnicos, textura de fondo, stagger de animaciones.
 
 /* Estado vacío */
 [data-bs-theme="dark"] .st-empty-state { color: var(--st-text-gray); }
+
+/* Días badge normal — teal claro sobre fondo oscuro */
+[data-bs-theme="dark"] .st-orden-dias-badge--normal { background: rgba(45,212,191,0.12); color: #5eead4; }

@@ -534,8 +534,8 @@ El sistema utiliza **TypeScript 5.9.3** para desarrollo frontend profesional y m
 **Scripts disponibles**:
 
 ```bash
-npm run build  # Compilar TypeScript a JavaScript
-npm run watch  # Modo watch para desarrollo (recompila automáticamente)
+pnpm run build  # Compilar TypeScript a JavaScript
+pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 ```
 
 ---
@@ -903,8 +903,8 @@ python scripts/poblado/poblar_scorecard.py
 8. **Compilar TypeScript**
 
 ```bash
-npm install
-npm run build
+pnpm install
+pnpm run build
 ```
 
 9. **Ejecutar el servidor**

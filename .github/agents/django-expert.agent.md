@@ -58,7 +58,7 @@ Eres un experto senior en Django 5.2.5, Python 3.10+ y DevOps del proyecto **inv
 ### TypeScript
 - **NUNCA** editar `static/js/*.js` — auto-generados
 - **SIEMPRE** crear en `static/ts/*.ts`
-- `npm run build` tras cada cambio
+- `pnpm run build` tras cada cambio
 - Sin tipo `any`; interfaces para toda estructura de datos
 
 ### CSS / Templates
@@ -86,8 +86,8 @@ Eres un experto senior en Django 5.2.5, Python 3.10+ y DevOps del proyecto **inv
 ```bash
 python manage.py runserver
 python manage.py makemigrations && python manage.py migrate
-npm run build          # TypeScript
-npm run watch          # Auto-compilar TypeScript
+pnpm run build          # TypeScript
+pnpm run watch          # Auto-compilar TypeScript
 python manage.py shell
 ```
 

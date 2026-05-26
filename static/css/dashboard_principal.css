@@ -21,21 +21,21 @@ CARACTERÍSTICAS:
    ============================================================================ */
 :root {
     /* Colores principales de cada módulo */
-    --color-inventario: #4F46E5;        /* Índigo profesional */
-    --color-inventario-light: #818CF8;
-    --color-inventario-dark: #3730A3;
+    --color-inventario: #1f6391;        /* Azul primario del proyecto */
+    --color-inventario-light: #3498db;
+    --color-inventario-dark: #2980b9;
     
     --color-scorecard: #10B981;         /* Verde éxito */
     --color-scorecard-light: #34D399;
     --color-scorecard-dark: #059669;
     
-    --color-servicio: #F59E0B;          /* Ámbar energético */
-    --color-servicio-light: #FBBF24;
-    --color-servicio-dark: #D97706;
+    --color-servicio: #0d9488;          /* Teal — servicio técnico */
+    --color-servicio-light: #14b8a6;
+    --color-servicio-dark: #0f766e;
 
-    --color-almacen: #8B5CF6;           /* Violeta profesional */
-    --color-almacen-light: #A78BFA;
-    --color-almacen-dark: #6D28D9;
+    --color-almacen: #0369a1;           /* Azul cielo profundo */
+    --color-almacen-light: #38bdf8;
+    --color-almacen-dark: #0284c7;
     
     /* Colores neutrales */
     --color-bg-light: #F9FAFB;
@@ -202,7 +202,7 @@ CARACTERÍSTICAS:
 /* Colores específicos por módulo */
 .module-card.inventario:hover {
     border-color: var(--color-inventario-light);
-    box-shadow: 0 20px 40px rgba(79, 70, 229, 0.22), var(--shadow-md);
+    box-shadow: 0 20px 40px rgba(31, 99, 145, 0.22), var(--shadow-md);
 }
 
 .module-card.scorecard:hover {
@@ -212,12 +212,12 @@ CARACTERÍSTICAS:
 
 .module-card.servicio:hover {
     border-color: var(--color-servicio-light);
-    box-shadow: 0 20px 40px rgba(245, 158, 11, 0.22), var(--shadow-md);
+    box-shadow: 0 20px 40px rgba(13, 148, 136, 0.22), var(--shadow-md);
 }
 
 .module-card.almacen:hover {
     border-color: var(--color-almacen-light);
-    box-shadow: 0 20px 40px rgba(139, 92, 246, 0.22), var(--shadow-md);
+    box-shadow: 0 20px 40px rgba(3, 105, 161, 0.22), var(--shadow-md);
 }
 
 /* ============================================================================
@@ -740,10 +740,10 @@ CARACTERÍSTICAS:
 /* SERVICIO - Glow/Brillo */
 @keyframes iconGlow {
     0%, 100% {
-        filter: drop-shadow(0 0 0px rgba(245, 158, 11, 0));
+        filter: drop-shadow(0 0 0px rgba(13, 148, 136, 0));
     }
     50% {
-        filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6));
+        filter: drop-shadow(0 0 8px rgba(13, 148, 136, 0.6));
     }
 }
 
@@ -854,21 +854,21 @@ CARACTERÍSTICAS:
     --color-text-light: #94a3b8;
     
     /* Colores de módulos - ajustados para dark mode */
-    --color-inventario: #818CF8;
-    --color-inventario-light: #A5B4FC;
-    --color-inventario-dark: #4F46E5;
+    --color-inventario: #60a5fa;
+    --color-inventario-light: #93c5fd;
+    --color-inventario-dark: #3498db;
     
     --color-scorecard: #34D399;
     --color-scorecard-light: #6EE7B7;
     --color-scorecard-dark: #10B981;
     
-    --color-servicio: #FBBF24;
-    --color-servicio-light: #FCD34D;
-    --color-servicio-dark: #F59E0B;
+    --color-servicio: #2dd4bf;
+    --color-servicio-light: #5eead4;
+    --color-servicio-dark: #0d9488;
 
-    --color-almacen: #A78BFA;
-    --color-almacen-light: #C4B5FD;
-    --color-almacen-dark: #8B5CF6;
+    --color-almacen: #38bdf8;
+    --color-almacen-light: #7dd3fc;
+    --color-almacen-dark: #0284c7;
     
     /* Sombras oscuras */
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
@@ -1008,16 +1008,16 @@ CARACTERÍSTICAS:
 
 /* Sombras coloreadas en dark mode — más intensas */
 [data-bs-theme="dark"] .module-card.inventario:hover {
-    box-shadow: 0 20px 40px rgba(129, 140, 248, 0.3), 0 4px 6px rgba(0,0,0,0.4);
+    box-shadow: 0 20px 40px rgba(96, 165, 250, 0.3), 0 4px 6px rgba(0,0,0,0.4);
 }
 [data-bs-theme="dark"] .module-card.scorecard:hover {
     box-shadow: 0 20px 40px rgba(52, 211, 153, 0.3), 0 4px 6px rgba(0,0,0,0.4);
 }
 [data-bs-theme="dark"] .module-card.servicio:hover {
-    box-shadow: 0 20px 40px rgba(251, 191, 36, 0.3), 0 4px 6px rgba(0,0,0,0.4);
+    box-shadow: 0 20px 40px rgba(45, 212, 191, 0.3), 0 4px 6px rgba(0,0,0,0.4);
 }
 [data-bs-theme="dark"] .module-card.almacen:hover {
-    box-shadow: 0 20px 40px rgba(167, 139, 250, 0.3), 0 4px 6px rgba(0,0,0,0.4);
+    box-shadow: 0 20px 40px rgba(56, 189, 248, 0.3), 0 4px 6px rgba(0,0,0,0.4);
 }
 
 /* ============================================================================

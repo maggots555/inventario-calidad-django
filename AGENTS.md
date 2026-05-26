@@ -40,8 +40,8 @@ python manage.py collectstatic         # Collect static files
 
 ### TypeScript Commands
 ```bash
-npm run build      # Compile TypeScript once
-npm run watch      # Auto-compile on file changes
+pnpm run build      # Compile TypeScript once
+pnpm run watch      # Auto-compile on file changes
 tsc                # Direct TypeScript compilation
 ```
 
@@ -198,7 +198,7 @@ except Exception as e:
 - **NEVER write `.js` files directly** - They are auto-generated
 - **ALWAYS create `.ts` files** for new JavaScript functionality
 - **NEVER use `any` type** - Be explicit with types
-- **ALWAYS compile before testing** - Run `npm run build`
+- **ALWAYS compile before testing** - Run `pnpm run build`
 
 #### Type Definitions
 ```typescript
@@ -285,30 +285,53 @@ inventario-calidad-django/
 │   ├── settings.py           # Main settings
 │   ├── urls.py              # Root URL configuration
 │   ├── storage_utils.py      # Dynamic file storage
-│   └── constants.py          # Global constants
+│   ├── constants.py          # Global constants
+│   ├── paises_config.py      # Multi-country config
+│   ├── middleware_pais.py    # Country detection middleware
+│   ├── db_router.py          # Multi-country DB router
+│   ├── context_processors.py
+│   └── pwa_views.py          # Service worker & manifest views
 ├── inventario/               # App: Product inventory & employees
 ├── servicio_tecnico/         # App: Service orders (MAIN)
 │   ├── models.py            # 20+ models (OrdenServicio, etc.)
 │   ├── plotly_visualizations.py  # 3900+ lines of charts
 │   ├── ml_predictor.py      # ML predictions
-│   └── ml_advanced/         # Advanced ML modules
+│   ├── ml_advanced/         # Advanced ML modules
+│   ├── ollama_client.py     # Ollama + Gemini AI dispatcher
+│   ├── gemini_client.py     # Google Gemini client (módulo propio)
+│   ├── tasks.py             # Celery tasks (email, video, push)
+│   └── signals.py           # Django signals (push notifications)
 ├── scorecard/                # App: Quality control system
 ├── almacen/                  # App: Central warehouse
+├── notificaciones/           # App: Notifications + Web Push
+│   ├── models.py            # Notificacion + PushSubscription
+│   ├── push_service.py      # pywebpush VAPID service
+│   └── views.py             # Push endpoints + suscripción
 ├── static/
-│   ├── ts/                  # TypeScript source (EDIT THESE)
+│   ├── ts/                  # TypeScript source (EDIT THESE — ~43 módulos)
 │   │   ├── base.ts
-│   │   └── scanner.ts
+│   │   ├── service_worker.ts      # Service worker (compilado aparte)
+│   │   ├── pwa_install.ts         # Custom PWA install prompt
+│   │   ├── push_notifications.ts  # Web Push UI
+│   │   ├── video_resumen.ts       # Video summary generator (FFmpeg)
+│   │   ├── upload_video.ts        # Video evidence upload
+│   │   ├── voz_diagnostico.ts     # Voice dictation (Speech API → Whisper → Gemini)
+│   │   └── [otros módulos...]
 │   ├── js/                  # Compiled JavaScript (AUTO-GENERATED)
 │   ├── css/                 # Organized CSS files
-│   │   ├── base.css        # Global styles
+│   │   ├── base.css        # Global styles + dark mode variables
 │   │   ├── components.css  # UI components
 │   │   └── forms.css       # Form styling
+│   ├── audio/               # Audio assets (bg_music.mp3 para video resumen)
 │   └── images/
 ├── templates/                # Global templates
-│   └── base.html
-├── media/                    # User uploads (organized by app)
+│   ├── base.html
+│   └── offline.html          # PWA offline page
+├── media/                    # User uploads (organized by country)
+│   ├── mexico/
+│   └── argentina/
 ├── scripts/
-│   ├── testing/             # Manual test scripts (15 files)
+│   ├── testing/             # Manual test scripts
 │   ├── poblado/             # Database seeding
 │   └── verificacion/        # Data validation
 ├── logs/                     # Application logs
@@ -316,7 +339,8 @@ inventario-calidad-django/
 ├── manage.py
 ├── requirements.txt
 ├── package.json
-└── tsconfig.json
+├── tsconfig.json
+└── tsconfig.sw.json          # TypeScript config separado para service worker
 ```
 
 ---
@@ -401,18 +425,55 @@ Intelligent file storage with disk failover:
 - Images organized by order ID
 - Custom Django storage backend
 
+### Video Gallery & Video Resumen (FFmpeg)
+Sistema de video de evidencia implementado en `detalle_orden`:
+- **Galería de videos**: Subida y reproducción de videos de evidencia por orden (`upload_video.ts`)
+- **Compresión automática**: FFmpeg vía Celery task al subir video
+- **Video Resumen**: Genera un video resumen de la galería de imágenes (`video_resumen.ts`):
+  - Efecto Ken Burns en cada imagen
+  - Transiciones xfade entre imágenes
+  - Música ambient de fondo (`static/audio/bg_music.mp3`)
+  - Descarga comprimida vía Celery task
+  - Envío automático al cliente al finalizar la orden
+  - Disponible tanto en órdenes de Diagnóstico como en Venta Mostrador
+- **Lógica en backend**: `servicio_tecnico/tasks.py` (tarea Celery para generar/comprimir/enviar)
+
+### Dictado por Voz — Diagnóstico SIC
+Botón de micrófono junto al campo de texto de Diagnóstico en `detalle_orden`:
+- **Módulo**: `static/ts/voz_diagnostico.ts`
+- **Arquitectura 3 capas**: Web Speech API → Ollama Whisper → Google Gemini
+- Capa 1 (Web Speech API): `continuous=true`, instancia única, sin reinicio
+- Deduplicación de segmentos finales para evitar repeticiones
+- Inserción de texto con detección de solapamiento
+
+### Inspector Visual IA — Imágenes de Ingreso
+Al enviar imágenes de ingreso al cliente, un análisis IA opcional evalúa la condición estética:
+- Selector de modelo en el modal (Ollama / Gemini), ruteo sin fallback cruzado
+- Resultado incluido en el correo al cliente y guardado en historial
+- Diseño fail-safe: si la IA falla, el correo se envía sin la sección de análisis
+- Lógica en `servicio_tecnico/ollama_client.py` y `servicio_tecnico/gemini_client.py`
+
+### Analizador de Sentimientos de Encuestas con IA
+- Análisis de sentimientos del texto libre de encuestas de satisfacción
+- Generador de PDF ejecutivo con resultados del análisis
+- Selector de modelo (múltiples opciones Gemini / Ollama)
+- Dashboard de encuestas extendido con esta funcionalidad
+
 ### PWA (Progressive Web App)
 The app is installable on Android and iOS as a native-like app:
 - **Manifest**: `static/manifest.json` — name, icons, theme color, `display: standalone`
 - **iOS support**: `apple-mobile-web-app-capable` + `apple-mobile-web-app-status-bar-style` in `templates/base.html`
 - **Viewport**: `viewport-fit=cover` for notch/Dynamic Island support on iPhones
 - **Theme color**: `#1f6391` (matches brand)
-- **No service worker** currently — app requires internet connection (no offline mode)
+- **Service Worker**: `static/ts/service_worker.ts` → compilado con `tsconfig.sw.json` separado. Registrado en `base.html`. Incluye página `templates/offline.html` para modo sin conexión.
+- **Prompt de instalación personalizado**: `static/ts/pwa_install.ts` — reemplaza el prompt nativo del navegador con UI de marca
+- **Web Push Notifications**: Sistema completo con VAPID keys y `pywebpush`. Modelo `PushSubscription` en `notificaciones/`. Signal en `HistorialOrden` dispara push al técnico asignado. Push de ingreso/egreso para dispatchers. Toggle en "Mi Perfil".
 
 **PWA Rules for AI agents**:
 - NEVER remove the `<link rel="manifest">` tag from `base.html`
 - NEVER remove or alter the `apple-mobile-web-app-*` meta tags
 - NEVER set `maximum-scale` > 1.0 or remove `viewport-fit=cover`
+- NEVER modify the service worker registration script in `base.html`
 - All UI must be **mobile-first** — test layouts at 375px width minimum
 - Touch targets must be at least **44x44px** (iOS HIG standard)
 - Avoid hover-only interactions — use tap/click equivalents
@@ -466,25 +527,32 @@ Estos son los valores exactos usados en el proyecto. Usar solo estos para consis
 **Regla de oro**: Si un componente usa colores hardcodeados, SIEMPRE agregar un bloque `[data-bs-theme="dark"]`.
 
 ```css
-/* ✅ CORRECTO: Usar variables CSS en modo claro */
+/* ✅ CORRECTO: Usar variables CSS — se adaptan automáticamente */
 .mi-componente {
-    background-color: var(--gray-100);   /* Se adapta automáticamente */
+    background-color: var(--gray-100);
     color: var(--gray-900);
     border: 1px solid var(--gray-200);
 }
 
-/* ✅ CORRECTO: Override para colores hardcodeados */
-.mi-componente-con-gradiente {
-    background: linear-gradient(135deg, #1f6391, #2980b9); /* Color hardcodeado */
+/* ✅ CORRECTO: Override para colores hardcodeados (sin gradientes) */
+.mi-componente-especial {
+    background-color: #1f6391;
+    color: #ffffff;
 }
-[data-bs-theme="dark"] .mi-componente-con-gradiente {
-    background: linear-gradient(135deg, #1e3a5f, #1e293b); /* Versión oscura */
+[data-bs-theme="dark"] .mi-componente-especial {
+    background-color: #1e293b;
+    color: #e2e8f0;
 }
 
 /* ❌ INCORRECTO: Color hardcodeado sin override para oscuro */
 .mi-componente {
     background-color: #ffffff;  /* Se verá igual en modo oscuro — MAL */
     color: #333333;
+}
+
+/* ❌ INCORRECTO: Gradiente — prohibido, se ve como "IA Slop" */
+.mi-componente {
+    background: linear-gradient(135deg, #1f6391, #2980b9);
 }
 ```
 
@@ -510,9 +578,10 @@ var(--shadow-sm/md/lg/xl)  /* Sombras adaptadas al tema */
 ❌ NUNCA agregar data-bs-theme a elementos que no sean <html>
 ❌ NUNCA usar background: white o color: black directamente
 ❌ NUNCA olvidar sección [data-bs-theme="dark"] en archivos CSS nuevos
+❌ NUNCA usar gradientes (linear-gradient, radial-gradient, glassmorphism) — se ven como "IA Slop"
 
 ✅ SIEMPRE usar var(--nombre-variable) para colores
-✅ SIEMPRE agregar overrides oscuros para gradientes y colores hardcodeados
+✅ SIEMPRE agregar overrides oscuros para colores hardcodeados
 ✅ SIEMPRE probar visualmente en ambos modos antes de considerar listo
 ✅ SIEMPRE seguir la paleta de modo oscuro documentada arriba
 ✅ En TypeScript: leer tema con document.documentElement.getAttribute('data-bs-theme')
@@ -531,14 +600,16 @@ Cada archivo CSS de página debe tener dos secciones claramente separadas:
     color: var(--gray-900);
 }
 .mi-componente-especial {
-    background: linear-gradient(135deg, #1f6391, #2980b9);
+    background-color: #1f6391;
+    color: #ffffff;
 }
 
 /* ============================================================
    MODO OSCURO — Overrides para [data-bs-theme="dark"]
    ============================================================ */
 [data-bs-theme="dark"] .mi-componente-especial {
-    background: linear-gradient(135deg, #1e3a5f, #0f172a);
+    background-color: #1e293b;
+    color: #e2e8f0;
 }
 ```
 
@@ -703,11 +774,12 @@ Consider adding:
 7. **Don't forget Bootstrap classes** - All forms need styling
 8. **Don't skip `__str__()`** - Required for all models
 9. **Don't use inline styles** - Use static CSS files
-10. **Don't skip TypeScript compilation** - Run `npm run build` before testing
+10. **Don't skip TypeScript compilation** - Run `pnpm run build` before testing
 11. **Don't break PWA compatibility** - Never remove manifest, apple-mobile-web-app tags, or viewport-fit=cover from `base.html`
 12. **Don't use hover-only UI** - All interactions must work on touch screens (mobile-first)
 13. **Don't hardcode colors without dark mode override** - Use CSS variables (`var(--nombre)`) or add `[data-bs-theme="dark"] .clase {}` override. New CSS files MUST have a dark mode section. See Section 5 → Dark Mode.
 14. **Don't touch the anti-flash script in base.html** - The inline `<script>` in `<head>` that sets `data-bs-theme` before render prevents white flash — never modify or remove it.
+15. **Don't use gradients** — No `linear-gradient`, `radial-gradient` ni efectos de glassmorphism genéricos. El diseño del proyecto es limpio y directo. Los gradientes se ven como "IA Slop" y están prohibidos salvo que el usuario los pida explícitamente.
 
 ---
 
@@ -720,14 +792,14 @@ Consider adding:
 | Create migrations | `python manage.py makemigrations` |
 | Admin user | `python manage.py createsuperuser` |
 | Django shell | `python manage.py shell` |
-| Compile TypeScript | `npm run build` |
-| Watch TypeScript | `npm run watch` |
+| Compile TypeScript | `pnpm run build` |
+| Watch TypeScript | `pnpm run watch` |
 | Run tests | `python manage.py test` |
 | Seed data | `python scripts/poblado/poblar_sistema.py` |
 
 ---
 
-**Last Updated**: March 2026  
+**Last Updated**: Mayo 2026  
 **Django Version**: 5.2.5  
-**Python Version**: 3.10+  
+**Python Version**: 3.12+  
 **TypeScript Version**: 5.9.3

@@ -35,8 +35,9 @@
  *
  * Estrategias usadas:
  * ┌─────────────────────┬────────────────────────────────────────────────────┐
- * │ /static/**          │ Cache First: caché → si falla → red → guardar      │
- * │                     │ Ideal para CSS, JS, imágenes (cambian poco)         │
+ * │ /static/**          │ Network First: red → si falla → caché              │
+ * │                     │ Los cambios de CSS/JS son visibles con F5 normal.  │
+ * │                     │ El caché actúa solo como fallback offline.          │
  * ├─────────────────────┼────────────────────────────────────────────────────┤
  * │ Navegación (HTML)   │ Network First: red → si falla → página /offline/   │
  * │                     │ Garantiza contenido fresco, pero con fallback       │
@@ -208,29 +209,37 @@ sw.addEventListener('fetch', (event: FetchEvent) => {
 // ============================================================================
 
 /**
- * Cache First con fallback a red.
+ * Network First con fallback a caché (para archivos estáticos).
  *
  * EXPLICACIÓN:
- * 1. Buscar en el caché → si existe, devolver inmediatamente (carga instantánea).
- * 2. Si NO está en caché → ir a la red → guardar en caché → devolver.
- * 3. Si la red falla y tampoco está en caché → lanzar error (el navegador lo maneja).
+ * 1. Intentar la red primero → así los cambios de CSS/JS son visibles
+ *    inmediatamente con un F5 normal (sin necesidad de Ctrl+Shift+R).
+ * 2. Si la red responde → actualizar el caché y devolver la respuesta.
+ * 3. Si la red falla (sin conexión) → servir desde caché como fallback.
+ * 4. Si tampoco está en caché → lanzar error (el navegador lo maneja).
  *
- * Ideal para: CSS, JS, imágenes, fuentes — archivos que no cambian frecuentemente.
+ * Ideal para: CSS, JS, imágenes en desarrollo y producción.
+ * El caché solo actúa como seguro offline, no como fuente principal.
  */
 async function estrategiaStaticFirst(request: Request): Promise<Response> {
-    const cachedResponse = await caches.match(request);
-    if (cachedResponse) {
-        return cachedResponse;
+    try {
+        const networkResponse = await fetch(request);
+        // Solo cachear respuestas válidas (status 200)
+        if (networkResponse.ok) {
+            const cache = await caches.open(STATIC_CACHE_NAME);
+            // Guardar copia fresca en caché para fallback offline
+            cache.put(request, networkResponse.clone());
+        }
+        return networkResponse;
+    } catch {
+        // Sin conexión → intentar servir desde caché
+        const cachedResponse = await caches.match(request);
+        if (cachedResponse) {
+            return cachedResponse;
+        }
+        // Ni red ni caché disponibles
+        throw new Error(`[SIGMA SW] Sin respuesta de red ni caché para: ${request.url}`);
     }
-
-    const networkResponse = await fetch(request);
-    // Solo cachear respuestas válidas (status 200)
-    if (networkResponse.ok) {
-        const cache = await caches.open(STATIC_CACHE_NAME);
-        // Guardar una copia en caché (clone porque Response solo se puede leer una vez)
-        cache.put(request, networkResponse.clone());
-    }
-    return networkResponse;
 }
 
 /**

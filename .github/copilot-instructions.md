@@ -183,7 +183,7 @@ project_root/
 #### ✍️ TypeScript Development Workflow
 
 **1. Write TypeScript**: Edit `.ts` files in `static/ts/` with proper types and interfaces
-**2. Compile**: Run `npm run watch` (auto-compile) or `npm run build` (single compile)
+**2. Compile**: Run `pnpm run watch` (auto-compile) or `pnpm run build` (single compile)
 **3. Include in Templates**: Load compiled `.js` files with `{% static 'js/file.js' %}`
 
 **EXPLAIN TO USER**: Define interfaces for data structures, use type annotations for functions, leverage VS Code IntelliSense for autocomplete
@@ -195,13 +195,13 @@ project_root/
 ❌ **NEVER skip type annotations** - Use explicit types for function parameters and returns
 ❌ **NEVER use `any` type** - Be specific with types (use `unknown` if truly unknown)
 ❌ **NEVER ignore TypeScript errors** - Fix them before committing code
-❌ **NEVER commit without compiling** - Always run `npm run build` before committing
+❌ **NEVER commit without compiling** - Always run `pnpm run build` before committing
 
 ✅ **ALWAYS write `.ts` files** - For all new JavaScript functionality
 ✅ **ALWAYS define interfaces** - For data structures and API responses
 ✅ **ALWAYS use strict mode** - TypeScript strict checks prevent bugs
 ✅ **ALWAYS add JSDoc comments** - Explain complex functions
-✅ **ALWAYS compile before testing** - Run `tsc` or `npm run build`
+✅ **ALWAYS compile before testing** - Run `tsc` or `pnpm run build`
 ✅ **ALWAYS commit both `.ts` and compiled `.js`** - Others can use without compiling
 
 #### 📦 package.json Scripts
@@ -700,7 +700,7 @@ Settings automatically applied ONLY when using PostgreSQL (prevents SQLite "data
 ### Frontend (CSS/TypeScript)
 - **NEVER put CSS/JS directly in templates** - Always use separate static files
 - **ALWAYS write TypeScript (`.ts`), NEVER plain JavaScript (`.js`)** for new code
-- **ALWAYS compile TypeScript before testing** - Run `npm run build` or `tsc`
+- **ALWAYS compile TypeScript before testing** - Run `pnpm run build` or `tsc`
 - **ALWAYS define interfaces** for data structures and API responses
 - **ALWAYS use strict type checking** - No `any` types, explicit types for parameters/returns
 - Organize static files by functionality (base.css, components.css, forms.css)
