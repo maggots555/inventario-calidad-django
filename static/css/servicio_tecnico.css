@@ -2889,7 +2889,132 @@ thead.sticky-top {
     }
 }
 
-/* Selector de lentes (múltiples cámaras) */
+/* ============================================================
+   BADGE DE ORIENTACIÓN — Color e icono por cada ángulo
+   El ícono del teléfono rota para mostrar la posición real.
+   ============================================================ */
+
+/* Transición suave al cambiar de orientación */
+#badgeOrientacion {
+    transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+/* Transición suave del ícono al girar */
+#badgeOrientacion i {
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── 0° — Portrait normal — Azul ── */
+#badgeOrientacion.orientation-0 {
+    background: rgba(59, 130, 246, 0.85);
+    border-color: rgba(59, 130, 246, 0.9);
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.45);
+}
+#badgeOrientacion.orientation-0 i {
+    transform: translate(-50%, -50%) rotate(0deg);
+}
+
+/* ── 90° — Landscape derecha (botón izquierda) — Verde ── */
+#badgeOrientacion.orientation-90 {
+    background: rgba(34, 197, 94, 0.85);
+    border-color: rgba(34, 197, 94, 0.9);
+    box-shadow: 0 4px 16px rgba(34, 197, 94, 0.45);
+}
+#badgeOrientacion.orientation-90 i {
+    transform: translate(-50%, -50%) rotate(90deg);
+}
+
+/* ── 180° — Portrait invertido — Naranja ── */
+#badgeOrientacion.orientation-180 {
+    background: rgba(245, 158, 11, 0.85);
+    border-color: rgba(245, 158, 11, 0.9);
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.45);
+}
+#badgeOrientacion.orientation-180 i {
+    transform: translate(-50%, -50%) rotate(180deg);
+}
+
+/* ── 270° — Landscape izquierda (botón derecha) — Púrpura ── */
+#badgeOrientacion.orientation-270 {
+    background: rgba(168, 85, 247, 0.85);
+    border-color: rgba(168, 85, 247, 0.9);
+    box-shadow: 0 4px 16px rgba(168, 85, 247, 0.45);
+}
+#badgeOrientacion.orientation-270 i {
+    transform: translate(-50%, -50%) rotate(-90deg);
+}
+
+
+/* ============================================================
+   CONTRA-ROTACIÓN DE ICONOS — cam-orient-X en .modal-body
+   ─────────────────────────────────────────────────────────────
+   Cuando el teléfono gira, todos los iconos de badges y botones
+   contra-rotan para mantenerse legibles (igual que apps nativas).
+   #badgeOrientacion queda EXCLUIDO — ese ícono SÍ rota para
+   mostrar la posición real del dispositivo.
+   ============================================================ */
+
+/* Habilitar transición suave en iconos de badges (excluye #badgeOrientacion i,
+   que ya tiene su propia transición con mayor especificidad) */
+.camera-badge-circle i {
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Habilitar transición suave en contadores/texto de badges (robot, número, etc.) */
+.camera-badge-circle span {
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Habilitar transición suave en iconos de botones de control */
+.camera-controls button i {
+    display: inline-block; /* Necesario para que transform funcione en <i> */
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── 0° — Portrait normal — sin rotación (estado por defecto) ── */
+.cam-orient-0 .camera-badge-circle:not(#badgeOrientacion) i {
+    transform: translate(-50%, -50%) rotate(0deg);
+}
+.cam-orient-0 .camera-badge-circle span {
+    transform: rotate(0deg);
+}
+.cam-orient-0 .camera-controls button i {
+    transform: rotate(0deg);
+}
+
+/* ── 90° — Landscape derecha — contra-rotan -90° ── */
+.cam-orient-90 .camera-badge-circle:not(#badgeOrientacion) i {
+    transform: translate(-50%, -50%) rotate(-90deg);
+}
+.cam-orient-90 .camera-badge-circle span {
+    transform: rotate(-90deg);
+}
+.cam-orient-90 .camera-controls button i {
+    transform: rotate(-90deg);
+}
+
+/* ── 180° — Portrait invertido — contra-rotan 180° ── */
+.cam-orient-180 .camera-badge-circle:not(#badgeOrientacion) i {
+    transform: translate(-50%, -50%) rotate(180deg);
+}
+.cam-orient-180 .camera-badge-circle span {
+    transform: rotate(180deg);
+}
+.cam-orient-180 .camera-controls button i {
+    transform: rotate(180deg);
+}
+
+/* ── 270° — Landscape izquierda — contra-rotan 90° ── */
+.cam-orient-270 .camera-badge-circle:not(#badgeOrientacion) i {
+    transform: translate(-50%, -50%) rotate(90deg);
+}
+.cam-orient-270 .camera-badge-circle span {
+    transform: rotate(90deg);
+}
+.cam-orient-270 .camera-controls button i {
+    transform: rotate(90deg);
+}
+
 /* MEJORA: Estilo iOS translúcido y minimalista */
 .camera-lens-selector {
     display: flex;

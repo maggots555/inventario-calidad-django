@@ -51,6 +51,15 @@ class GaleriaLightbox {
     private readonly MIN_ZOOM: number = 0.5;
     private readonly MAX_ZOOM: number = 8;
     private readonly ZOOM_STEP: number = 0.25;
+
+    // ========================================================================
+    // PROPIEDAD DE ROTACIÓN
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Guardamos el ángulo de rotación actual en grados (0, 90, 180, 270).
+    // Se resetea a 0 cada vez que se navega a una imagen diferente.
+    // Se integra en applyTransform() junto con el zoom y el pan.
+    // ========================================================================
+    private rotationDeg: number;
     
     constructor() {
         this.lightboxContainer = null;
@@ -70,6 +79,9 @@ class GaleriaLightbox {
         this.lastPanY = 0;
         this.pinchStartDistance = 0;
         this.pinchStartZoom = 1;
+
+        // Inicializar rotación
+        this.rotationDeg = 0;
         
         this.init();
     }
@@ -181,6 +193,12 @@ class GaleriaLightbox {
                         </a>
                         <button type="button" class="btn btn-info btn-sm lightbox-zoom-toggle" title="Inspeccionar imagen con zoom y arrastre">
                             <i class="bi bi-search"></i> Inspeccionar
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm lightbox-rotate-left" title="Rotar a la izquierda (90°)">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm lightbox-rotate-right" title="Rotar a la derecha (90°)">
+                            <i class="bi bi-arrow-clockwise"></i>
                         </button>
                         <span class="lightbox-counter">
                             <span class="current-index">1</span> / <span class="total-images">1</span>
@@ -321,6 +339,18 @@ class GaleriaLightbox {
         if (deleteBtn) {
             deleteBtn.addEventListener('click', () => this.eliminarImagenActual());
         }
+
+        // ====================================================================
+        // EVENT LISTENERS DE ROTACIÓN
+        // ====================================================================
+        const rotateLeftBtn  = this.lightboxContainer.querySelector('.lightbox-rotate-left');
+        const rotateRightBtn = this.lightboxContainer.querySelector('.lightbox-rotate-right');
+        if (rotateLeftBtn) {
+            rotateLeftBtn.addEventListener('click', () => this.rotateLeft());
+        }
+        if (rotateRightBtn) {
+            rotateRightBtn.addEventListener('click', () => this.rotateRight());
+        }
         
         // ====================================================================
         // EVENT LISTENERS DEL MODO ZOOM / INSPECCIÓN
@@ -446,6 +476,17 @@ class GaleriaLightbox {
                         this.resetZoom();
                     }
                     break;
+                // Tecla R: rotar a la derecha. Shift+R: rotar a la izquierda.
+                // Disponible tanto en modo normal como en modo inspección.
+                case 'r':
+                case 'R':
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        this.rotateLeft();
+                    } else {
+                        this.rotateRight();
+                    }
+                    break;
             }
         });
     }
@@ -494,6 +535,12 @@ class GaleriaLightbox {
         const loader = this.lightboxContainer.querySelector('.lightbox-loader') as HTMLElement;
         
         if (!imgElement || !loader) return;
+
+        // Resetear rotación y transformación al cargar una imagen nueva
+        this.rotationDeg = 0;
+        this.panX = 0;
+        this.panY = 0;
+        imgElement.style.transform = '';
         
         // Mostrar loader
         loader.style.display = 'flex';
@@ -849,19 +896,39 @@ class GaleriaLightbox {
     }
     
     /**
-     * Aplica la transformación CSS (scale + translate) a la imagen.
+     * Aplica la transformación CSS completa a la imagen:
+     * rotate (siempre activo) + scale + translate (solo en modo zoom).
+     *
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * CSS transform con scale() y translate() es GPU-acelerado,
-     * lo que significa que es muy fluido y no causa "lag" al mover.
-     * El orden importa: primero escalamos, luego trasladamos.
+     * CSS transform es GPU-acelerado: rotate(), scale() y translate() se
+     * ejecutan en la tarjeta gráfica, por eso son tan fluidos.
+     *
+     * El orden de las funciones importa (se aplican de derecha a izquierda):
+     *   1. translate — mueve la imagen (pan en modo zoom)
+     *   2. scale     — la escala (zoom)
+     *   3. rotate    — la gira alrededor de su centro original
+     *
+     * Separamos rotate del resto para que la rotación siempre gire alrededor
+     * del centro visual de la imagen, independientemente del pan/zoom activo.
+     *
+     * Si no hay zoom ni pan activos (modo normal), solo aplicamos rotate().
+     * Así los botones de rotar funcionan incluso fuera del modo inspección.
      */
     private applyTransform(): void {
         if (!this.lightboxContainer) return;
-        
+
         const imgElement = this.lightboxContainer.querySelector('.lightbox-image') as HTMLImageElement;
         if (!imgElement) return;
-        
-        imgElement.style.transform = `scale(${this.zoomLevel}) translate(${this.panX}px, ${this.panY}px)`;
+
+        if (this.isZoomMode) {
+            imgElement.style.transform =
+                `rotate(${this.rotationDeg}deg) scale(${this.zoomLevel}) translate(${this.panX}px, ${this.panY}px)`;
+        } else {
+            // Fuera del modo zoom solo aplicamos la rotación (sin escala ni pan)
+            imgElement.style.transform = this.rotationDeg !== 0
+                ? `rotate(${this.rotationDeg}deg)`
+                : '';
+        }
     }
     
     /**
@@ -1062,6 +1129,46 @@ class GaleriaLightbox {
         return Math.sqrt(dx * dx + dy * dy);
     }
     
+    // ========================================================================
+    // MÉTODOS DE ROTACIÓN
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Rotamos en pasos de 90°. Usamos módulo 360 para que el valor siempre
+    // esté entre 0 y 359: (270 + 90) % 360 = 0 (vuelve al inicio).
+    // Al rotar, también reseteamos el pan (panX/panY) para que la imagen
+    // vuelva al centro — si el usuario la había desplazado con zoom y luego
+    // la rota, sería confuso que quedara en una posición inesperada.
+    // ========================================================================
+
+    /**
+     * Rota la imagen 90° en sentido antihorario.
+     * Funciona tanto en modo normal como en modo zoom/inspección.
+     */
+    private rotateLeft(): void {
+        this.rotationDeg = (this.rotationDeg - 90 + 360) % 360;
+        // Resetear pan para volver al centro después de rotar
+        this.panX = 0;
+        this.panY = 0;
+        this.applyTransform();
+        console.log(`↺ Rotación: ${this.rotationDeg}°`);
+    }
+
+    /**
+     * Rota la imagen 90° en sentido horario.
+     * Funciona tanto en modo normal como en modo zoom/inspección.
+     */
+    private rotateRight(): void {
+        this.rotationDeg = (this.rotationDeg + 90) % 360;
+        // Resetear pan para volver al centro después de rotar
+        this.panX = 0;
+        this.panY = 0;
+        this.applyTransform();
+        console.log(`↻ Rotación: ${this.rotationDeg}°`);
+    }
+
+    // ========================================================================
+    // FIN DE MÉTODOS DE ROTACIÓN
+    // ========================================================================
+
     // ========================================================================
     // FIN DE MÉTODOS DE ZOOM
     // ========================================================================

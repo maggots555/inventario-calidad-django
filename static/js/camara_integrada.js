@@ -41,9 +41,28 @@ class CamaraIntegrada {
         // FIX iOS Safari: Handler para prevenir el bounce scroll elástico dentro del modal
         // Se guarda la referencia para poder removerlo al cerrar el modal
         this.preventTouchMoveHandler = null;
-        // Sistema híbrido de detección de orientación (NUEVO v5.2)
-        this.orientacionManual = 270; // null = auto, 0/90/180/270 = manual - DEFAULT: 270° landscape
-        this.modoDeteccion = 'manual'; // Modo actual - DEFAULT: manual
+        // Sistema híbrido de detección de orientación (NUEVO v5.2 / actualizado v7.0)
+        this.orientacionManual = null; // null = auto, 0/90/180/270 = manual forzado
+        this.modoDeteccion = 'auto'; // Modo actual - DEFAULT: auto (giroscopio)
+        // SISTEMA GIROSCOPIO / SENSOR DE ORIENTACIÓN (NUEVO v7.0)
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // En lugar de adivinar la orientación por las dimensiones del video (poco confiable),
+        // ahora leemos directamente los sensores del dispositivo:
+        // - screenOrientationAngle: el ángulo que reporta la pantalla (0/90/180/270)
+        // - deviceGamma / deviceBeta: valores del giroscopio físico del celular
+        //   · gamma: inclinación izquierda/derecha (-90° a 90°)
+        //   · beta: inclinación adelante/atrás (-180° a 180°)
+        // Cuando el usuario bloquea la rotación automática, la pantalla no rota pero
+        // el giroscopio sigue reportando la inclinación real — así seguimos sabiendo
+        // cómo está sosteniendo el celular aunque la pantalla esté "fija".
+        this.screenOrientationAngle = 0;
+        this.deviceGamma = null;
+        this.deviceBeta = null;
+        this.deviceOrientationHandler = null;
+        this.screenOrientationChangeHandler = null;
+        this.permisosOrientacionSolicitados = false;
+        // Último ángulo mostrado en el badge (-1 = nunca mostrado → fuerza actualización inicial)
+        this.lastOrientacionBadge = -1;
         this.modal = document.getElementById('modalCamaraIntegrada');
         this.videoElement = document.getElementById('videoPreview');
         this.canvas = document.getElementById('canvasCaptura');
@@ -132,7 +151,7 @@ class CamaraIntegrada {
     onModalAbierto() {
         this.modalAbierto = true;
         this.agregarProteccionBotonAtras();
-        this.iniciarMonitoreoOrientacion(); // NUEVO: Monitorear cambios de orientación
+        this.iniciarMonitoreoOrientacion(); // v7.0: async, se ejecuta en paralelo (sin await)
         this.bloquearScrollBody(); // FIX iOS: Prevenir bounce scroll
         this.abrirCamara();
     }
@@ -239,40 +258,122 @@ class CamaraIntegrada {
         console.log('🔓 Scroll del body restaurado (FIX iOS Safari)');
     }
     /**
-     * Inicia el monitoreo de cambios de orientación
-     * NUEVO: Actualiza el badge en tiempo real cuando el usuario rota el dispositivo
+     * Inicia el monitoreo de orientación usando sensores del dispositivo.
+     *
+     * v7.0 — Sistema de giroscopio:
+     *
+     * CAPA 1 — Screen Orientation API:
+     *   Lee screen.orientation.angle (0/90/180/270) directamente.
+     *   Funciona cuando la rotación automática está activada.
+     *
+     * CAPA 2 — DeviceOrientationEvent (giroscopio físico):
+     *   Lee gamma/beta del giroscopio, que reportan la inclinación REAL
+     *   del dispositivo aunque la rotación automática esté bloqueada.
+     *
+     * iOS 13+: requiere permiso explícito del usuario para DeviceOrientationEvent.
+     *   Se solicita automáticamente al abrir el modal.
+     *
+     * Android: no requiere permiso, los eventos llegan directamente.
      */
-    iniciarMonitoreoOrientacion() {
-        // Actualizar badge inicial
-        this.actualizarBadgeOrientacion();
-        // Escuchar cambios de orientación
-        if (window.screen && window.screen.orientation) {
-            window.screen.orientation.addEventListener('change', () => {
+    async iniciarMonitoreoOrientacion() {
+        var _a;
+        // ── CAPA 1: Screen Orientation API ──────────────────────────────────
+        if ((_a = window.screen) === null || _a === void 0 ? void 0 : _a.orientation) {
+            // Leer ángulo inicial
+            this.screenOrientationAngle = window.screen.orientation.angle;
+            // Suscribirse a cambios
+            this.screenOrientationChangeHandler = () => {
+                this.screenOrientationAngle = window.screen.orientation.angle;
                 this.actualizarBadgeOrientacion();
-            });
+                console.log(`📐 screen.orientation cambió: ${this.screenOrientationAngle}°`);
+            };
+            window.screen.orientation.addEventListener('change', this.screenOrientationChangeHandler);
         }
-        // Fallback: escuchar evento orientationchange (deprecated pero funcional)
-        window.addEventListener('orientationchange', () => {
-            this.actualizarBadgeOrientacion();
-        });
-        // Fallback adicional: escuchar resize (cuando cambia orientación cambia tamaño)
-        window.addEventListener('resize', () => {
-            this.actualizarBadgeOrientacion();
-        });
-        console.log('👂 Monitoreo de orientación iniciado');
+        else if (typeof window.orientation !== 'undefined') {
+            // Fallback legacy para iOS < 16.4 y algunos Android
+            this.screenOrientationAngle = Math.abs(Number(window.orientation));
+        }
+        // ── CAPA 2: DeviceOrientationEvent (giroscopio físico) ───────────────
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // DeviceOrientationEvent.gamma = inclinación izquierda/derecha del celular
+        // - gamma cerca de 0 → celular vertical (portrait)
+        // - gamma cerca de 90 → celular inclinado a la derecha (landscape)
+        // - gamma cerca de -90 → celular inclinado a la izquierda (landscape inverso)
+        this.deviceOrientationHandler = (e) => {
+            this.deviceGamma = e.gamma;
+            this.deviceBeta = e.beta;
+            // Actualizar badge solo cuando la orientación inferida cambia (0/90/180/270).
+            // El giroscopio dispara ~60 veces/segundo — comparar antes de re-renderizar
+            // garantiza máximo 4 actualizaciones posibles al rotar el celular.
+            const nuevaOrientacion = this.inferirOrientacionDeGiroscopio();
+            if (nuevaOrientacion !== this.lastOrientacionBadge) {
+                this.lastOrientacionBadge = nuevaOrientacion;
+                this.actualizarBadgeOrientacion();
+            }
+        };
+        try {
+            // iOS 13+: DeviceOrientationEvent requiere permiso explícito
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                if (!this.permisosOrientacionSolicitados) {
+                    this.permisosOrientacionSolicitados = true;
+                    console.log('📱 iOS detectado — solicitando permiso de giroscopio...');
+                    const permiso = await DeviceOrientationEvent.requestPermission();
+                    if (permiso === 'granted') {
+                        window.addEventListener('deviceorientation', this.deviceOrientationHandler);
+                        console.log('✅ Permiso de giroscopio concedido (iOS)');
+                    }
+                    else {
+                        // Sin permiso: solo usamos screen.orientation (funciona si rotación automática está ON)
+                        console.warn('⚠️ Permiso de giroscopio denegado — usando solo screen.orientation');
+                    }
+                }
+                else {
+                    // Permiso ya solicitado en sesión anterior — intentar suscribirse directamente
+                    window.addEventListener('deviceorientation', this.deviceOrientationHandler);
+                }
+            }
+            else {
+                // Android y escritorio: sin permiso necesario
+                window.addEventListener('deviceorientation', this.deviceOrientationHandler);
+                console.log('✅ Giroscopio suscrito (Android/desktop — sin permiso necesario)');
+            }
+        }
+        catch (err) {
+            // El permiso falló o la API no está disponible → seguimos con screen.orientation
+            console.warn('⚠️ No se pudo suscribir al giroscopio:', err);
+        }
+        // Actualizar badge con estado inicial
+        this.actualizarBadgeOrientacion();
+        console.log(`👂 Monitoreo de orientación iniciado | screen.orientation: ${this.screenOrientationAngle}° | giroscopio: ${this.deviceGamma !== null ? 'activo' : 'no disponible'}`);
     }
     /**
-     * Detiene el monitoreo de cambios de orientación
+     * Detiene el monitoreo de orientación y limpia todos los listeners.
+     * v7.0: implementación real de limpieza (antes era solo un console.log)
      */
     detenerMonitoreoOrientacion() {
-        // Remover listeners (simplificado, los listeners persistirán pero no afectarán)
-        console.log('🛑 Monitoreo de orientación detenido');
+        var _a;
+        // Remover listener de screen.orientation
+        if (this.screenOrientationChangeHandler && ((_a = window.screen) === null || _a === void 0 ? void 0 : _a.orientation)) {
+            window.screen.orientation.removeEventListener('change', this.screenOrientationChangeHandler);
+            this.screenOrientationChangeHandler = null;
+        }
+        // Remover listener del giroscopio
+        if (this.deviceOrientationHandler) {
+            window.removeEventListener('deviceorientation', this.deviceOrientationHandler);
+            this.deviceOrientationHandler = null;
+        }
+        // Resetear sentinel para que la próxima apertura fuerce actualización del badge
+        this.deviceGamma = null;
+        this.deviceBeta = null;
+        this.lastOrientacionBadge = -1;
+        console.log('🛑 Monitoreo de orientación detenido — listeners removidos');
     }
     /**
      * Actualiza el badge visual con la orientación actual
      * NUEVO: Muestra el ángulo detectado y un ícono visual
      */
     actualizarBadgeOrientacion() {
+        var _a;
         const orientacion = this.obtenerOrientacionFinal();
         if (this.infoOrientacion) {
             // Actualizar texto con el ángulo
@@ -289,6 +390,15 @@ class CamaraIntegrada {
         // NUEVO: Actualizar indicador de modo (automático/manual)
         if (this.infoModoOrientacion) {
             this.infoModoOrientacion.textContent = this.modoDeteccion === 'manual' ? '👤' : '🤖';
+        }
+        // ── Contra-rotación de iconos ────────────────────────────────────────
+        // Aplica cam-orient-X al modal-body para que el CSS contra-rote todos
+        // los iconos de badges y botones, manteniéndolos legibles igual que
+        // una app nativa de cámara (el badge de orientación queda excluido).
+        const modalBody = (_a = this.modal) === null || _a === void 0 ? void 0 : _a.querySelector('.modal-body');
+        if (modalBody) {
+            modalBody.classList.remove('cam-orient-0', 'cam-orient-90', 'cam-orient-180', 'cam-orient-270');
+            modalBody.classList.add(`cam-orient-${orientacion}`);
         }
         const modo = this.modoDeteccion === 'manual' ? 'MANUAL' : 'AUTO';
         console.log(`📐 Badge actualizado: ${orientacion}° | ${this.obtenerDescripcionOrientacion(orientacion)} | Modo: ${modo}`);
@@ -1018,53 +1128,190 @@ class CamaraIntegrada {
         }
     }
     /**
-     * Toggle manual de orientación
-     * NUEVO v5.2: Permite al usuario cambiar manualmente entre portrait/landscape
+     * Toggle manual de orientación.
+     *
+     * v7.0: Cicla por todos los estados en orden:
+     *   auto → 0° (portrait) → 90° (landscape derecha) → 180° (portrait invertido)
+     *           → 270° (landscape izquierda) → auto → ...
+     *
+     * Útil cuando el giroscopio no está disponible o el usuario quiere forzar
+     * una orientación específica independientemente de cómo sostiene el celular.
      */
     toggleOrientacionManual() {
         console.log('🔄 Toggle manual de orientación activado');
         if (this.modoDeteccion === 'auto') {
-            // Cambiar a modo manual
+            // auto → primera orientación manual (portrait 0°)
             this.modoDeteccion = 'manual';
-            // Obtener orientación actual y alternar
-            const orientacionActual = this.obtenerOrientacionFinal();
-            // CORREGIDO: Usar 270° para landscape (mano derecha) en lugar de 90°
-            this.orientacionManual = orientacionActual === 0 ? 270 : 0; // Alternar entre portrait y landscape
-            console.log(`  ✅ Modo MANUAL activado. Orientación fijada en: ${this.orientacionManual}°`);
+            this.orientacionManual = 0;
+            console.log('  ✅ Modo MANUAL activado → 0° (portrait)');
         }
         else {
-            // Ya está en modo manual, alternar orientación
-            // CORREGIDO: Usar 270° para landscape (mano derecha) en lugar de 90°
-            this.orientacionManual = this.orientacionManual === 0 ? 270 : 0;
-            console.log(`  🔄 Orientación manual cambiada a: ${this.orientacionManual}°`);
+            // Ciclar entre orientaciones manuales → volver a auto al final
+            switch (this.orientacionManual) {
+                case 0:
+                    this.orientacionManual = 90;
+                    console.log('  🔄 Manual → 90° (landscape derecha)');
+                    break;
+                case 90:
+                    this.orientacionManual = 180;
+                    console.log('  🔄 Manual → 180° (portrait invertido)');
+                    break;
+                case 180:
+                    this.orientacionManual = 270;
+                    console.log('  🔄 Manual → 270° (landscape izquierda)');
+                    break;
+                case 270:
+                default:
+                    // Regresa a auto
+                    this.modoDeteccion = 'auto';
+                    this.orientacionManual = null;
+                    console.log('  🤖 Modo AUTO activado (sensores)');
+                    break;
+            }
         }
         // Actualizar badge
         this.actualizarBadgeOrientacion();
     }
     /**
-     * Obtiene la orientación final usando lógica híbrida
-     * NUEVO v5.2: Prioriza orientación manual sobre auto-detección
+     * Obtiene la orientación final usando lógica híbrida.
      *
-     * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Este es el método principal que decide qué orientación usar.
-     * Primero revisa si el usuario configuró algo manual, si no, usa auto-detección.
+     * v7.0: En modo auto usa detectarOrientacionPorSensor() (giroscopio + screen.orientation).
+     * El modo manual sigue existiendo como override cuando el usuario lo activa.
      *
      * @returns Ángulo de rotación en grados (0, 90, 180, 270)
      */
     obtenerOrientacionFinal() {
-        // PRIORIDAD 1: Si hay orientación manual, usarla
+        // PRIORIDAD 1: Si el usuario fijó manualmente una orientación, respetarla
         if (this.modoDeteccion === 'manual' && this.orientacionManual !== null) {
-            console.log(`📐 Usando orientación MANUAL: ${this.orientacionManual}°`);
+            console.log(`📐 Usando orientación MANUAL forzada: ${this.orientacionManual}°`);
             return this.orientacionManual;
         }
-        // PRIORIDAD 2: Detección automática por dimensiones de video
-        const orientacionAuto = this.detectarOrientacionPorVideo();
-        console.log(`📐 Usando orientación AUTO: ${orientacionAuto}°`);
+        // PRIORIDAD 2: Detección automática por sensores (giroscopio + screen.orientation)
+        const orientacionAuto = this.detectarOrientacionPorSensor();
+        console.log(`📐 Usando orientación AUTO (sensores): ${orientacionAuto}°`);
         return orientacionAuto;
     }
     /**
-     * Detecta orientación analizando las dimensiones del stream de video
-     * NUEVO v5.2: Método principal de auto-detección que SÍ funciona
+     * Detecta orientación usando los sensores del dispositivo.
+     *
+     * v7.0 — reemplaza detectarOrientacionPorVideo() como método principal.
+     *
+     * Prioridad de fuentes:
+     *  1. Screen Orientation API (screen.orientation.type) — más limpia y directa
+     *  2. Giroscopio (DeviceOrientationEvent.gamma/beta) — fallback cuando rotation lock activo
+     *  3. window.orientation legacy — fallback para iOS < 16.4
+     *  4. Dimensiones de video — último recurso (comportamiento anterior)
+     *
+     * @returns Ángulo de rotación (0, 90, 180, 270) que necesita el canvas para compensar
+     */
+    detectarOrientacionPorSensor() {
+        var _a;
+        // ── FUENTE 1: Screen Orientation API ──
+        if ((_a = window.screen) === null || _a === void 0 ? void 0 : _a.orientation) {
+            const tipo = window.screen.orientation.type;
+            // Mapeo screen.orientation.type → ángulo de canvas:
+            // portrait-primary   = 0°  → sin rotación
+            // landscape-primary  = 90° → landscape (botón derecha)
+            // portrait-secondary = 180° → portrait invertido
+            // landscape-secondary = 270° → landscape (botón izquierda)
+            let orientacionScreen;
+            switch (tipo) {
+                case 'portrait-primary':
+                    orientacionScreen = 0;
+                    break;
+                case 'landscape-primary':
+                    orientacionScreen = 90;
+                    break;
+                case 'portrait-secondary':
+                    orientacionScreen = 180;
+                    break;
+                case 'landscape-secondary':
+                    orientacionScreen = 270;
+                    break;
+                default: orientacionScreen = 0;
+            }
+            // ── FUENTE 2 (corrección): Giroscopio cuando rotation lock está activo ──
+            // Si el giroscopio dice algo diferente a lo que reporta la pantalla,
+            // es señal de que el usuario activó el bloqueo de rotación y el celular
+            // físicamente está en otra posición. En ese caso, confiamos en el giroscopio.
+            if (this.deviceGamma !== null && this.deviceBeta !== null) {
+                const orientacionFisica = this.inferirOrientacionDeGiroscopio();
+                // "Discrepancia significativa": diferencia > 80° en el rango circular
+                const diff = Math.abs(orientacionFisica - orientacionScreen);
+                const discrepancia = Math.min(diff, 360 - diff);
+                if (discrepancia > 80) {
+                    console.log(`🔒 Rotation lock detectado — screen: ${orientacionScreen}° / giroscopio: ${orientacionFisica}° → usando giroscopio`);
+                    return orientacionFisica;
+                }
+            }
+            console.log(`📐 Orientación por screen.orientation.type (${tipo}): ${orientacionScreen}°`);
+            return orientacionScreen;
+        }
+        // ── FUENTE 3: window.orientation legacy (iOS < 16.4) ──
+        if (typeof window.orientation !== 'undefined') {
+            // Convención de window.orientation (diferente a screen.orientation.angle):
+            // 0 = portrait, 90 = landscape izquierda, -90 = landscape derecha, 180 = portrait invertido
+            const angLegacy = Number(window.orientation);
+            let orientacionLegacy;
+            switch (angLegacy) {
+                case 0:
+                    orientacionLegacy = 0;
+                    break;
+                case 90:
+                    orientacionLegacy = 270;
+                    break; // window.90 = landscape izquierda = nuestro 270
+                case -90:
+                    orientacionLegacy = 90;
+                    break; // window.-90 = landscape derecha = nuestro 90
+                case 180:
+                    orientacionLegacy = 180;
+                    break;
+                default: orientacionLegacy = 0;
+            }
+            console.log(`📐 Orientación por window.orientation (${angLegacy}°): ${orientacionLegacy}°`);
+            return orientacionLegacy;
+        }
+        // ── FUENTE 4: Solo giroscopio (sin screen.orientation) ──
+        if (this.deviceGamma !== null) {
+            const orientacionGiro = this.inferirOrientacionDeGiroscopio();
+            console.log(`📐 Orientación por giroscopio puro: ${orientacionGiro}°`);
+            return orientacionGiro;
+        }
+        // ── FUENTE 5: Fallback final — dimensiones del stream de video ──
+        console.warn('⚠️ Sensores no disponibles — fallback a dimensiones de video');
+        return this.detectarOrientacionPorVideo();
+    }
+    /**
+     * Infiere la orientación del dispositivo a partir de los valores del giroscopio.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * El giroscopio reporta cómo está inclinado el celular en los 3 ejes del espacio.
+     * Nosotros usamos:
+     * - gamma: inclinación izquierda/derecha
+     *   · cerca de 0  → celular vertical (portrait)
+     *   · cerca de +90 → inclinado hacia la derecha (landscape derecha)
+     *   · cerca de -90 → inclinado hacia la izquierda (landscape izquierda)
+     * - beta: inclinación adelante/atrás
+     *   · cerca de +90 → inclinado hacia adelante (portrait normal)
+     *   · cerca de -90 → inclinado hacia atrás (portrait invertido)
+     *
+     * @returns 0, 90, 180 o 270
+     */
+    inferirOrientacionDeGiroscopio() {
+        var _a, _b;
+        const gamma = (_a = this.deviceGamma) !== null && _a !== void 0 ? _a : 0;
+        const beta = (_b = this.deviceBeta) !== null && _b !== void 0 ? _b : 90;
+        if (gamma > 45)
+            return 90; // Celular inclinado derecha → landscape botón derecha
+        if (gamma < -45)
+            return 270; // Celular inclinado izquierda → landscape botón izquierda
+        if (beta < -45)
+            return 180; // Celular boca abajo → portrait invertido
+        return 0; // Celular vertical → portrait normal
+    }
+    /**
+     * Detecta orientación analizando las dimensiones del stream de video.
+     * Método de ÚLTIMO RECURSO usado solo cuando no hay sensores disponibles.
      *
      * EXPLICACIÓN PARA PRINCIPIANTES:
      * En lugar de preguntarle al sistema operativo la orientación del celular,
@@ -1073,10 +1320,7 @@ class CamaraIntegrada {
      * - Si el video es más ancho que alto (1920x1080) → Landscape (horizontal)
      * - Si el video es más alto que ancho (1080x1920) → Portrait (vertical)
      *
-     * Esto funciona porque las cámaras modernas adaptan su resolución según
-     * cómo sostienes el celular.
-     *
-     * @returns 0 para portrait, 90 para landscape
+     * @returns 0 para portrait, 270 para landscape
      */
     detectarOrientacionPorVideo() {
         if (!this.videoElement) {
