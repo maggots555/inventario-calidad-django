@@ -4,10 +4,6 @@
 // ============================================================================
 class CamaraIntegrada {
     constructor() {
-        // OPTIMIZACIÓN v6.0: Canvas pre-configurados para evitar reflows costosos
-        // Se crean una vez al inicio con dimensiones fijas
-        this.canvasPortrait = null; // 1080x1920 (vertical)
-        this.canvasLandscape = null; // 1920x1080 (horizontal)
         this.infoCamaras = null; // NUEVO: Para mostrar info de cámaras detectadas
         this.infoOrientacion = null; // NUEVO: Para mostrar orientación detectada
         this.infoModoOrientacion = null; // NUEVO: Indicador de modo (auto/manual)
@@ -66,8 +62,6 @@ class CamaraIntegrada {
         this.modal = document.getElementById('modalCamaraIntegrada');
         this.videoElement = document.getElementById('videoPreview');
         this.canvas = document.getElementById('canvasCaptura');
-        // OPTIMIZACIÓN v6.0: Inicializar canvas pre-configurados
-        this.inicializarCanvasCache();
         this.btnCapturar = document.getElementById('btnCapturar');
         this.btnCambiarCamara = document.getElementById('btnCambiarCamara');
         this.btnCerrar = document.getElementById('btnCerrarCamara');
@@ -122,26 +116,6 @@ class CamaraIntegrada {
             });
         }
         console.log('✅ Cámara integrada inicializada');
-    }
-    /**
-     * Inicializa canvas pre-configurados para optimizar rendimiento
-     * OPTIMIZACIÓN v6.0: Evita reflows costosos al re-dimensionar canvas en cada captura
-     *
-     * EXPLICACIÓN PARA PRINCIPIANTES:
-     * - Crear canvas con dimensiones fijas es MUCHO más rápido que cambiarlas después
-     * - En móviles lentos, cambiar canvas.width/height puede tardar 300-800ms
-     * - Con este sistema, solo seleccionamos el canvas correcto (instantáneo)
-     */
-    inicializarCanvasCache() {
-        // Canvas portrait: para fotos verticales (1080x1920)
-        this.canvasPortrait = document.createElement('canvas');
-        this.canvasPortrait.width = 1080;
-        this.canvasPortrait.height = 1920;
-        // Canvas landscape: para fotos horizontales (1920x1080)
-        this.canvasLandscape = document.createElement('canvas');
-        this.canvasLandscape.width = 1920;
-        this.canvasLandscape.height = 1080;
-        console.log('✅ Canvas cacheados inicializados (Portrait: 1080x1920, Landscape: 1920x1080)');
     }
     /**
      * Se ejecuta cuando el modal se abre
@@ -653,12 +627,15 @@ class CamaraIntegrada {
         }
     }
     /**
-     * Construye las constraints para getUserMedia según el dispositivo seleccionado
+     * Construye las constraints para getUserMedia según el dispositivo seleccionado.
+     * Se pide la máxima resolución posible: min 1280 garantiza que el navegador
+     * no entregue menos (error explícito), ideal 4096 apunta a cámaras 4K/12MP+.
+     * Si el hardware no llega a 4096, el navegador entrega lo máximo que puede.
      */
     construirConstraintsCamara() {
         const constraints = {
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { min: 1280, ideal: 4096 },
+            height: { min: 720, ideal: 2160 }
         };
         // Si hay un dispositivo específico seleccionado, usarlo
         if (this.dispositivoActualId) {
@@ -1051,16 +1028,32 @@ class CamaraIntegrada {
             // NUEVO: Obtener orientación del dispositivo
             const orientacion = this.obtenerOrientacionFinal();
             console.log(`📐 Orientación detectada: ${orientacion}°`);
-            // Dimensiones originales del video
+            // Dimensiones reales del video entregadas por la cámara
             const videoWidth = this.videoElement.videoWidth;
             const videoHeight = this.videoElement.videoHeight;
-            // OPTIMIZACIÓN v6.0: Seleccionar canvas pre-configurado según orientación
-            // Esto ELIMINA el costoso cambio de dimensiones (canvas.width = X)
+            // ── Canvas dinámico ───────────────────────────────────────────────
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // Cuando el teléfono está en portrait (0°/180°), la foto final mide
+            // igual que el video (ej. 1080×1920). Cuando está en landscape (90°/270°),
+            // rotamos el frame, así que ancho y alto se intercambian (1920×1080).
+            // En vez de usar un canvas de tamaño fijo (que desperdicia píxeles si la
+            // cámara entrega menos resolución, o recorta si entrega más), calculamos
+            // las dimensiones exactas a partir del video real y solo redimensionamos
+            // el canvas cuando cambian — lo cual ocurre como máximo una vez por sesión.
             const necesitaRotacion = orientacion === 90 || orientacion === 270;
-            const canvasActual = necesitaRotacion ? this.canvasLandscape : this.canvasPortrait;
+            const targetW = necesitaRotacion ? videoHeight : videoWidth;
+            const targetH = necesitaRotacion ? videoWidth : videoHeight;
+            const canvasActual = this.canvas;
             if (!canvasActual) {
-                console.error('❌ Canvas pre-configurado no disponible');
+                console.error('❌ Canvas no disponible');
                 return;
+            }
+            // Redimensionar solo si cambió (el primer frame siempre cambia;
+            // las fotos siguientes dentro de la misma sesión no — sin reflow)
+            if (canvasActual.width !== targetW || canvasActual.height !== targetH) {
+                canvasActual.width = targetW;
+                canvasActual.height = targetH;
+                console.log(`📐 Canvas redimensionado a ${targetW}×${targetH}`);
             }
             const canvasWidth = canvasActual.width;
             const canvasHeight = canvasActual.height;
@@ -1078,8 +1071,10 @@ class CamaraIntegrada {
             context.drawImage(this.videoElement, 0, 0, videoWidth, videoHeight);
             // Restaurar transformación del canvas para futuras capturas
             context.setTransform(1, 0, 0, 1, 0, 0);
-            // Convertir canvas a Blob (ahora usando Promise para evitar race conditions)
-            // OPTIMIZACIÓN v6.0: Calidad reducida de 0.95 a 0.87 (visualmente idéntica, 50% más rápida)
+            // Convertir canvas a Blob con máxima calidad JPEG
+            // 0.95 = excelente balance entre nitidez y tamaño de archivo.
+            // (Fue reducido a 0.87 en v6.0 por velocidad; se restaura porque en
+            //  imágenes técnicas —piezas, texto, rayones— la diferencia sí se nota.)
             const blob = await new Promise((resolve, reject) => {
                 canvasActual.toBlob((b) => {
                     if (b) {
@@ -1088,7 +1083,7 @@ class CamaraIntegrada {
                     else {
                         reject(new Error('Error al crear blob de la foto'));
                     }
-                }, 'image/jpeg', 0.87);
+                }, 'image/jpeg', 0.95);
             });
             // OPTIMIZACIÓN v6.0: dataURL eliminado (no se usa en el flujo de upload)
             // Agregar a lista de fotos capturadas

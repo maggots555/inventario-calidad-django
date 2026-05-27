@@ -23,7 +23,7 @@ from django_ratelimit.decorators import ratelimit
 from django.conf import settings
 from django.urls import reverse
 from functools import wraps
-from PIL import Image
+from PIL import Image, ImageOps
 import os
 import logging
 
@@ -3662,6 +3662,14 @@ def comprimir_y_guardar_imagen(orden, imagen_file, tipo, descripcion, empleado):
     
     # Abrir imagen con Pillow
     img_original = Image.open(imagen_file)
+    
+    # Corregir rotación EXIF antes de cualquier procesamiento.
+    # Las fotos tomadas con celular incluyen un metadato EXIF que indica cómo
+    # rotarlas al mostrarlas. Sin esta corrección, Pillow guarda los píxeles
+    # en la orientación cruda del sensor (puede salir girada 90°).
+    # exif_transpose() aplica esa rotación y elimina el metadato para que
+    # cualquier visor (WhatsApp, Windows, etc.) la vea siempre derecha.
+    img_original = ImageOps.exif_transpose(img_original)
     
     # Convertir a RGB si es necesario (para JPG)
     if img_original.mode in ('RGBA', 'LA', 'P'):
