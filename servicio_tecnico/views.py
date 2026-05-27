@@ -5558,7 +5558,7 @@ def _enviar_notificacion_pieza_recibida(orden, seguimiento):
         
         cotizacion = seguimiento.cotizacion
         seguimientos_pendientes = cotizacion.seguimientos_piezas.exclude(
-            estado='recibido'
+            estado__in=['recibido', 'incorrecto', 'danado']
         ).exclude(
             id=seguimiento.id  # Excluir el seguimiento actual (que acaba de ser recibido)
         )
@@ -5661,6 +5661,31 @@ Hecho por Jorge Magos todos los derechos reservados.
         print(f"   TO: {', '.join(destinatarios_principales)}")
         if destinatarios_copia:
             print(f"   CC: {', '.join(destinatarios_copia)}")
+        
+        # =================================================================
+        # NOTIFICACIÓN PUSH AL TÉCNICO
+        # =================================================================
+        # Complementa el correo con una notificación push inmediata.
+        # Se ejecuta en try/except propio para que un fallo de push NUNCA
+        # bloquee ni revierta el envío del correo ya realizado.
+        try:
+            from notificaciones.push_service import enviar_push_a_usuario
+            tecnico_user = orden.tecnico_asignado_actual.user
+            url_orden = reverse('servicio_tecnico:detalle_orden', args=[orden.pk])
+            # Truncar descripción a 100 chars para que quepa bien en la notificación
+            descripcion_corta = seguimiento.descripcion_piezas[:100]
+            if len(seguimiento.descripcion_piezas) > 100:
+                descripcion_corta += '...'
+            enviados = enviar_push_a_usuario(
+                usuario=tecnico_user,
+                titulo=f"📬 Pieza recibida — {orden_cliente}",
+                mensaje=descripcion_corta,
+                url=url_orden,
+            )
+            print(f"🔔 Push enviado a {enviados} dispositivo(s) de {tecnico_user.username}")
+        except Exception as e_push:
+            # El push falló pero el correo ya fue enviado — no es crítico
+            print(f"⚠️ [PUSH] No se pudo notificar llegada de pieza: {e_push}")
         
         return {
             'success': True,
