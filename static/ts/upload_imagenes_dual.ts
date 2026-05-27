@@ -241,6 +241,18 @@ class ImageCache {
      * @param tipo       - Tipo de imagen seleccionado (radio button)
      * @param descripcion - Texto del campo descripción
      * @param imagenes   - Pares { file, id } del array imagenesSeleccionadas
+     * 
+     * CAMBIO v8.1 (Mayo 2026) — Correcciones para iOS/Safari:
+     * 1. LECTURA SECUENCIAL: los ArrayBuffers se leen uno a la vez (for...of en
+     *    vez de Promise.all). Promise.all cargaba TODOS los archivos en memoria
+     *    simultáneamente causando picos de RAM que iOS mataba como OOM crash.
+     *    Con lectura secuencial el pico máximo es el tamaño de UN solo archivo.
+     * 2. LÍMITE DE TAMAÑO: si el total de imágenes supera 80 MB se omite el
+     *    guardado en caché para no arriesgar OOM en dispositivos con poca RAM.
+     *    (Umbral conservador: Cloudflare admite hasta 100 MB por request.)
+     * 3. TRANSACCIÓN CONFIRMADA: se espera el evento tx.oncomplete antes de
+     *    llamar db.close(). Safari/WebKit puede abortar la transacción si se
+     *    cierra la conexión antes de que el motor confirme el commit.
      */
     static async guardar(
         ordenUrl: string,
@@ -254,10 +266,37 @@ class ImageCache {
             return;
         }
 
-        try {
-            const cachedImagenes = await Promise.all(
-                imagenes.map(img => ImageCache.fileToCached(img.file, img.id))
+        // ── Protección de memoria: skip si el total supera 80 MB ────────────
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // En iPhones con poca RAM, leer muchos archivos grandes en memoria puede
+        // hacer que iOS mate el proceso del navegador. Si el conjunto supera
+        // este umbral, simplemente no guardamos en caché (el usuario seguirá
+        // pudiendo subir, solo que si hay un corte de red no habrá recuperación
+        // automática — lo mismo que ocurría antes de v7.0).
+        const LIMITE_CACHE_BYTES = 80 * 1024 * 1024; // 80 MB
+        const totalBytes = imagenes.reduce((sum, img) => sum + img.file.size, 0);
+        if (totalBytes > LIMITE_CACHE_BYTES) {
+            console.warn(
+                `⚠️ Caché omitido: ${(totalBytes / 1024 / 1024).toFixed(1)} MB supera el límite ` +
+                `de ${LIMITE_CACHE_BYTES / 1024 / 1024} MB. ` +
+                `Se evita pico de memoria en dispositivos con poca RAM (iPhone).`
             );
+            return;
+        }
+
+        try {
+            // ── Lectura secuencial de ArrayBuffers (un archivo a la vez) ────
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // Antes usábamos Promise.all() que lee TODOS los archivos en paralelo.
+            // Eso significa que si hay 15 fotos de 8 MB, se crean 120 MB de
+            // ArrayBuffers al mismo tiempo en la memoria de JavaScript.
+            // Ahora los leemos de uno en uno: en todo momento solo hay UN
+            // ArrayBuffer en proceso, el anterior ya fue entregado al objeto
+            // CachedImage y el GC puede reclamarlo si necesita memoria.
+            const cachedImagenes: CachedImage[] = [];
+            for (const img of imagenes) {
+                cachedImagenes.push(await ImageCache.fileToCached(img.file, img.id));
+            }
 
             const record: CacheRecord = {
                 ordenUrl,
@@ -267,10 +306,23 @@ class ImageCache {
                 savedAt: Date.now(),
             };
 
-            const db    = await ImageCache.abrirDB();
-            const tx    = db.transaction(ImageCache.STORE_NAME, 'readwrite');
-            const store = tx.objectStore(ImageCache.STORE_NAME);
-            store.put(record); // put = insert or update (upsert)
+            // ── Escritura en IndexedDB esperando confirmación del commit ────
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // IndexedDB es asíncrono. store.put() inicia la escritura pero no la
+            // termina de inmediato. Antes llamábamos db.close() enseguida, lo cual
+            // funciona en Chrome (muy tolerante) pero en Safari puede abortar la
+            // transacción antes de que se confirme el commit.
+            // Ahora esperamos el evento tx.oncomplete (que dispara cuando la
+            // transacción fue grabada definitivamente en disco) antes de cerrar.
+            const db = await ImageCache.abrirDB();
+            await new Promise<void>((resolve, reject) => {
+                const tx    = db.transaction(ImageCache.STORE_NAME, 'readwrite');
+                const store = tx.objectStore(ImageCache.STORE_NAME);
+                store.put(record); // put = insert or update (upsert)
+                tx.oncomplete = () => resolve();
+                tx.onerror    = () => reject(tx.error);
+                tx.onabort    = () => reject(new Error('Transacción abortada'));
+            });
             db.close();
 
             console.log(`💾 Caché: ${imagenes.length} imagen(es) guardada(s) para ${ordenUrl}`);
@@ -316,13 +368,21 @@ class ImageCache {
     /**
      * Elimina el registro de caché de una orden específica.
      * Se llama tras subida exitosa o al limpiar la selección manualmente.
+     * 
+     * CAMBIO v8.1: Se espera tx.oncomplete antes de db.close() para evitar
+     * que Safari aborte la transacción de eliminación prematuramente.
      */
     static async limpiar(ordenUrl: string): Promise<void> {
         try {
-            const db    = await ImageCache.abrirDB();
-            const tx    = db.transaction(ImageCache.STORE_NAME, 'readwrite');
-            const store = tx.objectStore(ImageCache.STORE_NAME);
-            store.delete(ordenUrl);
+            const db = await ImageCache.abrirDB();
+            await new Promise<void>((resolve, reject) => {
+                const tx    = db.transaction(ImageCache.STORE_NAME, 'readwrite');
+                const store = tx.objectStore(ImageCache.STORE_NAME);
+                store.delete(ordenUrl);
+                tx.oncomplete = () => resolve();
+                tx.onerror    = () => reject(tx.error);
+                tx.onabort    = () => reject(new Error('Transacción abortada'));
+            });
             db.close();
             console.log(`🗑️ Caché limpiado para ${ordenUrl}`);
         } catch (e) {
@@ -333,33 +393,48 @@ class ImageCache {
     /**
      * Elimina todos los registros con más de 24 horas.
      * Se llama al inicializar la página para no acumular datos viejos.
+     * 
+     * CAMBIO v8.1: Se usa una única transacción readwrite y se espera
+     * tx.oncomplete antes de db.close(). Antes cada store.delete() dentro
+     * del bucle no tenía garantía de completarse antes del cierre en Safari.
      */
     static async limpiarViejos(): Promise<void> {
         try {
-            const db    = await ImageCache.abrirDB();
-            const tx    = db.transaction(ImageCache.STORE_NAME, 'readwrite');
-            const store = tx.objectStore(ImageCache.STORE_NAME);
+            const db = await ImageCache.abrirDB();
 
-            // getAll() retorna todos los registros del store
+            // Primero leemos todos los registros en una transacción readonly
             const todos: CacheRecord[] = await new Promise((resolve, reject) => {
-                const req = store.getAll();
+                const tx    = db.transaction(ImageCache.STORE_NAME, 'readonly');
+                const store = tx.objectStore(ImageCache.STORE_NAME);
+                const req   = store.getAll();
                 req.onsuccess = () => resolve(req.result as CacheRecord[]);
                 req.onerror   = () => reject(req.error);
             });
 
+            // Identificar cuáles expiaron
             const ahora = Date.now();
-            let eliminados = 0;
-            for (const record of todos) {
-                if (ahora - record.savedAt > ImageCache.TTL_MS) {
-                    store.delete(record.ordenUrl);
-                    eliminados++;
-                }
+            const expirados = todos.filter(r => ahora - r.savedAt > ImageCache.TTL_MS);
+
+            if (expirados.length === 0) {
+                db.close();
+                return;
             }
 
+            // Eliminar todos los expirados en UNA sola transacción readwrite
+            // y esperar su confirmación antes de cerrar
+            await new Promise<void>((resolve, reject) => {
+                const tx    = db.transaction(ImageCache.STORE_NAME, 'readwrite');
+                const store = tx.objectStore(ImageCache.STORE_NAME);
+                for (const record of expirados) {
+                    store.delete(record.ordenUrl);
+                }
+                tx.oncomplete = () => resolve();
+                tx.onerror    = () => reject(tx.error);
+                tx.onabort    = () => reject(new Error('Transacción abortada'));
+            });
+
             db.close();
-            if (eliminados > 0) {
-                console.log(`🗑️ Caché: ${eliminados} registro(s) expirado(s) eliminado(s)`);
-            }
+            console.log(`🗑️ Caché: ${expirados.length} registro(s) expirado(s) eliminado(s)`);
         } catch (e) {
             console.warn('⚠️ No se pudo limpiar registros viejos de IndexedDB:', e);
         }
