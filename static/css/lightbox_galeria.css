@@ -44,62 +44,71 @@
     padding: 20px;
 }
 
-/* Botón cerrar */
+/* Botón cerrar — compacto y discreto */
 .lightbox-close {
     position: absolute;
-    top: 20px;
-    right: 20px;
-    width: 50px;
-    height: 50px;
+    top: 16px;
+    right: 16px;
+    /* Área táctil real 44×44 para móvil; apariencia visual 32×32 */
+    width: 44px;
+    height: 44px;
     border: none;
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    font-size: 1.5rem;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.95rem;
     border-radius: 50%;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s ease;
+    transition: color 0.2s ease, background 0.2s ease;
     z-index: 10;
 }
 
 .lightbox-close:hover {
-    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    background: rgba(255, 255, 255, 0.12);
     transform: rotate(90deg);
+    transition: color 0.2s ease, background 0.2s ease, transform 0.25s ease;
 }
 
-/* Botones de navegación */
+/* Botones de navegación — finos y no invasivos */
 .lightbox-nav {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    width: 60px;
-    height: 60px;
-    border: none;
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    font-size: 2rem;
+    /* Área táctil 44×44 */
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.25);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.05rem;
     border-radius: 50%;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s ease;
+    /* En desktop se ven muy tenues hasta que el cursor se acerca */
+    opacity: 0.3;
+    transition: opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
     z-index: 10;
+    backdrop-filter: blur(4px);
 }
 
 .lightbox-nav:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateY(-50%) scale(1.1);
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-50%);
 }
 
 .lightbox-prev {
-    left: 30px;
+    left: 20px;
 }
 
 .lightbox-next {
-    right: 30px;
+    right: 20px;
 }
 
 /* Contenedor de imagen */
@@ -134,115 +143,132 @@
 .lightbox-info {
     width: 90%;
     max-width: 800px;
-    margin-top: 20px;
+    margin-top: 10px;
     background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 20px;
+    border-radius: 10px;
+    padding: 10px 14px;
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .lightbox-caption {
     color: white;
-    margin-bottom: 15px;
+    margin-bottom: 8px;
 }
 
 .lightbox-description {
-    font-size: 1rem;
-    margin-bottom: 10px;
-    line-height: 1.5;
+    font-size: 0.875rem;
+    margin-bottom: 6px;
+    line-height: 1.4;
 }
 
 .lightbox-meta {
     display: flex;
-    gap: 20px;
-    font-size: 0.9rem;
-    color: rgba(255, 255, 255, 0.8);
+    gap: 16px;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .lightbox-meta span {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
 }
 
 .lightbox-meta i {
     color: #4a9eff;
+    font-size: 0.75rem;
 }
 
-/* Acciones */
+/* Barra de acciones — icon strip compacto */
 .lightbox-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-top: 15px;
+    padding-top: 8px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.lightbox-download {
-    text-decoration: none;
-    display: inline-flex;
+.lightbox-actions-group {
+    display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    border: none;
+    gap: 4px;
 }
 
-.lightbox-download:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+/* Botón ícono base — 32px visual, 44px área táctil vía padding extendido */
+.lightbox-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.85rem;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    /* Área táctil extendida sin alterar el layout */
+    position: relative;
+}
+
+.lightbox-icon-btn::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+}
+
+.lightbox-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.35);
+    color: white;
+    text-decoration: none;
+}
+
+/* Variante descarga: tono azul de marca */
+.lightbox-download.lightbox-icon-btn {
+    background: rgba(31, 99, 145, 0.5);
+    border-color: rgba(31, 99, 145, 0.8);
+    color: white;
+}
+
+.lightbox-download.lightbox-icon-btn:hover {
+    background: rgba(31, 99, 145, 0.85);
+    border-color: #1f6391;
+    color: white;
+}
+
+/* Variante zoom activo */
+.lightbox-zoom-toggle.lightbox-icon-btn.active,
+.lightbox-zoom-toggle.lightbox-icon-btn[data-active="true"] {
+    background: rgba(13, 202, 240, 0.25);
+    border-color: rgba(13, 202, 240, 0.6);
+    color: #0dcaf0;
+}
+
+/* Variante peligro: eliminar */
+.lightbox-icon-btn--danger {
+    background: rgba(220, 53, 69, 0.15);
+    border-color: rgba(220, 53, 69, 0.4);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.lightbox-icon-btn--danger:hover {
+    background: rgba(220, 53, 69, 0.5);
+    border-color: #dc3545;
     color: white;
 }
 
 .lightbox-counter {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.8rem;
     font-weight: 500;
-}
-
-/* Botón eliminar dentro del lightbox */
-.lightbox-delete {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    border-radius: 6px;
-    transition: all 0.3s ease;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    /* Hereda el rojo de Bootstrap btn-danger */
-}
-
-.lightbox-delete:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
-}
-
-/* Botón "Inspeccionar" en la barra de acciones */
-.lightbox-zoom-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    border-radius: 6px;
-    transition: all 0.3s ease;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.lightbox-zoom-toggle:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(13, 202, 240, 0.4);
+    letter-spacing: 0.02em;
 }
 
 /* =============================================================================
@@ -355,25 +381,26 @@
 /* Responsive */
 @media (max-width: 768px) {
     .lightbox-close {
-        top: 10px;
-        right: 10px;
-        width: 40px;
-        height: 40px;
-        font-size: 1.2rem;
+        top: 8px;
+        right: 8px;
+        /* En móvil siempre visible — no hay hover */
+        color: rgba(255, 255, 255, 0.75);
     }
     
     .lightbox-nav {
-        width: 45px;
-        height: 45px;
-        font-size: 1.5rem;
+        width: 44px;
+        height: 44px;
+        font-size: 1rem;
+        /* En móvil siempre visible — no hay hover */
+        opacity: 0.75;
     }
     
     .lightbox-prev {
-        left: 10px;
+        left: 8px;
     }
     
     .lightbox-next {
-        right: 10px;
+        right: 8px;
     }
     
     .lightbox-image {
@@ -382,34 +409,28 @@
     
     .lightbox-info {
         width: 95%;
-        padding: 15px;
+        padding: 8px 12px;
+        margin-top: 8px;
     }
     
     .lightbox-meta {
         flex-direction: column;
-        gap: 8px;
+        gap: 4px;
     }
     
     .lightbox-actions {
-        flex-direction: column;
-        gap: 10px;
-        align-items: stretch;
+        flex-wrap: wrap;
+        gap: 6px;
     }
-    
-    .lightbox-download {
-        justify-content: center;
-    }
-    
-    .lightbox-zoom-toggle {
-        justify-content: center;
-    }
-    
+
     .lightbox-counter {
-        text-align: center;
+        font-size: 0.75rem;
     }
-    
-    .lightbox-delete {
-        justify-content: center;
+
+    .lightbox-icon-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
     }
     
     /* Controles de zoom en móvil: más compactos */

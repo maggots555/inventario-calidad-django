@@ -112,34 +112,41 @@ class GaleriaLightbox {
                         <p class="lightbox-description"></p>
                         <div class="lightbox-meta">
                             <span class="lightbox-user">
-                                <i class="bi bi-person-circle"></i> 
+                                <i class="bi bi-person-circle"></i>
                                 <span class="user-name"></span>
                             </span>
                             <span class="lightbox-date">
-                                <i class="bi bi-calendar"></i> 
+                                <i class="bi bi-calendar"></i>
                                 <span class="date-text"></span>
                             </span>
                         </div>
                     </div>
                     <div class="lightbox-actions">
-                        <a href="#" class="btn btn-primary btn-sm lightbox-download" download>
-                            <i class="bi bi-download"></i> Descargar Original
-                        </a>
-                        <button type="button" class="btn btn-info btn-sm lightbox-zoom-toggle" title="Inspeccionar imagen con zoom y arrastre">
-                            <i class="bi bi-search"></i> Inspeccionar
-                        </button>
-                        <button type="button" class="btn btn-secondary btn-sm lightbox-rotate-left" title="Rotar a la izquierda (90°)">
-                            <i class="bi bi-arrow-counterclockwise"></i>
-                        </button>
-                        <button type="button" class="btn btn-secondary btn-sm lightbox-rotate-right" title="Rotar a la derecha (90°)">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
+                        <!-- Grupo izquierdo: acciones principales -->
+                        <div class="lightbox-actions-group">
+                            <a href="#" class="lightbox-icon-btn lightbox-download" download title="Descargar original">
+                                <i class="bi bi-download"></i>
+                            </a>
+                            <button type="button" class="lightbox-icon-btn lightbox-zoom-toggle" title="Inspeccionar con zoom">
+                                <i class="bi bi-search"></i>
+                            </button>
+                            <button type="button" class="lightbox-icon-btn lightbox-rotate-left" title="Rotar izquierda (90°)">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </button>
+                            <button type="button" class="lightbox-icon-btn lightbox-rotate-right" title="Rotar derecha (90°)">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                        <!-- Centro: contador -->
                         <span class="lightbox-counter">
                             <span class="current-index">1</span> / <span class="total-images">1</span>
                         </span>
-                        <button type="button" class="btn btn-danger btn-sm lightbox-delete">
-                            <i class="bi bi-trash-fill"></i> Eliminar
-                        </button>
+                        <!-- Grupo derecho: acción destructiva separada -->
+                        <div class="lightbox-actions-group">
+                            <button type="button" class="lightbox-icon-btn lightbox-icon-btn--danger lightbox-delete" title="Eliminar imagen">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
