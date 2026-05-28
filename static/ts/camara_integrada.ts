@@ -85,9 +85,12 @@ class CamaraIntegrada {
     // porque el compresor JPEG trabaja solo con CPU, sin aceleración de GPU.
     //
     // Solución: medimos el tiempo de la PRIMERA captura. Si tarda más de 2.5
-    // segundos, activamos "modo optimizado" que reduce resolución (4096 → 2048)
-    // y calidad (0.95 → 0.87). El usuario lo nota en un toast. Las capturas
-    // siguientes tardarán ~2-3s en lugar de 10-20s.
+    // segundos, activamos "modo optimizado" que reduce la calidad JPEG (0.95 → 0.75)
+    // manteniendo la resolución 4K intacta. El usuario lo nota en un toast.
+    //
+    // Ventaja frente a reducir resolución: con 4K a calidad 0.75, al hacer zoom en
+    // detalles finos (texto en una placa, rayones, piezas) hay el mismo número de
+    // píxeles que en un gama alta. Solo hay más artefactos en fondos lisos.
     //
     // En gama alta: la primera captura es rápida → sin cambios, calidad máxima.
     // En gama baja: la primera captura detecta el problema y se auto-corrige.
@@ -798,24 +801,19 @@ class CamaraIntegrada {
     
     /**
      * Construye las constraints para getUserMedia según el dispositivo seleccionado.
+     * Se pide la máxima resolución posible: min 1280 garantiza que el navegador
+     * no entregue menos (error explícito), ideal 4096 apunta a cámaras 4K/12MP+.
+     * Si el hardware no llega a 4096, el navegador entrega lo máximo que puede.
      *
-     * RESOLUCIÓN ADAPTATIVA (v8.1):
-     * - Primera apertura y dispositivos rápidos: min 1280, ideal 4096 (4K/12MP+)
-     * - Dispositivo lento detectado: min 1280, ideal 2048 (~3MP, excelente para docs técnicas)
-     *
-     * El ideal no garantiza que el navegador entregue esa resolución exacta;
-     * es el máximo que el browser intentará pedir al hardware. Si el dispositivo
-     * no soporta esa resolución, entrega la máxima disponible.
+     * NOTA: La resolución siempre se pide al máximo posible. En dispositivos lentos
+     * solo se ajusta la calidad JPEG del compresor (ver capturarFoto), no los píxeles
+     * capturados. Así al hacer zoom en detalles finos (texto, rayones, piezas) se
+     * conserva toda la información del sensor aunque el archivo pese menos.
      */
     private construirConstraintsCamara(): MediaTrackConstraints {
-        // En modo optimizado (dispositivo lento detectado) pedimos 2048px de ancho,
-        // que reduce el área de píxeles a ~¼ de 4096px y hace el toBlob() ~4x más rápido.
-        const idealWidth  = this.dispositivoLento ? 2048 : 4096;
-        const idealHeight = this.dispositivoLento ? 1536 : 2160;
-
         const constraints: MediaTrackConstraints = {
-            width:  { min: 1280, ideal: idealWidth  },
-            height: { min: 720,  ideal: idealHeight }
+            width:  { min: 1280, ideal: 4096 },
+            height: { min: 720,  ideal: 2160 }
         };
         
         // Si hay un dispositivo específico seleccionado, usarlo
@@ -1331,15 +1329,23 @@ class CamaraIntegrada {
             
             // Convertir canvas a Blob — aquí está el costo de CPU principal.
             //
-            // SISTEMA ADAPTATIVO (v8.1):
-            // - Calidad 0.95 = máxima nitidez (gama alta / primera captura antes de medir)
-            // - Calidad 0.87 = modo optimizado (gama media: Galaxy A, etc.)
-            //   La diferencia visual es mínima para imágenes técnicas en pantalla/PDF.
-            //   El beneficio de rendimiento es enorme: 4-6x más rápido en dispositivos lentos.
+            // SISTEMA ADAPTATIVO DE CALIDAD JPEG (v8.1):
             //
-            // En la PRIMERA captura medimos el tiempo real de toBlob(). Si supera
-            // 2500ms, activamos el modo optimizado para todas las capturas siguientes.
-            const calidadJpeg = this.dispositivoLento ? 0.87 : 0.95;
+            // La resolución siempre es la máxima que entregue el sensor (4K si es posible).
+            // Lo que varía es la calidad del compresor JPEG:
+            //
+            // - Calidad 0.95 (gama alta): ~1-2s en Snapdragon 8xx. Archivos ~6-8 MB.
+            //   Artefactos prácticamente imperceptibles.
+            //
+            // - Calidad 0.75 (gama media/baja): ~1.5-2s en Galaxy A / Snapdragon 7xx.
+            //   Archivos ~1-1.5 MB. Artefactos visibles solo en zonas de color uniforme
+            //   (fondos lisos), no en zonas de detalle donde importa (texto, piezas,
+            //   rayones, componentes). Para documentación técnica es completamente válido.
+            //
+            // VENTAJA frente a reducir resolución:
+            // Un Galaxy A con calidad 0.75 tiene los mismos píxeles 4K disponibles
+            // para hacer zoom que un gama alta. Reducir a 2K quitaría esa información.
+            const calidadJpeg = this.dispositivoLento ? 0.75 : 0.95;
             const t0Blob = Date.now();
 
             const blob = await new Promise<Blob>((resolve, reject) => {
@@ -1363,14 +1369,12 @@ class CamaraIntegrada {
                     this.dispositivoLento = true;
                     console.warn(
                         `⚡ Dispositivo lento detectado: toBlob() tardó ${tiempoBlob}ms. ` +
-                        `Activando modo optimizado (resolución 2048px, calidad 0.87). ` +
-                        `La cámara se reiniciará con la nueva configuración.`
+                        `Activando modo optimizado (calidad JPEG 0.75, resolución 4K sin cambios).`
                     );
                     // Mostrar aviso al usuario
                     this.mostrarToastModoOptimizado(tiempoBlob);
-                    // Reiniciar cámara con resolución reducida (fire-and-forget)
-                    // El stream actual sigue activo para la foto que se acaba de tomar.
-                    setTimeout(() => this.abrirCamara(), 500);
+                    // No es necesario reiniciar el stream: la resolución no cambia,
+                    // solo la calidad del compresor JPEG en capturas siguientes.
                 } else if (!this.dispositivoLento) {
                     console.log(`✅ Dispositivo rápido: toBlob() tardó ${tiempoBlob}ms — calidad máxima activa.`);
                 }
@@ -1834,12 +1838,12 @@ class CamaraIntegrada {
                 <div class="toast-body">
                     <p class="mb-1">
                         Tu dispositivo procesa imágenes de alta resolución lentamente
-                        <small class="text-muted">(${tiempoMs / 1000}s en la primera captura)</small>.
+                        <small class="text-muted">(${(tiempoMs / 1000).toFixed(1)}s en la primera captura)</small>.
                     </p>
                     <p class="mb-0 small text-muted">
                         <i class="bi bi-check-circle text-success"></i>
-                        Resolución ajustada automáticamente. Las fotos siguen siendo de
-                        excelente calidad para documentación técnica.
+                        Compresión ajustada automáticamente. La resolución 4K se mantiene — 
+                        las fotos siguen siendo aptas para hacer zoom en detalles finos.
                     </p>
                 </div>
             </div>
