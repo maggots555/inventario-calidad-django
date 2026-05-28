@@ -76,6 +76,23 @@ class CamaraIntegrada {
     
     // Flag para prevenir capturas simultáneas (BUG FIX)
     private estáCapturando: boolean = false;
+
+    // ── SISTEMA ADAPTATIVO DE CALIDAD (v8.1) ────────────────────────────────
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // canvas.toBlob() comprime la imagen en el hilo principal de JavaScript.
+    // En dispositivos de gama alta (Snapdragon 8xx) esto tarda < 1 segundo.
+    // En gama media (Samsung Galaxy A, Snapdragon 7xx/6xx) puede tardar 10-20s
+    // porque el compresor JPEG trabaja solo con CPU, sin aceleración de GPU.
+    //
+    // Solución: medimos el tiempo de la PRIMERA captura. Si tarda más de 2.5
+    // segundos, activamos "modo optimizado" que reduce resolución (4096 → 2048)
+    // y calidad (0.95 → 0.87). El usuario lo nota en un toast. Las capturas
+    // siguientes tardarán ~2-3s en lugar de 10-20s.
+    //
+    // En gama alta: la primera captura es rápida → sin cambios, calidad máxima.
+    // En gama baja: la primera captura detecta el problema y se auto-corrige.
+    private dispositivoLento: boolean = false;   // true cuando se detecta hardware lento
+    private primeraCaptura: boolean = true;      // false tras la primera medición
     
     // OPTIMIZACIÓN v6.0: Control de event listeners para prevenir memory leaks
     private abortController: AbortController | null = null;
@@ -202,6 +219,12 @@ class CamaraIntegrada {
         this.modalAbierto = true;
         this.agregarProteccionBotonAtras();
         this.iniciarMonitoreoOrientacion(); // v7.0: async, se ejecuta en paralelo (sin await)
+
+        // v8.1: Resetear flag de primera captura al abrir una nueva sesión.
+        // Si el dispositivo ya fue marcado como lento, lo mantenemos (no remedir cada vez).
+        // Solo reseteamos primeraCaptura para que si el usuario cierra y vuelve a abrir
+        // sin que hayamos llegado a medir, se pueda medir correctamente.
+        this.primeraCaptura = true;
         this.bloquearScrollBody();          // FIX iOS: Prevenir bounce scroll
         this.abrirCamara();
     }
@@ -775,14 +798,24 @@ class CamaraIntegrada {
     
     /**
      * Construye las constraints para getUserMedia según el dispositivo seleccionado.
-     * Se pide la máxima resolución posible: min 1280 garantiza que el navegador
-     * no entregue menos (error explícito), ideal 4096 apunta a cámaras 4K/12MP+.
-     * Si el hardware no llega a 4096, el navegador entrega lo máximo que puede.
+     *
+     * RESOLUCIÓN ADAPTATIVA (v8.1):
+     * - Primera apertura y dispositivos rápidos: min 1280, ideal 4096 (4K/12MP+)
+     * - Dispositivo lento detectado: min 1280, ideal 2048 (~3MP, excelente para docs técnicas)
+     *
+     * El ideal no garantiza que el navegador entregue esa resolución exacta;
+     * es el máximo que el browser intentará pedir al hardware. Si el dispositivo
+     * no soporta esa resolución, entrega la máxima disponible.
      */
     private construirConstraintsCamara(): MediaTrackConstraints {
+        // En modo optimizado (dispositivo lento detectado) pedimos 2048px de ancho,
+        // que reduce el área de píxeles a ~¼ de 4096px y hace el toBlob() ~4x más rápido.
+        const idealWidth  = this.dispositivoLento ? 2048 : 4096;
+        const idealHeight = this.dispositivoLento ? 1536 : 2160;
+
         const constraints: MediaTrackConstraints = {
-            width:  { min: 1280, ideal: 4096 },
-            height: { min: 720,  ideal: 2160 }
+            width:  { min: 1280, ideal: idealWidth  },
+            height: { min: 720,  ideal: idealHeight }
         };
         
         // Si hay un dispositivo específico seleccionado, usarlo
@@ -1296,10 +1329,19 @@ class CamaraIntegrada {
             // Restaurar transformación del canvas para futuras capturas
             context.setTransform(1, 0, 0, 1, 0, 0);
             
-            // Convertir canvas a Blob con máxima calidad JPEG
-            // 0.95 = excelente balance entre nitidez y tamaño de archivo.
-            // (Fue reducido a 0.87 en v6.0 por velocidad; se restaura porque en
-            //  imágenes técnicas —piezas, texto, rayones— la diferencia sí se nota.)
+            // Convertir canvas a Blob — aquí está el costo de CPU principal.
+            //
+            // SISTEMA ADAPTATIVO (v8.1):
+            // - Calidad 0.95 = máxima nitidez (gama alta / primera captura antes de medir)
+            // - Calidad 0.87 = modo optimizado (gama media: Galaxy A, etc.)
+            //   La diferencia visual es mínima para imágenes técnicas en pantalla/PDF.
+            //   El beneficio de rendimiento es enorme: 4-6x más rápido en dispositivos lentos.
+            //
+            // En la PRIMERA captura medimos el tiempo real de toBlob(). Si supera
+            // 2500ms, activamos el modo optimizado para todas las capturas siguientes.
+            const calidadJpeg = this.dispositivoLento ? 0.87 : 0.95;
+            const t0Blob = Date.now();
+
             const blob = await new Promise<Blob>((resolve, reject) => {
                 canvasActual.toBlob((b) => {
                     if (b) {
@@ -1307,8 +1349,32 @@ class CamaraIntegrada {
                     } else {
                         reject(new Error('Error al crear blob de la foto'));
                     }
-                }, 'image/jpeg', 0.95);
+                }, 'image/jpeg', calidadJpeg);
             });
+
+            const tiempoBlob = Date.now() - t0Blob;
+
+            // ── Detección de dispositivo lento (solo en la primera captura) ───
+            if (this.primeraCaptura) {
+                this.primeraCaptura = false;
+                const UMBRAL_LENTO_MS = 2500; // Si tarda más de 2.5s → modo optimizado
+
+                if (!this.dispositivoLento && tiempoBlob > UMBRAL_LENTO_MS) {
+                    this.dispositivoLento = true;
+                    console.warn(
+                        `⚡ Dispositivo lento detectado: toBlob() tardó ${tiempoBlob}ms. ` +
+                        `Activando modo optimizado (resolución 2048px, calidad 0.87). ` +
+                        `La cámara se reiniciará con la nueva configuración.`
+                    );
+                    // Mostrar aviso al usuario
+                    this.mostrarToastModoOptimizado(tiempoBlob);
+                    // Reiniciar cámara con resolución reducida (fire-and-forget)
+                    // El stream actual sigue activo para la foto que se acaba de tomar.
+                    setTimeout(() => this.abrirCamara(), 500);
+                } else if (!this.dispositivoLento) {
+                    console.log(`✅ Dispositivo rápido: toBlob() tardó ${tiempoBlob}ms — calidad máxima activa.`);
+                }
+            }
             
             // OPTIMIZACIÓN v6.0: dataURL eliminado (no se usa en el flujo de upload)
             
@@ -1332,6 +1398,7 @@ class CamaraIntegrada {
             console.log(`  📏 Canvas final: ${canvasWidth}x${canvasHeight}`);
             console.log(`  🔄 Rotación aplicada: ${necesitaRotacion ? 'SÍ' : 'NO'}`);
             console.log(`  💾 Tamaño blob: ${(blob.size / 1024).toFixed(2)} KB`);
+            console.log(`  ⏱️ Tiempo toBlob(): ${tiempoBlob}ms | Calidad: ${calidadJpeg} | Modo: ${this.dispositivoLento ? 'OPTIMIZADO' : 'MÁXIMA CALIDAD'}`);
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             
         } catch (error) {
@@ -1735,6 +1802,62 @@ class CamaraIntegrada {
         }
     }
     
+    /**
+     * Muestra un toast informando al usuario que se activó el modo optimizado.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Cuando el sistema detecta que el dispositivo es lento, le decimos al usuario
+     * en lenguaje simple qué pasó y qué cambia. El toast dura 6 segundos para
+     * que haya tiempo de leerlo antes de tomar la siguiente foto.
+     *
+     * @param tiempoMs Tiempo que tardó el primer toBlob() en ms (para mostrar en debug)
+     */
+    private mostrarToastModoOptimizado(tiempoMs: number): void {
+        // Crear contenedor de toast si no existe (reutiliza el mismo que upload_imagenes_dual)
+        let container = document.getElementById('toastContainerImagenes');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toastContainerImagenes';
+            container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            container.style.zIndex = '9999'; // Por encima del modal de cámara
+            document.body.appendChild(container);
+        }
+
+        const toastId = `toast_modo_opt_${Date.now()}`;
+        const toastHtml = `
+            <div id="${toastId}" class="toast border-start border-4 border-info" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header">
+                    <i class="bi bi-lightning-charge-fill text-info me-2"></i>
+                    <strong class="me-auto">Modo optimizado activado</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+                </div>
+                <div class="toast-body">
+                    <p class="mb-1">
+                        Tu dispositivo procesa imágenes de alta resolución lentamente
+                        <small class="text-muted">(${tiempoMs / 1000}s en la primera captura)</small>.
+                    </p>
+                    <p class="mb-0 small text-muted">
+                        <i class="bi bi-check-circle text-success"></i>
+                        Resolución ajustada automáticamente. Las fotos siguen siendo de
+                        excelente calidad para documentación técnica.
+                    </p>
+                </div>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', toastHtml);
+
+        const toastEl = document.getElementById(toastId);
+        if (toastEl && typeof (window as any).bootstrap !== 'undefined') {
+            const bsToast = new (window as any).bootstrap.Toast(toastEl, {
+                autohide: true,
+                delay: 7000
+            });
+            bsToast.show();
+            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+        }
+    }
+
     /**
      * Muestra mensaje de error al usuario
      */
