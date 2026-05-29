@@ -101,7 +101,8 @@ class CamaraIntegrada {
     private abortController: AbortController | null = null;
     
     // OPTIMIZACIÓN v6.0: Sistema de enfoque robusto
-    private enfoqueOriginalMode: string | null = null;  // Guardar modo original
+    // NOTA: enfoqueOriginalMode se declara como variable local en enfocarEnPunto(),
+    // no como propiedad de clase, para evitar condiciones de carrera entre llamadas.
     private ultimoEnfoque: number = 0;                  // Timestamp para debounce
     private enfocandoActualmente: boolean = false;      // Flag de estado
     
@@ -966,21 +967,28 @@ class CamaraIntegrada {
     }
     
     /**
-     * Configura tap-to-focus en el video
-     * OPTIMIZACIÓN v6.0: Usa AbortController para limpieza automática de listeners
+     * Configura tap-to-focus en el video.
+     * OPTIMIZACIÓN v6.0: Usa AbortController para limpieza automática de listeners.
+     * 
+     * MEJORA: La validación de capabilities se hace aquí una sola vez mediante
+     * verificarSoporteFocus(), con el criterio correcto (single-shot).
+     * Antes se verificaba 'continuous' aquí y 'single-shot' en enfocarEnPunto —
+     * dos chequeos distintos que podían dar resultados contradictorios.
+     * 
+     * MEJORA: Los listeners de touch ya no crean un MouseEvent sintético.
+     * enfocarEnPunto() acepta directamente {clientX, clientY} como objeto plano,
+     * que tanto MouseEvent como TouchEvent exponen de forma nativa.
      */
     private configurarTapToFocus(): void {
         if (!this.videoElement || !this.mediaStream) {
             return;
         }
         
-        // Obtener el track de video
         const videoTrack = this.mediaStream.getVideoTracks()[0];
         
-        // Verificar si el dispositivo soporta focus
-        const capabilities: any = videoTrack.getCapabilities();
-        if (!capabilities.focusMode || !capabilities.focusMode.includes('continuous')) {
-            console.log('⚠️ Dispositivo no soporta enfoque manual');
+        // Validación única y consistente: ¿soporta single-shot?
+        if (!this.verificarSoporteFocus(videoTrack)) {
+            console.log('⚠️ Dispositivo no soporta tap-to-focus (single-shot no disponible)');
             return;
         }
         
@@ -988,50 +996,83 @@ class CamaraIntegrada {
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
         
-        // Event listener para tap en el video
-        this.videoElement.addEventListener('click', async (e: MouseEvent) => {
-            await this.enfocarEnPunto(e);
+        // Click en escritorio
+        this.videoElement.addEventListener('click', (e: MouseEvent) => {
+            this.enfocarEnPunto({ clientX: e.clientX, clientY: e.clientY });
         }, { signal });
         
-        // También para touch en móviles
-        this.videoElement.addEventListener('touchstart', async (e: TouchEvent) => {
+        // Touch en móviles — sin MouseEvent sintético, pasamos las coordenadas directamente
+        this.videoElement.addEventListener('touchstart', (e: TouchEvent) => {
             e.preventDefault();
             const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('click', {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            await this.enfocarEnPunto(mouseEvent);
+            this.enfocarEnPunto({ clientX: touch.clientX, clientY: touch.clientY });
         }, { signal, passive: false });
         
         console.log('✅ Tap-to-focus configurado (con AbortController)');
     }
     
     /**
-     * Enfoca la cámara en un punto específico
-     * OPTIMIZACIÓN v6.0: Sistema robusto con timeout, validación y restauración
+     * Verifica si un video track soporta tap-to-focus con modo 'single-shot'.
      * 
      * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Este método soluciona el problema del "enfoque infinito" con 4 técnicas:
+     * 'single-shot' = el sensor hace UN enfoque y se detiene (modo foto).
+     * 'continuous'  = el sensor enfoca constantemente (modo video, más batería).
+     * Para tap-to-focus necesitamos 'single-shot': el usuario toca, enfocamos
+     * en ese punto, y luego volvemos a 'continuous' para el preview.
      * 
-     * 1. DEBOUNCE (500ms): Ignora toques repetidos muy rápidos
-     * 2. VALIDACIÓN: Verifica que el dispositivo soporte 'single-shot' focus
-     * 3. TIMEOUT (2 segundos): Si el enfoque no responde, lo cancela automáticamente
-     * 4. RESTAURACIÓN: Siempre vuelve al modo 'continuous' original
+     * Esta función centraliza el criterio para evitar duplicación entre
+     * configurarTapToFocus() y enfocarEnPunto().
      * 
-     * Esto garantiza que NUNCA se quedará atascado enfocando.
+     * @param videoTrack Track de video a verificar
+     * @returns true si el track soporta single-shot focus
      */
-    private async enfocarEnPunto(e: MouseEvent): Promise<void> {
-        // PASO 1: DEBOUNCE - Ignorar si han pasado menos de 500ms desde el último toque
+    private verificarSoporteFocus(videoTrack: MediaStreamTrack): boolean {
+        // getCapabilities() puede no existir en algunos navegadores/dispositivos
+        if (typeof videoTrack.getCapabilities !== 'function') {
+            return false;
+        }
+        const capabilities: any = videoTrack.getCapabilities();
+        if (!capabilities || !Array.isArray(capabilities.focusMode)) {
+            return false;
+        }
+        return capabilities.focusMode.includes('single-shot');
+    }
+    
+    /**
+     * Enfoca la cámara en un punto específico.
+     * 
+     * MEJORAS respecto a la versión anterior:
+     * 
+     * 1. FIRMA: acepta {clientX, clientY} en lugar de MouseEvent.
+     *    Elimina la necesidad de crear MouseEvent sintéticos desde touchstart.
+     * 
+     * 2. ESTADO LOCAL: enfoqueOriginalMode es ahora variable local, no propiedad
+     *    de instancia. Evita condiciones de carrera si el AbortController cancela
+     *    el listener antes de que llegue el finally.
+     * 
+     * 3. CONSTANTE NOMBRADA: FOCUS_RESTORE_DELAY_MS documenta el "magic number" 800.
+     * 
+     * 4. FEEDBACK OCUPADO: cuando enfocandoActualmente === true, muestra un
+     *    indicador visual amarillo en el punto tocado en vez de silenciar el tap.
+     * 
+     * 5. VALIDACIÓN ELIMINADA: getCapabilities() se llama una sola vez en
+     *    verificarSoporteFocus(), que es invocada desde configurarTapToFocus()
+     *    antes de registrar cualquier listener. No tiene sentido repetirla aquí.
+     * 
+     * @param punto Coordenadas del toque/click (clientX, clientY del viewport)
+     */
+    private async enfocarEnPunto(punto: { clientX: number; clientY: number }): Promise<void> {
+        // PASO 1: DEBOUNCE — ignorar si han pasado menos de 500ms desde el último toque
         const ahora = Date.now();
         if (ahora - this.ultimoEnfoque < 500) {
             console.log('⚠️ Debounce: Ignorando toque (muy rápido)');
             return;
         }
         
-        // PASO 2: Verificar si ya estamos enfocando
+        // PASO 2: Si ya hay un enfoque en progreso, mostrar feedback visual y salir
         if (this.enfocandoActualmente) {
             console.log('⚠️ Enfoque en progreso, ignorando toque');
+            this.mostrarIndicadorEnfoqueBloqueado(punto);
             return;
         }
         
@@ -1039,37 +1080,27 @@ class CamaraIntegrada {
             return;
         }
         
-        // Actualizar timestamp
+        // Actualizar timestamp y bloquear nuevas peticiones
         this.ultimoEnfoque = ahora;
         this.enfocandoActualmente = true;
         
         const videoTrack = this.mediaStream.getVideoTracks()[0];
         
+        // Tiempo de espera antes de restaurar el modo continuous.
+        // 800ms es el mínimo seguro para que el AF del sensor termine en
+        // dispositivos de gama media (Snapdragon 6xx/7xx). En gama alta
+        // termina antes y el modo continuous vuelve sin impacto visible.
+        const FOCUS_RESTORE_DELAY_MS = 800;
+        
+        // Modo original como variable LOCAL — no como estado de instancia.
+        // Valor por defecto defensivo: 'continuous' es el modo estándar de preview.
+        let enfoqueOriginalMode: string = 'continuous';
+        
         try {
-            // PASO 3: VALIDACIÓN - Verificar capabilities del dispositivo
-            const capabilities: any = videoTrack.getCapabilities();
-            
-            if (!capabilities.focusMode) {
-                console.log('⚠️ Dispositivo no expone focusMode en capabilities');
-                return;
-            }
-            
-            // Verificar que soporte 'single-shot' mode
-            const supportedModes = capabilities.focusMode;
-            if (!supportedModes.includes('single-shot')) {
-                console.log('⚠️ Dispositivo no soporta single-shot focus, modos disponibles:', supportedModes);
-                return;
-            }
-            
-            // PASO 4: Guardar modo original antes de cambiar
-            const settings: any = videoTrack.getSettings();
-            this.enfoqueOriginalMode = settings.focusMode || 'continuous';
-            console.log(`📐 Modo de enfoque original: ${this.enfoqueOriginalMode}`);
-            
-            // Calcular coordenadas normalizadas (0 a 1)
+            // Calcular coordenadas normalizadas (0 a 1) relativas al video
             const rect = this.videoElement.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / rect.width;
-            const y = (e.clientY - rect.top) / rect.height;
+            const x = (punto.clientX - rect.left) / rect.width;
+            const y = (punto.clientY - rect.top) / rect.height;
             
             // Validar coordenadas (deben estar en rango 0-1)
             if (x < 0 || x > 1 || y < 0 || y > 1) {
@@ -1077,7 +1108,12 @@ class CamaraIntegrada {
                 return;
             }
             
-            // PASO 5: Aplicar enfoque con TIMEOUT de 2 segundos
+            // Guardar el modo actual antes de cambiarlo
+            const settings: any = videoTrack.getSettings();
+            enfoqueOriginalMode = settings.focusMode || 'continuous';
+            console.log(`📐 Modo de enfoque original: ${enfoqueOriginalMode}`);
+            
+            // PASO 3: Aplicar enfoque con TIMEOUT de 2 segundos
             const enfoquePromise = videoTrack.applyConstraints({
                 advanced: [{ 
                     focusMode: 'single-shot',
@@ -1089,42 +1125,38 @@ class CamaraIntegrada {
                 setTimeout(() => reject(new Error('Timeout de enfoque (2s)')), 2000);
             });
             
-            // Race: lo que termine primero (enfoque o timeout)
+            // Race: lo que termine primero (enfoque exitoso o timeout)
             await Promise.race([enfoquePromise, timeoutPromise]);
             
-            console.log(`🎯 Enfoque aplicado en: (${(x*100).toFixed(0)}%, ${(y*100).toFixed(0)}%)`);
+            console.log(`🎯 Enfoque aplicado en: (${(x * 100).toFixed(0)}%, ${(y * 100).toFixed(0)}%)`);
             
-            // Calcular coordenadas relativas al contenedor para feedback visual
-            const relativeX = e.clientX - rect.left;
-            const relativeY = e.clientY - rect.top;
+            // Mostrar indicador visual (coordenadas relativas al contenedor del video)
+            const relativeX = punto.clientX - rect.left;
+            const relativeY = punto.clientY - rect.top;
             this.mostrarIndicadorEnfoque(relativeX, relativeY);
             
-            // PASO 6: Esperar 800ms y RESTAURAR modo original
-            await new Promise(resolve => setTimeout(resolve, 800));
+            // PASO 4: Esperar y RESTAURAR modo original
+            await new Promise(resolve => setTimeout(resolve, FOCUS_RESTORE_DELAY_MS));
             
-            // CRÍTICO: Restaurar modo continuous para evitar quedarse en single-shot
             await videoTrack.applyConstraints({
-                advanced: [{ focusMode: this.enfoqueOriginalMode } as any]
+                advanced: [{ focusMode: enfoqueOriginalMode } as any]
             });
             
-            console.log(`✅ Modo de enfoque restaurado a: ${this.enfoqueOriginalMode}`);
+            console.log(`✅ Modo de enfoque restaurado a: ${enfoqueOriginalMode}`);
             
         } catch (error) {
-            // Manejo de errores (timeout o fallo de hardware)
             if (error instanceof Error && error.message.includes('Timeout')) {
                 console.warn('⏱️ Timeout de enfoque alcanzado, restaurando modo original');
             } else {
                 console.warn('⚠️ Error al aplicar enfoque:', error);
             }
             
-            // CRÍTICO: Intentar restaurar modo original incluso en error
+            // CRÍTICO: Restaurar modo original incluso en error
             try {
-                if (this.enfoqueOriginalMode) {
-                    await videoTrack.applyConstraints({
-                        advanced: [{ focusMode: this.enfoqueOriginalMode } as any]
-                    });
-                    console.log(`✅ Modo restaurado después de error: ${this.enfoqueOriginalMode}`);
-                }
+                await videoTrack.applyConstraints({
+                    advanced: [{ focusMode: enfoqueOriginalMode } as any]
+                });
+                console.log(`✅ Modo restaurado después de error: ${enfoqueOriginalMode}`);
             } catch (restoreError) {
                 console.error('❌ No se pudo restaurar modo de enfoque:', restoreError);
             }
@@ -1136,7 +1168,14 @@ class CamaraIntegrada {
     }
     
     /**
-     * Muestra un indicador visual de enfoque
+     * Muestra un indicador visual de enfoque en el punto tocado.
+     * 
+     * MEJORA: Usa clases CSS (.focus-indicator, .focus-indicator--focusing,
+     * .focus-indicator--done) en lugar de estilos inline, siguiendo las
+     * reglas del proyecto (AGENTS.md §2: NEVER put CSS in elements).
+     * 
+     * @param x Coordenada X relativa al contenedor del video (px)
+     * @param y Coordenada Y relativa al contenedor del video (px)
      */
     private mostrarIndicadorEnfoque(x: number, y: number): void {
         if (!this.videoElement) return;
@@ -1144,35 +1183,53 @@ class CamaraIntegrada {
         const container = this.videoElement.parentElement;
         if (!container) return;
         
-        // Crear círculo de enfoque (coordenadas relativas al contenedor)
         const indicator = document.createElement('div');
-        indicator.style.position = 'absolute';
+        indicator.className = 'focus-indicator';
         indicator.style.left = `${x}px`;
-        indicator.style.top = `${y}px`;
-        indicator.style.width = '80px';
-        indicator.style.height = '80px';
-        indicator.style.border = '2px solid rgba(255, 255, 255, 0.8)';
-        indicator.style.borderRadius = '50%';
-        indicator.style.transform = 'translate(-50%, -50%)';
-        indicator.style.pointerEvents = 'none';
-        indicator.style.zIndex = '100';
-        indicator.style.transition = 'all 0.3s ease';
-        indicator.style.boxShadow = '0 0 0 2px rgba(0, 0, 0, 0.3)';
+        indicator.style.top  = `${y}px`;
         
         container.appendChild(indicator);
         
-        // Animación de enfoque
-        setTimeout(() => {
-            indicator.style.width = '60px';
-            indicator.style.height = '60px';
-            indicator.style.borderColor = 'rgba(76, 175, 80, 0.8)';
-        }, 100);
+        // Activar la animación de "enfocado" en el siguiente frame de render
+        // (requestAnimationFrame garantiza que el browser ya pintó el estado inicial)
+        requestAnimationFrame(() => {
+            indicator.classList.add('focus-indicator--focusing');
+        });
         
-        // Eliminar después de 1 segundo
+        // Fade out y eliminar
         setTimeout(() => {
-            indicator.style.opacity = '0';
+            indicator.classList.add('focus-indicator--done');
             setTimeout(() => indicator.remove(), 300);
         }, 700);
+    }
+    
+    /**
+     * Muestra un indicador visual de "ocupado" cuando ya hay un enfoque en progreso.
+     * 
+     * En lugar de silenciar el tap sin feedback, mostramos un indicador amarillo
+     * pulsante que le dice al usuario "ya estoy enfocando, espera un momento".
+     * 
+     * @param punto Coordenadas del toque ignorado (clientX, clientY del viewport)
+     */
+    private mostrarIndicadorEnfoqueBloqueado(punto: { clientX: number; clientY: number }): void {
+        if (!this.videoElement) return;
+        
+        const container = this.videoElement.parentElement;
+        if (!container) return;
+        
+        const rect = this.videoElement.getBoundingClientRect();
+        const x = punto.clientX - rect.left;
+        const y = punto.clientY - rect.top;
+        
+        const indicator = document.createElement('div');
+        indicator.className = 'focus-indicator focus-indicator--busy';
+        indicator.style.left = `${x}px`;
+        indicator.style.top  = `${y}px`;
+        
+        container.appendChild(indicator);
+        
+        // La animación CSS maneja el fade-out; solo necesitamos eliminar el elemento
+        setTimeout(() => indicator.remove(), 600);
     }
     
     /**

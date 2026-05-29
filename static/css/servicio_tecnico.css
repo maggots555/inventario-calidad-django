@@ -3094,6 +3094,65 @@ thead.sticky-top {
     color: #ccc;
 }
 
+/* ============================================================
+   INDICADOR TAP-TO-FOCUS
+   Reemplaza los estilos inline de mostrarIndicadorEnfoque().
+   Posición (left/top) se sigue asignando por JS porque depende
+   del punto exacto donde tocó el usuario.
+   ============================================================ */
+
+/* Estado base: círculo blanco que aparece en el punto tocado */
+.focus-indicator {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    border-radius: 50%;
+    /* translate(-50%, -50%) centra el círculo en las coordenadas del toque */
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
+    opacity: 1;
+    transition:
+        width            0.25s ease,
+        height           0.25s ease,
+        border-color     0.25s ease,
+        box-shadow       0.25s ease,
+        opacity          0.3s  ease,
+        transform        0.25s ease;
+}
+
+/* Estado: enfoque en progreso — se contrae y vira a verde */
+.focus-indicator--focusing {
+    width: 56px;
+    height: 56px;
+    border-color: rgba(76, 175, 80, 0.9);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.3), 0 0 14px rgba(76, 175, 80, 0.4);
+}
+
+/* Estado: fade-out al terminar la animación de enfoque */
+.focus-indicator--done {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85);
+}
+
+/* Estado: tap bloqueado (otro enfoque ya en progreso) —
+   pulso amarillo que desaparece solo, indica "espera un momento" */
+.focus-indicator--busy {
+    width: 60px;
+    height: 60px;
+    border-color: rgba(251, 191, 36, 0.9);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25), 0 0 12px rgba(251, 191, 36, 0.35);
+    animation: focus-busy-pulse 0.55s ease-out forwards;
+}
+
+@keyframes focus-busy-pulse {
+    0%   { opacity: 1;   transform: translate(-50%, -50%) scale(1);    }
+    45%  { opacity: 0.8; transform: translate(-50%, -50%) scale(1.25); }
+    100% { opacity: 0;   transform: translate(-50%, -50%) scale(0.75); }
+}
+
 /* Controles de la cámara */
 /* MEJORA: Completamente transparente - máxima área de visualización */
 .camera-controls {
@@ -3133,21 +3192,22 @@ thead.sticky-top {
 }
 
 /* Botón de captura (grande y circular) */
-/* MEJORA: Estilo iOS más refinado con transiciones suaves - 10% más pequeño */
+/* Opción A: outline rojo — espejo del botón "Listo" (verde outline) */
 .btn-capture {
     width: 68px;  /* Reducido de 75px (10% menos) */
     height: 68px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
-    border: 4px solid rgba(255, 255, 255, 0.4);
+    background: transparent;
+    border: 3px solid #ef4444;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1),
-                0 8px 24px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.35);
     /*
      * FIX iOS Safari: touch-action:manipulation elimina el delay de 300ms que
      * iOS Safari agrega a todos los eventos de toque para detectar double-tap zoom.
@@ -3162,18 +3222,21 @@ thead.sticky-top {
 }
 
 .btn-capture:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #f87171;
+    box-shadow: 0 6px 24px rgba(239, 68, 68, 0.5);
     transform: scale(1.05);
-    border-color: rgba(255, 255, 255, 0.5);
 }
 
 .btn-capture:active {
     transform: scale(0.88);
-    background: rgba(255, 255, 255, 1);
+    background: rgba(239, 68, 68, 0.25);
+    border-color: #ef4444;
 }
 
 .btn-capture i {
     font-size: 2rem;  /* Reducido de 2.2rem */
-    color: #ef4444;
+    color: white;
 }
 
 /* NUEVO: Estado de captura en progreso */
@@ -3267,7 +3330,7 @@ thead.sticky-top {
     .btn-capture {
         width: 63px;  /* Reducido de 70px (10% menos) */
         height: 63px;
-        border: 3px solid rgba(255, 255, 255, 0.4);
+        border: 3px solid #ef4444;
     }
     
     .btn-capture i {
