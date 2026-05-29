@@ -95,6 +95,7 @@ class CamaraVideo {
         this.contProgreso = null;
         this.progressBar = null;
         this.labelMB = null;
+        this.labelTiempo = null;
         // Selector de tipo + aviso + descripción (visibles en estado preview/subiendo)
         this.contTipo = null;
         this.previewActions = null; // Descartar + Guardar dentro del overlay
@@ -106,9 +107,12 @@ class CamaraVideo {
         this.barraSubida = null;
         this.textoSubida = null;
         this.contFFmpeg = null;
-        // Mensaje de error general (visible en todos los estados)
+        // Mensaje de error inline (visible en preview/subiendo, dentro del overlay de tipo)
         this.errorCont = null;
         this.mensajeError = null;
+        // Mensaje de error superior (visible en idle/grabando, flotando sobre el video)
+        this.errorContTop = null;
+        this.mensajeErrorTop = null;
         // ── Estado interno ───────────────────────────────────────────────────────
         this.stream = null;
         this.recorder = null;
@@ -116,6 +120,13 @@ class CamaraVideo {
         this.totalBytes = 0;
         this.videoBlob = null;
         this.estado = 'idle';
+        // ── Cronómetro de grabación ───────────────────────────────────────────────
+        this.tiempoInicioMs = 0; // Date.now() cuando arranca la grabación
+        this.intervaloTiempo = null;
+        // ── Tap-to-focus (mismo patrón que CamaraIntegrada) ──────────────────────
+        this.abortController = null; // Cancela listeners de tap
+        this.ultimoEnfoque = 0; // Timestamp para debounce
+        this.enfocandoActualmente = false; // Flag para evitar solapamientos
         this.modalEl = document.getElementById('modalCamaraVideo');
         // Si el modal no existe en esta página, no hay nada más que hacer.
         // Todas las propiedades quedan en null y el módulo no hace nada.
@@ -135,6 +146,7 @@ class CamaraVideo {
         this.contProgreso = document.getElementById('cvContProgreso');
         this.progressBar = document.getElementById('cvProgressBar');
         this.labelMB = document.getElementById('cvLabelMB');
+        this.labelTiempo = document.getElementById('cvLabelTiempo');
         this.contTipo = document.getElementById('cvContTipo');
         this.previewActions = document.getElementById('cvPreviewActions');
         this.tipoCards = document.getElementById('cvTipoCards');
@@ -146,6 +158,8 @@ class CamaraVideo {
         this.contFFmpeg = document.getElementById('cvContFFmpeg');
         this.errorCont = document.getElementById('cvErrorCont');
         this.mensajeError = document.getElementById('cvMensajeError');
+        this.errorContTop = document.getElementById('cvErrorContTop');
+        this.mensajeErrorTop = document.getElementById('cvMensajeErrorTop');
         this.registrarEventos();
     }
     // ────────────────────────────────────────────────────────────────────────
@@ -166,10 +180,14 @@ class CamaraVideo {
         // Limpiar stream y recursos cuando Bootstrap cierra el modal
         (_e = this.modalEl) === null || _e === void 0 ? void 0 : _e.addEventListener('hidden.bs.modal', () => this.liberarRecursos());
         // Avisos contextuales al seleccionar tipo de video
+        // También limpia el error "elige el tipo" si estaba visible
         if (this.tipoCards) {
             const radios = this.tipoCards.querySelectorAll('input[type="radio"]');
             radios.forEach(radio => {
-                radio.addEventListener('change', () => this.actualizarAviso(radio.value));
+                radio.addEventListener('change', () => {
+                    this.actualizarAviso(radio.value);
+                    this.ocultarError();
+                });
             });
         }
     }
@@ -203,8 +221,8 @@ class CamaraVideo {
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: { ideal: 'environment' },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
                 },
                 audio: true,
             });
@@ -213,6 +231,8 @@ class CamaraVideo {
                 this.videoEl.muted = true; // Sin eco en el preview en vivo
                 this.videoEl.controls = false;
             }
+            // Activar tap-to-focus (solo en dispositivos que lo soporten)
+            this.configurarTapToFocus();
         }
         catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -251,6 +271,8 @@ class CamaraVideo {
         this.recorder.ondataavailable = (e) => this.onChunk(e);
         this.recorder.onstop = () => this.onRecorderStop();
         this.recorder.start(1000);
+        this.tiempoInicioMs = Date.now();
+        this.intervaloTiempo = setInterval(() => this.actualizarTiempo(), 1000);
         this.setEstado('grabando');
     }
     // ────────────────────────────────────────────────────────────────────────
@@ -287,6 +309,11 @@ class CamaraVideo {
     // ────────────────────────────────────────────────────────────────────────
     onRecorderStop() {
         var _a;
+        // Detener el cronómetro al terminar la grabación
+        if (this.intervaloTiempo !== null) {
+            clearInterval(this.intervaloTiempo);
+            this.intervaloTiempo = null;
+        }
         const tipoMime = ((_a = this.recorder) === null || _a === void 0 ? void 0 : _a.mimeType) || 'video/webm';
         this.videoBlob = new Blob(this.chunks, { type: tipoMime });
         // Sustituir el stream en vivo por el video grabado para que el usuario
@@ -451,6 +478,22 @@ class CamaraVideo {
         return ''; // Deja que el navegador elija el predeterminado
     }
     // ────────────────────────────────────────────────────────────────────────
+    // HELPER — CRONÓMETRO EN TIEMPO REAL
+    // ────────────────────────────────────────────────────────────────────────
+    /** Actualiza el label de tiempo transcurrido cada segundo (disparado por setInterval). */
+    actualizarTiempo() {
+        if (!this.labelTiempo)
+            return;
+        const segundos = Math.floor((Date.now() - this.tiempoInicioMs) / 1000);
+        const mm = Math.floor(segundos / 60);
+        const ss = String(segundos % 60).padStart(2, '0');
+        // Conservar el icono REC (primer hijo) y reemplazar solo el texto
+        const icono = this.labelTiempo.querySelector('i');
+        this.labelTiempo.textContent = `${mm}:${ss}`;
+        if (icono)
+            this.labelTiempo.prepend(icono);
+    }
+    // ────────────────────────────────────────────────────────────────────────
     // HELPER — CONTADOR EN TIEMPO REAL
     // ────────────────────────────────────────────────────────────────────────
     /**
@@ -477,6 +520,13 @@ class CamaraVideo {
         }
         if (this.labelMB) {
             this.labelMB.textContent = `${mb.toFixed(1)} MB / ${CV_MAX_LABEL_MB} MB`;
+        }
+        // Resetear el label de tiempo al limpiar el contador (bytes=0 → estado inicial)
+        if (bytes === 0 && this.labelTiempo) {
+            const icono = this.labelTiempo.querySelector('i');
+            this.labelTiempo.textContent = '0:00';
+            if (icono)
+                this.labelTiempo.prepend(icono);
         }
     }
     // ────────────────────────────────────────────────────────────────────────
@@ -557,6 +607,12 @@ class CamaraVideo {
     // ────────────────────────────────────────────────────────────────────────
     resetearEstado() {
         var _a;
+        // Detener cronómetro si quedó activo
+        if (this.intervaloTiempo !== null) {
+            clearInterval(this.intervaloTiempo);
+            this.intervaloTiempo = null;
+        }
+        this.tiempoInicioMs = 0;
         this.chunks = [];
         this.totalBytes = 0;
         this.videoBlob = null;
@@ -602,6 +658,17 @@ class CamaraVideo {
     // ────────────────────────────────────────────────────────────────────────
     liberarRecursos() {
         var _a;
+        // Detener cronómetro si quedó activo al cerrar el modal
+        if (this.intervaloTiempo !== null) {
+            clearInterval(this.intervaloTiempo);
+            this.intervaloTiempo = null;
+        }
+        // Cancelar listeners de tap-to-focus
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+        }
+        this.enfocandoActualmente = false;
         // Detener grabación si estaba activa
         if (this.recorder && this.recorder.state !== 'inactive') {
             this.recorder.stop();
@@ -620,19 +687,162 @@ class CamaraVideo {
         }
     }
     // ────────────────────────────────────────────────────────────────────────
+    // TAP-TO-FOCUS — mismo patrón que CamaraIntegrada
+    // ────────────────────────────────────────────────────────────────────────
+    /**
+     * Configura los listeners de tap/click para hacer foco en el punto tocado.
+     * Solo activa si el dispositivo soporta 'single-shot' focusMode.
+     */
+    configurarTapToFocus() {
+        if (!this.videoEl || !this.stream)
+            return;
+        const videoTrack = this.stream.getVideoTracks()[0];
+        if (!this.verificarSoporteFocus(videoTrack)) {
+            console.log('⚠️ Dispositivo no soporta tap-to-focus (single-shot no disponible)');
+            return;
+        }
+        this.abortController = new AbortController();
+        const signal = this.abortController.signal;
+        // Click en escritorio
+        this.videoEl.addEventListener('click', (e) => {
+            void this.enfocarEnPunto({ clientX: e.clientX, clientY: e.clientY });
+        }, { signal });
+        // Touch en móviles — sin MouseEvent sintético
+        this.videoEl.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            void this.enfocarEnPunto({ clientX: touch.clientX, clientY: touch.clientY });
+        }, { signal, passive: false });
+        console.log('✅ Tap-to-focus configurado (grabador de video)');
+    }
+    /** Verifica si el track soporta single-shot focus (necesario para tap-to-focus). */
+    verificarSoporteFocus(videoTrack) {
+        if (typeof videoTrack.getCapabilities !== 'function')
+            return false;
+        const capabilities = videoTrack.getCapabilities();
+        if (!capabilities || !Array.isArray(capabilities.focusMode))
+            return false;
+        return capabilities.focusMode.includes('single-shot');
+    }
+    /**
+     * Enfoca en el punto tocado/clickeado.
+     * Aplica single-shot, muestra indicador visual y restaura continuous.
+     */
+    async enfocarEnPunto(punto) {
+        // Debounce: ignorar si han pasado menos de 500 ms desde el último toque
+        const ahora = Date.now();
+        if (ahora - this.ultimoEnfoque < 500)
+            return;
+        // Si ya hay un enfoque en progreso, mostrar feedback y salir
+        if (this.enfocandoActualmente) {
+            this.mostrarIndicadorEnfoqueBloqueado(punto);
+            return;
+        }
+        if (!this.videoEl || !this.stream)
+            return;
+        this.ultimoEnfoque = ahora;
+        this.enfocandoActualmente = true;
+        const videoTrack = this.stream.getVideoTracks()[0];
+        const FOCUS_RESTORE_DELAY_MS = 800;
+        let enfoqueOriginalMode = 'continuous';
+        try {
+            const rect = this.videoEl.getBoundingClientRect();
+            const x = (punto.clientX - rect.left) / rect.width;
+            const y = (punto.clientY - rect.top) / rect.height;
+            if (x < 0 || x > 1 || y < 0 || y > 1)
+                return;
+            const settings = videoTrack.getSettings();
+            enfoqueOriginalMode = settings.focusMode || 'continuous';
+            const enfoquePromise = videoTrack.applyConstraints({
+                advanced: [{ focusMode: 'single-shot', pointsOfInterest: [{ x, y }] }]
+            });
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout de enfoque (2s)')), 2000));
+            await Promise.race([enfoquePromise, timeoutPromise]);
+            this.mostrarIndicadorEnfoque(punto.clientX - rect.left, punto.clientY - rect.top);
+            await new Promise(resolve => setTimeout(resolve, FOCUS_RESTORE_DELAY_MS));
+            await videoTrack.applyConstraints({
+                advanced: [{ focusMode: enfoqueOriginalMode }]
+            });
+        }
+        catch {
+            // Restaurar modo original incluso en error
+            try {
+                await videoTrack.applyConstraints({
+                    advanced: [{ focusMode: enfoqueOriginalMode }]
+                });
+            }
+            catch { /* silencioso — dispositivo no soporta restaurar */ }
+        }
+        finally {
+            this.enfocandoActualmente = false;
+        }
+    }
+    /** Indicador visual de enfoque en el punto tocado (cuadrado blanco → verde). */
+    mostrarIndicadorEnfoque(x, y) {
+        if (!this.videoEl)
+            return;
+        const container = this.videoEl.parentElement;
+        if (!container)
+            return;
+        const indicator = document.createElement('div');
+        indicator.className = 'focus-indicator';
+        indicator.style.left = `${x}px`;
+        indicator.style.top = `${y}px`;
+        container.appendChild(indicator);
+        requestAnimationFrame(() => indicator.classList.add('focus-indicator--focusing'));
+        setTimeout(() => {
+            indicator.classList.add('focus-indicator--done');
+            setTimeout(() => indicator.remove(), 300);
+        }, 700);
+    }
+    /** Indicador visual cuando ya hay un enfoque en progreso (amarillo pulsante). */
+    mostrarIndicadorEnfoqueBloqueado(punto) {
+        if (!this.videoEl)
+            return;
+        const container = this.videoEl.parentElement;
+        if (!container)
+            return;
+        const rect = this.videoEl.getBoundingClientRect();
+        const indicator = document.createElement('div');
+        indicator.className = 'focus-indicator focus-indicator--busy';
+        indicator.style.left = `${punto.clientX - rect.left}px`;
+        indicator.style.top = `${punto.clientY - rect.top}px`;
+        container.appendChild(indicator);
+        setTimeout(() => indicator.remove(), 600);
+    }
+    // ────────────────────────────────────────────────────────────────────────
     // HELPERS — ERRORES
     // ────────────────────────────────────────────────────────────────────────
     mostrarError(msg) {
-        if (this.errorCont)
-            this.errorCont.style.display = 'block';
-        if (this.mensajeError)
-            this.mensajeError.textContent = msg;
+        /*
+         * En estados 'preview' y 'subiendo', el error se muestra inline dentro
+         * del overlay de tipo (cvContTipo), justo encima de los botones Descartar/Guardar.
+         * En 'idle' y 'grabando', cvContTipo está oculto → usar el elemento flotante
+         * en la parte superior del visor (cvErrorContTop).
+         */
+        const esPreviewOSubiendo = this.estado === 'preview' || this.estado === 'subiendo';
+        if (esPreviewOSubiendo) {
+            if (this.errorCont)
+                this.errorCont.style.display = 'block';
+            if (this.mensajeError)
+                this.mensajeError.textContent = msg;
+        }
+        else {
+            if (this.errorContTop)
+                this.errorContTop.style.display = 'block';
+            if (this.mensajeErrorTop)
+                this.mensajeErrorTop.textContent = msg;
+        }
     }
     ocultarError() {
         if (this.errorCont)
             this.errorCont.style.display = 'none';
         if (this.mensajeError)
             this.mensajeError.textContent = '';
+        if (this.errorContTop)
+            this.errorContTop.style.display = 'none';
+        if (this.mensajeErrorTop)
+            this.mensajeErrorTop.textContent = '';
     }
 }
 // ── Límites ──────────────────────────────────────────────────────────────

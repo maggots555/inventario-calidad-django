@@ -2411,20 +2411,10 @@
     <div class="row mt-4">
         <div class="col-12" id="galeria-videos">
             <div class="card section-card">
-                <div class="section-header modal-header-video d-flex align-items-center justify-content-between flex-wrap gap-2">
-                    <span>
-                        <i class="bi bi-camera-video-fill me-1"></i>
-                        Galería de Videos del Equipo
-                        <span class="badge bg-dark ms-2">{{ total_videos }} video{{ total_videos|pluralize:"s" }}</span>
-                    </span>
-                    <!-- Botón para abrir la cámara grabadora integrada -->
-                    <button type="button"
-                            id="btnAbrirCamaraVideo"
-                            class="btn-grabar-video"
-                            title="Grabar video directamente desde la cámara">
-                        <i class="bi bi-record-circle-fill"></i>
-                        Grabar Video
-                    </button>
+                <div class="section-header modal-header-video">
+                    <i class="bi bi-camera-video-fill me-1"></i>
+                    Galería de Videos del Equipo
+                    <span class="badge bg-dark ms-2">{{ total_videos }} video{{ total_videos|pluralize:"s" }}</span>
                 </div>
                 <div class="card-body">
 
@@ -2492,19 +2482,33 @@
 
                             <div class="row align-items-start">
                                 <div class="col-md-9 mb-3">
-                                    <!-- Botón grande para seleccionar video -->
-                                    <label for="inputVideo"
-                                           class="btn btn-outline-primary w-100 btn-upload-dual"
-                                           style="height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; padding: 0.5rem;"
-                                           id="labelInputVideo">
-                                        <i class="bi bi-camera-video-fill" style="font-size: 1.8rem; line-height: 1;"></i>
-                                        <span style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.2;">Seleccionar<br>Video</span>
-                                    </label>
-                                    <input type="file"
-                                           name="video"
-                                           id="inputVideo"
-                                           class="d-none"
-                                           accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,video/mpeg,video/3gpp,video/x-ms-wmv">
+                                    <!-- Botones dual: Seleccionar archivo + Grabar con cámara -->
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <label for="inputVideo"
+                                                   class="btn btn-outline-primary w-100 btn-upload-dual"
+                                                   style="height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; padding: 0.5rem;"
+                                                   id="labelInputVideo">
+                                                <i class="bi bi-folder2-open" style="font-size: 1.8rem; line-height: 1;"></i>
+                                                <span style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.2;">Seleccionar<br>Video</span>
+                                            </label>
+                                            <input type="file"
+                                                   name="video"
+                                                   id="inputVideo"
+                                                   class="d-none"
+                                                   accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm,video/mpeg,video/3gpp,video/x-ms-wmv">
+                                        </div>
+                                        <div class="col-6">
+                                            <button type="button"
+                                                    id="btnAbrirCamaraVideo"
+                                                    class="btn btn-outline-danger w-100 btn-upload-dual"
+                                                    style="height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0.5rem;"
+                                                    title="Grabar video directamente desde la cámara">
+                                                <i class="bi bi-record-circle-fill" style="font-size: 1.8rem; line-height: 1;"></i>
+                                                <span style="margin-top: 0.4rem; font-size: 0.85rem; line-height: 1.2;">Grabar con<br>Cámara</span>
+                                            </button>
+                                        </div>
+                                    </div>
 
                                     <!-- Preview del archivo seleccionado -->
                                     <div id="previewVideo" class="preview-container mt-2" style="display: none;">
@@ -2687,13 +2691,13 @@
 
                                         <!-- Botones de acción -->
                                         <div class="d-flex gap-1 p-2 pt-0">
-                                            <!-- Ver video (abre en nueva pestaña) -->
-                                            <a href="{{ video.video.url }}"
-                                               target="_blank"
-                                               class="btn btn-sm btn-outline-primary flex-fill"
-                                               title="Ver video">
+                                            <!-- Ver video — modal in-app (no _blank, no rompe el PWA) -->
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-primary flex-fill"
+                                                    title="Ver video"
+                                                    onclick="abrirModalVideo('{{ video.video.url }}', '{{ video.get_tipo_display }}')">
                                                 <i class="bi bi-play-circle me-1"></i>Ver
-                                            </a>
+                                            </button>
                                             <!-- Eliminar -->
                                             {% if perms.servicio_tecnico.delete_videoorden %}
                                             <button type="button"
@@ -4888,9 +4892,15 @@
                            class="camera-video"></video>
 
                     <!-- Barra de progreso de grabación (solo visible mientras graba) -->
-                    <!-- Estado 'grabando': muestra MB acumulados en tiempo real -->
+                    <!-- Estado 'grabando': muestra tiempo transcurrido y MB acumulados -->
                     <div id="cvContProgreso" class="cv-progreso-container" style="display:none;">
-                        <div class="cv-progreso-label" id="cvLabelMB">0.0 MB / 95 MB</div>
+                        <div class="cv-progreso-label">
+                            <span id="cvLabelTiempo" class="cv-label-tiempo">
+                                <i class="bi bi-record-circle-fill cv-rec-dot"></i>
+                                0:00
+                            </span>
+                            <span id="cvLabelMB">0.0 MB / 95 MB</span>
+                        </div>
                         <div class="progress cv-progress-bar-wrap">
                             <div class="progress-bar bg-success"
                                  id="cvProgressBar"
@@ -4996,6 +5006,12 @@
                             .camera-controls, para que sean siempre accesibles
                             aunque el teclado virtual esté abierto.
                         -->
+                        <!-- Error de validación (preview/subiendo): inline en el overlay -->
+                        <div id="cvErrorCont" class="cv-error-inline" style="display:none;">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                            <span id="cvMensajeError"></span>
+                        </div>
+
                         <div id="cvPreviewActions" class="cv-preview-actions" style="display:none;">
                             <button type="button"
                                     class="btn btn-lg btn-outline-light"
@@ -5013,16 +5029,12 @@
 
                     </div><!-- /cvContTipo -->
 
-                    <!--
-                        Mensaje de error general — posicionado absolutamente para ser
-                        visible en CUALQUIER estado (idle, grabando, preview, subiendo).
-                        Cubre tanto errores de permisos de cámara como errores de subida.
-                    -->
-                    <div id="cvErrorCont"
-                         class="cv-error-overlay"
-                         style="display:none; position:absolute; bottom:110px; left:1rem; right:1rem; z-index:30;">
+                    <!-- Error de cámara/permisos (idle/grabando): flota en la parte superior del visor -->
+                    <div id="cvErrorContTop"
+                         class="cv-error-top"
+                         style="display:none;">
                         <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                        <span id="cvMensajeError"></span>
+                        <span id="cvMensajeErrorTop"></span>
                     </div>
 
                 </div><!-- /camera-viewer-container -->
@@ -5072,6 +5084,42 @@
         </div>
     </div>
 </div><!-- /#modalCamaraVideo -->
+
+<!-- ============================================================ -->
+<!-- MODAL: REPRODUCTOR DE VIDEO IN-APP (#modalVerVideo)         -->
+<!-- Fullscreen — video ocupa toda la pantalla (sin barras)      -->
+<!-- Evita abrir el navegador externo (rompe el PWA)             -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalVerVideo" tabindex="-1"
+     aria-labelledby="modalVerVideoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content bg-black position-relative">
+
+            <!-- Cabecera flotante sobre el video: título + cerrar -->
+            <div class="modal-ver-video-header">
+                <span id="modalVerVideoTitulo" class="modal-ver-video-titulo">
+                    <i class="bi bi-play-circle-fill me-1"></i>Video
+                </span>
+                <button type="button"
+                        class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+            </div>
+
+            <!-- Video ocupa todo el espacio disponible -->
+            <div class="modal-body p-0 d-flex align-items-center justify-content-center"
+                 style="height:100%;">
+                <video id="modalVerVideoPlayer"
+                       controls
+                       playsinline
+                       preload="metadata"
+                       style="width:100%; height:100%; object-fit:contain; display:block;">
+                </video>
+            </div>
+
+        </div>
+    </div>
+</div><!-- /#modalVerVideo -->
 
 <!-- Botón flotante para ir a galería de imágenes -->
 <button id="btnIrGaleria" class="btn-ir-galeria" aria-label="Ir a Galería de Imágenes" title="Ver galería de imágenes">
@@ -5351,6 +5399,46 @@
 
 <!-- Cámara grabadora de video integrada -->
 <script src="{% static 'js/camara_video.js' %}"></script>
+
+<!-- Reproductor de video in-app — evita abrir el navegador externo (rompe el PWA) -->
+<script>
+(function () {
+    /**
+     * Abre el modal in-app para reproducir un video de la galería.
+     * Reemplaza el <a target="_blank"> que sacaba al usuario del PWA.
+     *
+     * @param {string} url   - URL del archivo de video
+     * @param {string} titulo - Etiqueta del tipo de video (para el título del modal)
+     */
+    window.abrirModalVideo = function (url, titulo) {
+        var player = document.getElementById('modalVerVideoPlayer');
+        var label  = document.getElementById('modalVerVideoTitulo');
+        if (player) player.src = url;
+        if (label)  label.textContent = titulo || 'Video';
+
+        var modalEl = document.getElementById('modalVerVideo');
+        if (modalEl) {
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
+    };
+
+    // Al cerrar el modal: detener reproducción y liberar el src
+    // para que el navegador no siga descargando el archivo en segundo plano.
+    document.addEventListener('DOMContentLoaded', function () {
+        var modalEl = document.getElementById('modalVerVideo');
+        if (!modalEl) return;
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            var player = document.getElementById('modalVerVideoPlayer');
+            if (player) {
+                player.pause();
+                player.src = '';
+                player.load();
+            }
+        });
+    });
+}());
+</script>
 
 <!-- Cámara integrada - v6.1: Soporte iOS PWA + mejoras en cámara/galería -->
 <script src="{% static 'js/camara_integrada.js' %}"></script>

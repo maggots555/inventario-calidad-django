@@ -5381,12 +5381,31 @@ thead.sticky-top {
 }
 
 .cv-progreso-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-size: 0.78rem;
     font-weight: 600;
     color: #f1f5f9;
     margin-bottom: 0.35rem;
     letter-spacing: 0.02em;
-    text-align: right;
+}
+
+.cv-label-tiempo {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.cv-rec-dot {
+    color: #ef4444;
+    font-size: 0.7rem;
+    animation: cv-rec-pulse 1s ease-in-out infinite;
+}
+
+@keyframes cv-rec-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.25; }
 }
 
 .cv-progress-bar-wrap {
@@ -5638,15 +5657,36 @@ thead.sticky-top {
 /* Reutiliza .camera-error ya definido para la cámara de fotos */
 
 /* ── Error en el panel de tipo (preview) ── */
-.cv-error-overlay {
-    margin: 0.5rem 0;
-    padding: 0.6rem 0.85rem;
-    background: rgba(239, 68, 68, 0.20);
-    border: 1px solid rgba(239, 68, 68, 0.50);
-    border-radius: 6px;
-    color: #fecaca;
-    font-size: 0.82rem;
-    white-space: pre-line;   /* respeta los \n del mensaje */
+/* Error inline dentro del overlay de tipo (estado preview/subiendo) */
+.cv-error-inline {
+    margin: 0.75rem 0 0.25rem;
+    padding: 0.65rem 0.9rem;
+    background: #7f1d1d;          /* rojo oscuro opaco — legible sobre cualquier fondo */
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    color: #fef2f2;
+    font-size: 0.84rem;
+    font-weight: 500;
+    white-space: pre-line;
+    line-height: 1.45;
+}
+
+/* Error absoluto superior (estado idle/grabando — permisos de cámara) */
+.cv-error-top {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    right: 1rem;
+    z-index: 30;
+    padding: 0.7rem 1rem;
+    background: #7f1d1d;
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    color: #fef2f2;
+    font-size: 0.84rem;
+    font-weight: 500;
+    white-space: pre-line;
+    line-height: 1.45;
 }
 
 /* ── Indicador de FFmpeg procesando ── */
@@ -5728,3 +5768,51 @@ thead.sticky-top {
     border-color: #fca5a5;
     color: #fca5a5;
 }
+
+/* ============================================================
+   MODAL REPRODUCTOR DE VIDEO IN-APP (#modalVerVideo)
+   ============================================================ */
+
+/*
+ * Cabecera flotante sobre el video.
+ * position: absolute para que no quite espacio al video,
+ * degradado sutil solo en el borde superior para legibilidad.
+ */
+.modal-ver-video-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0.75rem));
+    background: linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 100%);
+    pointer-events: none;   /* el área transparente no bloquea taps al video */
+}
+
+/* Los hijos sí son interactuables */
+.modal-ver-video-header > * {
+    pointer-events: auto;
+}
+
+.modal-ver-video-titulo {
+    color: #f1f5f9;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+
+/* El modal-body debe ocupar toda la altura disponible bajo la cabecera absoluta */
+#modalVerVideo .modal-content {
+    height: 100%;
+}
+
+#modalVerVideo .modal-body {
+    flex: 1;
+    padding: 0 !important;
+}
+
+/* MODO OSCURO: sin cambios necesarios — el modal es siempre fondo negro */

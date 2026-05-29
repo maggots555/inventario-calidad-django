@@ -3787,7 +3787,7 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
     try:
         # =====================================================================
         # COMPRIMIR CON FFMPEG
-        # Comando acordado: H.264 + AAC, máx 720p, CRF 28, fast
+        # Comando acordado: H.264 + AAC, máx 1080p, CRF 23, fast
         # El límite de duración es 600 s (10 min) como red de seguridad contra
         # inputs maliciosos. El límite real de UX es 90 MB de tamaño de archivo,
         # controlado en el frontend (auto-stop de MediaRecorder) y en el form
@@ -3798,11 +3798,11 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
             '-protocol_whitelist', 'file,pipe,fd',
             '-i', tmp_in_path,
             '-vf', (
-                "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
+                "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease,"
                 "scale=trunc(iw/2)*2:trunc(ih/2)*2"
             ),
             '-c:v', 'libx264',
-            '-crf', '28',
+            '-crf', '23',
             '-preset', 'fast',
             '-pix_fmt', 'yuv420p',
             '-profile:v', 'main',

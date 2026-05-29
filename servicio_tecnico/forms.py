@@ -1210,7 +1210,8 @@ class SubirVideoForm(forms.Form):
 
     Validaciones del formulario:
     - tipo: campo obligatorio, debe ser uno de TIPO_VIDEO_CHOICES
-    - video: archivo obligatorio, máximo 90MB (bajo el límite de 100MB de Cloudflare)
+    - video: archivo obligatorio, máximo 95 MB en servidor (el grabador integrado para en 90 MB;
+             los 5 MB extra absorben el último chunk de MediaRecorder que llega tras recorder.stop())
     - descripcion: texto libre opcional, hasta 200 caracteres
 
     La compresión con FFmpeg se realiza en la VISTA, no aquí.
@@ -1234,7 +1235,7 @@ class SubirVideoForm(forms.Form):
             'id': 'inputVideo',
         }),
         label='Seleccionar Video',
-        help_text='Máximo 90MB · Hasta 60 segundos · Formatos: MP4, MOV, AVI, WebM, MKV',
+        help_text='Máximo 95MB · Hasta 10 minutos · Formatos: MP4, MOV, AVI, WebM, MKV',
         required=True,
     )
 
@@ -1272,11 +1273,14 @@ class SubirVideoForm(forms.Form):
         if not video:
             return video
 
-        # Validar tamaño (90 MB máximo)
-        limite_bytes = 90 * 1024 * 1024
+        # Validar tamaño (95 MB máximo en servidor)
+        # El cliente (MediaRecorder) para automáticamente al llegar a 90 MB.
+        # Los 5 MB de margen absorben el último chunk en vuelo que puede
+        # llegar justo después de llamar recorder.stop().
+        limite_bytes = 95 * 1024 * 1024
         if video.size > limite_bytes:
             raise forms.ValidationError(
-                f'El video pesa {video.size / (1024 * 1024):.1f} MB y supera el límite de 90 MB. '
+                f'El video pesa {video.size / (1024 * 1024):.1f} MB y supera el límite de 95 MB. '
                 'Recorta el video antes de subirlo.'
             )
 
