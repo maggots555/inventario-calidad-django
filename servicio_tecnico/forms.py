@@ -1291,8 +1291,15 @@ class SubirVideoForm(forms.Form):
 
         # Validar content-type reportado por el navegador
         # (doble barrera: extensión + MIME type)
+        #
+        # NORMALIZACIÓN: MediaRecorder (API de grabación de video del navegador)
+        # reporta tipos MIME con codecs explícitos, p.ej.:
+        #   'video/webm;codecs=vp9,opus'  o  'video/webm;codecs=vp8'
+        # El set TIPOS_MIME_PERMITIDOS solo almacena la parte BASE ('video/webm').
+        # Por eso normalizamos quitando todo después del ';' antes del chequeo.
         content_type = getattr(video, 'content_type', '')
-        if content_type and content_type not in self.TIPOS_MIME_PERMITIDOS:
+        content_type_base = content_type.split(';')[0].strip() if content_type else ''
+        if content_type and content_type_base not in self.TIPOS_MIME_PERMITIDOS:
             raise forms.ValidationError(
                 f'Tipo de archivo no permitido ({content_type}). '
                 'Solo se aceptan archivos de video.'

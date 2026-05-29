@@ -5356,3 +5356,375 @@ thead.sticky-top {
     );
     background-size: 28px 28px;
 }
+
+/* ============================================================
+   CÁMARA GRABADORA DE VIDEO (#modalCamaraVideo)
+   Estilos base (modo claro — default)
+   Sigue el mismo patrón que la cámara de fotos (.camera-*).
+   ============================================================ */
+
+/* ── Barra de progreso de grabación ── */
+
+/*
+ * Flotante en la parte superior del visor, visible únicamente
+ * mientras MediaRecorder está activo (estado 'grabando').
+ * Fondo oscuro translúcido para que se lea sobre cualquier video.
+ */
+.cv-progreso-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    padding: 0.6rem 1rem 0.5rem;
+    background: rgba(0, 0, 0, 0.72);
+}
+
+.cv-progreso-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #f1f5f9;
+    margin-bottom: 0.35rem;
+    letter-spacing: 0.02em;
+    text-align: right;
+}
+
+.cv-progress-bar-wrap {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.18);
+    overflow: hidden;
+}
+
+.cv-progress-bar-wrap .progress-bar {
+    border-radius: 4px;
+    transition: width 0.4s ease, background-color 0.4s ease;
+}
+
+/* ── Panel de tipo + descripción + botones de acción ── */
+
+/*
+ * Aparece sobre el video cuando el estado es 'preview' o 'subiendo'.
+ * Los botones Descartar/Subir están DENTRO de este overlay (no en
+ * .camera-controls) para que sean accesibles aunque el teclado virtual
+ * esté abierto.
+ *
+ * touch-action: pan-y  →  permite scroll vertical aunque el padre
+ * (.camera-viewer-container) tenga touch-action: none (necesario para
+ * que el video no scrollee la página).
+ *
+ * max-height usa dvh para reflejar el viewport visible real en iOS Safari.
+ */
+.cv-tipo-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 15;
+    padding: 1rem 1rem 0;
+    background: rgba(0, 0, 0, 0.88);
+    max-height: calc(100dvh - 52px - 8px);
+    overflow-y: auto;
+    /* Permite scroll vertical aunque el padre tenga touch-action: none */
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Overrides para tipo-imagen-cards dentro del overlay oscuro */
+.cv-tipo-container .tipo-imagen-card {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #e2e8f0;
+}
+
+.cv-tipo-container .tipo-imagen-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+/* Radio seleccionado — mantener colores de tipo pero más luminosos */
+.cv-tipo-container input.tipo-imagen-radio:checked + .tipo-ingreso {
+    background: rgba(59, 130, 246, 0.30);
+    border-color: #60a5fa;
+    color: #bfdbfe;
+}
+.cv-tipo-container input.tipo-imagen-radio:checked + .tipo-diagnostico {
+    background: rgba(234, 179, 8, 0.28);
+    border-color: #fbbf24;
+    color: #fef08a;
+}
+.cv-tipo-container input.tipo-imagen-radio:checked + .tipo-reparacion {
+    background: rgba(239, 68, 68, 0.28);
+    border-color: #f87171;
+    color: #fecaca;
+}
+.cv-tipo-container input.tipo-imagen-radio:checked + .tipo-egreso {
+    background: rgba(34, 197, 94, 0.28);
+    border-color: #4ade80;
+    color: #bbf7d0;
+}
+.cv-tipo-container input.tipo-imagen-radio:checked + .tipo-packing {
+    background: rgba(168, 85, 247, 0.28);
+    border-color: #c084fc;
+    color: #e9d5ff;
+}
+
+/* Textarea descripción con fondo oscuro */
+.cv-tipo-container .cv-descripcion {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e2e8f0;
+    border-radius: 6px;
+    resize: none;
+}
+.cv-tipo-container .cv-descripcion::placeholder {
+    color: rgba(226, 232, 240, 0.45);
+}
+.cv-tipo-container .cv-descripcion:focus {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #f1f5f9;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
+}
+
+/* Labels de sección dentro del overlay */
+.cv-tipo-container .cv-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+/*
+ * Fila de botones Descartar / Guardar — al final del overlay.
+ * Al estar dentro del panel scrollable son siempre accesibles,
+ * incluso cuando el teclado virtual está abierto.
+ * padding-bottom = safe-area para no quedar detrás de la barra
+ * de gestos del sistema en iPhone/Android.
+ */
+.cv-preview-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 1.25rem;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 1.25rem));
+}
+
+.cv-preview-actions .btn {
+    flex: 1;
+    max-width: 180px;
+    font-size: 0.95rem;
+}
+
+/* ── Paneles de controles inferiores ── */
+
+/*
+ * Los paneles se muestran dentro de .camera-controls (ya definido arriba).
+ * Cada panel cubre todo el ancho para que los botones se distribuyan igual
+ * que en la cámara de fotos.
+ */
+.cv-controls-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3rem;
+    width: 100%;
+}
+
+/* ── Botón de grabar (idle) ── */
+
+/*
+ * Circular, rojo sólido.
+ * Mismo diámetro que .btn-capture para mantener la simetría visual.
+ * El ícono de punto (bi-record-circle) indica "listo para grabar".
+ */
+.cv-btn-record {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: #ef4444;
+    border: 3px solid #ef4444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    color: white;
+}
+
+.cv-btn-record i {
+    font-size: 2rem;
+    color: white;
+}
+
+.cv-btn-record:hover {
+    background: #f87171;
+    border-color: #f87171;
+    box-shadow: 0 6px 28px rgba(239, 68, 68, 0.7);
+    transform: scale(1.05);
+}
+
+.cv-btn-record:active {
+    transform: scale(0.9);
+    background: #dc2626;
+}
+
+/* ── Botón de detener (grabando) ── */
+
+/*
+ * Cuadrado redondeado, blanco pulsante.
+ * El pulso visual refuerza que "hay algo en curso" (grabando).
+ */
+.cv-btn-stop {
+    width: 68px;
+    height: 68px;
+    border-radius: 14px;    /* Cuadrado con esquinas redondeadas = símbolo de stop */
+    background: white;
+    border: 3px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    animation: cv-stop-pulse 1.4s ease-in-out infinite;
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.4);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    color: #ef4444;
+}
+
+.cv-btn-stop i {
+    font-size: 1.8rem;
+    color: #ef4444;
+}
+
+.cv-btn-stop:active {
+    transform: scale(0.9);
+}
+
+@keyframes cv-stop-pulse {
+    0%, 100% {
+        box-shadow: 0 4px 20px rgba(255, 255, 255, 0.4);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 6px 30px rgba(255, 255, 255, 0.65);
+        transform: scale(1.06);
+    }
+}
+
+/* ── Botones de descartar y subir (preview) ── */
+/* Reutilizan .camera-controls .btn-lg y .camera-controls .btn-success ya definidos */
+
+/* ── Panel de estado "subiendo" ── */
+.cv-subiendo-info {
+    display: flex;
+    align-items: center;
+    color: #e2e8f0;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* ── Mensaje de error ── */
+/* Reutiliza .camera-error ya definido para la cámara de fotos */
+
+/* ── Error en el panel de tipo (preview) ── */
+.cv-error-overlay {
+    margin: 0.5rem 0;
+    padding: 0.6rem 0.85rem;
+    background: rgba(239, 68, 68, 0.20);
+    border: 1px solid rgba(239, 68, 68, 0.50);
+    border-radius: 6px;
+    color: #fecaca;
+    font-size: 0.82rem;
+    white-space: pre-line;   /* respeta los \n del mensaje */
+}
+
+/* ── Indicador de FFmpeg procesando ── */
+.cv-ffmpeg-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(59, 130, 246, 0.18);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: 6px;
+    color: #bfdbfe;
+    font-size: 0.82rem;
+    margin-top: 0.5rem;
+}
+
+/* ── Botón "Grabar Video" en el header de la sección ── */
+.btn-grabar-video {
+    background: transparent;
+    border: 2px solid #ef4444;
+    color: #ef4444;
+    border-radius: 8px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn-grabar-video:hover {
+    background: rgba(239, 68, 68, 0.10);
+    border-color: #f87171;
+    color: #f87171;
+}
+
+.btn-grabar-video:active {
+    transform: scale(0.96);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .cv-btn-record,
+    .cv-btn-stop {
+        width: 63px;
+        height: 63px;
+    }
+
+    .cv-btn-record i,
+    .cv-btn-stop i {
+        font-size: 1.75rem;
+    }
+
+    .cv-tipo-container {
+        padding: 0.75rem 0.75rem calc(100px + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   El modal de grabación ya usa fondo negro por diseño (como
+   la cámara de fotos). Solo se necesitan ajustes menores.
+   ============================================================ */
+
+/* El modal de grabación ya es oscuro por naturaleza (video fullscreen negro).
+   Los overrides aplican solo a elementos que heredan colores del tema claro. */
+
+[data-bs-theme="dark"] .btn-grabar-video {
+    border-color: #f87171;
+    color: #f87171;
+}
+
+[data-bs-theme="dark"] .btn-grabar-video:hover {
+    background: rgba(248, 113, 113, 0.12);
+    border-color: #fca5a5;
+    color: #fca5a5;
+}

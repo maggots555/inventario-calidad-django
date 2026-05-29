@@ -3787,7 +3787,11 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
     try:
         # =====================================================================
         # COMPRIMIR CON FFMPEG
-        # Comando acordado: H.264 + AAC, máx 720p, máx 65 s, CRF 28, fast
+        # Comando acordado: H.264 + AAC, máx 720p, CRF 28, fast
+        # El límite de duración es 600 s (10 min) como red de seguridad contra
+        # inputs maliciosos. El límite real de UX es 90 MB de tamaño de archivo,
+        # controlado en el frontend (auto-stop de MediaRecorder) y en el form
+        # de validación Django (forms.py).
         # =====================================================================
         cmd_compress = [
             ffmpeg_bin,
@@ -3808,7 +3812,7 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
             '-map', '0:v:0',
             '-map', '0:a:0?',
             '-movflags', '+faststart',
-            '-t', '65',
+            '-t', '600',  # Safety-limit: 10 min máx (el límite real de UX es 90 MB en el cliente)
             '-map_metadata', '-1',
             '-y',
             tmp_out_path,

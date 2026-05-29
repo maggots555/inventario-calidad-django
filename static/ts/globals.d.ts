@@ -8,3 +8,5 @@ declare const Chart: any;
 interface Window {
     sigmaLoader: InstanceType<typeof DashboardLoader> | null;
 }
+
+

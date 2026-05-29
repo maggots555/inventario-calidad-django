@@ -2417,6 +2417,14 @@
                         Galería de Videos del Equipo
                         <span class="badge bg-dark ms-2">{{ total_videos }} video{{ total_videos|pluralize:"s" }}</span>
                     </span>
+                    <!-- Botón para abrir la cámara grabadora integrada -->
+                    <button type="button"
+                            id="btnAbrirCamaraVideo"
+                            class="btn-grabar-video"
+                            title="Grabar video directamente desde la cámara">
+                        <i class="bi bi-record-circle-fill"></i>
+                        Grabar Video
+                    </button>
                 </div>
                 <div class="card-body">
 
@@ -2517,7 +2525,7 @@
 
                                     <small class="text-muted d-block mt-2">
                                         <i class="bi bi-info-circle"></i>
-                                        Máximo 90 MB · Duración máx. 60 s · Formatos: MP4, MOV, AVI, MKV, WebM
+                                        Máximo 90 MB · Formatos: MP4, MOV, AVI, MKV, WebM
                                     </small>
                                 </div>
 
@@ -4842,6 +4850,229 @@
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- MODAL: CÁMARA GRABADORA DE VIDEO (#modalCamaraVideo)        -->
+<!-- Controlado por static/ts/camara_video.ts                    -->
+<!-- ============================================================ -->
+<!--
+    data-bs-backdrop="static": evita que el usuario cierre el modal
+    accidentalmente tocando fuera mientras graba.
+-->
+<div class="modal fade" id="modalCamaraVideo" tabindex="-1"
+     aria-labelledby="modalCamaraVideoLabel" aria-hidden="true"
+     data-bs-backdrop="static">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content" style="background:#000;">
+
+            <!-- ── Header ── -->
+            <div class="modal-header modal-header-camera text-white">
+                <h5 class="modal-title" id="modalCamaraVideoLabel">
+                    <i class="bi bi-record-circle-fill me-1" style="color:#ef4444;"></i>
+                    Grabar Video
+                </h5>
+                <button type="button"
+                        class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"
+                        aria-label="Cerrar"
+                        id="cvBtnCerrar"></button>
+            </div>
+
+            <!-- ── Body ── -->
+            <div class="modal-body p-0 position-relative">
+
+                <!-- Visor de video (stream en vivo o preview del video grabado) -->
+                <div class="camera-viewer-container">
+                    <video id="cvVideoEl"
+                           autoplay
+                           playsinline
+                           class="camera-video"></video>
+
+                    <!-- Barra de progreso de grabación (solo visible mientras graba) -->
+                    <!-- Estado 'grabando': muestra MB acumulados en tiempo real -->
+                    <div id="cvContProgreso" class="cv-progreso-container" style="display:none;">
+                        <div class="cv-progreso-label" id="cvLabelMB">0.0 MB / 95 MB</div>
+                        <div class="progress cv-progress-bar-wrap">
+                            <div class="progress-bar bg-success"
+                                 id="cvProgressBar"
+                                 role="progressbar"
+                                 style="width: 0%"
+                                 aria-valuenow="0"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel de tipo + descripción + progreso de subida -->
+                    <!-- Estado 'preview' y 'subiendo': flota sobre el video desde abajo -->
+                    <div id="cvContTipo" class="cv-tipo-container" style="display:none;">
+
+                        <!-- Etiqueta de sección -->
+                        <div class="cv-label mb-2">
+                            <i class="bi bi-tag-fill me-1"></i>
+                            Tipo de video
+                            <span class="text-danger ms-1" title="Obligatorio">*</span>
+                        </div>
+
+                        <!-- Radio cards — mismo patrón que el formulario de subida -->
+                        <div class="tipo-imagen-cards" id="cvTipoCards"
+                             role="group" aria-label="Tipo de video">
+
+                            <input type="radio" class="tipo-imagen-radio"
+                                   name="cv_tipo" id="cvtipo_ingreso" value="ingreso">
+                            <label for="cvtipo_ingreso" class="tipo-imagen-card tipo-ingreso">
+                                <i class="bi bi-box-arrow-in-right"></i>
+                                <span>Ingreso</span>
+                            </label>
+
+                            <input type="radio" class="tipo-imagen-radio"
+                                   name="cv_tipo" id="cvtipo_diagnostico" value="diagnostico">
+                            <label for="cvtipo_diagnostico" class="tipo-imagen-card tipo-diagnostico">
+                                <i class="bi bi-search"></i>
+                                <span>Diagnóstico</span>
+                            </label>
+
+                            <input type="radio" class="tipo-imagen-radio"
+                                   name="cv_tipo" id="cvtipo_reparacion" value="reparacion">
+                            <label for="cvtipo_reparacion" class="tipo-imagen-card tipo-reparacion">
+                                <i class="bi bi-wrench-adjustable"></i>
+                                <span>Reparación</span>
+                            </label>
+
+                            <input type="radio" class="tipo-imagen-radio"
+                                   name="cv_tipo" id="cvtipo_egreso" value="egreso">
+                            <label for="cvtipo_egreso" class="tipo-imagen-card tipo-egreso">
+                                <i class="bi bi-box-arrow-right"></i>
+                                <span>Egreso</span>
+                            </label>
+
+                            <input type="radio" class="tipo-imagen-radio"
+                                   name="cv_tipo" id="cvtipo_packing" value="packing">
+                            <label for="cvtipo_packing" class="tipo-imagen-card tipo-packing">
+                                <i class="bi bi-box-seam"></i>
+                                <span>Packing</span>
+                            </label>
+
+                        </div>
+
+                        <!-- Aviso contextual según el tipo seleccionado -->
+                        <div id="cvAvisoCont" class="tipo-imagen-aviso d-none mt-2"></div>
+
+                        <!-- Descripción opcional -->
+                        <div class="cv-label mt-3 mb-1">
+                            <i class="bi bi-pencil me-1"></i>
+                            Descripción (opcional)
+                        </div>
+                        <textarea id="cvDescripcion"
+                                  class="form-control cv-descripcion"
+                                  rows="2"
+                                  maxlength="500"
+                                  placeholder="Describe brevemente lo que muestra el video…"></textarea>
+
+                        <!-- Barra de progreso de subida XHR -->
+                        <div id="cvContProgressSubida" class="mt-3" style="display:none;">
+                            <div class="progress" style="height: 22px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                     id="cvBarraSubida"
+                                     role="progressbar"
+                                     style="width: 0%"
+                                     aria-valuenow="0"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                    <span id="cvTextoSubida">Subiendo…</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Indicador de FFmpeg procesando en servidor -->
+                        <div id="cvContFFmpeg" class="cv-ffmpeg-info" style="display:none;">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            FFmpeg comprimiendo el video en el servidor…
+                        </div>
+
+                        <!--
+                            Botones de acción del estado 'preview'.
+                            Están aquí (dentro del overlay scrollable) y NO en
+                            .camera-controls, para que sean siempre accesibles
+                            aunque el teclado virtual esté abierto.
+                        -->
+                        <div id="cvPreviewActions" class="cv-preview-actions" style="display:none;">
+                            <button type="button"
+                                    class="btn btn-lg btn-outline-light"
+                                    id="cvBtnDescartar"
+                                    title="Descartar y volver a grabar">
+                                <i class="bi bi-trash3 me-1"></i>Descartar
+                            </button>
+                            <button type="button"
+                                    class="btn btn-lg btn-success"
+                                    id="cvBtnSubir"
+                                    title="Subir video">
+                                <i class="bi bi-cloud-upload me-1"></i>Guardar
+                            </button>
+                        </div>
+
+                    </div><!-- /cvContTipo -->
+
+                    <!--
+                        Mensaje de error general — posicionado absolutamente para ser
+                        visible en CUALQUIER estado (idle, grabando, preview, subiendo).
+                        Cubre tanto errores de permisos de cámara como errores de subida.
+                    -->
+                    <div id="cvErrorCont"
+                         class="cv-error-overlay"
+                         style="display:none; position:absolute; bottom:110px; left:1rem; right:1rem; z-index:30;">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                        <span id="cvMensajeError"></span>
+                    </div>
+
+                </div><!-- /camera-viewer-container -->
+
+                <!-- ── Controles inferiores ── -->
+                <!--
+                    Solo uno de los cvPanel* está visible a la vez.
+                    La máquina de estados en camara_video.ts controla cuál.
+                -->
+                <div class="camera-controls">
+
+                    <!-- Estado idle: botón de grabar -->
+                    <div id="cvPanelIdle" class="cv-controls-panel">
+                        <button type="button"
+                                class="btn cv-btn-record"
+                                id="cvBtnGrabar"
+                                title="Iniciar grabación">
+                            <i class="bi bi-record-circle-fill"></i>
+                        </button>
+                    </div>
+
+                    <!-- Estado grabando: botón de detener (pulsante) -->
+                    <div id="cvPanelGrabando" class="cv-controls-panel" style="display:none;">
+                        <button type="button"
+                                class="btn cv-btn-stop"
+                                id="cvBtnDetener"
+                                title="Detener grabación">
+                            <i class="bi bi-stop-fill"></i>
+                        </button>
+                    </div>
+
+                    <!-- Estado preview: panel vacío — los botones están en cvContTipo -->
+                    <div id="cvPanelPreview" class="cv-controls-panel" style="display:none;"></div>
+
+                    <!-- Estado subiendo: spinner informativo -->
+                    <div id="cvPanelSubiendo" class="cv-controls-panel" style="display:none;">
+                        <div class="cv-subiendo-info">
+                            <span class="spinner-border spinner-border-sm me-2"
+                                  role="status" aria-hidden="true"></span>
+                            Subiendo video…
+                        </div>
+                    </div>
+
+                </div><!-- /camera-controls -->
+
+            </div><!-- /modal-body -->
+        </div>
+    </div>
+</div><!-- /#modalCamaraVideo -->
+
 <!-- Botón flotante para ir a galería de imágenes -->
 <button id="btnIrGaleria" class="btn-ir-galeria" aria-label="Ir a Galería de Imágenes" title="Ver galería de imágenes">
     <i class="bi bi-camera"></i>
@@ -5117,6 +5348,9 @@
 
 <!-- Subida y eliminación de videos de evidencia -->
 <script src="{% static 'js/upload_video.js' %}"></script>
+
+<!-- Cámara grabadora de video integrada -->
+<script src="{% static 'js/camara_video.js' %}"></script>
 
 <!-- Cámara integrada - v6.1: Soporte iOS PWA + mejoras en cámara/galería -->
 <script src="{% static 'js/camara_integrada.js' %}"></script>
