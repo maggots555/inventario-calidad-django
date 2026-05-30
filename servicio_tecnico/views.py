@@ -1909,8 +1909,6 @@ def detalle_orden(request, orden_id):
         # ------------------------------------------------------------------------
         elif form_type == 'subir_imagenes':
             # LOGGING: Información inicial para diagnóstico
-            import logging
-            logger = logging.getLogger(__name__)
             logger.info(f"📷 Inicio procesamiento de imágenes para orden {orden.numero_orden_interno}")
             logger.info(f"   - POST data: {request.POST.keys()}")
             logger.info(f"   - FILES data: {request.FILES.keys()}")
@@ -2166,10 +2164,20 @@ def detalle_orden(request, orden_id):
         # ------------------------------------------------------------------------
         # FORMULARIO: Subir Video de Evidencia
         # ------------------------------------------------------------------------
+        # EXPLICACIÓN DEL CAMBIO (asíncrono con Celery):
+        # Antes, este bloque llamaba a comprimir_y_guardar_video() de forma síncrona,
+        # lo que mantenía el request HTTP abierto mientras FFmpeg comprimía el video
+        # (hasta 5 minutos). Con videos 1080p, Cloudflare cortaba la conexión.
+        #
+        # Ahora el flujo es:
+        #   1. Guardar el archivo crudo en /tmp (rápido)
+        #   2. Despachar comprimir_video_evidencia_task.delay() a Celery
+        #   3. Responder al cliente INMEDIATAMENTE con task_queued=True
+        #   4. Celery comprime en segundo plano y notifica al usuario cuando termina
+        #      (campanita siempre + push si el usuario tiene suscripciones activas)
         elif form_type == 'subir_video':
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"🎥 Inicio procesamiento de video para orden {orden.numero_orden_interno}")
+            import tempfile
+            logger.info(f"🎥 Video recibido para Orden {orden.numero_orden_interno} — encolando en Celery")
 
             # Verificar que llegó el archivo
             if 'video' not in request.FILES:
@@ -2192,40 +2200,67 @@ def detalle_orden(request, orden_id):
             descripcion = form_video.cleaned_data.get('descripcion', '')
             video_file  = form_video.cleaned_data['video']  # ya validado por clean_video()
 
-            # Comprimir y guardar (síncrono — FFmpeg corre en el proceso)
+            # ── Guardar el archivo crudo en /tmp para que Celery lo acceda ────────
+            # IMPORTANTE: delete=False es necesario — sin esto Python borraría el
+            # archivo al cerrar el context manager, antes de que Celery lo procese.
+            # La tarea Celery es responsable de borrar el archivo en su bloque finally.
             try:
-                video_orden = comprimir_y_guardar_video(
-                    orden=orden,
-                    video_file=video_file,
+                extension_entrada = os.path.splitext(video_file.name)[1].lower() or '.webm'
+                with tempfile.NamedTemporaryFile(
+                    suffix=extension_entrada,
+                    prefix='sigmavideo_',
+                    delete=False
+                ) as tmp_in:
+                    for chunk in video_file.chunks():
+                        tmp_in.write(chunk)
+                    archivo_tmp_path = tmp_in.name
+            except Exception as e:
+                logger.error(f"❌ No se pudo guardar video en /tmp: {e}")
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Error al recibir el archivo de video. Intenta de nuevo.',
+                }, status=500)
+
+            # ── Despachar la tarea Celery ─────────────────────────────────────────
+            try:
+                from .tasks import comprimir_video_evidencia_task
+                comprimir_video_evidencia_task.delay(
+                    archivo_tmp_path=archivo_tmp_path,
+                    nombre_original=video_file.name,
+                    tamano_bytes=video_file.size,
+                    orden_id=orden.pk,
                     tipo=tipo_video,
                     descripcion=descripcion,
-                    empleado=empleado_actual,
+                    empleado_id=empleado_actual.pk,
+                    usuario_id=request.user.pk,
                 )
-                logger.info(f"✅ Video guardado correctamente (ID: {video_orden.pk})")
-
-                return JsonResponse({
-                    'success': True,
-                    'message': f'✅ Video de {video_orden.get_tipo_display()} comprimido y guardado correctamente.',
-                    'video_id': video_orden.pk,
-                    'tipo': tipo_video,
-                    'tamano_original_mb': round(video_file.size / (1024 * 1024), 2),
-                    'porcentaje_compresion': video_orden.porcentaje_compresion,
-                    'thumbnail_url': video_orden.thumbnail.url if video_orden.thumbnail else '',
-                })
-            except RuntimeError as e:
-                logger.error(f"❌ FFmpeg error al procesar video: {str(e)}")
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Error al comprimir el video: {str(e)}',
-                }, status=500)
+                logger.info(
+                    f"✅ Tarea Celery encolada para video de Orden {orden.numero_orden_interno} "
+                    f"({round(video_file.size / (1024*1024), 1)} MB, tipo={tipo_video})"
+                )
             except Exception as e:
-                import traceback
-                logger.critical(f"❌ ERROR CRÍTICO AL GUARDAR VIDEO: {traceback.format_exc()}")
+                # Si Celery no está disponible (Redis caído, etc.), limpiar el tmp
+                # y devolver error para que el técnico sepa que debe reintentar
+                logger.error(f"❌ No se pudo encolar tarea Celery: {e}")
+                try:
+                    if os.path.exists(archivo_tmp_path):
+                        os.remove(archivo_tmp_path)
+                except Exception:
+                    pass
                 return JsonResponse({
                     'success': False,
-                    'error': f'Error inesperado al procesar el video: {str(e)}',
-                    'error_type': type(e).__name__,
+                    'error': 'No se pudo encolar el video para procesamiento. Intenta de nuevo.',
                 }, status=500)
+
+            # ── Responder inmediatamente al cliente ───────────────────────────────
+            return JsonResponse({
+                'success': True,
+                'task_queued': True,
+                'message': (
+                    'Video recibido. Se procesará en segundo plano. '
+                    'Recibirás una notificación cuando esté listo.'
+                ),
+            })
 
         # ------------------------------------------------------------------------
         # FORMULARIO 7: Editar Información Principal del Equipo
@@ -3798,8 +3833,9 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
             '-protocol_whitelist', 'file,pipe,fd',
             '-i', tmp_in_path,
             '-vf', (
-                "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease,"
-                "scale=trunc(iw/2)*2:trunc(ih/2)*2"
+                "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
+                "scale=trunc(iw/2)*2:trunc(ih/2)*2,"
+                "unsharp=5:5:1.0:5:5:0.0"
             ),
             '-c:v', 'libx264',
             '-crf', '23',
@@ -3808,7 +3844,8 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
             '-profile:v', 'main',
             '-level', '4.0',
             '-c:a', 'aac',
-            '-b:a', '96k',
+            '-b:a', '128k',    # Subido de 96k: evita distorsión al recodificar Opus→AAC
+            '-ar', '48000',    # Sample rate explícito — previene variación entre dispositivos
             '-map', '0:v:0',
             '-map', '0:a:0?',
             '-movflags', '+faststart',

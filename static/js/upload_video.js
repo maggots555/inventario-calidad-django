@@ -205,12 +205,27 @@ class UploadVideo {
             try {
                 const data = JSON.parse(xhr.responseText);
                 if (data.success) {
-                    const ahorro = data.porcentaje_compresion != null
-                        ? ` · Compresión: −${data.porcentaje_compresion}%`
-                        : '';
-                    this.mostrarResultado(true, `✅ ${data.message || 'Video guardado.'}${ahorro}`);
-                    // Recargar para mostrar el video en la galería
-                    setTimeout(() => window.location.reload(), 1800);
+                    if (data.task_queued) {
+                        /*
+                         * FLUJO ASÍNCRONO (Celery):
+                         * El servidor guardó el archivo en /tmp y encoló la compresión.
+                         * Mostramos el mensaje de cola y NO recargamos — el usuario
+                         * recibirá una notificación por campanita (y push si está suscrito)
+                         * cuando el video esté listo.
+                         */
+                        this.mostrarResultado(true, `✅ ${data.message || 'Video recibido. Recibirás una notificación cuando esté listo.'}`);
+                        // No recargamos: el técnico puede seguir trabajando
+                        // y el video aparecerá al recargar la página después de la notif
+                    }
+                    else {
+                        // FLUJO SÍNCRONO LEGADO: respuesta con video_id listo
+                        const ahorro = data.porcentaje_compresion != null
+                            ? ` · Compresión: −${data.porcentaje_compresion}%`
+                            : '';
+                        this.mostrarResultado(true, `✅ ${data.message || 'Video guardado.'}${ahorro}`);
+                        // Recargar para mostrar el video en la galería
+                        setTimeout(() => window.location.reload(), 1800);
+                    }
                 }
                 else {
                     this.mostrarResultado(false, `❌ ${data.error || 'Error desconocido al guardar el video.'}`);

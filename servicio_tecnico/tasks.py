@@ -3375,7 +3375,8 @@ def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int):
             '-i', ruta_original,
             '-vf', (
                 "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
-                "scale=trunc(iw/2)*2:trunc(ih/2)*2"
+                "scale=trunc(iw/2)*2:trunc(ih/2)*2,"
+                "unsharp=5:5:1.0:5:5:0.0"
             ),
             '-c:v',      'libx264',
             '-crf',      '28',
@@ -3384,7 +3385,8 @@ def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int):
             '-profile:v', 'main',
             '-level',    '4.0',
             '-c:a',      'aac',
-            '-b:a',      '96k',
+            '-b:a',      '128k',     # Subido de 96k: evita distorsión al recodificar Opus→AAC
+            '-ar',       '48000',    # Sample rate explícito — previene variación entre dispositivos
             '-map',      '0:v:0',
             '-map',      '0:a:0?',   # Audio opcional (no falla si no hay)
             '-movflags', '+faststart',
@@ -3508,12 +3510,358 @@ def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int):
         raise
 
     finally:
+        # Limpiar el directorio temporal siempre, incluso si hubo error
         try:
             if os.path.isdir(tmp_dir):
                 shutil.rmtree(tmp_dir, ignore_errors=True)
                 logger.debug(f"[VIDEO-COMPRESION] Directorio temporal eliminado: {tmp_dir}")
         except Exception:
             pass
+
+
+# ============================================================================
+# TAREA: Comprimir Video de Evidencia (reemplazo asíncrono de comprimir_y_guardar_video)
+# ============================================================================
+
+@shared_task(
+    bind=True,
+    max_retries=1,
+    default_retry_delay=30,
+    soft_time_limit=360,   # 6 minutos — suficiente para un video 1080p de 90 MB
+    time_limit=420,        # 7 minutos hard-limit (el worker se mata si supera esto)
+    name='servicio_tecnico.comprimir_video_evidencia',
+)
+def comprimir_video_evidencia_task(
+    self,
+    archivo_tmp_path: str,
+    nombre_original: str,
+    tamano_bytes: int,
+    orden_id: int,
+    tipo: str,
+    descripcion: str,
+    empleado_id: int,
+    usuario_id: int,
+):
+    """
+    Tarea Celery: comprime un video de evidencia con FFmpeg y guarda el VideoOrden.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta tarea es el reemplazo asíncrono de comprimir_y_guardar_video() en views.py.
+    Antes, esa función bloqueaba el request HTTP hasta que FFmpeg terminaba de
+    comprimir — lo que causaba que Cloudflare cortara la conexión en videos largos.
+
+    Nuevo flujo:
+      1. La VISTA guarda el video crudo en /tmp y despacha esta tarea de inmediato.
+      2. Esta TAREA corre en el worker de Celery (proceso separado, sin límite HTTP):
+         - Comprime con FFmpeg (H.264/AAC, máx 1080p, CRF 23)
+         - Extrae thumbnail del segundo 1
+         - Guarda VideoOrden en la base de datos
+         - Notifica al usuario por campanita (siempre) y por push (si está suscrito)
+
+    Parámetros (IMPORTANTE: solo tipos simples — NUNCA objetos Django):
+        self              : Referencia a la tarea (para reintentos), viene de bind=True
+        archivo_tmp_path  : Ruta absoluta del archivo crudo guardado en /tmp
+        nombre_original   : Nombre original del archivo (para detectar extensión)
+        tamano_bytes      : Tamaño original sin comprimir en bytes (para el registro)
+        orden_id          : ID de la OrdenServicio en la base de datos
+        tipo              : Tipo de video (ingreso, diagnostico, reparacion, egreso, packing)
+        descripcion       : Descripción opcional del técnico
+        empleado_id       : ID del Empleado que sube el video (para VideoOrden.subido_por)
+        usuario_id        : ID del User Django (para la notificación campanita y push)
+    """
+    import subprocess
+    import shutil
+    import time
+    from pathlib import Path as PPath
+    from django.core.files import File
+    from django.core.files.base import ContentFile
+    from django.contrib.auth import get_user_model
+    from django.urls import reverse
+    from servicio_tecnico.models import OrdenServicio, VideoOrden
+    from inventario.models import Empleado
+    from notificaciones.push_service import enviar_push_a_usuario
+
+    logger.info(
+        f"[VIDEO-EVIDENCIA] Iniciando compresión — Orden ID {orden_id}, tipo={tipo}"
+    )
+
+    # ── Resolver usuario para notificaciones ─────────────────────────────────
+    # Se hace aquí, fuera del try principal, para poder usarlo también en except
+    User = get_user_model()
+    try:
+        usuario = User.objects.get(pk=usuario_id)
+    except User.DoesNotExist:
+        usuario = None
+        logger.warning(f"[VIDEO-EVIDENCIA] Usuario ID {usuario_id} no encontrado en BD")
+
+    # Variables de rutas intermedias — declaradas aquí para el bloque finally
+    tmp_out_path   = None
+    tmp_thumb_path = None
+
+    try:
+        # =====================================================================
+        # PASO 1: VERIFICAR QUE EL ARCHIVO TEMPORAL EXISTE EN DISCO
+        # =====================================================================
+        # La vista guardó el video crudo en /tmp antes de despachar esta tarea.
+        # Si el archivo ya no existe (limpieza del SO, crash, etc.) lanzamos
+        # FileNotFoundError que no se reintenta (ver bloque except abajo).
+        if not PPath(archivo_tmp_path).exists():
+            raise FileNotFoundError(
+                f"Archivo temporal no encontrado: {archivo_tmp_path}. "
+                f"Puede haberse limpiado antes de que Celery procesara la tarea."
+            )
+
+        # =====================================================================
+        # PASO 2: OBTENER OBJETOS DJANGO DESDE LA BD
+        # =====================================================================
+        try:
+            orden = OrdenServicio.objects.select_related(
+                'detalle_equipo', 'sucursal'
+            ).get(pk=orden_id)
+        except OrdenServicio.DoesNotExist:
+            raise ValueError(f"OrdenServicio ID {orden_id} no encontrada en BD")
+
+        try:
+            empleado = Empleado.objects.get(pk=empleado_id)
+        except Empleado.DoesNotExist:
+            raise ValueError(f"Empleado ID {empleado_id} no encontrado en BD")
+
+        # =====================================================================
+        # PASO 3: PREPARAR RUTAS TEMPORALES DE SALIDA
+        # =====================================================================
+        timestamp      = int(time.time() * 1000)
+        nombre_video   = f"{tipo}_{timestamp}.mp4"
+        nombre_thumb   = f"{tipo}_{timestamp}_thumb.jpg"
+        tmp_out_path   = archivo_tmp_path + '_out.mp4'
+        tmp_thumb_path = archivo_tmp_path + '_thumb.jpg'
+
+        # Mismo patrón de detección de ffmpeg que comprimir_y_guardar_video():
+        # shutil.which() busca en el PATH del worker; fallback a ruta absoluta.
+        ffmpeg_bin = shutil.which('ffmpeg') or '/usr/bin/ffmpeg'
+
+        # =====================================================================
+        # PASO 4: COMPRIMIR CON FFMPEG
+        # Parámetros idénticos a comprimir_y_guardar_video() en views.py:
+        # H.264 + AAC, máx 1080p, CRF 23, preset fast, safety-limit 10 min.
+        # =====================================================================
+        cmd_compress = [
+            ffmpeg_bin,
+            '-protocol_whitelist', 'file,pipe,fd',
+             '-i', archivo_tmp_path,
+             '-vf', (
+                 "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
+                 "scale=trunc(iw/2)*2:trunc(ih/2)*2,"
+                 "unsharp=5:5:1.0:5:5:0.0"
+             ),
+            '-c:v', 'libx264',
+            '-crf', '23',
+            '-preset', 'fast',
+            '-pix_fmt', 'yuv420p',
+            '-profile:v', 'main',
+            '-level', '4.0',
+            '-c:a', 'aac',
+            '-b:a', '128k',    # Subido de 96k: evita distorsión al recodificar Opus→AAC
+            '-ar', '48000',    # Sample rate explícito — previene variación entre dispositivos
+            '-map', '0:v:0',
+            '-map', '0:a:0?',      # Audio opcional — no falla si el video no tiene audio
+            '-movflags', '+faststart',
+            '-t', '600',           # Safety-limit: 10 min máx
+            '-map_metadata', '-1',
+            '-y',
+            tmp_out_path,
+        ]
+        resultado = subprocess.run(
+            cmd_compress,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 minutos máximo para el proceso FFmpeg
+        )
+        if resultado.returncode != 0:
+            raise RuntimeError(
+                f'FFmpeg falló (código {resultado.returncode}): {resultado.stderr[-500:]}'
+            )
+
+        logger.info(
+            f"[VIDEO-EVIDENCIA] FFmpeg completado — Orden {orden.numero_orden_interno}"
+        )
+
+        # =====================================================================
+        # PASO 5: EXTRAER THUMBNAIL DEL SEGUNDO 1
+        # Si falla no es crítico — VideoOrden.thumbnail puede quedar vacío
+        # =====================================================================
+        cmd_thumb = [
+            ffmpeg_bin,
+            '-protocol_whitelist', 'file,pipe,fd',
+            '-i', tmp_out_path,
+            '-ss', '00:00:01',
+            '-vframes', '1',
+            '-q:v', '3',
+            '-y',
+            tmp_thumb_path,
+        ]
+        subprocess.run(cmd_thumb, capture_output=True, timeout=30)
+
+        # =====================================================================
+        # PASO 6: CREAR REGISTRO VideoOrden EN LA BASE DE DATOS
+        # video_orden.save() llama al override del modelo que registra el historial
+        # =====================================================================
+        tamano_original_mb = round(tamano_bytes / (1024 * 1024), 2)
+        tamano_final_mb    = round(os.path.getsize(tmp_out_path) / (1024 * 1024), 2)
+
+        video_orden = VideoOrden(
+            orden=orden,
+            tipo=tipo,
+            descripcion=descripcion,
+            subido_por=empleado,
+            tamano_original_mb=tamano_original_mb,
+            tamano_final_mb=tamano_final_mb,
+        )
+
+        with open(tmp_out_path, 'rb') as f_video:
+            video_orden.video.save(nombre_video, File(f_video), save=False)
+
+        if PPath(tmp_thumb_path).exists():
+            with open(tmp_thumb_path, 'rb') as f_thumb:
+                video_orden.thumbnail.save(nombre_thumb, ContentFile(f_thumb.read()), save=False)
+
+        video_orden.save()
+
+        logger.info(
+            f"[VIDEO-EVIDENCIA] VideoOrden ID {video_orden.pk} guardado — "
+            f"{tamano_original_mb} MB → {tamano_final_mb} MB"
+        )
+
+        # =====================================================================
+        # PASO 7: NOTIFICAR AL USUARIO — campanita (garantizada) + push (opcional)
+        # =====================================================================
+        try:
+            orden_ref = (
+                orden.detalle_equipo.orden_cliente
+                if orden.detalle_equipo and orden.detalle_equipo.orden_cliente
+                else orden.numero_orden_interno
+            )
+        except Exception:
+            orden_ref = orden.numero_orden_interno
+
+        try:
+            tipo_display = dict(
+                VideoOrden._meta.get_field('tipo').choices
+            ).get(tipo, tipo)
+        except Exception:
+            tipo_display = tipo
+
+        porcentaje    = video_orden.porcentaje_compresion
+        titulo_notif  = f"Video listo — {orden_ref}"
+        mensaje_notif = (
+            f"Video de {tipo_display} procesado. Compresión: −{porcentaje}%."
+            if porcentaje
+            else f"Video de {tipo_display} guardado correctamente."
+        )
+
+        # URL para el botón de la notificación push — abre la orden directamente
+        try:
+            url_orden = reverse(
+                'servicio_tecnico:detalle_orden', kwargs={'orden_id': orden_id}
+            )
+        except Exception:
+            url_orden = f"/servicio_tecnico/ordenes/{orden_id}/"
+
+        # Campanita: polling de 15s la muestra rápido, y es la notificación garantizada
+        notificar_exito(
+            titulo=titulo_notif,
+            mensaje=mensaje_notif,
+            usuario=usuario,
+            task_id=self.request.id,
+            app_origen='servicio_tecnico',
+            url=url_orden,
+        )
+
+        # Push: solo si el usuario tiene suscripciones activas
+        if usuario:
+            try:
+                enviados = enviar_push_a_usuario(
+                    usuario=usuario,
+                    titulo=titulo_notif,
+                    mensaje=mensaje_notif,
+                    url=url_orden,
+                )
+                if enviados:
+                    logger.info(
+                        f"[VIDEO-EVIDENCIA] Push enviado a {enviados} dispositivo(s) "
+                        f"del usuario {usuario.username}"
+                    )
+            except Exception as e_push:
+                # El push falla en silencio — la campanita ya notificó al usuario
+                logger.warning(
+                    f"[VIDEO-EVIDENCIA] No se pudo enviar push a {usuario.username}: {e_push}"
+                )
+
+        return {
+            'success': True,
+            'video_id': video_orden.pk,
+            'orden_id': orden_id,
+            'tipo': tipo,
+        }
+
+    except Exception as exc:
+        logger.error(
+            f"[VIDEO-EVIDENCIA] Error para Orden ID {orden_id}: {exc}",
+            exc_info=True,
+        )
+
+        # Notificar el error al usuario por campanita y push
+        try:
+            if usuario:
+                _url_err = locals().get(
+                    'url_orden',
+                    f"/servicio_tecnico/ordenes/{orden_id}/"
+                )
+                notificar_error(
+                    titulo=f"Error al procesar video — Orden ID {orden_id}",
+                    mensaje=(
+                        f"No se pudo comprimir el video de {tipo}. "
+                        f"Detalle: {str(exc)[:300]}"
+                    ),
+                    usuario=usuario,
+                    task_id=self.request.id,
+                    app_origen='servicio_tecnico',
+                    url=_url_err,
+                )
+                try:
+                    enviar_push_a_usuario(
+                        usuario=usuario,
+                        titulo="Error al procesar video",
+                        mensaje=(
+                            f"No se pudo comprimir el video de {tipo}. "
+                            f"Intenta subirlo de nuevo."
+                        ),
+                        url=_url_err,
+                    )
+                except Exception:
+                    pass
+        except Exception as e_notif:
+            logger.warning(
+                f"[VIDEO-EVIDENCIA] No se pudo crear notificación de error: {e_notif}"
+            )
+
+        # Solo reintentar en errores de sistema — no en errores de lógica
+        # (FileNotFoundError y ValueError no se van a resolver solos con un reintento)
+        if not isinstance(exc, (ValueError, FileNotFoundError)):
+            raise self.retry(exc=exc, countdown=30)
+        raise
+
+    finally:
+        # Limpiar TODOS los archivos temporales: original crudo + intermedios de FFmpeg
+        # Se ejecuta siempre, aunque la tarea haya fallado — evita llenar el disco
+        for tmp_path in filter(None, [archivo_tmp_path, tmp_out_path, tmp_thumb_path]):
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except Exception:
+                pass
+        logger.info(
+            f"[VIDEO-EVIDENCIA] Archivos temporales limpiados — Orden ID {orden_id}"
+        )
 
 
 # ============================================================================
