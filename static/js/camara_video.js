@@ -416,9 +416,9 @@ class CamaraVideo {
                         if (this.contFFmpeg) {
                             this.contFFmpeg.innerHTML = `
                                 <div class="text-center py-3">
-                                    <i class="bi bi-check-circle-fill text-success d-block mb-2" style="font-size:2rem;"></i>
-                                    <p class="mb-1 fw-semibold">Video recibido</p>
-                                    <p class="text-muted small mb-0">
+                                    <i class="bi bi-check-circle-fill d-block mb-2" style="font-size:2rem; color:#22c55e;"></i>
+                                    <p class="mb-1 fw-semibold" style="color:#f1f5f9;">Video recibido</p>
+                                    <p class="small mb-0" style="color:#94a3b8;">
                                         Procesando en segundo plano…<br>
                                         Recibirás una notificación cuando esté listo.
                                     </p>
