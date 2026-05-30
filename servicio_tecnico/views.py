@@ -3882,6 +3882,29 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
         # Si el thumbnail falla no es crítico; VideoOrden.thumbnail puede quedar vacío
 
         # =====================================================================
+        # MEDIR DURACIÓN CON FFPROBE (antes de crear el registro)
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # ffprobe lee los metadatos del video comprimido para obtener su duración
+        # exacta en segundos. Si falla por cualquier motivo, simplemente guarda
+        # None — no es un error crítico.
+        # =====================================================================
+        duracion_segundos = None
+        try:
+            cmd_probe = [
+                'ffprobe', '-v', 'error',
+                '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                tmp_out_path,
+            ]
+            resultado_probe = subprocess.run(
+                cmd_probe, capture_output=True, text=True, timeout=10
+            )
+            if resultado_probe.returncode == 0:
+                duracion_segundos = int(float(resultado_probe.stdout.strip()))
+        except Exception:
+            pass  # No crítico — el video se guarda igualmente sin duración
+
+        # =====================================================================
         # CREAR REGISTRO VideoOrden
         # =====================================================================
         tamano_original_mb = round(video_file.size / (1024 * 1024), 2)
@@ -3894,6 +3917,7 @@ def comprimir_y_guardar_video(orden, video_file, tipo, descripcion, empleado):
             subido_por=empleado,
             tamano_original_mb=tamano_original_mb,
             tamano_final_mb=tamano_final_mb,
+            duracion_segundos=duracion_segundos,
         )
 
         # Guardar video comprimido usando File() para no cargar todo en RAM

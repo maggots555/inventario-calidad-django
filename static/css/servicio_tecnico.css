@@ -2436,6 +2436,113 @@ thead.sticky-top {
 }
 
 /* =============================================================================
+   BOTÓN FLOTANTE — IR A GALERÍA DE VIDEOS
+   Mismo estilo que .btn-ir-galeria, un nivel más arriba en la pila
+   Posición: bottom 160px (95px + 50px botón fotos + 15px gap)
+   ============================================================================= */
+
+.btn-ir-galeria-video {
+    position: fixed;
+    bottom: 160px; /* Encima del botón de fotos (95px + 50px + 15px gap) */
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #2d3e50 0%, #34495e 100%);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: #ffffff;
+    font-size: 1.25rem;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(100px);
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    z-index: 997; /* Un nivel debajo del botón de fotos (998) */
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                0 0 0 0 rgba(52, 152, 219, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Estado visible */
+.btn-ir-galeria-video.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    animation: pulseGlowGaleriaVideo 2s ease-in-out infinite;
+}
+
+/* Efecto hover */
+.btn-ir-galeria-video:hover {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    transform: translateY(-5px) scale(1.1);
+    box-shadow: 0 8px 25px rgba(45, 62, 80, 0.7),
+                0 0 20px rgba(52, 152, 219, 0.6);
+    border-color: rgba(52, 152, 219, 0.5);
+}
+
+/* Efecto activo (click) */
+.btn-ir-galeria-video:active {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5);
+}
+
+/* Animación del ícono al hover — oscilación vertical suave */
+.btn-ir-galeria-video:hover i {
+    animation: videoFloat 0.6s ease-in-out infinite;
+}
+
+@keyframes videoFloat {
+    0%, 100% {
+        transform: translateY(0) scale(1);
+    }
+    50% {
+        transform: translateY(-3px) scale(1.08);
+    }
+}
+
+/* Pulso sutil mientras es visible — matching con los otros botones */
+@keyframes pulseGlowGaleriaVideo {
+    0%, 100% {
+        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                    0 0 0 0 rgba(52, 152, 219, 0.4);
+    }
+    50% {
+        box-shadow: 0 4px 15px rgba(45, 62, 80, 0.5),
+                    0 0 15px rgba(52, 152, 219, 0.6);
+    }
+}
+
+/* Efecto focus para accesibilidad */
+.btn-ir-galeria-video:focus {
+    outline: 3px solid rgba(52, 152, 219, 0.5);
+    outline-offset: 3px;
+}
+
+/* Responsive — móviles medianos */
+@media (max-width: 768px) {
+    .btn-ir-galeria-video {
+        width: 45px;
+        height: 45px;
+        bottom: 145px; /* 80px botón fotos + 45px + 20px gap */
+        right: 20px;
+        font-size: 1.1rem;
+    }
+}
+
+/* Responsive — pantallas muy pequeñas */
+@media (max-width: 480px) {
+    .btn-ir-galeria-video {
+        width: 40px;
+        height: 40px;
+        bottom: 125px; /* 70px botón fotos + 40px + 15px gap */
+        right: 15px;
+        font-size: 1rem;
+    }
+}
+
+/* =============================================================================
    SISTEMA DUAL DE SUBIDA DE IMÁGENES - GALERÍA Y CÁMARA
    ============================================================================= */
 
@@ -4378,6 +4485,15 @@ thead.sticky-top {
     background: linear-gradient(135deg, #495057 0%, #3c4248 100%);
 }
 
+[data-bs-theme="dark"] .btn-ir-galeria-video {
+    background: linear-gradient(135deg, #3c4248 0%, #495057 100%);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-bs-theme="dark"] .btn-ir-galeria-video:hover {
+    background: linear-gradient(135deg, #495057 0%, #3c4248 100%);
+}
+
 /* ===== SISTEMA DUAL DE SUBIDA ===== */
 [data-bs-theme="dark"] .preview-container {
     background: #343a40;
@@ -5002,13 +5118,14 @@ thead.sticky-top {
     transform: translateY(-2px);
 }
 
-/* Zona del thumbnail / player */
+/* Zona del thumbnail / player — clickeable */
 .video-card .video-thumb-wrapper {
     position: relative;
     background-color: #000;
     aspect-ratio: 16 / 9;
     overflow: hidden;
     border-radius: 0.75rem 0.75rem 0 0;
+    cursor: pointer;
 }
 
 .video-card .video-thumb-wrapper video,
@@ -5017,6 +5134,106 @@ thead.sticky-top {
     height: 100%;
     object-fit: cover;
     display: block;
+    transition: transform 0.25s ease;
+}
+
+/* Zoom suave en la imagen al hover del wrapper */
+.video-card .video-thumb-wrapper:hover img,
+.video-card .video-thumb-wrapper:hover video {
+    transform: scale(1.04);
+}
+
+/* Placeholder cuando no hay thumbnail */
+.video-thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background-color: #111;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 2.5rem;
+}
+
+/* Overlay oscuro + botón play (aparece en hover del wrapper) */
+.video-play-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0);
+    transition: background-color 0.2s ease;
+}
+
+.video-card .video-thumb-wrapper:hover .video-play-overlay {
+    background-color: rgba(0, 0, 0, 0.35);
+}
+
+/* Botón play circular con efecto glass */
+.play-btn-circle {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.4rem;
+    opacity: 0;
+    transform: scale(0.75);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.play-btn-circle .bi-play-fill {
+    /* El ícono de play tiene un ligero desfase óptico hacia la izquierda */
+    margin-left: 3px;
+}
+
+.video-card .video-thumb-wrapper:hover .play-btn-circle {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Badge de duración (esquina inferior derecha del thumbnail) */
+.video-duration-badge {
+    position: absolute;
+    bottom: 6px;
+    right: 7px;
+    background: rgba(0, 0, 0, 0.78);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    padding: 0.15rem 0.45rem;
+    border-radius: 0.3rem;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+/* Fila de metadata compacta: tamaño · autor · fecha */
+.video-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.1rem 0.65rem;
+    font-size: 0.75rem;
+    margin-top: 0.35rem;
+}
+
+.video-meta-row span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+.video-meta-row .bi {
+    font-size: 0.8rem;
+    opacity: 0.7;
 }
 
 /* Badge de tipo (ingreso, diagnóstico, etc.) */
@@ -5027,6 +5244,12 @@ thead.sticky-top {
     text-transform: uppercase;
     padding: 0.25rem 0.55rem;
     border-radius: 0.4rem;
+}
+
+/* Ícono de estado vacío — sin inline style */
+.video-empty-icon {
+    font-size: 3rem;
+    display: block;
 }
 
 /* Preview de archivo antes de subir */
@@ -5075,8 +5298,9 @@ thead.sticky-top {
     background-color: var(--border-color);
 }
 
+/* Fix: sin gradiente en modo oscuro (gradientes = prohibidos en AGENTS.md) */
 [data-bs-theme="dark"] .modal-header-video {
-    background: linear-gradient(135deg, #1e3a5f 0%, #0d4a3a 100%);
+    background: #0d2137;
 }
 
 /* =============================================================================

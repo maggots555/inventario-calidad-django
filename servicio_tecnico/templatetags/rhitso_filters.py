@@ -722,3 +722,30 @@ def es_email_valido(email):
     # Django ya validó el formato de email en el modelo (EmailField)
     # así que podemos confiar en que es un formato válido
     return True
+
+
+@register.filter
+def duracion(segundos):
+    """
+    Convierte un número de segundos a formato M:SS legible.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    ================================
+    Este filtro convierte la duración de un video (guardada como número entero
+    de segundos) al formato visual que aparece en YouTube: minutos:segundos.
+
+    Ejemplo de uso en template:
+        {{ video.duracion_segundos|duracion }}  →  "2:34"
+
+    divmod(142, 60) devuelve (2, 22) → "2:22"
+    El :02d asegura que los segundos siempre tengan dos dígitos: "2:05" no "2:5"
+
+    Si el valor es None o 0, retorna '' para que el badge no aparezca.
+    """
+    if not segundos:
+        return ''
+    try:
+        m, s = divmod(int(segundos), 60)
+        return f"{m}:{s:02d}"
+    except (ValueError, TypeError):
+        return ''

@@ -2651,21 +2651,41 @@
                                 <div class="col-md-4 col-sm-6">
                                     <div class="video-card" data-video-id="{{ video.pk }}">
 
-                                        <!-- Thumbnail / player -->
-                                        <div class="video-thumb-wrapper">
+                                        <!-- Thumbnail con overlay de reproducción y badge de duración -->
+                                        <div class="video-thumb-wrapper"
+                                             onclick="abrirModalVideo('{{ video.video.url }}', '{{ video.get_tipo_display }}')"
+                                             role="button"
+                                             title="Ver video">
+
                                             {% if video.thumbnail %}
                                                 <img src="{{ video.thumbnail.url }}"
                                                      alt="Thumbnail {{ video.get_tipo_display }}"
                                                      loading="lazy">
                                             {% else %}
-                                                <div class="d-flex align-items-center justify-content-center h-100 bg-dark text-white">
-                                                    <i class="bi bi-camera-video fs-1"></i>
+                                                <div class="video-thumb-placeholder">
+                                                    <i class="bi bi-camera-video"></i>
                                                 </div>
                                             {% endif %}
+
+                                            <!-- Overlay con botón play (visible en hover) -->
+                                            <div class="video-play-overlay">
+                                                <div class="play-btn-circle">
+                                                    <i class="bi bi-play-fill"></i>
+                                                </div>
+                                            </div>
+
+                                            <!-- Badge de duración (esquina inferior derecha) -->
+                                            {% if video.duracion_segundos %}
+                                            <span class="video-duration-badge">
+                                                {{ video.duracion_segundos|duracion }}
+                                            </span>
+                                            {% endif %}
+
                                         </div>
 
                                         <!-- Info del video -->
                                         <div class="p-2">
+                                            <!-- Fila: tipo + compresión -->
                                             <div class="d-flex align-items-start justify-content-between gap-1 mb-1">
                                                 <span class="video-tipo-badge bg-primary text-white">
                                                     {{ video.get_tipo_display }}
@@ -2676,29 +2696,45 @@
                                                 </span>
                                                 {% endif %}
                                             </div>
+
+                                            <!-- Descripción truncada (si existe) -->
                                             {% if video.descripcion %}
                                             <p class="small text-muted mb-1 text-truncate" title="{{ video.descripcion }}">
                                                 {{ video.descripcion }}
                                             </p>
                                             {% endif %}
-                                            <small class="text-muted d-block">
-                                                <i class="bi bi-person-circle"></i> {{ video.subido_por.nombre_completo }}
-                                            </small>
-                                            <small class="text-muted d-block">
-                                                <i class="bi bi-calendar3"></i> {{ video.fecha_subida|date:"d/m/Y H:i" }}
-                                            </small>
+
+                                            <!-- Metadata compacta: tamaño · autor · fecha -->
+                                            <div class="video-meta-row text-muted">
+                                                {% if video.tamano_final_mb %}
+                                                <span title="Tamaño del archivo">
+                                                    <i class="bi bi-file-earmark-play"></i> {{ video.tamano_final_mb }} MB
+                                                </span>
+                                                {% endif %}
+                                                <span title="Subido por">
+                                                    <i class="bi bi-person"></i> {{ video.subido_por.nombre_completo }}
+                                                </span>
+                                                <span title="Fecha de subida">
+                                                    <i class="bi bi-clock"></i> {{ video.fecha_subida|date:"d/m H:i" }}
+                                                </span>
+                                            </div>
                                         </div>
 
                                         <!-- Botones de acción -->
                                         <div class="d-flex gap-1 p-2 pt-0">
-                                            <!-- Ver video — modal in-app (no _blank, no rompe el PWA) -->
                                             <button type="button"
                                                     class="btn btn-sm btn-outline-primary flex-fill"
                                                     title="Ver video"
                                                     onclick="abrirModalVideo('{{ video.video.url }}', '{{ video.get_tipo_display }}')">
                                                 <i class="bi bi-play-circle me-1"></i>Ver
                                             </button>
-                                            <!-- Eliminar -->
+                                            <!-- Descargar video directamente al dispositivo -->
+                                            <a href="{{ video.video.url }}"
+                                               download
+                                               class="btn btn-sm btn-outline-secondary"
+                                               title="Descargar video">
+                                                <i class="bi bi-download"></i>
+                                            </a>
                                             {% if perms.servicio_tecnico.delete_videoorden %}
                                             <button type="button"
                                                     class="btn btn-sm btn-outline-danger"
@@ -2719,7 +2755,7 @@
                             </div>
                             {% else %}
                             <div class="text-center text-muted py-5">
-                                <i class="bi bi-camera-video" style="font-size: 3rem;"></i>
+                                <i class="bi bi-camera-video video-empty-icon"></i>
                                 <p class="mt-2">No hay videos de {{ tipo }} aún.</p>
                             </div>
                             {% endif %}
@@ -5131,6 +5167,11 @@
     <i class="bi bi-camera"></i>
 </button>
 
+<!-- Botón flotante para ir a galería de videos -->
+<button id="btnIrGaleriaVideo" class="btn-ir-galeria-video" aria-label="Ir a Galería de Videos" title="Ver galería de videos">
+    <i class="bi bi-camera-video"></i>
+</button>
+
 <!-- ============================================================ -->
 <!-- MODAL: CONFIRMACIÓN DE SALIDA DE CÁMARA CON FOTOS PENDIENTES -->
 <!-- ============================================================ -->
@@ -7351,6 +7392,62 @@ document.addEventListener('DOMContentLoaded', function() {
             seccionGaleria.classList.add('highlight-section');
             setTimeout(() => {
                 seccionGaleria.classList.remove('highlight-section');
+            }, 2000);
+        }, 500); // Esperar a que termine el scroll
+    });
+});
+</script>
+
+<!-- ============================================================
+    BOTÓN FLOTANTE — IR A GALERÍA DE VIDEOS
+    FUNCIONALIDADES:
+    - Aparece cuando se ha scrolleado 300px y la galería de videos
+      no está visible en el viewport
+    - Se oculta automáticamente cuando la galería de videos está visible
+    - Scroll suave animado con efecto de highlight en destino
+    - Ocupa el tercer nivel en la pila de botones flotantes
+    ============================================================ -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnIrGaleriaVideo = document.getElementById('btnIrGaleriaVideo');
+    const seccionGaleriaVideo = document.getElementById('galeria-videos');
+
+    if (!btnIrGaleriaVideo || !seccionGaleriaVideo) return;
+
+    // Función para verificar si la galería de videos está visible en viewport
+    function verificarVisibilidadGaleriaVideo() {
+        const rect = seccionGaleriaVideo.getBoundingClientRect();
+        const galeriaVisible = rect.top < window.innerHeight && rect.bottom > 0;
+
+        if (galeriaVisible) {
+            btnIrGaleriaVideo.classList.remove('visible');
+        } else if (window.scrollY > 300) {
+            // Solo mostrar si hemos scrolleado al menos 300px
+            btnIrGaleriaVideo.classList.add('visible');
+        } else {
+            btnIrGaleriaVideo.classList.remove('visible');
+        }
+    }
+
+    // Verificar al hacer scroll
+    window.addEventListener('scroll', verificarVisibilidadGaleriaVideo);
+
+    // Verificar al cargar la página
+    setTimeout(verificarVisibilidadGaleriaVideo, 100);
+
+    // Acción al hacer click: scroll suave a la galería de videos
+    btnIrGaleriaVideo.addEventListener('click', function() {
+        seccionGaleriaVideo.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+            inline: 'nearest'
+        });
+
+        // Efecto visual: resaltar brevemente la galería al llegar
+        setTimeout(function() {
+            seccionGaleriaVideo.classList.add('highlight-section');
+            setTimeout(() => {
+                seccionGaleriaVideo.classList.remove('highlight-section');
             }, 2000);
         }, 500); // Esperar a que termine el scroll
     });

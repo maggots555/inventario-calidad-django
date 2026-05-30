@@ -3702,7 +3702,30 @@ def comprimir_video_evidencia_task(
         subprocess.run(cmd_thumb, capture_output=True, timeout=30)
 
         # =====================================================================
-        # PASO 6: CREAR REGISTRO VideoOrden EN LA BASE DE DATOS
+        # PASO 6: MEDIR DURACIÓN CON FFPROBE
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # ffprobe lee los metadatos del video comprimido para obtener su duración
+        # exacta en segundos. Si falla por cualquier motivo, simplemente guarda
+        # None — no es un error crítico.
+        # =====================================================================
+        duracion_segundos = None
+        try:
+            cmd_probe = [
+                'ffprobe', '-v', 'error',
+                '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                tmp_out_path,
+            ]
+            resultado_probe = subprocess.run(
+                cmd_probe, capture_output=True, text=True, timeout=10
+            )
+            if resultado_probe.returncode == 0:
+                duracion_segundos = int(float(resultado_probe.stdout.strip()))
+        except Exception:
+            pass  # No crítico — el video se guarda igualmente sin duración
+
+        # =====================================================================
+        # PASO 7: CREAR REGISTRO VideoOrden EN LA BASE DE DATOS
         # video_orden.save() llama al override del modelo que registra el historial
         # =====================================================================
         tamano_original_mb = round(tamano_bytes / (1024 * 1024), 2)
@@ -3715,6 +3738,7 @@ def comprimir_video_evidencia_task(
             subido_por=empleado,
             tamano_original_mb=tamano_original_mb,
             tamano_final_mb=tamano_final_mb,
+            duracion_segundos=duracion_segundos,
         )
 
         with open(tmp_out_path, 'rb') as f_video:
