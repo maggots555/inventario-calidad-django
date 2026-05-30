@@ -2754,6 +2754,37 @@ input[readonly].form-control:focus {
     background: #fef2f2;
 }
 
+/* ── Wrapper de contenido de la notificación ── */
+/* Con URL: es un <a> que hace que toda la notif sea navegable */
+/* Sin URL: es un <div> estático (comportamiento original)     */
+.notif-link {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+.notif-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+/* Variante estática: misma maquetación pero sin cursor de mano */
+.notif-link--static {
+    cursor: default;
+}
+
+[data-bs-theme="dark"] .notif-link {
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .notif-link:hover {
+    color: var(--text-primary);
+}
+
 /* ── Animación de remoción ── */
 .notif-removing {
     opacity: 0;

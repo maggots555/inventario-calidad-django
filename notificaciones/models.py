@@ -93,6 +93,18 @@ class Notificacion(models.Model):
         help_text="Módulo Django que generó la notificación (ej: servicio_tecnico)"
     )
 
+    # ── URL de destino (opcional) ──
+    # EXPLICACIÓN: Si se rellena este campo, al hacer clic en la notificación
+    # de la campanita el usuario navega a esa URL. Útil para llevar al técnico
+    # directamente a la orden o recurso relacionado con la notificación.
+    url = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True,
+        verbose_name="URL de destino",
+        help_text="Si se especifica, al pulsar la notificación el usuario navega a esta URL"
+    )
+
     class Meta:
         verbose_name = "Notificación"
         verbose_name_plural = "Notificaciones"

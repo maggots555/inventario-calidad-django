@@ -289,8 +289,14 @@ class PanelNotificaciones {
             var _a;
             const cfg = (_a = TIPO_CONFIG[n.tipo]) !== null && _a !== void 0 ? _a : TIPO_CONFIG['info'];
             const claseLeida = n.leida ? 'notif-leida' : 'notif-nueva';
-            return `
-                <li class="notif-item ${claseLeida}" data-id="${n.id}">
+            /*
+             * Si la notificación tiene URL, envolvemos el contenido en un <a>
+             * para que sea navegable al pulsar. El botón de eliminar queda fuera
+             * del <a> para no interferir con la navegación.
+             * Si no hay URL, el contenido es solo un <div> estático (comportamiento
+             * original — compatible con todas las notificaciones existentes).
+             */
+            const contenidoHtml = `
                     <div class="notif-icono">${cfg.icono}</div>
                     <div class="notif-contenido">
                         <div class="notif-titulo ${cfg.clase}">${this.escaparHtml(n.titulo)}</div>
@@ -299,7 +305,13 @@ class PanelNotificaciones {
                             ${n.app ? `<span class="notif-app">${this.escaparHtml(n.app)}</span>` : ''}
                             <span class="notif-fecha">${this.escaparHtml(n.fecha)}</span>
                         </div>
-                    </div>
+                    </div>`;
+            const innerHtml = n.url
+                ? `<a href="${this.escaparHtml(n.url)}" class="notif-link">${contenidoHtml}</a>`
+                : `<div class="notif-link notif-link--static">${contenidoHtml}</div>`;
+            return `
+                <li class="notif-item ${claseLeida}" data-id="${n.id}">
+                    ${innerHtml}
                     <button class="notif-btn-eliminar" data-id="${n.id}" title="Eliminar notificación">
                         <i class="bi bi-x-lg"></i>
                     </button>

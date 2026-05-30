@@ -118,6 +118,7 @@ def obtener_notificaciones(request):
                     'leida':  n.leida,
                     'fecha':  n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
                     'app':    n.app_origen or '',
+                    'url':    n.url or '',
                 }
                 for n in notificaciones
             ]
