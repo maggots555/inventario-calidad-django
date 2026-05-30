@@ -2176,7 +2176,7 @@ def detalle_orden(request, orden_id):
         #   4. Celery comprime en segundo plano y notifica al usuario cuando termina
         #      (campanita siempre + push si el usuario tiene suscripciones activas)
         elif form_type == 'subir_video':
-            import tempfile
+            import uuid as _uuid_video
             logger.info(f"🎥 Video recibido para Orden {orden.numero_orden_interno} — encolando en Celery")
 
             # Verificar que llegó el archivo
@@ -2200,20 +2200,21 @@ def detalle_orden(request, orden_id):
             descripcion = form_video.cleaned_data.get('descripcion', '')
             video_file  = form_video.cleaned_data['video']  # ya validado por clean_video()
 
-            # ── Guardar el archivo crudo en /tmp para que Celery lo acceda ────────
-            # IMPORTANTE: delete=False es necesario — sin esto Python borraría el
-            # archivo al cerrar el context manager, antes de que Celery lo procese.
+            # ── Guardar el archivo crudo en MEDIA_ROOT/video_tmp/ ────────────────
+            # IMPORTANTE: Usamos MEDIA_ROOT en lugar de /tmp porque los archivos
+            # en /tmp se limpian periódicamente por el SO (systemd-tmpfiles-clean).
+            # Si Celery tarda en procesar, el archivo de /tmp ya no existe.
+            # MEDIA_ROOT es un directorio persistente al que el worker Celery tiene acceso.
             # La tarea Celery es responsable de borrar el archivo en su bloque finally.
             try:
                 extension_entrada = os.path.splitext(video_file.name)[1].lower() or '.webm'
-                with tempfile.NamedTemporaryFile(
-                    suffix=extension_entrada,
-                    prefix='sigmavideo_',
-                    delete=False
-                ) as tmp_in:
+                video_tmp_dir = os.path.join(settings.MEDIA_ROOT, 'video_tmp')
+                os.makedirs(video_tmp_dir, exist_ok=True)
+                nombre_tmp = f"sigmavideo_{_uuid_video.uuid4().hex[:8]}{extension_entrada}"
+                archivo_tmp_path = os.path.join(video_tmp_dir, nombre_tmp)
+                with open(archivo_tmp_path, 'wb') as tmp_in:
                     for chunk in video_file.chunks():
                         tmp_in.write(chunk)
-                    archivo_tmp_path = tmp_in.name
             except Exception as e:
                 logger.error(f"❌ No se pudo guardar video en /tmp: {e}")
                 return JsonResponse({
