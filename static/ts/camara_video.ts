@@ -76,9 +76,20 @@ const CV_AVISOS: Record<string, { clase: string; texto: string }> = {
 /** Estados posibles de la máquina de estados de la grabadora */
 type EstadoCamaraVideo = 'idle' | 'grabando' | 'preview' | 'subiendo';
 
+/**
+ * Representa un dispositivo de cámara trasera detectado por enumerateDevices().
+ * Simplificado respecto a camara_integrada.ts: solo traseras, sin frontal.
+ * Nombre distinto (CvDispositivo) para evitar conflicto con DispositivoCamara de camara_integrada.ts.
+ */
+interface CvDispositivo {
+    deviceId: string;
+    label:    string;
+}
+
 /** Respuesta JSON del backend al subir un video (mismo shape que upload_video.ts) */
 interface CvVideoUploadResponse {
     success: boolean;
+    task_queued?: boolean;  // true cuando el video se encoló en Celery (flujo asíncrono)
     message?: string;
     error?: string;
     form_errors?: Record<string, string[]>;
@@ -168,6 +179,15 @@ class CamaraVideo {
     private videoBlob: Blob | null = null;
     private estado: EstadoCamaraVideo = 'idle';
 
+    // ── Selector de lentes ──
+    // Detectados via enumerateDevices(). Solo cámaras traseras.
+    // Si el dispositivo no expone múltiples lentes, dispositivosCamara tendrá
+    // un solo elemento y el selector permanecerá oculto (igual que en fotos).
+    private dispositivosCamara:  CvDispositivo[] = [];
+    private dispositivoActualId: string | null = null;
+    private botonesLenteCache:   Map<string, HTMLButtonElement> = new Map();
+    private selectorLentesEl:    HTMLElement | null = null;
+
     // ── Cronómetro de grabación ───────────────────────────────────────────────
     private tiempoInicioMs = 0;          // Date.now() cuando arranca la grabación
     private intervaloTiempo: ReturnType<typeof setInterval> | null = null;
@@ -221,6 +241,7 @@ class CamaraVideo {
         this.mensajeError       = document.getElementById('cvMensajeError');
         this.errorContTop       = document.getElementById('cvErrorContTop');
         this.mensajeErrorTop    = document.getElementById('cvMensajeErrorTop');
+        this.selectorLentesEl   = document.getElementById('cvSelectorLentes');
 
         this.registrarEventos();
     }
@@ -279,28 +300,25 @@ class CamaraVideo {
     private async activarCamara(): Promise<void> {
         this.ocultarError();
         try {
-            /*
-             * EXPLICACIÓN:
-             * facingMode: { ideal: 'environment' } solicita la cámara trasera.
-             * Usamos 'ideal' en lugar de 'exact' para mayor compatibilidad:
-             * - 'exact' falla en dispositivos sin cámara trasera (escritorio, portátiles)
-             * - 'ideal' permite que el navegador use la mejor disponible
-             * Resolución: 1280×720 (el servidor lo trunca a 720p igualmente)
-             */
-            this.stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: { ideal: 'environment' },
-                    width:  { ideal: 1920 },
-                    height: { ideal: 1080 },
-                },
-                audio: true,
-            });
+            // PASO 1: Detectar lentes disponibles (enumerateDevices + permisos).
+            // En teléfonos con múltiples lentes rellena dispositivosCamara[].
+            // En teléfonos de un solo lente deja el array con un elemento → selector oculto.
+            await this.detectarDispositivosCamara();
+
+            // PASO 2: Abrir stream con deviceId exacto si hay lente seleccionado,
+            // o con facingMode como fallback (misma calidad y audio que antes).
+            this.stream = await navigator.mediaDevices.getUserMedia(
+                this.construirConstraintsVideo()
+            );
 
             if (this.videoEl) {
                 this.videoEl.srcObject = this.stream;
                 this.videoEl.muted     = true;   // Sin eco en el preview en vivo
                 this.videoEl.controls  = false;
             }
+
+            // PASO 3: Mostrar selector de lentes si hay múltiples cámaras traseras
+            this.actualizarSelectorLentes();
 
             // Activar tap-to-focus (solo en dispositivos que lo soporten)
             this.configurarTapToFocus();
@@ -333,10 +351,18 @@ class CamaraVideo {
         try {
             this.recorder = new MediaRecorder(this.stream, {
                 mimeType: tipoMime || undefined,
+                // EXPLICACIÓN PARA PRINCIPIANTES:
+                // Sin este parámetro, Chrome graba el audio Opus a ~32 kbps
+                // (prioriza tamaño de archivo sobre calidad).
+                // Con 128 kbps el audio queda limpio y sin distorsión.
+                audioBitsPerSecond: 128000,
             });
         } catch {
-            // Fallback sin especificar mimeType — el navegador elige el predeterminado
-            this.recorder = new MediaRecorder(this.stream);
+            // Fallback sin especificar mimeType — el navegador elige el predeterminado.
+            // audioBitsPerSecond se mantiene para no perder calidad de audio.
+            this.recorder = new MediaRecorder(this.stream, {
+                audioBitsPerSecond: 128000,
+            });
         }
 
         /*
@@ -486,8 +512,40 @@ class CamaraVideo {
             try {
                 const data: CvVideoUploadResponse = JSON.parse(xhr.responseText);
                 if (data.success) {
-                    // Éxito — recargar la página para mostrar el video en la galería
-                    setTimeout(() => window.location.reload(), 1200);
+                    if (data.task_queued) {
+                        /*
+                         * FLUJO ASÍNCRONO (Celery):
+                         * El servidor guardó el archivo en /tmp y encoló la compresión.
+                         * Ya no esperamos a FFmpeg en el request — el usuario recibirá
+                         * una notificación por campanita (y push si está suscrito)
+                         * cuando el video esté listo.
+                         *
+                         * UX: actualizamos el spinner de FFmpeg para mostrar el estado
+                         * de "en cola", y cerramos el modal después de 3 segundos.
+                         */
+                        if (this.contFFmpeg) {
+                            this.contFFmpeg.innerHTML = `
+                                <div class="text-center py-3">
+                                    <i class="bi bi-check-circle-fill text-success d-block mb-2" style="font-size:2rem;"></i>
+                                    <p class="mb-1 fw-semibold">Video recibido</p>
+                                    <p class="text-muted small mb-0">
+                                        Procesando en segundo plano…<br>
+                                        Recibirás una notificación cuando esté listo.
+                                    </p>
+                                </div>
+                            `;
+                            this.contFFmpeg.style.display = 'block';
+                        }
+                        // Cerrar el modal automáticamente para que el técnico
+                        // pueda seguir trabajando — la campanita avisará cuando termine
+                        setTimeout(() => {
+                            if (this.bsModal) this.bsModal.hide();
+                        }, 3000);
+                    } else {
+                        // FLUJO SÍNCRONO LEGADO: respuesta con video_id listo
+                        // (compatibilidad hacia atrás por si se necesita en el futuro)
+                        setTimeout(() => window.location.reload(), 1200);
+                    }
                 } else {
                     this.setEstado('preview');
                     this.mostrarError(data.error || 'Error desconocido al guardar el video.');
@@ -712,6 +770,9 @@ class CamaraVideo {
         if (this.descripcionInput) {
             this.descripcionInput.disabled = nuevoEstado === 'subiendo';
         }
+
+        // Selector de lentes: solo visible en idle con múltiples cámaras
+        this.actualizarSelectorLentes();
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -801,6 +862,192 @@ class CamaraVideo {
             this.videoEl.src       = '';
             this.videoEl.srcObject = null;
         }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // SELECTOR DE LENTES — detectar, construir constraints, renderizar botones
+    // Mismo patrón que CamaraIntegrada, simplificado: solo cámaras traseras.
+    // ────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Detecta todas las cámaras traseras disponibles mediante enumerateDevices().
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * El navegador no lista cámaras hasta que el usuario concede permiso.
+     * Por eso abrimos un stream temporal SOLO de video (sin audio) para forzar
+     * el prompt de permisos, luego lo cerramos inmediatamente. A partir de ese
+     * momento enumerateDevices() devuelve los labels reales de cada cámara.
+     *
+     * En teléfonos con múltiples lentes (Samsung, Pixel, etc.) aparecerán varios
+     * 'videoinput'. En teléfonos que no exponen lentes individualmente solo
+     * aparecerá uno — en ese caso el selector queda oculto automáticamente.
+     */
+    private async detectarDispositivosCamara(): Promise<void> {
+        let streamTemporal: MediaStream | null = null;
+        try {
+            // Stream temporal solo para obtener permisos — SIN audio para no
+            // interferir con el stream principal que sí lleva audio.
+            streamTemporal = await navigator.mediaDevices.getUserMedia({ video: true });
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const camaras  = devices.filter(d => d.kind === 'videoinput');
+
+            this.dispositivosCamara = [];
+
+            for (const camara of camaras) {
+                const label = camara.label.toLowerCase();
+
+                // Excluir cámaras frontales explícitas
+                const esFrontal = label.includes('front') ||
+                                  label.includes('user')  ||
+                                  label.includes('selfie') ||
+                                  label.includes('facing front');
+
+                if (!esFrontal) {
+                    this.dispositivosCamara.push({
+                        deviceId: camara.deviceId,
+                        label:    camara.label,
+                    });
+                }
+            }
+
+            // Si no se pudo clasificar ninguna como trasera, usar todas (fallback)
+            if (this.dispositivosCamara.length === 0) {
+                this.dispositivosCamara = camaras.map(c => ({
+                    deviceId: c.deviceId,
+                    label:    c.label,
+                }));
+            }
+
+            // Seleccionar la primera cámara trasera si aún no hay una elegida
+            if (!this.dispositivoActualId && this.dispositivosCamara.length > 0) {
+                this.dispositivoActualId = this.dispositivosCamara[0].deviceId;
+            }
+
+        } catch {
+            // Si falla enumerateDevices, simplemente se usará facingMode como fallback
+            this.dispositivosCamara  = [];
+            this.dispositivoActualId = null;
+        } finally {
+            if (streamTemporal) {
+                streamTemporal.getTracks().forEach(t => t.stop());
+                streamTemporal = null;
+            }
+        }
+    }
+
+    /**
+     * Construye los MediaStreamConstraints para el grabador de video.
+     * Usa deviceId exacto si hay un lente seleccionado; facingMode como fallback.
+     */
+    private construirConstraintsVideo(): MediaStreamConstraints {
+        const videoConstraints: MediaTrackConstraints = {
+            width:     { ideal: 1280 },
+            height:    { ideal: 720 },
+            frameRate: { ideal: 60 },
+        };
+
+        if (this.dispositivoActualId) {
+            videoConstraints.deviceId = { exact: this.dispositivoActualId };
+        } else {
+            videoConstraints.facingMode = { ideal: 'environment' };
+        }
+
+        return {
+            video: videoConstraints,
+            audio: {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl:  false,
+            },
+        };
+    }
+
+    /**
+     * Genera o actualiza los botones del selector de lentes en el DOM.
+     * Solo visible en estado 'idle' con múltiples cámaras traseras disponibles.
+     */
+    private actualizarSelectorLentes(): void {
+        if (!this.selectorLentesEl) return;
+
+        // Ocultar si no hay múltiples lentes o si no estamos en idle
+        if (this.dispositivosCamara.length <= 1 || this.estado !== 'idle') {
+            this.selectorLentesEl.style.display = 'none';
+            return;
+        }
+
+        this.selectorLentesEl.style.display = 'flex';
+
+        // Si los botones ya están en cache y el count no cambió, solo actualizar active
+        if (this.botonesLenteCache.size === this.dispositivosCamara.length) {
+            this.botonesLenteCache.forEach((btn, deviceId) => {
+                btn.classList.toggle('active', deviceId === this.dispositivoActualId);
+            });
+            return;
+        }
+
+        // Primera vez o cambio en la cantidad de cámaras: reconstruir desde cero
+        this.selectorLentesEl.innerHTML = '';
+        this.botonesLenteCache.clear();
+
+        const fragment = document.createDocumentFragment();
+
+        this.dispositivosCamara.forEach((camara, index) => {
+            const btn       = document.createElement('button');
+            btn.type        = 'button';
+            btn.className   = 'btn btn-sm btn-lente';
+            btn.title       = camara.label;
+            btn.classList.toggle('active', camara.deviceId === this.dispositivoActualId);
+
+            const { icono, texto } = this.obtenerInfoLente(camara.label, index);
+            btn.innerHTML = `<i class="bi ${icono}"></i> ${texto}`;
+
+            btn.addEventListener('click', () => void this.cambiarADispositivo(camara.deviceId));
+
+            this.botonesLenteCache.set(camara.deviceId, btn);
+            fragment.appendChild(btn);
+        });
+
+        this.selectorLentesEl.appendChild(fragment);
+    }
+
+    /**
+     * Clasifica el lente por su label para asignarle un icono y texto descriptivo.
+     * Mismo criterio que CamaraIntegrada.
+     */
+    private obtenerInfoLente(label: string, index: number): { icono: string; texto: string } {
+        const l = label.toLowerCase();
+        if (l.includes('ultra') || l.includes('wide') || l.includes('0.5')) {
+            return { icono: 'bi-arrows-angle-expand', texto: '0.5x' };
+        }
+        if (l.includes('tele') || l.includes('zoom') || l.includes('2x') || l.includes('3x')) {
+            return { icono: 'bi-zoom-in', texto: '2x' };
+        }
+        if (l.includes('macro')) {
+            return { icono: 'bi-flower1', texto: 'Macro' };
+        }
+        return { icono: 'bi-camera', texto: `Lente ${index + 1}` };
+    }
+
+    /**
+     * Cambia al lente indicado por deviceId.
+     * Solo opera en estado 'idle' — no interrumpe una grabación en curso.
+     */
+    private async cambiarADispositivo(deviceId: string): Promise<void> {
+        if (this.estado !== 'idle') return;
+
+        const existe = this.dispositivosCamara.some(d => d.deviceId === deviceId);
+        if (!existe) return;
+
+        this.dispositivoActualId = deviceId;
+
+        // Detener el stream actual antes de abrir el nuevo
+        if (this.stream) {
+            this.stream.getTracks().forEach(t => t.stop());
+            this.stream = null;
+        }
+
+        await this.activarCamara();
     }
 
     // ────────────────────────────────────────────────────────────────────────

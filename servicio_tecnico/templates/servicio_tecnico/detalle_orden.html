@@ -4871,7 +4871,7 @@
             <!-- ── Header ── -->
             <div class="modal-header modal-header-camera text-white">
                 <h5 class="modal-title" id="modalCamaraVideoLabel">
-                    <i class="bi bi-record-circle-fill me-1" style="color:#ef4444;"></i>
+                    <i class="bi bi-record-circle-fill me-1 cv-header-rec-icon"></i>
                     Grabar Video
                 </h5>
                 <button type="button"
@@ -5032,10 +5032,15 @@
                     <!-- Error de cámara/permisos (idle/grabando): flota en la parte superior del visor -->
                     <div id="cvErrorContTop"
                          class="cv-error-top"
+
                          style="display:none;">
                         <i class="bi bi-exclamation-triangle-fill me-1"></i>
                         <span id="cvMensajeErrorTop"></span>
                     </div>
+
+                    <!-- Selector de lentes — visible solo en estado idle, oculto si hay ≤1 cámara trasera -->
+                    <!-- Los botones se generan dinámicamente desde camara_video.ts -->
+                    <div id="cvSelectorLentes" class="camera-lens-selector" style="display:none;"></div>
 
                 </div><!-- /camera-viewer-container -->
 

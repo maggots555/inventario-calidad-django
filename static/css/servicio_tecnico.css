@@ -5556,22 +5556,24 @@ thead.sticky-top {
 /* ── Botón de grabar (idle) ── */
 
 /*
- * Circular, rojo sólido.
- * Mismo diámetro que .btn-capture para mantener la simetría visual.
- * El ícono de punto (bi-record-circle) indica "listo para grabar".
+ * Mismo lenguaje visual que .btn-capture de la cámara de fotos:
+ * fondo transparente + borde rojo + backdrop-filter blur (glass).
+ * El ícono rojo dentro del círculo transparente indica "listo para grabar".
  */
 .cv-btn-record {
     width: 68px;
     height: 68px;
     border-radius: 50%;
-    background: #ef4444;
+    background: transparent;
     border: 3px solid #ef4444;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5);
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.35);
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
@@ -5581,49 +5583,53 @@ thead.sticky-top {
 
 .cv-btn-record i {
     font-size: 2rem;
-    color: white;
+    color: #ef4444;
 }
 
 .cv-btn-record:hover {
-    background: #f87171;
+    background: rgba(239, 68, 68, 0.15);
     border-color: #f87171;
-    box-shadow: 0 6px 28px rgba(239, 68, 68, 0.7);
+    box-shadow: 0 6px 28px rgba(239, 68, 68, 0.55);
     transform: scale(1.05);
 }
 
 .cv-btn-record:active {
-    transform: scale(0.9);
-    background: #dc2626;
+    transform: scale(0.88);
+    background: rgba(239, 68, 68, 0.25);
+    border-color: #ef4444;
 }
 
 /* ── Botón de detener (grabando) ── */
 
 /*
- * Cuadrado redondeado, blanco pulsante.
- * El pulso visual refuerza que "hay algo en curso" (grabando).
+ * Cuadrado redondeado (border-radius 14px = símbolo universal de stop)
+ * con el mismo efecto glass: fondo semitransparente + blur.
+ * El pulso visual refuerza que hay algo en curso (grabando).
  */
 .cv-btn-stop {
     width: 68px;
     height: 68px;
-    border-radius: 14px;    /* Cuadrado con esquinas redondeadas = símbolo de stop */
-    background: white;
-    border: 3px solid white;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 3px solid rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     animation: cv-stop-pulse 1.4s ease-in-out infinite;
-    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2);
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
     -webkit-user-select: none;
-    color: #ef4444;
+    color: white;
 }
 
 .cv-btn-stop i {
     font-size: 1.8rem;
-    color: #ef4444;
+    color: white;
 }
 
 .cv-btn-stop:active {
@@ -5632,11 +5638,11 @@ thead.sticky-top {
 
 @keyframes cv-stop-pulse {
     0%, 100% {
-        box-shadow: 0 4px 20px rgba(255, 255, 255, 0.4);
+        box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2);
         transform: scale(1);
     }
     50% {
-        box-shadow: 0 6px 30px rgba(255, 255, 255, 0.65);
+        box-shadow: 0 6px 30px rgba(255, 255, 255, 0.45);
         transform: scale(1.06);
     }
 }
@@ -5747,6 +5753,31 @@ thead.sticky-top {
     .cv-tipo-container {
         padding: 0.75rem 0.75rem calc(100px + env(safe-area-inset-bottom, 0px));
     }
+}
+
+/* ── Selector de lentes del grabador de video ──
+ *
+ * A diferencia de la cámara de fotos (donde el selector vive dentro de
+ * .camera-overlay en la parte superior), en el grabador lo colocamos
+ * en la parte inferior del visor — igual que las cámaras nativas de
+ * Android e iOS — para no tapar el stream en vivo.
+ *
+ * Los botones reutilizan .btn-lente y .camera-lens-selector ya definidos.
+ * Solo necesitamos añadir el posicionamiento absoluto propio de este modal.
+ */
+#cvSelectorLentes {
+    position: absolute;
+    bottom: 1.25rem;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    justify-content: center;
+    padding: 0 1rem;
+}
+
+/* Ícono de grabación (●) en el header — rojo sin inline style */
+.cv-header-rec-icon {
+    color: #ef4444;
 }
 
 /* ============================================================
