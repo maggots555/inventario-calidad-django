@@ -372,9 +372,12 @@ class CamaraVideo {
         const formData = new FormData();
         // CSRF token — sin él, Django rechaza el POST con error 403
         const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
-        if (csrfInput) {
-            formData.append('csrfmiddlewaretoken', csrfInput.value);
+        if (!csrfInput) {
+            this.setEstado('preview');
+            this.mostrarError('Error de seguridad: no se encontró el token CSRF. Recarga la página.');
+            return;
         }
+        formData.append('csrfmiddlewaretoken', csrfInput.value);
         formData.append('form_type', 'subir_video');
         formData.append('tipo', tipoRadio.value);
         formData.append('descripcion', ((_b = (_a = this.descripcionInput) === null || _a === void 0 ? void 0 : _a.value) === null || _b === void 0 ? void 0 : _b.trim()) || '');
@@ -750,6 +753,10 @@ class CamaraVideo {
      * aparecerá uno — en ese caso el selector queda oculto automáticamente.
      */
     async detectarDispositivosCamara() {
+        // Si ya detectamos los dispositivos (p. ej. al cambiar de lente), no volver
+        // a abrir un stream temporal — es costoso y no aporta información nueva.
+        if (this.dispositivosCamara.length > 0)
+            return;
         let streamTemporal = null;
         try {
             // Stream temporal solo para obtener permisos — SIN audio para no
@@ -906,8 +913,14 @@ class CamaraVideo {
             return;
         const videoTrack = this.stream.getVideoTracks()[0];
         if (!this.verificarSoporteFocus(videoTrack)) {
-            console.log('⚠️ Dispositivo no soporta tap-to-focus (single-shot no disponible)');
             return;
+        }
+        // Cancelar listeners anteriores ANTES de crear los nuevos.
+        // Sin esto, cada cambio de lente añade un nuevo par de handlers sin quitar
+        // los viejos → múltiples llamadas a enfocarEnPunto por cada toque.
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
         }
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
@@ -921,7 +934,6 @@ class CamaraVideo {
             const touch = e.touches[0];
             void this.enfocarEnPunto({ clientX: touch.clientX, clientY: touch.clientY });
         }, { signal, passive: false });
-        console.log('✅ Tap-to-focus configurado (grabador de video)');
     }
     /** Verifica si el track soporta single-shot focus (necesario para tap-to-focus). */
     verificarSoporteFocus(videoTrack) {
