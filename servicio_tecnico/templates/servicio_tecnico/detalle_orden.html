@@ -5074,10 +5074,6 @@
                         <span id="cvMensajeErrorTop"></span>
                     </div>
 
-                    <!-- Selector de lentes — visible solo en estado idle, oculto si hay ≤1 cámara trasera -->
-                    <!-- Los botones se generan dinámicamente desde camara_video.ts -->
-                    <div id="cvSelectorLentes" class="camera-lens-selector" style="display:none;"></div>
-
                 </div><!-- /camera-viewer-container -->
 
                 <!-- ── Controles inferiores ── -->
@@ -5086,6 +5082,10 @@
                     La máquina de estados en camara_video.ts controla cuál.
                 -->
                 <div class="camera-controls">
+
+                    <!-- Selector de lentes — visible solo en estado idle, oculto si hay ≤1 cámara trasera -->
+                    <!-- Los botones se generan dinámicamente desde camara_video.ts -->
+                    <div id="cvSelectorLentes" class="camera-lens-selector" style="display:none;"></div>
 
                     <!-- Estado idle: botón de grabar -->
                     <div id="cvPanelIdle" class="cv-controls-panel">
