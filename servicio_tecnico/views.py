@@ -2200,6 +2200,16 @@ def detalle_orden(request, orden_id):
             descripcion = form_video.cleaned_data.get('descripcion', '')
             video_file  = form_video.cleaned_data['video']  # ya validado por clean_video()
 
+            # Orientación del dispositivo al grabar (0/90/180/270).
+            # Capturada por el sensor del cliente en camara_video.ts y enviada en el form.
+            # FFmpeg usará este valor para aplicar el transpose correcto al comprimir.
+            try:
+                orientacion_video = int(request.POST.get('orientacion_video', 0))
+                if orientacion_video not in (0, 90, 180, 270):
+                    orientacion_video = 0
+            except (ValueError, TypeError):
+                orientacion_video = 0
+
             # ── Guardar el archivo crudo en MEDIA_ROOT/video_tmp/ ────────────────
             # IMPORTANTE: Usamos MEDIA_ROOT en lugar de /tmp porque los archivos
             # en /tmp se limpian periódicamente por el SO (systemd-tmpfiles-clean).
@@ -2234,6 +2244,7 @@ def detalle_orden(request, orden_id):
                     descripcion=descripcion,
                     empleado_id=empleado_actual.pk,
                     usuario_id=request.user.pk,
+                    orientacion_video=orientacion_video,
                 )
                 logger.info(
                     f"✅ Tarea Celery encolada para video de Orden {orden.numero_orden_interno} "

@@ -3541,6 +3541,7 @@ def comprimir_video_evidencia_task(
     descripcion: str,
     empleado_id: int,
     usuario_id: int,
+    orientacion_video: int = 0,
 ):
     """
     Tarea Celery: comprime un video de evidencia con FFmpeg y guarda el VideoOrden.
@@ -3640,7 +3641,32 @@ def comprimir_video_evidencia_task(
         ffmpeg_bin = shutil.which('ffmpeg') or '/usr/bin/ffmpeg'
 
         # =====================================================================
-        # PASO 4: COMPRIMIR CON FFMPEG
+        # PASO 4: CONSTRUIR FILTRO DE ORIENTACIÓN
+        # El cliente captura la orientación del dispositivo al iniciar la grabación
+        # (screen.orientation + giroscopio) y la envía como 'orientacion_video' (0/90/180/270).
+        #
+        # Muchos teléfonos graban los píxeles en orientación portrait (sensor nativo)
+        # independientemente de cómo se sostenga el celular, y embeben un tag de rotación
+        # en el contenedor. FFmpeg con -map_metadata -1 elimina ese tag sin rotar los píxeles,
+        # dejando el video "de lado". Este filtro corrige los píxeles directamente.
+        #
+        # Mapa de transposes:
+        #   orientacion=0   → portrait normal       → sin transpose
+        #   orientacion=90  → landscape hacia derecha → transpose=1 (rota 90° CW)
+        #   orientacion=270 → landscape hacia izquierda → transpose=2 (rota 90° CCW)
+        #   orientacion=180 → portrait invertido     → hflip + vflip (180°)
+        # =====================================================================
+        if orientacion_video == 90:
+            transpose_prefijo = 'transpose=1,'
+        elif orientacion_video == 270:
+            transpose_prefijo = 'transpose=2,'
+        elif orientacion_video == 180:
+            transpose_prefijo = 'hflip,vflip,'
+        else:
+            transpose_prefijo = ''
+
+        # =====================================================================
+        # PASO 5: COMPRIMIR CON FFMPEG
         # Parámetros idénticos a comprimir_y_guardar_video() en views.py:
         # H.264 + AAC, máx 1080p, CRF 23, preset fast, safety-limit 10 min.
         # =====================================================================
@@ -3649,6 +3675,7 @@ def comprimir_video_evidencia_task(
             '-protocol_whitelist', 'file,pipe,fd',
              '-i', archivo_tmp_path,
              '-vf', (
+                 f"{transpose_prefijo}"
                  "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
                  "scale=trunc(iw/2)*2:trunc(ih/2)*2,"
                  "unsharp=5:5:1.0:5:5:0.0"
@@ -3670,6 +3697,11 @@ def comprimir_video_evidencia_task(
             '-y',
             tmp_out_path,
         ]
+        logger.info(
+            f"[VIDEO-EVIDENCIA] FFmpeg iniciando — Orden {orden.numero_orden_interno} "
+            f"| orientacion={orientacion_video}° "
+            f"| transpose={'sí (' + transpose_prefijo.rstrip(',') + ')' if transpose_prefijo else 'no'}"
+        )
         resultado = subprocess.run(
             cmd_compress,
             capture_output=True,

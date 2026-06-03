@@ -197,6 +197,18 @@ class CamaraVideo {
     private ultimoEnfoque = 0;                               // Timestamp para debounce
     private enfocandoActualmente = false;                    // Flag para evitar solapamientos
 
+    // ── Orientación del dispositivo al grabar ────────────────────────────────
+    // Mismo sistema que CamaraIntegrada: screen.orientation + giroscopio.
+    // El giroscopio corrige el caso de rotation lock activado.
+    // El ángulo se captura en iniciarGrabacion() y se envía al backend para
+    // que FFmpeg aplique el transpose correcto al comprimir el video.
+    private cvOrientacionGrabacion: number = 0;   // 0/90/180/270 al inicio de la grabación
+    private cvScreenAngle: number = 0;             // Último ángulo reportado por screen.orientation
+    private cvDeviceGamma: number | null = null;   // Inclinación izq/der del giroscopio
+    private cvDeviceBeta:  number | null = null;   // Inclinación delante/atrás del giroscopio
+    private cvScreenOrientHandler: (() => void) | null = null;
+    private cvDeviceOrientHandler: ((e: DeviceOrientationEvent) => void) | null = null;
+
     // ────────────────────────────────────────────────────────────────────────
     // CONSTRUCTOR
     // ────────────────────────────────────────────────────────────────────────
@@ -286,6 +298,7 @@ class CamaraVideo {
     async abrir(): Promise<void> {
         if (!this.bsModal) return;
         this.resetearEstado();
+        this.iniciarMonitoreoOrientacion();
         this.bsModal.show();
         // Pequeño delay para que el modal termine la animación de apertura de
         // Bootstrap antes de solicitar permisos de cámara (mejor UX en móvil)
@@ -344,6 +357,10 @@ class CamaraVideo {
         this.chunks     = [];
         this.totalBytes = 0;
         this.actualizarContador(0);
+
+        // Capturar orientación del dispositivo en este instante exacto.
+        // Se enviará al backend para que FFmpeg aplique el transpose correcto.
+        this.cvOrientacionGrabacion = this.leerOrientacionActual();
 
         // Elegir el mejor MIME type que soporte este navegador
         const tipoMime = this.elegirMimeType();
@@ -486,9 +503,10 @@ class CamaraVideo {
         }
         formData.append('csrfmiddlewaretoken', csrfInput.value);
 
-        formData.append('form_type',   'subir_video');
-        formData.append('tipo',        tipoRadio.value);
-        formData.append('descripcion', this.descripcionInput?.value?.trim() || '');
+        formData.append('form_type',        'subir_video');
+        formData.append('tipo',             tipoRadio.value);
+        formData.append('descripcion',      this.descripcionInput?.value?.trim() || '');
+        formData.append('orientacion_video', String(this.cvOrientacionGrabacion));
 
         // El archivo se nombra con timestamp para garantizar unicidad
         const nombreArchivo = `grabacion_${Date.now()}.webm`;
@@ -848,6 +866,9 @@ class CamaraVideo {
         }
         this.enfocandoActualmente = false;
 
+        // Detener monitoreo de orientación
+        this.detenerMonitoreoOrientacion();
+
         // Detener grabación si estaba activa
         if (this.recorder && this.recorder.state !== 'inactive') {
             this.recorder.stop();
@@ -865,6 +886,112 @@ class CamaraVideo {
             this.videoEl.src       = '';
             this.videoEl.srcObject = null;
         }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // ORIENTACIÓN DEL DISPOSITIVO — detectar al iniciar grabación
+    // Mismo sistema de doble fuente que CamaraIntegrada:
+    //   Fuente 1 — screen.orientation (cambia automáticamente si la rotación está libre)
+    //   Fuente 2 — DeviceOrientationEvent.gamma (lee el giroscopio físico)
+    // Si hay discrepancia entre ambas fuentes se usa el giroscopio, porque indica
+    // que el usuario tiene el rotation lock activado y el celular está físicamente
+    // en landscape aunque la pantalla siga en portrait.
+    // ────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Inicia el monitoreo continuo de orientación.
+     * Llamado en abrir() para que el sensor esté activo antes de grabar.
+     */
+    private iniciarMonitoreoOrientacion(): void {
+        // ── Fuente 1: screen.orientation ──
+        if (window.screen?.orientation) {
+            this.cvScreenAngle = window.screen.orientation.angle;
+            this.cvScreenOrientHandler = () => {
+                this.cvScreenAngle = window.screen.orientation.angle;
+            };
+            window.screen.orientation.addEventListener('change', this.cvScreenOrientHandler);
+        }
+
+        // ── Fuente 2: DeviceOrientationEvent (giroscopio) ──
+        const registrarGiroscopio = () => {
+            this.cvDeviceOrientHandler = (e: DeviceOrientationEvent) => {
+                this.cvDeviceGamma = e.gamma;
+                this.cvDeviceBeta  = e.beta;
+            };
+            window.addEventListener('deviceorientation', this.cvDeviceOrientHandler);
+        };
+
+        // iOS requiere permiso explícito para DeviceOrientationEvent
+        if (typeof (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission === 'function') {
+            (DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> })
+                .requestPermission()
+                .then((result: string) => { if (result === 'granted') registrarGiroscopio(); })
+                .catch(() => { /* sin permiso — screen.orientation es suficiente */ });
+        } else {
+            registrarGiroscopio();
+        }
+    }
+
+    /**
+     * Detiene el monitoreo de orientación y limpia todos los listeners.
+     * Llamado desde liberarRecursos() al cerrar el modal.
+     */
+    private detenerMonitoreoOrientacion(): void {
+        if (this.cvScreenOrientHandler && window.screen?.orientation) {
+            window.screen.orientation.removeEventListener('change', this.cvScreenOrientHandler);
+            this.cvScreenOrientHandler = null;
+        }
+        if (this.cvDeviceOrientHandler) {
+            window.removeEventListener('deviceorientation', this.cvDeviceOrientHandler);
+            this.cvDeviceOrientHandler = null;
+        }
+        this.cvDeviceGamma = null;
+        this.cvDeviceBeta  = null;
+    }
+
+    /**
+     * Lee la orientación actual del dispositivo: 0 / 90 / 180 / 270.
+     * Aplica la misma lógica que CamaraIntegrada.inferirOrientacionDeGiroscopio():
+     *   - Si el giroscopio discrepa con screen.orientation → ganó el giroscopio
+     *     (indica rotation lock activo, el celular físicamente está rotado)
+     *   - En caso contrario → usa screen.orientation
+     */
+    private leerOrientacionActual(): number {
+        let orientacionScreen = 0;
+
+        if (window.screen?.orientation) {
+            switch (window.screen.orientation.type) {
+                case 'portrait-primary':    orientacionScreen = 0;   break;
+                case 'landscape-primary':   orientacionScreen = 90;  break;
+                case 'portrait-secondary':  orientacionScreen = 180; break;
+                case 'landscape-secondary': orientacionScreen = 270; break;
+            }
+        } else if (typeof (window as unknown as { orientation?: number }).orientation !== 'undefined') {
+            // Fallback legacy iOS < 16.4
+            const leg = Number((window as unknown as { orientation: number }).orientation);
+            orientacionScreen = leg === 90 ? 270 : leg === -90 ? 90 : leg === 180 ? 180 : 0;
+        } else {
+            orientacionScreen = this.cvScreenAngle;
+        }
+
+        // Corrección por giroscopio si el rotation lock está activo
+        if (this.cvDeviceGamma !== null && this.cvDeviceBeta !== null) {
+            const gamma = this.cvDeviceGamma;
+            const beta  = this.cvDeviceBeta;
+            let orientacionFisica: number;
+            if      (gamma >  45) orientacionFisica = 90;
+            else if (gamma < -45) orientacionFisica = 270;
+            else if (beta  < -45) orientacionFisica = 180;
+            else                  orientacionFisica = 0;
+
+            // Si hay discrepancia significativa (> 80°) → el giroscopio manda
+            const diff = Math.abs(orientacionFisica - orientacionScreen);
+            if (Math.min(diff, 360 - diff) > 80) {
+                return orientacionFisica;
+            }
+        }
+
+        return orientacionScreen;
     }
 
     // ────────────────────────────────────────────────────────────────────────
