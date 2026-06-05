@@ -7599,6 +7599,103 @@ def enviar_rewind_egreso_cliente(request, orden_id):
 
 
 # ============================================================================
+# ENVIAR EVIDENCIA EN VIDEO AL CLIENTE POR CORREO ELECTRÓNICO
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+@require_http_methods(["POST"])
+def enviar_evidencia_video(request, orden_id):
+    """
+    Vista para enviar evidencia en video del servicio al cliente por correo electrónico.
+
+    Flujo:
+    1. Valida que la orden exista y tenga videos seleccionados.
+    2. Dispara la tarea Celery enviar_evidencia_video_task en segundo plano.
+    3. La tarea extrae frames, genera análisis IA opcional y envía el correo.
+    4. Retorna JsonResponse inmediato con task_id.
+    """
+    from .tasks import enviar_evidencia_video_task
+
+    try:
+        orden = get_object_or_404(OrdenServicio.objects.select_related('detalle_equipo'), pk=orden_id)
+
+        email_cliente = orden.detalle_equipo.email_cliente
+        if not email_cliente or email_cliente == 'cliente@ejemplo.com':
+            return JsonResponse({
+                'success': False,
+                'error': '❌ El email del cliente no está configurado o es el valor por defecto. '
+                        'Por favor, actualiza el email del cliente antes de enviar.'
+            }, status=400)
+
+        video_ids = request.POST.getlist('videos_seleccionados')
+
+        if not video_ids:
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Debes seleccionar al menos un video para enviar.'
+            }, status=400)
+
+        videos = VideoOrden.objects.filter(
+            id__in=video_ids,
+            orden=orden,
+        ).exclude(tipo__in=['resumen', 'resumen_comprimido'])
+
+        if not videos.exists():
+            return JsonResponse({
+                'success': False,
+                'error': '❌ Los videos seleccionados no son válidos.'
+            }, status=400)
+
+        copia_empleados = request.POST.getlist('copia_empleados', [])
+        copia_tecnico = request.POST.getlist('copia_tecnico', [])
+        destinatarios_copia = list(set(copia_empleados + copia_tecnico))
+
+        modelo_ia_analisis = request.POST.get('modelo_ia_analisis', '').strip()
+
+        usuario_id = request.user.pk if request.user.is_authenticated else None
+
+        video_ids_str = [str(i) for i in video_ids]
+
+        tarea = enviar_evidencia_video_task.delay(
+            orden_id=orden_id,
+            video_ids=video_ids_str,
+            destinatarios_copia=destinatarios_copia,
+            modelo_ia_analisis=modelo_ia_analisis,
+            usuario_id=usuario_id,
+        )
+
+        HistorialOrden.objects.create(
+            orden=orden,
+            usuario=getattr(request.user, 'empleado', None),
+            tipo_evento='email',
+            comentario=f'Envío de evidencia en video al cliente iniciado — tarea en segundo plano (task_id: {tarea.id})',
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': (
+                f'✅ Evidencia en video en proceso de envío a {email_cliente}. '
+                f'El análisis y envío se están procesando en segundo plano.'
+            ),
+            'data': {
+                'task_id': tarea.id,
+                'destinatario': email_cliente,
+                'videos_seleccionados': len(video_ids),
+                'orden': orden.numero_orden_interno,
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': f'❌ Error al procesar la solicitud: {str(e)}'
+        }, status=500)
+
+
+# ============================================================================
 # DIAGNÓSTICO: OBTENER DESTINATARIOS DEL HISTORIAL DE INGRESO (API auxiliar)
 # ============================================================================
 

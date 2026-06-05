@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="{% static 'css/servicio_tecnico.css' %}">
 <link rel="stylesheet" href="{% static 'css/lightbox_galeria.css' %}">
 <link rel="stylesheet" href="{% static 'css/video_resumen.css' %}">
+<link rel="stylesheet" href="{% static 'css/compartir_video.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -2412,9 +2413,20 @@
         <div class="col-12" id="galeria-videos">
             <div class="card section-card">
                 <div class="section-header modal-header-video">
-                    <i class="bi bi-camera-video-fill me-1"></i>
-                    Galería de Videos del Equipo
-                    <span class="badge bg-dark ms-2">{{ total_videos }} video{{ total_videos|pluralize:"s" }}</span>
+                    <div class="d-flex align-items-center gap-2 flex-grow-1">
+                        <i class="bi bi-camera-video-fill me-1"></i>
+                        Galería de Videos del Equipo
+                        <span class="badge bg-dark ms-2">{{ total_videos }} video{{ total_videos|pluralize:"s" }}</span>
+                    </div>
+                    {% if total_videos > 0 %}
+                    <button type="button"
+                            class="btn btn-sm btn-outline-light"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalCompartirEvidencia"
+                            title="Compartir evidencia en video con el cliente">
+                        <i class="bi bi-share-fill"></i> Compartir Evidencia
+                    </button>
+                    {% endif %}
                 </div>
                 <div class="card-body">
 
@@ -4805,6 +4817,228 @@
                     {% endif %}
                 </button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MODAL: COMPARTIR EVIDENCIA EN VIDEO -->
+<!-- ============================================================ -->
+<div class="modal fade" id="modalCompartirEvidencia" tabindex="-1" aria-labelledby="modalCompartirEvidenciaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <div class="modal-header modal-header-ev">
+                <h5 class="modal-title" id="modalCompartirEvidenciaLabel">
+                    <i class="bi bi-share-fill me-2"></i>Compartir Evidencia en Video
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body">
+                <form method="post"
+                      id="formCompartirEvidencia"
+                      action="{% url 'servicio_tecnico:enviar_evidencia_video' orden.id %}">
+                    {% csrf_token %}
+
+                    {% if orden.detalle_equipo.email_cliente|es_email_valido %}
+
+                    <!-- SECCIÓN 1: DESTINATARIO -->
+                    <div class="ev-section">
+                        <div class="ev-section-title">
+                            <i class="bi bi-envelope-fill text-primary me-1"></i> Destinatario
+                        </div>
+                        <div class="ev-destinatario-card">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                <span class="ev-email">{{ orden.detalle_equipo.email_cliente }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 2: CON COPIA A -->
+                    <div class="ev-section">
+                        <div class="ev-section-title">
+                            <i class="bi bi-people-fill text-info me-1"></i> Con copia a (opcional)
+                        </div>
+                        <div class="ev-cc-grid">
+                            {% if orden.tecnico_asignado_actual and orden.tecnico_asignado_actual.email %}
+                            <label class="ev-cc-item">
+                                <input type="checkbox" name="copia_tecnico"
+                                       value="{{ orden.tecnico_asignado_actual.email }}" checked>
+                                <i class="bi bi-tools text-success"></i>
+                                {{ orden.tecnico_asignado_actual.nombre_completo }}
+                            </label>
+                            {% endif %}
+
+                            {% if empleados_copia_imagenes %}
+                                {% for empleado in empleados_copia_imagenes %}
+                                <label class="ev-cc-item">
+                                    <input type="checkbox" name="copia_empleados"
+                                           value="{{ empleado.email }}"
+                                           {% if empleado.id == request.user.empleado.id %}checked{% endif %}>
+                                    {% if empleado.id == request.user.empleado.id %}
+                                        <span class="badge bg-primary" style="font-size:0.6rem;">TÚ</span>
+                                    {% endif %}
+                                    {{ empleado.nombre_completo }}
+                                </label>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 3: SELECCIÓN DE VIDEOS -->
+                    <div class="ev-section">
+                        <div class="ev-section-title">
+                            <i class="bi bi-camera-video-fill text-warning me-1"></i> Videos a compartir
+                        </div>
+
+                        <div class="ev-select-all-bar">
+                            <label class="d-flex align-items-center gap-2 mb-0" style="cursor:pointer;">
+                                <input type="checkbox" id="evSelectAll">
+                                <span style="font-size:0.85rem;">Seleccionar todos</span>
+                            </label>
+                            <span class="ev-counter" id="evCounter">0 videos seleccionados</span>
+                        </div>
+
+                        <div class="ev-video-grid">
+                            {% for tipo, videos in videos_por_tipo.items %}
+                                {% for video in videos %}
+                                    {% if video.tipo != 'resumen' and video.tipo != 'resumen_comprimido' %}
+                                    <div class="ev-video-card" data-video-id="{{ video.pk }}">
+                                        <div class="ev-check-overlay">
+                                            <i class="bi bi-check-lg" style="font-size:0.8rem;"></i>
+                                        </div>
+                                        <input type="checkbox" class="ev-video-checkbox d-none"
+                                               name="videos_seleccionados"
+                                               value="{{ video.pk }}">
+
+                                        {% if video.thumbnail %}
+                                            <img src="{{ video.thumbnail.url }}"
+                                                 alt="{{ video.get_tipo_display }}"
+                                                 class="ev-thumb" loading="lazy">
+                                        {% else %}
+                                            <div class="ev-thumb-placeholder">
+                                                <i class="bi bi-camera-video"></i>
+                                            </div>
+                                        {% endif %}
+
+                                        <div class="ev-info">
+                                            <span class="ev-tipo">{{ video.get_tipo_display }}</span>
+                                            <div class="ev-meta">
+                                                {% if video.duracion_segundos %}
+                                                    {{ video.duracion_segundos|duracion }}
+                                                {% endif %}
+                                                {% if video.tamano_final_mb %}
+                                                    · {{ video.tamano_final_mb }} MB
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN 4: ANÁLISIS IA (si Ollama está habilitado) -->
+                    {% if ollama_enabled %}
+                    <div class="ev-section">
+                        <div class="ev-section-title">
+                            <i class="bi bi-stars text-purple me-1"></i> Análisis con IA (opcional)
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <select name="modelo_ia_analisis" class="form-select form-select-sm" style="max-width:300px;">
+                                <option value="">Sin análisis IA</option>
+                                <option value="">— Automático (Gemini → Ollama) —</option>
+                                {% for modelo in ollama_models %}
+                                    <option value="{{ modelo }}">{{ modelo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small class="text-muted d-block mt-1" style="font-size:0.75rem;">
+                            <i class="bi bi-info-circle"></i>
+                            La IA extrae capturas del video y genera un resumen ejecutivo del servicio.
+                            Si el análisis falla, el correo se envía sin esta sección.
+                        </small>
+                    </div>
+                    {% endif %}
+
+                    <!-- SECCIÓN 5: VISTA PREVIA -->
+                    <div class="ev-section">
+                        <div class="ev-section-title">
+                            <i class="bi bi-eye-fill text-secondary me-1"></i> Vista previa del correo
+                        </div>
+                        <div class="ev-preview-box">
+                            <div class="ev-preview-row">
+                                <span class="ev-preview-label">De:</span>
+                                <span class="ev-preview-value">Servicio Técnico System</span>
+                            </div>
+                            <div class="ev-preview-row">
+                                <span class="ev-preview-label">Para:</span>
+                                <span class="ev-preview-value">{{ orden.detalle_equipo.email_cliente }}</span>
+                            </div>
+                            <div class="ev-preview-row">
+                                <span class="ev-preview-label">Asunto:</span>
+                                <span class="ev-preview-value">
+                                    🎬 Evidencia en video del servicio - Orden
+                                    {% if orden.detalle_equipo.orden_cliente %}
+                                        {{ orden.detalle_equipo.orden_cliente }}
+                                    {% else %}
+                                        {{ orden.numero_orden_interno }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="ev-preview-row">
+                                <span class="ev-preview-label">Adjuntos:</span>
+                                <span class="ev-preview-value">Thumbnails de videos embebidos + resumen IA (si se activa)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% else %}
+                    <!-- EMAIL NO VÁLIDO -->
+                    <div class="alert alert-warning mb-0">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-warning"></i>
+                            <div>
+                                <h6 class="alert-heading">Email del cliente no configurado</h6>
+                                <p class="mb-2 small">
+                                    El email del cliente <code>{{ orden.detalle_equipo.email_cliente|default:"(vacío)" }}</code>
+                                    no es válido para enviar correos.
+                                </p>
+                                <p class="mb-0 small">
+                                    <i class="bi bi-arrow-up-circle"></i>
+                                    Edita el email del cliente en la sección <strong>Información Principal</strong> antes de usar esta función.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </button>
+                <button type="submit"
+                        form="formCompartirEvidencia"
+                        class="btn btn-primary btn-lg"
+                        id="btnEnviarEvidencia"
+                        data-original-text='<i class="bi bi-send-fill"></i> Enviar Evidencia'
+                        {% if not orden.detalle_equipo.email_cliente|es_email_valido %}
+                            disabled
+                            title="⚠️ Configura un email válido antes de enviar"
+                        {% else %}
+                            disabled
+                            title="Selecciona al menos un video"
+                        {% endif %}>
+                    <i class="bi bi-send-fill"></i> Enviar Evidencia
+                </button>
+            </div>
+
         </div>
     </div>
 </div>
@@ -7911,5 +8145,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Script de Video Resumen — compilado desde static/ts/video_resumen.ts -->
 <script src="{% static 'js/video_resumen.js' %}"></script>
+
+<!-- Script de Compartir Evidencia en Video — compilado desde static/ts/compartir_video.ts -->
+<script src="{% static 'js/compartir_video.js' %}"></script>
 
 {% endblock %}

@@ -1926,3 +1926,442 @@ def transcribir_audio_ollama(
             exc_info=True,
         )
         return {'success': False, 'error': f'Error inesperado al transcribir con Ollama: {str(e)}'}
+
+
+# ============================================================================
+# ANÁLISIS DE EVIDENCIA EN VIDEO — Extracción de frames + IA de visión
+# ============================================================================
+# Flujo:
+#   1. FFmpeg extrae N frames equiespaciados del video (sin tocar disco, en memoria)
+#   2. Los frames se envían como imágenes al modelo de visión (Ollama o Gemini)
+#   3. El modelo genera un resumen ejecutivo del servicio basado en las capturas
+#
+# DISEÑO FAIL-SAFE:
+#   Si la extracción de frames o el análisis IA fallan, el correo se envía
+#   sin la sección de análisis. Nunca bloquea el envío de evidencia.
+#
+# PROMPT:
+#   PROMPT_ANALISIS_VIDEO_EVIDENCIA está diseñado para generar un resumen
+#   ejecutivo del servicio, no una inspección estética. Describe acciones
+#   visibles, estado del equipo en cada etapa y condición final.
+# ============================================================================
+
+PROMPT_ANALISIS_VIDEO_EVIDENCIA = """\
+Eres un técnico especializado en servicio de equipos electrónicos en un \
+centro de servicio profesional. Tu función es generar un resumen ejecutivo \
+del servicio realizado basado en capturas de video de evidencia. \
+SIEMPRE redactas en español, sin excepción.
+
+Se te proporcionan {n_frames} capturas de pantalla extraídas de {n_videos} \
+video(s) de evidencia del servicio realizado al {tipo_equipo} {marca} {modelo}.
+
+CONTEXTO DE LAS CAPTURAS:
+Las imágenes provienen de videos grabados durante el proceso de servicio. \
+Pueden mostrar diferentes etapas: ingreso, diagnóstico, reparación y egreso.
+
+REGLAS DE OBSERVACIÓN — NUNCA las violes:
+1. Describe ÚNICAMENTE lo que puedes observar con claridad en las capturas.
+2. Si algo no se aprecia con certeza, OMÍTELO.
+3. NUNCA uses lenguaje de incertidumbre: prohibido "parece", "aparenta", \
+"podría", "es posible". Si no lo ves con claridad, no lo escribas.
+4. Estructura tu respuesta como un RESUMEN EJECUTIVO del servicio:
+   - Estado inicial del equipo (lo que se observa al ingreso)
+   - Acciones visibles realizadas (desmontaje, limpieza, reemplazo de piezas)
+   - Estado final del equipo (condición al egreso)
+5. Si observas piezas o componentes siendo reemplazados, menciónalos.
+6. Tono formal, tercera persona, lenguaje técnico pero comprensible.
+7. Escribe un único párrafo fluido de 3 a 6 oraciones.
+8. Si las capturas muestran buen estado general sin acciones notables, \
+indícalo en una oración directa.
+9. Responde ÚNICAMENTE con el párrafo del resumen. Sin prefijos, sin títulos, \
+sin "Resumen:", sin comillas.
+10. IDIOMA: el resumen debe estar escrito EXCLUSIVAMENTE en español.\
+"""
+
+
+def extraer_frames_video(ruta_video: str, max_frames: int = 8) -> list[bytes]:
+    """
+    Extrae frames equiespaciados de un video usando FFmpeg.
+
+    Los frames se generan en memoria (sin archivos temporales en disco)
+    usando subprocess con pipes stdin/stdout.
+
+    Args:
+        ruta_video: Ruta absoluta al archivo de video en disco.
+        max_frames: Cantidad máxima de frames a extraer (default: 8).
+
+    Returns:
+        Lista de bytes JPEG de los frames extraídos.
+        Lista vacía si falla la extracción.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    FFmpeg puede leer un video y extraer imágenes en momentos específicos.
+    Usamos el filtro "fps" para obtener frames a intervalos regulares.
+    Primero medimos la duración del video con ffprobe, luego calculamos
+    el intervalo para obtener exactamente max_frames capturas.
+    """
+    import subprocess
+    import shutil
+    from pathlib import Path
+
+    if not Path(ruta_video).exists():
+        logger.error(f"[VideoIA] Archivo de video no encontrado: {ruta_video}")
+        return []
+
+    ffmpeg_bin = shutil.which('ffmpeg') or '/usr/bin/ffmpeg'
+    ffprobe_bin = shutil.which('ffprobe') or '/usr/bin/ffprobe'
+
+    try:
+        resultado_probe = subprocess.run(
+            [
+                ffprobe_bin,
+                '-v', 'error',
+                '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                ruta_video,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        duracion = float(resultado_probe.stdout.strip())
+        if duracion <= 0:
+            logger.warning(f"[VideoIA] Duración inválida del video: {duracion}s")
+            return []
+    except Exception as e:
+        logger.warning(f"[VideoIA] No se pudo obtener duración del video: {e}")
+        duracion = 60.0
+
+    fps_interval = max_frames / duracion
+    fps_filter = f"fps={fps_interval}"
+
+    logger.info(
+        f"[VideoIA] Extrayendo frames | Video: {ruta_video} | "
+        f"Duración: {duracion:.1f}s | FPS filter: {fps_filter} | "
+        f"Max frames: {max_frames}"
+    )
+
+    try:
+        proceso = subprocess.run(
+            [
+                ffmpeg_bin,
+                '-loglevel', 'error',
+                '-i', ruta_video,
+                '-vf', fps_filter,
+                '-frames:v', str(max_frames),
+                '-f', 'image2pipe',
+                '-vcodec', 'mjpeg',
+                '-q:v', '3',
+                'pipe:1',
+            ],
+            capture_output=True,
+            timeout=120,
+        )
+
+        if proceso.returncode != 0:
+            logger.warning(
+                f"[VideoIA] FFmpeg falló extrayendo frames: "
+                f"{proceso.stderr.decode('utf-8', errors='replace')[:300]}"
+            )
+            return []
+
+        datos_completos = proceso.stdout
+        if not datos_completos:
+            logger.warning("[VideoIA] FFmpeg no produjo datos de salida.")
+            return []
+
+        frames = []
+        marcador_inicio = b'\xff\xd8'
+        marcador_fin = b'\xff\xd9'
+        inicio = 0
+
+        while True:
+            pos_inicio = datos_completos.find(marcador_inicio, inicio)
+            if pos_inicio == -1:
+                break
+            pos_fin = datos_completos.find(marcador_fin, pos_inicio)
+            if pos_fin == -1:
+                break
+            frame_bytes = datos_completos[pos_inicio:pos_fin + 2]
+            frames.append(frame_bytes)
+            inicio = pos_fin + 2
+
+        logger.info(f"[VideoIA] Frames extraídos: {len(frames)} de {max_frames} solicitados")
+        return frames[:max_frames]
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"[VideoIA] Timeout extrayendo frames del video: {ruta_video}")
+        return []
+    except Exception as e:
+        logger.error(f"[VideoIA] Error inesperado extrayendo frames: {e}", exc_info=True)
+        return []
+
+
+def analizar_video_evidencia_ollama(
+    frames_bytes: list[bytes],
+    tipo_equipo: str = "",
+    marca: str = "",
+    modelo_equipo: str = "",
+    n_videos: int = 1,
+    modelo_override: str = "",
+) -> dict:
+    """
+    Envía frames de video al modelo Ollama con capacidades de visión para
+    obtener un resumen ejecutivo del servicio.
+
+    Args:
+        frames_bytes:  Lista de bytes JPEG de frames extraídos del video.
+        tipo_equipo:   Tipo de equipo (Laptop, PC, Tablet, etc.)
+        marca:         Marca del equipo.
+        modelo_equipo: Modelo específico del equipo.
+        n_videos:      Cantidad de videos de donde provienen los frames.
+        modelo_override: Modelo específico a usar (vacío = default).
+
+    Returns:
+        dict:
+            {'success': True,  'analisis': '...texto...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...mensaje...'}
+    """
+    if not frames_bytes:
+        return {'success': False, 'error': 'No se proporcionaron frames para analizar.'}
+
+    if not getattr(settings, 'OLLAMA_ENABLED', False):
+        return {'success': False, 'error': 'Ollama no está habilitado en este entorno.'}
+
+    base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434')
+    model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'OLLAMA_MODEL', 'gemma4:e4b')
+    timeout = getattr(settings, 'OLLAMA_VISION_TIMEOUT', 600)
+    max_imgs = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
+
+    frames_limitados = frames_bytes[:max_imgs]
+    frames_b64 = [
+        _base64.b64encode(f).decode('utf-8')
+        for f in frames_limitados
+    ]
+
+    tipo_eq = tipo_equipo.strip() or 'equipo'
+    marca_eq = marca.strip() or ''
+    modelo_eq = modelo_equipo.strip() or ''
+    prompt = PROMPT_ANALISIS_VIDEO_EVIDENCIA.format(
+        n_frames=len(frames_b64),
+        n_videos=n_videos,
+        tipo_equipo=tipo_eq,
+        marca=marca_eq,
+        modelo=modelo_eq,
+    ).strip()
+
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt,
+                "images": frames_b64,
+            }
+        ],
+        "stream": False,
+        "think": True,
+        "options": {
+            "temperature": 0.2,
+            "top_p": 0.9,
+        },
+    }
+
+    url = f"{base_url.rstrip('/')}/api/chat"
+    data = json.dumps(payload).encode('utf-8')
+
+    logger.info(
+        f"[VideoIA][Ollama] Analizando evidencia en video | "
+        f"Modelo: {model} | Frames: {len(frames_b64)} | "
+        f"Videos: {n_videos} | Equipo: {marca_eq} {modelo_eq}"
+    )
+
+    try:
+        req = urllib.request.Request(
+            url=url,
+            data=data,
+            headers={
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            method='POST',
+        )
+
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            response_data = json.loads(response.read().decode('utf-8'))
+
+        analisis = (
+            response_data
+            .get('message', {})
+            .get('content', '')
+            .strip()
+        )
+
+        if not analisis:
+            logger.warning("[VideoIA][Ollama] El modelo devolvió una respuesta vacía.")
+            return {'success': False, 'error': 'El modelo devolvió una respuesta vacía.'}
+
+        logger.info(
+            f"[VideoIA][Ollama] Análisis completado | "
+            f"{len(analisis)} chars | Modelo: {model}"
+        )
+        return {
+            'success': True,
+            'analisis': analisis,
+            'modelo_usado': model,
+        }
+
+    except urllib.error.URLError as e:
+        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
+        logger.error(f"[VideoIA][Ollama] Error de conexión: {error_msg}")
+        return {'success': False, 'error': f'Error de conexión con Ollama: {error_msg}'}
+
+    except TimeoutError:
+        logger.error(f"[VideoIA][Ollama] Timeout después de {timeout}s")
+        return {
+            'success': False,
+            'error': f'El modelo tardó más de {timeout}s en responder.',
+        }
+
+    except json.JSONDecodeError:
+        logger.error("[VideoIA][Ollama] Error al parsear respuesta JSON.")
+        return {'success': False, 'error': 'Respuesta inválida de Ollama.'}
+
+    except Exception as e:
+        logger.error(
+            f"[VideoIA][Ollama] Error inesperado: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        return {'success': False, 'error': f'Error inesperado: {str(e)}'}
+
+
+def analizar_video_evidencia_dispatch(
+    frames_bytes: list[bytes],
+    tipo_equipo: str = "",
+    marca: str = "",
+    modelo_equipo: str = "",
+    n_videos: int = 1,
+    modelo_override: str = "",
+) -> dict:
+    """
+    Dispatcher para el análisis de evidencia en video.
+
+    Misma estrategia que analizar_imagenes_ingreso_dispatch:
+    1. Gemini primero (mejor visión), con fallback entre modelos.
+    2. Ollama como último recurso.
+    3. Nunca lanza excepciones — el llamador recibe success/error.
+
+    Args:
+        frames_bytes:    Lista de bytes JPEG de frames extraídos del video.
+        tipo_equipo:     Tipo de equipo para contextualizar el prompt.
+        marca:           Marca del equipo.
+        modelo_equipo:   Modelo específico del equipo.
+        n_videos:        Cantidad de videos de donde provienen los frames.
+        modelo_override: Modelo elegido en el selector (con o sin prefijo).
+
+    Returns:
+        dict:
+            {'success': True,  'analisis': '...texto...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...mensaje de error...'}
+    """
+    kwargs_base = dict(
+        frames_bytes=frames_bytes,
+        tipo_equipo=tipo_equipo,
+        marca=marca,
+        modelo_equipo=modelo_equipo,
+        n_videos=n_videos,
+    )
+
+    ERRORES_REINTENTABLES = {'rate_limit', 'server_error', 'timeout', 'network_error'}
+
+    nombre_limpio = modelo_override.strip()
+    proveedor_override = None
+
+    for prefijo in ('[Gemini] ', '[Ollama] '):
+        if nombre_limpio.startswith(prefijo):
+            nombre_limpio = nombre_limpio[len(prefijo):]
+            proveedor_override = 'gemini' if prefijo == '[Gemini] ' else 'ollama'
+            break
+
+    if nombre_limpio and proveedor_override is None:
+        proveedor_override = 'gemini' if nombre_limpio.lower().startswith('gemini') else 'ollama'
+
+    if proveedor_override == 'ollama':
+        logger.info(f"[VideoIA][Dispatch] Ollama seleccionado: {nombre_limpio}")
+        return analizar_video_evidencia_ollama(**kwargs_base, modelo_override=nombre_limpio)
+
+    gemini_models_configurados = getattr(settings, 'GEMINI_MODELS', [])
+
+    if nombre_limpio:
+        restantes = [m for m in gemini_models_configurados if m != nombre_limpio]
+        modelos_a_intentar = [nombre_limpio] + restantes
+    else:
+        modelos_a_intentar = list(gemini_models_configurados)
+
+    if getattr(settings, 'GEMINI_ENABLED', False) and modelos_a_intentar:
+        try:
+            from .gemini_client import analizar_video_evidencia_gemini
+        except ImportError as e:
+            logger.error(f"[VideoIA][Dispatch] No se pudo importar gemini_client: {e}")
+            modelos_a_intentar = []
+
+        ultimo_error = 'Sin detalles'
+
+        for idx, modelo_gemini in enumerate(modelos_a_intentar, start=1):
+            logger.info(
+                f"[VideoIA][Dispatch] Gemini intento {idx}/{len(modelos_a_intentar)}: {modelo_gemini}"
+            )
+
+            try:
+                resultado = analizar_video_evidencia_gemini(
+                    **kwargs_base,
+                    modelo_override=modelo_gemini,
+                )
+            except Exception as e_exc:
+                ultimo_error = f'Excepción inesperada: {type(e_exc).__name__}: {e_exc}'
+                logger.error(
+                    f"[VideoIA][Dispatch] Excepción con {modelo_gemini}: {ultimo_error}",
+                    exc_info=True,
+                )
+                continue
+
+            if resultado.get('success'):
+                logger.info(f"[VideoIA][Dispatch] Éxito con {modelo_gemini}")
+                return resultado
+
+            error_type = resultado.get('error_type', 'hard_error')
+            ultimo_error = resultado.get('error', 'sin detalles')
+
+            if error_type in ERRORES_REINTENTABLES:
+                logger.warning(
+                    f"[VideoIA][Dispatch] {modelo_gemini} → [{error_type}] — siguiente modelo..."
+                )
+                continue
+            else:
+                logger.error(
+                    f"[VideoIA][Dispatch] {modelo_gemini} → [{error_type}] — error irrecuperable."
+                )
+                break
+        else:
+            logger.warning(
+                f"[VideoIA][Dispatch] Todos los modelos Gemini agotados. Último error: {ultimo_error}"
+            )
+
+    if getattr(settings, 'OLLAMA_ENABLED', False):
+        logger.info("[VideoIA][Dispatch] Fallback a Ollama...")
+        try:
+            resultado_ollama = analizar_video_evidencia_ollama(**kwargs_base)
+            if resultado_ollama.get('success'):
+                return resultado_ollama
+            logger.warning(
+                f"[VideoIA][Dispatch] Ollama también falló: "
+                f"{resultado_ollama.get('error', 'sin detalles')}"
+            )
+        except Exception as e:
+            logger.error(f"[VideoIA][Dispatch] Excepción en fallback Ollama: {e}", exc_info=True)
+
+    logger.warning("[VideoIA][Dispatch] Todos los proveedores fallaron.")
+    return {
+        'success': False,
+        'error': 'No se pudo obtener análisis de ningún proveedor de IA disponible.',
+    }

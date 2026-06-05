@@ -158,6 +158,11 @@ urlpatterns = [
          views.enviar_rewind_egreso_cliente,
          name='enviar_rewind_egreso_cliente'),
 
+    # Enviar evidencia en video al cliente (extrae frames + IA opcional + correo)
+    path('orden/<int:orden_id>/enviar-evidencia-video/',
+         views.enviar_evidencia_video,
+         name='enviar_evidencia_video'),
+
     # API: obtener destinatarios del historial de ingreso para el modal de egreso
     path('orden/<int:orden_id>/destinatarios-egreso/',
          views.obtener_destinatarios_egreso,

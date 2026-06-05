@@ -19,6 +19,21 @@
 
 **Razón**: El usuario es hispanohablante y el proyecto usa español para toda la lógica de dominio, nombres de variables, comentarios de negocio y documentación.
 
+
+### 📝 Reglas Estrictas de Documentación Inline y Docstrings
+
+- **Idioma y Enfoque Obligatorio:** Todos los comentarios inline y docstrings DEBEN ser escritos en **Español (es-MX)**. Deben mantener un tono altamente didáctico y pedagógico, diseñado para que un desarrollador principiante pueda entender el "por qué" de la lógica.
+- **Cobertura de Docstrings Estricta:** Toda clase, vista de Django, tarea de Celery, método o componente de TypeScript DEBE iniciar con un bloque de documentación que detalle:
+  1. El objetivo principal de la función o componente (el contexto del negocio).
+  2. Los argumentos/parámetros de entrada y sus tipos esperados.
+  3. Los efectos secundarios (si modifica la base de datos, dispara eventos o encola tareas).
+- **Densidad de Comentarios Inline:** No asumas que el código se explica por sí mismo. Toda lógica que involucre:
+  - Manipulación de archivos o multimedia (ej. flujos de FFmpeg).
+  - Lógica asíncrona o estados de tareas (ej. Celery).
+  - Filtros complejos de QuerySets, manipulación de datos o condicionales.
+  DEBE llevar comentarios inline detallando el flujo paso a paso cada 3 o 5 líneas de código lógico.
+- **Restricción Negativa:** Se PROHÍBE rotundamente entregar funciones o bloques de código de más de 10 líneas de lógica de negocio pura sin al menos dos comentarios inline que expliquen el flujo de los datos.
+
 ---
 
 ## 1. BUILD/LINT/TEST COMMANDS

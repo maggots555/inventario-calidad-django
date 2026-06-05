@@ -4254,3 +4254,397 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
         if not isinstance(exc, ValueError):
             raise self.retry(exc=exc, countdown=30)
         raise
+
+
+# ============================================================================
+# TAREA: ENVIAR EVIDENCIA EN VIDEO AL CLIENTE
+# ============================================================================
+# Flujo:
+#   1. Cargar orden + videos seleccionados
+#   2. Extraer frames de cada video con FFmpeg (en memoria)
+#   3. Análisis IA con frames (fail-safe: si falla, se omite la sección)
+#   4. Renderizar plantilla HTML con thumbnails embebidos CID
+#   5. Enviar correo al cliente
+#   6. Registrar en historial + notificar al usuario
+# ============================================================================
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='servicio_tecnico.enviar_evidencia_video',
+    soft_time_limit=600,
+    time_limit=660,
+)
+def enviar_evidencia_video_task(
+    self, orden_id, video_ids, destinatarios_copia,
+    modelo_ia_analisis='', usuario_id=None,
+):
+    """
+    Tarea Celery: extrae frames de videos de evidencia, genera análisis IA
+    opcional y envía correo al cliente con la evidencia en video.
+
+    Parámetros:
+        orden_id            : ID de la OrdenServicio
+        video_ids           : Lista de IDs de VideoOrden seleccionados
+        destinatarios_copia : Lista de emails en CC
+        modelo_ia_analisis  : Modelo IA seleccionado (vacío = sin análisis)
+        usuario_id          : ID del usuario que disparó la acción
+    """
+    from pathlib import Path
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+
+    from .models import OrdenServicio, VideoOrden, HistorialOrden
+
+    logger.info(f"[EVIDENCIA-VIDEO] Iniciando tarea para Orden ID {orden_id}")
+
+    try:
+        # ===================================================================
+        # PASO 1: RECUPERAR ORDEN Y VIDEOS
+        # ===================================================================
+        try:
+            orden = OrdenServicio.objects.select_related('detalle_equipo').get(pk=orden_id)
+        except OrdenServicio.DoesNotExist:
+            logger.error(f"[EVIDENCIA-VIDEO] Orden ID {orden_id} no encontrada.")
+            return {'success': False, 'mensaje': f'Orden ID {orden_id} no encontrada.'}
+
+        email_cliente = orden.detalle_equipo.email_cliente
+
+        videos = VideoOrden.objects.filter(
+            id__in=video_ids, orden=orden
+        ).exclude(tipo__in=['resumen', 'resumen_comprimido'])
+
+        if not videos.exists():
+            raise Exception("No se encontraron videos válidos para enviar.")
+
+        # ===================================================================
+        # PASO 2: EXTRAER FRAMES DE CADA VIDEO (para IA y thumbnails)
+        # ===================================================================
+        from .ollama_client import extraer_frames_video
+
+        todos_los_frames = []
+        videos_data = []
+        site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+
+        for video in videos:
+            video_path = video.video.path if video.video else None
+            if not video_path or not Path(video_path).exists():
+                logger.warning(f"[EVIDENCIA-VIDEO] Video {video.id} no encontrado en disco.")
+                continue
+
+            frames = extraer_frames_video(video_path, max_frames=4)
+            todos_los_frames.extend(frames)
+
+            duracion_str = ''
+            if video.duracion_segundos:
+                mins = video.duracion_segundos // 60
+                segs = video.duracion_segundos % 60
+                duracion_str = f"{mins}:{segs:02d}"
+
+            thumbnail_bytes = None
+            if video.thumbnail and Path(video.thumbnail.path).exists():
+                try:
+                    from PIL import Image
+                    import io
+                    img = Image.open(video.thumbnail.path)
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                        img = background
+                    max_dim = 480
+                    if max(img.size) > max_dim:
+                        ratio = max_dim / max(img.size)
+                        new_size = tuple([int(d * ratio) for d in img.size])
+                        img = img.resize(new_size, Image.Resampling.LANCZOS)
+                    output = io.BytesIO()
+                    img.save(output, format='JPEG', quality=80, optimize=True)
+                    thumbnail_bytes = output.getvalue()
+                except Exception as e_thumb:
+                    logger.warning(f"[EVIDENCIA-VIDEO] Error procesando thumbnail {video.id}: {e_thumb}")
+
+            videos_data.append({
+                'id': video.id,
+                'tipo_display': video.get_tipo_display(),
+                'descripcion': video.descripcion or '',
+                'duracion': duracion_str,
+                'tamano': str(video.tamano_final_mb) if video.tamano_final_mb else '',
+                'tiene_thumbnail': thumbnail_bytes is not None,
+                'thumbnail_bytes': thumbnail_bytes,
+                'video_url': f"{site_url}{video.video.url}" if video.video else '',
+            })
+
+        if not videos_data:
+            raise Exception("No se pudo procesar ningún video.")
+
+        # ===================================================================
+        # PASO 2.5: ANÁLISIS IA DE EVIDENCIA EN VIDEO (no crítico)
+        # ===================================================================
+        analisis_ia_texto = None
+        analisis_ia_modelo = None
+
+        if modelo_ia_analisis and todos_los_frames:
+            try:
+                from .ollama_client import analizar_video_evidencia_dispatch
+
+                max_frames_ia = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
+                frames_para_ia = todos_los_frames[:max_frames_ia]
+
+                detalle = orden.detalle_equipo
+                resultado_ia = analizar_video_evidencia_dispatch(
+                    frames_bytes=frames_para_ia,
+                    tipo_equipo=detalle.tipo_equipo if detalle else '',
+                    marca=detalle.marca if detalle else '',
+                    modelo_equipo=detalle.modelo if detalle else '',
+                    n_videos=len(videos_data),
+                    modelo_override=modelo_ia_analisis,
+                )
+
+                if resultado_ia.get('success'):
+                    analisis_ia_texto = resultado_ia['analisis']
+                    analisis_ia_modelo = resultado_ia['modelo_usado']
+
+                    logger.info(
+                        f"[EVIDENCIA-VIDEO] Análisis IA completado | "
+                        f"{len(analisis_ia_texto)} chars | Modelo: {analisis_ia_modelo}"
+                    )
+
+                    HistorialOrden.objects.create(
+                        orden=orden,
+                        tipo_evento='inspeccion_ia',
+                        comentario=(
+                            f"🤖 Análisis de evidencia en video — {analisis_ia_modelo}\n\n"
+                            f"{analisis_ia_texto}"
+                        ),
+                        es_sistema=True,
+                    )
+                else:
+                    logger.warning(
+                        f"[EVIDENCIA-VIDEO] Análisis IA no disponible: "
+                        f"{resultado_ia.get('error', 'Sin detalles')}"
+                    )
+
+            except Exception as e_ia:
+                logger.warning(
+                    f"[EVIDENCIA-VIDEO] Excepción en análisis IA (no crítico): "
+                    f"{type(e_ia).__name__}: {e_ia}"
+                )
+
+        # ===================================================================
+        # PASO 3: PREPARAR HTML DEL CORREO
+        # ===================================================================
+        from config.paises_config import get_pais_actual, fecha_local_pais
+        _pais_email = get_pais_actual()
+
+        whatsapp_empleado = ''
+        if usuario_id:
+            User = get_user_model()
+            try:
+                usuario = User.objects.get(pk=usuario_id)
+                if hasattr(usuario, 'empleado') and usuario.empleado:
+                    numero_local = usuario.empleado.numero_whatsapp
+                    if numero_local:
+                        codigo_tel = _pais_email.get('codigo_telefonico', '')
+                        whatsapp_empleado = f"{codigo_tel}{numero_local}"
+            except User.DoesNotExist:
+                pass
+
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+
+        seguimiento_url = None
+        if orden.es_fuera_garantia:
+            try:
+                enlace = orden.enlace_seguimiento
+                if enlace and enlace.activo:
+                    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                    seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
+            except Exception:
+                pass
+
+        context = {
+            'orden': orden,
+            'detalle': orden.detalle_equipo,
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'cantidad_videos': len(videos_data),
+            'videos_data': videos_data,
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
+            'whatsapp_empleado': whatsapp_empleado,
+            'seguimiento_url': seguimiento_url,
+            'analisis_ia_texto': analisis_ia_texto,
+            'analisis_ia_modelo': analisis_ia_modelo,
+        }
+
+        html_content = render_to_string(
+            'servicio_tecnico/emails/evidencia_video_cliente.html',
+            context
+        )
+
+        # ===================================================================
+        # PASO 4: CREAR Y ENVIAR EL CORREO
+        # ===================================================================
+        numero_orden_display = (
+            orden.detalle_equipo.orden_cliente
+            if orden.detalle_equipo.orden_cliente
+            else orden.numero_orden_interno
+        )
+        asunto = f'🎬 Evidencia en video del servicio - Orden {numero_orden_display}'
+
+        import re
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente = f"Servicio Técnico System <{email_solo}>"
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=[email_cliente],
+            cc=destinatarios_copia if destinatarios_copia else None,
+        )
+        email_msg.content_subtype = 'html'
+
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f"[EVIDENCIA-VIDEO] Error al adjuntar logo: {e}")
+
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+                'icon_whatsapp': 'images/utilitys/whatsapp.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning(f"[EVIDENCIA-VIDEO] Error al adjuntar iconos: {e}")
+
+        for v_data in videos_data:
+            if v_data['tiene_thumbnail'] and v_data['thumbnail_bytes']:
+                try:
+                    thumb_mime = MIMEImage(v_data['thumbnail_bytes'], _subtype='jpeg')
+                    thumb_mime.add_header('Content-ID', f'<thumb_video_{v_data["id"]}>')
+                    thumb_mime.add_header('Content-Disposition', 'inline', filename=f'thumb_{v_data["id"]}.jpg')
+                    email_msg.attach(thumb_mime)
+                except Exception as e_thumb:
+                    logger.warning(f"[EVIDENCIA-VIDEO] Error adjuntando thumbnail {v_data['id']}: {e_thumb}")
+
+        email_msg.send(fail_silently=False)
+        logger.info(f"[EVIDENCIA-VIDEO] Correo enviado a {email_cliente}")
+
+        # ===================================================================
+        # PASO 5: REGISTRAR EN HISTORIAL
+        # ===================================================================
+        try:
+            usuario_empleado = None
+            if usuario_id:
+                User = get_user_model()
+                try:
+                    usuario = User.objects.get(pk=usuario_id)
+                    if hasattr(usuario, 'empleado'):
+                        usuario_empleado = usuario.empleado
+                except User.DoesNotExist:
+                    pass
+
+            tipos_enviados = [v['tipo_display'] for v in videos_data]
+            comentario = (
+                f"🎬 Evidencia en video enviada al cliente ({email_cliente})\n"
+                f"📹 Cantidad de videos: {len(videos_data)}\n"
+                f"🏷️ Tipos: {', '.join(tipos_enviados)}"
+            )
+            if destinatarios_copia:
+                comentario += f"\n👥 Copia a: {', '.join(destinatarios_copia)}"
+            if analisis_ia_texto:
+                comentario += f"\n🤖 Análisis IA: {analisis_ia_modelo}"
+
+            HistorialOrden.objects.create(
+                orden=orden,
+                tipo_evento='email',
+                comentario=comentario,
+                usuario=usuario_empleado,
+                es_sistema=False,
+            )
+        except Exception as e:
+            logger.warning(f"[EVIDENCIA-VIDEO] No se pudo registrar historial: {e}")
+
+        logger.info(f"[EVIDENCIA-VIDEO] Tarea completada para Orden {orden.numero_orden_interno}")
+
+        try:
+            _usuario_notif = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_notif = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            _oc = (
+                orden.detalle_equipo.orden_cliente
+                if orden.detalle_equipo and orden.detalle_equipo.orden_cliente
+                else orden.numero_orden_interno
+            )
+            notificar_exito(
+                titulo="Evidencia en video enviada",
+                mensaje=(
+                    f"Orden {_oc} — "
+                    f"{len(videos_data)} video(s) enviado(s) a {email_cliente}."
+                ),
+                usuario=_usuario_notif,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception as e:
+            logger.warning(f"[EVIDENCIA-VIDEO] No se pudo crear notificación de éxito: {e}")
+
+        return {
+            'success': True,
+            'orden': orden.numero_orden_interno,
+            'destinatario': email_cliente,
+            'videos_enviados': len(videos_data),
+        }
+
+    except Exception as exc:
+        logger.error(
+            f"[EVIDENCIA-VIDEO] Error para Orden ID {orden_id}: {exc}\n{traceback.format_exc()}"
+        )
+        try:
+            _usuario_err = None
+            if usuario_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    _usuario_err = User.objects.get(pk=usuario_id)
+                except User.DoesNotExist:
+                    pass
+            notificar_error(
+                titulo="Error al enviar evidencia en video",
+                mensaje=f"Orden {orden_id} — {str(exc)[:200]}",
+                usuario=_usuario_err,
+                task_id=self.request.id,
+                app_origen='servicio_tecnico',
+            )
+        except Exception:
+            pass
+        raise self.retry(exc=exc, countdown=60)

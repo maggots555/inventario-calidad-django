@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evidencia en Video - {{ detalle.orden_cliente }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(180deg, #ffffff 0%, #e3f2fd 50%, #90caf9 100%);
+            color: #051d63;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .header::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231976d2' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        
+        .logo-container {
+            position: relative;
+            z-index: 1;
+            margin-bottom: 15px;
+        }
+        
+        .logo-image {
+            max-width: 180px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+        }
+        
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .intro-text {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 25px;
+            line-height: 1.7;
+        }
+        
+        .equipment-info {
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .info-title {
+            font-size: 20px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-align: center;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .info-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #667eea;
+            min-width: 150px;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            color: #333;
+            font-size: 15px;
+            flex: 1;
+        }
+        
+        .info-value.highlight {
+            font-weight: 700;
+            color: #764ba2;
+        }
+
+        .ai-analysis-box {
+            background: #f0f7ff;
+            border-left: 4px solid #1f6391;
+            border-radius: 0 8px 8px 0;
+            padding: 22px 24px;
+            margin: 25px 0;
+        }
+
+        .ai-analysis-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #d0e8f8;
+        }
+
+        .ai-analysis-badge {
+            display: inline-block;
+            background: #1f6391;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+
+        .ai-analysis-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1e3a5f;
+            flex: 1;
+        }
+
+        .ai-analysis-body {
+            font-size: 14px;
+            color: #2d3748;
+            line-height: 1.75;
+        }
+
+        .ai-analysis-footer {
+            margin-top: 14px;
+            padding-top: 10px;
+            border-top: 1px solid #d0e8f8;
+            font-size: 11px;
+            color: #6b849e;
+        }
+
+        .videos-section {
+            margin: 30px 0;
+        }
+
+        .videos-section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 25px;
+            text-align: center;
+            border-bottom: 3px solid #17a2b8;
+            padding-bottom: 12px;
+        }
+
+        .video-item {
+            background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
+            border: 2px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 28px 24px;
+            margin-bottom: 25px;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(31, 99, 145, 0.1);
+        }
+
+        .video-tipo {
+            display: inline-block;
+            background: #1f6391;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 6px 16px;
+            border-radius: 20px;
+            margin-bottom: 18px;
+            letter-spacing: 0.3px;
+        }
+
+        .video-thumb-table {
+            margin: 0 auto 16px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .video-thumb-td {
+            position: relative;
+            line-height: 0;
+            font-size: 0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .video-thumb {
+            display: block;
+            width: 380px;
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+        }
+
+        .click-to-play {
+            display: block;
+            margin: 10px auto 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1f6391;
+            text-decoration: none;
+        }
+
+        .click-to-play:hover {
+            color: #0d4a6e;
+            text-decoration: underline;
+        }
+
+        .video-meta {
+            font-size: 14px;
+            color: #3b5f80;
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+
+        .video-descripcion {
+            font-size: 14px;
+            color: #3b5f80;
+            margin-bottom: 18px;
+            line-height: 1.6;
+            font-style: italic;
+        }
+
+        .video-play-btn {
+            display: inline-block;
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #1f6391 0%, #1558a8 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            box-shadow: 0 4px 12px rgba(31, 99, 145, 0.35);
+        }
+
+        .video-play-btn:hover {
+            background: linear-gradient(135deg, #1558a8 0%, #0d4a6e 100%);
+        }
+        
+        .help-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        .help-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #17a2b8;
+            margin-bottom: 10px;
+        }
+        
+        .help-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .signature {
+            margin-bottom: 15px;
+        }
+        
+        .signature-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .signature-role {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .signature-area {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+        
+        .company {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+        
+        .social-media {
+            margin: 20px 0;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+        
+        .social-title {
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+            text-align: center;
+        }
+        
+        .social-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            text-align: center;
+        }
+        
+        .social-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            text-decoration: none;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .social-link:hover {
+            background-color: rgba(255, 255, 255, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .social-icon {
+            font-size: 18px;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 0;
+            }
+            
+            .content {
+                padding: 20px 15px;
+            }
+            
+            .info-row {
+                flex-direction: column;
+            }
+            
+            .info-label {
+                min-width: auto;
+                margin-bottom: 5px;
+            }
+
+            .video-item {
+                padding: 20px 15px;
+            }
+
+            .video-thumb {
+                width: 280px;
+            }
+
+            .video-play-btn {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            
+            .social-media {
+                padding: 15px 5px;
+            }
+            
+            .social-links {
+                gap: 8px;
+                padding: 0 5px;
+            }
+            
+            .social-link {
+                padding: 6px 10px;
+                font-size: 11px;
+                gap: 6px;
+                flex: 0 1 auto;
+                min-width: 0;
+            }
+            
+            .social-icon {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-container">
+                <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
+            </div>
+            <div class="logo">🎬 EVIDENCIA EN VIDEO DEL SERVICIO</div>
+            <div class="subtitle">Registro Visual del Proceso de Reparación</div>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Estimado/a cliente,
+            </div>
+            
+            <div class="intro-text">
+                Le compartimos la evidencia en video del servicio realizado a su equipo. 
+                Estos videos documentan el proceso de diagnóstico y reparación llevado a cabo 
+                por nuestro equipo técnico.
+            </div>
+            
+            <div class="equipment-info">
+                <div class="info-title">📋 INFORMACIÓN DE SU EQUIPO</div>
+                
+                <div class="info-row">
+                    <div class="info-label">🎯 Número de Orden:</div>
+                    <div class="info-value highlight">
+                        {% if detalle.orden_cliente %}
+                            {{ detalle.orden_cliente }}
+                        {% else %}
+                            {{ orden.numero_orden_interno }}
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">💻 Equipo:</div>
+                    <div class="info-value">
+                        {{ detalle.tipo_equipo }} {{ detalle.marca }} 
+                        {% if detalle.modelo %}{{ detalle.modelo }}{% endif %}
+                    </div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">🔢 Número de Serie:</div>
+                    <div class="info-value">{{ detalle.numero_serie }}</div>
+                </div>
+                
+                <div class="info-row">
+                    <div class="info-label">📅 Fecha de Ingreso:</div>
+                    <div class="info-value">{{ orden.fecha_ingreso|date:"d/m/Y H:i" }}</div>
+                </div>
+            </div>
+
+            {% if analisis_ia_texto %}
+            <div class="ai-analysis-box">
+                <div class="ai-analysis-header">
+                    <span class="ai-analysis-badge">IA</span>
+                    <span class="ai-analysis-title">Resumen Ejecutivo del Servicio</span>
+                </div>
+                <div class="ai-analysis-body">
+                    {{ analisis_ia_texto|linebreaksbr }}
+                </div>
+                <div class="ai-analysis-footer">
+                    Resumen generado automáticamente por IA ({{ analisis_ia_modelo }}) a partir de los videos de evidencia.
+                    Este reporte describe las acciones observables durante el proceso de servicio.
+                </div>
+            </div>
+            {% endif %}
+
+            <div style="margin: 30px 0;">
+                <div style="font-size: 20px; font-weight: 700; color: #2c3e50; margin-bottom: 25px; text-align: center; border-bottom: 3px solid #17a2b8; padding-bottom: 12px;">
+                    🎥 VIDEOS DE EVIDENCIA ({{ cantidad_videos }})
+                </div>
+                
+                {% for video in videos_data %}
+                <div style="background: #f0f7ff; border: 2px solid #bfdbfe; border-radius: 12px; padding: 28px 24px; margin-bottom: 25px; text-align: center;">
+
+                    <span style="display: inline-block; background: #1f6391; color: #ffffff; font-size: 13px; font-weight: 700; padding: 6px 16px; border-radius: 20px; margin-bottom: 18px; letter-spacing: 0.3px;">
+                        {{ video.tipo_display }}
+                    </span>
+
+                    {% if video.tiene_thumbnail %}
+                    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto 16px; border-radius: 10px; overflow: hidden;">
+                        <tr>
+                            <td style="line-height: 0; font-size: 0; border-radius: 10px; overflow: hidden;">
+                                <a href="{{ video.video_url }}" target="_blank" style="display:block; line-height:0; font-size:0; border: 3px solid #1f6391; border-radius: 10px;">
+                                    <img src="cid:thumb_video_{{ video.id }}" alt="Vista previa {{ video.tipo_display }}" style="display: block; width: 380px; max-width: 100%; height: auto; border-radius: 10px;" />
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                    <a href="{{ video.video_url }}" target="_blank" style="display: block; margin: 10px auto 16px; font-size: 14px; font-weight: 600; color: #1f6391; text-decoration: none;">
+                        ▶ Toca aquí para reproducir el video
+                    </a>
+                    {% else %}
+                    <div style="font-size: 48px; margin-bottom: 12px;">🎬</div>
+                    {% endif %}
+
+                    {% if video.descripcion %}
+                    <div style="font-size: 14px; color: #3b5f80; margin-bottom: 18px; line-height: 1.6; font-style: italic;">
+                        "{{ video.descripcion }}"
+                    </div>
+                    {% endif %}
+
+                    <div style="font-size: 14px; color: #3b5f80; margin-bottom: 16px; line-height: 1.6;">
+                        {% if video.duracion %}⏱ Duración: {{ video.duracion }}{% endif %}
+                        {% if video.duracion and video.tamano %} · {% endif %}
+                        {% if video.tamano %}📦 Tamaño: {{ video.tamano }} MB{% endif %}
+                    </div>
+
+                    {% if video.video_url %}
+                    <a href="{{ video.video_url }}" target="_blank" style="display: inline-block; padding: 12px 28px; background-color: #1f6391; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;">
+                        ▶ Reproducir video
+                    </a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="help-section">
+                <div class="help-title">ℹ️ Información Importante</div>
+                <div class="help-text">
+                    <strong>•</strong> Los videos adjuntos documentan el proceso de servicio de su equipo.<br>
+                    <strong>•</strong> Esta evidencia forma parte de nuestro registro de calidad y transparencia.<br>
+                    <strong>•</strong> Si tiene alguna pregunta sobre el servicio realizado, no dude en contactarnos.<br>
+                    <strong>•</strong> Le mantendremos informado sobre cualquier actualización de su equipo.
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
+                <p style="margin: 0; font-size: 14px;">
+                    Gracias por confiar en nuestros servicios.
+                </p>
+            </div>
+
+            {% if seguimiento_url %}
+            <div style="margin-top: 20px; padding: 16px 20px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 10px; border-left: 4px solid #0284c7; text-align: center;">
+                <p style="margin: 0 0 10px; font-size: 14px; color: #0c4a6e;">
+                    🔍 Consulta el <strong>estado de tu equipo</strong> en cualquier momento:
+                </p>
+                <a href="{{ seguimiento_url }}" style="display: inline-block; padding: 10px 24px; background-color: #0284c7; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: bold;">Ver seguimiento de mi equipo</a>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-name">
+                    Sistema de Servicio Técnico
+                </div>
+                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 18.2px;">
+                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                </div>
+                <div class="signature-area" style="margin-top: 10px; font-size: 16.9px; line-height: 1.5;">
+                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                    Para seguimiento de su orden, contacte directamente a su responsable de seguimiento.
+                </div>
+            </div>
+            
+            <div class="company">{{ empresa_nombre }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
+            
+            <div class="social-media">
+                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+                <div class="social-links">
+                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
+                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Sitio Web</span>
+                    </a>
+                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Instagram</span>
+                    </a>
+                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Facebook</span>
+                    </a>
+                    {% if whatsapp_empleado %}
+                    <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
+                        <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>WhatsApp</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="timestamp">
+                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

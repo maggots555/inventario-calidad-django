@@ -1098,3 +1098,205 @@ def transcribir_audio_gemini_con_fallback(
         'error': ultimo_error,
         'intentos': intentos,
     }
+
+
+# ============================================================================
+# ANÁLISIS DE EVIDENCIA EN VIDEO — Gemini visión con frames extraídos
+# ============================================================================
+# Reutiliza PROMPT_ANALISIS_VIDEO_EVIDENCIA de ollama_client para coherencia.
+# Los frames ya fueron extraídos por FFmpeg antes de llegar aquí.
+# ============================================================================
+
+
+def analizar_video_evidencia_gemini(
+    frames_bytes: list[bytes],
+    tipo_equipo: str = "",
+    marca: str = "",
+    modelo_equipo: str = "",
+    n_videos: int = 1,
+    modelo_override: str = "",
+) -> dict:
+    """
+    Envía frames de video a la API de Google Gemini para obtener un resumen
+    ejecutivo del servicio realizado al equipo.
+
+    Args:
+        frames_bytes:   Lista de bytes JPEG de frames extraídos por FFmpeg.
+        tipo_equipo:    Tipo de equipo para contextualizar el prompt.
+        marca:          Marca del equipo.
+        modelo_equipo:  Modelo específico del equipo.
+        n_videos:       Cantidad de videos de donde provienen los frames.
+        modelo_override: Modelo específico a usar (vacío = default).
+
+    Returns:
+        dict — éxito:
+            {'success': True, 'analisis': '...texto...', 'modelo_usado': '...'}
+        dict — error (siempre incluye 'error_type'):
+            {'success': False, 'error': '...mensaje...', 'error_type': '<tipo>'}
+    """
+    from .ollama_client import PROMPT_ANALISIS_VIDEO_EVIDENCIA
+
+    if not frames_bytes:
+        return {'success': False, 'error': 'No se proporcionaron frames para analizar.', 'error_type': 'config_error'}
+
+    if not getattr(settings, 'GEMINI_ENABLED', False):
+        return {'success': False, 'error': 'Gemini no está habilitado en este entorno.', 'error_type': 'config_error'}
+
+    api_key = getattr(settings, 'GEMINI_API_KEY', '').strip()
+    if not api_key:
+        logger.error("[VideoIA][Gemini] GEMINI_API_KEY no está configurada.")
+        return {'success': False, 'error': 'GEMINI_API_KEY no configurada.', 'error_type': 'config_error'}
+
+    model = modelo_override.strip() if modelo_override.strip() else getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+    timeout = getattr(settings, 'OLLAMA_VISION_TIMEOUT', 600)
+    max_imgs = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
+
+    frames_limitados = frames_bytes[:max_imgs]
+
+    tipo_eq = tipo_equipo.strip() or 'equipo'
+    marca_eq = marca.strip() or ''
+    modelo_eq = modelo_equipo.strip() or ''
+    prompt_texto = PROMPT_ANALISIS_VIDEO_EVIDENCIA.format(
+        n_frames=len(frames_limitados),
+        n_videos=n_videos,
+        tipo_equipo=tipo_eq,
+        marca=marca_eq,
+        modelo=modelo_eq,
+    ).strip()
+
+    parts = [{"text": prompt_texto}]
+    for frame_bytes in frames_limitados:
+        parts.append({
+            "inline_data": {
+                "mime_type": "image/jpeg",
+                "data": _base64.b64encode(frame_bytes).decode('utf-8'),
+            }
+        })
+
+    payload = {
+        "contents": [
+            {
+                "parts": parts,
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.2,
+            "topP": 0.9,
+            "maxOutputTokens": 2048,
+            "thinkingConfig": {"thinkingBudget": -1},
+        },
+    }
+
+    url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
+    url_log = f"{GEMINI_API_BASE}/{model}:generateContent"
+    data = json.dumps(payload).encode('utf-8')
+
+    logger.info(
+        f"[VideoIA][Gemini] Analizando evidencia en video | "
+        f"Modelo: {model} | Frames: {len(frames_limitados)} | "
+        f"Videos: {n_videos} | Equipo: {marca_eq} {modelo_eq}"
+    )
+
+    try:
+        ctx = ssl.create_default_context()
+        req = urllib.request.Request(
+            url=url,
+            data=data,
+            headers={
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            method='POST',
+        )
+
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as response:
+            response_data = json.loads(response.read().decode('utf-8'))
+
+        feedback = response_data.get('promptFeedback', {})
+        block_reason = feedback.get('blockReason', '')
+        if block_reason:
+            logger.warning(f"[VideoIA][Gemini] Respuesta bloqueada por safety: {block_reason}")
+            return {
+                'success': False,
+                'error': f'Gemini bloqueó la solicitud por filtros de seguridad: {block_reason}',
+                'error_type': 'safety_block',
+            }
+
+        candidates = response_data.get('candidates', [])
+        if not candidates:
+            logger.warning("[VideoIA][Gemini] Respuesta vacía — sin candidatos.")
+            return {'success': False, 'error': 'Gemini devolvió una respuesta vacía.', 'error_type': 'server_error'}
+
+        finish_reason = candidates[0].get('finishReason', 'STOP')
+        if finish_reason == 'SAFETY':
+            logger.warning(f"[VideoIA][Gemini] finishReason=SAFETY | Modelo: {model}")
+            return {
+                'success': False,
+                'error': 'Gemini bloqueó la respuesta por políticas de seguridad.',
+                'error_type': 'safety_block',
+            }
+
+        analisis = (
+            candidates[0]
+            .get('content', {})
+            .get('parts', [{}])[0]
+            .get('text', '')
+            .strip()
+        )
+
+        if not analisis:
+            logger.warning("[VideoIA][Gemini] Texto extraído vacío.")
+            return {'success': False, 'error': 'Gemini devolvió una respuesta vacía.', 'error_type': 'server_error'}
+
+        logger.info(
+            f"[VideoIA][Gemini] Análisis completado | "
+            f"{len(analisis)} chars | Modelo: {model} | finishReason: {finish_reason}"
+        )
+        return {
+            'success': True,
+            'analisis': analisis,
+            'modelo_usado': model,
+        }
+
+    except urllib.error.HTTPError as e:
+        error_body = ''
+        try:
+            error_body = e.read().decode('utf-8')
+            error_json = json.loads(error_body)
+            error_msg = error_json.get('error', {}).get('message', str(e))
+        except Exception:
+            error_msg = error_body or str(e)
+        logger.error(f"[VideoIA][Gemini] HTTP {e.code}: {error_msg} | Modelo: {model}")
+
+        if e.code == 429:
+            error_type = 'rate_limit'
+        elif e.code in (500, 502, 503, 504):
+            error_type = 'server_error'
+        else:
+            error_type = 'hard_error'
+
+        return {'success': False, 'error': f'Error HTTP {e.code} de Gemini: {error_msg}', 'error_type': error_type}
+
+    except urllib.error.URLError as e:
+        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
+        logger.error(f"[VideoIA][Gemini] Error de red: {error_msg}")
+        return {'success': False, 'error': f'Error de red al conectar con Gemini: {error_msg}', 'error_type': 'network_error'}
+
+    except TimeoutError:
+        logger.error(f"[VideoIA][Gemini] Timeout después de {timeout}s | Modelo: {model}")
+        return {
+            'success': False,
+            'error': f'Gemini tardó más de {timeout}s en responder.',
+            'error_type': 'timeout',
+        }
+
+    except json.JSONDecodeError:
+        logger.error("[VideoIA][Gemini] Error al parsear respuesta JSON.")
+        return {'success': False, 'error': 'Respuesta inválida de la API de Gemini.', 'error_type': 'server_error'}
+
+    except Exception as e:
+        logger.error(
+            f"[VideoIA][Gemini] Error inesperado: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        return {'success': False, 'error': f'Error inesperado con Gemini: {str(e)}', 'error_type': 'hard_error'}
