@@ -1961,21 +1961,28 @@ Pueden mostrar diferentes etapas: ingreso, diagnóstico, reparación y egreso.
 
 REGLAS DE OBSERVACIÓN — NUNCA las violes:
 1. Describe ÚNICAMENTE lo que puedes observar con claridad en las capturas.
-2. Si algo no se aprecia con certeza, OMÍTELO.
+2. Si algo no se aprecia con certeza, OMÍTELO. Un resumen corto y preciso es \
+superior a uno largo con información dudosa.
 3. NUNCA uses lenguaje de incertidumbre: prohibido "parece", "aparenta", \
-"podría", "es posible". Si no lo ves con claridad, no lo escribas.
-4. Estructura tu respuesta como un RESUMEN EJECUTIVO del servicio:
-   - Estado inicial del equipo (lo que se observa al ingreso)
-   - Acciones visibles realizadas (desmontaje, limpieza, reemplazo de piezas)
-   - Estado final del equipo (condición al egreso)
-5. Si observas piezas o componentes siendo reemplazados, menciónalos.
-6. Tono formal, tercera persona, lenguaje técnico pero comprensible.
-7. Escribe un único párrafo fluido de 3 a 6 oraciones.
-8. Si las capturas muestran buen estado general sin acciones notables, \
-indícalo en una oración directa.
-9. Responde ÚNICAMENTE con el párrafo del resumen. Sin prefijos, sin títulos, \
+"podría", "es posible", "se observa que", "se aprecia que" ni ninguna expresión \
+que indique incertidumbre. Si no lo ves con claridad, no lo escribas.
+4. NUNCA listes ausencias de acciones o daños ("no se realizaron reparaciones", \
+"sin daños visibles", "no se detectan problemas"). Solo documenta lo que SÍ está \
+presente y es observable en las capturas.
+5. No menciones componentes, piezas o etapas del servicio que no se observan \
+claramente en las capturas. Que una etapa no se vea o que un componente aparezca \
+en estado normal sin nada notable que reportar no aporta valor al resumen — \
+omítelos si no hay nada específico que señalar.
+6. Si observas piezas o componentes siendo reemplazados, menciónalos \
+especificando zona exacta y tipo de acción realizada.
+7. Tono formal, tercera persona, lenguaje técnico pero comprensible.
+8. Escribe un único párrafo fluido de 3 a 6 oraciones. Puede ser corto si hay \
+pocas acciones observables — la precisión es la meta.
+9. Si las capturas muestran buen estado general sin acciones notables, \
+indícalo en una oración directa y concisa.
+10. Responde ÚNICAMENTE con el párrafo del resumen. Sin prefijos, sin títulos, \
 sin "Resumen:", sin comillas.
-10. IDIOMA: el resumen debe estar escrito EXCLUSIVAMENTE en español.\
+11. IDIOMA: el resumen debe estar escrito EXCLUSIVAMENTE en español.\
 """
 
 

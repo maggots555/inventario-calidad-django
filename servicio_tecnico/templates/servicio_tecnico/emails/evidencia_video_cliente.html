@@ -539,43 +539,46 @@
                 </div>
                 
                 {% for video in videos_data %}
-                <div style="background: #f0f7ff; border: 2px solid #bfdbfe; border-radius: 12px; padding: 28px 24px; margin-bottom: 25px; text-align: center;">
+                <div style="background: #f0f7ff; border: 2px solid #bfdbfe; border-radius: 12px; padding: 32px 28px; margin-bottom: 28px; text-align: center;">
 
-                    <span style="display: inline-block; background: #1f6391; color: #ffffff; font-size: 13px; font-weight: 700; padding: 6px 16px; border-radius: 20px; margin-bottom: 18px; letter-spacing: 0.3px;">
+                    <!-- Badge de tipo de video con más espacio inferior -->
+                    <span style="display: inline-block; background: #1f6391; color: #ffffff; font-size: 13px; font-weight: 700; padding: 6px 16px; border-radius: 20px; margin-bottom: 20px; letter-spacing: 0.3px;">
                         {{ video.tipo_display }}
                     </span>
 
                     {% if video.tiene_thumbnail %}
-                    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto 16px; border-radius: 10px; overflow: hidden;">
+                    <!-- Thumbnail con tamaño estándar fijo — object-fit:cover recorta
+                         el exceso tanto en videos verticales como horizontales,
+                         garantizando que todos los thumbnails ocupen el mismo recuadro -->
+                    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto 20px; border-radius: 10px; overflow: hidden; width: 320px; max-width: 100%;">
                         <tr>
-                            <td style="line-height: 0; font-size: 0; border-radius: 10px; overflow: hidden;">
-                                <a href="{{ video.video_url }}" target="_blank" style="display:block; line-height:0; font-size:0; border: 3px solid #1f6391; border-radius: 10px;">
-                                    <img src="cid:thumb_video_{{ video.id }}" alt="Vista previa {{ video.tipo_display }}" style="display: block; width: 380px; max-width: 100%; height: auto; border-radius: 10px;" />
+                            <td style="line-height: 0; font-size: 0; border-radius: 10px; overflow: hidden; width: 320px; height: 210px;">
+                                <a href="{{ video.video_url }}" target="_blank" style="display:block; line-height:0; font-size:0; border: 3px solid #1f6391; border-radius: 10px; overflow: hidden;">
+                                    <img src="cid:thumb_video_{{ video.id }}" alt="Vista previa {{ video.tipo_display }}" style="display: block; width: 320px; max-width: 100%; height: 210px; object-fit: cover; border-radius: 8px;" />
                                 </a>
                             </td>
                         </tr>
                     </table>
-                    <a href="{{ video.video_url }}" target="_blank" style="display: block; margin: 10px auto 16px; font-size: 14px; font-weight: 600; color: #1f6391; text-decoration: none;">
-                        ▶ Toca aquí para reproducir el video
-                    </a>
                     {% else %}
-                    <div style="font-size: 48px; margin-bottom: 12px;">🎬</div>
+                    <div style="font-size: 48px; margin-bottom: 20px;">🎬</div>
                     {% endif %}
 
                     {% if video.descripcion %}
-                    <div style="font-size: 14px; color: #3b5f80; margin-bottom: 18px; line-height: 1.6; font-style: italic;">
+                    <!-- Descripción con más margen superior e inferior para no pegarse al thumbnail ni al meta -->
+                    <div style="font-size: 14px; color: #3b5f80; margin: 4px 0 20px; line-height: 1.7; font-style: italic;">
                         "{{ video.descripcion }}"
                     </div>
                     {% endif %}
 
-                    <div style="font-size: 14px; color: #3b5f80; margin-bottom: 16px; line-height: 1.6;">
-                        {% if video.duracion %}⏱ Duración: {{ video.duracion }}{% endif %}
-                        {% if video.duracion and video.tamano %} · {% endif %}
-                        {% if video.tamano %}📦 Tamaño: {{ video.tamano }} MB{% endif %}
+                    <!-- Meta: duración y tamaño, separado del contenido anterior y del botón -->
+                    <div style="font-size: 14px; color: #3b5f80; margin: 0 0 22px; line-height: 1.6;">
+                        {% if video.duracion %}⏱ {{ video.duracion }}{% endif %}
+                        {% if video.duracion and video.tamano %}&nbsp;·&nbsp;{% endif %}
+                        {% if video.tamano %}📦 {{ video.tamano }} MB{% endif %}
                     </div>
 
                     {% if video.video_url %}
-                    <a href="{{ video.video_url }}" target="_blank" style="display: inline-block; padding: 12px 28px; background-color: #1f6391; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;">
+                    <a href="{{ video.video_url }}" target="_blank" style="display: inline-block; padding: 13px 32px; background-color: #1f6391; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;">
                         ▶ Reproducir video
                     </a>
                     {% endif %}

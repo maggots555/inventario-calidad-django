@@ -4338,7 +4338,7 @@ def enviar_evidencia_video_task(
                 logger.warning(f"[EVIDENCIA-VIDEO] Video {video.id} no encontrado en disco.")
                 continue
 
-            frames = extraer_frames_video(video_path, max_frames=4)
+            frames = extraer_frames_video(video_path, max_frames=8)
             todos_los_frames.extend(frames)
 
             duracion_str = ''
