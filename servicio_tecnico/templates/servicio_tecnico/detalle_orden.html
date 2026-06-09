@@ -2418,15 +2418,6 @@
                         Galería de Videos del Equipo
                         <span class="badge bg-dark ms-2">{{ total_videos }} video{{ total_videos|pluralize:"s" }}</span>
                     </div>
-                    {% if total_videos > 0 %}
-                    <button type="button"
-                            class="btn btn-sm btn-outline-light"
-                            data-bs-toggle="modal"
-                            data-bs-target="#modalCompartirEvidencia"
-                            title="Compartir evidencia en video con el cliente">
-                        <i class="bi bi-share-fill"></i> Compartir Evidencia
-                    </button>
-                    {% endif %}
                 </div>
                 <div class="card-body">
 
@@ -2549,11 +2540,21 @@
                                     <button type="submit"
                                             class="btn btn-success w-100"
                                             id="btnSubirVideo"
-                                            style="height: 70px; font-size: 0.95rem;"
+                                            style="height: 45px; font-size: 0.95rem;"
                                             disabled>
-                                        <i class="bi bi-cloud-upload d-block mb-1" style="font-size:1.4rem;"></i>
-                                        Subir Video
+                                        <i class="bi bi-cloud-upload"></i> Subir Video
                                     </button>
+
+                                    {% if total_videos > 0 %}
+                                    <button type="button"
+                                            class="btn w-100 btn-primary mt-2"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalCompartirEvidencia"
+                                            title="Compartir evidencia en video con el cliente">
+                                        <i class="bi bi-share-fill me-1"></i> Compartir videos
+                                        <span class="badge bg-light text-primary ms-1">{{ total_videos }}</span>
+                                    </button>
+                                    {% endif %}
                                 </div>
                             </div>
 
