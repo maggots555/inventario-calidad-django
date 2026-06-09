@@ -1958,7 +1958,7 @@ video(s) de evidencia del servicio realizado al {tipo_equipo} {marca} {modelo}.
 CONTEXTO DE LAS CAPTURAS:
 Las imágenes provienen de videos grabados durante el proceso de servicio. \
 Pueden mostrar diferentes etapas: ingreso, diagnóstico, reparación y egreso.
-
+{contexto_adicional}
 REGLAS DE OBSERVACIÓN — NUNCA las violes:
 1. Describe ÚNICAMENTE lo que puedes observar con claridad en las capturas.
 2. Si algo no se aprecia con certeza, OMÍTELO. Un resumen corto y preciso es \
@@ -2111,6 +2111,7 @@ def analizar_video_evidencia_ollama(
     modelo_equipo: str = "",
     n_videos: int = 1,
     modelo_override: str = "",
+    contexto_adicional: str = "",
 ) -> dict:
     """
     Envía frames de video al modelo Ollama con capacidades de visión para
@@ -2123,6 +2124,7 @@ def analizar_video_evidencia_ollama(
         modelo_equipo: Modelo específico del equipo.
         n_videos:      Cantidad de videos de donde provienen los frames.
         modelo_override: Modelo específico a usar (vacío = default).
+        contexto_adicional: Texto opcional del técnico con detalles del servicio.
 
     Returns:
         dict:
@@ -2149,12 +2151,27 @@ def analizar_video_evidencia_ollama(
     tipo_eq = tipo_equipo.strip() or 'equipo'
     marca_eq = marca.strip() or ''
     modelo_eq = modelo_equipo.strip() or ''
+
+    # --- Contexto adicional del técnico (opcional) ---
+    # Si el técnico proporcionó detalles del servicio, se incluyen en el prompt
+    # para que la IA tenga mejor contexto al interpretar los frames
+    contexto_texto = ''
+    if contexto_adicional.strip():
+        contexto_texto = (
+            '\n\nCONTEXTO ADICIONAL DEL TÉCNICO:\n'
+            f'{contexto_adicional.strip()}\n\n'
+            'Este contexto fue proporcionado por el técnico que realizó el servicio. '
+            'Úsalo como guía para interpretar las capturas, pero recuerda la regla 1: '
+            'describe ÚNICAMENTE lo que puedes observar con claridad.\n'
+        )
+
     prompt = PROMPT_ANALISIS_VIDEO_EVIDENCIA.format(
         n_frames=len(frames_b64),
         n_videos=n_videos,
         tipo_equipo=tipo_eq,
         marca=marca_eq,
         modelo=modelo_eq,
+        contexto_adicional=contexto_texto,
     ).strip()
 
     payload = {
@@ -2249,6 +2266,7 @@ def analizar_video_evidencia_dispatch(
     modelo_equipo: str = "",
     n_videos: int = 1,
     modelo_override: str = "",
+    contexto_adicional: str = "",
 ) -> dict:
     """
     Dispatcher para el análisis de evidencia en video.
@@ -2265,6 +2283,7 @@ def analizar_video_evidencia_dispatch(
         modelo_equipo:   Modelo específico del equipo.
         n_videos:        Cantidad de videos de donde provienen los frames.
         modelo_override: Modelo elegido en el selector (con o sin prefijo).
+        contexto_adicional: Texto opcional del técnico con detalles del servicio.
 
     Returns:
         dict:
@@ -2277,6 +2296,7 @@ def analizar_video_evidencia_dispatch(
         marca=marca,
         modelo_equipo=modelo_equipo,
         n_videos=n_videos,
+        contexto_adicional=contexto_adicional,
     )
 
     ERRORES_REINTENTABLES = {'rate_limit', 'server_error', 'timeout', 'network_error'}

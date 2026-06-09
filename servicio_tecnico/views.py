@@ -7652,6 +7652,7 @@ def enviar_evidencia_video(request, orden_id):
         destinatarios_copia = list(set(copia_empleados + copia_tecnico))
 
         modelo_ia_analisis = request.POST.get('modelo_ia_analisis', '').strip()
+        mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
 
         usuario_id = request.user.pk if request.user.is_authenticated else None
 
@@ -7663,6 +7664,7 @@ def enviar_evidencia_video(request, orden_id):
             destinatarios_copia=destinatarios_copia,
             modelo_ia_analisis=modelo_ia_analisis,
             usuario_id=usuario_id,
+            mensaje_personalizado=mensaje_personalizado,
         )
 
         HistorialOrden.objects.create(

@@ -9,16 +9,37 @@ if (modalEl) {
     const selectAllCheckbox = document.getElementById('evSelectAll');
     const counterEl = document.getElementById('evCounter');
     const videoGrid = document.querySelector('.ev-video-grid');
+    // --- Elementos de vista previa ---
+    const previewArchivosEl = document.getElementById('evPreviewArchivos');
+    const previewMensajeDiv = document.getElementById('evPreviewMensajePersonalizado');
+    const previewMensajeTexto = document.getElementById('evTextoMensajePersonalizado');
+    const mensajeTextarea = document.getElementById('evMensajePersonalizado');
     const getSelectedCount = () => {
         return document.querySelectorAll('.ev-video-checkbox:checked').length;
     };
     const updateCounter = () => {
         const count = getSelectedCount();
         if (counterEl) {
-            counterEl.textContent = `${count} video${count !== 1 ? 's' : ''} seleccionado${count !== 1 ? 's' : ''}`;
+            counterEl.textContent = `${count} seleccionado${count !== 1 ? 's' : ''}`;
+        }
+        if (previewArchivosEl) {
+            previewArchivosEl.innerHTML = `<i class="bi bi-camera-video"></i> ${count} video${count !== 1 ? 's' : ''}`;
         }
         if (btnEnviar) {
-            btnEnviar.disabled = count === 0;
+            const emailInvalido = btnEnviar.getAttribute('data-email-invalido') === 'true';
+            btnEnviar.disabled = count === 0 || emailInvalido;
+        }
+    };
+    const updateMensajePreview = () => {
+        if (!mensajeTextarea || !previewMensajeDiv || !previewMensajeTexto)
+            return;
+        const texto = mensajeTextarea.value.trim();
+        if (texto.length > 0) {
+            previewMensajeTexto.textContent = texto;
+            previewMensajeDiv.style.display = 'block';
+        }
+        else {
+            previewMensajeDiv.style.display = 'none';
         }
     };
     const toggleCard = (card, checkbox) => {
@@ -74,6 +95,10 @@ if (modalEl) {
                 }
             });
         });
+    }
+    // --- Listener para mensaje personalizado ---
+    if (mensajeTextarea) {
+        mensajeTextarea.addEventListener('input', updateMensajePreview);
     }
     if (form && btnEnviar) {
         form.addEventListener('submit', async (e) => {
@@ -138,14 +163,21 @@ if (modalEl) {
             selectAllCheckbox.indeterminate = false;
         }
         updateCounter();
+        // --- Limpiar mensaje personalizado ---
+        if (mensajeTextarea) {
+            mensajeTextarea.value = '';
+        }
+        updateMensajePreview();
         const alerts = form === null || form === void 0 ? void 0 : form.querySelectorAll('.alert-success, .alert-danger');
         alerts === null || alerts === void 0 ? void 0 : alerts.forEach(a => a.remove());
         if (btnEnviar) {
+            const emailInvalido = btnEnviar.getAttribute('data-email-invalido') === 'true';
             btnEnviar.disabled = true;
             const originalText = btnEnviar.getAttribute('data-original-text') || btnEnviar.innerHTML;
             btnEnviar.innerHTML = originalText;
         }
     });
     updateCounter();
+    updateMensajePreview();
 }
 //# sourceMappingURL=compartir_video.js.map

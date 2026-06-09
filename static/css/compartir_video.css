@@ -3,22 +3,7 @@
    Estilos para el modal de selección y envío de videos
    ============================================================ */
 
-.modal-header-ev {
-    background-color: #1f6391;
-    color: #ffffff;
-    border-bottom: none;
-    padding: 1rem 1.25rem;
-}
-
-.modal-header-ev .modal-title {
-    font-weight: 700;
-    font-size: 1.1rem;
-}
-
-.modal-header-ev .btn-close {
-    filter: brightness(0) invert(1);
-}
-
+/* --- Secciones y títulos --- */
 .ev-section {
     margin-bottom: 1.25rem;
 }
@@ -34,48 +19,110 @@
     border-bottom: 2px solid #e9ecef;
 }
 
+.ev-divider {
+    margin: 1.5rem 0;
+}
+
+/* --- Destinatario principal --- */
+.ev-destinatario-card {
+    transition: box-shadow 0.2s ease;
+}
+
+.ev-destinatario-success {
+    background: #d1e7dd;
+    border-color: #badbcc;
+}
+
+/* --- Con copia: subtítulos --- */
+.ev-cc-subtitle {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+/* --- Con copia: cards de empleados --- */
+.ev-cc-card {
+    display: block;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.ev-cc-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.ev-cc-card .form-check-input {
+    width: 1.2em;
+    height: 1.2em;
+    cursor: pointer;
+}
+
+.ev-cc-avatar {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.ev-cc-avatar-success {
+    border: 2px solid #28a745;
+}
+
+.ev-cc-avatar-primary {
+    border: 2px solid #0d6efd;
+}
+
+.ev-cc-avatar-info {
+    border: 2px solid #17a2b8;
+}
+
+/* --- Grid de videos --- */
 .ev-video-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 0.75rem;
-    max-height: 320px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+    max-height: 420px;
     overflow-y: auto;
     padding: 0.5rem;
 }
 
 .ev-video-card {
-    border: 2px solid #dee2e6;
-    border-radius: 8px;
+    border: 3px solid #dee2e6;
+    border-radius: 10px;
     overflow: hidden;
     cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
     background: #ffffff;
     position: relative;
 }
 
 .ev-video-card:hover {
     border-color: #86b7fe;
-    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.15);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);
+    transform: translateY(-2px);
 }
 
 .ev-video-card.ev-selected {
     border-color: #198754;
-    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.2);
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.25);
 }
 
 .ev-video-card .ev-check-overlay {
     position: absolute;
-    top: 6px;
-    right: 6px;
+    top: 8px;
+    right: 8px;
     z-index: 2;
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.95);
     border: 2px solid #dee2e6;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 0.9rem;
     transition: all 0.2s;
 }
 
@@ -87,7 +134,7 @@
 
 .ev-video-card .ev-thumb {
     width: 100%;
-    height: 100px;
+    height: 140px;
     object-fit: cover;
     display: block;
     background: #f8f9fa;
@@ -95,98 +142,53 @@
 
 .ev-video-card .ev-thumb-placeholder {
     width: 100%;
-    height: 100px;
+    height: 140px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #e9ecef;
     color: #6c757d;
-    font-size: 1.8rem;
+    font-size: 2.2rem;
 }
 
 .ev-video-card .ev-info {
-    padding: 0.4rem 0.5rem;
+    padding: 0.5rem 0.65rem;
 }
 
 .ev-video-card .ev-tipo {
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     font-weight: 700;
     color: #ffffff;
     background: #0d6efd;
-    padding: 1px 8px;
-    border-radius: 10px;
+    padding: 2px 10px;
+    border-radius: 12px;
     display: inline-block;
 }
 
 .ev-video-card .ev-meta {
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     color: #6c757d;
-    margin-top: 2px;
-}
-
-.ev-destinatario-card {
-    background: #d1e7dd;
-    border: 1px solid #badbcc;
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-}
-
-.ev-destinatario-card .ev-email {
-    font-weight: 600;
-    color: #0f5132;
-}
-
-.ev-cc-grid {
+    margin-top: 4px;
     display: flex;
+    gap: 0.5rem;
     flex-wrap: wrap;
-    gap: 0.5rem;
 }
 
-.ev-cc-item {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.75rem;
-    border: 1px solid #dee2e6;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    background: #f8f9fa;
-    cursor: pointer;
-    transition: all 0.2s;
+.ev-video-card .ev-meta i {
+    font-size: 0.65rem;
+    margin-right: 2px;
 }
 
-.ev-cc-item:hover {
-    background: #e9ecef;
+.ev-video-card .ev-desc {
+    font-size: 0.7rem;
+    color: #868e96;
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.ev-cc-item input[type="checkbox"] {
-    margin: 0;
-}
-
-.ev-preview-box {
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    padding: 1rem;
-    font-size: 0.85rem;
-}
-
-.ev-preview-row {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.35rem;
-}
-
-.ev-preview-label {
-    font-weight: 600;
-    color: #495057;
-    min-width: 70px;
-}
-
-.ev-preview-value {
-    color: #6c757d;
-}
-
+/* --- Barra seleccionar todos --- */
 .ev-select-all-bar {
     display: flex;
     align-items: center;
@@ -195,22 +197,29 @@
     background: #f8f9fa;
     border: 1px solid #e9ecef;
     border-radius: 6px;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
 }
 
-.ev-counter {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #198754;
+/* --- Vista previa del correo --- */
+.ev-preview-email {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.ev-preview-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.ev-preview-body {
+    font-size: 0.9rem;
+    line-height: 1.6;
 }
 
 /* ============================================================
    MODO OSCURO — Overrides para [data-bs-theme="dark"]
    ============================================================ */
-
-[data-bs-theme="dark"] .modal-header-ev {
-    background-color: #1e293b;
-}
 
 [data-bs-theme="dark"] #modalCompartirEvidencia .modal-content {
     background-color: #1e293b;
@@ -232,6 +241,52 @@
     border-bottom-color: #334155;
 }
 
+[data-bs-theme="dark"] .ev-divider {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .ev-cc-subtitle {
+    color: #cbd5e1;
+}
+
+/* --- Destinatario oscuro --- */
+[data-bs-theme="dark"] .ev-destinatario-success {
+    background: rgba(52, 211, 153, 0.1);
+    border-color: rgba(52, 211, 153, 0.2);
+}
+
+[data-bs-theme="dark"] .ev-destinatario-success .text-dark {
+    color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .ev-destinatario-success .text-success {
+    color: #34d399 !important;
+}
+
+/* --- CC cards oscuro --- */
+[data-bs-theme="dark"] .ev-cc-card {
+    background: #0f172a !important;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+
+[data-bs-theme="dark"] .ev-cc-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-bs-theme="dark"] .ev-cc-card.border-success {
+    border-color: #34d399 !important;
+}
+
+[data-bs-theme="dark"] .ev-cc-card.border-primary {
+    border-color: #60a5fa !important;
+}
+
+[data-bs-theme="dark"] .ev-cc-card .text-muted {
+    color: #94a3b8 !important;
+}
+
+/* --- Video cards oscuro --- */
 [data-bs-theme="dark"] .ev-video-card {
     background: #0f172a;
     border-color: #334155;
@@ -239,6 +294,7 @@
 
 [data-bs-theme="dark"] .ev-video-card:hover {
     border-color: #60a5fa;
+    box-shadow: 0 4px 12px rgba(96, 165, 250, 0.15);
 }
 
 [data-bs-theme="dark"] .ev-video-card.ev-selected {
@@ -247,7 +303,7 @@
 }
 
 [data-bs-theme="dark"] .ev-video-card .ev-check-overlay {
-    background: rgba(30, 41, 59, 0.9);
+    background: rgba(30, 41, 59, 0.95);
     border-color: #475569;
 }
 
@@ -269,53 +325,63 @@
     color: #94a3b8;
 }
 
-[data-bs-theme="dark"] .ev-destinatario-card {
-    background: rgba(52, 211, 153, 0.1);
-    border-color: rgba(52, 211, 153, 0.2);
+[data-bs-theme="dark"] .ev-video-card .ev-desc {
+    color: #64748b;
 }
 
-[data-bs-theme="dark"] .ev-destinatario-card .ev-email {
-    color: #34d399;
-}
-
-[data-bs-theme="dark"] .ev-cc-item {
-    background: #0f172a;
-    border-color: #334155;
-    color: #cbd5e1;
-}
-
-[data-bs-theme="dark"] .ev-cc-item:hover {
-    background: #1e293b;
-}
-
-[data-bs-theme="dark"] .ev-preview-box {
-    background: #0f172a;
-    border-color: #334155;
-}
-
-[data-bs-theme="dark"] .ev-preview-label {
-    color: #cbd5e1;
-}
-
-[data-bs-theme="dark"] .ev-preview-value {
-    color: #94a3b8;
-}
-
+/* --- Select all bar oscuro --- */
 [data-bs-theme="dark"] .ev-select-all-bar {
     background: #0f172a;
     border-color: #334155;
 }
 
-[data-bs-theme="dark"] .ev-counter {
-    color: #34d399;
+/* --- Preview oscuro --- */
+[data-bs-theme="dark"] .ev-preview-email {
+    border-color: #334155;
 }
 
+[data-bs-theme="dark"] .ev-preview-header {
+    background: #0f172a;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .ev-preview-header .text-muted {
+    color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] .ev-preview-body {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .ev-preview-body .bg-white {
+    background-color: #0f172a !important;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .ev-preview-body .bg-light {
+    background-color: #0f172a !important;
+    color: #e2e8f0;
+}
+
+/* --- Formularios oscuro --- */
 [data-bs-theme="dark"] #modalCompartirEvidencia .form-select {
     background-color: #0f172a;
     border-color: #334155;
     color: var(--text-primary);
 }
 
+[data-bs-theme="dark"] #modalCompartirEvidencia .form-control {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] #modalCompartirEvidencia .form-floating > label {
+    color: #94a3b8;
+}
+
+/* --- Alertas oscuro --- */
 [data-bs-theme="dark"] #modalCompartirEvidencia .alert-info {
     background-color: rgba(14, 165, 233, 0.08);
     border-color: rgba(56, 189, 248, 0.2);
@@ -326,4 +392,10 @@
     background-color: rgba(251, 191, 36, 0.08);
     border-color: rgba(251, 191, 36, 0.2);
     color: #fbbf24;
+}
+
+[data-bs-theme="dark"] #modalCompartirEvidencia .alert-light {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: #cbd5e1;
 }

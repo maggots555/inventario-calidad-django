@@ -1115,6 +1115,7 @@ def analizar_video_evidencia_gemini(
     modelo_equipo: str = "",
     n_videos: int = 1,
     modelo_override: str = "",
+    contexto_adicional: str = "",
 ) -> dict:
     """
     Envía frames de video a la API de Google Gemini para obtener un resumen
@@ -1127,6 +1128,7 @@ def analizar_video_evidencia_gemini(
         modelo_equipo:  Modelo específico del equipo.
         n_videos:       Cantidad de videos de donde provienen los frames.
         modelo_override: Modelo específico a usar (vacío = default).
+        contexto_adicional: Texto opcional del técnico con detalles del servicio.
 
     Returns:
         dict — éxito:
@@ -1156,12 +1158,27 @@ def analizar_video_evidencia_gemini(
     tipo_eq = tipo_equipo.strip() or 'equipo'
     marca_eq = marca.strip() or ''
     modelo_eq = modelo_equipo.strip() or ''
+
+    # --- Contexto adicional del técnico (opcional) ---
+    # Si el técnico proporcionó detalles del servicio, se incluyen en el prompt
+    # para que la IA tenga mejor contexto al interpretar los frames
+    contexto_texto = ''
+    if contexto_adicional.strip():
+        contexto_texto = (
+            '\n\nCONTEXTO ADICIONAL DEL TÉCNICO:\n'
+            f'{contexto_adicional.strip()}\n\n'
+            'Este contexto fue proporcionado por el técnico que realizó el servicio. '
+            'Úsalo como guía para interpretar las capturas, pero recuerda la regla 1: '
+            'describe ÚNICAMENTE lo que puedes observar con claridad.\n'
+        )
+
     prompt_texto = PROMPT_ANALISIS_VIDEO_EVIDENCIA.format(
         n_frames=len(frames_limitados),
         n_videos=n_videos,
         tipo_equipo=tipo_eq,
         marca=marca_eq,
         modelo=modelo_eq,
+        contexto_adicional=contexto_texto,
     ).strip()
 
     parts = [{"text": prompt_texto}]

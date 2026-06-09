@@ -585,7 +585,18 @@
                 </div>
                 {% endfor %}
             </div>
-            
+
+            {% if mensaje_personalizado %}
+            <div style="margin: 25px 0; padding: 20px; background-color: #f8f9fa; border-left: 4px solid #1f6391; border-radius: 6px;">
+                <p style="margin: 0 0 10px; font-size: 14px; color: #495057; font-weight: 700;">
+                    💬 Mensaje adicional del equipo:
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #212529; line-height: 1.6; font-style: italic;">
+                    {{ mensaje_personalizado|linebreaksbr }}
+                </p>
+            </div>
+            {% endif %}
+
             <div class="help-section">
                 <div class="help-title">ℹ️ Información Importante</div>
                 <div class="help-text">

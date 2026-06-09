@@ -21,6 +21,12 @@ if (modalEl) {
     const counterEl = document.getElementById('evCounter') as HTMLElement | null;
     const videoGrid = document.querySelector('.ev-video-grid') as HTMLElement | null;
 
+    // --- Elementos de vista previa ---
+    const previewArchivosEl = document.getElementById('evPreviewArchivos') as HTMLElement | null;
+    const previewMensajeDiv = document.getElementById('evPreviewMensajePersonalizado') as HTMLElement | null;
+    const previewMensajeTexto = document.getElementById('evTextoMensajePersonalizado') as HTMLElement | null;
+    const mensajeTextarea = document.getElementById('evMensajePersonalizado') as HTMLTextAreaElement | null;
+
     const getSelectedCount = (): number => {
         return document.querySelectorAll<HTMLInputElement>(
             '.ev-video-checkbox:checked'
@@ -30,10 +36,25 @@ if (modalEl) {
     const updateCounter = (): void => {
         const count = getSelectedCount();
         if (counterEl) {
-            counterEl.textContent = `${count} video${count !== 1 ? 's' : ''} seleccionado${count !== 1 ? 's' : ''}`;
+            counterEl.textContent = `${count} seleccionado${count !== 1 ? 's' : ''}`;
+        }
+        if (previewArchivosEl) {
+            previewArchivosEl.innerHTML = `<i class="bi bi-camera-video"></i> ${count} video${count !== 1 ? 's' : ''}`;
         }
         if (btnEnviar) {
-            btnEnviar.disabled = count === 0;
+            const emailInvalido = btnEnviar.getAttribute('data-email-invalido') === 'true';
+            btnEnviar.disabled = count === 0 || emailInvalido;
+        }
+    };
+
+    const updateMensajePreview = (): void => {
+        if (!mensajeTextarea || !previewMensajeDiv || !previewMensajeTexto) return;
+        const texto = mensajeTextarea.value.trim();
+        if (texto.length > 0) {
+            previewMensajeTexto.textContent = texto;
+            previewMensajeDiv.style.display = 'block';
+        } else {
+            previewMensajeDiv.style.display = 'none';
         }
     };
 
@@ -93,6 +114,11 @@ if (modalEl) {
                 }
             });
         });
+    }
+
+    // --- Listener para mensaje personalizado ---
+    if (mensajeTextarea) {
+        mensajeTextarea.addEventListener('input', updateMensajePreview);
     }
 
     if (form && btnEnviar) {
@@ -164,10 +190,17 @@ if (modalEl) {
         }
         updateCounter();
 
+        // --- Limpiar mensaje personalizado ---
+        if (mensajeTextarea) {
+            mensajeTextarea.value = '';
+        }
+        updateMensajePreview();
+
         const alerts = form?.querySelectorAll('.alert-success, .alert-danger');
         alerts?.forEach(a => a.remove());
 
         if (btnEnviar) {
+            const emailInvalido = btnEnviar.getAttribute('data-email-invalido') === 'true';
             btnEnviar.disabled = true;
             const originalText = btnEnviar.getAttribute('data-original-text') || btnEnviar.innerHTML;
             btnEnviar.innerHTML = originalText;
@@ -175,4 +208,5 @@ if (modalEl) {
     });
 
     updateCounter();
+    updateMensajePreview();
 }

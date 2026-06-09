@@ -4279,17 +4279,19 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
 def enviar_evidencia_video_task(
     self, orden_id, video_ids, destinatarios_copia,
     modelo_ia_analisis='', usuario_id=None,
+    mensaje_personalizado='',
 ):
     """
     Tarea Celery: extrae frames de videos de evidencia, genera análisis IA
     opcional y envía correo al cliente con la evidencia en video.
 
     Parámetros:
-        orden_id            : ID de la OrdenServicio
-        video_ids           : Lista de IDs de VideoOrden seleccionados
-        destinatarios_copia : Lista de emails en CC
-        modelo_ia_analisis  : Modelo IA seleccionado (vacío = sin análisis)
-        usuario_id          : ID del usuario que disparó la acción
+        orden_id              : ID de la OrdenServicio
+        video_ids             : Lista de IDs de VideoOrden seleccionados
+        destinatarios_copia   : Lista de emails en CC
+        modelo_ia_analisis    : Modelo IA seleccionado (vacío = sin análisis)
+        usuario_id            : ID del usuario que disparó la acción
+        mensaje_personalizado : Texto opcional que el usuario agrega al correo
     """
     from pathlib import Path
     from django.core.mail import EmailMessage
@@ -4405,6 +4407,7 @@ def enviar_evidencia_video_task(
                     modelo_equipo=detalle.modelo if detalle else '',
                     n_videos=len(videos_data),
                     modelo_override=modelo_ia_analisis,
+                    contexto_adicional=mensaje_personalizado,
                 )
 
                 if resultado_ia.get('success'):
@@ -4481,6 +4484,7 @@ def enviar_evidencia_video_task(
             'seguimiento_url': seguimiento_url,
             'analisis_ia_texto': analisis_ia_texto,
             'analisis_ia_modelo': analisis_ia_modelo,
+            'mensaje_personalizado': mensaje_personalizado,
         }
 
         html_content = render_to_string(
