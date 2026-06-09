@@ -1332,12 +1332,18 @@ def analizar_video_evidencia_gemini(
 
 # Prompt fijo para la generación de citas — se reutiliza en Ollama para consistencia.
 PROMPT_CITA_NIHILISMO = (
-    "Genera una cita breve e inspiradora sobre el nihilismo optimista. "
-    "La cita debe: estar en español, tener entre 1 y 3 oraciones cortas, "
-    "ser reflexiva y motivadora, transmitir que la falta de significado "
-    "inherente en el universo es una libertad para crear el propio significado. "
-    "Responde ÚNICAMENTE con el texto de la cita. "
-    "Sin comillas, sin guiones, sin 'Aquí tienes:', sin ningún prefacio."
+    "Actúa como un filósofo existencialista moderno. Escribe una sola cita breve "
+    "e inspiradora sobre el nihilismo optimista.\n\n"
+    "Requisitos de contenido:\n"
+    "- Idioma: Español.\n"
+    "- Extensión: Entre 1 y 3 oraciones cortas.\n"
+    "- Mensaje central: El universo no tiene un significado inherente, y esa "
+    "ausencia absoluta es la máxima libertad para crear tu propio propósito.\n"
+    "- Tono: Reflexivo, maduro y motivador, evitando caer en clichés ingenuos.\n\n"
+    "Restricciones estrictas de formato:\n"
+    "- Responde EXCLUSIVAMENTE con el texto de la cita.\n"
+    "- Prohibido incluir comillas, guiones, introducciones (como 'Aquí tienes') "
+    "o comentarios finales."
 )
 
 
