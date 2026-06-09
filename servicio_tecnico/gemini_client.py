@@ -1317,3 +1317,245 @@ def analizar_video_evidencia_gemini(
             exc_info=True,
         )
         return {'success': False, 'error': f'Error inesperado con Gemini: {str(e)}', 'error_type': 'hard_error'}
+
+
+# ============================================================================
+# CITA DIARIA — NIHILISMO OPTIMISTA (solo texto)
+# ============================================================================
+# Genera una cita breve e inspiradora sobre nihilismo optimista usando Gemini.
+# Esta función es llamada por el dispatcher en ollama_client.py como parte de
+# la cascada de fallback: Gemini → Ollama → lista predefinida.
+#
+# A diferencia de las funciones de diagnóstico (temperature 0.3), aquí usamos
+# temperature 0.9 para obtener citas creativas y variadas cada día.
+# ============================================================================
+
+# Prompt fijo para la generación de citas — se reutiliza en Ollama para consistencia.
+PROMPT_CITA_NIHILISMO = (
+    "Genera una cita breve e inspiradora sobre el nihilismo optimista. "
+    "La cita debe: estar en español, tener entre 1 y 3 oraciones cortas, "
+    "ser reflexiva y motivadora, transmitir que la falta de significado "
+    "inherente en el universo es una libertad para crear el propio significado. "
+    "Responde ÚNICAMENTE con el texto de la cita. "
+    "Sin comillas, sin guiones, sin 'Aquí tienes:', sin ningún prefacio."
+)
+
+
+def generar_cita_nihilismo_gemini(
+    modelo_override: str = "",
+) -> dict:
+    """
+    Genera una cita de nihilismo optimista usando la API de Google Gemini.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta función envía un prompt creativo a Gemini y recibe una cita filosófica
+    breve. Usa temperatura alta (0.9) para que cada día la cita sea diferente.
+    Devuelve un dict con 'error_type' para que el dispatcher pueda decidir si
+    reintentar con otro modelo o pasar al siguiente proveedor.
+
+    Args:
+        modelo_override: Nombre del modelo Gemini a usar (sin prefijo "[Gemini]").
+                         Si está vacío, usa GEMINI_MODEL de settings.
+
+    Returns:
+        dict:
+            {'success': True, 'cita': '...texto...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...', 'error_type': '...'}
+    """
+    # ── Verificar que Gemini está habilitado y tiene API key ──
+    if not getattr(settings, 'GEMINI_ENABLED', False):
+        return {
+            'success': False,
+            'error': 'Gemini no está habilitado en este entorno.',
+            'error_type': 'config_error',
+        }
+
+    api_key = getattr(settings, 'GEMINI_API_KEY', '').strip()
+    if not api_key:
+        logger.error("[CitaNihilismo][Gemini] GEMINI_API_KEY no está configurada.")
+        return {
+            'success': False,
+            'error': 'API Key de Gemini no configurada.',
+            'error_type': 'config_error',
+        }
+
+    # ── Selección del modelo ──
+    model = (
+        modelo_override.strip()
+        if modelo_override.strip()
+        else getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+    )
+
+    # Limpiar prefijo visual si viene del selector (aunque el dispatcher ya lo limpia)
+    if model.startswith('[Gemini] '):
+        model = model[len('[Gemini] '):]
+
+    timeout = min(getattr(settings, 'GEMINI_TIMEOUT', 60), 15)
+
+    # ── Construir el payload ──
+    # Temperature alta (0.9) = citas creativas y variadas cada día.
+    # maxOutputTokens bajo (150) = suficiente para 1-3 oraciones breves.
+    # thinkingBudget: 0 = sin razonamiento interno, respuesta directa.
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": PROMPT_CITA_NIHILISMO}
+                ]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.9,
+            "maxOutputTokens": 150,
+            "thinkingConfig": {
+                "thinkingBudget": 0
+            }
+        }
+    }
+
+    data = json.dumps(payload).encode('utf-8')
+    url = f"{GEMINI_API_BASE}/{model}:generateContent?key={api_key}"
+    url_log = f"{GEMINI_API_BASE}/{model}:generateContent"
+
+    try:
+        req = urllib.request.Request(
+            url=url,
+            data=data,
+            headers={
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            method='POST',
+        )
+
+        logger.info(
+            f"[CitaNihilismo][Gemini] Generando cita | Modelo: {model} | URL: {url_log}"
+        )
+
+        ctx = ssl.create_default_context()
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as response:
+            response_data = json.loads(response.read().decode('utf-8'))
+
+        # ── Verificar bloqueo por safety filters ──
+        feedback = response_data.get('promptFeedback', {})
+        block_reason = feedback.get('blockReason', '')
+        if block_reason:
+            logger.warning(
+                f"[CitaNihilismo][Gemini] Respuesta bloqueada por safety: {block_reason}"
+            )
+            return {
+                'success': False,
+                'error': f'Gemini bloqueó la solicitud: {block_reason}',
+                'error_type': 'safety_block',
+            }
+
+        # ── Extraer texto de la respuesta ──
+        candidates = response_data.get('candidates', [])
+        if not candidates:
+            logger.warning("[CitaNihilismo][Gemini] Respuesta vacía — sin candidatos.")
+            return {
+                'success': False,
+                'error': 'Gemini devolvió una respuesta vacía.',
+                'error_type': 'server_error',
+            }
+
+        finish_reason = candidates[0].get('finishReason', 'STOP')
+        if finish_reason == 'SAFETY':
+            logger.warning(
+                f"[CitaNihilismo][Gemini] finishReason=SAFETY | Modelo: {model}"
+            )
+            return {
+                'success': False,
+                'error': 'Gemini bloqueó la respuesta por políticas de seguridad.',
+                'error_type': 'safety_block',
+            }
+
+        cita = (
+            candidates[0]
+            .get('content', {})
+            .get('parts', [{}])[0]
+            .get('text', '')
+            .strip()
+        )
+
+        if not cita:
+            logger.warning("[CitaNihilismo][Gemini] Texto extraído vacío.")
+            return {
+                'success': False,
+                'error': 'Gemini devolvió una respuesta vacía.',
+                'error_type': 'server_error',
+            }
+
+        logger.info(
+            f"[CitaNihilismo][Gemini] Cita generada | "
+            f"{len(cita)} chars | Modelo: {model} | finishReason: {finish_reason}"
+        )
+        return {
+            'success': True,
+            'cita': cita,
+            'modelo_usado': model,
+        }
+
+    except urllib.error.HTTPError as e:
+        error_body = ''
+        try:
+            error_body = e.read().decode('utf-8')
+            error_json = json.loads(error_body)
+            error_msg = error_json.get('error', {}).get('message', str(e))
+        except Exception:
+            error_msg = error_body or str(e)
+        logger.error(
+            f"[CitaNihilismo][Gemini] HTTP {e.code}: {error_msg} | Modelo: {model}"
+        )
+
+        # Clasificar el error para que el dispatcher decida si reintentar
+        if e.code == 429:
+            error_type = 'rate_limit'
+        elif e.code in (500, 502, 503, 504):
+            error_type = 'server_error'
+        else:
+            error_type = 'hard_error'
+
+        return {
+            'success': False,
+            'error': f'Error HTTP {e.code} de Gemini: {error_msg}',
+            'error_type': error_type,
+        }
+
+    except urllib.error.URLError as e:
+        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
+        logger.error(f"[CitaNihilismo][Gemini] Error de red: {error_msg}")
+        return {
+            'success': False,
+            'error': f'Error de red al conectar con Gemini: {error_msg}',
+            'error_type': 'network_error',
+        }
+
+    except TimeoutError:
+        logger.error(
+            f"[CitaNihilismo][Gemini] Timeout después de {timeout}s | Modelo: {model}"
+        )
+        return {
+            'success': False,
+            'error': f'Gemini tardó más de {timeout}s en responder.',
+            'error_type': 'timeout',
+        }
+
+    except json.JSONDecodeError:
+        logger.error("[CitaNihilismo][Gemini] Error al parsear respuesta JSON.")
+        return {
+            'success': False,
+            'error': 'Respuesta inválida de la API de Gemini.',
+            'error_type': 'server_error',
+        }
+
+    except Exception as e:
+        logger.error(
+            f"[CitaNihilismo][Gemini] Error inesperado: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        return {
+            'success': False,
+            'error': f'Error inesperado con Gemini: {str(e)}',
+            'error_type': 'hard_error',
+        }

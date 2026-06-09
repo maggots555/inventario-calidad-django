@@ -421,6 +421,10 @@
                                onclick="return confirm('¿Estás seguro de limpiar la caché de Redis? Los dashboards se regenerarán en la próxima carga.');">
                                 <i class="bi bi-arrow-clockwise text-warning"></i> Limpiar Caché Redis
                             </a>
+                            <a href="{% url 'admin_regenerar_cita' %}" class="dropdown-item"
+                               onclick="return confirm('¿Regenerar la cita del día? Se generará una nueva reflexión con IA.');">
+                                <i class="bi bi-quote text-info"></i> Regenerar Cita del Día
+                            </a>
                             {% endif %}
                         </div>
                     </div>

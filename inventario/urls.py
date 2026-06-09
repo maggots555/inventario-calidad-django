@@ -52,4 +52,5 @@ urlpatterns = [
     # Administración
     path('admin/storage-monitor/', views.admin_storage_monitor, name='admin_storage_monitor'),
     path('admin/clear-redis-cache/', views.admin_clear_redis_cache, name='admin_clear_redis_cache'),
+    path('admin/regenerar-cita/', views.admin_regenerar_cita_nihilismo, name='admin_regenerar_cita'),
 ]

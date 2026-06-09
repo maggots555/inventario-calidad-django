@@ -18,6 +18,9 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from django.core.cache import cache
 from django.conf import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ===== DECORADORES DE PERMISOS =====
@@ -105,9 +108,9 @@ def fecha_local(fecha_utc):
 # ===== CITA DIARIA — NIHILISMO OPTIMISTA (IA) =====
 
 # EXPLICACIÓN PARA PRINCIPIANTES:
-# Esta lista contiene citas de respaldo que se usan cuando Ollama no está
-# disponible. Se elige una diferente cada día según el número del día del año,
-# así el usuario siempre ve algo distinto aunque la IA no responda.
+# Esta lista contiene citas de respaldo que se usan cuando ningún proveedor
+# de IA (Gemini ni Ollama) está disponible. Se elige una diferente cada día
+# según el número del día del año, así el usuario siempre ve algo distinto.
 _CITAS_NIHILISMO_RESPALDO = [
     "El universo no necesita tener sentido para que tu vida lo tenga. Tú eres el arquitecto de tu propio significado.",
     "Saber que nada importa por sí solo es liberador: de esa nada puedes construir exactamente lo que quieras.",
@@ -126,16 +129,17 @@ _CITAS_NIHILISMO_RESPALDO = [
 
 def obtener_cita_nihilismo_diaria():
     """
-    Genera o recupera una cita diaria sobre nihilismo optimista usando Google Gemini.
+    Genera o recupera una cita diaria sobre nihilismo optimista usando cascada de IA.
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Esta función hace tres cosas en orden:
       1. Revisa el caché de Django → si ya hay una cita guardada para hoy, la devuelve
          de inmediato (sin llamar a la IA, muy rápido).
-      2. Si no hay cita en caché y Gemini está habilitado → llama a la API de Google
-         para generar una nueva cita. La guarda en caché por 24 horas.
-      3. Si Gemini no está disponible o falla → usa una cita de la lista de respaldo,
+      2. Si no hay cita en caché → llama al dispatcher que intenta en cascada:
+         Gemini (ciclo de modelos) → Ollama → guarda en caché por 24 horas si tiene éxito.
+      3. Si todos los proveedores de IA fallan → usa una cita de la lista de respaldo,
          elegida de forma determinista según el día del año (siempre distinta cada día).
+         Se cachea solo 1 hora para reintentar con IA pronto.
 
     Returns:
         str: Texto de la cita para mostrar en el dashboard.
@@ -153,76 +157,47 @@ def obtener_cita_nihilismo_diaria():
         idx = date.today().timetuple().tm_yday % len(_CITAS_NIHILISMO_RESPALDO)
         return _CITAS_NIHILISMO_RESPALDO[idx]
 
-    # ── 2. Verificar que Gemini esté habilitado y con API key ─────────────────
-    gemini_habilitado = getattr(settings, 'GEMINI_ENABLED', False)
-    api_key = getattr(settings, 'GEMINI_API_KEY', '').strip()
-
-    if not gemini_habilitado or not api_key:
-        cita = _cita_respaldo()
-        cache.set(clave_cache, cita, 86400)  # 24 horas
-        return cita
-
-    # ── 3. Llamar a la API de Gemini para generar la cita ────────────────────
+    # ── 2. Intentar generar cita con cascada de IA ────────────────────────────
+    # El dispatcher intenta: Gemini (todos los modelos) → Ollama
     try:
-        model = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
-        timeout = min(getattr(settings, 'GEMINI_TIMEOUT', 60), 15)
+        from servicio_tecnico.ollama_client import generar_cita_nihilismo_dispatch
 
-        prompt = (
-            "Genera una cita breve e inspiradora sobre el nihilismo optimista. "
-            "La cita debe: estar en español, tener entre 1 y 3 oraciones cortas, "
-            "ser reflexiva y motivadora, transmitir que la falta de significado "
-            "inherente en el universo es una libertad para crear el propio significado. "
-            "Responde ÚNICAMENTE con el texto de la cita. "
-            "Sin comillas, sin guiones, sin 'Aquí tienes:', sin ningún prefacio."
+        resultado = generar_cita_nihilismo_dispatch()
+
+        if resultado.get('success'):
+            cita = resultado.get('cita', '').strip()
+            modelo_usado = resultado.get('modelo_usado', 'desconocido')
+
+            if cita:
+                logger.info(
+                    f"[CitaNihilismo] Cita generada exitosamente con {modelo_usado} | "
+                    f"{len(cita)} chars"
+                )
+                # Éxito → cachear por 24 horas
+                cache.set(clave_cache, cita, 86400)
+                return cita
+            else:
+                logger.warning("[CitaNihilismo] Dispatcher devolvió success=True pero cita vacía.")
+
+        else:
+            # El dispatcher falló con todos los proveedores
+            error_msg = resultado.get('error', 'sin detalles')
+            logger.warning(f"[CitaNihilismo] Todos los proveedores de IA fallaron: {error_msg}")
+
+    except ImportError as e:
+        logger.error(f"[CitaNihilismo] No se pudo importar el dispatcher: {e}")
+    except Exception as e:
+        logger.error(
+            f"[CitaNihilismo] Error inesperado al llamar al dispatcher: {type(e).__name__}: {e}",
+            exc_info=True,
         )
 
-        payload = json.dumps({
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.9,
-                "maxOutputTokens": 150,
-                "thinkingConfig": {"thinkingBudget": 0},
-            },
-        }).encode("utf-8")
-
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models"
-            f"/{model}:generateContent?key={api_key}"
-        )
-
-        req = urllib.request.Request(
-            url=url,
-            data=payload,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            method="POST",
-        )
-
-        ctx = ssl.create_default_context()
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-
-        # Extraer texto: candidates[0].content.parts[0].text
-        cita = (
-            data.get("candidates", [{}])[0]
-            .get("content", {})
-            .get("parts", [{}])[0]
-            .get("text", "")
-            .strip()
-        )
-
-        if not cita:
-            raise ValueError("Gemini devolvió una respuesta vacía.")
-
-        # Éxito → cachear por 24 horas
-        cache.set(clave_cache, cita, 86400)
-        return cita
-
-    except Exception:
-        # Cualquier fallo (red, quota, timeout) → usar respaldo
-        # Se cachea 1 hora para que el siguiente visitante reintente con Gemini
-        cita = _cita_respaldo()
-        cache.set(clave_cache, cita, 3600)
-        return cita
+    # ── 3. Fallback final: cita de respaldo predefinida ───────────────────────
+    # Se llega aquí cuando: todos los proveedores de IA fallaron, o hubo un error
+    # inesperado. Se cachea solo 1 hora para reintentar con IA pronto.
+    cita = _cita_respaldo()
+    cache.set(clave_cache, cita, 3600)
+    return cita
 
 
 # ===== DASHBOARD PRINCIPAL UNIFICADO =====
@@ -2062,6 +2037,64 @@ def admin_clear_redis_cache(request):
     
     # Redirigir al monitor de almacenamiento o a la página anterior
     return redirect('admin_storage_monitor')
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser, login_url='/acceso-denegado/')
+def admin_regenerar_cita_nihilismo(request):
+    """
+    Vista para regenerar manualmente la cita diaria de nihilismo optimista.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    La cita del día se genera automáticamente una vez al día y se guarda en caché.
+    Esta vista permite al superusuario forzar la generación de una nueva cita
+    sin esperar al día siguiente. Útil si la cita actual no es adecuada o si
+    se quiere probar que la cascada de IA funciona correctamente.
+
+    Flujo:
+    1. Borra la clave de caché de la cita de hoy
+    2. Llama a obtener_cita_nihilismo_diaria() que ejecuta la cascada completa
+    3. Redirige al dashboard principal donde se mostrará la nueva cita
+
+    Solo superusuarios pueden ejecutar esta acción (is_superuser=True).
+
+    Returns:
+        Redirect al dashboard principal con mensaje de confirmación
+    """
+    try:
+        # Borrar la cita cacheada de hoy para forzar regeneración
+        clave_cache = f"cita_nihilismo_{date.today().isoformat()}"
+        cache.delete(clave_cache)
+
+        # Llamar a la función que ejecuta la cascada completa de IA
+        nueva_cita = obtener_cita_nihilismo_diaria()
+
+        if nueva_cita:
+            messages.success(
+                request,
+                f'Cita del día regenerada exitosamente. '
+                f'Nueva reflexión: "{nueva_cita[:80]}..."'
+                if len(nueva_cita) > 80
+                else f'Cita del día regenerada exitosamente. Nueva reflexión: "{nueva_cita}"'
+            )
+        else:
+            messages.warning(
+                request,
+                'No se pudo generar una nueva cita. Se usará una cita de respaldo.'
+            )
+
+    except Exception as e:
+        logger.error(
+            f"[CitaNihilismo] Error al regenerar cita manualmente: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        messages.error(
+            request,
+            f'Error al regenerar la cita del día: {str(e)}'
+        )
+
+    # Redirigir al dashboard principal donde se muestra la cita
+    return redirect('home')
 
 
 @login_required

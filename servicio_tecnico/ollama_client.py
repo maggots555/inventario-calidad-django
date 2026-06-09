@@ -2392,3 +2392,286 @@ def analizar_video_evidencia_dispatch(
         'success': False,
         'error': 'No se pudo obtener análisis de ningún proveedor de IA disponible.',
     }
+
+
+# ============================================================================
+# CITA DIARIA — NIHILISMO OPTIMISTA
+# ============================================================================
+# Genera una cita breve e inspiradora sobre nihilismo optimista.
+# Arquitectura en cascada: Gemini (ciclo de modelos) → Ollama → lista predefinida.
+#
+# Ollama es el último recurso antes de la lista de respaldo hardcoded.
+# Usa el mismo prompt que Gemini para consistencia entre proveedores.
+# Temperature alta (0.9) para creatividad, igual que en la versión de Gemini.
+# ============================================================================
+
+
+def generar_cita_nihilismo_ollama(
+    modelo_override: str = "",
+) -> dict:
+    """
+    Genera una cita de nihilismo optimista usando la API local de Ollama.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Ollama corre localmente en tu servidor (o vía Tailscale). Esta función
+    envía el mismo prompt que usa Gemini al modelo local configurado.
+    Es el último recurso de IA antes de usar la lista de citas predefinidas.
+
+    Args:
+        modelo_override: Nombre del modelo Ollama a usar. Si está vacío,
+                         usa OLLAMA_MODEL de settings.
+
+    Returns:
+        dict:
+            {'success': True, 'cita': '...texto...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...mensaje de error...'}
+    """
+    # ── Verificar que Ollama está habilitado ──
+    if not getattr(settings, 'OLLAMA_ENABLED', False):
+        return {
+            'success': False,
+            'error': 'Ollama no está habilitado en este entorno.',
+        }
+
+    base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434')
+    model = (
+        modelo_override.strip()
+        if modelo_override.strip()
+        else getattr(settings, 'OLLAMA_MODEL', 'gemma3:12b')
+    )
+    timeout = getattr(settings, 'OLLAMA_TIMEOUT', 120)
+
+    # Importar el prompt compartido desde gemini_client
+    from .gemini_client import PROMPT_CITA_NIHILISMO
+
+    # ── Payload para /api/chat de Ollama ──
+    # Temperature alta (0.9) = citas creativas y variadas cada día.
+    # num_predict: 200 = suficiente para 1-3 oraciones breves.
+    # think: False = sin razonamiento interno, respuesta directa.
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": PROMPT_CITA_NIHILISMO,
+            }
+        ],
+        "stream": False,
+        "think": False,
+        "options": {
+            "temperature": 0.9,
+            "num_predict": 200,
+        }
+    }
+
+    url = f"{base_url.rstrip('/')}/api/chat"
+    data = json.dumps(payload).encode('utf-8')
+
+    try:
+        req = urllib.request.Request(
+            url=url,
+            data=data,
+            headers={
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            method='POST',
+        )
+
+        logger.info(
+            f"[CitaNihilismo][Ollama] Generando cita | Modelo: {model} | URL: {url}"
+        )
+
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            response_data = json.loads(response.read().decode('utf-8'))
+
+        # Extraer el texto de la respuesta de /api/chat
+        cita = (
+            response_data
+            .get('message', {})
+            .get('content', '')
+            .strip()
+        )
+
+        if not cita:
+            logger.warning("[CitaNihilismo][Ollama] Respuesta vacía del modelo.")
+            return {
+                'success': False,
+                'error': 'El modelo devolvió una respuesta vacía.',
+            }
+
+        logger.info(
+            f"[CitaNihilismo][Ollama] Cita generada | "
+            f"{len(cita)} chars | Modelo: {model}"
+        )
+        return {
+            'success': True,
+            'cita': cita,
+            'modelo_usado': model,
+        }
+
+    except urllib.error.URLError as e:
+        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
+        logger.error(f"[CitaNihilismo][Ollama] Error de conexión: {error_msg} | URL: {url}")
+
+        if 'Connection refused' in error_msg or 'refused' in error_msg.lower():
+            return {
+                'success': False,
+                'error': 'No se pudo conectar con Ollama. Verifica que el servicio esté corriendo.',
+            }
+        elif 'timed out' in error_msg.lower() or 'timeout' in error_msg.lower():
+            return {
+                'success': False,
+                'error': f'El modelo tardó más de {timeout} segundos en responder.',
+            }
+        else:
+            return {
+                'success': False,
+                'error': f'Error de red al conectar con Ollama: {error_msg}',
+            }
+
+    except TimeoutError:
+        logger.error(f"[CitaNihilismo][Ollama] Timeout después de {timeout}s | URL: {url}")
+        return {
+            'success': False,
+            'error': f'El modelo tardó más de {timeout} segundos en responder.',
+        }
+
+    except json.JSONDecodeError as e:
+        logger.error(f"[CitaNihilismo][Ollama] Error al parsear respuesta JSON: {e}")
+        return {
+            'success': False,
+            'error': 'Respuesta inválida de Ollama.',
+        }
+
+    except Exception as e:
+        logger.error(
+            f"[CitaNihilismo][Ollama] Error inesperado: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        return {
+            'success': False,
+            'error': f'Error inesperado: {str(e)}',
+        }
+
+
+def generar_cita_nihilismo_dispatch() -> dict:
+    """
+    Dispatcher para la generación de citas diarias de nihilismo optimista.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta función orquesta la cascada de proveedores de IA:
+      1. Intenta cada modelo de Gemini en orden (GEMINI_MODELS).
+         - Si uno responde bien → devuelve la cita inmediatamente.
+         - Si el error es recuperable (rate_limit, timeout, etc.) → siguiente modelo.
+         - Si el error es irrecuperable (API key inválida, etc.) → salta a Ollama.
+      2. Si todos los Gemini fallan → intenta Ollama como último recurso de IA.
+      3. Si Ollama también falla → devuelve {'success': False} y el llamador
+         usa la lista de citas predefinidas.
+
+    Esta función NUNCA lanza excepciones hacia afuera.
+
+    Returns:
+        dict:
+            {'success': True, 'cita': '...texto...', 'modelo_usado': '...'}
+            {'success': False, 'error': '...mensaje de error...'}
+    """
+    # Errores de Gemini que justifican probar el siguiente modelo de la lista.
+    ERRORES_REINTENTABLES = {'rate_limit', 'server_error', 'timeout', 'network_error'}
+
+    # ── Construir la lista de modelos Gemini a intentar ──
+    gemini_models_configurados = getattr(settings, 'GEMINI_MODELS', [])
+
+    if not gemini_models_configurados:
+        # Si no hay modelos configurados, usar el modelo por defecto
+        default_model = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+        gemini_models_configurados = [default_model]
+
+    logger.info(
+        f"[CitaNihilismo][Dispatch] Modo automático — modelos Gemini: {gemini_models_configurados}"
+    )
+
+    # ── Ciclo Gemini: intentar cada modelo hasta obtener éxito ──
+    if getattr(settings, 'GEMINI_ENABLED', False) and gemini_models_configurados:
+        try:
+            from .gemini_client import generar_cita_nihilismo_gemini
+        except ImportError as e:
+            logger.error(f"[CitaNihilismo][Dispatch] No se pudo importar gemini_client: {e}")
+            gemini_models_configurados = []
+
+        ultimo_error = 'Sin detalles'
+
+        for idx, modelo_gemini in enumerate(gemini_models_configurados, start=1):
+            logger.info(
+                f"[CitaNihilismo][Dispatch] Gemini intento {idx}/{len(gemini_models_configurados)}: "
+                f"{modelo_gemini}"
+            )
+
+            try:
+                resultado = generar_cita_nihilismo_gemini(modelo_override=modelo_gemini)
+            except Exception as e_exc:
+                ultimo_error = f'Excepción inesperada: {type(e_exc).__name__}: {e_exc}'
+                logger.error(
+                    f"[CitaNihilismo][Dispatch] Excepción con {modelo_gemini}: {ultimo_error}",
+                    exc_info=True,
+                )
+                continue
+
+            if resultado.get('success'):
+                logger.info(
+                    f"[CitaNihilismo][Dispatch] Éxito con {modelo_gemini} "
+                    f"(intento {idx}/{len(gemini_models_configurados)})"
+                )
+                return resultado
+
+            error_type = resultado.get('error_type', 'hard_error')
+            ultimo_error = resultado.get('error', 'sin detalles')
+
+            if error_type in ERRORES_REINTENTABLES:
+                logger.warning(
+                    f"[CitaNihilismo][Dispatch] {modelo_gemini} → [{error_type}] {ultimo_error} "
+                    f"— Probando siguiente modelo Gemini..."
+                )
+                continue
+            else:
+                logger.error(
+                    f"[CitaNihilismo][Dispatch] {modelo_gemini} → [{error_type}] {ultimo_error} "
+                    f"— Error irrecuperable, deteniendo ciclo Gemini."
+                )
+                break
+        else:
+            logger.warning(
+                f"[CitaNihilismo][Dispatch] Todos los modelos Gemini agotados "
+                f"({len(gemini_models_configurados)} intentos). Último error: {ultimo_error}"
+            )
+    else:
+        if not getattr(settings, 'GEMINI_ENABLED', False):
+            logger.info("[CitaNihilismo][Dispatch] Gemini deshabilitado (GEMINI_ENABLED=False).")
+        else:
+            logger.info("[CitaNihilismo][Dispatch] GEMINI_MODELS vacío — sin modelos configurados.")
+
+    # ── Fallback final: Ollama ──
+    if getattr(settings, 'OLLAMA_ENABLED', False):
+        logger.info("[CitaNihilismo][Dispatch] Fallback a Ollama (último recurso de IA)...")
+        try:
+            resultado_ollama = generar_cita_nihilismo_ollama()
+            if resultado_ollama.get('success'):
+                return resultado_ollama
+            logger.warning(
+                f"[CitaNihilismo][Dispatch] Ollama también falló: "
+                f"{resultado_ollama.get('error', 'sin detalles')}"
+            )
+        except Exception as e:
+            logger.error(
+                f"[CitaNihilismo][Dispatch] Excepción en fallback Ollama: {e}",
+                exc_info=True,
+            )
+    else:
+        logger.info("[CitaNihilismo][Dispatch] Ollama deshabilitado — sin más opciones de IA.")
+
+    # ── Todos los proveedores de IA fallaron ──
+    logger.warning("[CitaNihilismo][Dispatch] Todos los proveedores de IA fallaron.")
+    return {
+        'success': False,
+        'error': 'No se pudo generar la cita con ningún proveedor de IA disponible.',
+    }
