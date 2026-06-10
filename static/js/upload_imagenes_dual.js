@@ -1,7 +1,7 @@
 "use strict";
 // ============================================================================
 // SISTEMA DUAL DE SUBIDA DE IMÁGENES - GALERÍA Y CÁMARA
-// Versión 8.0 - Transacción única + Caché IndexedDB + Auto-recarga
+// Versión 8.2 - Correcciones de robustez del caché IndexedDB
 // ============================================================================
 /**
  * CLASE: ImageCache
@@ -21,10 +21,31 @@
  * asincrónicos (como las peticiones de red).
  */
 class ImageCache {
-    /** Abre (o crea) la base de datos IndexedDB. Retorna una Promise con la conexión. */
+    /**
+     * Abre (o crea) la base de datos IndexedDB. Retorna una Promise con la conexión.
+     *
+     * CAMBIO v8.2 (Junio 2026) — Manejo de onblocked + timeout de fallback:
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * IndexedDB puede quedar en estado "blocked" cuando una conexión anterior
+     * aún está abierta (ej: limpiarViejos() aún no cerró su conexión cuando
+     * restaurarDesdeCache() intenta abrir una nueva). En ese caso, la Promise
+     * nunca se resuelve y el sistema queda colgado.
+     *
+     * Solución:
+     * 1. Handler onblocked: registra que la DB está bloqueada
+     * 2. Timeout de 5 segundos: si la conexión no se establece en ese tiempo,
+     *    rechazamos la Promise para que el caller pueda continuar sin caché
+     *    (el caché es best-effort, no debe bloquear la experiencia del usuario)
+     */
     static abrirDB() {
         return new Promise((resolve, reject) => {
             const req = indexedDB.open(ImageCache.DB_NAME, ImageCache.DB_VERSION);
+            // Timeout de fallback: si en 5 segundos no se abrió, abortar
+            const timeoutId = setTimeout(() => {
+                console.warn('⚠️ abrirDB: timeout de 5s — IndexedDB bloqueado o no disponible');
+                reject(new Error('Timeout al abrir IndexedDB'));
+            }, 5000);
             // onupgradeneeded se ejecuta la primera vez que se crea la DB,
             // o cuando incrementamos DB_VERSION. Aquí definimos la estructura.
             req.onupgradeneeded = (event) => {
@@ -36,8 +57,19 @@ class ImageCache {
                     db.createObjectStore(ImageCache.STORE_NAME, { keyPath: 'ordenUrl' });
                 }
             };
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
+            req.onsuccess = () => {
+                clearTimeout(timeoutId);
+                resolve(req.result);
+            };
+            req.onerror = () => {
+                clearTimeout(timeoutId);
+                reject(req.error);
+            };
+            // onblocked: otra conexión tiene la DB abierta y no la suelta
+            req.onblocked = () => {
+                console.warn('⚠️ IndexedDB bloqueado: otra conexión tiene la DB abierta');
+                // No rechazamos inmediatamente — el timeout de 5s lo hará si persiste
+            };
         });
     }
     /**
@@ -78,6 +110,12 @@ class ImageCache {
      * @param descripcion - Texto del campo descripción
      * @param imagenes   - Pares { file, id } del array imagenesSeleccionadas
      *
+     * @returns Resultado de la operación:
+     *   - 'ok'             → guardado exitoso
+     *   - 'empty'          → no había imágenes, se limpió el caché
+     *   - 'omitted_size'   → se omitió por superar 80MB (protección de RAM en iOS)
+     *   - 'error'          → error de IndexedDB
+     *
      * CAMBIO v8.1 (Mayo 2026) — Correcciones para iOS/Safari:
      * 1. LECTURA SECUENCIAL: los ArrayBuffers se leen uno a la vez (for...of en
      *    vez de Promise.all). Promise.all cargaba TODOS los archivos en memoria
@@ -89,12 +127,15 @@ class ImageCache {
      * 3. TRANSACCIÓN CONFIRMADA: se espera el evento tx.oncomplete antes de
      *    llamar db.close(). Safari/WebKit puede abortar la transacción si se
      *    cierra la conexión antes de que el motor confirme el commit.
+     *
+     * CAMBIO v8.2 (Junio 2026):
+     * - Retorna string con resultado para que el caller pueda informar al usuario
      */
     static async guardar(ordenUrl, tipo, descripcion, imagenes) {
         if (imagenes.length === 0) {
             // Si no hay imágenes, borramos el registro para no dejar caché vacío
             await ImageCache.limpiar(ordenUrl);
-            return;
+            return 'empty';
         }
         // ── Protección de memoria: skip si el total supera 80 MB ────────────
         // EXPLICACIÓN PARA PRINCIPIANTES:
@@ -109,7 +150,7 @@ class ImageCache {
             console.warn(`⚠️ Caché omitido: ${(totalBytes / 1024 / 1024).toFixed(1)} MB supera el límite ` +
                 `de ${LIMITE_CACHE_BYTES / 1024 / 1024} MB. ` +
                 `Se evita pico de memoria en dispositivos con poca RAM (iPhone).`);
-            return;
+            return 'omitted_size';
         }
         try {
             // ── Lectura secuencial de ArrayBuffers (un archivo a la vez) ────
@@ -150,10 +191,12 @@ class ImageCache {
             });
             db.close();
             console.log(`💾 Caché: ${imagenes.length} imagen(es) guardada(s) para ${ordenUrl}`);
+            return 'ok';
         }
         catch (e) {
             // El caché es best-effort: si falla, no interrumpimos el flujo principal
             console.warn('⚠️ No se pudo guardar en caché IndexedDB:', e);
+            return 'error';
         }
     }
     /**
@@ -293,6 +336,13 @@ class UploadImagenesDual {
         this.DEBOUNCE_MS = 1500; // 1.5 segundos entre clicks
         // NUEVO v5.0: Flag para protección beforeunload
         this.subiendoImagenes = false;
+        // v8.2: Límite de reintentos automáticos por caché+recarga.
+        // Si la página se recarga N veces seguidas sin éxito, se detiene y muestra
+        // error manual para evitar loops infinitos (ej: Cloudflare 502 persistente).
+        this.MAX_REINTENTOS_CACHE = 2;
+        this.SESSION_KEY_REINTENTOS = 'sigma_upload_reintentos';
+        // v8.2: Flag para evitar mostrar el toast de "caché omitido por tamaño" múltiples veces
+        this.cacheOmitidoMostrado = false;
         // Elementos de selección de archivos
         this.inputGaleria = document.getElementById('inputGaleria');
         this.inputCamara = document.getElementById('inputCamara');
@@ -314,9 +364,11 @@ class UploadImagenesDual {
         }
         // v7.0: Inicializar clave de caché con la ruta actual
         this.cacheOrdenUrl = window.location.pathname;
-        this.init();
+        // v8.2: init() es async — las operaciones de caché se ejecutan en secuencia
+        // El .catch() es un safety net: si init falla, no debe romper la página
+        this.init().catch(e => console.warn('⚠️ Error en inicialización (no crítico):', e));
     }
-    init() {
+    async init() {
         // Crear contenedor de toasts si no existe
         this.crearContenedorToasts();
         // Crear panel de resumen
@@ -347,10 +399,27 @@ class UploadImagenesDual {
         this.configurarCamaraIntegrada();
         // NUEVO v5.0: Inicializar formulario de subida (submit handler + beforeunload)
         this.inicializarFormularioSubida();
-        // v7.0: Limpiar registros de caché expirados (> 24h) — fire-and-forget
-        ImageCache.limpiarViejos();
-        // v7.0: Restaurar imágenes pendientes desde caché (si las hay)
-        this.restaurarDesdeCache();
+        // ── v8.2: Operaciones de caché SECUENCIALES ──────────────────────────
+        // EXPLICACIÓN PARA PRINCIPIANTES:
+        // Antes ambas operaciones eran fire-and-forget (sin await). Esto causaba
+        // una race condition: limpiarViejos() y restaurarDesdeCache() competían
+        // por abrir la misma base de datos IndexedDB simultáneamente, lo que
+        // podía dejar a restaurarDesdeCache() bloqueada esperando a que
+        // limpiarViejos() soltara la conexión.
+        // Ahora: primero limpiamos registros viejos, DESPUÉS restauramos los
+        // pendientes. Una operación a la vez, sin competencia por la DB.
+        try {
+            await ImageCache.limpiarViejos();
+        }
+        catch (e) {
+            console.warn('⚠️ limpiarViejos falló (no crítico):', e);
+        }
+        try {
+            await this.restaurarDesdeCache();
+        }
+        catch (e) {
+            console.warn('⚠️ restaurarDesdeCache falló (no crítico):', e);
+        }
         // Botón manual de envío de imágenes de egreso (mostrado si no se envió vía modal)
         const btnEgreso = document.getElementById('btnEnviarImagenesEgreso');
         if (btnEgreso) {
@@ -361,7 +430,7 @@ class UploadImagenesDual {
         if (btnRewind) {
             btnRewind.addEventListener('click', () => this.mostrarModalRewindEmail());
         }
-        console.log('✅ Sistema dual de subida de imágenes v8.0 inicializado');
+        console.log('✅ Sistema dual de subida de imágenes v8.2 inicializado');
     }
     // =========================================================================
     // NUEVO: Selector de tipo de imagen (radio cards)
@@ -543,21 +612,40 @@ class UploadImagenesDual {
      * Sincroniza el estado actual de las imágenes seleccionadas con IndexedDB.
      * Se llama después de cualquier cambio en la selección (agregar, eliminar).
      *
-     * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Esta función es "fire-and-forget" — la llamamos sin await porque:
-     * 1. No necesitamos esperar a que termine para continuar con la UI
-     * 2. Si falla, es un error menor que no debe interrumpir la experiencia
-     * 3. Guardamos también el tipo y descripción actuales para poder restaurarlos
+     * CAMBIO v8.2 (Junio 2026) — Ahora es async y retorna Promise<boolean>:
+     * Antes era fire-and-forget (sin await). Esto causaba que en el flujo de
+     * error de red, la página se recargaba ANTES de que IndexedDB terminara de
+     * escribir los ArrayBuffers — especialmente en dispositivos lentos (iPhone
+     * viejo, Android gama baja) donde la lectura secuencial de muchos archivos
+     * puede tardar más de 5 segundos. El resultado: caché vacío tras recarga.
+     *
+     * Ahora retorna boolean para que el caller sepa si el guardado fue exitoso
+     * y pueda informar al usuario en consecuencia.
+     *
+     * @returns true si se guardó correctamente, false si se omitió o falló
      */
-    sincronizarCache() {
+    async sincronizarCache() {
         var _a;
         const tipo = this.getTipoSeleccionado();
         const descEl = this.descripcionInputId
             ? document.getElementById(this.descripcionInputId)
             : null;
         const descripcion = (_a = descEl === null || descEl === void 0 ? void 0 : descEl.value) !== null && _a !== void 0 ? _a : '';
-        // fire-and-forget: no await, la UI no debe esperar
-        ImageCache.guardar(this.cacheOrdenUrl, tipo, descripcion, this.imagenesSeleccionadas.map(img => ({ file: img.file, id: img.id })));
+        try {
+            const resultado = await ImageCache.guardar(this.cacheOrdenUrl, tipo, descripcion, this.imagenesSeleccionadas.map(img => ({ file: img.file, id: img.id })));
+            // v8.2: Informar al usuario cuando el caché se omite por tamaño
+            // Solo mostrar una vez para no saturar con toasts repetidos
+            if (resultado === 'omitted_size' && !this.cacheOmitidoMostrado) {
+                this.cacheOmitidoMostrado = true;
+                this.mostrarToast('Las imágenes superan 80 MB. Por seguridad de memoria, no se guardarán ' +
+                    'localmente. Si la conexión se corta, deberás seleccionar las imágenes de nuevo.', 'warning', undefined, 8000);
+            }
+            return resultado === 'ok';
+        }
+        catch (e) {
+            console.warn('⚠️ sincronizarCache falló:', e);
+            return false;
+        }
     }
     /**
      * EXPLICACIÓN PARA PRINCIPIANTES:
@@ -733,7 +821,9 @@ class UploadImagenesDual {
                 if (this.infoArchivos)
                     this.infoArchivos.innerHTML = html;
                 // Limpiar selección y caché
-                this.limpiarDespuesDeExito();
+                await this.limpiarDespuesDeExito();
+                // v8.2: Resetear contador de reintentos — la subida fue exitosa
+                this.resetearContadorReintentos();
                 // Detectar si fue egreso para mostrar modal de correo
                 const esEgreso = resultado.tipoImagen === 'egreso';
                 if (esEgreso && !resultado.egresoCorreoYaEnviado) {
@@ -789,8 +879,14 @@ class UploadImagenesDual {
                 this.textoProgreso.textContent = 'Conexión cortada';
             if (this.porcentajeProgreso)
                 this.porcentajeProgreso.textContent = '✗';
-            // Guardar TODAS las imágenes en caché antes de recargar
-            this.sincronizarCache();
+            // ── v8.2: Guardar TODAS las imágenes en caché ANTES de recargar ──
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // CRÍTICO: Debemos ESPERAR (await) a que IndexedDB termine de escribir
+            // los ArrayBuffers antes de recargar la página. Antes esto era
+            // fire-and-forget y en dispositivos lentos la recarga ocurría antes
+            // de que el guardado terminara, perdiendo las imágenes del caché.
+            // Ahora esperamos la confirmación y mostramos feedback según resultado.
+            const cacheGuardado = await this.sincronizarCache();
             let html = `
                 <div class="text-danger">
                     <i class="bi bi-x-circle-fill me-1"></i>
@@ -798,8 +894,10 @@ class UploadImagenesDual {
                 </div>
                 <div class="mt-1">
                     <small class="text-muted">
-                        <i class="bi bi-shield-check"></i> Tus imágenes se guardaron localmente.
-                        Recargando la página para restablecer la conexión...
+                        <i class="bi bi-${cacheGuardado ? 'shield-check' : 'exclamation-triangle'}"></i>
+                        ${cacheGuardado
+                ? 'Tus imágenes se guardaron localmente. Recargando la página para restablecer la conexión...'
+                : 'No se pudieron guardar las imágenes localmente. Recarga la página e intenta de nuevo.'}
                     </small>
                 </div>
                 <div class="mt-2 d-flex align-items-center gap-2">
@@ -822,7 +920,28 @@ class UploadImagenesDual {
             `;
             if (this.infoArchivos)
                 this.infoArchivos.innerHTML = html;
-            // Countdown visual + recarga
+            // ── v8.2: Verificar límite de reintentos antes de recargar ────────
+            // EXPLICACIÓN PARA PRINCIPIANTES:
+            // Si Cloudflare está caído de forma persistente, recargar la página
+            // una y otra vez crea un loop infinito que frustra al usuario.
+            // Contamos cuántas veces seguidas se recargó por error de red.
+            // Si ya fueron MAX_REINTENTOS_CACHE, mostramos error manual.
+            if (this.haExcedidoReintentos()) {
+                console.error(`❌ Se excedieron ${this.MAX_REINTENTOS_CACHE} reintentos automáticos. Deteniendo recarga.`);
+                const el = document.getElementById('cacheCountdown');
+                if (el) {
+                    el.innerHTML = `
+                        <span class="text-danger">
+                            Se intentó ${this.MAX_REINTENTOS_CACHE} veces y la conexión sigue fallando.<br>
+                            <strong>Intenta de nuevo manualmente</strong> o verifica tu conexión a internet.
+                        </span>
+                    `;
+                }
+                this.rehabilitarFormulario();
+                return;
+            }
+            // Incrementar contador y proceder con countdown + recarga
+            this.incrementarContadorReintentos();
             this.iniciarCountdownRecarga(5);
         }
     }
@@ -1388,6 +1507,54 @@ class UploadImagenesDual {
         }, 1000);
     }
     /**
+     * v8.2: Obtiene el contador de reintentos consecutivos desde sessionStorage.
+     * La clave incluye la URL de la orden para no mezclar contadores entre órdenes.
+     */
+    obtenerContadorReintentos() {
+        try {
+            const key = `${this.SESSION_KEY_REINTENTOS}_${this.cacheOrdenUrl}`;
+            const valor = sessionStorage.getItem(key);
+            return valor ? parseInt(valor, 10) : 0;
+        }
+        catch {
+            return 0;
+        }
+    }
+    /**
+     * v8.2: Incrementa el contador de reintentos en sessionStorage.
+     * Se llama justo antes de recargar la página por error de red.
+     */
+    incrementarContadorReintentos() {
+        try {
+            const key = `${this.SESSION_KEY_REINTENTOS}_${this.cacheOrdenUrl}`;
+            const actual = this.obtenerContadorReintentos();
+            sessionStorage.setItem(key, String(actual + 1));
+        }
+        catch {
+            // sessionStorage puede estar bloqueado en modo privado de iOS
+        }
+    }
+    /**
+     * v8.2: Resetea el contador de reintentos a 0.
+     * Se llama cuando la subida es exitosa o cuando el usuario limpia manualmente.
+     */
+    resetearContadorReintentos() {
+        try {
+            const key = `${this.SESSION_KEY_REINTENTOS}_${this.cacheOrdenUrl}`;
+            sessionStorage.removeItem(key);
+        }
+        catch {
+            // Ignorar si sessionStorage no está disponible
+        }
+    }
+    /**
+     * v8.2: Verifica si ya se excedió el máximo de reintentos consecutivos.
+     * Si es true, NO debemos recargar automáticamente — mostrar error manual.
+     */
+    haExcedidoReintentos() {
+        return this.obtenerContadorReintentos() >= this.MAX_REINTENTOS_CACHE;
+    }
+    /**
      * Deshabilita el formulario durante la subida.
      * Previene interacción con los controles mientras se sube.
      */
@@ -1744,9 +1911,12 @@ class UploadImagenesDual {
     }
     /**
      * API PÚBLICA: Limpiar después de subida exitosa
+     *
+     * CAMBIO v8.2: Ahora es async para esperar a que limpiarTodo() termine
+     * de limpiar el caché IndexedDB antes de marcar el fin del envío.
      */
-    limpiarDespuesDeExito() {
-        this.limpiarTodo();
+    async limpiarDespuesDeExito() {
+        await this.limpiarTodo();
         this.marcarFinEnvio();
     }
     /**
@@ -2099,8 +2269,15 @@ class UploadImagenesDual {
     /**
      * Limpia todas las imágenes seleccionadas.
      * v7.0: También limpia el caché IndexedDB de esta orden.
+     *
+     * CAMBIO v8.2 (Junio 2026):
+     * - Ahora es async y espera a que ImageCache.limpiar() termine antes de
+     *   continuar. Evita race conditions si el usuario limpia y rápidamente
+     *   selecciona nuevas imágenes.
+     * - Resetea el contador de reintentos (el usuario tomó acción manual).
+     * - Resetea el flag de toast de caché omitido.
      */
-    limpiarTodo() {
+    async limpiarTodo() {
         var _a;
         // Liberar memoria de todos los ObjectURLs
         this.imagenesSeleccionadas.forEach(img => {
@@ -2117,9 +2294,12 @@ class UploadImagenesDual {
         this.estaProcesando = false;
         this.archivosListos = false;
         this.enviando = false;
+        this.cacheOmitidoMostrado = false;
         console.log('🧹 Todas las imágenes eliminadas');
-        // v7.0: Limpiar caché IndexedDB — el usuario borró la selección voluntariamente
-        ImageCache.limpiar(this.cacheOrdenUrl);
+        // v8.2: Esperar a que el caché se limpie antes de continuar
+        // y resetear contador de reintentos (el usuario tomó acción manual)
+        await ImageCache.limpiar(this.cacheOrdenUrl);
+        this.resetearContadorReintentos();
         // Quitar banner de restauración si existe
         (_a = document.getElementById('cacheBannerRestauracion')) === null || _a === void 0 ? void 0 : _a.remove();
         // Actualizar UI
@@ -2142,7 +2322,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Verificar que estamos en la página correcta
     if (document.getElementById('formSubirImagenes')) {
         window.uploadImagenesDual = new UploadImagenesDual();
-        console.log('✅ Sistema de subida dual v8.0 inicializado (caché IndexedDB activo)');
+        console.log('✅ Sistema de subida dual v8.2 inicializado (caché IndexedDB robusto)');
     }
 });
 //# sourceMappingURL=upload_imagenes_dual.js.map
