@@ -3527,8 +3527,8 @@ def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int):
     bind=True,
     max_retries=1,
     default_retry_delay=30,
-    soft_time_limit=360,   # 6 minutos — suficiente para un video 1080p de 90 MB
-    time_limit=420,        # 7 minutos hard-limit (el worker se mata si supera esto)
+    soft_time_limit=660,   # 11 minutos — margen para videos grandes/pesados
+    time_limit=720,        # 12 minutos hard-limit (el worker se mata si supera esto)
     name='servicio_tecnico.comprimir_video_evidencia',
 )
 def comprimir_video_evidencia_task(
@@ -3706,7 +3706,7 @@ def comprimir_video_evidencia_task(
             cmd_compress,
             capture_output=True,
             text=True,
-            timeout=300,  # 5 minutos máximo para el proceso FFmpeg
+            timeout=600,  # 10 minutos máximo para el proceso FFmpeg
         )
         if resultado.returncode != 0:
             raise RuntimeError(
@@ -3900,9 +3900,10 @@ def comprimir_video_evidencia_task(
                 f"[VIDEO-EVIDENCIA] No se pudo crear notificación de error: {e_notif}"
             )
 
-        # Solo reintentar en errores de sistema — no en errores de lógica
-        # (FileNotFoundError y ValueError no se van a resolver solos con un reintento)
-        if not isinstance(exc, (ValueError, FileNotFoundError)):
+        # Solo reintentar en errores de sistema — no en errores de lógica ni timeouts
+        # (FileNotFoundError, ValueError y TimeoutExpired no se resuelven con un reintento:
+        #  el archivo temporal ya se eliminó en el finally antes del retry)
+        if not isinstance(exc, (ValueError, FileNotFoundError, subprocess.TimeoutExpired)):
             raise self.retry(exc=exc, countdown=30)
         raise
 
