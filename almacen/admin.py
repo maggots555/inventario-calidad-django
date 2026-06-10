@@ -34,6 +34,7 @@ from .models import (
     SolicitudCotizacion,
     LineaCotizacion,
     ImagenLineaCotizacion,
+    ImagenSolicitudCotizacion,
 )
 
 from config.constants import (
@@ -1004,6 +1005,8 @@ class SolicitudCotizacionAdmin(admin.ModelAdmin):
         'numero_solicitud',
         'numero_orden_cliente',
         'observaciones',
+        'nombre_cliente',
+        'service_tag',
     )
     
     ordering = ['-fecha_creacion']
@@ -1019,7 +1022,9 @@ class SolicitudCotizacionAdmin(admin.ModelAdmin):
     
     autocomplete_fields = ['orden_servicio', 'creado_por']
     
-    inlines = [LineaCotizacionInline]
+    # NOTA: Los inlines se asignan post-definición (ver final del archivo)
+    # para incluir tanto LineaCotizacionInline como ImagenSolicitudCotizacionInline
+    inlines = []
     
     fieldsets = (
         ('Identificación', {
@@ -1027,6 +1032,14 @@ class SolicitudCotizacionAdmin(admin.ModelAdmin):
         }),
         ('Vinculación', {
             'fields': ('orden_servicio', 'numero_orden_cliente')
+        }),
+        ('Modo Sin Orden Activa', {
+            'fields': ('sin_orden_activa', 'service_tag'),
+            'description': 'Datos cuando no hay orden de servicio vinculada'
+        }),
+        ('Datos del Cliente', {
+            'fields': ('nombre_cliente', 'telefono_cliente', 'email_cliente', 'marca', 'modelo'),
+            'description': 'Información del cliente que solicita la cotización (usado por recepción)'
         }),
         ('Observaciones', {
             'fields': ('observaciones', 'observaciones_cliente')
@@ -1380,3 +1393,122 @@ class ImagenLineaCotizacionAdmin(admin.ModelAdmin):
 # Esto es perfectamente válido en Python y es un patrón común.
 # ============================================================================
 LineaCotizacionAdmin.inlines = [ImagenLineaCotizacionInline]
+
+
+# ============================================================================
+# ADMIN: IMAGEN DE REFERENCIA DE SOLICITUD DE COTIZACIÓN
+# ============================================================================
+class ImagenSolicitudCotizacionInline(admin.TabularInline):
+    """
+    Inline para mostrar imágenes de referencia dentro del admin de SolicitudCotizacion.
+    """
+    model = ImagenSolicitudCotizacion
+    extra = 0
+    readonly_fields = ('preview_imagen', 'fecha_subida', 'fue_comprimida', 'tamano_display')
+    fields = ('preview_imagen', 'imagen', 'descripcion', 'fecha_subida', 'fue_comprimida', 'tamano_display')
+    
+    @admin.display(description='Vista Previa')
+    def preview_imagen(self, obj):
+        """Muestra una miniatura de la imagen"""
+        if obj.imagen:
+            return format_html(
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 100px; max-height: 100px; border-radius: 4px;"/>'
+                '</a>',
+                obj.imagen.url,
+                obj.imagen.url
+            )
+        return '-'
+    
+    @admin.display(description='Tamaño')
+    def tamano_display(self, obj):
+        """Muestra información de compresión"""
+        if obj.fue_comprimida and obj.tamano_original_kb and obj.tamano_final_kb:
+            ahorro = obj.tamano_original_kb - obj.tamano_final_kb
+            return format_html(
+                '{} KB <span style="color: green; font-size: 10px;">(-{} KB)</span>',
+                obj.tamano_final_kb,
+                ahorro
+            )
+        if obj.tamano_final_kb:
+            return f'{obj.tamano_final_kb} KB'
+        return '-'
+
+
+# Agregar inline de imágenes de referencia a SolicitudCotizacionAdmin
+SolicitudCotizacionAdmin.inlines = [LineaCotizacionInline, ImagenSolicitudCotizacionInline]
+
+
+@admin.register(ImagenSolicitudCotizacion)
+class ImagenSolicitudCotizacionAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Imágenes de Referencia de Solicitudes de Cotización.
+    """
+    
+    list_display = (
+        'id',
+        'preview_imagen',
+        'solicitud_display',
+        'descripcion_corta',
+        'fecha_subida',
+        'subido_por',
+        'fue_comprimida',
+        'tamano_display',
+    )
+    
+    list_filter = (
+        'fecha_subida',
+        'fue_comprimida',
+    )
+    
+    search_fields = (
+        'solicitud__numero_solicitud',
+        'descripcion',
+    )
+    
+    readonly_fields = (
+        'preview_imagen',
+        'fecha_subida',
+        'fue_comprimida',
+        'tamano_original_kb',
+        'tamano_final_kb',
+    )
+    
+    @admin.display(description='Vista Previa')
+    def preview_imagen(self, obj):
+        """Muestra una miniatura de la imagen"""
+        if obj.imagen:
+            return format_html(
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 80px; max-height: 80px; border-radius: 4px;"/>'
+                '</a>',
+                obj.imagen.url,
+                obj.imagen.url
+            )
+        return '-'
+    
+    @admin.display(description='Solicitud')
+    def solicitud_display(self, obj):
+        """Muestra el número de solicitud"""
+        return obj.solicitud.numero_solicitud
+    
+    @admin.display(description='Descripción')
+    def descripcion_corta(self, obj):
+        """Muestra la descripción truncada"""
+        if obj.descripcion and len(obj.descripcion) > 50:
+            return obj.descripcion[:50] + '...'
+        return obj.descripcion or '-'
+    
+    @admin.display(description='Tamaño')
+    def tamano_display(self, obj):
+        """Muestra información de compresión"""
+        if obj.fue_comprimida and obj.tamano_original_kb and obj.tamano_final_kb:
+            ahorro = obj.tamano_original_kb - obj.tamano_final_kb
+            return format_html(
+                '{} KB <span style="color: green; font-size: 10px;">(-{} KB)</span>',
+                obj.tamano_final_kb,
+                ahorro
+            )
+        if obj.tamano_final_kb:
+            return f'{obj.tamano_final_kb} KB'
+        return '-'

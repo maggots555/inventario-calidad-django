@@ -50,6 +50,8 @@ from config.constants import (
     # Constantes para SolicitudCotizacion (nuevo)
     ESTADO_SOLICITUD_COTIZACION_CHOICES,
     ESTADO_LINEA_COTIZACION_CHOICES,
+    # Constantes para datos del cliente en cotizaciones
+    MARCAS_EQUIPOS_CHOICES,
 )
 
 
@@ -2803,11 +2805,43 @@ class SolicitudCotizacion(models.Model):
         verbose_name='Sin Orden Activa',
         help_text='Marcar si aún no existe una orden de servicio para esta cotización'
     )
-    folio_referencia = models.CharField(
+    service_tag = models.CharField(
         max_length=100,
         blank=True,
-        verbose_name='Folio de Referencia',
-        help_text='Identificador temporal (ej: número de serie) cuando no hay orden activa'
+        verbose_name='Service Tag',
+        help_text='Número de serie o identificador del equipo cuando no hay orden activa'
+    )
+    
+    # ========== DATOS DEL CLIENTE (cuando recepción solicita cotización) ==========
+    nombre_cliente = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name='Nombre del Cliente',
+        help_text='Nombre completo del cliente que solicita la cotización'
+    )
+    telefono_cliente = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name='Teléfono del Cliente',
+        help_text='Número de contacto del cliente'
+    )
+    email_cliente = models.EmailField(
+        blank=True,
+        verbose_name='Correo del Cliente',
+        help_text='Correo electrónico del cliente para enviar la cotización'
+    )
+    marca = models.CharField(
+        max_length=50,
+        blank=True,
+        choices=MARCAS_EQUIPOS_CHOICES,
+        verbose_name='Marca del Equipo',
+        help_text='Marca del equipo del cliente'
+    )
+    modelo = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Modelo del Equipo',
+        help_text='Modelo del equipo del cliente (texto libre)'
     )
     
     # ========== AUDITORÍA ==========
@@ -2846,7 +2880,7 @@ class SolicitudCotizacion(models.Model):
         Override de save() para:
         1. Generar número de solicitud automáticamente
         2. Sincronizar numero_orden_cliente desde orden_servicio
-        3. Manejar modo sin_orden_activa con folio_referencia
+        3. Manejar modo sin_orden_activa con service_tag
         """
         # Generar número de solicitud si es nuevo
         if not self.numero_solicitud:
@@ -2860,9 +2894,9 @@ class SolicitudCotizacion(models.Model):
             # Si se vincula una orden, desactivar modo sin_orden
             self.sin_orden_activa = False
         elif self.sin_orden_activa:
-            # Si está en modo sin orden, usar folio_referencia como numero_orden_cliente
-            self.folio_referencia = self.folio_referencia.upper().strip()
-            self.numero_orden_cliente = self.folio_referencia
+            # Si está en modo sin orden, usar service_tag como numero_orden_cliente
+            self.service_tag = self.service_tag.upper().strip()
+            self.numero_orden_cliente = self.service_tag
             self.orden_servicio = None
         
         super().save(*args, **kwargs)
@@ -3282,9 +3316,12 @@ class LineaCotizacion(models.Model):
     costo_unitario = models.DecimalField(
         max_digits=10,
         decimal_places=2,
+        null=True,
+        blank=True,
+        default=0,
         validators=[MinValueValidator(0)],
         verbose_name='Costo Unitario',
-        help_text='Precio por unidad'
+        help_text='Precio por unidad (opcional, puede dejarse en 0 si aún no se conoce)'
     )
     
     # ========== ESTADO DEL CLIENTE ==========
@@ -3387,9 +3424,10 @@ class LineaCotizacion(models.Model):
         Calcula el subtotal de esta línea.
         
         Returns:
-            Decimal: cantidad × costo_unitario
+            Decimal: cantidad × costo_unitario (0 si costo es None)
         """
-        return self.cantidad * self.costo_unitario
+        costo = self.costo_unitario or 0
+        return self.cantidad * costo
     
     # ========== MÉTODOS DE WORKFLOW ==========
     
@@ -3843,3 +3881,258 @@ class ImagenLineaCotizacion(models.Model):
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Error al eliminar archivo de imagen: {e}")
+
+
+# ============================================================================
+# FUNCIÓN DE RUTA DE ALMACENAMIENTO PARA IMÁGENES DE REFERENCIA DE SOLICITUD
+# ============================================================================
+
+def imagen_solicitud_cotizacion_upload_path(instance, filename):
+    """
+    Genera la ruta de almacenamiento para imágenes de referencia de solicitud.
+    
+    Ruta: almacen/cotizaciones/{numero_solicitud}/referencia/{nombre_archivo}
+    
+    Args:
+        instance: Instancia de ImagenSolicitudCotizacion
+        filename: Nombre original del archivo
+        
+    Returns:
+        str: Ruta relativa donde se guardará la imagen
+    """
+    numero_solicitud = instance.solicitud.numero_solicitud or 'temp'
+    nombre_archivo = filename.replace(' ', '_')
+    return f'almacen/cotizaciones/{numero_solicitud}/referencia/{nombre_archivo}'
+
+
+# ============================================================================
+# MODELO: IMAGEN DE REFERENCIA DE SOLICITUD DE COTIZACIÓN
+# ============================================================================
+class ImagenSolicitudCotizacion(models.Model):
+    """
+    Imágenes de referencia asociadas a la solicitud de cotización completa.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    A diferencia de ImagenLineaCotizacion (que se vincula a una línea específica),
+    este modelo almacena imágenes generales de la solicitud.
+    
+    Caso de uso principal:
+    Cuando recepción solicita una cotización sin llevar el equipo al centro de
+    servicio, el cliente puede compartir fotos de las piezas que necesita cotizar.
+    Estas imágenes ayudan a compras a identificar exactamente qué piezas buscar.
+    
+    Características:
+    - Máximo 6 imágenes por solicitud
+    - Compresión automática si supera 2MB
+    - Se organizan en carpeta /referencia/ dentro de la solicitud
+    """
+    
+    MAX_IMAGENES_POR_SOLICITUD = 6
+    TAMANO_MAXIMO_SIN_COMPRIMIR = 2 * 1024 * 1024  # 2MB
+    
+    # ========== RELACIÓN CON SOLICITUD ==========
+    solicitud = models.ForeignKey(
+        SolicitudCotizacion,
+        on_delete=models.CASCADE,
+        related_name='imagenes_referencia',
+        verbose_name='Solicitud de Cotización',
+        help_text='Solicitud a la que pertenece esta imagen de referencia'
+    )
+    
+    # ========== IMAGEN ==========
+    imagen = models.ImageField(
+        upload_to=imagen_solicitud_cotizacion_upload_path,
+        max_length=255,
+        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif', 'webp'])],
+        verbose_name='Imagen',
+        help_text='Imagen de referencia (JPG, PNG, GIF, WebP). Máx 10MB.'
+    )
+    
+    # ========== DESCRIPCIÓN ==========
+    descripcion = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name='Descripción',
+        help_text='Descripción breve de la imagen'
+    )
+    
+    # ========== METADATOS ==========
+    fecha_subida = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de Subida'
+    )
+    subido_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='imagenes_solicitud_cotizacion_subidas',
+        verbose_name='Subido Por'
+    )
+    
+    # ========== INFORMACIÓN DE COMPRESIÓN ==========
+    fue_comprimida = models.BooleanField(
+        default=False,
+        verbose_name='¿Fue Comprimida?'
+    )
+    tamano_original_kb = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Tamaño Original (KB)'
+    )
+    tamano_final_kb = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Tamaño Final (KB)'
+    )
+    
+    class Meta:
+        verbose_name = 'Imagen de Referencia de Solicitud'
+        verbose_name_plural = 'Imágenes de Referencia de Solicitud'
+        ordering = ['solicitud', 'fecha_subida']
+    
+    def __str__(self):
+        """Representación en texto de la imagen."""
+        return f"Imagen Ref. {self.solicitud.numero_solicitud} - {self.descripcion or 'Sin descripción'}"
+    
+    @property
+    def nombre_archivo(self):
+        """Retorna solo el nombre del archivo sin la ruta completa."""
+        return os.path.basename(self.imagen.name) if self.imagen else ''
+    
+    @classmethod
+    def puede_agregar_imagen(cls, solicitud):
+        """
+        Verifica si se puede agregar otra imagen a la solicitud.
+        
+        Args:
+            solicitud: Instancia de SolicitudCotizacion
+            
+        Returns:
+            bool: True si se puede agregar, False si ya tiene el máximo
+        """
+        imagenes_actuales = cls.objects.filter(solicitud=solicitud).count()
+        return imagenes_actuales < cls.MAX_IMAGENES_POR_SOLICITUD
+    
+    @classmethod
+    def imagenes_restantes(cls, solicitud):
+        """
+        Calcula cuántas imágenes más se pueden subir.
+        
+        Args:
+            solicitud: Instancia de SolicitudCotizacion
+            
+        Returns:
+            int: Número de imágenes que aún se pueden subir (0-6)
+        """
+        imagenes_actuales = cls.objects.filter(solicitud=solicitud).count()
+        return max(0, cls.MAX_IMAGENES_POR_SOLICITUD - imagenes_actuales)
+    
+    def save(self, *args, **kwargs):
+        """
+        Override del método save() para:
+        1. Validar el límite de imágenes por solicitud
+        2. Comprimir la imagen si supera 2MB
+        3. Guardar información de compresión
+        """
+        es_nueva = self.pk is None
+        
+        # ========== VALIDAR LÍMITE DE IMÁGENES ==========
+        if es_nueva and not self.puede_agregar_imagen(self.solicitud):
+            raise ValueError(
+                f"No se pueden agregar más imágenes. Límite máximo: "
+                f"{self.MAX_IMAGENES_POR_SOLICITUD} imágenes por solicitud."
+            )
+        
+        # ========== PROCESAR Y COMPRIMIR IMAGEN ==========
+        if self.imagen and es_nueva:
+            imagen_file = self.imagen
+            
+            # Calcular tamaño original
+            imagen_file.seek(0, 2)
+            tamano_original = imagen_file.tell()
+            imagen_file.seek(0)
+            
+            self.tamano_original_kb = tamano_original // 1024
+            
+            # Comprimir solo si supera el límite de 2MB
+            if tamano_original > self.TAMANO_MAXIMO_SIN_COMPRIMIR:
+                imagen_comprimida = self._comprimir_imagen(imagen_file)
+                if imagen_comprimida:
+                    self.imagen = imagen_comprimida
+                    self.fue_comprimida = True
+                    
+                    imagen_comprimida.seek(0, 2)
+                    tamano_final = imagen_comprimida.tell()
+                    imagen_comprimida.seek(0)
+                    self.tamano_final_kb = tamano_final // 1024
+                else:
+                    self.tamano_final_kb = self.tamano_original_kb
+            else:
+                self.tamano_final_kb = self.tamano_original_kb
+        
+        super().save(*args, **kwargs)
+    
+    def _comprimir_imagen(self, imagen_file):
+        """
+        Comprime una imagen para reducir su tamaño.
+        Usa Pillow para redimensionar y comprimir a JPEG quality=85.
+        
+        Args:
+            imagen_file: Archivo de imagen
+            
+        Returns:
+            ContentFile: Imagen comprimida, o None si falla
+        """
+        from django.core.files.base import ContentFile
+        
+        try:
+            img = Image.open(imagen_file)
+            
+            # Convertir a RGB si tiene transparencia
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Redimensionar si es muy grande
+            max_dimension = 1920
+            if img.width > max_dimension or img.height > max_dimension:
+                ratio = min(max_dimension / img.width, max_dimension / img.height)
+                nuevo_ancho = int(img.width * ratio)
+                nuevo_alto = int(img.height * ratio)
+                img = img.resize((nuevo_ancho, nuevo_alto), Image.Resampling.LANCZOS)
+            
+            # Guardar con compresión JPEG
+            output = io.BytesIO()
+            img.save(output, format='JPEG', quality=85, optimize=True)
+            output.seek(0)
+            
+            nombre_original = os.path.basename(imagen_file.name)
+            nombre_sin_ext = os.path.splitext(nombre_original)[0]
+            nuevo_nombre = f"{nombre_sin_ext}.jpg"
+            
+            return ContentFile(output.read(), name=nuevo_nombre)
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error al comprimir imagen de solicitud: {e}")
+            return None
+    
+    def delete(self, *args, **kwargs):
+        """Override del método delete() para eliminar el archivo físico."""
+        imagen_path = self.imagen.path if self.imagen else None
+        super().delete(*args, **kwargs)
+        
+        if imagen_path and os.path.exists(imagen_path):
+            try:
+                os.remove(imagen_path)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error al eliminar archivo de imagen de solicitud: {e}")

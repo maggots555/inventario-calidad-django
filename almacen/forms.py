@@ -1634,29 +1634,25 @@ class SolicitudCotizacionForm(forms.ModelForm):
     --------------------------------
     Este formulario crea la "cabecera" de una cotización multi-proveedor.
     
-    El campo más importante es 'numero_orden_cliente' que permite buscar
-    la orden de servicio a la cual se vinculará esta cotización.
+    Tiene dos modos de operación:
     
-    NUEVO: Modo "Sin Orden Activa"
-    ------------------------------
-    Si aún no existe una orden de servicio (ej: cotización preventiva),
-    se puede marcar 'sin_orden_activa' y capturar un 'folio_referencia'
-    (típicamente el número de serie del equipo) como identificador temporal.
+    MODO 1 — Con Orden de Servicio (compras):
+    Se ingresa el número de orden del cliente (OOW-12345 o FL-67890) y el
+    sistema vincula automáticamente con la orden de servicio existente.
     
-    Cuando posteriormente se cree la orden y se reciba la pieza, se podrá
-    vincular manualmente la orden desde el formulario de Editar Unidad.
-    
-    La búsqueda se realiza mediante AJAX usando el endpoint existente
-    'api_buscar_crear_orden' que acepta números tipo OOW-12345 o FL-67890.
+    MODO 2 — Sin Orden Activa (recepción):
+    Se marca el checkbox "Sin orden activa" y se capturan los datos del
+    cliente (nombre, teléfono, correo, service tag, marca, modelo).
+    Esto permite que recepción solicite cotizaciones cuando el cliente
+    proporciona información sin llevar el equipo al centro de servicio.
     
     Campos:
     - numero_orden_cliente: Para buscar y vincular con OrdenServicio
     - sin_orden_activa: Checkbox para modo sin orden
-    - folio_referencia: Identificador temporal cuando no hay orden
+    - service_tag: Identificador del equipo cuando no hay orden
+    - nombre_cliente, telefono_cliente, email_cliente: Datos de contacto
+    - marca, modelo: Información del equipo
     - observaciones: Notas internas sobre la solicitud
-    
-    Los demás campos (numero_solicitud, estado, fechas) se manejan
-    automáticamente por el sistema.
     """
     
     class Meta:
@@ -1664,7 +1660,12 @@ class SolicitudCotizacionForm(forms.ModelForm):
         fields = [
             'numero_orden_cliente',
             'sin_orden_activa',
-            'folio_referencia',
+            'service_tag',
+            'nombre_cliente',
+            'telefono_cliente',
+            'email_cliente',
+            'marca',
+            'modelo',
             'observaciones',
         ]
         widgets = {
@@ -1678,11 +1679,36 @@ class SolicitudCotizacionForm(forms.ModelForm):
                 'class': 'form-check-input',
                 'id': 'sin_orden_activa',
             }),
-            'folio_referencia': forms.TextInput(attrs={
+            'service_tag': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Ej: Número de serie del equipo',
-                'id': 'folio_referencia',
+                'placeholder': 'Ej: Service Tag o número de serie del equipo',
+                'id': 'service_tag',
                 'style': 'text-transform: uppercase;',
+            }),
+            'nombre_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nombre completo del cliente',
+                'id': 'nombre_cliente',
+            }),
+            'telefono_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 33 1234 5678',
+                'id': 'telefono_cliente',
+            }),
+            'email_cliente': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'correo@ejemplo.com',
+                'id': 'email_cliente',
+            }),
+            'marca': forms.Select(attrs={
+                'class': 'form-select',
+                'id': 'marca',
+            }),
+            'modelo': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: Inspiron 15 3520, ThinkPad X1 Carbon',
+                'id': 'modelo',
+                'data-api-url': '/servicio-tecnico/api/buscar-modelos-por-marca/',
             }),
             'observaciones': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -1693,22 +1719,30 @@ class SolicitudCotizacionForm(forms.ModelForm):
         labels = {
             'numero_orden_cliente': 'Número de Orden del Cliente',
             'sin_orden_activa': 'Sin orden activa',
-            'folio_referencia': 'Folio de Referencia',
+            'service_tag': 'Service Tag',
+            'nombre_cliente': 'Nombre del Cliente',
+            'telefono_cliente': 'Teléfono',
+            'email_cliente': 'Correo Electrónico',
+            'marca': 'Marca del Equipo',
+            'modelo': 'Modelo del Equipo',
             'observaciones': 'Observaciones Internas',
         }
         help_texts = {
             'numero_orden_cliente': 'Ingresa el número de orden y presiona Tab para buscar',
             'sin_orden_activa': 'Marcar si aún no existe una orden de servicio para esta cotización',
-            'folio_referencia': 'Identificador temporal (ej: número de serie) - Se convertirá a mayúsculas',
+            'service_tag': 'Número de serie o identificador del equipo - Se convertirá a mayúsculas',
+            'nombre_cliente': 'Nombre completo del cliente que solicita la cotización',
+            'telefono_cliente': 'Número de contacto del cliente',
+            'email_cliente': 'Correo para enviar la cotización al cliente',
+            'marca': 'Marca del equipo del cliente',
+            'modelo': 'Modelo del equipo (se autocompleta según la marca o escribe libre)',
             'observaciones': 'Estas notas son internas, no se muestran al cliente',
         }
     
-    def clean_folio_referencia(self):
-        """
-        Normaliza el folio de referencia a mayúsculas.
-        """
-        folio = self.cleaned_data.get('folio_referencia', '').strip()
-        return folio.upper() if folio else ''
+    def clean_service_tag(self):
+        """Normaliza el service tag a mayúsculas."""
+        tag = self.cleaned_data.get('service_tag', '').strip()
+        return tag.upper() if tag else ''
     
     def clean(self):
         """
@@ -1716,19 +1750,25 @@ class SolicitudCotizacionForm(forms.ModelForm):
         
         EXPLICACIÓN:
         - Si sin_orden_activa=False: Debe haber un numero_orden_cliente válido
-        - Si sin_orden_activa=True: Debe haber un folio_referencia
+        - Si sin_orden_activa=True: Debe haber un service_tag y nombre_cliente
         """
         cleaned_data = super().clean()
         sin_orden = cleaned_data.get('sin_orden_activa', False)
         numero_orden = cleaned_data.get('numero_orden_cliente', '').strip()
-        folio = cleaned_data.get('folio_referencia', '').strip()
+        service_tag = cleaned_data.get('service_tag', '').strip()
+        nombre_cliente = cleaned_data.get('nombre_cliente', '').strip()
         
         if sin_orden:
-            # Modo sin orden: requiere folio_referencia
-            if not folio:
+            # Modo sin orden: requiere service_tag y nombre_cliente
+            if not service_tag:
                 self.add_error(
-                    'folio_referencia',
-                    'Debes ingresar un folio de referencia cuando no hay orden activa.'
+                    'service_tag',
+                    'Debes ingresar un Service Tag cuando no hay orden activa.'
+                )
+            if not nombre_cliente:
+                self.add_error(
+                    'nombre_cliente',
+                    'Debes ingresar el nombre del cliente cuando no hay orden activa.'
                 )
             # Limpiar el número de orden si está en modo sin orden
             cleaned_data['numero_orden_cliente'] = ''
@@ -1869,6 +1909,7 @@ class LineaCotizacionForm(forms.ModelForm):
         - Solo muestra productos activos
         - Solo muestra proveedores activos
         - Ordena alfabéticamente para facilitar búsqueda
+        - costo_unitario es opcional (required=False)
         """
         super().__init__(*args, **kwargs)
         
@@ -1883,6 +1924,9 @@ class LineaCotizacionForm(forms.ModelForm):
             activo=True
         ).order_by('nombre')
         self.fields['proveedor'].empty_label = '-- Seleccionar Proveedor --'
+        
+        # Hacer costo_unitario opcional (recepción puede no conocer el precio)
+        self.fields['costo_unitario'].required = False
     
     def clean(self):
         """
@@ -1900,11 +1944,11 @@ class LineaCotizacionForm(forms.ModelForm):
                 'La descripción de la pieza es obligatoria.'
             )
         
-        # El costo debe ser mayor a 0
-        if costo is not None and costo <= 0:
+        # Si hay costo, debe ser mayor a 0
+        if costo is not None and costo < 0:
             self.add_error(
                 'costo_unitario',
-                'El costo debe ser mayor a 0.'
+                'El costo no puede ser negativo.'
             )
         
         return cleaned_data

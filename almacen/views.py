@@ -49,6 +49,7 @@ from .models import (
     SolicitudCotizacion,
     LineaCotizacion,
     ImagenLineaCotizacion,
+    ImagenSolicitudCotizacion,
 )
 from .forms import (
     ProveedorForm,
@@ -3031,19 +3032,24 @@ def crear_solicitud_cotizacion(request):
     --------------------------------
     Esta vista maneja la creación de una solicitud de cotización.
     
-    El proceso tiene dos partes:
+    El proceso tiene tres partes:
     1. El formulario principal (SolicitudCotizacionForm) captura:
        - Número de orden del cliente (para vincular con servicio técnico)
+       - O modo sin orden: datos del cliente + service tag + marca/modelo
        - Observaciones internas
     
     2. El formset (LineaCotizacionFormSet) captura las líneas:
        - Cada línea tiene: producto, descripción, proveedor, cantidad, costo
        - Se pueden agregar múltiples líneas dinámicamente con JavaScript
     
+    3. Las imágenes de referencia (request.FILES):
+       - Hasta 6 imágenes del equipo/piezas que el cliente quiere cotizar
+       - Se procesan después de guardar la solicitud
+    
     Flujo:
     1. GET: Muestra formularios vacíos
     2. POST: Valida ambos formularios
-       - Si válidos: Guarda solicitud y líneas, redirige a detalle
+       - Si válidos: Guarda solicitud, líneas e imágenes, redirige a detalle
        - Si inválidos: Muestra errores
     """
     if request.method == 'POST':
@@ -3059,6 +3065,29 @@ def crear_solicitud_cotizacion(request):
             # Guardar las líneas (detalle)
             formset.instance = solicitud
             formset.save()
+            
+            # Procesar imágenes de referencia (hasta 6)
+            imagenes = request.FILES.getlist('imagenes_referencia')
+            descripciones = request.POST.getlist('descripcion_imagen')
+            imagenes_guardadas = 0
+            
+            for i, imagen in enumerate(imagenes):
+                if imagenes_guardadas >= ImagenSolicitudCotizacion.MAX_IMAGENES_POR_SOLICITUD:
+                    break
+                try:
+                    descripcion = descripciones[i] if i < len(descripciones) else ''
+                    ImagenSolicitudCotizacion.objects.create(
+                        solicitud=solicitud,
+                        imagen=imagen,
+                        descripcion=descripcion,
+                        subido_por=request.user,
+                    )
+                    imagenes_guardadas += 1
+                except (ValueError, Exception) as e:
+                    messages.warning(request, f'Error al subir imagen: {str(e)}')
+            
+            if imagenes_guardadas > 0:
+                messages.info(request, f'{imagenes_guardadas} imagen(es) de referencia subidas.')
             
             messages.success(
                 request,
@@ -3076,6 +3105,7 @@ def crear_solicitud_cotizacion(request):
         'formset': formset,
         'titulo': 'Nueva Solicitud de Cotización',
         'es_creacion': True,
+        'max_imagenes_referencia': ImagenSolicitudCotizacion.MAX_IMAGENES_POR_SOLICITUD,
     }
     
     return render(request, 'almacen/cotizaciones/form_solicitud.html', context)
@@ -3093,6 +3123,8 @@ def editar_solicitud_cotizacion(request, pk):
     
     Solo se puede editar si la solicitud está en estado 'borrador'.
     Una vez enviada al cliente, no se puede modificar.
+    
+    También permite agregar más imágenes de referencia.
     """
     solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
     
@@ -3112,6 +3144,33 @@ def editar_solicitud_cotizacion(request, pk):
             form.save()
             formset.save()
             
+            # Procesar imágenes de referencia nuevas (hasta el límite)
+            imagenes = request.FILES.getlist('imagenes_referencia')
+            descripciones = request.POST.getlist('descripcion_imagen')
+            imagenes_guardadas = 0
+            
+            for i, imagen in enumerate(imagenes):
+                if not ImagenSolicitudCotizacion.puede_agregar_imagen(solicitud):
+                    messages.warning(
+                        request,
+                        f'Se alcanzó el límite de {ImagenSolicitudCotizacion.MAX_IMAGENES_POR_SOLICITUD} imágenes.'
+                    )
+                    break
+                try:
+                    descripcion = descripciones[i] if i < len(descripciones) else ''
+                    ImagenSolicitudCotizacion.objects.create(
+                        solicitud=solicitud,
+                        imagen=imagen,
+                        descripcion=descripcion,
+                        subido_por=request.user,
+                    )
+                    imagenes_guardadas += 1
+                except (ValueError, Exception) as e:
+                    messages.warning(request, f'Error al subir imagen: {str(e)}')
+            
+            if imagenes_guardadas > 0:
+                messages.info(request, f'{imagenes_guardadas} imagen(es) de referencia agregadas.')
+            
             messages.success(request, 'Solicitud actualizada exitosamente.')
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
         else:
@@ -3120,12 +3179,19 @@ def editar_solicitud_cotizacion(request, pk):
         form = SolicitudCotizacionForm(instance=solicitud)
         formset = LineaCotizacionFormSet(instance=solicitud)
     
+    # Calcular imágenes restantes
+    imagenes_actuales = ImagenSolicitudCotizacion.objects.filter(solicitud=solicitud).count()
+    imagenes_restantes = max(0, ImagenSolicitudCotizacion.MAX_IMAGENES_POR_SOLICITUD - imagenes_actuales)
+    
     context = {
         'form': form,
         'formset': formset,
         'solicitud': solicitud,
         'titulo': f'Editar Solicitud {solicitud.numero_solicitud}',
         'es_creacion': False,
+        'max_imagenes_referencia': ImagenSolicitudCotizacion.MAX_IMAGENES_POR_SOLICITUD,
+        'imagenes_referencia_actuales': imagenes_actuales,
+        'imagenes_referencia_restantes': imagenes_restantes,
     }
     
     return render(request, 'almacen/cotizaciones/form_solicitud.html', context)
@@ -3163,6 +3229,7 @@ def detalle_solicitud_cotizacion(request, pk):
             'lineas__proveedor',
             'lineas__compra_generada',
             'lineas__imagenes',  # Incluir imágenes de cada línea
+            'imagenes_referencia',  # Incluir imágenes de referencia de la solicitud
         ),
         pk=pk
     )
@@ -3211,12 +3278,18 @@ def detalle_solicitud_cotizacion(request, pk):
     # Verificar si se puede subir imágenes
     puede_subir_imagenes = solicitud.estado == 'borrador'
     
+    # Imágenes de referencia de la solicitud
+    imagenes_referencia = solicitud.imagenes_referencia.all()
+    max_imagenes_referencia = ImagenSolicitudCotizacion.MAX_IMAGENES_POR_SOLICITUD
+    
     context = {
         'solicitud': solicitud,
         'info_orden': info_orden,
         'titulo': f'Solicitud {solicitud.numero_solicitud}',
         'puede_subir_imagenes': puede_subir_imagenes,
         'max_imagenes_por_linea': ImagenLineaCotizacion.MAX_IMAGENES_POR_LINEA,
+        'imagenes_referencia': imagenes_referencia,
+        'max_imagenes_referencia': max_imagenes_referencia,
     }
     
     return render(request, 'almacen/cotizaciones/detalle_solicitud.html', context)

@@ -31,7 +31,7 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
         </div>
     </div>
 
-    <form method="post" id="solicitudForm">
+    <form method="post" id="solicitudForm" enctype="multipart/form-data">
         {% csrf_token %}
         
         <!-- Datos principales de la solicitud -->
@@ -63,7 +63,8 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                         </label>
                         <div class="input-group">
                             {{ form.numero_orden_cliente }}
-                            <button type="button" class="btn btn-outline-secondary" id="buscarOrdenBtn">
+                            <button type="button" class="btn btn-outline-secondary" id="buscarOrdenBtn"
+                                    data-url="{% url 'almacen:api_buscar_crear_orden' %}">
                                 <i class="bi bi-search"></i>
                             </button>
                         </div>
@@ -83,27 +84,84 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                         </div>
                     </div>
                     
-                    <!-- Folio de Referencia (visible cuando sin_orden_activa=true) -->
-                    <div class="col-md-6 d-none" id="folioReferenciaContainer">
-                        <label class="form-label">
-                            {{ form.folio_referencia.label }}
-                            <span class="text-danger">*</span>
-                        </label>
-                        {{ form.folio_referencia }}
-                        <div class="form-text">
-                            {{ form.folio_referencia.help_text }}
-                        </div>
-                        {% if form.folio_referencia.errors %}
-                        <div class="text-danger small">
-                            {{ form.folio_referencia.errors.0 }}
-                        </div>
-                        {% endif %}
-                        
-                        <!-- Alerta informativa -->
-                        <div class="alert alert-warning mt-2 small">
-                            <i class="bi bi-info-circle me-1"></i>
-                            <strong>Nota:</strong> La orden de servicio se podrá vincular posteriormente 
-                            desde "Editar Unidad" cuando se reciba la pieza.
+                    <!-- Sección Sin Orden: Datos del Cliente y Equipo (visible cuando sin_orden_activa=true) -->
+                    <div class="col-12 d-none" id="sinOrdenContainer">
+                        <hr class="my-3">
+                        <h6 class="mb-3">
+                            <i class="bi bi-person-vcard me-1"></i>Datos del Cliente y Equipo
+                        </h6>
+                        <div class="row g-3">
+                            <!-- Service Tag -->
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    {{ form.service_tag.label }}
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {{ form.service_tag }}
+                                <div class="form-text">{{ form.service_tag.help_text }}</div>
+                                {% if form.service_tag.errors %}
+                                <div class="text-danger small">{{ form.service_tag.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Nombre del Cliente -->
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    {{ form.nombre_cliente.label }}
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {{ form.nombre_cliente }}
+                                <div class="form-text">{{ form.nombre_cliente.help_text }}</div>
+                                {% if form.nombre_cliente.errors %}
+                                <div class="text-danger small">{{ form.nombre_cliente.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Teléfono -->
+                            <div class="col-md-4">
+                                <label class="form-label">{{ form.telefono_cliente.label }}</label>
+                                {{ form.telefono_cliente }}
+                                {% if form.telefono_cliente.errors %}
+                                <div class="text-danger small">{{ form.telefono_cliente.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Correo Electrónico -->
+                            <div class="col-md-4">
+                                <label class="form-label">{{ form.email_cliente.label }}</label>
+                                {{ form.email_cliente }}
+                                {% if form.email_cliente.errors %}
+                                <div class="text-danger small">{{ form.email_cliente.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Marca del Equipo -->
+                            <div class="col-md-4">
+                                <label class="form-label">{{ form.marca.label }}</label>
+                                {{ form.marca }}
+                                {% if form.marca.errors %}
+                                <div class="text-danger small">{{ form.marca.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Modelo del Equipo -->
+                            <div class="col-md-12">
+                                <label class="form-label">{{ form.modelo.label }}</label>
+                                {{ form.modelo }}
+                                <div class="form-text">{{ form.modelo.help_text }}</div>
+                                {% if form.modelo.errors %}
+                                <div class="text-danger small">{{ form.modelo.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Alerta informativa -->
+                            <div class="col-12">
+                                <div class="alert alert-warning mt-2 small mb-0">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    <strong>Nota:</strong> La orden de servicio se podrá vincular posteriormente 
+                                    desde "Editar Unidad" cuando se reciba la pieza.
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -128,6 +186,74 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                     </ul>
                 </div>
                 {% endif %}
+            </div>
+        </div>
+
+        <!-- Imágenes de Referencia (solo en modo sin orden) -->
+        <div class="card shadow-sm mb-4 d-none" id="imagenesReferenciaCard">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-images me-2"></i>Imágenes de Referencia
+                    <span class="badge bg-light text-dark ms-2" id="contadorImagenesRef">0/{{ max_imagenes_referencia }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Sube imágenes de las piezas que el cliente necesita cotizar. Máximo {{ max_imagenes_referencia }} imágenes.
+                </p>
+                
+                <!-- Imágenes existentes (en modo edición) -->
+                {% if not es_creacion and solicitud.imagenes_referencia.all %}
+                <div class="row g-2 mb-3">
+                    {% for img in solicitud.imagenes_referencia.all %}
+                    <div class="col-md-2 col-sm-4">
+                        <div class="border rounded p-1 text-center">
+                            <img src="{{ img.imagen.url }}" alt="{{ img.descripcion }}" 
+                                 class="img-fluid rounded" style="max-height: 80px; object-fit: cover;">
+                            <small class="text-muted d-block text-truncate">{{ img.descripcion|default:"Sin desc." }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <hr>
+                <p class="small text-muted">
+                    <i class="bi bi-plus-circle me-1"></i>Agregar más imágenes:
+                    <span id="imagenesRestantes">{{ imagenes_referencia_restantes|default:max_imagenes_referencia }}</span> espacio(s) disponible(s)
+                </p>
+                {% endif %}
+                
+                <!-- Zona de subida de imágenes -->
+                <div id="imagenesUploadZone">
+                    <div class="imagen-upload-slot mb-2">
+                        <div class="row g-2 align-items-center">
+                            <div class="col-md-5">
+                                <input type="file" name="imagenes_referencia" 
+                                       class="form-control form-control-sm imagen-ref-input"
+                                       accept="image/jpeg,image/png,image/gif,image/webp">
+                            </div>
+                            <div class="col-md-5">
+                                <input type="text" name="descripcion_imagen" 
+                                       class="form-control form-control-sm"
+                                       placeholder="Descripción (opcional)" maxlength="200">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-imagen-slot" 
+                                        title="Quitar este slot">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Preview -->
+                        <div class="imagen-preview mt-1 d-none">
+                            <img src="" alt="Preview" class="img-thumbnail" style="max-height: 60px;">
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="button" id="addImagenSlotBtn" class="btn btn-sm btn-outline-secondary mt-2">
+                    <i class="bi bi-plus-lg me-1"></i>Agregar otra imagen
+                </button>
             </div>
         </div>
 
@@ -169,9 +295,6 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                                 <label class="form-label small fw-bold">#</label>
                                 <input type="text" class="form-control form-control-sm text-center linea-numero" 
                                        value="{{ forloop.counter }}" readonly>
-                                {% if linea_form.instance.pk %}
-                                {{ linea_form.id }}
-                                {% endif %}
                             </div>
                             
                             <!-- Producto -->
@@ -204,14 +327,13 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                             <!-- Eliminar -->
                             <div class="col-md-1 d-flex align-items-end">
                                 {% if linea_form.instance.pk %}
-                                <div class="form-check">
-                                    {{ linea_form.DELETE }}
-                                    <label class="form-check-label text-danger small">
-                                        <i class="bi bi-trash"></i>
-                                    </label>
-                                </div>
+                                <div class="d-none">{{ linea_form.DELETE }}</div>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-linea-btn" title="Eliminar línea">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                {{ linea_form.id }}
                                 {% else %}
-                                <button type="button" class="btn btn-sm btn-outline-danger remove-linea-btn">
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-linea-btn" title="Eliminar línea">
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 {% endif %}
@@ -224,7 +346,7 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                             </div>
                             
                             <div class="col-md-2">
-                                <label class="form-label small">Costo Unit. <span class="text-danger">*</span></label>
+                                <label class="form-label small">Costo Unit. <span class="badge bg-secondary" style="font-size: 0.65em;">Opcional</span></label>
                                 {{ linea_form.costo_unitario }}
                             </div>
                             
@@ -298,10 +420,10 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                                        min="1" value="1" required>
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label small">Costo Unit. <span class="text-danger">*</span></label>
+                                <label class="form-label small">Costo Unit. <span class="badge bg-secondary" style="font-size: 0.65em;">Opcional</span></label>
                                 <input type="number" name="lineas-__prefix__-costo_unitario" 
                                        class="form-control form-control-sm costo-input" 
-                                       min="0" step="0.01" placeholder="0.00" required>
+                                       min="0" step="0.01" placeholder="0.00">
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label small">Entrega (días)</label>
@@ -359,222 +481,5 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
 {% endblock almacen_content %}
 
 {% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const container = document.getElementById('lineasContainer');
-    const template = document.getElementById('lineaTemplate');
-    const addBtn = document.getElementById('addLineaBtn');
-    const totalFormsInput = document.querySelector('[name="lineas-TOTAL_FORMS"]');
-    const buscarOrdenBtn = document.getElementById('buscarOrdenBtn');
-    const ordenInput = document.getElementById('numero_orden_cliente');
-    const ordenInfo = document.getElementById('ordenInfo');
-    const ordenInfoTexto = document.getElementById('ordenInfoTexto');
-    
-    // ========== ELEMENTOS MODO SIN ORDEN ==========
-    const sinOrdenCheckbox = document.getElementById('sin_orden_activa');
-    const ordenClienteContainer = document.getElementById('ordenClienteContainer');
-    const folioReferenciaContainer = document.getElementById('folioReferenciaContainer');
-    const folioInput = document.getElementById('folio_referencia');
-    
-    let formCount = parseInt(totalFormsInput.value);
-    
-    // ========== FUNCIONES MODO SIN ORDEN ==========
-    
-    function toggleModoSinOrden() {
-        const sinOrden = sinOrdenCheckbox.checked;
-        
-        if (sinOrden) {
-            // Activar modo sin orden
-            ordenClienteContainer.classList.add('d-none');
-            folioReferenciaContainer.classList.remove('d-none');
-            ordenInput.removeAttribute('required');
-            folioInput.setAttribute('required', 'required');
-            // Limpiar campo de orden
-            ordenInput.value = '';
-            ordenInfo.classList.add('d-none');
-        } else {
-            // Desactivar modo sin orden (modo normal)
-            ordenClienteContainer.classList.remove('d-none');
-            folioReferenciaContainer.classList.add('d-none');
-            ordenInput.setAttribute('required', 'required');
-            folioInput.removeAttribute('required');
-            // Limpiar campo de folio
-            folioInput.value = '';
-        }
-    }
-    
-    // Evento para el checkbox
-    sinOrdenCheckbox.addEventListener('change', toggleModoSinOrden);
-    
-    // Inicializar estado al cargar (por si hay errores de validación)
-    toggleModoSinOrden();
-    
-    // Convertir folio a mayúsculas mientras se escribe
-    folioInput.addEventListener('input', function() {
-        this.value = this.value.toUpperCase();
-    });
-    
-    // ========== FUNCIONES DE LÍNEAS ==========
-    
-    // Actualizar números de línea
-    function updateLineNumbers() {
-        const forms = container.querySelectorAll('.linea-form:not([style*="display: none"])');
-        forms.forEach((form, index) => {
-            const lineaNumero = form.querySelector('.linea-numero');
-            if (lineaNumero) {
-                lineaNumero.value = index + 1;
-            }
-        });
-    }
-    
-    // Calcular subtotal de una línea
-    function calcularSubtotal(lineaForm) {
-        const cantidadInput = lineaForm.querySelector('[name$="-cantidad"], .cantidad-input');
-        const costoInput = lineaForm.querySelector('[name$="-costo_unitario"], .costo-input');
-        const subtotalEl = lineaForm.querySelector('.subtotal-linea');
-        
-        if (cantidadInput && costoInput && subtotalEl) {
-            const cantidad = parseFloat(cantidadInput.value) || 0;
-            const costo = parseFloat(costoInput.value) || 0;
-            const subtotal = cantidad * costo;
-            subtotalEl.textContent = '$' + subtotal.toFixed(2);
-        }
-        
-        calcularTotalGeneral();
-    }
-    
-    // Calcular total general
-    function calcularTotalGeneral() {
-        let total = 0;
-        container.querySelectorAll('.linea-form:not([style*="display: none"])').forEach(form => {
-            const cantidadInput = form.querySelector('[name$="-cantidad"], .cantidad-input');
-            const costoInput = form.querySelector('[name$="-costo_unitario"], .costo-input');
-            
-            if (cantidadInput && costoInput) {
-                const cantidad = parseFloat(cantidadInput.value) || 0;
-                const costo = parseFloat(costoInput.value) || 0;
-                total += cantidad * costo;
-            }
-        });
-        
-        document.getElementById('totalGeneral').textContent = '$' + total.toFixed(2);
-    }
-    
-    // Agregar event listeners a los inputs de una línea
-    function addLineaListeners(lineaForm) {
-        const cantidadInput = lineaForm.querySelector('[name$="-cantidad"], .cantidad-input');
-        const costoInput = lineaForm.querySelector('[name$="-costo_unitario"], .costo-input');
-        
-        if (cantidadInput) {
-            cantidadInput.addEventListener('input', () => calcularSubtotal(lineaForm));
-        }
-        if (costoInput) {
-            costoInput.addEventListener('input', () => calcularSubtotal(lineaForm));
-        }
-        
-        const removeBtn = lineaForm.querySelector('.remove-linea-btn');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', function() {
-                lineaForm.remove();
-                updateLineNumbers();
-                calcularTotalGeneral();
-            });
-        }
-        
-        // Calcular subtotal inicial
-        calcularSubtotal(lineaForm);
-    }
-    
-    // Agregar nueva línea
-    addBtn.addEventListener('click', function() {
-        const newForm = template.content.cloneNode(true);
-        const formHtml = newForm.querySelector('.linea-form');
-        
-        // Reemplazar __prefix__ con el índice actual
-        formHtml.innerHTML = formHtml.innerHTML.replace(/__prefix__/g, formCount);
-        
-        container.appendChild(newForm);
-        formCount++;
-        totalFormsInput.value = formCount;
-        
-        updateLineNumbers();
-        
-        // Agregar listeners a la nueva línea
-        const nuevaLinea = container.lastElementChild;
-        addLineaListeners(nuevaLinea);
-    });
-    
-    // Inicializar listeners para líneas existentes
-    container.querySelectorAll('.linea-form').forEach(addLineaListeners);
-    
-    // ========== BÚSQUEDA DE ORDEN ==========
-    
-    buscarOrdenBtn.addEventListener('click', buscarOrden);
-    ordenInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab' || e.key === 'Enter') {
-            e.preventDefault();
-            buscarOrden();
-        }
-    });
-    
-    function buscarOrden() {
-        // No buscar si está en modo sin orden
-        if (sinOrdenCheckbox.checked) return;
-        
-        const numero = ordenInput.value.trim().toUpperCase();
-        
-        if (!numero) {
-            ordenInfo.classList.add('d-none');
-            return;
-        }
-        
-        // Validar formato
-        if (!numero.startsWith('OOW-') && !numero.startsWith('FL-')) {
-            ordenInfo.classList.remove('d-none');
-            ordenInfo.classList.remove('alert-info');
-            ordenInfo.classList.add('alert-warning');
-            ordenInfoTexto.textContent = 'Formato inválido. Use OOW-12345 o FL-67890';
-            return;
-        }
-        
-        // Buscar usando el endpoint existente
-        fetch(`{% url 'almacen:api_buscar_crear_orden' %}?orden_cliente=${encodeURIComponent(numero)}`)
-            .then(response => response.json())
-            .then(data => {
-                ordenInfo.classList.remove('d-none');
-                
-                if (data.found) {
-                    ordenInfo.classList.remove('alert-warning');
-                    ordenInfo.classList.add('alert-info');
-                    ordenInfoTexto.innerHTML = `
-                        <strong>${data.orden_cliente}</strong><br>
-                        Estado: ${data.estado_display || data.estado || '-'}<br>
-                        Sucursal: ${data.sucursal || '-'}
-                    `;
-                    ordenInput.value = numero; // Normalizar
-                } else if (data.success && !data.found) {
-                    // No encontrada pero formato válido
-                    ordenInfo.classList.remove('alert-info');
-                    ordenInfo.classList.add('alert-warning');
-                    ordenInfoTexto.textContent = `No se encontró ninguna orden con el número "${numero}". Verifica que sea correcta.`;
-                } else {
-                    ordenInfo.classList.remove('alert-info');
-                    ordenInfo.classList.add('alert-warning');
-                    ordenInfoTexto.textContent = data.error || `No se encontró ninguna orden con el número "${numero}"`;
-                }
-            })
-            .catch(error => {
-                console.error('Error buscando orden:', error);
-                ordenInfo.classList.remove('d-none');
-                ordenInfo.classList.remove('alert-info');
-                ordenInfo.classList.add('alert-warning');
-                ordenInfoTexto.textContent = 'Error al buscar la orden. Intenta de nuevo.';
-            });
-    }
-    
-    // Calcular totales al cargar
-    calcularTotalGeneral();
-    updateLineNumbers();
-});
-</script>
+<script src="{% static 'js/form_solicitud_cotizacion.js' %}"></script>
 {% endblock extra_js %}
