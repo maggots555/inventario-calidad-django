@@ -2062,7 +2062,7 @@ def extraer_frames_video(ruta_video: str, max_frames: int = 8) -> list[bytes]:
                 'pipe:1',
             ],
             capture_output=True,
-            timeout=120,
+            timeout=300,  # 5 minutos — suficiente para videos largos (10+ min)
         )
 
         if proceso.returncode != 0:
@@ -2303,6 +2303,11 @@ def analizar_video_evidencia_dispatch(
 
     nombre_limpio = modelo_override.strip()
     proveedor_override = None
+
+    # "auto" es el modo automático con fallback completo (Gemini → Ollama)
+    if nombre_limpio.lower() == 'auto':
+        nombre_limpio = ''  # Resetear para que use el flujo automático
+        logger.info("[VideoIA][Dispatch] Modo automático seleccionado — fallback Gemini → Ollama")
 
     for prefijo in ('[Gemini] ', '[Ollama] '):
         if nombre_limpio.startswith(prefijo):

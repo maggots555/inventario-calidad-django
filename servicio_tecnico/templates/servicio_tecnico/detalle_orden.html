@@ -5113,7 +5113,7 @@
                         </div>
                         <select name="modelo_ia_analisis" class="form-select form-select-sm" style="max-width:400px;">
                             <option value="">Sin análisis IA</option>
-                            <option value="">— Automático (Gemini → Ollama) —</option>
+                            <option value="auto">— Automático (Gemini → Ollama) —</option>
                             {% for modelo in ollama_models %}
                                 <option value="{{ modelo }}">{{ modelo }}</option>
                             {% endfor %}

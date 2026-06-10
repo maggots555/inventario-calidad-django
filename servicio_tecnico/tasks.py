@@ -3527,8 +3527,8 @@ def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int):
     bind=True,
     max_retries=1,
     default_retry_delay=30,
-    soft_time_limit=660,   # 11 minutos — margen para videos grandes/pesados
-    time_limit=720,        # 12 minutos hard-limit (el worker se mata si supera esto)
+    soft_time_limit=1260,  # 21 minutos — margen amplio para videos WebM pesados
+    time_limit=1320,       # 22 minutos hard-limit (el worker se mata si supera esto)
     name='servicio_tecnico.comprimir_video_evidencia',
 )
 def comprimir_video_evidencia_task(
@@ -3677,12 +3677,11 @@ def comprimir_video_evidencia_task(
              '-vf', (
                  f"{transpose_prefijo}"
                  "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease,"
-                 "scale=trunc(iw/2)*2:trunc(ih/2)*2,"
-                 "unsharp=5:5:1.0:5:5:0.0"
+                 "scale=trunc(iw/2)*2:trunc(ih/2)*2"
              ),
             '-c:v', 'libx264',
-            '-crf', '23',
-            '-preset', 'fast',
+            '-crf', '25',
+            '-preset', 'veryfast',
             '-pix_fmt', 'yuv420p',
             '-profile:v', 'main',
             '-level', '4.0',
@@ -3706,7 +3705,7 @@ def comprimir_video_evidencia_task(
             cmd_compress,
             capture_output=True,
             text=True,
-            timeout=600,  # 10 minutos máximo para el proceso FFmpeg
+            timeout=1200,  # 20 minutos máximo para el proceso FFmpeg
         )
         if resultado.returncode != 0:
             raise RuntimeError(
