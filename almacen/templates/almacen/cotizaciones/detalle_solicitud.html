@@ -92,13 +92,17 @@ Muestra toda la información y acciones según el estado
                         {% if info_orden %}
                         <div class="col-md-4">
                             <strong>Equipo:</strong><br>
-                            {{ info_orden.equipo_tipo|default:"-" }} 
-                            {{ info_orden.equipo_marca|default:"" }} 
-                            {{ info_orden.equipo_modelo|default:"" }}
+                            {{ info_orden.tipo_equipo|default:"-" }} 
+                            {{ info_orden.marca|default:"" }} 
+                            {{ info_orden.modelo|default:"" }}
                         </div>
                         <div class="col-md-4">
                             <strong>Service Tag:</strong><br>
-                            {{ info_orden.service_tag|default:"-" }}
+                            {{ info_orden.numero_serie|default:"-" }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Email:</strong><br>
+                            {{ info_orden.email_cliente|default:"-" }}
                         </div>
                         {% endif %}
                     </div>

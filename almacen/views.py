@@ -3699,9 +3699,8 @@ def eliminar_imagen_linea(request, solicitud_pk, linea_pk, imagen_pk):
             'Solo se pueden eliminar imágenes cuando la solicitud está en borrador.'
         )
         return redirect(
-            'almacen:gestionar_imagenes_linea',
-            solicitud_pk=solicitud_pk,
-            linea_pk=linea_pk
+            'almacen:detalle_solicitud_cotizacion',
+            pk=solicitud_pk
         )
     
     # Solo procesar eliminación con método POST
@@ -3714,9 +3713,8 @@ def eliminar_imagen_linea(request, solicitud_pk, linea_pk, imagen_pk):
         )
     
     return redirect(
-        'almacen:gestionar_imagenes_linea',
-        solicitud_pk=solicitud_pk,
-        linea_pk=linea_pk
+        'almacen:detalle_solicitud_cotizacion',
+        pk=solicitud_pk
     )
 
 
