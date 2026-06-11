@@ -101,6 +101,7 @@ urlpatterns = [
     
     # Workflow de solicitudes
     path('solicitudes-cotizacion/<int:pk>/enviar/', views.enviar_solicitud_cliente, name='enviar_solicitud_cliente'),
+    path('solicitudes-cotizacion/<int:pk>/notificar-front/', views.notificar_front, name='notificar_front'),
     path('solicitudes-cotizacion/<int:pk>/cancelar/', views.cancelar_solicitud_cotizacion, name='cancelar_solicitud_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/generar-compras/', views.generar_compras_solicitud, name='generar_compras_solicitud'),
     

@@ -591,7 +591,7 @@ ESTADOS_COMPRA_FINALIZADOS = ['recibida', 'devuelta', 'cancelada', 'rechazada']
 # Flujo: borrador → enviada_cliente → respuesta del cliente → procesamiento
 ESTADO_SOLICITUD_COTIZACION_CHOICES = [
     ('borrador', 'Borrador'),                          # Compras está preparando
-    ('enviada_cliente', 'Enviada a Cliente'),          # Recepción puede compartir con cliente
+    ('enviada_cliente', 'Enviada a Front'),            # Notificación enviada a recepción
     ('parcialmente_aprobada', 'Parcialmente Aprobada'),# Cliente aprobó algunas líneas
     ('totalmente_aprobada', 'Totalmente Aprobada'),    # Cliente aprobó todas las líneas
     ('totalmente_rechazada', 'Totalmente Rechazada'),  # Cliente rechazó todas las líneas

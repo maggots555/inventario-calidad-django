@@ -33,6 +33,7 @@ from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.utils import timezone
 from django.urls import reverse
+from django.views.decorators.http import require_http_methods
 from functools import wraps
 
 from .models import (
@@ -3282,6 +3283,20 @@ def detalle_solicitud_cotizacion(request, pk):
     imagenes_referencia = solicitud.imagenes_referencia.all()
     max_imagenes_referencia = ImagenSolicitudCotizacion.MAX_IMAGENES_POR_SOLICITUD
     
+    # Empleados disponibles para copia en notificación a front
+    empleados_copia = Empleado.objects.filter(
+        Q(area='CALIDAD') | Q(area='FRONTDESK') | Q(area='CARRY IN'),
+        activo=True,
+        email__isnull=False
+    ).exclude(
+        email=''
+    ).order_by('area', 'nombre_completo')
+    
+    # Verificar si el usuario actual está en la lista de CC
+    usuario_en_lista_cc = False
+    if hasattr(request.user, 'empleado') and request.user.empleado:
+        usuario_en_lista_cc = empleados_copia.filter(id=request.user.empleado.id).exists()
+    
     context = {
         'solicitud': solicitud,
         'info_orden': info_orden,
@@ -3290,6 +3305,8 @@ def detalle_solicitud_cotizacion(request, pk):
         'max_imagenes_por_linea': ImagenLineaCotizacion.MAX_IMAGENES_POR_LINEA,
         'imagenes_referencia': imagenes_referencia,
         'max_imagenes_referencia': max_imagenes_referencia,
+        'empleados_copia': empleados_copia,
+        'usuario_en_lista_cc': usuario_en_lista_cc,
     }
     
     return render(request, 'almacen/cotizaciones/detalle_solicitud.html', context)
@@ -3327,6 +3344,103 @@ def enviar_solicitud_cliente(request, pk):
             )
     
     return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+@permission_required_with_message('almacen.change_solicitudcotizacion')
+@require_http_methods(["POST"])
+def notificar_front(request, pk):
+    """
+    Enviar notificación de cotización a recepción (FRONTDESK) por correo.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista reemplaza el antiguo "Enviar a Cliente". En lugar de cambiar
+    solo el estado, ahora envía un correo HTML a los empleados de FRONTDESK
+    con el detalle de la cotización (piezas, costos, imágenes) para que
+    recepción la comparta con el cliente.
+    
+    Flujo:
+    1. Valida que la solicitud esté en estado 'borrador' y tenga líneas
+    2. Cambia el estado a 'enviada_cliente'
+    3. Dispara la tarea Celery para enviar el correo en segundo plano
+    4. Devuelve JsonResponse inmediato
+    
+    Args:
+        request: HttpRequest con datos POST del formulario
+        pk: ID de la SolicitudCotizacion
+    
+    Returns:
+        JsonResponse — el correo se procesa en background via Celery
+    """
+    from .tasks import notificar_front_cotizacion_task
+    
+    try:
+        solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+        
+        # Validar estado: permitir envío inicial (borrador) o reenvío (enviada_cliente)
+        if solicitud.estado not in ['borrador', 'enviada_cliente']:
+            return JsonResponse({
+                'success': False,
+                'error': 'Solo se puede notificar cuando la solicitud está en borrador o ya enviada a front.'
+            }, status=400)
+        
+        # Validar que tenga al menos una línea
+        if not solicitud.lineas.exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'La solicitud debe tener al menos una línea para notificar.'
+            }, status=400)
+        
+        # Obtener destinatarios del formulario (los seleccionados en el modal)
+        copia_empleados = request.POST.getlist('copia_empleados', [])
+        copia_tecnico = request.POST.getlist('copia_tecnico', [])
+        
+        # Los destinatarios principales son los que el usuario seleccionó
+        destinatarios = list(set(copia_empleados + copia_tecnico))
+        
+        if not destinatarios:
+            return JsonResponse({
+                'success': False,
+                'error': 'Debes seleccionar al menos un destinatario.'
+            }, status=400)
+        
+        mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
+        
+        # Cambiar estado de la solicitud a 'enviada_cliente' solo si está en borrador
+        if solicitud.estado == 'borrador':
+            solicitud.enviar_a_cliente(usuario=request.user)
+        
+        # Disparar tarea Celery
+        usuario_id = request.user.pk if request.user.is_authenticated else None
+        
+        tarea = notificar_front_cotizacion_task.delay(
+            solicitud_id=pk,
+            destinatarios=destinatarios,
+            mensaje_personalizado=mensaje_personalizado,
+            usuario_id=usuario_id,
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': (
+                f'Notificación en proceso de envío a {len(destinatarios)} '
+                f'destinatario(s).'
+            ),
+            'data': {
+                'task_id': tarea.id,
+                'destinatario': ', '.join(destinatarios),
+                'solicitud': solicitud.numero_solicitud,
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': f'Error al procesar la solicitud: {str(e)}'
+        }, status=500)
 
 
 @login_required
