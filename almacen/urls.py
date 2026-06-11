@@ -97,6 +97,7 @@ urlpatterns = [
     path('solicitudes-cotizacion/crear/', views.crear_solicitud_cotizacion, name='crear_solicitud_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/', views.detalle_solicitud_cotizacion, name='detalle_solicitud_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/editar/', views.editar_solicitud_cotizacion, name='editar_solicitud_cotizacion'),
+    path('solicitudes-cotizacion/<int:pk>/editar-lineas/', views.editar_lineas_cotizacion, name='editar_lineas_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/eliminar/', views.eliminar_solicitud_cotizacion, name='eliminar_solicitud_cotizacion'),
     
     # Workflow de solicitudes

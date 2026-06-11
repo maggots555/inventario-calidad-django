@@ -3199,6 +3199,112 @@ def editar_solicitud_cotizacion(request, pk):
 
 
 @login_required
+@permission_required_with_message('almacen.change_lineacotizacion')
+def editar_lineas_cotizacion(request, pk):
+    """
+    Editar líneas de cotización cuando la solicitud está en estado 'enviada_cliente'.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista permite modificar ciertos campos de las líneas de cotización
+    DESPUÉS de que la solicitud fue enviada a Front, pero ANTES de que el
+    cliente apruebe o se genere la compra.
+    
+    ¿Qué se puede editar?
+    - Proveedor (si el original no tiene stock)
+    - Costo unitario (si cambió el precio)
+    - Cantidad (si el cliente pide más/menos)
+    - Tiempo de entrega estimado
+    - Notas adicionales
+    
+    ¿Qué NO se puede editar?
+    - Producto (ya fue definido)
+    - Descripción de la pieza (es la identidad)
+    
+    ¿Qué líneas se pueden editar?
+    - Solo las que tienen estado 'pendiente' o 'rechazada'
+    - Las líneas 'aprobada' o 'compra_generada' se muestran como solo lectura
+    
+    IMPORTANTE: El formset solo incluye las líneas editables.
+    Las líneas bloqueadas se muestran como texto plano fuera del formset.
+    """
+    from .forms import EditarLineaCotizacionFormSet
+    from .models import LineaCotizacion
+    
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    # Solo se puede editar líneas cuando la solicitud está enviada a cliente
+    if solicitud.estado != 'enviada_cliente':
+        messages.error(
+            request,
+            'Solo se pueden editar líneas cuando la solicitud está en estado "Enviada a Front".'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+    
+    # Filtrar solo líneas editables (pendiente o rechazada)
+    lineas_editables_qs = solicitud.lineas.filter(
+        estado_cliente__in=['pendiente', 'rechazada']
+    ).order_by('numero_linea')
+    
+    # Líneas bloqueadas (aprobada o compra_generada) - solo para mostrar
+    lineas_bloqueadas = solicitud.lineas.filter(
+        estado_cliente__in=['aprobada', 'compra_generada']
+    ).order_by('numero_linea')
+    
+    if request.method == 'POST':
+        # El formset solo procesa líneas editables
+        formset = EditarLineaCotizacionFormSet(
+            request.POST,
+            instance=solicitud,
+            queryset=lineas_editables_qs
+        )
+        
+        if formset.is_valid():
+            # Guardar cambios y contar cuántas líneas se modificaron
+            lineas_modificadas = 0
+            
+            for form in formset.forms:
+                if form.has_changed():
+                    form.save()
+                    lineas_modificadas += 1
+            
+            if lineas_modificadas > 0:
+                messages.success(
+                    request,
+                    f'Se actualizaron {lineas_modificadas} línea(s) de la cotización.'
+                )
+            else:
+                messages.info(request, 'No se realizaron cambios en las líneas.')
+            
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+        else:
+            messages.error(request, 'Por favor corrige los errores en el formulario.')
+    else:
+        formset = EditarLineaCotizacionFormSet(
+            instance=solicitud,
+            queryset=lineas_editables_qs
+        )
+    
+    # Preparar información para el template
+    lineas_editables_info = []
+    for form, linea in zip(formset.forms, lineas_editables_qs):
+        lineas_editables_info.append({
+            'form': form,
+            'linea': linea,
+        })
+    
+    context = {
+        'formset': formset,
+        'solicitud': solicitud,
+        'lineas_editables_info': lineas_editables_info,
+        'lineas_bloqueadas': lineas_bloqueadas,
+        'titulo': f'Editar Líneas - {solicitud.numero_solicitud}',
+    }
+    
+    return render(request, 'almacen/cotizaciones/editar_lineas.html', context)
+
+
+@login_required
 @permission_required_with_message('almacen.view_solicitudcotizacion')
 def detalle_solicitud_cotizacion(request, pk):
     """

@@ -1,0 +1,237 @@
+{% extends 'almacen/base_almacen.html' %}
+{% load static %}
+
+{% comment %}
+Formulario para editar líneas de cotización en estado 'enviada_cliente'.
+Solo permite modificar proveedor, costo, cantidad, tiempo de entrega y notas.
+Las líneas aprobadas o con compra generada se muestran como texto plano (bloqueadas).
+{% endcomment %}
+
+{% block title %}{{ titulo }} - Almacén{% endblock %}
+
+{% block almacen_content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-0">
+                <i class="bi bi-pencil-square me-2"></i>{{ titulo }}
+            </h1>
+            <p class="text-muted mb-0">
+                Modifica proveedor, costos y cantidades de las líneas pendientes
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'almacen:detalle_solicitud_cotizacion' solicitud.pk %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Volver al Detalle
+            </a>
+        </div>
+    </div>
+
+    <!-- Aviso informativo -->
+    <div class="alert alert-warning d-flex align-items-start" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+        <div>
+            <strong>Edición restringida:</strong>
+            <ul class="mb-0 mt-1">
+                <li>Solo puedes editar líneas en estado <strong>Pendiente</strong> o <strong>Rechazada</strong></li>
+                <li>Las líneas <strong>Aprobadas</strong> o con <strong>Compra Generada</strong> aparecen bloqueadas abajo</li>
+                <li>No se puede cambiar el producto ni la descripción de la pieza</li>
+            </ul>
+        </div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ formset.management_form }}
+        
+        <!-- Tabla de líneas EDITABLES -->
+        {% if lineas_editables_info %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-pencil me-2"></i>Líneas Editables
+                    <span class="badge bg-light text-dark ms-2">{{ lineas_editables_info|length }}</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="5%">#</th>
+                                <th width="20%">Producto / Descripción</th>
+                                <th width="15%">Proveedor</th>
+                                <th width="8%" class="text-center">Cant.</th>
+                                <th width="10%" class="text-end">Costo Unit.</th>
+                                <th width="10%" class="text-center">Entrega (días)</th>
+                                <th width="12%">Notas</th>
+                                <th width="10%">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in lineas_editables_info %}
+                            <tr>
+                                <!-- Campo ID oculto requerido por el formset -->
+                                {{ item.form.id }}
+                                <!-- Número de línea -->
+                                <td class="align-middle fw-bold">{{ item.linea.numero_linea }}</td>
+                                
+                                <!-- Producto / Descripción (solo lectura) -->
+                                <td class="align-middle">
+                                    <strong>{{ item.linea.producto.nombre }}</strong>
+                                    <br><small class="text-muted">{{ item.linea.descripcion_pieza }}</small>
+                                </td>
+                                
+                                <!-- Campos editables -->
+                                <td class="align-middle">
+                                    {{ item.form.proveedor }}
+                                    {% if item.form.proveedor.errors %}
+                                    <div class="text-danger small">{{ item.form.proveedor.errors.0 }}</div>
+                                    {% endif %}
+                                </td>
+                                
+                                <td class="align-middle">
+                                    {{ item.form.cantidad }}
+                                    {% if item.form.cantidad.errors %}
+                                    <div class="text-danger small">{{ item.form.cantidad.errors.0 }}</div>
+                                    {% endif %}
+                                </td>
+                                
+                                <td class="align-middle">
+                                    {{ item.form.costo_unitario }}
+                                    {% if item.form.costo_unitario.errors %}
+                                    <div class="text-danger small">{{ item.form.costo_unitario.errors.0 }}</div>
+                                    {% endif %}
+                                </td>
+                                
+                                <td class="align-middle">
+                                    {{ item.form.tiempo_entrega_estimado }}
+                                    {% if item.form.tiempo_entrega_estimado.errors %}
+                                    <div class="text-danger small">{{ item.form.tiempo_entrega_estimado.errors.0 }}</div>
+                                    {% endif %}
+                                </td>
+                                
+                                <td class="align-middle">
+                                    {{ item.form.notas }}
+                                    {% if item.form.notas.errors %}
+                                    <div class="text-danger small">{{ item.form.notas.errors.0 }}</div>
+                                    {% endif %}
+                                </td>
+                                
+                                <!-- Estado -->
+                                <td class="align-middle">
+                                    <span class="badge bg-{{ item.linea.get_badge_estado }}">
+                                        {{ item.linea.get_estado_cliente_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            No hay líneas pendientes o rechazadas para editar.
+        </div>
+        {% endif %}
+        
+        <!-- Botones de acción -->
+        {% if lineas_editables_info %}
+        <div class="d-flex justify-content-between mb-4">
+            <a href="{% url 'almacen:detalle_solicitud_cotizacion' solicitud.pk %}" class="btn btn-outline-secondary">
+                <i class="bi bi-x-circle me-2"></i>Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-circle me-2"></i>Guardar Cambios
+            </button>
+        </div>
+        {% endif %}
+    </form>
+    
+    <!-- Tabla de líneas BLOQUEADAS (solo lectura) -->
+    {% if lineas_bloqueadas %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-lock me-2"></i>Líneas Bloqueadas
+                <span class="badge bg-light text-dark ms-2">{{ lineas_bloqueadas|length }}</span>
+            </h5>
+            <small>Estas líneas ya fueron aprobadas o tienen compra generada, no se pueden modificar</small>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-secondary table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="5%">#</th>
+                            <th width="25%">Producto / Descripción</th>
+                            <th width="15%">Proveedor</th>
+                            <th width="8%" class="text-center">Cant.</th>
+                            <th width="10%" class="text-end">Costo Unit.</th>
+                            <th width="10%" class="text-center">Entrega (días)</th>
+                            <th width="12%">Notas</th>
+                            <th width="15%">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linea in lineas_bloqueadas %}
+                        <tr>
+                            <td class="align-middle fw-bold">{{ linea.numero_linea }}</td>
+                            <td class="align-middle">
+                                <strong>{{ linea.producto.nombre }}</strong>
+                                <br><small class="text-muted">{{ linea.descripcion_pieza }}</small>
+                            </td>
+                            <td class="align-middle">
+                                {% if linea.proveedor %}
+                                {{ linea.proveedor.nombre }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="align-middle text-center">{{ linea.cantidad }}</td>
+                            <td class="align-middle text-end">
+                                {% if linea.costo_unitario %}
+                                ${{ linea.costo_unitario|floatformat:2 }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="align-middle text-center">
+                                {% if linea.tiempo_entrega_estimado %}
+                                {{ linea.tiempo_entrega_estimado }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">
+                                {% if linea.notas %}
+                                <small>{{ linea.notas|truncatechars:50 }}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">
+                                <span class="badge bg-{{ linea.get_badge_estado }}">
+                                    <i class="bi bi-{% if linea.get_badge_estado == 'success' %}check-circle-fill{% elif linea.get_badge_estado == 'primary' %}cart-check-fill{% else %}hourglass-split{% endif %} me-1"></i>
+                                    {{ linea.get_estado_cliente_display }}
+                                </span>
+                                {% if linea.compra_generada %}
+                                <br><a href="{% url 'almacen:detalle_compra' linea.compra_generada.pk %}" class="small text-decoration-none">
+                                    <i class="bi bi-cart me-1"></i>Ver compra
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

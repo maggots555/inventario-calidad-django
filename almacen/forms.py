@@ -1980,6 +1980,128 @@ LineaCotizacionFormSet = inlineformset_factory(
 )
 
 
+class EditarLineaCotizacionForm(forms.ModelForm):
+    """
+    Formulario restringido para editar líneas de cotización en estado 'enviada_cliente'.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando una cotización ya fue enviada a Front, no se puede editar todo libremente.
+    Solo se permiten cambios en campos que no afectan la identidad de la pieza:
+    - proveedor: Cambiar de proveedor si el original no tiene stock
+    - costo_unitario: Actualizar precio si cambió
+    - cantidad: Ajustar cantidad si el cliente pide más/menos
+    - tiempo_entrega_estimado: Actualizar días de entrega
+    - notas: Agregar observaciones
+    
+    NO se permite cambiar:
+    - producto: Ya fue definido y acordado
+    - descripcion_pieza: Es la identidad de la pieza
+    
+    NOTA: Este form solo se usa para líneas en estado 'pendiente' o 'rechazada'.
+    Las líneas aprobadas se muestran como texto plano fuera del formset.
+    """
+    
+    class Meta:
+        model = LineaCotizacion
+        fields = [
+            'proveedor',
+            'costo_unitario',
+            'cantidad',
+            'tiempo_entrega_estimado',
+            'notas',
+        ]
+        widgets = {
+            'proveedor': forms.Select(attrs={
+                'class': 'form-select form-select-sm',
+            }),
+            'costo_unitario': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm',
+                'min': 0,
+                'step': '0.01',
+                'placeholder': '0.00',
+            }),
+            'cantidad': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm',
+                'min': 1,
+            }),
+            'tiempo_entrega_estimado': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm',
+                'min': 0,
+                'placeholder': 'días',
+            }),
+            'notas': forms.Textarea(attrs={
+                'class': 'form-control form-control-sm',
+                'rows': 2,
+                'placeholder': 'Notas adicionales...',
+            }),
+        }
+        labels = {
+            'proveedor': 'Proveedor',
+            'costo_unitario': 'Costo Unitario',
+            'cantidad': 'Cantidad',
+            'tiempo_entrega_estimado': 'Entrega (días)',
+            'notas': 'Notas',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """
+        Personaliza querysets.
+        
+        EXPLICACIÓN:
+        - Solo muestra proveedores activos
+        - costo_unitario es opcional
+        - proveedor es opcional (puede no estar asignado aún)
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar proveedores activos y ordenar por nombre
+        self.fields['proveedor'].queryset = Proveedor.objects.filter(
+            activo=True
+        ).order_by('nombre')
+        self.fields['proveedor'].empty_label = '-- Seleccionar Proveedor --'
+        self.fields['proveedor'].required = False
+        
+        # Hacer costo_unitario opcional
+        self.fields['costo_unitario'].required = False
+    
+    def clean(self):
+        """
+        Validaciones que involucran múltiples campos.
+        """
+        cleaned_data = super().clean()
+        costo = cleaned_data.get('costo_unitario')
+        
+        # Si hay costo, debe ser mayor o igual a 0
+        if costo is not None and costo < 0:
+            self.add_error(
+                'costo_unitario',
+                'El costo no puede ser negativo.'
+            )
+        
+        return cleaned_data
+
+
+# Formset para edición de líneas en estado 'enviada_cliente'
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# --------------------------------
+# Este formset es similar al de creación, pero:
+# - No permite agregar líneas nuevas (extra=0)
+# - No permite eliminar líneas (can_delete=False)
+# - Solo permite editar campos específicos (proveedor, costo, cantidad, etc.)
+# - Las líneas aprobadas se muestran como solo lectura
+
+EditarLineaCotizacionFormSet = inlineformset_factory(
+    SolicitudCotizacion,           # Modelo padre
+    LineaCotizacion,               # Modelo hijo
+    form=EditarLineaCotizacionForm,
+    extra=0,                       # No agregar líneas nuevas
+    can_delete=False,              # No permitir eliminar
+    min_num=1,                     # Al menos 1 línea
+    validate_min=True,
+)
+
+
 class SolicitudCotizacionFiltroForm(forms.Form):
     """
     Formulario de filtros para la lista de solicitudes de cotización.
