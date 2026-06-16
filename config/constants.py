@@ -588,10 +588,11 @@ ESTADOS_COMPRA_FINALIZADOS = ['recibida', 'devuelta', 'cancelada', 'rechazada']
 # ============================================================================
 
 # ESTADOS DE LA SOLICITUD DE COTIZACIÓN (cabecera)
-# Flujo: borrador → enviada_cliente → respuesta del cliente → procesamiento
+# Flujo: borrador → enviada_front → enviada_cliente → respuesta del cliente → procesamiento
 ESTADO_SOLICITUD_COTIZACION_CHOICES = [
     ('borrador', 'Borrador'),                          # Compras está preparando
-    ('enviada_cliente', 'Enviada a Front'),            # Notificación enviada a recepción
+    ('enviada_front', 'Enviada a Front'),              # Notificación enviada a recepción
+    ('enviada_cliente', 'Enviada a Cliente'),          # Recepción compartió con el cliente
     ('parcialmente_aprobada', 'Parcialmente Aprobada'),# Cliente aprobó algunas líneas
     ('totalmente_aprobada', 'Totalmente Aprobada'),    # Cliente aprobó todas las líneas
     ('totalmente_rechazada', 'Totalmente Rechazada'),  # Cliente rechazó todas las líneas
@@ -610,7 +611,7 @@ ESTADO_LINEA_COTIZACION_CHOICES = [
 ]
 
 # CLASIFICACIÓN DE ESTADOS PARA LÓGICA DE SOLICITUD DE COTIZACIÓN
-ESTADOS_SOLICITUD_ACTIVOS = ['borrador', 'enviada_cliente', 'parcialmente_aprobada', 'totalmente_aprobada', 'en_proceso']
+ESTADOS_SOLICITUD_ACTIVOS = ['borrador', 'enviada_front', 'enviada_cliente', 'parcialmente_aprobada', 'totalmente_aprobada', 'en_proceso']
 ESTADOS_SOLICITUD_FINALIZADOS = ['completada', 'totalmente_rechazada', 'cancelada']
 
 

@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nueva Cotización Sin Orden — {{ solicitud.numero_solicitud }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+
+        .container {
+            max-width: 750px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(180deg, #ffffff 0%, #fff3e0 50%, #ffb74d 100%);
+            color: #e65100;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .logo-container {
+            position: relative;
+            z-index: 1;
+            margin-bottom: 15px;
+        }
+
+        .logo-image {
+            max-width: 180px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+        }
+
+        .logo {
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .badge-sin-orden {
+            display: inline-block;
+            background-color: #e65100;
+            color: #ffffff;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-top: 12px;
+            position: relative;
+            z-index: 1;
+            letter-spacing: 0.5px;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .greeting {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .intro-text {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 25px;
+            line-height: 1.7;
+        }
+
+        .alert-box {
+            background: #fff3e0;
+            border-left: 4px solid #e65100;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .alert-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e65100;
+            margin-bottom: 10px;
+        }
+
+        .alert-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .equipment-info {
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .info-title {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-align: center;
+            border-bottom: 2px solid #ff9800;
+            padding-bottom: 10px;
+        }
+
+        .info-row {
+            display: flex;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #ff9800;
+            min-width: 140px;
+            font-size: 14px;
+        }
+
+        .info-value {
+            color: #333;
+            font-size: 15px;
+            flex: 1;
+        }
+
+        .info-value.highlight {
+            font-weight: 700;
+            color: #e65100;
+        }
+
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 25px 0;
+            font-size: 14px;
+        }
+
+        .lineas-table thead {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .lineas-table th {
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .lineas-table th.text-center {
+            text-align: center;
+        }
+
+        .lineas-table th.text-end {
+            text-align: right;
+        }
+
+        .lineas-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+        }
+
+        .lineas-table td.text-center {
+            text-align: center;
+        }
+
+        .lineas-table td.text-end {
+            text-align: right;
+        }
+
+        .lineas-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .lineas-table tfoot {
+            background-color: #fff3e0;
+            font-weight: 700;
+        }
+
+        .lineas-table tfoot td {
+            padding: 14px 10px;
+            border-bottom: none;
+        }
+
+        .linea-descripcion {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .linea-proveedor {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+
+        .linea-notas {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+
+        .observaciones-box {
+            background: #e8f4fd;
+            border-left: 4px solid #17a2b8;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .observaciones-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #17a2b8;
+            margin-bottom: 10px;
+        }
+
+        .observaciones-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .help-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+            border-left: 4px solid #ff9800;
+        }
+
+        .help-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e65100;
+            margin-bottom: 10px;
+        }
+
+        .help-text {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .signature {
+            margin-bottom: 15px;
+        }
+
+        .signature-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .signature-role {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .signature-area {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+
+        .company {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .timestamp {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+
+        .social-media {
+            margin: 20px 0;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+
+        .social-title {
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+        }
+
+        .social-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .social-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            text-decoration: none;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 600;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 0;
+            }
+
+            .content {
+                padding: 20px 15px;
+            }
+
+            .info-row {
+                flex-direction: column;
+            }
+
+            .info-label {
+                min-width: auto;
+                margin-bottom: 5px;
+            }
+
+            .lineas-table {
+                font-size: 12px;
+            }
+
+            .lineas-table th,
+            .lineas-table td {
+                padding: 8px 6px;
+            }
+
+            .social-links {
+                gap: 8px;
+            }
+
+            .social-link {
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Encabezado -->
+        <div class="header">
+            <div class="logo-container">
+                <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
+            </div>
+            <div class="logo">📋 NUEVA COTIZACIÓN SIN ORDEN</div>
+            <div class="subtitle">{{ solicitud.numero_solicitud }}</div>
+            <div class="badge-sin-orden">⚠️ REQUIERE ATENCIÓN DE COMPRAS</div>
+        </div>
+
+        <div class="content">
+            <!-- Saludo -->
+            <div class="greeting">
+                Equipo de Compras,
+            </div>
+
+            <div class="intro-text">
+                Se ha creado una nueva solicitud de cotización <strong>sin orden de servicio vinculada</strong>.
+                Esta solicitud requiere su atención para buscar proveedores, cotizar las piezas solicitadas
+                y notificar a frontdesk cuando este terminada.
+            </div>
+
+            <!-- Alerta de sin orden -->
+            <div class="alert-box">
+                <div class="alert-title">⚠️ Cotización Sin Orden Activa</div>
+                <div class="alert-text">
+                    Esta solicitud fue creada sin una orden de servicio existente. El cliente aún no tiene
+                    una orden en el sistema. La orden de servicio se podrá vincular posteriormente desde
+                    "Editar Unidad" cuando se reciba la pieza.
+                </div>
+            </div>
+
+            <!-- Datos del cliente y equipo -->
+            <div class="equipment-info">
+                <div class="info-title">👤 DATOS DEL CLIENTE Y EQUIPO</div>
+
+                <div class="info-row">
+                    <div class="info-label">📛 Cliente:</div>
+                    <div class="info-value highlight">{{ solicitud.nombre_cliente|default:"-" }}</div>
+                </div>
+
+                {% if solicitud.service_tag %}
+                <div class="info-row">
+                    <div class="info-label">🔢 Service Tag:</div>
+                    <div class="info-value highlight">{{ solicitud.service_tag }}</div>
+                </div>
+                {% endif %}
+
+                {% if solicitud.telefono_cliente %}
+                <div class="info-row">
+                    <div class="info-label">📱 Teléfono:</div>
+                    <div class="info-value">{{ solicitud.telefono_cliente }}</div>
+                </div>
+                {% endif %}
+
+                {% if solicitud.email_cliente %}
+                <div class="info-row">
+                    <div class="info-label">📧 Email:</div>
+                    <div class="info-value">{{ solicitud.email_cliente }}</div>
+                </div>
+                {% endif %}
+
+                {% if solicitud.marca %}
+                <div class="info-row">
+                    <div class="info-label">🏷️ Marca:</div>
+                    <div class="info-value">{{ solicitud.get_marca_display|default:solicitud.marca }}</div>
+                </div>
+                {% endif %}
+
+                {% if solicitud.modelo %}
+                <div class="info-row">
+                    <div class="info-label">📦 Modelo:</div>
+                    <div class="info-value">{{ solicitud.modelo }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Tabla de líneas de cotización -->
+            <table class="lineas-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Producto / Descripción</th>
+                        <th>Proveedor</th>
+                        <th class="text-center">Cant.</th>
+                        <th class="text-end">Costo Unit.</th>
+                        <th class="text-end">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linea in lineas %}
+                    <tr>
+                        <td>{{ linea.numero_linea }}</td>
+                        <td>
+                            <div class="linea-descripcion">{{ linea.producto.nombre }}</div>
+                            {% if linea.descripcion_pieza %}
+                            <div class="linea-notas">{{ linea.descripcion_pieza }}</div>
+                            {% endif %}
+                            {% if linea.notas %}
+                            <div class="linea-notas"><em>{{ linea.notas }}</em></div>
+                            {% endif %}
+
+                        </td>
+                        <td>
+                            {% if linea.proveedor %}
+                                {{ linea.proveedor.nombre }}
+                            {% else %}
+                                <span style="color: #e65100; font-weight: 600;">Por asignar</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ linea.cantidad }}</td>
+                        <td class="text-end">
+                            {% if linea.costo_unitario and linea.costo_unitario > 0 %}
+                                ${{ linea.costo_unitario|floatformat:2 }}
+                            {% else %}
+                                <span style="color: #e65100;">Pendiente</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if linea.subtotal > 0 %}
+                                <strong>${{ linea.subtotal|floatformat:2 }}</strong>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+
+            <!-- Observaciones -->
+            {% if solicitud.observaciones %}
+            <div class="observaciones-box">
+                <div class="observaciones-title">📝 Observaciones</div>
+                <div class="observaciones-text">
+                    {{ solicitud.observaciones|linebreaks }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Instrucciones para Compras -->
+            <div class="help-section">
+                <div class="help-title">📌 Instrucciones para Compras</div>
+                <div class="help-text">
+                    <strong>1.</strong> Revisa las líneas de cotización y verifica los productos solicitados.<br>
+                    <strong>2.</strong> Si algún proveedor no está asignado, busca la mejor opción de precio y disponibilidad.<br>
+                    <strong>3.</strong> Actualiza los costos unitarios conforme recibas cotizaciones de los proveedores.<br>
+
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #f0f0f0; text-align: center; color: #777;">
+                <p style="margin: 0; font-size: 14px;">
+                    {% if nombre_usuario %}
+                    Solicitud creada por: <strong>{{ nombre_usuario }}</strong>
+                    {% else %}
+                    Solicitud creada desde el Sistema de Almacén
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-name">
+                    Sistema de Almacén SIC
+                </div>
+                <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 16px;">
+                    ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+                </div>
+                <div class="signature-area" style="margin-top: 10px; font-size: 15px; line-height: 1.5;">
+                    Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                    Para consultas sobre esta cotización, contacte directamente al área de Almacén.
+                </div>
+            </div>
+
+            <div class="company">{{ empresa_nombre }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
+
+            <div class="social-media">
+                <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+                <div class="social-links">
+                    <a href="https://sicfix.mx/" class="social-link" target="_blank">
+                        <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Sitio Web</span>
+                    </a>
+                    <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                        <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Instagram</span>
+                    </a>
+                    <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                        <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
+                        <span>Facebook</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="timestamp">
+                📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

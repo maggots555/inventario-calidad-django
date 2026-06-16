@@ -44,8 +44,16 @@ Muestra todas las solicitudes con filtros y contadores por estado
         <div class="col-md-2">
             <div class="card bg-info text-white">
                 <div class="card-body text-center py-2">
+                    <h3 class="mb-0">{{ contadores.enviada_front|default:0 }}</h3>
+                    <small>En Front</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center py-2">
                     <h3 class="mb-0">{{ contadores.enviada_cliente|default:0 }}</h3>
-                    <small>Enviadas</small>
+                    <small>Con Cliente</small>
                 </div>
             </div>
         </div>

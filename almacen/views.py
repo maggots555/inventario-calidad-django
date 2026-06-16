@@ -80,6 +80,10 @@ from .forms import (
 )
 from inventario.models import Empleado
 
+import logging
+
+logger = logging.getLogger('almacen')
+
 
 # ============================================================================
 # DECORADOR PERSONALIZADO PARA PERMISOS
@@ -2120,7 +2124,8 @@ def panel_cotizaciones(request):
     
     Estados del nuevo sistema:
     - borrador: En preparación
-    - enviada_cliente: Esperando respuesta del cliente
+    - enviada_front: Enviada a recepción para revisión
+    - enviada_cliente: Enviada al cliente, esperando respuesta
     - parcialmente_aprobada: Algunas líneas aprobadas
     - totalmente_aprobada: Todas las líneas aprobadas
     - totalmente_rechazada: Todas las líneas rechazadas
@@ -2135,8 +2140,9 @@ def panel_cotizaciones(request):
     from django.db.models import Count, Q
     
     # Cotizaciones pendientes de respuesta del cliente
+    # Incluye enviada_front (en revisión por recepción) y enviada_cliente (con el cliente)
     cotizaciones_pendientes = SolicitudCotizacion.objects.filter(
-        estado='enviada_cliente'
+        estado__in=['enviada_front', 'enviada_cliente']
     ).select_related(
         'orden_servicio', 'creado_por'
     ).prefetch_related('lineas').order_by('-fecha_creacion')
@@ -3089,7 +3095,88 @@ def crear_solicitud_cotizacion(request):
             
             if imagenes_guardadas > 0:
                 messages.info(request, f'{imagenes_guardadas} imagen(es) de referencia subidas.')
-            
+
+            # =================================================================
+            # NOTIFICAR A COMPRAS cuando la solicitud es "Sin Orden Activa"
+            # =================================================================
+            # EXPLICACIÓN PARA PRINCIPIANTES:
+            # Cuando una solicitud se crea sin una orden de servicio vinculada
+            # (modo "sin orden activa"), el área de Compras necesita saberlo
+            # de inmediato para procesar la cotización. Les enviamos:
+            #   1. Push al dispositivo (notificación en tiempo real)
+            #   2. Campanita interna (notificación del sistema)
+            #   3. Email en segundo plano vía Celery (no bloquea al usuario)
+            if solicitud.sin_orden_activa:
+                try:
+                    from notificaciones.push_service import enviar_push_a_usuario
+                    from notificaciones.utils import notificar_info
+                    from .tasks import notificar_compras_nueva_cotizacion_task
+
+                    # Buscar todos los empleados con rol "Compras" que tengan
+                    # usuario activo en el sistema (pueden recibir notificaciones)
+                    compradores = Empleado.objects.filter(
+                        rol='compras',
+                        user__is_active=True,
+                    ).select_related('user')
+
+                    if compradores.exists():
+                        # Construir la URL al detalle de la solicitud para que
+                        # al hacer clic en la notificación los lleve directamente
+                        url_solicitud = reverse(
+                            'almacen:detalle_solicitud_cotizacion',
+                            kwargs={'pk': solicitud.pk}
+                        )
+
+                        # Texto de la notificación — incluye el nombre del
+                        # cliente y el service tag para identificación rápida
+                        titulo_push = f'📋 Nueva cotización sin orden: {solicitud.numero_solicitud}'
+                        mensaje_push = (
+                            f'Cliente: {solicitud.nombre_cliente or "Sin nombre"} — '
+                            f'S/T: {solicitud.service_tag or "N/A"}. '
+                            f'Requiere atención para procesar la cotización.'
+                        )
+
+                        # Enviar push + campanita a cada empleado de Compras
+                        for comprador in compradores:
+                            try:
+                                enviar_push_a_usuario(
+                                    usuario=comprador.user,
+                                    titulo=titulo_push,
+                                    mensaje=mensaje_push,
+                                    url=url_solicitud,
+                                )
+                            except Exception as push_err:
+                                logger.warning(
+                                    f"[COTIZACION] Error enviando push a {comprador.nombre_completo}: {push_err}"
+                                )
+
+                            try:
+                                notificar_info(
+                                    titulo=titulo_push,
+                                    mensaje=mensaje_push,
+                                    usuario=comprador.user,
+                                    url=url_solicitud,
+                                    app_origen='almacen',
+                                )
+                            except Exception as notif_err:
+                                logger.warning(
+                                    f"[COTIZACION] Error creando notificación para {comprador.nombre_completo}: {notif_err}"
+                                )
+
+                        # Enviar email en segundo plano vía Celery (no bloquea)
+                        notificar_compras_nueva_cotizacion_task.delay(
+                            solicitud.pk,
+                            request.user.pk,
+                        )
+                        logger.info(
+                            f"[COTIZACION] Notificaciones enviadas a {compradores.count()} "
+                            f"empleado(s) de Compras para solicitud {solicitud.numero_solicitud}"
+                        )
+                except Exception as e:
+                    # Si falla la notificación, NO debe impedir que la solicitud
+                    # se haya creado correctamente. Solo registramos el error.
+                    logger.error(f"[COTIZACION] Error al notificar a Compras: {e}")
+
             messages.success(
                 request,
                 f'Solicitud de cotización {solicitud.numero_solicitud} creada exitosamente.'
@@ -3202,7 +3289,7 @@ def editar_solicitud_cotizacion(request, pk):
 @permission_required_with_message('almacen.change_lineacotizacion')
 def editar_lineas_cotizacion(request, pk):
     """
-    Editar líneas de cotización cuando la solicitud está en estado 'enviada_cliente'.
+    Editar líneas de cotización cuando la solicitud está en estado 'enviada_front'.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
@@ -3233,11 +3320,11 @@ def editar_lineas_cotizacion(request, pk):
     
     solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
     
-    # Solo se puede editar líneas cuando la solicitud está enviada a cliente
-    if solicitud.estado != 'enviada_cliente':
+    # Se puede editar líneas en enviada_front o enviada_cliente (por si se necesita recotizar)
+    if solicitud.estado not in ['enviada_front', 'enviada_cliente']:
         messages.error(
             request,
-            'Solo se pueden editar líneas cuando la solicitud está en estado "Enviada a Front".'
+            'Solo se pueden editar líneas cuando la solicitud está en estado "Enviada a Front" o "Enviada a Cliente".'
         )
         return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
     
@@ -3422,12 +3509,12 @@ def detalle_solicitud_cotizacion(request, pk):
 @permission_required_with_message('almacen.change_solicitudcotizacion')
 def enviar_solicitud_cliente(request, pk):
     """
-    Cambiar estado de la solicitud a 'enviada_cliente'.
+    Cambiar estado de la solicitud a 'enviada_front'.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Esta acción marca la solicitud como lista para compartir con el cliente.
-    Recepción podrá entonces enviarla y registrar las respuestas.
+    Esta acción marca la solicitud como lista para que Recepción la revise.
+    Recepción podrá entonces enviarla al cliente y registrar las respuestas.
     
     Requisitos:
     - Estado debe ser 'borrador'
@@ -3436,17 +3523,54 @@ def enviar_solicitud_cliente(request, pk):
     solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
     
     if request.method == 'POST':
-        if solicitud.enviar_a_cliente():
+        if solicitud.enviar_a_front():
             messages.success(
                 request,
-                f'Solicitud {solicitud.numero_solicitud} enviada a cliente. '
-                'Recepción puede ahora compartirla y registrar respuestas.'
+                f'Solicitud {solicitud.numero_solicitud} enviada a Front. '
+                'Recepción puede ahora revisarla y compartirla con el cliente.'
             )
         else:
             messages.error(
                 request,
                 'No se puede enviar la solicitud. Verifica que esté en estado '
                 'borrador y tenga al menos una línea.'
+            )
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+@permission_required_with_message('almacen.change_solicitudcotizacion')
+def enviar_solicitud_a_cliente(request, pk):
+    """
+    Cambiar estado de la solicitud de 'enviada_front' a 'enviada_cliente'.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta acción la realiza Recepción (Front) cuando ya compartió la cotización
+    con el cliente final. A partir de este momento:
+    - El cliente puede aprobar o rechazar cada línea
+    - Ya no se pueden editar líneas ni reenviar notificaciones
+    - Aparecen los botones de aprobar/rechazar en el detalle
+    
+    Requisitos:
+    - Estado debe ser 'enviada_front'
+    - Debe tener al menos una línea
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    if request.method == 'POST':
+        if solicitud.enviar_a_cliente():
+            messages.success(
+                request,
+                f'Solicitud {solicitud.numero_solicitud} enviada al cliente. '
+                'Ahora se pueden registrar las respuestas de aprobación/rechazo.'
+            )
+        else:
+            messages.error(
+                request,
+                'No se puede enviar al cliente. Verifica que la solicitud esté '
+                'en estado "Enviada a Front" y tenga al menos una línea.'
             )
     
     return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
@@ -3468,7 +3592,7 @@ def notificar_front(request, pk):
     
     Flujo:
     1. Valida que la solicitud esté en estado 'borrador' y tenga líneas
-    2. Cambia el estado a 'enviada_cliente'
+    2. Cambia el estado a 'enviada_front'
     3. Dispara la tarea Celery para enviar el correo en segundo plano
     4. Devuelve JsonResponse inmediato
     
@@ -3484,8 +3608,8 @@ def notificar_front(request, pk):
     try:
         solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
         
-        # Validar estado: permitir envío inicial (borrador) o reenvío (enviada_cliente)
-        if solicitud.estado not in ['borrador', 'enviada_cliente']:
+        # Validar estado: permitir envío inicial (borrador) o reenvío (enviada_front)
+        if solicitud.estado not in ['borrador', 'enviada_front']:
             return JsonResponse({
                 'success': False,
                 'error': 'Solo se puede notificar cuando la solicitud está en borrador o ya enviada a front.'
@@ -3513,9 +3637,9 @@ def notificar_front(request, pk):
         
         mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
         
-        # Cambiar estado de la solicitud a 'enviada_cliente' solo si está en borrador
+        # Cambiar estado de la solicitud a 'enviada_front' solo si está en borrador
         if solicitud.estado == 'borrador':
-            solicitud.enviar_a_cliente(usuario=request.user)
+            solicitud.enviar_a_front(usuario=request.user)
         
         # Disparar tarea Celery
         usuario_id = request.user.pk if request.user.is_authenticated else None

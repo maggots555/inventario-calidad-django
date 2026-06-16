@@ -2713,8 +2713,8 @@ class SolicitudCotizacion(models.Model):
     ------
     1. Compras crea la solicitud (estado: borrador)
     2. Compras agrega las líneas con productos y proveedores
-    3. Compras libera la solicitud (estado: enviada_cliente)
-    4. Recepción comparte con el cliente
+    3. Compras libera la solicitud (estado: enviada_front)
+    4. Recepción comparte con el cliente (estado: enviada_cliente)
     5. Cliente aprueba/rechaza por línea
     6. Para líneas aprobadas, se generan CompraProducto automáticamente
     
@@ -3012,10 +3012,11 @@ class SolicitudCotizacion(models.Model):
         Returns:
             int: Número de días sin respuesta (0 si ya fue respondida o no enviada)
         """
-        if self.estado == 'enviada_cliente' and self.fecha_envio_cliente:
+        # Calcular días tanto en enviada_front como en enviada_cliente
+        if self.estado in ['enviada_front', 'enviada_cliente'] and self.fecha_envio_cliente:
             delta = timezone.now() - self.fecha_envio_cliente
             return delta.days
-        elif self.estado == 'enviada_cliente' and not self.fecha_envio_cliente:
+        elif self.estado in ['enviada_front', 'enviada_cliente'] and not self.fecha_envio_cliente:
             # Fallback: usar fecha de creación si no hay fecha de envío
             delta = timezone.now() - self.fecha_creacion
             return delta.days
@@ -3023,9 +3024,9 @@ class SolicitudCotizacion(models.Model):
     
     # ========== MÉTODOS DE WORKFLOW ==========
     
-    def puede_enviar_a_cliente(self):
+    def puede_enviar_a_front(self):
         """
-        Verifica si la solicitud puede enviarse al cliente.
+        Verifica si la solicitud puede enviarse a Front (recepción).
         
         Condiciones:
         - Estado debe ser 'borrador'
@@ -3033,9 +3034,51 @@ class SolicitudCotizacion(models.Model):
         """
         return self.estado == 'borrador' and self.total_lineas > 0
     
+    def enviar_a_front(self, usuario=None):
+        """
+        Cambia el estado a 'enviada_front' para que Recepción pueda verla.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Este método se llama cuando Compras termina de preparar la cotización
+        y la libera para que Recepción la revise. En este estado, Recepción
+        puede reenviar notificaciones y editar líneas, pero NO puede aprobar
+        ni rechazar piezas (eso solo ocurre cuando se envía al cliente).
+        
+        Args:
+            usuario: Usuario que realiza la acción (opcional, para auditoría)
+        
+        Returns:
+            bool: True si se cambió el estado exitosamente
+        """
+        if not self.puede_enviar_a_front():
+            return False
+        
+        self.estado = 'enviada_front'
+        self.fecha_envio_cliente = timezone.now()
+        self.save()
+        return True
+    
+    def puede_enviar_a_cliente(self):
+        """
+        Verifica si la solicitud puede enviarse al cliente final.
+        
+        Condiciones:
+        - Estado debe ser 'enviada_front' (ya fue revisada por recepción)
+        - Debe tener al menos una línea
+        """
+        return self.estado == 'enviada_front' and self.total_lineas > 0
+    
     def enviar_a_cliente(self, usuario=None):
         """
-        Cambia el estado a 'enviada_cliente' para que Recepción pueda compartir.
+        Cambia el estado a 'enviada_cliente' para que el cliente pueda aprobar/rechazar.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Este método se llama cuando Recepción comparte la cotización con el
+        cliente final. A partir de este momento, el cliente puede aprobar o
+        rechazar cada línea individualmente. Ya no se pueden editar líneas
+        ni reenviar notificaciones (eso era en el estado enviada_front).
         
         Args:
             usuario: Usuario que realiza la acción (opcional, para auditoría)
@@ -3047,7 +3090,6 @@ class SolicitudCotizacion(models.Model):
             return False
         
         self.estado = 'enviada_cliente'
-        self.fecha_envio_cliente = timezone.now()
         self.save()
         return True
     
@@ -3064,7 +3106,7 @@ class SolicitudCotizacion(models.Model):
         Returns:
             str: Nuevo estado de la solicitud
         """
-        if self.estado not in ['enviada_cliente', 'parcialmente_aprobada']:
+        if self.estado not in ['enviada_front', 'enviada_cliente', 'parcialmente_aprobada']:
             return self.estado
         
         total = self.total_lineas
@@ -3205,7 +3247,8 @@ class SolicitudCotizacion(models.Model):
         """
         estados_css = {
             'borrador': 'secondary',
-            'enviada_cliente': 'info',
+            'enviada_front': 'info',
+            'enviada_cliente': 'primary',
             'parcialmente_aprobada': 'warning',
             'totalmente_aprobada': 'success',
             'totalmente_rechazada': 'danger',

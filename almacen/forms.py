@@ -1982,7 +1982,7 @@ LineaCotizacionFormSet = inlineformset_factory(
 
 class EditarLineaCotizacionForm(forms.ModelForm):
     """
-    Formulario restringido para editar líneas de cotización en estado 'enviada_cliente'.
+    Formulario restringido para editar líneas de cotización en estado 'enviada_front'.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------

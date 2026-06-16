@@ -419,13 +419,30 @@ Muestra toda la información y acciones según el estado
                     </button>
                     {% endif %}
                     
-                    <!-- Reenviar (cuando ya está enviada a front) -->
-                    {% if solicitud.estado == 'enviada_cliente' %}
+                    <!-- Reenviar y editar (cuando está enviada a front) -->
+                    {% if solicitud.estado == 'enviada_front' %}
                     <button type="button" class="btn btn-outline-success w-100"
                             data-bs-toggle="modal" data-bs-target="#notificarFrontModal">
                         <i class="bi bi-arrow-clockwise me-2"></i>Reenviar Notificación
                     </button>
                     
+                    <a href="{% url 'almacen:editar_lineas_cotizacion' solicitud.pk %}" 
+                       class="btn btn-outline-primary w-100">
+                        <i class="bi bi-pencil-square me-2"></i>Editar Líneas
+                    </a>
+                    
+                    <!-- Botón para enviar al cliente (cambia de enviada_front a enviada_cliente) -->
+                    <form method="post" action="{% url 'almacen:enviar_solicitud_a_cliente' solicitud.pk %}" class="w-100">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-warning w-100"
+                                onclick="return confirm('¿Enviar esta cotización al cliente? Se habilitarán las opciones de aprobar/rechazar.')">
+                            <i class="bi bi-person-check me-2"></i>Enviar a Cliente
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    <!-- Editar líneas (cuando está enviada al cliente, por si se necesita recotizar) -->
+                    {% if solicitud.estado == 'enviada_cliente' %}
                     <a href="{% url 'almacen:editar_lineas_cotizacion' solicitud.pk %}" 
                        class="btn btn-outline-primary w-100">
                         <i class="bi bi-pencil-square me-2"></i>Editar Líneas

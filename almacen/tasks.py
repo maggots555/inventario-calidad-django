@@ -287,3 +287,181 @@ def notificar_front_cotizacion_task(
         logger.error(f"[COTIZACION] Error en tarea: {e}")
         logger.error(traceback.format_exc())
         return {'success': False, 'mensaje': f'Error: {str(e)}'}
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='almacen.notificar_compras_nueva_cotizacion'
+)
+def notificar_compras_nueva_cotizacion_task(
+    self,
+    solicitud_id,
+    usuario_id=None,
+):
+    """
+    Tarea Celery: envía email a los empleados de Compras cuando se crea
+    una solicitud de cotización "Sin Orden Activa".
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cuando recepción crea una cotización sin una orden de servicio vinculada,
+    el área de Compras necesita procesarla (buscar proveedores, cotizar piezas).
+    Esta tarea se ejecuta en segundo plano para no bloquear al usuario que
+    creó la solicitud.
+
+    Parámetros:
+        solicitud_id : ID de la SolicitudCotizacion recién creada
+        usuario_id   : ID del usuario que creó la solicitud (para el contexto)
+    """
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+
+    from .models import SolicitudCotizacion
+    from inventario.models import Empleado
+    from config.paises_config import get_pais_actual, fecha_local_pais
+
+    logger.info(f"[COTIZACION-COMPRAS] Iniciando notificación para Solicitud ID {solicitud_id}")
+
+    try:
+        # ===================================================================
+        # PASO 1: RECUPERAR SOLICITUD Y VALIDAR
+        # ===================================================================
+        try:
+            solicitud = SolicitudCotizacion.objects.select_related(
+                'creado_por'
+            ).prefetch_related(
+                'lineas__producto',
+                'lineas__proveedor',
+            ).get(pk=solicitud_id)
+        except SolicitudCotizacion.DoesNotExist:
+            logger.error(f"[COTIZACION-COMPRAS] Solicitud ID {solicitud_id} no encontrada.")
+            return {'success': False, 'mensaje': f'Solicitud ID {solicitud_id} no encontrada.'}
+
+        # ===================================================================
+        # PASO 2: OBTENER EMPLEADOS DE COMPRAS CON EMAIL
+        # ===================================================================
+        compradores = Empleado.objects.filter(
+            rol='compras',
+            user__is_active=True,
+            email__isnull=False,
+        ).exclude(email='').select_related('user')
+
+        if not compradores.exists():
+            logger.info("[COTIZACION-COMPRAS] No hay empleados de Compras con email configurado.")
+            return {'success': True, 'mensaje': 'No hay empleados de Compras con email.'}
+
+        # Recopilar emails únicos de los compradores
+        destinatarios = list(set(
+            emp.email for emp in compradores if emp.email
+        ))
+
+        if not destinatarios:
+            logger.info("[COTIZACION-COMPRAS] Sin destinatarios de email válidos.")
+            return {'success': True, 'mensaje': 'Sin destinatarios válidos.'}
+
+        # ===================================================================
+        # PASO 3: PREPARAR CONTEXTO Y RENDERIZAR HTML
+        # ===================================================================
+        _pais_email = get_pais_actual()
+
+        nombre_usuario = ''
+        if usuario_id:
+            User = get_user_model()
+            try:
+                usuario = User.objects.get(pk=usuario_id)
+                nombre_usuario = usuario.get_full_name() or usuario.username
+            except User.DoesNotExist:
+                pass
+
+        ahora_local = fecha_local_pais(timezone.now(), _pais_email)
+
+        context = {
+            'solicitud': solicitud,
+            'lineas': solicitud.lineas.select_related('producto', 'proveedor').all(),
+            'fecha_envio_texto': ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto': ahora_local.strftime('%H:%M'),
+            'empresa_nombre': _pais_email['empresa_nombre_corto'],
+            'pais_nombre': _pais_email['nombre'],
+            'nombre_usuario': nombre_usuario,
+        }
+
+        html_content = render_to_string(
+            'almacen/emails/nueva_cotizacion_sin_orden.html',
+            context
+        )
+
+        # ===================================================================
+        # PASO 4: CREAR Y ENVIAR EL CORREO
+        # ===================================================================
+        service_tag_display = solicitud.service_tag or 'N/A'
+        asunto = f'📋 Nueva Cotización Sin Orden — {solicitud.numero_solicitud} (S/T: {service_tag_display})'
+
+        import re
+        email_match = re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente = f"Sistema de Almacén <{email_solo}>"
+
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=destinatarios,
+        )
+        email_msg.content_subtype = 'html'
+
+        # Adjuntar logo SIC (CID para mostrar inline en el correo)
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f"[COTIZACION-COMPRAS] Error al adjuntar logo: {e}")
+
+        # Adjuntar iconos de redes sociales (CID para mostrar inline)
+        try:
+            iconos_sociales = {
+                'icon_link': 'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook': 'images/utilitys/facebook.png',
+                'icon_whatsapp': 'images/utilitys/whatsapp.png',
+            }
+            for cid_name, icon_static_path in iconos_sociales.items():
+                icon_path = finders.find(icon_static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning(f"[COTIZACION-COMPRAS] Error al adjuntar iconos: {e}")
+
+        email_msg.send(fail_silently=False)
+        logger.info(
+            f"[COTIZACION-COMPRAS] Correo enviado a {len(destinatarios)} destinatario(s): "
+            f"{', '.join(destinatarios)}"
+        )
+
+        # ===================================================================
+        # PASO 5: RETORNAR RESULTADO EXITOSO
+        # ===================================================================
+        return {
+            'success': True,
+            'mensaje': f'Correo enviado a {len(destinatarios)} empleado(s) de Compras',
+            'solicitud': solicitud.numero_solicitud,
+        }
+
+    except Exception as e:
+        logger.error(f"[COTIZACION-COMPRAS] Error en tarea: {e}")
+        logger.error(traceback.format_exc())
+        return {'success': False, 'mensaje': f'Error: {str(e)}'}
