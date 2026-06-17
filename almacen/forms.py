@@ -33,6 +33,7 @@ from .models import (
     SolicitudCotizacion,
     LineaCotizacion,
     ImagenLineaCotizacion,
+    LineaServicioAdicional,
 )
 from config.constants import (
     TIPO_PRODUCTO_ALMACEN_CHOICES,
@@ -49,6 +50,8 @@ from config.constants import (
     ESTADO_UNIDAD_COMPRA_CHOICES,
     ESTADO_SOLICITUD_COTIZACION_CHOICES,
     ESTADO_LINEA_COTIZACION_CHOICES,
+    TIPO_SERVICIO_ADICIONAL_CHOICES,
+    PRECIOS_SERVICIOS_ADICIONALES,
 )
 
 
@@ -2409,3 +2412,115 @@ class ImagenLineaCotizacionForm(forms.ModelForm):
             instance.save()
         
         return instance
+
+
+# ============================================================================
+# FORMULARIO: LÍNEA DE SERVICIO ADICIONAL (Venta Mostrador en Cotizaciones)
+# ============================================================================
+
+class LineaServicioAdicionalForm(forms.ModelForm):
+    """
+    Formulario para agregar servicios adicionales a una cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este formulario permite agregar servicios de Venta Mostrador (limpieza,
+    reinstalación de SO, paquetes de mejora, etc.) dentro de una cotización
+    de almacén.
+    
+    Cuando el cliente aprueba estos servicios, se crean automáticamente
+    en el módulo de Servicio Técnico (modelo VentaMostrador).
+    
+    Campos principales:
+    - tipo_servicio: Qué servicio se ofrece (paquete, limpieza, etc.)
+    - costo: Precio del servicio (se sugiere automáticamente)
+    - notas: Observaciones adicionales
+    """
+    
+    class Meta:
+        model = LineaServicioAdicional
+        fields = [
+            'tipo_servicio',
+            'costo',
+            'notas',
+        ]
+        widgets = {
+            'tipo_servicio': forms.Select(attrs={
+                'class': 'form-select form-select-sm tipo-servicio-select',
+            }),
+            'costo': forms.NumberInput(attrs={
+                'class': 'form-control form-control-sm',
+                'min': 0,
+                'step': '0.01',
+                'placeholder': '0.00',
+            }),
+            'notas': forms.Textarea(attrs={
+                'class': 'form-control form-control-sm',
+                'rows': 2,
+                'placeholder': 'Notas adicionales sobre el servicio...',
+            }),
+        }
+        labels = {
+            'tipo_servicio': 'Servicio',
+            'costo': 'Costo',
+            'notas': 'Notas',
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """
+        Personaliza el formulario al inicializarlo.
+        
+        EXPLICACIÓN:
+        - Agrega data-attributes con los precios sugeridos para JavaScript
+        - El costo se llena automáticamente al seleccionar un servicio
+        """
+        super().__init__(*args, **kwargs)
+        
+        # Agregar data-attributes con precios sugeridos para JS
+        self.fields['tipo_servicio'].widget.attrs['data-precios'] = {
+            tipo: float(precio) for tipo, precio in PRECIOS_SERVICIOS_ADICIONALES.items()
+        }
+        
+        # Hacer costo opcional (se puede sugerir desde JS)
+        self.fields['costo'].required = False
+    
+    def clean(self):
+        """
+        Validaciones del formulario.
+        
+        EXPLICACIÓN:
+        - Si no hay costo, usar el precio sugerido del catálogo
+        - Validar que el costo no sea negativo
+        """
+        cleaned_data = super().clean()
+        tipo_servicio = cleaned_data.get('tipo_servicio')
+        costo = cleaned_data.get('costo')
+        
+        # Si no hay costo, usar el precio sugerido
+        if (costo is None or costo == 0) and tipo_servicio:
+            from decimal import Decimal
+            precio_sugerido = PRECIOS_SERVICIOS_ADICIONALES.get(tipo_servicio, 0)
+            cleaned_data['costo'] = Decimal(str(precio_sugerido))
+        
+        # Validar que el costo no sea negativo
+        if costo is not None and costo < 0:
+            self.add_error('costo', 'El costo no puede ser negativo.')
+        
+        return cleaned_data
+
+
+# Formset para los servicios adicionales
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# --------------------------------
+# Similar a LineaCotizacionFormSet, permite agregar múltiples servicios
+# adicionales dinámicamente desde JavaScript.
+
+LineaServicioAdicionalFormSet = inlineformset_factory(
+    SolicitudCotizacion,      # Modelo padre
+    LineaServicioAdicional,   # Modelo hijo
+    form=LineaServicioAdicionalForm,
+    extra=1,                  # Un formulario vacío inicial
+    can_delete=True,          # Permitir eliminar servicios
+    min_num=0,                # No es obligatorio tener servicios
+    validate_min=False,
+)

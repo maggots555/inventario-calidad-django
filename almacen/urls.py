@@ -105,12 +105,20 @@ urlpatterns = [
     path('solicitudes-cotizacion/<int:pk>/enviar-a-cliente/', views.enviar_solicitud_a_cliente, name='enviar_solicitud_a_cliente'),
     path('solicitudes-cotizacion/<int:pk>/notificar-front/', views.notificar_front, name='notificar_front'),
     path('solicitudes-cotizacion/<int:pk>/cancelar/', views.cancelar_solicitud_cotizacion, name='cancelar_solicitud_cotizacion'),
+    path('solicitudes-cotizacion/<int:pk>/vincular-orden/', views.vincular_orden_solicitud, name='vincular_orden_solicitud'),
     path('solicitudes-cotizacion/<int:pk>/generar-compras/', views.generar_compras_solicitud, name='generar_compras_solicitud'),
     
     # Respuestas del cliente por línea
     path('solicitudes-cotizacion/<int:solicitud_pk>/linea/<int:linea_pk>/responder/', views.responder_linea_cotizacion, name='responder_linea_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/aprobar-todas/', views.aprobar_todas_lineas, name='aprobar_todas_lineas'),
     path('solicitudes-cotizacion/<int:pk>/rechazar-todas/', views.rechazar_todas_lineas, name='rechazar_todas_lineas'),
+    
+    # Servicios adicionales (Venta Mostrador en cotizaciones)
+    path('solicitudes-cotizacion/<int:solicitud_pk>/servicio/agregar/', views.agregar_servicio_adicional, name='agregar_servicio_adicional'),
+    path('solicitudes-cotizacion/<int:solicitud_pk>/servicio/<int:servicio_pk>/eliminar/', views.eliminar_servicio_adicional, name='eliminar_servicio_adicional'),
+    path('solicitudes-cotizacion/<int:solicitud_pk>/servicio/<int:servicio_pk>/responder/', views.responder_servicio_adicional, name='responder_servicio_adicional'),
+    path('solicitudes-cotizacion/<int:pk>/servicios/aprobar-todos/', views.aprobar_todos_servicios, name='aprobar_todos_servicios'),
+    path('solicitudes-cotizacion/<int:pk>/servicios/rechazar-todos/', views.rechazar_todos_servicios, name='rechazar_todos_servicios'),
     
     # Gestión de imágenes de líneas de cotización
     path('solicitudes-cotizacion/<int:solicitud_pk>/linea/<int:linea_pk>/imagenes/', views.gestionar_imagenes_linea, name='gestionar_imagenes_linea'),

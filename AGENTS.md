@@ -474,6 +474,35 @@ Al enviar imágenes de ingreso al cliente, un análisis IA opcional evalúa la c
 - Selector de modelo (múltiples opciones Gemini / Ollama)
 - Dashboard de encuestas extendido con esta funcionalidad
 
+### Sincronización Almacén ↔ Servicio Técnico (Cotizaciones)
+Sistema bidireccional de sincronización entre cotizaciones de Almacén y Servicio Técnico:
+
+**Flujo Almacén → ST (principal):**
+- Al crear `SolicitudCotizacion` con `orden_servicio` → crea automáticamente `Cotizacion` en ST
+- Al agregar `LineaCotizacion` → crea/actualiza `PiezaCotizada` en ST
+- Al aprobar/rechazar en Almacén → refleja en `PiezaCotizada.aceptada_por_cliente`
+- Cuando todas las piezas tienen respuesta → actualiza `Cotizacion.usuario_acepto`
+
+**Servicios Adicionales (Venta Mostrador en cotizaciones):**
+- Modelo `LineaServicioAdicional` en Almacén para cotizar servicios (limpieza, reinstalación SO, paquetes)
+- Al aprobar y generar compras → crea/actualiza `VentaMostrador` en ST
+- Mapeo automático: tipo_servicio → campos booleanos de VentaMostrador
+
+**Vinculación de cotizaciones sin orden activa:**
+- `SolicitudCotizacion` puede crearse sin orden (modo `sin_orden_activa`)
+- Vista de búsqueda para vincular cuando el equipo ingresa formalmente
+- Sincroniza datos del cliente y service tag
+
+**Archivos clave:**
+- `almacen/models.py`: `SolicitudCotizacion`, `LineaCotizacion`, `LineaServicioAdicional`
+- `almacen/views.py`: `vincular_orden_solicitud`, `generar_compras_solicitud`
+- `servicio_tecnico/templates/.../detalle_orden.html`: Indicador de piezas de Almacén
+
+**Reglas para agentes:**
+- Las piezas con `pieza.linea_cotizacion_almacen` NO deben editarse/eliminarse desde ST
+- El campo `costo_mano_obra` de `Cotizacion` se crea en $0, el técnico lo edita después
+- La sincronización es automática en `save()`, no requiere intervención manual
+
 ### PWA (Progressive Web App)
 The app is installable on Android and iOS as a native-like app:
 - **Manifest**: `static/manifest.json` — name, icons, theme color, `display: standalone`

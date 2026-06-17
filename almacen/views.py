@@ -51,6 +51,7 @@ from .models import (
     LineaCotizacion,
     ImagenLineaCotizacion,
     ImagenSolicitudCotizacion,
+    LineaServicioAdicional,
 )
 from .forms import (
     ProveedorForm,
@@ -77,6 +78,8 @@ from .forms import (
     SolicitudCotizacionFiltroForm,
     RespuestaLineaCotizacionForm,
     ImagenLineaCotizacionForm,
+    LineaServicioAdicionalForm,
+    LineaServicioAdicionalFormSet,
 )
 from inventario.models import Empleado
 
@@ -3794,48 +3797,359 @@ def rechazar_todas_lineas(request, pk):
     return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
 
 
+# ============================================================================
+# VISTAS PARA SERVICIOS ADICIONALES (Venta Mostrador en Cotizaciones)
+# ============================================================================
+
 @login_required
-@permission_required_with_message('almacen.add_compraproducto')
-def generar_compras_solicitud(request, pk):
+@permission_required_with_message('almacen.add_lineaservicioadicional')
+def agregar_servicio_adicional(request, solicitud_pk):
     """
-    Genera CompraProducto para las líneas aprobadas.
+    Agregar un servicio adicional a una solicitud de cotización.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Una vez que el cliente ha aprobado las líneas, esta acción crea
-    los registros de CompraProducto para cada línea aprobada.
+    Esta vista permite agregar servicios de Venta Mostrador (limpieza,
+    reinstalación de SO, paquetes, etc.) a una cotización existente.
     
-    Cada CompraProducto:
-    - Queda vinculado a la línea de cotización
-    - Tiene estado 'pendiente_llegada'
-    - Hereda el producto, proveedor, cantidad y costo de la línea
-    - Se vincula a la misma orden de servicio
+    Los servicios adicionales aparecen debajo de las líneas de cotización
+    y el cliente puede aprobarlos/rechazarlos por separado.
     
-    Esto integra el flujo de cotizaciones con el flujo existente de compras.
+    Cuando el cliente aprueba y se generan las compras, estos servicios
+    se crean automáticamente en el VentaMostrador de la orden.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=solicitud_pk)
+    
+    # Solo se pueden agregar servicios en estados iniciales
+    if solicitud.estado not in ['borrador', 'enviada_front', 'enviada_cliente']:
+        messages.error(
+            request,
+            'No se pueden agregar servicios adicionales en este estado de la solicitud.'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=solicitud_pk)
+    
+    if request.method == 'POST':
+        form = LineaServicioAdicionalForm(request.POST)
+        
+        if form.is_valid():
+            servicio = form.save(commit=False)
+            servicio.solicitud = solicitud
+            servicio.save()
+            
+            messages.success(
+                request,
+                f'Servicio "{servicio.get_tipo_servicio_display()}" agregado a la cotización.'
+            )
+        else:
+            messages.error(request, 'Por favor corrige los errores en el formulario.')
+    else:
+        # GET: redirigir al detalle
+        pass
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=solicitud_pk)
+
+
+@login_required
+@permission_required_with_message('almacen.delete_lineaservicioadicional')
+def eliminar_servicio_adicional(request, solicitud_pk, servicio_pk):
+    """
+    Eliminar un servicio adicional de una solicitud de cotización.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Elimina un servicio adicional que fue agregado por error o que el
+    cliente ya no quiere. Solo se puede eliminar si aún no ha sido
+    aprobado/rechazado por el cliente.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=solicitud_pk)
+    servicio = get_object_or_404(
+        LineaServicioAdicional,
+        pk=servicio_pk,
+        solicitud=solicitud
+    )
+    
+    # Solo se pueden eliminar servicios pendientes
+    if servicio.estado_cliente != 'pendiente':
+        messages.error(
+            request,
+            'No se puede eliminar un servicio que ya fue respondido por el cliente.'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=solicitud_pk)
+    
+    if request.method == 'POST':
+        nombre_servicio = servicio.get_tipo_servicio_display()
+        servicio.delete()
+        messages.success(
+            request,
+            f'Servicio "{nombre_servicio}" eliminado de la cotización.'
+        )
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=solicitud_pk)
+
+
+@login_required
+@permission_required_with_message('almacen.change_lineaservicioadicional')
+def responder_servicio_adicional(request, solicitud_pk, servicio_pk):
+    """
+    Registrar la respuesta del cliente para un servicio adicional.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Similar a responder_linea_cotizacion, pero para servicios adicionales.
+    Permite registrar si el cliente aprobó o rechazó el servicio.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=solicitud_pk)
+    servicio = get_object_or_404(
+        LineaServicioAdicional,
+        pk=servicio_pk,
+        solicitud=solicitud
+    )
+    
+    # Solo se puede responder si la solicitud está enviada
+    if solicitud.estado not in ['enviada_cliente', 'parcialmente_aprobada']:
+        messages.error(
+            request,
+            'Solo se pueden registrar respuestas en solicitudes enviadas al cliente.'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=solicitud_pk)
+    
+    if request.method == 'POST':
+        decision = request.POST.get('decision', '')
+        motivo = request.POST.get('motivo_rechazo', '')
+        
+        if decision == 'aprobar':
+            if servicio.aprobar():
+                messages.success(
+                    request,
+                    f'Servicio "{servicio.get_tipo_servicio_display()}" aprobado por el cliente.'
+                )
+            else:
+                messages.error(request, 'No se pudo aprobar el servicio.')
+        elif decision == 'rechazar':
+            if servicio.rechazar(motivo=motivo):
+                messages.warning(
+                    request,
+                    f'Servicio "{servicio.get_tipo_servicio_display()}" rechazado por el cliente.'
+                )
+            else:
+                messages.error(request, 'No se pudo rechazar el servicio.')
+        else:
+            messages.error(request, 'Decisión no válida.')
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=solicitud_pk)
+
+
+@login_required
+@permission_required_with_message('almacen.change_lineaservicioadicional')
+def aprobar_todos_servicios(request, pk):
+    """
+    Aprobar todos los servicios adicionales pendientes de una solicitud.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Atajo para cuando el cliente aprueba todos los servicios adicionales.
     """
     solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
     
     if request.method == 'POST':
-        if not solicitud.puede_generar_compras():
+        servicios_pendientes = solicitud.servicios_adicionales.filter(estado_cliente='pendiente')
+        aprobados = 0
+        
+        for servicio in servicios_pendientes:
+            if servicio.aprobar():
+                aprobados += 1
+        
+        if aprobados > 0:
+            messages.success(
+                request,
+                f'Se aprobaron {aprobados} servicio(s) adicional(es).'
+            )
+        else:
+            messages.info(request, 'No había servicios pendientes por aprobar.')
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+@permission_required_with_message('almacen.change_lineaservicioadicional')
+def rechazar_todos_servicios(request, pk):
+    """
+    Rechazar todos los servicios adicionales pendientes de una solicitud.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    if request.method == 'POST':
+        motivo = request.POST.get('motivo', 'Rechazado por el cliente')
+        servicios_pendientes = solicitud.servicios_adicionales.filter(estado_cliente='pendiente')
+        rechazados = 0
+        
+        for servicio in servicios_pendientes:
+            if servicio.rechazar(motivo=motivo):
+                rechazados += 1
+        
+        if rechazados > 0:
+            messages.warning(
+                request,
+                f'Se rechazaron {rechazados} servicio(s) adicional(es).'
+            )
+        else:
+            messages.info(request, 'No había servicios pendientes por rechazar.')
+    
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+@permission_required_with_message('almacen.add_compraproducto')
+def generar_compras_solicitud(request, pk):
+    """
+    Genera CompraProducto para las líneas aprobadas y VentaMostrador para servicios adicionales.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Una vez que el cliente ha aprobado las líneas y/o servicios adicionales,
+    esta acción crea:
+    
+    1. CompraProducto para cada línea de pieza aprobada
+       - Queda vinculado a la línea de cotización
+       - Tiene estado 'pendiente_llegada'
+       - Hereda el producto, proveedor, cantidad y costo de la línea
+       - Se vincula a la misma orden de servicio
+    
+    2. VentaMostrador (o actualiza si ya existe) para servicios adicionales aprobados
+       - Mapea cada servicio a su campo correspondiente en VentaMostrador
+       - Ejemplo: 'limpieza' → incluye_limpieza=True, costo_limpieza=$450
+    
+    Esto integra el flujo de cotizaciones con el flujo existente de compras
+    y ventas mostrador.
+    """
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    if request.method == 'POST':
+        puede_generar_compras = solicitud.puede_generar_compras()
+        puede_generar_venta = solicitud.puede_generar_venta_mostrador()
+        
+        # Validar que haya algo que generar
+        if not puede_generar_compras and not puede_generar_venta:
             messages.error(
                 request,
-                'No se pueden generar compras. Verifica que haya líneas '
-                'aprobadas sin compra generada.'
+                'No hay líneas ni servicios aprobados pendientes de procesar.'
             )
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
         
-        compras = solicitud.generar_compras(usuario=request.user)
+        mensajes_exito = []
         
-        if compras:
+        # Generar compras para piezas
+        if puede_generar_compras:
+            compras = solicitud.generar_compras(usuario=request.user)
+            if compras:
+                mensajes_exito.append(
+                    f'{len(compras)} compra(s) de piezas generada(s)'
+                )
+        
+        # Generar VentaMostrador para servicios adicionales
+        if puede_generar_venta:
+            venta = solicitud.generar_venta_mostrador()
+            if venta:
+                mensajes_exito.append(
+                    f'Venta Mostrador creada/actualizada ({venta.folio_venta})'
+                )
+        
+        # Mostrar mensajes al usuario
+        if mensajes_exito:
             messages.success(
                 request,
-                f'Se generaron {len(compras)} compra(s) exitosamente. '
-                'Puedes verlas en la lista de compras.'
+                'Se generaron exitosamente: ' + '. '.join(mensajes_exito) + '.'
             )
         else:
-            messages.error(request, 'No se pudieron generar las compras.')
+            messages.warning(request, 'No se pudieron generar las compras/servicios.')
     
     return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+@permission_required_with_message('almacen.change_solicitudcotizacion')
+def vincular_orden_solicitud(request, pk):
+    """
+    Vincular una solicitud de cotización (sin orden activa) a una orden de servicio.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando una cotización se crea sin orden activa (el equipo aún no ingresa),
+    esta vista permite buscar y vincular la orden de servicio correspondiente
+    cuando el equipo ya ingresó formalmente.
+    
+    BÚSQUEDA:
+    - Por número de orden interno (ORD-2025-0001)
+    - Por número de orden cliente (OOW-12345, FL-67890)
+    - Por service tag / número de serie
+    - Por nombre del cliente
+    """
+    from servicio_tecnico.models import OrdenServicio, DetalleEquipo
+    
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+    
+    if not solicitud.puede_vincular_orden():
+        messages.error(
+            request,
+            'No se puede vincular una orden. La solicitud ya tiene orden activa '
+            'o está completada/cancelada.'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+    
+    resultados = []
+    termino_busqueda = ''
+    
+    if request.method == 'POST':
+        termino_busqueda = request.POST.get('busqueda', '').strip()
+        orden_pk = request.POST.get('orden_pk', '')
+        
+        # Si se seleccionó una orden específica, vincularla
+        if orden_pk:
+            orden = get_object_or_404(OrdenServicio, pk=orden_pk)
+            
+            try:
+                solicitud.vincular_orden(orden)
+                messages.success(
+                    request,
+                    f'Solicitud {solicitud.numero_solicitud} vinculada exitosamente '
+                    f'a la orden {orden.numero_orden_interno}.'
+                )
+            except ValueError as e:
+                messages.error(request, str(e))
+            
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+        
+        # Buscar órdenes que coincidan
+        if termino_busqueda:
+            from django.db.models import Q
+            
+            # Buscar por número de orden interno, orden cliente, o service tag
+            resultados = OrdenServicio.objects.filter(
+                Q(numero_orden_interno__icontains=termino_busqueda) |
+                Q(detalle_equipo__orden_cliente__icontains=termino_busqueda) |
+                Q(detalle_equipo__numero_serie__icontains=termino_busqueda) |
+                Q(detalle_equipo__nombre_cliente__icontains=termino_busqueda)
+            ).select_related('detalle_equipo').order_by('-fecha_ingreso')[:20]
+            
+            # Si no hay resultados y tenemos service_tag de la solicitud, buscar por eso
+            if not resultados and solicitud.service_tag:
+                resultados = OrdenServicio.objects.filter(
+                    detalle_equipo__numero_serie__icontains=solicitud.service_tag
+                ).select_related('detalle_equipo').order_by('-fecha_ingreso')[:20]
+    
+    # Si es GET, buscar automáticamente por service_tag si existe
+    elif solicitud.service_tag:
+        from servicio_tecnico.models import OrdenServicio
+        resultados = OrdenServicio.objects.filter(
+            detalle_equipo__numero_serie__icontains=solicitud.service_tag
+        ).select_related('detalle_equipo').order_by('-fecha_ingreso')[:20]
+        termino_busqueda = solicitud.service_tag
+    
+    return render(request, 'almacen/cotizaciones/vincular_orden.html', {
+        'solicitud': solicitud,
+        'resultados': resultados,
+        'termino_busqueda': termino_busqueda,
+    })
 
 
 @login_required

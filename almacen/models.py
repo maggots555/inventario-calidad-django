@@ -53,7 +53,14 @@ from config.constants import (
     # Constantes para datos del cliente en cotizaciones
     MARCAS_EQUIPOS_CHOICES,
     TIPO_EQUIPO_CHOICES,
+    # Constantes para servicios adicionales (Venta Mostrador en cotizaciones)
+    TIPO_SERVICIO_ADICIONAL_CHOICES,
+    PRECIOS_SERVICIOS_ADICIONALES,
+    MAPEO_SERVICIO_A_VENTA_MOSTRADOR,
 )
+
+import logging
+logger = logging.getLogger('almacen')
 
 
 # ============================================================================
@@ -2899,6 +2906,7 @@ class SolicitudCotizacion(models.Model):
         1. Generar número de solicitud automáticamente
         2. Sincronizar numero_orden_cliente desde orden_servicio
         3. Manejar modo sin_orden_activa con service_tag
+        4. Crear Cotizacion en Servicio Técnico si tiene orden_servicio
         """
         # Generar número de solicitud si es nuevo
         if not self.numero_solicitud:
@@ -2918,6 +2926,10 @@ class SolicitudCotizacion(models.Model):
             self.orden_servicio = None
         
         super().save(*args, **kwargs)
+        
+        # Crear Cotizacion en Servicio Técnico si tiene orden_servicio
+        if self.orden_servicio:
+            self._sincronizar_cotizacion_st()
     
     def _generar_numero_solicitud(self):
         """
@@ -2953,6 +2965,41 @@ class SolicitudCotizacion(models.Model):
             siguiente_numero = 1
         
         return f"{prefijo}{siguiente_numero:04d}"
+    
+    def _sincronizar_cotizacion_st(self):
+        """
+        Crea o reutiliza la Cotizacion en Servicio Técnico para esta orden.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Cuando una SolicitudCotizacion tiene orden_servicio vinculada,
+        este método asegura que exista una Cotizacion correspondiente
+        en el módulo de Servicio Técnico.
+        
+        Si ya existe (creada manualmente o desde diagnóstico), la reutiliza.
+        Si no existe, la crea con costo_mano_obra = 0.
+        
+        Las piezas (PiezaCotizada) se sincronizan desde LineaCotizacion.save()
+        """
+        from servicio_tecnico.models import Cotizacion
+        
+        if not self.orden_servicio:
+            return
+        
+        # Buscar o crear Cotizacion en ST
+        cotizacion, creada = Cotizacion.objects.get_or_create(
+            orden=self.orden_servicio,
+            defaults={
+                'fecha_envio': timezone.now(),
+                'costo_mano_obra': 0,
+            }
+        )
+        
+        if creada:
+            logger.info(
+                f"Cotizacion creada en ST para orden {self.orden_servicio.numero_orden_interno} "
+                f"desde SolicitudCotizacion {self.numero_solicitud}"
+            )
     
     # ========== PROPIEDADES CALCULADAS ==========
     
@@ -3003,6 +3050,76 @@ class SolicitudCotizacion(models.Model):
             total=Sum(F('cantidad') * F('costo_unitario'))
         )['total']
         return total or 0
+    
+    # ========== PROPIEDADES DE SERVICIOS ADICIONALES ==========
+    
+    @property
+    def total_servicios_adicionales(self):
+        """Número total de servicios adicionales en esta solicitud."""
+        return self.servicios_adicionales.count()
+    
+    @property
+    def servicios_aprobados(self):
+        """Número de servicios adicionales aprobados por el cliente."""
+        return self.servicios_adicionales.filter(estado_cliente='aprobada').count()
+    
+    @property
+    def servicios_rechazados(self):
+        """Número de servicios adicionales rechazados por el cliente."""
+        return self.servicios_adicionales.filter(estado_cliente='rechazada').count()
+    
+    @property
+    def servicios_pendientes(self):
+        """Número de servicios adicionales pendientes de respuesta."""
+        return self.servicios_adicionales.filter(estado_cliente='pendiente').count()
+    
+    @property
+    def costo_servicios_adicionales(self):
+        """
+        Suma total de todos los servicios adicionales.
+        
+        Returns:
+            Decimal: Suma de costos de todos los servicios adicionales
+        """
+        from django.db.models import Sum
+        total = self.servicios_adicionales.aggregate(
+            total=Sum('costo')
+        )['total']
+        return total or 0
+    
+    @property
+    def costo_servicios_aprobados(self):
+        """
+        Suma de los servicios adicionales aprobados.
+        
+        Returns:
+            Decimal: Suma solo de servicios con estado_cliente='aprobada'
+        """
+        from django.db.models import Sum
+        total = self.servicios_adicionales.filter(estado_cliente='aprobada').aggregate(
+            total=Sum('costo')
+        )['total']
+        return total or 0
+    
+    @property
+    def costo_total_con_servicios(self):
+        """
+        Suma total incluyendo piezas Y servicios adicionales.
+        
+        Returns:
+            Decimal: costo_total + costo_servicios_adicionales
+        """
+        return self.costo_total + self.costo_servicios_adicionales
+    
+    @property
+    def costo_aprobado_con_servicios(self):
+        """
+        Suma aprobada incluyendo piezas Y servicios adicionales.
+        
+        Returns:
+            Decimal: costo_aprobado + costo_servicios_aprobados
+        """
+        return self.costo_aprobado + self.costo_servicios_aprobados
     
     @property
     def total_estimado(self):
@@ -3113,13 +3230,18 @@ class SolicitudCotizacion(models.Model):
     
     def actualizar_estado_segun_lineas(self):
         """
-        Actualiza el estado de la solicitud basándose en las respuestas de las líneas.
+        Actualiza el estado de la solicitud basándose en las respuestas de líneas Y servicios.
         
         LÓGICA:
-        - Si todas las líneas están aprobadas → 'totalmente_aprobada'
-        - Si todas las líneas están rechazadas → 'totalmente_rechazada'
-        - Si hay mezcla de aprobadas y rechazadas → 'parcialmente_aprobada'
-        - Si aún hay pendientes → mantiene 'enviada_cliente'
+        - Cuenta tanto líneas de cotización (piezas) como servicios adicionales
+        - Si TODOS están aprobados → 'totalmente_aprobada'
+        - Si TODOS están rechazados → 'totalmente_rechazada'
+        - Si hay mezcla de aprobados y rechazados → 'parcialmente_aprobada'
+        - Si aún hay pendientes (piezas o servicios) → mantiene 'enviada_cliente'
+        
+        IMPORTANTE:
+        - Los servicios adicionales también cuentan para determinar el estado
+        - No se marca como "totalmente_aprobada" hasta que servicios también respondan
         
         Returns:
             str: Nuevo estado de la solicitud
@@ -3127,16 +3249,33 @@ class SolicitudCotizacion(models.Model):
         if self.estado not in ['enviada_front', 'enviada_cliente', 'parcialmente_aprobada']:
             return self.estado
         
-        total = self.total_lineas
-        aprobadas = self.lineas_aprobadas
-        rechazadas = self.lineas_rechazadas
-        pendientes = self.lineas_pendientes
+        # Contar líneas de cotización (piezas)
+        total_lineas = self.total_lineas
+        lineas_aprobadas = self.lineas_aprobadas
+        lineas_rechazadas = self.lineas_rechazadas
+        lineas_pendientes = self.lineas_pendientes
         
-        if pendientes > 0:
-            # Aún hay líneas sin respuesta
+        # Contar servicios adicionales
+        total_servicios = self.total_servicios_adicionales
+        servicios_aprobados = self.servicios_aprobados
+        servicios_rechazados = self.servicios_rechazados
+        servicios_pendientes = self.servicios_pendientes
+        
+        # Totales combinados
+        total = total_lineas + total_servicios
+        aprobadas = lineas_aprobadas + servicios_aprobados
+        rechazadas = lineas_rechazadas + servicios_rechazados
+        pendientes = lineas_pendientes + servicios_pendientes
+        
+        # Si no hay nada que evaluar, no cambiar estado
+        if total == 0:
             return self.estado
         
-        # Todas las líneas tienen respuesta
+        if pendientes > 0:
+            # Aún hay líneas o servicios sin respuesta
+            return self.estado
+        
+        # Todas las líneas y servicios tienen respuesta
         self.fecha_respuesta_cliente = timezone.now()
         
         if aprobadas == total:
@@ -3235,6 +3374,97 @@ class SolicitudCotizacion(models.Model):
         
         return compras_creadas
     
+    def puede_generar_venta_mostrador(self):
+        """
+        Verifica si se puede crear/actualizar VentaMostrador.
+        
+        Condiciones:
+        - Debe tener orden_servicio vinculada
+        - Debe haber al menos un servicio adicional aprobado sin procesar
+        """
+        if not self.orden_servicio:
+            return False
+        
+        return self.servicios_adicionales.filter(
+            estado_cliente='aprobada'
+        ).exclude(
+            estado_cliente='compra_generada'
+        ).exists()
+    
+    def generar_venta_mostrador(self):
+        """
+        Crea o actualiza el VentaMostrador en la orden de servicio vinculada.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Este método toma los servicios adicionales aprobados y los "traslada"
+        al modelo VentaMostrador de servicio_tecnico.
+        
+        Por ejemplo, si el cliente aprobó:
+        - paquete_premium ($5,500)
+        - limpieza ($450)
+        
+        Este método creará/actualizará el VentaMostrador con:
+        - paquete = 'premium'
+        - costo_paquete = 5500
+        - incluye_limpieza = True
+        - costo_limpieza = 450
+        
+        IMPORTANTE:
+        - Solo funciona si la solicitud tiene orden_servicio vinculada
+        - Si ya existe VentaMostrador, actualiza los campos correspondientes
+        - Marca los servicios como 'compra_generada' para no procesarlos dos veces
+        
+        Returns:
+            VentaMostrador: Instancia creada/actualizada, o None si no aplica
+        """
+        # Validar que haya orden de servicio
+        if not self.orden_servicio:
+            return None
+        
+        # Obtener servicios aprobados que no hayan sido procesados
+        servicios_aprobados = self.servicios_adicionales.filter(
+            estado_cliente='aprobada'
+        )
+        
+        if not servicios_aprobados.exists():
+            return None
+        
+        # Importar modelos de servicio_tecnico (evitar import circular)
+        from servicio_tecnico.models import VentaMostrador
+        
+        # Buscar o crear VentaMostrador para esta orden
+        venta, creada = VentaMostrador.objects.get_or_create(
+            orden=self.orden_servicio,
+            defaults={'fecha_venta': timezone.now()}
+        )
+        
+        # Procesar cada servicio aprobado
+        for servicio in servicios_aprobados:
+            mapeo = MAPEO_SERVICIO_A_VENTA_MOSTRADOR.get(servicio.tipo_servicio)
+            
+            if not mapeo:
+                continue
+            
+            # Si es un paquete (premium/oro/plata)
+            if servicio.es_paquete:
+                venta.paquete = servicio.valor_paquete
+                venta.costo_paquete = servicio.costo
+            
+            # Si es un servicio individual (limpieza, reinstalación, etc.)
+            elif 'campo_incluye' in mapeo:
+                setattr(venta, mapeo['campo_incluye'], True)
+                setattr(venta, mapeo['campo_costo'], servicio.costo)
+            
+            # Marcar servicio como procesado
+            servicio.estado_cliente = 'compra_generada'
+            servicio.save()
+        
+        # Guardar VentaMostrador con todos los cambios
+        venta.save()
+        
+        return venta
+    
     def cancelar(self, motivo=''):
         """
         Cancela la solicitud.
@@ -3252,6 +3482,91 @@ class SolicitudCotizacion(models.Model):
         if motivo:
             self.observaciones = f"{self.observaciones}\n[CANCELADA] {motivo}".strip()
         self.save()
+        return True
+    
+    def puede_vincular_orden(self):
+        """
+        Verifica si se puede vincular una orden de servicio.
+        
+        Condiciones:
+        - Debe estar en modo sin_orden_activa
+        - No debe estar completada ni cancelada
+        """
+        return (
+            self.sin_orden_activa
+            and self.estado not in ['completada', 'cancelada']
+        )
+    
+    def vincular_orden(self, orden_servicio):
+        """
+        Vincula esta solicitud con una orden de servicio existente.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Cuando una cotización se crea sin orden activa (el equipo aún no ingresa),
+        este método permite vincularla después cuando el equipo ya ingresó
+        formalmente y se creó la orden de servicio.
+        
+        Al vincular:
+        - Se asigna el FK orden_servicio
+        - Se desactiva el modo sin_orden_activa
+        - Se sincroniza el numero_orden_cliente desde DetalleEquipo
+        - Se conservan los datos del cliente de la cotización (no se sobreescriben)
+        
+        Args:
+            orden_servicio: Instancia de OrdenServicio a vincular
+        
+        Returns:
+            bool: True si se vinculó exitosamente
+        
+        Raises:
+            ValueError: Si no se puede vincular la orden
+        """
+        if not self.puede_vincular_orden():
+            raise ValueError(
+                'No se puede vincular la orden. La solicitud ya tiene orden activa '
+                'o está en un estado que no lo permite.'
+            )
+        
+        if not orden_servicio:
+            raise ValueError('Debe proporcionar una orden de servicio válida.')
+        
+        # Verificar que la orden no tenga ya otra solicitud vinculada en estados activos
+        solicitudes_existentes = SolicitudCotizacion.objects.filter(
+            orden_servicio=orden_servicio,
+            estado__in=['borrador', 'enviada_front', 'enviada_cliente', 'parcialmente_aprobada', 'totalmente_aprobada']
+        ).exclude(pk=self.pk)
+        
+        if solicitudes_existentes.exists():
+            raise ValueError(
+                f'La orden {orden_servicio.numero_orden_interno} ya tiene '
+                f'{solicitudes_existentes.count()} solicitud(es) activa(s) vinculada(s).'
+            )
+        
+        # Vincular la orden
+        self.orden_servicio = orden_servicio
+        self.sin_orden_activa = False
+        
+        # Sincronizar numero_orden_cliente desde DetalleEquipo
+        if hasattr(orden_servicio, 'detalle_equipo'):
+            detalle = orden_servicio.detalle_equipo
+            if detalle and hasattr(detalle, 'orden_cliente'):
+                self.numero_orden_cliente = detalle.orden_cliente or ''
+        
+        # Agregar nota en observaciones
+        nota = f"[VINCULADA] Orden {orden_servicio.numero_orden_interno} vinculada el {timezone.now().strftime('%d/%m/%Y %H:%M')}"
+        if self.observaciones:
+            self.observaciones = f"{self.observaciones}\n{nota}"
+        else:
+            self.observaciones = nota
+        
+        self.save()
+        
+        logger.info(
+            f"SolicitudCotizacion {self.numero_solicitud} vinculada a "
+            f"OrdenServicio {orden_servicio.numero_orden_interno}"
+        )
+        
         return True
     
     # ========== MÉTODOS DE VISUALIZACIÓN ==========
@@ -3416,6 +3731,17 @@ class LineaCotizacion(models.Model):
         help_text='CompraProducto creada al aprobar esta línea'
     )
     
+    # ========== VINCULACIÓN CON PIEZA COTIZADA (Servicio Técnico) ==========
+    pieza_cotizada_origen = models.OneToOneField(
+        'servicio_tecnico.PiezaCotizada',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='linea_cotizacion_almacen',
+        verbose_name='Pieza Cotizada Origen',
+        help_text='PiezaCotizada de servicio técnico que originó esta línea (sincronización automática)'
+    )
+    
     # ========== INFORMACIÓN ADICIONAL ==========
     notas = models.TextField(
         blank=True,
@@ -3458,11 +3784,13 @@ class LineaCotizacion(models.Model):
         Override de save() para:
         1. Auto-asignar número de línea si es nuevo o tiene valor 0
         2. Copiar tiempo de entrega del proveedor si no se especifica
+        3. Sincronizar con PiezaCotizada en Servicio Técnico
         
         EXPLICACIÓN:
         - numero_linea=0 indica que debe auto-asignarse
         - El formset envía todas las líneas con numero_linea=0
         - Esta lógica calcula el siguiente número disponible
+        - Si la solicitud tiene orden_servicio, crea/actualiza PiezaCotizada en ST
         """
         # Auto-asignar número de línea si es nuevo o tiene valor 0
         if not self.numero_linea or self.numero_linea == 0:
@@ -3476,6 +3804,10 @@ class LineaCotizacion(models.Model):
             self.tiempo_entrega_estimado = self.proveedor.tiempo_entrega_dias
         
         super().save(*args, **kwargs)
+        
+        # Sincronizar con PiezaCotizada en Servicio Técnico
+        if self.solicitud.orden_servicio:
+            self._sincronizar_pieza_st()
     
     # ========== PROPIEDADES CALCULADAS ==========
     
@@ -3489,6 +3821,157 @@ class LineaCotizacion(models.Model):
         """
         costo = self.costo_unitario or 0
         return self.cantidad * costo
+    
+    def _sincronizar_pieza_st(self):
+        """
+        Crea o actualiza la PiezaCotizada correspondiente en Servicio Técnico.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Cada LineaCotizacion en almacén tiene una PiezaCotizada correspondiente
+        en el módulo de Servicio Técnico. Este método asegura que estén sincronizadas.
+        
+        MAPEO DE CAMPOS:
+        - LineaCotizacion.producto.nombre → busca ComponenteEquipo por nombre
+        - LineaCotizacion.descripcion_pieza → PiezaCotizada.descripcion_adicional
+        - LineaCotizacion.cantidad → PiezaCotizada.cantidad
+        - LineaCotizacion.costo_unitario → PiezaCotizada.costo_unitario
+        - LineaCotizacion.proveedor.nombre → PiezaCotizada.proveedor (CharField)
+        
+        Si ya existe PiezaCotizada vinculada (pieza_cotizada_origen), la actualiza.
+        Si no existe, busca una que coincida o crea una nueva.
+        """
+        from servicio_tecnico.models import Cotizacion, PiezaCotizada
+        from scorecard.models import ComponenteEquipo
+        from decimal import Decimal
+        
+        if not self.solicitud.orden_servicio:
+            return
+        
+        # Obtener o crear Cotizacion en ST
+        try:
+            cotizacion = Cotizacion.objects.get(orden=self.solicitud.orden_servicio)
+        except Cotizacion.DoesNotExist:
+            # No debería pasar porque SolicitudCotizacion.save() ya la crea
+            logger.warning(
+                f"No existe Cotizacion en ST para orden {self.solicitud.orden_servicio.numero_orden_interno}"
+            )
+            return
+        
+        # Buscar ComponenteEquipo que coincida con el producto
+        componente = ComponenteEquipo.objects.filter(
+            nombre__icontains=self.producto.nombre,
+            activo=True
+        ).first()
+        
+        if not componente:
+            # Intentar búsqueda más amplia
+            componente = ComponenteEquipo.objects.filter(activo=True).first()
+        
+        if not componente:
+            logger.warning(
+                f"No se encontró ComponenteEquipo para producto '{self.producto.nombre}'"
+            )
+            return
+        
+        # Buscar PiezaCotizada existente (por vínculo o por coincidencia)
+        pieza = None
+        
+        # 1. Buscar por vínculo directo
+        if self.pieza_cotizada_origen:
+            pieza = self.pieza_cotizada_origen
+        
+        # 2. Buscar por coincidencia en la misma cotización
+        if not pieza:
+            pieza = PiezaCotizada.objects.filter(
+                cotizacion=cotizacion,
+                componente=componente,
+                descripcion_adicional__icontains=self.descripcion_pieza[:50]
+            ).first()
+        
+        # 3. Crear nueva si no existe
+        if not pieza:
+            pieza = PiezaCotizada(
+                cotizacion=cotizacion,
+                componente=componente,
+            )
+        
+        # Actualizar campos
+        pieza.descripcion_adicional = self.descripcion_pieza
+        pieza.cantidad = self.cantidad
+        pieza.costo_unitario = self.costo_unitario or Decimal('0.00')
+        pieza.proveedor = self.proveedor.nombre if self.proveedor else ''
+        pieza.sugerida_por_tecnico = False  # Viene de almacén, no del técnico
+        pieza.es_necesaria = True
+        pieza.orden_prioridad = self.numero_linea
+        
+        # Sincronizar estado de aceptación
+        if self.estado_cliente == 'aprobada':
+            pieza.aceptada_por_cliente = True
+        elif self.estado_cliente == 'rechazada':
+            pieza.aceptada_por_cliente = False
+            pieza.motivo_rechazo_pieza = self.motivo_rechazo
+        # Si está pendiente, no tocar aceptada_por_cliente (dejar None)
+        
+        pieza.save()
+        
+        # Vincular bidireccionalmente
+        if not self.pieza_cotizada_origen:
+            self.pieza_cotizada_origen = pieza
+            # Guardar sin disparar sincronización recursiva
+            super(LineaCotizacion, self).save(update_fields=['pieza_cotizada_origen'])
+        
+        logger.debug(
+            f"PiezaCotizada #{pieza.pk} sincronizada desde LineaCotizacion #{self.pk}"
+        )
+    
+    def _actualizar_cotizacion_st_estado(self):
+        """
+        Actualiza el estado general de la Cotizacion en ST según las piezas.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Cuando el cliente aprueba/rechaza piezas en almacén, este método
+        actualiza el campo usuario_acepto de la Cotizacion en ST:
+        
+        - Si TODAS las piezas tienen respuesta → establece usuario_acepto
+        - Si al menos una fue aceptada → usuario_acepto = True
+        - Si todas fueron rechazadas → usuario_acepto = False
+        - Si aún hay pendientes → usuario_acepto = None
+        """
+        from servicio_tecnico.models import Cotizacion
+        
+        if not self.solicitud.orden_servicio:
+            return
+        
+        try:
+            cotizacion = Cotizacion.objects.get(orden=self.solicitud.orden_servicio)
+        except Cotizacion.DoesNotExist:
+            return
+        
+        # Contar piezas con respuesta
+        total_piezas = self.solicitud.lineas.count()
+        aprobadas = self.solicitud.lineas.filter(estado_cliente='aprobada').count()
+        rechazadas = self.solicitud.lineas.filter(estado_cliente='rechazada').count()
+        pendientes = total_piezas - aprobadas - rechazadas
+        
+        # Solo actualizar si todas las piezas tienen respuesta
+        if pendientes == 0 and total_piezas > 0:
+            # Si al menos una fue aceptada, la cotización se considera aceptada
+            if aprobadas > 0:
+                cotizacion.usuario_acepto = True
+            else:
+                cotizacion.usuario_acepto = False
+            
+            if not cotizacion.fecha_respuesta:
+                cotizacion.fecha_respuesta = timezone.now()
+            
+            cotizacion.save()
+            
+            logger.info(
+                f"Cotizacion ST actualizada: usuario_acepto={cotizacion.usuario_acepto} "
+                f"para orden {self.solicitud.orden_servicio.numero_orden_interno}"
+            )
     
     # ========== MÉTODOS DE WORKFLOW ==========
     
@@ -3504,6 +3987,11 @@ class LineaCotizacion(models.Model):
         """
         Marca la línea como aprobada por el cliente.
         
+        Efectos:
+        - Cambia estado_cliente a 'aprobada'
+        - Sincroniza con PiezaCotizada en ST (aceptada_por_cliente=True)
+        - Actualiza estado general de Cotizacion en ST si todas tienen respuesta
+        
         Returns:
             bool: True si se aprobó exitosamente
         """
@@ -3517,11 +4005,19 @@ class LineaCotizacion(models.Model):
         # Actualizar estado de la solicitud
         self.solicitud.actualizar_estado_segun_lineas()
         
+        # Actualizar estado general de Cotizacion en ST
+        self._actualizar_cotizacion_st_estado()
+        
         return True
     
     def rechazar(self, motivo=''):
         """
         Marca la línea como rechazada por el cliente.
+        
+        Efectos:
+        - Cambia estado_cliente a 'rechazada'
+        - Sincroniza con PiezaCotizada en ST (aceptada_por_cliente=False)
+        - Actualiza estado general de Cotizacion en ST si todas tienen respuesta
         
         Args:
             motivo: Razón del rechazo
@@ -3540,6 +4036,9 @@ class LineaCotizacion(models.Model):
         
         # Actualizar estado de la solicitud
         self.solicitud.actualizar_estado_segun_lineas()
+        
+        # Actualizar estado general de Cotizacion en ST
+        self._actualizar_cotizacion_st_estado()
         
         return True
     
@@ -4197,3 +4696,278 @@ class ImagenSolicitudCotizacion(models.Model):
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Error al eliminar archivo de imagen de solicitud: {e}")
+
+
+# ============================================================================
+# MODELO: LÍNEA DE SERVICIO ADICIONAL (Venta Mostrador en Cotizaciones)
+# ============================================================================
+
+class LineaServicioAdicional(models.Model):
+    """
+    Servicios adicionales de Venta Mostrador dentro de una SolicitudCotizacion.
+    
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Este modelo permite agregar servicios adicionales (como limpieza, reinstalación
+    de SO, paquetes de mejora, etc.) dentro de una cotización de almacén.
+    
+    ¿Por qué es útil?
+    -----------------
+    Cuando un cliente trae su equipo a servicio técnico, además de las piezas que
+    necesita (RAM, disco duro, etc.), también puede querer servicios adicionales:
+    - Limpieza profunda del equipo
+    - Reinstalación del sistema operativo
+    - Respaldo de su información
+    - Un paquete completo de mejora (Premium/Oro/Plata)
+    
+    Antes, estos servicios se tenían que crear manualmente en "Ventas Mostrador"
+    después de que el cliente aceptaba. Ahora se pueden cotizar juntos con las
+    piezas, y cuando el cliente aprueba, se crea automáticamente el VentaMostrador.
+    
+    FLUJO:
+    ------
+    1. Almacén agrega servicios adicionales a la cotización (junto con las piezas)
+    2. El cliente ve TODO junto: piezas + servicios
+    3. El cliente aprueba/rechaza cada línea por separado
+    4. Al generar compras, los servicios aprobados crean/actualizan VentaMostrador
+    
+    RELACIÓN CON VentaMostrador:
+    ----------------------------
+    Cada tipo de servicio mapea a un campo específico en VentaMostrador:
+    - paquete_premium → VentaMostrador.paquete = 'premium'
+    - limpieza → VentaMostrador.incluye_limpieza = True
+    - reinstalacion_so → VentaMostrador.incluye_reinstalacion_so = True
+    - etc.
+    
+    Campos importantes:
+    - solicitud: FK a SolicitudCotizacion (la cabecera)
+    - tipo_servicio: Tipo de servicio (paquete, limpieza, etc.)
+    - costo: Precio del servicio
+    - estado_cliente: Si el cliente aprobó/rechazó este servicio
+    """
+    
+    # ========== RELACIÓN CON SOLICITUD ==========
+    solicitud = models.ForeignKey(
+        SolicitudCotizacion,
+        on_delete=models.CASCADE,
+        related_name='servicios_adicionales',
+        verbose_name='Solicitud de Cotización'
+    )
+    numero_linea = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Número de Línea',
+        help_text='Orden de la línea dentro de la solicitud (se asigna automáticamente)'
+    )
+    
+    # ========== TIPO DE SERVICIO ==========
+    tipo_servicio = models.CharField(
+        max_length=25,
+        choices=TIPO_SERVICIO_ADICIONAL_CHOICES,
+        verbose_name='Tipo de Servicio',
+        help_text='Tipo de servicio adicional (paquete, limpieza, reinstalación, etc.)'
+    )
+    
+    # ========== COSTO ==========
+    costo = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        verbose_name='Costo del Servicio',
+        help_text='Precio del servicio (IVA incluido)'
+    )
+    
+    # ========== ESTADO DEL CLIENTE ==========
+    estado_cliente = models.CharField(
+        max_length=20,
+        choices=ESTADO_LINEA_COTIZACION_CHOICES,
+        default='pendiente',
+        verbose_name='Estado del Cliente',
+        help_text='Respuesta del cliente para este servicio'
+    )
+    fecha_respuesta = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de Respuesta',
+        help_text='Cuándo el cliente respondió'
+    )
+    motivo_rechazo = models.TextField(
+        blank=True,
+        verbose_name='Motivo de Rechazo',
+        help_text='Si el cliente rechazó, por qué'
+    )
+    
+    # ========== NOTAS ==========
+    notas = models.TextField(
+        blank=True,
+        verbose_name='Notas',
+        help_text='Observaciones sobre este servicio'
+    )
+    
+    # ========== AUDITORÍA ==========
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de Creación'
+    )
+    fecha_actualizacion = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Última Actualización'
+    )
+    
+    class Meta:
+        verbose_name = 'Servicio Adicional'
+        verbose_name_plural = 'Servicios Adicionales'
+        ordering = ['solicitud', 'numero_linea']
+        unique_together = ['solicitud', 'numero_linea']
+    
+    def __str__(self):
+        """Representación en texto del servicio adicional."""
+        return f"#{self.numero_linea}: {self.get_tipo_servicio_display()} (${self.costo})"
+    
+    def save(self, *args, **kwargs):
+        """
+        Override de save() para auto-asignar número de línea.
+        
+        Los números de línea de servicios adicionales empiezan en 1000
+        para no chocar con las líneas de cotización (que empiezan en 1).
+        """
+        if not self.numero_linea or self.numero_linea == 0:
+            max_linea = LineaServicioAdicional.objects.filter(
+                solicitud=self.solicitud
+            ).aggregate(models.Max('numero_linea'))['numero_linea__max']
+            # Empezar en 1000 para diferenciar de líneas de cotización
+            self.numero_linea = (max_linea or 999) + 1
+        
+        # Asignar costo por defecto si es 0 o None
+        if not self.costo or self.costo == 0:
+            from decimal import Decimal
+            costo_default = PRECIOS_SERVICIOS_ADICIONALES.get(self.tipo_servicio, 0)
+            self.costo = Decimal(str(costo_default))
+        
+        super().save(*args, **kwargs)
+    
+    # ========== PROPIEDADES CALCULADAS ==========
+    
+    @property
+    def subtotal(self):
+        """
+        Calcula el subtotal de este servicio.
+        
+        Los servicios adicionales siempre tienen cantidad = 1,
+        por lo que el subtotal es igual al costo.
+        
+        Returns:
+            Decimal: El costo del servicio
+        """
+        return self.costo or 0
+    
+    @property
+    def es_paquete(self):
+        """Verifica si este servicio es un paquete (premium/oro/plata)."""
+        return self.tipo_servicio.startswith('paquete_')
+    
+    @property
+    def valor_paquete(self):
+        """
+        Si es un paquete, retorna el valor del paquete ('premium', 'oro', 'plata').
+        Si no es paquete, retorna None.
+        """
+        if self.es_paquete:
+            return self.tipo_servicio.replace('paquete_', '')
+        return None
+    
+    # ========== MÉTODOS DE WORKFLOW ==========
+    
+    def puede_aprobar(self):
+        """Verifica si el servicio puede ser aprobado."""
+        return self.estado_cliente == 'pendiente'
+    
+    def puede_rechazar(self):
+        """Verifica si el servicio puede ser rechazado."""
+        return self.estado_cliente == 'pendiente'
+    
+    def aprobar(self):
+        """
+        Marca el servicio como aprobado por el cliente.
+        
+        Efectos:
+        - Cambia estado_cliente a 'aprobada'
+        - Actualiza estado general de la solicitud (piezas + servicios)
+        
+        Returns:
+            bool: True si se aprobó exitosamente
+        """
+        if not self.puede_aprobar():
+            return False
+        
+        self.estado_cliente = 'aprobada'
+        self.fecha_respuesta = timezone.now()
+        self.save()
+        
+        # Actualizar estado general de la solicitud
+        self.solicitud.actualizar_estado_segun_lineas()
+        
+        return True
+    
+    def rechazar(self, motivo=''):
+        """
+        Marca el servicio como rechazado por el cliente.
+        
+        Efectos:
+        - Cambia estado_cliente a 'rechazada'
+        - Actualiza estado general de la solicitud (piezas + servicios)
+        
+        Args:
+            motivo: Razón del rechazo
+        
+        Returns:
+            bool: True si se rechazó exitosamente
+        """
+        if not self.puede_rechazar():
+            return False
+        
+        self.estado_cliente = 'rechazada'
+        self.fecha_respuesta = timezone.now()
+        if motivo:
+            self.motivo_rechazo = motivo
+        self.save()
+        
+        # Actualizar estado general de la solicitud
+        self.solicitud.actualizar_estado_segun_lineas()
+        
+        return True
+    
+    # ========== MÉTODOS DE VISUALIZACIÓN ==========
+    
+    def get_badge_estado(self):
+        """Retorna la clase CSS de Bootstrap para el badge de estado."""
+        estados_css = {
+            'pendiente': 'secondary',
+            'aprobada': 'success',
+            'rechazada': 'danger',
+            'compra_generada': 'primary',
+        }
+        return estados_css.get(self.estado_cliente, 'secondary')
+    
+    def get_estado_icon(self):
+        """Retorna el icono Bootstrap Icons para el estado."""
+        estados_icon = {
+            'pendiente': 'hourglass-split',
+            'aprobada': 'check-circle-fill',
+            'rechazada': 'x-circle-fill',
+            'compra_generada': 'wrench-adjustable',
+        }
+        return estados_icon.get(self.estado_cliente, 'question-circle')
+    
+    def get_icono_servicio(self):
+        """Retorna el icono Bootstrap Icons según el tipo de servicio."""
+        iconos = {
+            'paquete_premium': 'trophy-fill',
+            'paquete_oro': 'award-fill',
+            'paquete_plata': 'shield-fill-check',
+            'cambio_pieza': 'tools',
+            'limpieza': 'droplet-fill',
+            'kit_limpieza': 'box-seam-fill',
+            'reinstalacion_so': 'windows',
+            'respaldo': 'cloud-arrow-up-fill',
+        }
+        return iconos.get(self.tipo_servicio, 'gear-fill')

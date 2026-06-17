@@ -35,6 +35,7 @@ from .models import (
     LineaCotizacion,
     ImagenLineaCotizacion,
     ImagenSolicitudCotizacion,
+    LineaServicioAdicional,
 )
 
 from config.constants import (
@@ -1512,3 +1513,74 @@ class ImagenSolicitudCotizacionAdmin(admin.ModelAdmin):
         if obj.tamano_final_kb:
             return f'{obj.tamano_final_kb} KB'
         return '-'
+
+
+# ============================================================================
+# ADMIN: LÍNEA DE SERVICIO ADICIONAL (Venta Mostrador en Cotizaciones)
+# ============================================================================
+@admin.register(LineaServicioAdicional)
+class LineaServicioAdicionalAdmin(admin.ModelAdmin):
+    """
+    Configuración del admin para Servicios Adicionales en cotizaciones.
+    
+    Permite gestionar los servicios de Venta Mostrador que se agregan
+    a las solicitudes de cotización.
+    """
+    
+    list_display = (
+        'numero_linea',
+        'solicitud_display',
+        'tipo_servicio',
+        'costo',
+        'estado_cliente',
+        'fecha_creacion',
+    )
+    
+    list_filter = (
+        'tipo_servicio',
+        'estado_cliente',
+        'fecha_creacion',
+    )
+    
+    search_fields = (
+        'solicitud__numero_solicitud',
+        'notas',
+    )
+    
+    readonly_fields = (
+        'numero_linea',
+        'fecha_creacion',
+        'fecha_actualizacion',
+        'fecha_respuesta',
+    )
+    
+    fieldsets = (
+        ('Información del Servicio', {
+            'fields': (
+                'solicitud',
+                'numero_linea',
+                'tipo_servicio',
+                'costo',
+                'notas',
+            )
+        }),
+        ('Estado del Cliente', {
+            'fields': (
+                'estado_cliente',
+                'fecha_respuesta',
+                'motivo_rechazo',
+            )
+        }),
+        ('Auditoría', {
+            'fields': (
+                'fecha_creacion',
+                'fecha_actualizacion',
+            ),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    @admin.display(description='Solicitud')
+    def solicitud_display(self, obj):
+        """Muestra el número de solicitud"""
+        return obj.solicitud.numero_solicitud

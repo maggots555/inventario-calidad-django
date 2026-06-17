@@ -614,6 +614,44 @@ ESTADO_LINEA_COTIZACION_CHOICES = [
 ESTADOS_SOLICITUD_ACTIVOS = ['borrador', 'enviada_front', 'enviada_cliente', 'parcialmente_aprobada', 'totalmente_aprobada', 'en_proceso']
 ESTADOS_SOLICITUD_FINALIZADOS = ['completada', 'totalmente_rechazada', 'cancelada']
 
+# TIPOS DE SERVICIO ADICIONAL (para LíneaServicioAdicional en cotizaciones)
+# Mapea directamente a los campos de VentaMostrador en servicio_tecnico
+TIPO_SERVICIO_ADICIONAL_CHOICES = [
+    ('paquete_premium', 'Solución Premium'),
+    ('paquete_oro', 'Solución Oro'),
+    ('paquete_plata', 'Solución Plata'),
+    ('cambio_pieza', 'Cambio de Pieza (sin diagnóstico)'),
+    ('limpieza', 'Limpieza y Mantenimiento'),
+    ('kit_limpieza', 'Kit de Limpieza Profesional'),
+    ('reinstalacion_so', 'Reinstalación de Sistema Operativo'),
+    ('respaldo', 'Respaldo de Información'),
+]
+
+# Precios sugeridos para servicios adicionales (IVA incluido)
+# Estos son valores por defecto, el usuario puede modificarlos en cada línea
+PRECIOS_SERVICIOS_ADICIONALES = {
+    'paquete_premium': 00.00, # Producto descontinuado, se mantiene precio en 0 para evitar confusión
+    'paquete_oro': 00.00,     # Producto descontinuado, se mantiene precio en 0 para evitar confusión
+    'paquete_plata': 4295.00,
+    'cambio_pieza': 589.00,
+    'limpieza': 1050.00,
+    'kit_limpieza': 589.00,
+    'reinstalacion_so': 589.00,
+    'respaldo': 400.00,
+}
+
+# Mapeo de tipo_servicio_adicional → campo booleano en VentaMostrador
+# Usado para crear/actualizar VentaMostrador al aprobar servicios adicionales
+MAPEO_SERVICIO_A_VENTA_MOSTRADOR = {
+    'paquete_premium': {'campo_paquete': 'premium', 'campo_costo': 'costo_paquete'},
+    'paquete_oro': {'campo_paquete': 'oro', 'campo_costo': 'costo_paquete'},
+    'paquete_plata': {'campo_paquete': 'plata', 'campo_costo': 'costo_paquete'},
+    'cambio_pieza': {'campo_incluye': 'incluye_cambio_pieza', 'campo_costo': 'costo_cambio_pieza'},
+    'limpieza': {'campo_incluye': 'incluye_limpieza', 'campo_costo': 'costo_limpieza'},
+    'kit_limpieza': {'campo_incluye': 'incluye_kit_limpieza', 'campo_costo': 'costo_kit'},
+    'reinstalacion_so': {'campo_incluye': 'incluye_reinstalacion_so', 'campo_costo': 'costo_reinstalacion'},
+    'respaldo': {'campo_incluye': 'incluye_respaldo', 'campo_costo': 'costo_respaldo'},
+}
 
 # ============================================================================
 # FUNCIONES DE UTILIDAD - MÓDULO ALMACÉN

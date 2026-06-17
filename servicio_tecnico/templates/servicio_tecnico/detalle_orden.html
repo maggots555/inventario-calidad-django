@@ -1137,6 +1137,23 @@
                                         <i class="bi bi-plus-circle"></i> Agregar Pieza
                                     </button>
                                 </div>
+                                <!-- Alerta: Piezas sincronizadas desde Almacén -->
+                                {% if orden.solicitudes_cotizacion.exists %}
+                                    <div class="alert alert-info mb-0 mx-3 mt-3" style="border-left: 4px solid #0dcaf0;">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-box-seam-fill me-2" style="font-size: 1.5rem;"></i>
+                                            <div>
+                                                <strong>Piezas de Almacén:</strong> Esta orden tiene una 
+                                                <a href="{% url 'almacen:detalle_solicitud_cotizacion' orden.solicitudes_cotizacion.first.pk %}" class="alert-link">
+                                                    solicitud de cotización
+                                                </a> 
+                                                en el módulo de Almacén. Las piezas marcadas con 
+                                                <span class="badge bg-info"><i class="bi bi-box-seam"></i> Almacén</span> 
+                                                se gestionan desde ahí. Para aprobar/rechazar, usa el módulo de Almacén.
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
                                 <!-- Mensaje de Ayuda (solo visible si cotización pendiente) -->
                                 {% if cotizacion.usuario_acepto is None %}
                                     <div class="alert alert-info mb-0 mx-3 mt-3" style="border-left: 4px solid #0dcaf0;">
@@ -1233,19 +1250,30 @@
                                                             {% endif %}
                                                         </td>
                                                         <td class="text-center">
-                                                            <button type="button" class="btn btn-sm btn-outline-primary me-1" 
-                                                                    onclick="editarPieza({{ pieza.id }})" title="Editar">
-                                                                📝
-                                                            </button>
-                                                            {% if cotizacion.usuario_acepto %}
-                                                                <span class="text-muted" title="No se puede eliminar (cotización aceptada)">
+                                                            {% if pieza.linea_cotizacion_almacen %}
+                                                                <!-- Pieza sincronizada desde Almacén -->
+                                                                <span class="badge bg-info" title="Pieza sincronizada desde cotización de Almacén">
+                                                                    <i class="bi bi-box-seam"></i> Almacén
+                                                                </span>
+                                                                <span class="text-muted" title="Editar en módulo de Almacén">
                                                                     🔒
                                                                 </span>
                                                             {% else %}
-                                                                <button type="button" class="btn btn-sm btn-outline-danger" 
-                                                                        onclick="eliminarPieza({{ pieza.id }})" title="Eliminar">
-                                                                    🗑️
+                                                                <!-- Pieza creada manualmente en ST -->
+                                                                <button type="button" class="btn btn-sm btn-outline-primary me-1" 
+                                                                        onclick="editarPieza({{ pieza.id }})" title="Editar">
+                                                                    📝
                                                                 </button>
+                                                                {% if cotizacion.usuario_acepto %}
+                                                                    <span class="text-muted" title="No se puede eliminar (cotización aceptada)">
+                                                                        🔒
+                                                                    </span>
+                                                                {% else %}
+                                                                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                                            onclick="eliminarPieza({{ pieza.id }})" title="Eliminar">
+                                                                        🗑️
+                                                                    </button>
+                                                                {% endif %}
                                                             {% endif %}
                                                         </td>
                                                     </tr>

@@ -354,6 +354,143 @@ Muestra toda la información y acciones según el estado
                 </div>
             </div>
 
+            <!-- Servicios Adicionales (Venta Mostrador) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-wrench-adjustable me-2"></i>Servicios Adicionales
+                        <span class="badge bg-light text-dark ms-2">{{ solicitud.total_servicios_adicionales }}</span>
+                    </h5>
+                    
+                    <!-- Acciones masivas para servicios -->
+                    {% if solicitud.estado in 'enviada_cliente,parcialmente_aprobada' and solicitud.servicios_pendientes > 0 %}
+                    <div>
+                        <form method="post" action="{% url 'almacen:aprobar_todos_servicios' solicitud.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-light" 
+                                    onclick="return confirm('¿Aprobar todos los servicios adicionales pendientes?')">
+                                <i class="bi bi-check-all me-1"></i>Aprobar Todos
+                            </button>
+                        </form>
+                        <button type="button" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#rechazarTodosServiciosModal">
+                            <i class="bi bi-x-lg me-1"></i>Rechazar Todos
+                        </button>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Botón para agregar servicio (solo en estados editables) -->
+                    {% if solicitud.estado in 'borrador,enviada_front,enviada_cliente' %}
+                    <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#agregarServicioModal">
+                        <i class="bi bi-plus-lg me-1"></i>Agregar Servicio
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="5%">#</th>
+                                    <th width="35%">Servicio</th>
+                                    <th width="15%" class="text-end">Costo</th>
+                                    <th width="15%">Estado</th>
+                                    <th width="15%" class="text-end">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for servicio in solicitud.servicios_adicionales.all %}
+                                <tr class="{% if servicio.estado_cliente == 'rechazada' %}table-danger{% elif servicio.estado_cliente == 'aprobada' %}table-success{% elif servicio.estado_cliente == 'compra_generada' %}table-primary{% endif %}">
+                                    <td>{{ servicio.numero_linea }}</td>
+                                    <td>
+                                        <i class="bi bi-{{ servicio.get_icono_servicio }} me-2 text-success"></i>
+                                        <strong>{{ servicio.get_tipo_servicio_display }}</strong>
+                                        {% if servicio.notas %}
+                                        <br>
+                                        <small class="text-info"><i class="bi bi-chat-text me-1"></i>{{ servicio.notas }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end fw-bold">
+                                        ${{ servicio.costo|floatformat:2 }}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ servicio.get_badge_estado }}">
+                                            <i class="bi bi-{{ servicio.get_estado_icon }} me-1"></i>
+                                            {{ servicio.get_estado_cliente_display }}
+                                        </span>
+                                        {% if servicio.motivo_rechazo %}
+                                        <br>
+                                        <small class="text-danger" title="{{ servicio.motivo_rechazo }}">
+                                            <i class="bi bi-info-circle"></i> Ver motivo
+                                        </small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if servicio.estado_cliente == 'pendiente' and solicitud.estado in 'enviada_cliente,parcialmente_aprobada' %}
+                                        <div class="btn-group btn-group-sm">
+                                            <form method="post" action="{% url 'almacen:responder_servicio_adicional' solicitud.pk servicio.pk %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="decision" value="aprobar">
+                                                <button type="submit" class="btn btn-outline-success" title="Aprobar">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            </form>
+                                            <button type="button" class="btn btn-outline-danger" 
+                                                    title="Rechazar"
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#rechazarServicioModal"
+                                                    data-servicio-pk="{{ servicio.pk }}"
+                                                    data-servicio-nombre="{{ servicio.get_tipo_servicio_display }}">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                        {% elif servicio.estado_cliente == 'pendiente' and solicitud.estado in 'borrador,enviada_front' %}
+                                        <form method="post" action="{% url 'almacen:eliminar_servicio_adicional' solicitud.pk servicio.pk %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                    title="Eliminar"
+                                                    onclick="return confirm('¿Eliminar este servicio?')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        No hay servicios adicionales en esta solicitud
+                                        {% if solicitud.estado in 'borrador,enviada_front,enviada_cliente' %}
+                                        <br>
+                                        <small>Haz clic en "Agregar Servicio" para añadir servicios de Venta Mostrador</small>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            {% if solicitud.total_servicios_adicionales > 0 %}
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="2" class="text-end"><strong>Total Servicios:</strong></td>
+                                    <td class="text-end"><strong class="fs-5">${{ solicitud.costo_servicios_adicionales|floatformat:2 }}</strong></td>
+                                    <td colspan="2"></td>
+                                </tr>
+                                {% if solicitud.costo_servicios_aprobados > 0 %}
+                                <tr>
+                                    <td colspan="2" class="text-end text-success"><strong>Servicios Aprobados:</strong></td>
+                                    <td class="text-end text-success"><strong class="fs-5">${{ solicitud.costo_servicios_aprobados|floatformat:2 }}</strong></td>
+                                    <td colspan="2"></td>
+                                </tr>
+                                {% endif %}
+                            </tfoot>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- Observaciones -->
             {% if solicitud.observaciones or solicitud.observaciones_cliente %}
             <div class="card shadow-sm mb-4">
@@ -488,6 +625,14 @@ Muestra toda la información y acciones según el estado
                             <i class="bi bi-cart-plus me-2"></i>Generar Compras
                         </button>
                     </form>
+                    {% endif %}
+                    
+                    <!-- Vincular Orden (solo sin_orden_activa) -->
+                    {% if solicitud.puede_vincular_orden %}
+                    <a href="{% url 'almacen:vincular_orden_solicitud' solicitud.pk %}" 
+                       class="btn btn-info w-100">
+                        <i class="bi bi-link-45deg me-2"></i>Vincular a Orden de Servicio
+                    </a>
                     {% endif %}
                     
                     <!-- Cancelar (si no está completada) -->
@@ -989,6 +1134,164 @@ Muestra toda la información y acciones según el estado
         </div>
     </div>
 </div>
+
+<!-- Modal: Agregar Servicio Adicional -->
+<div class="modal fade" id="agregarServicioModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'almacen:agregar_servicio_adicional' solicitud.pk %}">
+                {% csrf_token %}
+                
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-wrench-adjustable me-2"></i>Agregar Servicio Adicional
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Servicio <span class="text-danger">*</span></label>
+                        <select name="tipo_servicio" class="form-select" id="selectTipoServicio" required>
+                            <option value="">-- Seleccionar Servicio --</option>
+                            <option value="paquete_premium" data-precio="5500.00">Solución Premium - $5,500</option>
+                            <option value="paquete_oro" data-precio="3850.00">Solución Oro - $3,850</option>
+                            <option value="paquete_plata" data-precio="3870.00">Solución Plata - $3,870</option>
+                            <option value="cambio_pieza" data-precio="350.00">Cambio de Pieza (sin diagnóstico) - $350</option>
+                            <option value="limpieza" data-precio="450.00">Limpieza y Mantenimiento - $450</option>
+                            <option value="kit_limpieza" data-precio="180.00">Kit de Limpieza Profesional - $180</option>
+                            <option value="reinstalacion_so" data-precio="650.00">Reinstalación de Sistema Operativo - $650</option>
+                            <option value="respaldo" data-precio="400.00">Respaldo de Información - $400</option>
+                        </select>
+                        <small class="text-muted">Selecciona el servicio a cotizar. El precio se llena automáticamente.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Costo del Servicio <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" name="costo" class="form-control" id="inputCostoServicio"
+                                   min="0" step="0.01" placeholder="0.00" required>
+                        </div>
+                        <small class="text-muted">Puedes ajustar el precio si es necesario.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Notas (opcional)</label>
+                        <textarea name="notas" class="form-control" rows="2" 
+                                  placeholder="Observaciones sobre el servicio..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-plus-lg me-1"></i>Agregar Servicio
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Rechazar servicio individual -->
+<div class="modal fade" id="rechazarServicioModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" id="rechazarServicioForm">
+                {% csrf_token %}
+                <input type="hidden" name="decision" value="rechazar">
+                
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-x-circle me-2"></i>Rechazar Servicio
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Estás seguro de rechazar el servicio: <strong id="servicioNombreModal"></strong>?</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Motivo del rechazo <span class="text-danger">*</span></label>
+                        <textarea name="motivo_rechazo" class="form-control" rows="3" 
+                                  placeholder="Indica por qué el cliente rechazó este servicio..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-x-lg me-1"></i>Confirmar Rechazo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Rechazar todos los servicios -->
+<div class="modal fade" id="rechazarTodosServiciosModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'almacen:rechazar_todos_servicios' solicitud.pk %}">
+                {% csrf_token %}
+                
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-x-circle me-2"></i>Rechazar Todos los Servicios
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Estás seguro de rechazar <strong>todos los servicios adicionales pendientes</strong>?</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Motivo del rechazo <span class="text-danger">*</span></label>
+                        <textarea name="motivo" class="form-control" rows="3" 
+                                  placeholder="Indica por qué el cliente rechazó los servicios..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-x-lg me-1"></i>Rechazar Todos
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Script para auto-llenar costo al seleccionar servicio -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectServicio = document.getElementById('selectTipoServicio');
+    const inputCosto = document.getElementById('inputCostoServicio');
+    
+    if (selectServicio && inputCosto) {
+        selectServicio.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const precio = selectedOption.getAttribute('data-precio');
+            if (precio) {
+                inputCosto.value = precio;
+            } else {
+                inputCosto.value = '';
+            }
+        });
+    }
+    
+    // Modal de rechazar servicio individual
+    const rechazarServicioModal = document.getElementById('rechazarServicioModal');
+    if (rechazarServicioModal) {
+        rechazarServicioModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const servicioPk = button.getAttribute('data-servicio-pk');
+            const servicioNombre = button.getAttribute('data-servicio-nombre');
+            
+            document.getElementById('servicioNombreModal').textContent = servicioNombre;
+            document.getElementById('rechazarServicioForm').action = 
+                "{% url 'almacen:responder_servicio_adicional' solicitud.pk 0 %}".replace('/0/', '/' + servicioPk + '/');
+        });
+    }
+});
+</script>
 
 <!-- Datos de imágenes para JavaScript -->
 <script type="application/json" id="imagenesData">
