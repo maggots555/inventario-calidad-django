@@ -72,12 +72,23 @@ Muestra toda la información y acciones según el estado
                             {% endif %}
                         </div>
                     </div>
-                    {% if solicitud.marca or solicitud.modelo %}
+                    <!-- ✅ NUEVO: RFC del Cliente (Junio 2026) -->
+                    {% if solicitud.rfc_cliente %}
+                    <div class="row mt-2">
+                        <div class="col-md-4">
+                            <strong>RFC:</strong><br>
+                            <code>{{ solicitud.rfc_cliente }}</code>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if solicitud.tipo_equipo or solicitud.marca or solicitud.modelo %}
                     <div class="row mt-3">
                         <div class="col-md-4">
                             <strong>Equipo:</strong><br>
-                            {{ solicitud.get_marca_display|default:"-" }}
+                            {% if solicitud.tipo_equipo %}{{ solicitud.get_tipo_equipo_display }}{% endif %}
+                            {% if solicitud.marca %} {{ solicitud.get_marca_display }}{% endif %}
                             {% if solicitud.modelo %} {{ solicitud.modelo }}{% endif %}
+                            {% if not solicitud.tipo_equipo and not solicitud.marca and not solicitud.modelo %}-{% endif %}
                         </div>
                     </div>
                     {% endif %}
@@ -104,6 +115,25 @@ Muestra toda la información y acciones según el estado
                             <strong>Email:</strong><br>
                             {{ info_orden.email_cliente|default:"-" }}
                         </div>
+                        <!-- ✅ NUEVO: Datos adicionales del cliente desde la orden (Junio 2026) -->
+                        {% if info_orden.nombre_cliente %}
+                        <div class="col-md-4">
+                            <strong>Cliente:</strong><br>
+                            {{ info_orden.nombre_cliente }}
+                        </div>
+                        {% endif %}
+                        {% if info_orden.rfc_cliente %}
+                        <div class="col-md-4">
+                            <strong>RFC:</strong><br>
+                            <code>{{ info_orden.rfc_cliente }}</code>
+                        </div>
+                        {% endif %}
+                        {% if info_orden.telefono_cliente %}
+                        <div class="col-md-4">
+                            <strong>Teléfono:</strong><br>
+                            <i class="bi bi-telephone me-1"></i>{{ info_orden.telefono_cliente }}
+                        </div>
+                        {% endif %}
                         {% endif %}
                     </div>
                     {% else %}

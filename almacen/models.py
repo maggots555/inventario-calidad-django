@@ -52,6 +52,7 @@ from config.constants import (
     ESTADO_LINEA_COTIZACION_CHOICES,
     # Constantes para datos del cliente en cotizaciones
     MARCAS_EQUIPOS_CHOICES,
+    TIPO_EQUIPO_CHOICES,
 )
 
 
@@ -2825,6 +2826,14 @@ class SolicitudCotizacion(models.Model):
         verbose_name='Teléfono del Cliente',
         help_text='Número de contacto del cliente'
     )
+    # ✅ NUEVO CAMPO: RFC del Cliente (Junio 2026)
+    # Campo opcional para datos fiscales del cliente cuando no hay orden activa
+    rfc_cliente = models.CharField(
+        max_length=13,
+        blank=True,
+        verbose_name='RFC del Cliente',
+        help_text='RFC del cliente (opcional, 13 caracteres persona física, 12 persona moral)'
+    )
     email_cliente = models.EmailField(
         blank=True,
         verbose_name='Correo del Cliente',
@@ -2836,6 +2845,15 @@ class SolicitudCotizacion(models.Model):
         choices=MARCAS_EQUIPOS_CHOICES,
         verbose_name='Marca del Equipo',
         help_text='Marca del equipo del cliente'
+    )
+    # ✅ NUEVO CAMPO: Tipo de Equipo (Junio 2026)
+    # Permite clasificar el equipo cuando no hay orden activa vinculada
+    tipo_equipo = models.CharField(
+        max_length=10,
+        blank=True,
+        choices=TIPO_EQUIPO_CHOICES,
+        verbose_name='Tipo de Equipo',
+        help_text='Tipo de equipo del cliente (PC, Laptop, AIO)'
     )
     modelo = models.CharField(
         max_length=100,

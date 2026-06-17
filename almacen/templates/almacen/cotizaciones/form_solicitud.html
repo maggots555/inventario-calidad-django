@@ -126,12 +126,37 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                                 {% endif %}
                             </div>
                             
+                            <!-- ✅ NUEVO: RFC del Cliente (Junio 2026) -->
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    {{ form.rfc_cliente.label }}
+                                    <span class="badge bg-secondary" style="font-size: 0.65em;">Opcional</span>
+                                </label>
+                                {{ form.rfc_cliente }}
+                                <div class="form-text">Genérico: XAXX010101000</div>
+                                {% if form.rfc_cliente.errors %}
+                                <div class="text-danger small">{{ form.rfc_cliente.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
                             <!-- Correo Electrónico -->
                             <div class="col-md-4">
                                 <label class="form-label">{{ form.email_cliente.label }}</label>
                                 {{ form.email_cliente }}
                                 {% if form.email_cliente.errors %}
                                 <div class="text-danger small">{{ form.email_cliente.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- ✅ NUEVO: Tipo de Equipo (Junio 2026) -->
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    {{ form.tipo_equipo.label }}
+                                    <span class="badge bg-secondary" style="font-size: 0.65em;">Opcional</span>
+                                </label>
+                                {{ form.tipo_equipo }}
+                                {% if form.tipo_equipo.errors %}
+                                <div class="text-danger small">{{ form.tipo_equipo.errors.0 }}</div>
                                 {% endif %}
                             </div>
                             

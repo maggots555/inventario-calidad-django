@@ -1663,7 +1663,9 @@ class SolicitudCotizacionForm(forms.ModelForm):
             'service_tag',
             'nombre_cliente',
             'telefono_cliente',
+            'rfc_cliente',  # ✅ NUEVO CAMPO (Junio 2026)
             'email_cliente',
+            'tipo_equipo',  # ✅ NUEVO CAMPO (Junio 2026)
             'marca',
             'modelo',
             'observaciones',
@@ -1695,10 +1697,24 @@ class SolicitudCotizacionForm(forms.ModelForm):
                 'placeholder': 'Ej: 33 1234 5678',
                 'id': 'telefono_cliente',
             }),
+            # ✅ NUEVO WIDGET: RFC del Cliente (Junio 2026)
+            'rfc_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: XAXX010101000',
+                'id': 'rfc_cliente',
+                'maxlength': '13',
+                'style': 'text-transform: uppercase;',
+                'autocomplete': 'off',
+            }),
             'email_cliente': forms.EmailInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'correo@ejemplo.com',
                 'id': 'email_cliente',
+            }),
+            # ✅ NUEVO WIDGET: Tipo de Equipo (Junio 2026)
+            'tipo_equipo': forms.Select(attrs={
+                'class': 'form-select',
+                'id': 'tipo_equipo',
             }),
             'marca': forms.Select(attrs={
                 'class': 'form-select',
@@ -1722,7 +1738,9 @@ class SolicitudCotizacionForm(forms.ModelForm):
             'service_tag': 'Service Tag',
             'nombre_cliente': 'Nombre del Cliente',
             'telefono_cliente': 'Teléfono',
+            'rfc_cliente': 'RFC del Cliente',  # ✅ NUEVO (Junio 2026)
             'email_cliente': 'Correo Electrónico',
+            'tipo_equipo': 'Tipo de Equipo',  # ✅ NUEVO (Junio 2026)
             'marca': 'Marca del Equipo',
             'modelo': 'Modelo del Equipo',
             'observaciones': 'Observaciones Internas',
@@ -1733,7 +1751,9 @@ class SolicitudCotizacionForm(forms.ModelForm):
             'service_tag': 'Número de serie o identificador del equipo - Se convertirá a mayúsculas',
             'nombre_cliente': 'Nombre completo del cliente que solicita la cotización',
             'telefono_cliente': 'Número de contacto del cliente',
+            'rfc_cliente': 'RFC del cliente — Genérico: XAXX010101000 (opcional, 13 caracteres)',  # ✅ NUEVO (Junio 2026)
             'email_cliente': 'Correo para enviar la cotización al cliente',
+            'tipo_equipo': 'Tipo de equipo del cliente (PC, Laptop, AIO)',  # ✅ NUEVO (Junio 2026)
             'marca': 'Marca del equipo del cliente',
             'modelo': 'Modelo del equipo (se autocompleta según la marca o escribe libre)',
             'observaciones': 'Estas notas son internas, no se muestran al cliente',
@@ -1743,6 +1763,18 @@ class SolicitudCotizacionForm(forms.ModelForm):
         """Normaliza el service tag a mayúsculas."""
         tag = self.cleaned_data.get('service_tag', '').strip()
         return tag.upper() if tag else ''
+    
+    def clean_rfc_cliente(self):
+        """
+        Normaliza el RFC a mayúsculas y sin espacios.
+        
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El RFC siempre se escribe en mayúsculas (ej: XAXX010101000).
+        Este método asegura que sin importar cómo lo escriba el usuario,
+        se guarde siempre en el formato correcto.
+        """
+        rfc = self.cleaned_data.get('rfc_cliente', '').strip()
+        return rfc.upper() if rfc else ''
     
     def clean(self):
         """

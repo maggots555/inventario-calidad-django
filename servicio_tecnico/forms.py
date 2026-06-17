@@ -1341,6 +1341,9 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'numero_serie',
             'orden_cliente',
             'email_cliente',  # ✅ NUEVO CAMPO (Noviembre 2025)
+            'nombre_cliente',  # ✅ NUEVO CAMPO (Junio 2026)
+            'rfc_cliente',  # ✅ NUEVO CAMPO (Junio 2026)
+            'telefono_cliente',  # ✅ NUEVO CAMPO (Junio 2026)
             'equipo_enciende',
             'es_mis',
             'tiene_cargador',
@@ -1382,6 +1385,24 @@ class EditarInformacionEquipoForm(forms.ModelForm):
                 'type': 'email',  # HTML5 email validation
                 'autocomplete': 'email',
             }),
+            # ✅ NUEVOS WIDGETS: Datos adicionales del cliente (Junio 2026)
+            'nombre_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nombre completo del cliente (opcional)',
+                'autocomplete': 'name',
+            }),
+            'rfc_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: XAXX010101000',
+                'maxlength': '13',
+                'style': 'text-transform: uppercase;',
+                'autocomplete': 'off',
+            }),
+            'telefono_cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ej: 33 1234 5678 (opcional)',
+                'autocomplete': 'tel',
+            }),
             'equipo_enciende': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
             }),
@@ -1410,6 +1431,9 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'numero_serie': 'Número de Serie',
             'orden_cliente': 'Orden del Cliente',
             'email_cliente': '📧 Email del Cliente',  # ✅ NUEVO
+            'nombre_cliente': 'Nombre Completo del Cliente',  # ✅ NUEVO (Junio 2026)
+            'rfc_cliente': 'RFC del Cliente',  # ✅ NUEVO (Junio 2026)
+            'telefono_cliente': 'Teléfono del Cliente',  # ✅ NUEVO (Junio 2026)
             'equipo_enciende': '¿El equipo enciende?',
             'es_mis': '¿Es MIS? (Mail-In Service)',
             'tiene_cargador': '¿Incluye cargador?',
@@ -1424,6 +1448,9 @@ class EditarInformacionEquipoForm(forms.ModelForm):
             'numero_serie': 'Número de serie o Service Tag del equipo',
             'orden_cliente': 'Número de orden del cliente',
             'email_cliente': 'Email para enviar fotos del ingreso y notificaciones (obligatorio)',  # ✅ NUEVO
+            'nombre_cliente': 'Nombre completo del cliente para facturación (opcional)',  # ✅ NUEVO (Junio 2026)
+            'rfc_cliente': 'RFC del cliente — Genérico: XAXX010101000 (opcional, 13 caracteres)',  # ✅ NUEVO (Junio 2026)
+            'telefono_cliente': 'Teléfono de contacto del cliente (opcional)',  # ✅ NUEVO (Junio 2026)
             'equipo_enciende': 'Marca si el equipo enciende al momento del ingreso',
             'es_mis': 'Marca si el equipo llegó por paquetería (Mail-In Service)',
             'tiene_cargador': 'Marca si el equipo incluye cargador',

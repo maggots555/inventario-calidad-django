@@ -285,6 +285,27 @@
                             </p>
                         </div>
                         
+                        <!-- ✅ NUEVO: Datos adicionales del cliente (Junio 2026) -->
+                        {% if detalle.nombre_cliente or detalle.rfc_cliente or detalle.telefono_cliente %}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small">
+                                <i class="bi bi-person-vcard-fill text-info"></i> Datos del Cliente
+                            </label>
+                            <p class="mb-0">
+                                {% if detalle.nombre_cliente %}
+                                    <i class="bi bi-person"></i> {{ detalle.nombre_cliente }}<br>
+                                {% endif %}
+                                {% if detalle.rfc_cliente %}
+                                    <i class="bi bi-card-checklist"></i> RFC: <code>{{ detalle.rfc_cliente }}</code><br>
+                                {% endif %}
+                                {% if detalle.telefono_cliente %}
+                                    <i class="bi bi-telephone"></i> 
+                                    <a href="tel:{{ detalle.telefono_cliente }}" class="text-decoration-none">{{ detalle.telefono_cliente }}</a>
+                                {% endif %}
+                            </p>
+                        </div>
+                        {% endif %}
+                        
                         <!-- Gama y Accesorios -->
                         <div class="col-md-6 mb-3">
                             <label class="form-label text-muted small">Gama del Equipo</label>
@@ -3028,6 +3049,65 @@
                                 <small class="text-muted d-block mt-1">
                                     <i class="bi bi-info-circle"></i>
                                     {{ form_editar_info.email_cliente.help_text|safe }}
+                                </small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- ✅ NUEVO: Datos adicionales del cliente (Junio 2026) -->
+                        <div class="col-12 mb-2">
+                            <hr class="my-2">
+                            <small class="text-muted">
+                                <i class="bi bi-person-vcard"></i> <strong>Datos adicionales del cliente</strong> (opcionales, para facturación)
+                            </small>
+                        </div>
+                        
+                        <!-- Nombre del Cliente -->
+                        <div class="col-md-12 mb-3">
+                            {{ form_editar_info.nombre_cliente.errors }}
+                            <label for="{{ form_editar_info.nombre_cliente.id_for_label }}" class="form-label">
+                                <i class="bi bi-person-fill text-info"></i>
+                                {{ form_editar_info.nombre_cliente.label }}
+                                <span class="badge bg-secondary ms-2">Opcional</span>
+                            </label>
+                            {{ form_editar_info.nombre_cliente }}
+                            {% if form_editar_info.nombre_cliente.help_text %}
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    {{ form_editar_info.nombre_cliente.help_text }}
+                                </small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- RFC del Cliente -->
+                        <div class="col-md-6 mb-3">
+                            {{ form_editar_info.rfc_cliente.errors }}
+                            <label for="{{ form_editar_info.rfc_cliente.id_for_label }}" class="form-label">
+                                <i class="bi bi-card-checklist text-warning"></i>
+                                {{ form_editar_info.rfc_cliente.label }}
+                                <span class="badge bg-secondary ms-2">Opcional</span>
+                            </label>
+                            {{ form_editar_info.rfc_cliente }}
+                            {% if form_editar_info.rfc_cliente.help_text %}
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    {{ form_editar_info.rfc_cliente.help_text }}
+                                </small>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Teléfono del Cliente -->
+                        <div class="col-md-6 mb-3">
+                            {{ form_editar_info.telefono_cliente.errors }}
+                            <label for="{{ form_editar_info.telefono_cliente.id_for_label }}" class="form-label">
+                                <i class="bi bi-telephone-fill text-success"></i>
+                                {{ form_editar_info.telefono_cliente.label }}
+                                <span class="badge bg-secondary ms-2">Opcional</span>
+                            </label>
+                            {{ form_editar_info.telefono_cliente }}
+                            {% if form_editar_info.telefono_cliente.help_text %}
+                                <small class="text-muted d-block mt-1">
+                                    <i class="bi bi-info-circle"></i>
+                                    {{ form_editar_info.telefono_cliente.help_text }}
                                 </small>
                             {% endif %}
                         </div>

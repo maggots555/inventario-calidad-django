@@ -851,6 +851,24 @@ class DetalleEquipo(models.Model):
         help_text="Email del cliente para envío de fotos y notificaciones"
     )
     
+    # ✅ NUEVOS CAMPOS: Datos adicionales del cliente (Junio 2026)
+    # Información opcional para facturación y contacto futuro
+    nombre_cliente = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Nombre completo del cliente (opcional, para facturación)"
+    )
+    rfc_cliente = models.CharField(
+        max_length=13,
+        blank=True,
+        help_text="RFC del cliente (opcional, 13 caracteres para persona física, 12 para moral)"
+    )
+    telefono_cliente = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="Teléfono de contacto del cliente (opcional)"
+    )
+    
     # GAMA DEL EQUIPO
     gama = models.CharField(
         max_length=10,
@@ -998,6 +1016,10 @@ class DetalleEquipo(models.Model):
         # Normalizar email (lowercase y sin espacios)
         if self.email_cliente:
             self.email_cliente = self.email_cliente.strip().lower()
+        
+        # Normalizar RFC (uppercase y sin espacios) — el RFC siempre va en mayúsculas
+        if self.rfc_cliente:
+            self.rfc_cliente = self.rfc_cliente.strip().upper()
         
         super().save(*args, **kwargs)
         
