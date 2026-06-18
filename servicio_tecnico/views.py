@@ -605,9 +605,11 @@ def crear_orden(request):
                         email_cli = orden.detalle_equipo.email_cliente
                         if email_cli:
                             from .tasks import enviar_seguimiento_cliente_task
+                            from config.paises_config import get_pais_actual
                             enviar_seguimiento_cliente_task.delay(
                                 orden_id=orden.id,
                                 usuario_id=request.user.id,
+                                db_alias=get_pais_actual()['db_alias'],
                             )
                     except Exception:
                         pass  # No bloquear la creación si falla el envío
@@ -681,9 +683,11 @@ def crear_orden_venta_mostrador(request):
                         email_cli = orden.detalle_equipo.email_cliente
                         if email_cli:
                             from .tasks import enviar_seguimiento_cliente_task
+                            from config.paises_config import get_pais_actual
                             enviar_seguimiento_cliente_task.delay(
                                 orden_id=orden.id,
                                 usuario_id=request.user.id,
+                                db_alias=get_pais_actual()['db_alias'],
                             )
                     except Exception:
                         pass  # No bloquear la creación si falla el envío
@@ -1463,6 +1467,7 @@ def cerrar_todas_finalizadas(request):
                 import secrets as _secrets_bulk
                 from .models import FeedbackCliente as _FBCBulk
                 from .tasks import enviar_feedback_satisfaccion_task
+                from config.paises_config import get_pais_actual
                 _uid_bulk    = request.user.pk if request.user.is_authenticated else None
                 _enviadas    = 0
                 _ordenes_bulk = OrdenServicio.objects.filter(
@@ -1500,6 +1505,7 @@ def cerrar_todas_finalizadas(request):
                             enviar_feedback_satisfaccion_task.delay(
                                 feedback_id=_fb_bulk.pk,
                                 usuario_id=_uid_bulk,
+                                db_alias=get_pais_actual()['db_alias'],
                             )
                             _enviadas += 1
 
@@ -1517,6 +1523,7 @@ def cerrar_todas_finalizadas(request):
                             enviar_feedback_satisfaccion_task.delay(
                                 feedback_id=_fb_bulk.pk,
                                 usuario_id=_uid_bulk,
+                                db_alias=get_pais_actual()['db_alias'],
                             )
                             _enviadas += 1
 
@@ -2235,6 +2242,7 @@ def detalle_orden(request, orden_id):
             # ── Despachar la tarea Celery ─────────────────────────────────────────
             try:
                 from .tasks import comprimir_video_evidencia_task
+                from config.paises_config import get_pais_actual
                 comprimir_video_evidencia_task.delay(
                     archivo_tmp_path=archivo_tmp_path,
                     nombre_original=video_file.name,
@@ -2245,6 +2253,7 @@ def detalle_orden(request, orden_id):
                     empleado_id=empleado_actual.pk,
                     usuario_id=request.user.pk,
                     orientacion_video=orientacion_video,
+                    db_alias=get_pais_actual()['db_alias'],
                 )
                 logger.info(
                     f"✅ Tarea Celery encolada para video de Orden {orden.numero_orden_interno} "
@@ -2351,9 +2360,11 @@ def detalle_orden(request, orden_id):
 
                             if debe_enviar:
                                 from .tasks import enviar_seguimiento_cliente_task
+                                from config.paises_config import get_pais_actual
                                 enviar_seguimiento_cliente_task.delay(
                                     orden_id=orden.id,
                                     usuario_id=request.user.id,
+                                    db_alias=get_pais_actual()['db_alias'],
                                 )
                                 messages.info(
                                     request,
@@ -3167,7 +3178,8 @@ def confirmar_envio_feedback(request, feedback_id):
             messages.warning(request, '⚠️ El correo de feedback ya fue enviado anteriormente.')
         else:
             usuario_id = request.user.pk if request.user.is_authenticated else None
-            enviar_feedback_rechazo_task.delay(feedback_id=feedback.pk, usuario_id=usuario_id)
+            from config.paises_config import get_pais_actual
+            enviar_feedback_rechazo_task.delay(feedback_id=feedback.pk, usuario_id=usuario_id, db_alias=get_pais_actual()['db_alias'])
             messages.success(
                 request,
                 f'📧 Correo de feedback enviado a {feedback.cotizacion.orden.detalle_equipo.email_cliente}. '
@@ -3197,7 +3209,8 @@ def confirmar_envio_vigencia_vencida(request, orden_id):
 
     if accion == 'enviar':
         usuario_id = request.user.pk if request.user.is_authenticated else None
-        enviar_vigencia_vencida_task.delay(orden_id=orden.pk, usuario_id=usuario_id)
+        from config.paises_config import get_pais_actual
+        enviar_vigencia_vencida_task.delay(orden_id=orden.pk, usuario_id=usuario_id, db_alias=get_pais_actual()['db_alias'])
         email_cl = orden.detalle_equipo.email_cliente if orden.detalle_equipo else '(sin email)'
         messages.success(
             request,
@@ -7032,11 +7045,13 @@ def enviar_correo_rhitso(request, orden_id):
         # - NUNCA pasar objetos Django directamente (no son serializables a JSON)
         usuario_id = request.user.pk if request.user.is_authenticated else None
 
+        from config.paises_config import get_pais_actual
         tarea = enviar_correo_rhitso_task.delay(
             orden_id=orden_id,
             destinatarios_principales=destinatarios_principales,
             copia_empleados=copia_empleados,
             usuario_id=usuario_id,
+            db_alias=get_pais_actual()['db_alias'],
         )
 
         return JsonResponse({
@@ -7234,6 +7249,7 @@ def enviar_imagenes_cliente(request, orden_id):
         # Convertir IDs a lista de strings (JSON serializable)
         imagenes_ids_str = [str(i) for i in imagenes_ids]
         
+        from config.paises_config import get_pais_actual
         tarea = enviar_imagenes_cliente_task.delay(
             orden_id=orden_id,
             imagenes_ids=imagenes_ids_str,
@@ -7241,6 +7257,7 @@ def enviar_imagenes_cliente(request, orden_id):
             mensaje_personalizado=mensaje_personalizado,
             usuario_id=usuario_id,
             modelo_ia_inspeccion=modelo_ia_inspeccion,
+            db_alias=get_pais_actual()['db_alias'],
         )
 
         # Registrar de inmediato que el envío fue iniciado, para que el botón
@@ -7256,9 +7273,11 @@ def enviar_imagenes_cliente(request, orden_id):
         # ── Disparar envío de enlace de seguimiento (solo fuera de garantía) ──
         if orden.es_fuera_garantia:
             from .tasks import enviar_seguimiento_cliente_task
+            from config.paises_config import get_pais_actual
             enviar_seguimiento_cliente_task.delay(
                 orden_id=orden_id,
                 usuario_id=usuario_id,
+                db_alias=get_pais_actual()['db_alias'],
             )
         
         return JsonResponse({
@@ -7378,10 +7397,12 @@ def enviar_imagenes_egreso_cliente(request, orden_id):
         # ===================================================================
         usuario_id = request.user.pk if request.user.is_authenticated else None
 
+        from config.paises_config import get_pais_actual
         tarea = enviar_imagenes_egreso_cliente_task.delay(
             orden_id=orden_id,
             destinatarios_copia=destinatarios_copia,
             usuario_id=usuario_id,
+            db_alias=get_pais_actual()['db_alias'],
         )
 
         # Registrar de inmediato que el envío fue iniciado, para que el botón
@@ -7556,12 +7577,14 @@ def enviar_rewind_egreso_cliente(request, orden_id):
         # ===================================================================
         from celery import chain as celery_chain
         from .tasks import generar_video_resumen_task, enviar_rewind_egreso_email_task
+        from config.paises_config import get_pais_actual
 
         usuario_id = request.user.pk if request.user.is_authenticated else None
+        _db_alias_rewind = get_pais_actual()['db_alias']
 
         cadena = celery_chain(
-            generar_video_resumen_task.s(orden_id, usuario_id),
-            enviar_rewind_egreso_email_task.s(orden_id, usuario_id, destinatarios_copia),
+            generar_video_resumen_task.s(orden_id, usuario_id, _db_alias_rewind),
+            enviar_rewind_egreso_email_task.s(orden_id, usuario_id, destinatarios_copia, _db_alias_rewind),
         )
         tarea_raiz = cadena.delay()
 
@@ -7658,6 +7681,7 @@ def enviar_evidencia_video(request, orden_id):
 
         video_ids_str = [str(i) for i in video_ids]
 
+        from config.paises_config import get_pais_actual
         tarea = enviar_evidencia_video_task.delay(
             orden_id=orden_id,
             video_ids=video_ids_str,
@@ -7665,6 +7689,7 @@ def enviar_evidencia_video(request, orden_id):
             modelo_ia_analisis=modelo_ia_analisis,
             usuario_id=usuario_id,
             mensaje_personalizado=mensaje_personalizado,
+            db_alias=get_pais_actual()['db_alias'],
         )
 
         HistorialOrden.objects.create(
@@ -7877,6 +7902,7 @@ def enviar_diagnostico_cliente(request, orden_id):
         # =======================================================================
         usuario_id = request.user.pk if request.user.is_authenticated else None
         
+        from config.paises_config import get_pais_actual
         tarea = enviar_diagnostico_cliente_task.delay(
             orden_id=orden_id,
             folio=folio,
@@ -7887,6 +7913,7 @@ def enviar_diagnostico_cliente(request, orden_id):
             email_empleado=email_empleado,
             nombre_empleado=nombre_empleado,
             usuario_id=usuario_id,
+            db_alias=get_pais_actual()['db_alias'],
         )
         
         return JsonResponse({
@@ -15204,7 +15231,12 @@ def confirmar_feedback_satisfaccion(request, feedback_id):
             messages.warning(request, '⚠️ La encuesta de satisfacción ya fue enviada anteriormente.')
         else:
             usuario_id = request.user.pk if request.user.is_authenticated else None
-            enviar_feedback_satisfaccion_task.delay(feedback_id=feedback.pk, usuario_id=usuario_id)
+            from config.paises_config import get_pais_actual
+            enviar_feedback_satisfaccion_task.delay(
+                feedback_id=feedback.pk,
+                usuario_id=usuario_id,
+                db_alias=get_pais_actual()['db_alias'],
+            )
             messages.success(
                 request,
                 f'⭐ Encuesta de satisfacción enviada a '
@@ -18647,9 +18679,11 @@ def generar_video_resumen(request, orden_id):
         }, status=400)
 
     # Encolar la tarea Celery (responde inmediatamente al usuario)
+    from config.paises_config import get_pais_actual
     tarea = generar_video_resumen_task.delay(
         orden_id=orden.pk,
         usuario_id=request.user.pk,
+        db_alias=get_pais_actual()['db_alias'],
     )
 
     logger.info(
@@ -18770,9 +18804,11 @@ def comprimir_video_resumen(request, video_id):
         }, status=400)
 
     # Encolar la tarea Celery
+    from config.paises_config import get_pais_actual
     tarea = comprimir_video_resumen_descarga_task.delay(
         video_id=video_original.pk,
         usuario_id=request.user.pk,
+        db_alias=get_pais_actual()['db_alias'],
     )
 
     logger.info(

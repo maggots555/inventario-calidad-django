@@ -824,6 +824,7 @@ Consider adding:
 13. **Don't hardcode colors without dark mode override** - Use CSS variables (`var(--nombre)`) or add `[data-bs-theme="dark"] .clase {}` override. New CSS files MUST have a dark mode section. See Section 5 → Dark Mode.
 14. **Don't touch the anti-flash script in base.html** - The inline `<script>` in `<head>` that sets `data-bs-theme` before render prevents white flash — never modify or remove it.
 15. **Don't use gradients** — No `linear-gradient`, `radial-gradient` ni efectos de glassmorphism genéricos. El diseño del proyecto es limpio y directo. Los gradientes se ven como "IA Slop" y están prohibidos salvo que el usuario los pida explícitamente.
+16. **Don't call `.delay()` without `db_alias`** — Toda tarea Celery que acceda a la base de datos DEBE recibir `db_alias=get_pais_actual()['db_alias']`. Sin este parámetro, el worker siempre usa la BD `default` (México), rompiendo el multi-tenant para Chile, Argentina y Colombia. Ver Sección 12 → Celery Multi-Tenant.
 
 ---
 
@@ -843,7 +844,83 @@ Consider adding:
 
 ---
 
-**Last Updated**: Mayo 2026  
+## 12. CELERY MULTI-TENANT — REGLAS CRÍTICAS
+
+El proyecto usa una arquitectura **Database-per-Tenant** manual (un subdominio → una BD independiente).
+Las tareas Celery se ejecutan en un worker separado, **fuera del contexto HTTP**, por lo que el middleware
+`PaisMiddleware` no corre automáticamente. Sin intervención explícita, **todas las tareas usan la BD `default` (México)**.
+
+### Cómo funciona el mecanismo
+
+| Componente | Archivo | Rol |
+|---|---|---|
+| Señal `task_prerun` | `config/celery.py` | Lee `db_alias` de los kwargs de la tarea y configura thread-locals antes de ejecutarla |
+| DB Router | `config/db_router.py` | Lee los thread-locals para enrutar automáticamente todas las queries al tenant correcto |
+| `get_pais_actual()` | `config/paises_config.py` | En vistas HTTP, lee el subdominio. En tasks, funciona porque la señal ya configuró los thread-locals |
+
+### Regla obligatoria al crear o modificar tareas Celery
+
+**Toda tarea que acceda a la BD debe:**
+
+1. **Aceptar `db_alias='default'` en su firma:**
+```python
+@shared_task(bind=True, ...)
+def mi_nueva_tarea(self, param1, param2, usuario_id=None, db_alias='default'):
+    """
+    ...
+    Parámetros:
+        db_alias : Alias de BD del país activo. La señal task_prerun lo usa
+                   para configurar el contexto de país en el worker.
+    """
+    # Las queries ORM se enrutan automáticamente — NO necesitas .using(db_alias)
+    objeto = MiModelo.objects.get(pk=param1)
+```
+
+2. **Recibir el valor correcto al encolar desde una vista:**
+```python
+# ✅ CORRECTO
+from config.paises_config import get_pais_actual
+mi_nueva_tarea.delay(
+    param1=valor,
+    param2=valor,
+    usuario_id=request.user.pk,
+    db_alias=get_pais_actual()['db_alias'],
+)
+
+# ❌ INCORRECTO — el worker usará siempre la BD de México
+mi_nueva_tarea.delay(param1=valor, param2=valor)
+```
+
+3. **En Celery chains, pasar `db_alias` dentro de `.s()`:**
+```python
+from config.paises_config import get_pais_actual
+_db = get_pais_actual()['db_alias']
+
+cadena = celery_chain(
+    tarea_a.s(orden_id, usuario_id, _db),
+    tarea_b.s(orden_id, usuario_id, _db),
+)
+cadena.delay()
+# NOTA: cadena.delay() no lleva db_alias — ya va en cada .s()
+```
+
+### Países activos y sus db_alias
+
+| País | Subdominio | `db_alias` |
+|---|---|---|
+| México | `app.sigmasystem.work` | `default` |
+| Argentina | `argentina.sigmasystem.work` | `argentina` |
+| Chile | `chile.sigmasystem.work` | `chile` |
+| Colombia | `colombia.sigmasystem.work` | `colombia` |
+
+### Tareas Celery existentes (referencia)
+
+Todas las tareas en `servicio_tecnico/tasks.py` y `almacen/tasks.py` ya tienen `db_alias` en su firma.
+Al agregar una tarea nueva, seguir el mismo patrón.
+
+---
+
+**Last Updated**: Junio 2026  
 **Django Version**: 5.2.5  
 **Python Version**: 3.12+  
 **TypeScript Version**: 5.9.3

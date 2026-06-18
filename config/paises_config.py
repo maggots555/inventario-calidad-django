@@ -122,6 +122,94 @@ PAISES_CONFIG = {
         # --- Media ---
         'media_subdir': 'argentina',
     },
+
+    'chile': {
+        # --- Identificación ---
+        'codigo': 'CL',                    # Código ISO 3166-1 alpha-2
+        'codigo_telefonico': '56',         # Código telefónico internacional (para WhatsApp)
+        'nombre': 'Chile',
+        'nombre_completo': 'Chile',
+
+        # --- Base de datos ---
+        'db_alias': 'chile',               # Alias en DATABASES de settings.py
+
+        # --- Zona horaria ---
+        'timezone': 'America/Santiago',
+        'language_code': 'es-cl',
+
+        # --- Moneda ---
+        'moneda_codigo': 'CLP',            # Código ISO 4217
+        'moneda_simbolo': '$',             # Símbolo para mostrar
+        'moneda_nombre': 'Peso Chileno',
+        'moneda_locale': 'es_CL',          # Para formateo con locale
+
+        # --- Empresa ---
+        'empresa_nombre': config('EMPRESA_NOMBRE_CL', default='SIC Chile'),
+        'empresa_nombre_corto': 'SIC Chile',
+        'empresa_direccion': config('EMPRESA_DIRECCION_CL', default='Av. Ricardo Lyon 100, local 59, Providencia, Región Metropolitana, Chile'),
+        'empresa_telefono': config('EMPRESA_TELEFONO_CL', default='+56 9 5042 9335'),
+        'empresa_email': config('EMPRESA_EMAIL_CL', default='jpizarro@cl.sic-la.com'),
+
+        # --- Contacto de seguimiento (para PDFs y emails) ---
+        'agente_nombre': 'Jorge Antonio Pizarro Rodriguez',
+        'agente_celular': '+56 9 5042 9335',
+        'agente_email': 'jpizarro@cl.sic-la.com',
+
+        # --- RHITSO (laboratorio externo) ---
+        'rhitso_habilitado': False,        # Chile no usa RHITSO inicialmente
+        'rhitso_email_recipients': [],
+
+        # --- URLs ---
+        'dominio': 'chile.sigmasystem.work',
+        'url_base': 'https://chile.sigmasystem.work',
+
+        # --- Media ---
+        'media_subdir': 'chile',           # Subcarpeta dentro de MEDIA_ROOT
+    },
+
+    'colombia': {
+        # --- Identificación ---
+        'codigo': 'CO',                    # Código ISO 3166-1 alpha-2
+        'codigo_telefonico': '57',         # Código telefónico internacional (para WhatsApp)
+        'nombre': 'Colombia',
+        'nombre_completo': 'Colombia',
+
+        # --- Base de datos ---
+        'db_alias': 'colombia',            # Alias en DATABASES de settings.py
+
+        # --- Zona horaria ---
+        'timezone': 'America/Bogota',
+        'language_code': 'es-co',
+
+        # --- Moneda ---
+        'moneda_codigo': 'COP',            # Código ISO 4217
+        'moneda_simbolo': '$',             # Símbolo para mostrar
+        'moneda_nombre': 'Peso Colombiano',
+        'moneda_locale': 'es_CO',          # Para formateo con locale
+
+        # --- Empresa ---
+        'empresa_nombre': config('EMPRESA_NOMBRE_CO', default='SIC Colombia'),
+        'empresa_nombre_corto': 'SIC Colombia',
+        'empresa_direccion': config('EMPRESA_DIRECCION_CO', default='Cra. 16A N80-79, Bogotá, Colombia'),
+        'empresa_telefono': config('EMPRESA_TELEFONO_CO', default='57 3175172058'),
+        'empresa_email': config('EMPRESA_EMAIL_CO', default='lcmartinez@co.sic-la.com'),
+
+        # --- Contacto de seguimiento (para PDFs y emails) ---
+        'agente_nombre': 'Luis Carlos Martinez',
+        'agente_celular': '57 3175172058',
+        'agente_email': 'lcmartinez@co.sic-la.com',
+
+        # --- RHITSO (laboratorio externo) ---
+        'rhitso_habilitado': False,        # Colombia no usa RHITSO inicialmente
+        'rhitso_email_recipients': [],
+
+        # --- URLs ---
+        'dominio': 'colombia.sigmasystem.work',
+        'url_base': 'https://colombia.sigmasystem.work',
+
+        # --- Media ---
+        'media_subdir': 'colombia',        # Subcarpeta dentro de MEDIA_ROOT
+    },
 }
 
 

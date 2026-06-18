@@ -231,6 +231,26 @@ if not _is_sqlite:
             'CONN_MAX_AGE': 600,
             'OPTIONS': {'connect_timeout': 10},
         },
+        'chile': {
+            'ENGINE': DB_ENGINE,
+            'NAME': config('DB_NAME_CL', default='inventario_chile'),
+            'USER': config('DB_USER', default='django_user'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {'connect_timeout': 10},
+        },
+        'colombia': {
+            'ENGINE': DB_ENGINE,
+            'NAME': config('DB_NAME_CO', default='inventario_colombia'),
+            'USER': config('DB_USER', default='django_user'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {'connect_timeout': 10},
+        },
     }
 
 # --- Configuración para desarrollo (SQLite) ---
@@ -247,6 +267,14 @@ else:
         'argentina': {
             'ENGINE': DB_ENGINE,
             'NAME': BASE_DIR / config('DB_NAME_AR', default='db_argentina.sqlite3'),
+        },
+        'chile': {
+            'ENGINE': DB_ENGINE,
+            'NAME': BASE_DIR / config('DB_NAME_CL', default='db_chile.sqlite3'),
+        },
+        'colombia': {
+            'ENGINE': DB_ENGINE,
+            'NAME': BASE_DIR / config('DB_NAME_CO', default='db_colombia.sqlite3'),
         },
     }
 

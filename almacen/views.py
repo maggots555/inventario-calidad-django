@@ -3167,9 +3167,11 @@ def crear_solicitud_cotizacion(request):
                                 )
 
                         # Enviar email en segundo plano vía Celery (no bloquea)
+                        from config.paises_config import get_pais_actual
                         notificar_compras_nueva_cotizacion_task.delay(
                             solicitud.pk,
                             request.user.pk,
+                            get_pais_actual()['db_alias'],
                         )
                         logger.info(
                             f"[COTIZACION] Notificaciones enviadas a {compradores.count()} "
@@ -3646,12 +3648,14 @@ def notificar_front(request, pk):
         
         # Disparar tarea Celery
         usuario_id = request.user.pk if request.user.is_authenticated else None
-        
+        from config.paises_config import get_pais_actual
+
         tarea = notificar_front_cotizacion_task.delay(
             solicitud_id=pk,
             destinatarios=destinatarios,
             mensaje_personalizado=mensaje_personalizado,
             usuario_id=usuario_id,
+            db_alias=get_pais_actual()['db_alias'],
         )
         
         return JsonResponse({

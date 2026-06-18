@@ -38,6 +38,7 @@ def notificar_front_cotizacion_task(
     destinatarios,
     mensaje_personalizado,
     usuario_id=None,
+    db_alias='default',
 ):
     """
     Tarea Celery: comprime imágenes y envía correo de cotización a los destinatarios seleccionados.
@@ -53,6 +54,9 @@ def notificar_front_cotizacion_task(
         destinatarios           : Lista de emails seleccionados por el usuario
         mensaje_personalizado   : Texto opcional del usuario
         usuario_id              : ID del usuario que disparó la acción
+        db_alias                : Alias de BD del país activo (ej: 'mexico', 'chile').
+                                  La señal task_prerun de Celery usa este valor para
+                                  configurar el contexto de país en el worker.
     """
     from pathlib import Path
     from django.core.mail import EmailMessage
@@ -299,6 +303,7 @@ def notificar_compras_nueva_cotizacion_task(
     self,
     solicitud_id,
     usuario_id=None,
+    db_alias='default',
 ):
     """
     Tarea Celery: envía email a los empleados de Compras cuando se crea
@@ -313,6 +318,9 @@ def notificar_compras_nueva_cotizacion_task(
     Parámetros:
         solicitud_id : ID de la SolicitudCotizacion recién creada
         usuario_id   : ID del usuario que creó la solicitud (para el contexto)
+        db_alias     : Alias de BD del país activo (ej: 'mexico', 'chile').
+                       La señal task_prerun de Celery usa este valor para
+                       configurar el contexto de país en el worker.
     """
     from django.core.mail import EmailMessage
     from django.template.loader import render_to_string

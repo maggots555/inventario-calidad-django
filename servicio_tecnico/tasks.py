@@ -37,7 +37,7 @@ logger = logging.getLogger('servicio_tecnico')
     default_retry_delay=60,   # Reintentar tras 60 segundos si falla
     name='servicio_tecnico.enviar_correo_rhitso'
 )
-def enviar_correo_rhitso_task(self, orden_id, destinatarios_principales, copia_empleados, usuario_id=None):
+def enviar_correo_rhitso_task(self, orden_id, destinatarios_principales, copia_empleados, usuario_id=None, db_alias='default'):
     """
     Tarea Celery: genera el PDF, comprime imágenes y envía el correo RHITSO.
 
@@ -325,7 +325,7 @@ def enviar_correo_rhitso_task(self, orden_id, destinatarios_principales, copia_e
 # ==============================================================================
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_feedback_rechazo')
-def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None):
+def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None, db_alias='default'):
     """
     Envía correo al cliente con link de feedback de rechazo de cotización.
 
@@ -550,7 +550,7 @@ def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None):
 # ==============================================================================
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_vigencia_vencida')
-def enviar_vigencia_vencida_task(self, orden_id, usuario_id=None):
+def enviar_vigencia_vencida_task(self, orden_id, usuario_id=None, db_alias='default'):
     """
     Envía correo al cliente informando que la cotización venció por falta de respuesta.
 
@@ -746,7 +746,7 @@ def enviar_vigencia_vencida_task(self, orden_id, usuario_id=None):
 def enviar_diagnostico_cliente_task(
     self, orden_id, folio, componentes_data, imagenes_ids,
     destinatarios_copia, mensaje_personalizado,
-    email_empleado, nombre_empleado, usuario_id=None
+    email_empleado, nombre_empleado, usuario_id=None, db_alias='default'
 ):
     """
     Tarea Celery: genera PDF de diagnóstico, comprime imágenes, crea Cotización
@@ -1167,7 +1167,7 @@ def enviar_diagnostico_cliente_task(
 def enviar_imagenes_cliente_task(
     self, orden_id, imagenes_ids, destinatarios_copia,
     mensaje_personalizado, usuario_id=None,
-    modelo_ia_inspeccion='',
+    modelo_ia_inspeccion='', db_alias='default',
 ):
     """
     Tarea Celery: comprime imágenes de ingreso y las envía al cliente por correo.
@@ -1572,7 +1572,7 @@ def enviar_imagenes_cliente_task(
     name='servicio_tecnico.enviar_imagenes_egreso_cliente'
 )
 def enviar_imagenes_egreso_cliente_task(
-    self, orden_id, destinatarios_copia, usuario_id=None
+    self, orden_id, destinatarios_copia, usuario_id=None, db_alias='default'
 ):
     """
     Tarea Celery: comprime imágenes de egreso y las envía al cliente por correo.
@@ -1890,7 +1890,7 @@ def enviar_imagenes_egreso_cliente_task(
 # ============================================================================
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_feedback_satisfaccion')
-def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None):
+def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None, db_alias='default'):
     """
     Envía correo al cliente con link de encuesta de satisfacción.
     Se dispara cuando una orden cambia a estado 'entregado' con cotización aceptada.
@@ -2078,7 +2078,7 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None):
 # pero con asunto diferente para indicar que es un recordatorio.
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_recordatorio_encuesta')
-def enviar_recordatorio_encuesta_task(self, feedback_id):
+def enviar_recordatorio_encuesta_task(self, feedback_id, db_alias='default'):
     """
     Envía un correo de recordatorio al cliente para que conteste
     la encuesta de satisfacción antes de que expire (día 10 de 12).
@@ -2235,9 +2235,14 @@ def verificar_encuestas_pendientes_task():
     """
     Tarea periódica diaria (Celery Beat) que detecta encuestas de satisfacción
     que llevan 10+ días sin respuesta y dispara el recordatorio por correo.
+
+    MULTI-PAÍS: Itera sobre TODOS los países configurados para no omitir
+    encuestas de ninguna base de datos. Pasa db_alias a cada recordatorio
+    para que Celery use la BD correcta al ejecutarlo.
     """
     from datetime import timedelta
     from django.utils import timezone
+    from config.paises_config import PAISES_CONFIG
     from .models import FeedbackCliente
 
     ahora = timezone.now()
@@ -2246,29 +2251,38 @@ def verificar_encuestas_pendientes_task():
     limite_inferior = ahora - timedelta(days=12)  # No expiradas aún
     limite_superior = ahora - timedelta(days=10)  # Al menos 10 días de antigüedad
 
-    pendientes = FeedbackCliente.objects.filter(
-        tipo='satisfaccion',
-        correo_enviado=True,
-        utilizado=False,
-        recordatorio_enviado=False,
-        fecha_creacion__lte=limite_superior,   # Tiene ≥10 días
-        fecha_creacion__gte=limite_inferior,   # Aún no expiró
-    )
+    total_global = 0
 
-    total = pendientes.count()
-    logger.info(f"[VERIFICAR-ENCUESTAS] Encontradas {total} encuesta(s) para recordatorio.")
+    # Iterar sobre cada país para revisar su BD independiente
+    for subdominio, pais_config in PAISES_CONFIG.items():
+        db_alias = pais_config['db_alias']
 
-    for feedback in pendientes:
-        try:
-            enviar_recordatorio_encuesta_task.delay(feedback_id=feedback.pk)
-            logger.info(
-                f"[VERIFICAR-ENCUESTAS] Recordatorio encolado para FeedbackCliente ID {feedback.pk} "
-                f"(Orden {feedback.orden.numero_orden_interno})"
-            )
-        except Exception as e:
-            logger.error(f"[VERIFICAR-ENCUESTAS] Error al encolar feedback ID {feedback.pk}: {e}")
+        pendientes = FeedbackCliente.objects.using(db_alias).filter(
+            tipo='satisfaccion',
+            correo_enviado=True,
+            utilizado=False,
+            recordatorio_enviado=False,
+            fecha_creacion__lte=limite_superior,
+            fecha_creacion__gte=limite_inferior,
+        )
 
-    return {'procesadas': total}
+        total = pendientes.count()
+        logger.info(f"[VERIFICAR-ENCUESTAS] [{subdominio}] Encontradas {total} encuesta(s) para recordatorio.")
+
+        for feedback in pendientes:
+            try:
+                # Pasar db_alias para que la señal task_prerun configure el contexto correcto
+                enviar_recordatorio_encuesta_task.delay(feedback_id=feedback.pk, db_alias=db_alias)
+                logger.info(
+                    f"[VERIFICAR-ENCUESTAS] [{subdominio}] Recordatorio encolado para "
+                    f"FeedbackCliente ID {feedback.pk} (Orden {feedback.orden.numero_orden_interno})"
+                )
+            except Exception as e:
+                logger.error(f"[VERIFICAR-ENCUESTAS] [{subdominio}] Error al encolar feedback ID {feedback.pk}: {e}")
+
+        total_global += total
+
+    return {'procesadas': total_global}
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -2276,7 +2290,7 @@ def verificar_encuestas_pendientes_task():
 # ═══════════════════════════════════════════════════════════════════════
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_seguimiento_cliente')
-def enviar_seguimiento_cliente_task(self, orden_id, usuario_id=None):
+def enviar_seguimiento_cliente_task(self, orden_id, usuario_id=None, db_alias='default'):
     """
     Envía correo al cliente con link de seguimiento público de su orden.
     Solo se dispara para órdenes fuera de garantía (es_fuera_garantia=True).
@@ -2324,7 +2338,12 @@ def enviar_seguimiento_cliente_task(self, orden_id, usuario_id=None):
             return {'success': False, 'mensaje': 'El correo de seguimiento ya fue enviado previamente.'}
 
         # ── Datos del equipo y responsable ──
-        site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        # Usar la url_base del país activo para que el enlace apunte al subdominio correcto
+        # (ej: chile.sigmasystem.work en vez de siempre mexico). get_pais_actual() funciona
+        # en este contexto Celery porque task_prerun ya configuró los thread-locals con db_alias.
+        from config.paises_config import get_pais_actual
+        _pais = get_pais_actual()
+        site_url = _pais.get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
         seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
 
         marca_equipo = detalle.marca or ''
@@ -2477,7 +2496,7 @@ def enviar_seguimiento_cliente_task(self, orden_id, usuario_id=None):
     time_limit=1200,              # 20 minutos — override del global de 10 min
     name='servicio_tecnico.generar_video_resumen',
 )
-def generar_video_resumen_task(self, orden_id, usuario_id):
+def generar_video_resumen_task(self, orden_id, usuario_id, db_alias='default'):
     """
     Tarea Celery: genera un video resumen tipo presentación con todas las fotos
     de la galería (ingreso, diagnóstico, reparación, egreso) de una orden.
@@ -3285,7 +3304,7 @@ def generar_video_resumen_task(self, orden_id, usuario_id):
     soft_time_limit=600,   # 10 minutos soft limit
     time_limit=720,        # 12 minutos hard limit
 )
-def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int):
+def comprimir_video_resumen_descarga_task(self, video_id: int, usuario_id: int, db_alias: str = 'default'):
     """
     Tarea Celery que comprime el video resumen de una orden para su descarga.
 
@@ -3542,6 +3561,7 @@ def comprimir_video_evidencia_task(
     empleado_id: int,
     usuario_id: int,
     orientacion_video: int = 0,
+    db_alias: str = 'default',
 ):
     """
     Tarea Celery: comprime un video de evidencia con FFmpeg y guarda el VideoOrden.
@@ -3932,7 +3952,7 @@ def comprimir_video_evidencia_task(
     soft_time_limit=120,
     time_limit=180,
 )
-def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, destinatarios_copia):
+def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, destinatarios_copia, db_alias='default'):
     """
     Segunda etapa del chain rewind de egreso.
 
@@ -4279,7 +4299,7 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
 def enviar_evidencia_video_task(
     self, orden_id, video_ids, destinatarios_copia,
     modelo_ia_analisis='', usuario_id=None,
-    mensaje_personalizado='',
+    mensaje_personalizado='', db_alias='default',
 ):
     """
     Tarea Celery: extrae frames de videos de evidencia, genera análisis IA
