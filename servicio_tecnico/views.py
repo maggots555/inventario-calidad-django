@@ -3535,7 +3535,8 @@ def seguimiento_orden_cliente(request, token):
                 correo_enviado=True,
             ).first()
             if fb and fb.es_valido:
-                site_url = getattr(_settings, 'SITE_URL', 'http://localhost:8000')
+                from config.paises_config import get_pais_actual
+                site_url = get_pais_actual().get('url_base', getattr(_settings, 'SITE_URL', 'http://localhost:8000'))
                 encuesta_url = f"{site_url}/feedback-satisfaccion/{fb.token}/"
         except Exception:
             pass

@@ -371,7 +371,9 @@ def enviar_feedback_rechazo_task(self, feedback_id, usuario_id=None, db_alias='d
             return {'success': False, 'mensaje': 'Sin email de cliente.'}
 
         # ── Construir URL pública del feedback ──
-        site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        from config.paises_config import get_pais_actual
+        _pais = get_pais_actual()
+        site_url = _pais.get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
         feedback_url = f"{site_url}/feedback/{feedback.token}/"
 
         # ── Datos del cliente y equipo ──
@@ -950,7 +952,7 @@ def enviar_diagnostico_cliente_task(
             try:
                 enlace = orden.enlace_seguimiento
                 if enlace and enlace.activo:
-                    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                    site_url = _pais_email.get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
                     seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
             except Exception:
                 pass
@@ -1368,7 +1370,7 @@ def enviar_imagenes_cliente_task(
             try:
                 enlace = orden.enlace_seguimiento
                 if enlace and enlace.activo:
-                    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                    site_url = _pais_email.get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
                     seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
             except Exception:
                 pass
@@ -1703,7 +1705,7 @@ def enviar_imagenes_egreso_cliente_task(
             try:
                 enlace = orden.enlace_seguimiento
                 if enlace and enlace.activo:
-                    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                    site_url = _pais_email.get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
                     seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
             except Exception:
                 pass
@@ -1924,7 +1926,9 @@ def enviar_feedback_satisfaccion_task(self, feedback_id, usuario_id=None, db_ali
             return {'success': False, 'mensaje': 'Sin email de cliente.'}
 
         # ── Construir URL pública ──
-        site_url     = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        from config.paises_config import get_pais_actual
+        _pais = get_pais_actual()
+        site_url     = _pais.get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
         feedback_url = f"{site_url}/feedback-satisfaccion/{feedback.token}/"
 
         # ── Datos del equipo ──
@@ -2116,7 +2120,9 @@ def enviar_recordatorio_encuesta_task(self, feedback_id, db_alias='default'):
             return {'success': False, 'mensaje': 'Sin email de cliente.'}
 
         # ── Construir URL y datos del equipo ──
-        site_url     = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        from config.paises_config import get_pais_actual
+        _pais = get_pais_actual()
+        site_url     = _pais.get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
         feedback_url = f"{site_url}/feedback-satisfaccion/{feedback.token}/"
 
         marca_equipo  = detalle.marca       or ''
@@ -4048,7 +4054,8 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
                 # URL directa al archivo de video para el enlace del correo
                 if video_obj.video:
                     try:
-                        site_url_vid = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                        from config.paises_config import get_pais_actual as _get_pais_vid
+                        site_url_vid = _get_pais_vid().get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
                         video_url = f"{site_url_vid}{video_obj.video.url}"
                     except Exception:
                         pass
@@ -4082,7 +4089,7 @@ def enviar_rewind_egreso_email_task(self, prev_result, orden_id, usuario_id, des
             try:
                 enlace = orden.enlace_seguimiento
                 if enlace and enlace.activo:
-                    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                    site_url = _pais.get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
                     seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
             except Exception:
                 pass
@@ -4352,7 +4359,8 @@ def enviar_evidencia_video_task(
 
         todos_los_frames = []
         videos_data = []
-        site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        from config.paises_config import get_pais_actual as _get_pais_ev
+        site_url = _get_pais_ev().get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
 
         for video in videos:
             video_path = video.video.path if video.video else None
@@ -4486,7 +4494,7 @@ def enviar_evidencia_video_task(
             try:
                 enlace = orden.enlace_seguimiento
                 if enlace and enlace.activo:
-                    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+                    site_url = _pais_email.get('url_base', getattr(settings, 'SITE_URL', 'http://localhost:8000'))
                     seguimiento_url = f"{site_url}/seguimiento/{enlace.token}/"
             except Exception:
                 pass
