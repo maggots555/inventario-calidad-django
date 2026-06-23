@@ -210,13 +210,14 @@ Muestra toda la información y acciones según el estado
                             <thead class="table-light">
                                 <tr>
                                     <th width="5%">#</th>
-                                    <th width="22%">Producto / Descripción</th>
-                                    <th width="15%">Proveedor</th>
+                                    <th width="20%">Producto / Descripción</th>
+                                    <th width="13%">Proveedor</th>
                                     <th width="6%" class="text-center">Cant.</th>
-                                    <th width="10%" class="text-end">Costo Unit.</th>
-                                    <th width="10%" class="text-end">Subtotal</th>
-                                    <th width="10%">Estado</th>
-                                    <th width="12%" class="text-center">Imágenes</th>
+                                    <th width="9%" class="text-end">Costo Unit.</th>
+                                    <th width="9%" class="text-end">Subtotal</th>
+                                    <th width="8%" class="text-center">Tipo</th>
+                                    <th width="9%">Estado</th>
+                                    <th width="11%" class="text-center">Imágenes</th>
                                     <th width="10%" class="text-end">Acciones</th>
                                 </tr>
                             </thead>
@@ -254,14 +255,26 @@ Muestra toda la información y acciones según el estado
                                         <span class="badge bg-warning text-dark">Pendiente</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end fw-bold">
-                                        {% if linea.costo_unitario and linea.costo_unitario > 0 %}
-                                        ${{ linea.subtotal|floatformat:2 }}
-                                        {% else %}
-                                        <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
+                                     <td class="text-end fw-bold">
+                                         {% if linea.costo_unitario and linea.costo_unitario > 0 %}
+                                         ${{ linea.subtotal|floatformat:2 }}
+                                         {% else %}
+                                         <span class="text-muted">-</span>
+                                         {% endif %}
+                                     </td>
+                                     <!-- Columna Tipo: indica si la pieza es necesaria o mejora opcional -->
+                                     <td class="text-center">
+                                         {% if linea.es_necesaria %}
+                                         <span class="badge bg-danger" title="Pieza necesaria para el funcionamiento del equipo">
+                                             <i class="bi bi-exclamation-circle me-1"></i>Necesaria
+                                         </span>
+                                         {% else %}
+                                         <span class="badge bg-secondary" title="Mejora estética o de rendimiento — no indispensable">
+                                             <i class="bi bi-stars me-1"></i>Opcional
+                                         </span>
+                                         {% endif %}
+                                     </td>
+                                     <td>
                                         <span class="badge bg-{{ linea.get_badge_estado }}">
                                             <i class="bi bi-{{ linea.get_estado_icon }} me-1"></i>
                                             {{ linea.get_estado_cliente_display }}
@@ -328,8 +341,8 @@ Muestra toda la información y acciones según el estado
                                     </td>
                                 </tr>
                                 {% empty %}
-                                <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">
+                                 <tr>
+                                    <td colspan="10" class="text-center text-muted py-4">
                                         No hay líneas en esta solicitud
                                     </td>
                                 </tr>

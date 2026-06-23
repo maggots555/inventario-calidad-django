@@ -60,13 +60,14 @@ Las líneas aprobadas o con compra generada se muestran como texto plano (bloque
                         <thead class="table-light">
                             <tr>
                                 <th width="5%">#</th>
-                                <th width="20%">Producto / Descripción</th>
-                                <th width="15%">Proveedor</th>
-                                <th width="8%" class="text-center">Cant.</th>
-                                <th width="10%" class="text-end">Costo Unit.</th>
-                                <th width="10%" class="text-center">Entrega (días)</th>
+                                <th width="18%">Producto / Descripción</th>
+                                <th width="13%">Proveedor</th>
+                                <th width="7%" class="text-center">Cant.</th>
+                                <th width="9%" class="text-end">Costo Unit.</th>
+                                <th width="9%" class="text-center">Entrega (días)</th>
+                                <th width="8%" class="text-center">¿Necesaria?</th>
                                 <th width="12%">Notas</th>
-                                <th width="10%">Estado</th>
+                                <th width="9%">Estado</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -109,6 +110,16 @@ Las líneas aprobadas o con compra generada se muestran como texto plano (bloque
                                     {{ item.form.tiempo_entrega_estimado }}
                                     {% if item.form.tiempo_entrega_estimado.errors %}
                                     <div class="text-danger small">{{ item.form.tiempo_entrega_estimado.errors.0 }}</div>
+                                    {% endif %}
+                                </td>
+                                
+                                <!-- Campo ¿Es necesaria? — checkbox con tooltip explicativo -->
+                                <td class="align-middle text-center">
+                                    <div class="form-check d-flex justify-content-center">
+                                        {{ item.form.es_necesaria }}
+                                    </div>
+                                    {% if item.form.es_necesaria.errors %}
+                                    <div class="text-danger small">{{ item.form.es_necesaria.errors.0 }}</div>
                                     {% endif %}
                                 </td>
                                 
@@ -168,11 +179,12 @@ Las líneas aprobadas o con compra generada se muestran como texto plano (bloque
                     <thead class="table-light">
                         <tr>
                             <th width="5%">#</th>
-                            <th width="25%">Producto / Descripción</th>
-                            <th width="15%">Proveedor</th>
-                            <th width="8%" class="text-center">Cant.</th>
-                            <th width="10%" class="text-end">Costo Unit.</th>
-                            <th width="10%" class="text-center">Entrega (días)</th>
+                            <th width="22%">Producto / Descripción</th>
+                            <th width="13%">Proveedor</th>
+                            <th width="7%" class="text-center">Cant.</th>
+                            <th width="9%" class="text-end">Costo Unit.</th>
+                            <th width="9%" class="text-center">Entrega (días)</th>
+                            <th width="8%" class="text-center">¿Necesaria?</th>
                             <th width="12%">Notas</th>
                             <th width="15%">Estado</th>
                         </tr>
@@ -205,6 +217,18 @@ Las líneas aprobadas o con compra generada se muestran como texto plano (bloque
                                 {{ linea.tiempo_entrega_estimado }}
                                 {% else %}
                                 <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <!-- Estado necesaria/opcional — solo lectura en líneas bloqueadas -->
+                            <td class="align-middle text-center">
+                                {% if linea.es_necesaria %}
+                                <span class="badge bg-danger" title="Necesaria para el funcionamiento">
+                                    <i class="bi bi-exclamation-circle"></i> Sí
+                                </span>
+                                {% else %}
+                                <span class="badge bg-secondary" title="Mejora opcional">
+                                    <i class="bi bi-stars"></i> No
+                                </span>
                                 {% endif %}
                             </td>
                             <td class="align-middle">

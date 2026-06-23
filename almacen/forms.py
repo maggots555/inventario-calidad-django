@@ -1891,6 +1891,7 @@ class LineaCotizacionForm(forms.ModelForm):
             'cantidad',
             'costo_unitario',
             'tiempo_entrega_estimado',
+            'es_necesaria',
             'notas',
         ]
         widgets = {
@@ -1920,6 +1921,12 @@ class LineaCotizacionForm(forms.ModelForm):
                 'min': 0,
                 'placeholder': 'días',
             }),
+            # Checkbox compacto para "¿Es necesaria?"
+            # Se muestra como toggle dentro del formset de líneas
+            'es_necesaria': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'title': '¿Es necesaria para la reparación?',
+            }),
             'notas': forms.Textarea(attrs={
                 'class': 'form-control form-control-sm',
                 'rows': 1,
@@ -1933,6 +1940,7 @@ class LineaCotizacionForm(forms.ModelForm):
             'cantidad': 'Cant.',
             'costo_unitario': 'Costo Unit.',
             'tiempo_entrega_estimado': 'Entrega (días)',
+            'es_necesaria': 'Necesaria',
             'notas': 'Notas',
         }
     
@@ -2044,6 +2052,7 @@ class EditarLineaCotizacionForm(forms.ModelForm):
             'costo_unitario',
             'cantidad',
             'tiempo_entrega_estimado',
+            'es_necesaria',
             'notas',
         ]
         widgets = {
@@ -2065,6 +2074,11 @@ class EditarLineaCotizacionForm(forms.ModelForm):
                 'min': 0,
                 'placeholder': 'días',
             }),
+            # Checkbox para indicar si la pieza es necesaria o una mejora opcional
+            'es_necesaria': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'title': '¿Es necesaria para la reparación?',
+            }),
             'notas': forms.Textarea(attrs={
                 'class': 'form-control form-control-sm',
                 'rows': 2,
@@ -2076,6 +2090,7 @@ class EditarLineaCotizacionForm(forms.ModelForm):
             'costo_unitario': 'Costo Unitario',
             'cantidad': 'Cantidad',
             'tiempo_entrega_estimado': 'Entrega (días)',
+            'es_necesaria': 'Necesaria',
             'notas': 'Notas',
         }
     

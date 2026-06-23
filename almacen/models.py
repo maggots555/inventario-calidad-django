@@ -3742,6 +3742,21 @@ class LineaCotizacion(models.Model):
         help_text='PiezaCotizada de servicio técnico que originó esta línea (sincronización automática)'
     )
     
+    # ========== CLASIFICACIÓN DE LA PIEZA (espejo de PiezaCotizada en ST) ==========
+    # Estos campos son equivalentes a los de PiezaCotizada en servicio_tecnico/models.py.
+    # Permiten que el personal de almacén indique si una pieza es necesaria para
+    # la reparación o solo una mejora opcional, manteniendo ambos módulos sincronizados.
+    es_necesaria = models.BooleanField(
+        default=True,
+        verbose_name='¿Es necesaria?',
+        help_text='¿Es necesaria para el funcionamiento? Desmarcar si es mejora estética o de rendimiento'
+    )
+    sugerida_por_tecnico = models.BooleanField(
+        default=False,
+        verbose_name='¿Sugerida por técnico?',
+        help_text='¿Fue sugerida por el técnico en su diagnóstico? (normalmente False para líneas de Almacén)'
+    )
+
     # ========== INFORMACIÓN ADICIONAL ==========
     notas = models.TextField(
         blank=True,
@@ -3896,13 +3911,16 @@ class LineaCotizacion(models.Model):
                 componente=componente,
             )
         
-        # Actualizar campos
+        # Actualizar campos — sincronización completa con LineaCotizacion de Almacén.
+        # Los campos es_necesaria y sugerida_por_tecnico se toman del campo real
+        # en lugar de hardcodear valores (antes era False/True fijo).
         pieza.descripcion_adicional = self.descripcion_pieza
         pieza.cantidad = self.cantidad
         pieza.costo_unitario = self.costo_unitario or Decimal('0.00')
         pieza.proveedor = self.proveedor.nombre if self.proveedor else ''
-        pieza.sugerida_por_tecnico = False  # Viene de almacén, no del técnico
-        pieza.es_necesaria = True
+        # Usar el valor real del campo (ya no hardcodeado)
+        pieza.sugerida_por_tecnico = self.sugerida_por_tecnico
+        pieza.es_necesaria = self.es_necesaria
         pieza.orden_prioridad = self.numero_linea
         
         # Sincronizar estado de aceptación

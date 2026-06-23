@@ -364,34 +364,51 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                                 {% endif %}
                             </div>
                             
-                            <!-- Segunda fila: Cantidad, Costo, Tiempo entrega, Notas -->
-                            <div class="col-md-2">
-                                <label class="form-label small">Cantidad <span class="text-danger">*</span></label>
-                                {{ linea_form.cantidad }}
-                            </div>
-                            
-                            <div class="col-md-2">
-                                <label class="form-label small">Costo Unit. <span class="badge bg-secondary" style="font-size: 0.65em;">Opcional</span></label>
-                                {{ linea_form.costo_unitario }}
-                            </div>
-                            
-                            <div class="col-md-2">
-                                <label class="form-label small">Entrega (días)</label>
-                                {{ linea_form.tiempo_entrega_estimado }}
-                            </div>
-                            
-                            <div class="col-md-5">
-                                <label class="form-label small">Notas</label>
-                                {{ linea_form.notas }}
-                            </div>
-                            
-                            <!-- Subtotal calculado -->
-                            <div class="col-md-1 d-flex align-items-end">
-                                <div class="text-end w-100">
-                                    <small class="text-muted">Subtotal:</small>
-                                    <div class="fw-bold subtotal-linea">$0.00</div>
-                                </div>
-                            </div>
+                             <!-- Segunda fila: Cantidad, Costo, Tiempo entrega, ¿Necesaria?, Notas -->
+                             <div class="col-md-2">
+                                 <label class="form-label small">Cantidad <span class="text-danger">*</span></label>
+                                 {{ linea_form.cantidad }}
+                             </div>
+                             
+                             <div class="col-md-2">
+                                 <label class="form-label small">Costo Unit. <span class="badge bg-secondary" style="font-size: 0.65em;">Opcional</span></label>
+                                 {{ linea_form.costo_unitario }}
+                             </div>
+                             
+                             <div class="col-md-2">
+                                 <label class="form-label small">Entrega (días)</label>
+                                 {{ linea_form.tiempo_entrega_estimado }}
+                             </div>
+                             
+                             <!-- ¿Es necesaria? — equivalente a PiezaCotizada.es_necesaria en ST -->
+                             <div class="col-md-2">
+                                 <label class="form-label small d-block">
+                                     ¿Necesaria?
+                                     <span class="badge bg-secondary" style="font-size: 0.65em;" 
+                                           title="Desmarca si es mejora estética o de rendimiento, no indispensable para el funcionamiento">
+                                         <i class="bi bi-info-circle"></i>
+                                     </span>
+                                 </label>
+                                 <div class="form-check mt-2">
+                                     {{ linea_form.es_necesaria }}
+                                     <label class="form-check-label small" for="{{ linea_form.es_necesaria.id_for_label }}">
+                                         Pieza necesaria
+                                     </label>
+                                 </div>
+                             </div>
+                             
+                             <div class="col-md-3">
+                                 <label class="form-label small">Notas</label>
+                                 {{ linea_form.notas }}
+                             </div>
+                             
+                             <!-- Subtotal calculado -->
+                             <div class="col-md-1 d-flex align-items-end">
+                                 <div class="text-end w-100">
+                                     <small class="text-muted">Subtotal:</small>
+                                     <div class="fw-bold subtotal-linea">$0.00</div>
+                                 </div>
+                             </div>
                         </div>
                     </div>
                     {% empty %}
@@ -438,35 +455,54 @@ Incluye formset dinámico para agregar múltiples líneas con diferentes proveed
                                 </button>
                             </div>
                             
-                            <div class="col-md-2">
-                                <label class="form-label small">Cantidad <span class="text-danger">*</span></label>
-                                <input type="number" name="lineas-__prefix__-cantidad" 
-                                       class="form-control form-control-sm cantidad-input" 
-                                       min="1" value="1" required>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small">Costo Unit. <span class="badge bg-secondary" style="font-size: 0.65em;">Opcional</span></label>
-                                <input type="number" name="lineas-__prefix__-costo_unitario" 
-                                       class="form-control form-control-sm costo-input" 
-                                       min="0" step="0.01" placeholder="0.00">
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small">Entrega (días)</label>
-                                <input type="number" name="lineas-__prefix__-tiempo_entrega_estimado" 
-                                       class="form-control form-control-sm" min="0" placeholder="días">
-                            </div>
-                            <div class="col-md-5">
-                                <label class="form-label small">Notas</label>
-                                <textarea name="lineas-__prefix__-notas" 
-                                          class="form-control form-control-sm" rows="1"
-                                          placeholder="Notas adicionales..."></textarea>
-                            </div>
-                            <div class="col-md-1 d-flex align-items-end">
-                                <div class="text-end w-100">
-                                    <small class="text-muted">Subtotal:</small>
-                                    <div class="fw-bold subtotal-linea">$0.00</div>
-                                </div>
-                            </div>
+                             <div class="col-md-2">
+                                 <label class="form-label small">Cantidad <span class="text-danger">*</span></label>
+                                 <input type="number" name="lineas-__prefix__-cantidad" 
+                                        class="form-control form-control-sm cantidad-input" 
+                                        min="1" value="1" required>
+                             </div>
+                             <div class="col-md-2">
+                                 <label class="form-label small">Costo Unit. <span class="badge bg-secondary" style="font-size: 0.65em;">Opcional</span></label>
+                                 <input type="number" name="lineas-__prefix__-costo_unitario" 
+                                        class="form-control form-control-sm costo-input" 
+                                        min="0" step="0.01" placeholder="0.00">
+                             </div>
+                             <div class="col-md-2">
+                                 <label class="form-label small">Entrega (días)</label>
+                                 <input type="number" name="lineas-__prefix__-tiempo_entrega_estimado" 
+                                        class="form-control form-control-sm" min="0" placeholder="días">
+                             </div>
+                             <!-- ¿Es necesaria? — se incluye con checked por defecto (True) -->
+                             <div class="col-md-2">
+                                 <label class="form-label small d-block">
+                                     ¿Necesaria?
+                                     <span class="badge bg-secondary" style="font-size: 0.65em;"
+                                           title="Desmarca si es mejora estética o de rendimiento, no indispensable para el funcionamiento">
+                                         <i class="bi bi-info-circle"></i>
+                                     </span>
+                                 </label>
+                                 <div class="form-check mt-2">
+                                     <input type="checkbox" name="lineas-__prefix__-es_necesaria"
+                                            class="form-check-input"
+                                            id="lineas-__prefix__-es_necesaria"
+                                            checked>
+                                     <label class="form-check-label small" for="lineas-__prefix__-es_necesaria">
+                                         Pieza necesaria
+                                     </label>
+                                 </div>
+                             </div>
+                             <div class="col-md-3">
+                                 <label class="form-label small">Notas</label>
+                                 <textarea name="lineas-__prefix__-notas" 
+                                           class="form-control form-control-sm" rows="1"
+                                           placeholder="Notas adicionales..."></textarea>
+                             </div>
+                             <div class="col-md-1 d-flex align-items-end">
+                                 <div class="text-end w-100">
+                                     <small class="text-muted">Subtotal:</small>
+                                     <div class="fw-bold subtotal-linea">$0.00</div>
+                                 </div>
+                             </div>
                         </div>
                     </div>
                 </template>
