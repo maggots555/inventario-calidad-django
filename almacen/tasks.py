@@ -473,3 +473,289 @@ def notificar_compras_nueva_cotizacion_task(
         logger.error(f"[COTIZACION-COMPRAS] Error en tarea: {e}")
         logger.error(traceback.format_exc())
         return {'success': False, 'mensaje': f'Error: {str(e)}'}
+
+
+# =============================================================================
+# TAREA: ENVIAR COTIZACIÓN DIRECTAMENTE AL CLIENTE FINAL CON PDF ADJUNTO
+# =============================================================================
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='almacen.enviar_cotizacion_cliente'
+)
+def enviar_cotizacion_cliente_task(
+    self,
+    solicitud_id,
+    email_cliente,
+    copia_empleados,
+    tipo_servicio,
+    items,
+    titulo_propuesta='',
+    incluir_descuento_diagnostico=True,
+    mano_de_obra_override=None,
+    mensaje_personalizado='',
+    usuario_id=None,
+    db_alias='default',
+):
+    """
+    Genera el PDF de cotización y lo envía directamente al cliente por correo.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta tarea es la encargada de la parte pesada del envío al cliente:
+    1. Recupera la SolicitudCotizacion de la base de datos.
+    2. Instancia PDFCotizacionCliente con los parámetros del modal.
+    3. Genera el PDF en memoria (BytesIO) con el estilo SIC.
+    4. Compone el correo HTML con el resumen de la cotización.
+    5. Adjunta el PDF al correo y lo envía al cliente.
+
+    Parámetros:
+        solicitud_id                 : ID de la SolicitudCotizacion.
+        email_cliente                : Correo del destinatario principal (el cliente).
+        copia_empleados              : Lista de emails para CC (empleados internos).
+        tipo_servicio                : Clave del perfil ('estandar', 'express', etc.)
+        items                        : Lista de dicts con los ítems del PDF (ya serializada).
+        titulo_propuesta             : Título de la propuesta (vacío = usar nombre del perfil).
+        incluir_descuento_diagnostico: Si True, muestra el precio con deducción de diagnóstico.
+        mano_de_obra_override        : Costo de mano de obra editado por el usuario (float).
+        mensaje_personalizado        : Texto adicional para el cuerpo del email.
+        usuario_id                   : ID del usuario que disparó la acción.
+        db_alias                     : Alias de BD del país activo (CRÍTICO para multi-tenant).
+
+    Efectos secundarios:
+        - Envía un correo con PDF adjunto al email_cliente.
+        - Loguea el resultado en el logger 'almacen'.
+    """
+    import io as _io
+    from django.core.mail import EmailMessage
+    from django.template.loader import render_to_string
+    from django.utils import timezone
+    from django.conf import settings
+    from django.contrib.auth import get_user_model
+    from django.contrib.staticfiles import finders
+    from email.mime.image import MIMEImage
+    from email.mime.application import MIMEApplication
+
+    from .models import SolicitudCotizacion
+    from .utils.pdf_cotizacion_cliente import PDFCotizacionCliente
+
+    logger.info(
+        f"[COTIZACION-CLIENTE] Iniciando envío al cliente para Solicitud ID {solicitud_id} "
+        f"| tipo_servicio={tipo_servicio} | email={email_cliente}"
+    )
+
+    try:
+        # --- PASO 1: RECUPERAR LA SOLICITUD ---
+        # Incluimos select_related para minimizar queries al generar el PDF
+        try:
+            solicitud = SolicitudCotizacion.objects.select_related(
+                'orden_servicio',
+                'orden_servicio__detalle_equipo',
+                'creado_por',
+            ).prefetch_related(
+                'lineas__producto',
+                'servicios_adicionales',
+            ).get(pk=solicitud_id)
+        except SolicitudCotizacion.DoesNotExist:
+            logger.error(f"[COTIZACION-CLIENTE] Solicitud ID {solicitud_id} no encontrada.")
+            return {'success': False, 'mensaje': f'Solicitud ID {solicitud_id} no encontrada.'}
+
+        # --- PASO 2: OBTENER CONFIGURACIÓN DEL PAÍS ACTIVO ---
+        # La señal task_prerun ya configuró el contexto de país en el worker
+        from config.paises_config import get_pais_actual, fecha_local_pais
+        _pais = get_pais_actual()
+
+        # --- PASO 3: GENERAR EL PDF EN MEMORIA ---
+        logger.info(f"[COTIZACION-CLIENTE] Generando PDF con {len(items)} ítem(s)...")
+
+        generador = PDFCotizacionCliente(
+            solicitud=solicitud,
+            tipo_servicio=tipo_servicio,
+            items=items,
+            titulo_propuesta=titulo_propuesta,
+            incluir_descuento_diagnostico=incluir_descuento_diagnostico,
+            mano_de_obra_override=mano_de_obra_override,
+            pais_config=_pais,
+        )
+        resultado_pdf = generador.generar_pdf()
+
+        if not resultado_pdf['success']:
+            logger.error(f"[COTIZACION-CLIENTE] Error al generar PDF: {resultado_pdf.get('error')}")
+            return {'success': False, 'mensaje': f"Error al generar PDF: {resultado_pdf.get('error')}"}
+
+        pdf_bytes   = resultado_pdf['buffer'].getvalue()
+        nombre_pdf  = resultado_pdf['nombre_archivo']
+        logger.info(f"[COTIZACION-CLIENTE] PDF generado exitosamente ({len(pdf_bytes)} bytes): {nombre_pdf}")
+
+        # --- PASO 4: PREPARAR CONTEXTO PARA EL TEMPLATE DE EMAIL ---
+        # Obtener nombre del usuario que envió la cotización
+        nombre_usuario = ''
+        whatsapp_empleado = ''
+        if usuario_id:
+            User = get_user_model()
+            try:
+                usuario = User.objects.get(pk=usuario_id)
+                nombre_usuario = usuario.get_full_name() or usuario.username
+                if hasattr(usuario, 'empleado') and usuario.empleado:
+                    numero_local = usuario.empleado.numero_whatsapp
+                    if numero_local:
+                        codigo_tel = _pais.get('codigo_telefonico', '')
+                        whatsapp_empleado = f"{codigo_tel}{numero_local}"
+            except Exception:
+                pass
+
+        # Calcular la fecha local del país
+        ahora_local = fecha_local_pais(timezone.now(), _pais)
+
+        # Datos del equipo para el email (si hay orden vinculada)
+        info_equipo = None
+        if solicitud.orden_servicio:
+            try:
+                det = solicitud.orden_servicio.detalle_equipo
+                info_equipo = {
+                    'tipo': det.tipo_equipo,
+                    'marca': det.marca,
+                    'modelo': det.modelo,
+                    'service_tag': det.numero_serie,
+                }
+            except Exception:
+                pass
+
+        # Nombre del cliente para personalizar el saludo
+        nombre_cliente = ''
+        if info_equipo and solicitud.orden_servicio:
+            try:
+                nombre_cliente = solicitud.orden_servicio.detalle_equipo.nombre_cliente or ''
+            except Exception:
+                pass
+        if not nombre_cliente and solicitud.nombre_cliente:
+            nombre_cliente = solicitud.nombre_cliente
+
+        # Calcular total con IVA para mostrar en el email (sin abrir el PDF)
+        from .utils.pdf_cotizacion_cliente import calcular_precio_cliente
+        total_items_costo = sum(
+            float(item.get('costo_unitario', 0) or 0) * int(item.get('cantidad', 1) or 1)
+            for item in items
+        )
+        calculo_resumen = calcular_precio_cliente(
+            costo_piezas=total_items_costo,
+            tipo_servicio=tipo_servicio,
+            incluir_descuento_diagnostico=incluir_descuento_diagnostico,
+        )
+
+        # Construir el nombre del título de la propuesta para el asunto del email
+        titulo_display = titulo_propuesta or calculo_resumen['servicio_nombre']
+
+        context_email = {
+            'solicitud':             solicitud,
+            'titulo_propuesta':      titulo_display,
+            'info_equipo':           info_equipo,
+            'nombre_cliente':        nombre_cliente,
+            'calculo':               calculo_resumen,
+            'mensaje_personalizado': mensaje_personalizado,
+            'fecha_envio_texto':     ahora_local.strftime('%d/%m/%Y'),
+            'hora_envio_texto':      ahora_local.strftime('%H:%M'),
+            'empresa_nombre':        _pais.get('empresa_nombre_corto', 'SIC'),
+            'pais_nombre':           _pais.get('nombre', ''),
+            'whatsapp_empleado':     whatsapp_empleado,
+            'nombre_usuario':        nombre_usuario,
+            'incluir_descuento':     incluir_descuento_diagnostico,
+        }
+
+        # Renderizar el template HTML del email
+        html_content = render_to_string(
+            'almacen/emails/cotizacion_cliente_final.html',
+            context_email
+        )
+
+        # --- PASO 5: COMPONER Y ENVIAR EL CORREO ---
+        # Construir el asunto del email con el folio/número de solicitud
+        numero_display = solicitud.numero_solicitud
+        if solicitud.orden_servicio:
+            try:
+                st = solicitud.orden_servicio.detalle_equipo.numero_serie
+                if st:
+                    numero_display = f"S/T: {st}"
+            except Exception:
+                pass
+
+        asunto = f'Cotización SIC — {titulo_display} | {numero_display}'
+
+        # Correo remitente extraído desde DEFAULT_FROM_EMAIL
+        import re as _re
+        email_match = _re.search(r'<(.+?)>', settings.DEFAULT_FROM_EMAIL)
+        email_solo  = email_match.group(1) if email_match else settings.DEFAULT_FROM_EMAIL
+        remitente   = f"SIC Cotizaciones <{email_solo}>"
+
+        # Crear el objeto EmailMessage con el cliente como destinatario principal
+        email_msg = EmailMessage(
+            subject=asunto,
+            body=html_content,
+            from_email=remitente,
+            to=[email_cliente],
+            cc=copia_empleados or [],
+        )
+        email_msg.content_subtype = 'html'
+
+        # Adjuntar el logo SIC como imagen inline (CID)
+        try:
+            logo_path = finders.find('images/logos/logo_sic.png')
+            if logo_path:
+                with open(logo_path, 'rb') as f:
+                    logo_mime = MIMEImage(f.read(), _subtype='png')
+                    logo_mime.add_header('Content-ID', '<logo_sic>')
+                    logo_mime.add_header('Content-Disposition', 'inline', filename='logo_sic.png')
+                    email_msg.attach(logo_mime)
+        except Exception as e:
+            logger.warning(f"[COTIZACION-CLIENTE] Error al adjuntar logo: {e}")
+
+        # Adjuntar iconos de redes sociales (CID inline)
+        try:
+            iconos = {
+                'icon_link':      'images/utilitys/link.png',
+                'icon_instagram': 'images/utilitys/instagram.png',
+                'icon_facebook':  'images/utilitys/facebook.png',
+                'icon_whatsapp':  'images/utilitys/whatsapp.png',
+            }
+            for cid_name, static_path in iconos.items():
+                icon_path = finders.find(static_path)
+                if icon_path:
+                    with open(icon_path, 'rb') as f:
+                        icon_mime = MIMEImage(f.read(), _subtype='png')
+                        icon_mime.add_header('Content-ID', f'<{cid_name}>')
+                        icon_mime.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                        email_msg.attach(icon_mime)
+        except Exception as e:
+            logger.warning(f"[COTIZACION-CLIENTE] Error al adjuntar iconos: {e}")
+
+        # Adjuntar el PDF generado como archivo descargable
+        pdf_mime = MIMEApplication(pdf_bytes, _subtype='pdf')
+        pdf_mime.add_header('Content-Disposition', 'attachment', filename=nombre_pdf)
+        email_msg.attach(pdf_mime)
+
+        # Enviar el correo
+        email_msg.send(fail_silently=False)
+        logger.info(
+            f"[COTIZACION-CLIENTE] Correo enviado a {email_cliente} "
+            f"(CC: {', '.join(copia_empleados) if copia_empleados else 'ninguno'}) "
+            f"| PDF: {nombre_pdf}"
+        )
+
+        return {
+            'success': True,
+            'mensaje': f'Correo enviado a {email_cliente}',
+            'solicitud': numero_display,
+            'pdf': nombre_pdf,
+            'items': len(items),
+        }
+
+    except Exception as e:
+        logger.error(f"[COTIZACION-CLIENTE] Error en tarea: {e}")
+        logger.error(traceback.format_exc())
+        # Reintentar la tarea hasta max_retries veces si es un error de red
+        try:
+            raise self.retry(exc=e)
+        except self.MaxRetriesExceededError:
+            return {'success': False, 'mensaje': f'Error tras {self.max_retries} reintentos: {str(e)}'}

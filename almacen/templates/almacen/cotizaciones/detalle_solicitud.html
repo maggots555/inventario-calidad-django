@@ -8,6 +8,10 @@ Muestra toda la información y acciones según el estado
 
 {% block title %}{{ titulo }} - Almacén{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/cotizacion_cliente.css' %}">
+{% endblock extra_css %}
+
 {% block almacen_content %}
 <div class="container-fluid py-4">
     <!-- Encabezado -->
@@ -611,23 +615,25 @@ Muestra toda la información y acciones según el estado
                         <i class="bi bi-pencil-square me-2"></i>Editar Líneas
                     </a>
                     
-                    <!-- Botón para enviar al cliente (cambia de enviada_front a enviada_cliente) -->
-                    <form method="post" action="{% url 'almacen:enviar_solicitud_a_cliente' solicitud.pk %}" class="w-100">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-warning w-100"
-                                onclick="return confirm('¿Enviar esta cotización al cliente? Se habilitarán las opciones de aprobar/rechazar.')">
-                            <i class="bi bi-person-check me-2"></i>Enviar a Cliente
-                        </button>
-                    </form>
+                     <!-- Botón para enviar al cliente — abre modal con calculadora de profit -->
+                     <button type="button" class="btn btn-warning w-100"
+                             data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
+                         <i class="bi bi-send me-2"></i>Enviar Cotización al Cliente
+                     </button>
                     {% endif %}
                     
-                    <!-- Editar líneas (cuando está enviada al cliente, por si se necesita recotizar) -->
-                    {% if solicitud.estado == 'enviada_cliente' %}
-                    <a href="{% url 'almacen:editar_lineas_cotizacion' solicitud.pk %}" 
-                       class="btn btn-outline-primary w-100">
-                        <i class="bi bi-pencil-square me-2"></i>Editar Líneas
-                    </a>
-                    {% endif %}
+                     <!-- Botones para estado "Enviada al Cliente" -->
+                     {% if solicitud.estado == 'enviada_cliente' %}
+                     <a href="{% url 'almacen:editar_lineas_cotizacion' solicitud.pk %}" 
+                        class="btn btn-outline-primary w-100">
+                         <i class="bi bi-pencil-square me-2"></i>Editar Líneas
+                     </a>
+                     <!-- Reenviar cotización — abre el mismo modal de envío -->
+                     <button type="button" class="btn btn-outline-warning w-100"
+                             data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
+                         <i class="bi bi-arrow-clockwise me-2"></i>Reenviar Cotización
+                     </button>
+                     {% endif %}
                     
                     <!-- Generar compras (si hay aprobadas sin compra) -->
                     {% if solicitud.puede_generar_compras %}
@@ -1343,8 +1349,330 @@ document.addEventListener('DOMContentLoaded', function() {
     "csrfToken": "{{ csrf_token }}"
 }
 </script>
+
+<!-- ================================================================
+     MODAL: Enviar Cotización al Cliente
+     ================================================================
+     Permite al usuario:
+     1. Seleccionar el tipo de servicio (perfil de profit)
+     2. Ver la calculadora de profit en tiempo real
+     3. Elegir el modo de agrupación (todo junto / separado)
+     4. Ingresar o confirmar el email del cliente
+     5. Previsualizar el PDF antes de enviar
+     6. Enviar el correo con el PDF adjunto
+     ================================================================ -->
+{% if solicitud.estado in 'enviada_front,enviada_cliente,parcialmente_aprobada' %}
+<div class="modal fade" id="modalEnviarCotizacionCliente" tabindex="-1"
+     aria-labelledby="modalEnviarCotizLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <!-- HEADER -->
+            <div class="modal-header" style="background-color: #003366; color: #fff; border-bottom: none;">
+                <h5 class="modal-title" id="modalEnviarCotizLabel">
+                    <i class="bi bi-send me-2"></i>Enviar Cotización al Cliente
+                    <small class="ms-2 fw-normal" style="color: #c8d8f0; font-size: 0.85rem;">
+                        {{ solicitud.numero_solicitud }}
+                    </small>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <!-- BODY -->
+            <div class="modal-body p-0">
+                <div class="row g-0" style="min-height: 500px;">
+
+                    <!-- ==================================================
+                         COLUMNA IZQUIERDA: Configuración del envío
+                         ================================================== -->
+                    <div class="col-lg-6 p-4 border-end">
+
+                        <!-- --- 1. TIPO DE SERVICIO --- -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold mb-2" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-600);">
+                                <i class="bi bi-sliders me-1"></i>Tipo de Servicio (perfil de profit)
+                            </label>
+                            <div class="d-flex flex-wrap gap-2" id="tipoServicioContainer">
+                                <div class="servicio-tipo-btn {% if gama_equipo == 'ALTA' %}activo{% endif %}" data-tipo="alta_gama">
+                                    <i class="bi bi-star-fill" style="font-size: 0.9rem; color: #f59e0b;"></i>
+                                    <span class="nombre-servicio">Alta Gama</span>
+                                    <span class="profit-badge">44% profit</span>
+                                </div>
+                                <div class="servicio-tipo-btn {% if gama_equipo not in 'ALTA,BAJA' and not gama_equipo %}activo{% elif gama_equipo == 'MEDIA' or gama_equipo == '' %}activo{% endif %}" data-tipo="estandar" id="btnEstandar">
+                                    <i class="bi bi-laptop" style="font-size: 0.9rem; color: #3b82f6;"></i>
+                                    <span class="nombre-servicio">Estándar</span>
+                                    <span class="profit-badge">36% profit</span>
+                                </div>
+                                <div class="servicio-tipo-btn {% if gama_equipo == 'BAJA' %}activo{% endif %}" data-tipo="mostrador">
+                                    <i class="bi bi-phone" style="font-size: 0.9rem; color: #10b981;"></i>
+                                    <span class="nombre-servicio">Mostrador</span>
+                                    <span class="profit-badge">42% profit</span>
+                                </div>
+                                <div class="servicio-tipo-btn" data-tipo="express">
+                                    <i class="bi bi-lightning-charge-fill" style="font-size: 0.9rem; color: #f97316;"></i>
+                                    <span class="nombre-servicio">Express</span>
+                                    <span class="profit-badge">44% profit</span>
+                                </div>
+                                <div class="servicio-tipo-btn" data-tipo="server">
+                                    <i class="bi bi-server" style="font-size: 0.9rem; color: #8b5cf6;"></i>
+                                    <span class="nombre-servicio">Server</span>
+                                    <span class="profit-badge">59% profit</span>
+                                </div>
+                            </div>
+                            <input type="hidden" id="tipoServicioInput" name="tipo_servicio"
+                                   value="{% if gama_equipo == 'ALTA' %}alta_gama{% elif gama_equipo == 'BAJA' %}mostrador{% else %}estandar{% endif %}">
+                        </div>
+
+                        <!-- --- 2. MANO DE OBRA (override) --- -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem;" for="manoObraOverride">
+                                <i class="bi bi-wrench me-1"></i>Mano de Obra (MXN sin IVA)
+                            </label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="manoObraOverride"
+                                       name="mano_de_obra_override"
+                                       step="0.01" min="0"
+                                       value="{{ costo_mano_obra|default:'' }}"
+                                       placeholder="0.00">
+                                <span class="input-group-text">MXN</span>
+                            </div>
+                            <div class="form-text" style="font-size: 0.75rem;">
+                                {% if costo_mano_obra %}
+                                    Valor de la cotización ST: ${{ costo_mano_obra }}. Puedes ajustarlo.
+                                {% else %}
+                                    Ingresa el costo de mano de obra si aplica.
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- --- 3. DESCUENTO DIAGNÓSTICO --- -->
+                        {% if solicitud.orden_servicio %}
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       id="checkDescuentoDiagnostico" name="incluir_descuento_diagnostico"
+                                       value="1" checked>
+                                <label class="form-check-label fw-semibold" for="checkDescuentoDiagnostico"
+                                       style="font-size: 0.87rem;">
+                                    <i class="bi bi-tag-fill me-1 text-success"></i>
+                                    Descontar costo de diagnóstico del total
+                                </label>
+                            </div>
+                            <div class="form-text ms-4" style="font-size: 0.75rem;">
+                                El cliente ya pagó el diagnóstico. Se mostrará el total a pagar restando ese costo.
+                            </div>
+                        </div>
+                        {% else %}
+                        <input type="hidden" name="incluir_descuento_diagnostico" value="0">
+                        {% endif %}
+
+                        <!-- --- 4. CALCULADORA DE PROFIT (resultado dinámico) --- -->
+                        <div id="calcResultadoContainer" class="mb-4">
+                            <div class="calc-resultado-panel">
+                                <div class="calc-resultado-header">
+                                    <i class="bi bi-calculator me-1"></i>Resultado de la Calculadora
+                                </div>
+                                <div class="calc-resultado-body" id="calcBody">
+                                    <div class="text-center py-3 text-muted" style="font-size: 0.82rem;">
+                                        <i class="bi bi-arrow-up-circle me-1"></i>
+                                        Selecciona un tipo de servicio para ver los cálculos
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- --- 5. MODO DE AGRUPACIÓN --- -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold mb-2" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-600);">
+                                <i class="bi bi-collection me-1"></i>Modo de Envío (agrupación)
+                            </label>
+
+                            <label class="agrupacion-option activo" for="agrupTodoJunto">
+                                <input type="radio" id="agrupTodoJunto" name="modo_agrupacion"
+                                       value="todo_junto" checked>
+                                <div>
+                                    <span class="opcion-titulo">Un solo PDF completo</span>
+                                    <span class="opcion-desc">Todas las piezas y servicios en un mismo documento</span>
+                                </div>
+                            </label>
+
+                            <label class="agrupacion-option" for="agrupPiezasServicios">
+                                <input type="radio" id="agrupPiezasServicios" name="modo_agrupacion"
+                                       value="piezas_vs_servicios">
+                                <div>
+                                    <span class="opcion-titulo">Piezas vs. Servicios (2 correos)</span>
+                                    <span class="opcion-desc">PDF separado para piezas y para servicios adicionales</span>
+                                </div>
+                            </label>
+
+                            <label class="agrupacion-option" for="agrupNecOpc">
+                                <input type="radio" id="agrupNecOpc" name="modo_agrupacion"
+                                       value="necesarias_vs_opcionales">
+                                <div>
+                                    <span class="opcion-titulo">Necesarias vs. Opcionales (2 correos)</span>
+                                    <span class="opcion-desc">PDF de piezas necesarias y otro de opcionales/extras</span>
+                                </div>
+                            </label>
+                        </div>
+
+                    </div>
+
+                    <!-- ==================================================
+                         COLUMNA DERECHA: Destinatario + Mensaje + Preview
+                         ================================================== -->
+                    <div class="col-lg-6 p-4">
+
+                        <!-- --- 6. EMAIL DEL CLIENTE --- -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem;" for="emailClienteInput">
+                                <i class="bi bi-envelope me-1"></i>Email del Cliente
+                            </label>
+                            {% if email_cliente_modal %}
+                            <div class="email-cliente-card mb-2">
+                                <div style="font-size: 0.8rem; color: var(--gray-500); margin-bottom: 2px;">Email detectado:</div>
+                                <strong style="font-size: 0.9rem;">{{ email_cliente_modal }}</strong>
+                            </div>
+                            {% else %}
+                            <div class="email-cliente-card sin-email mb-2">
+                                <div style="font-size: 0.8rem; color: #856404;">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    No se detectó email del cliente. Ingrésalo manualmente.
+                                </div>
+                            </div>
+                            {% endif %}
+                            <input type="email" class="form-control form-control-sm" id="emailClienteInput"
+                                   name="email_cliente"
+                                   value="{{ email_cliente_modal }}"
+                                   placeholder="cliente@ejemplo.com" required>
+                        </div>
+
+                        <!-- --- 7. CC (copia a empleados) --- -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem;">
+                                <i class="bi bi-people me-1"></i>Copia (CC) a empleados
+                            </label>
+                            <div style="max-height: 130px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: 6px; padding: 8px;">
+                                {% for emp in empleados_copia %}
+                                <div class="form-check form-check-sm mb-1">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="copia_empleados" value="{{ emp.email }}"
+                                           id="ccEmp{{ emp.pk }}"
+                                           {% if emp.email == request.user.email %}checked{% endif %}>
+                                    <label class="form-check-label" for="ccEmp{{ emp.pk }}"
+                                           style="font-size: 0.8rem;">
+                                        {{ emp.nombre_completo }}
+                                        <span style="color: var(--gray-400); font-size: 0.72rem;">
+                                            ({{ emp.area }})
+                                        </span>
+                                    </label>
+                                </div>
+                                {% empty %}
+                                <div style="font-size: 0.8rem; color: var(--gray-400);">No hay empleados disponibles</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- --- 8. MENSAJE PERSONALIZADO --- -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem;" for="mensajePersonalizado">
+                                <i class="bi bi-chat-text me-1"></i>Mensaje personalizado (opcional)
+                            </label>
+                            <textarea class="form-control form-control-sm" id="mensajePersonalizado"
+                                      name="mensaje_personalizado" rows="3"
+                                      placeholder="Texto adicional que aparecerá en el correo al cliente..."></textarea>
+                        </div>
+
+                        <!-- --- 9. PREVISUALIZACIÓN DEL PDF --- -->
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <label class="form-label fw-semibold mb-0" style="font-size: 0.85rem;">
+                                    <i class="bi bi-file-earmark-pdf me-1"></i>Previsualización del PDF
+                                </label>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPreviewPDF">
+                                    <i class="bi bi-eye me-1"></i>Generar preview
+                                </button>
+                            </div>
+                            <div id="previewPDFContainer" style="display:none;">
+                                <iframe id="iframePreviewPDF"
+                                        style="width: 100%; height: 380px; border: 1px solid var(--gray-200); border-radius: 6px;"
+                                        title="Preview PDF"></iframe>
+                            </div>
+                            <div id="previewPDFPlaceholder"
+                                 style="background: var(--gray-50); border: 1px dashed var(--gray-300); border-radius: 6px; height: 100px; display: flex; align-items: center; justify-content: center; color: var(--gray-400); font-size: 0.82rem;">
+                                <span><i class="bi bi-file-earmark me-1"></i>Haz clic en "Generar preview" para ver el PDF</span>
+                            </div>
+                        </div>
+
+                    </div><!-- /col-lg-6 derecha -->
+                </div><!-- /row -->
+            </div><!-- /modal-body -->
+
+            <!-- FOOTER -->
+            <div class="modal-footer" style="border-top: 2px solid var(--gray-100);">
+                <!-- Alerta de resultado (oculta al inicio) -->
+                <div id="alertaEnvioModal" class="w-100 mb-2" style="display: none;"></div>
+
+                <div class="d-flex gap-2 w-100 justify-content-end">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x me-1"></i>Cerrar
+                    </button>
+                    <button type="button" class="btn btn-warning" id="btnConfirmarEnvioCliente"
+                            style="min-width: 170px;">
+                        <span id="btnEnvioTexto">
+                            <i class="bi bi-send me-2"></i>Enviar al Cliente
+                        </span>
+                        <span id="btnEnvioSpinner" style="display:none;">
+                            <span class="spinner-border spinner-border-sm me-2"></span>Enviando...
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+        </div><!-- /modal-content -->
+    </div><!-- /modal-dialog -->
+</div><!-- /modal -->
+
+<!-- Script de configuración de datos para cotizacion_cliente_modal.ts -->
+<script>
+window.COTIZACION_CLIENTE_CONFIG = {
+    urlApi:     "{% url 'almacen:api_enviar_cotizacion_cliente' solicitud.pk %}",
+    urlPreview: "{% url 'almacen:preview_pdf_cotizacion' solicitud.pk %}",
+    csrfToken:  "{{ csrf_token }}",
+    gama:       "{{ gama_equipo }}",
+    // profitConfig: valores de margen, costos fijos y diagnóstico por perfil.
+    // Los números vienen del .env del servidor (nunca del código fuente),
+    // los inyecta Django en tiempo de render. No aparecen en el repositorio.
+    profitConfig: {{ profit_config_json|safe }},
+    lineas: [
+        {% for linea in solicitud.lineas.all %}
+        {
+            pk:         {{ linea.pk }},
+            nombre:     "{{ linea.producto.nombre|escapejs }}",
+            descripcion:"{{ linea.descripcion_pieza|default_if_none:''|escapejs }}",
+            cantidad:   {{ linea.cantidad }},
+            costo:      {{ linea.costo_unitario|default:0 }},
+            es_necesaria: {{ linea.es_necesaria|yesno:"true,false" }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ],
+    servicios: [
+        {% for svc in solicitud.servicios_adicionales.all %}
+        {
+            pk:   {{ svc.pk }},
+            nombre: "{{ svc.get_tipo_servicio_display|escapejs }}",
+            costo: {{ svc.costo|default:0 }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]
+};
+</script>
+{% endif %}
 {% endblock almacen_content %}
 
 {% block extra_js %}
 <script src="{% static 'js/detalle_solicitud.js' %}"></script>
+{% if solicitud.estado in 'enviada_front,enviada_cliente,parcialmente_aprobada' %}
+<script src="{% static 'js/cotizacion_cliente_modal.js' %}"></script>
+{% endif %}
 {% endblock extra_js %}

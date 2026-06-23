@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotización SIC — {{ solicitud.numero_solicitud }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f6f8;
+        }
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        /* Encabezado navy — mismo color que los headers del PDF */
+        .header {
+            background-color: #003366;
+            color: #ffffff;
+            padding: 28px 32px;
+            text-align: left;
+        }
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo-img {
+            max-width: 140px;
+            height: auto;
+            filter: brightness(0) invert(1);
+        }
+        .header-text h1 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #ffffff;
+        }
+        .header-text p {
+            font-size: 13px;
+            color: #c8d8f0;
+        }
+        /* Banda con el tipo de servicio */
+        .servicio-band {
+            background-color: #1d4e8f;
+            color: #ffffff;
+            text-align: center;
+            padding: 10px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        .content {
+            padding: 32px;
+        }
+        .saludo {
+            font-size: 17px;
+            color: #1a2f5a;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .intro-text {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 24px;
+        }
+        /* Datos del equipo — tarjeta pequeña */
+        .equipo-card {
+            background-color: #f0f4fa;
+            border-left: 4px solid #003366;
+            border-radius: 4px;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            font-size: 13px;
+        }
+        .equipo-card .equipo-titulo {
+            font-weight: 700;
+            color: #003366;
+            margin-bottom: 6px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .equipo-card .equipo-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 24px;
+        }
+        .equipo-item span:first-child {
+            font-weight: 600;
+            color: #333;
+        }
+        .equipo-item span:last-child {
+            color: #555;
+        }
+        /* Totales de la cotización — caja destacada */
+        .totales-box {
+            border: 2px solid #003366;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .totales-header {
+            background-color: #003366;
+            color: #ffffff;
+            text-align: center;
+            padding: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .totales-body {
+            padding: 0;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 18px;
+            border-bottom: 1px solid #e8eaf0;
+            font-size: 14px;
+        }
+        .total-row:last-child {
+            border-bottom: none;
+        }
+        .total-row .etiqueta {
+            color: #444;
+        }
+        .total-row .monto {
+            font-weight: 600;
+            color: #333;
+        }
+        /* Fila destacada: Total con IVA */
+        .total-row.destacado {
+            background-color: #003366;
+        }
+        .total-row.destacado .etiqueta,
+        .total-row.destacado .monto {
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 16px;
+        }
+        /* Fila total a pagar (con descuento diagnóstico) */
+        .total-row.final {
+            background-color: #1d4e8f;
+        }
+        .total-row.final .etiqueta,
+        .total-row.final .monto {
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 15px;
+        }
+        /* PDF adjunto — aviso */
+        .pdf-notice {
+            background-color: #fff8e1;
+            border: 1px solid #ffe082;
+            border-radius: 6px;
+            padding: 14px 18px;
+            font-size: 13px;
+            color: #5d4037;
+            margin-bottom: 24px;
+        }
+        .pdf-notice strong {
+            color: #e65100;
+        }
+        /* Mensaje personalizado del usuario */
+        .mensaje-personalizado {
+            background-color: #f0f4fa;
+            border-left: 3px solid #1d4e8f;
+            border-radius: 4px;
+            padding: 14px 18px;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 24px;
+            white-space: pre-wrap;
+        }
+        /* Footer con información de contacto */
+        .footer {
+            background-color: #1a2a4a;
+            color: #c0cfe8;
+            padding: 20px 32px;
+            font-size: 12px;
+            text-align: center;
+        }
+        .footer a {
+            color: #90b8f8;
+            text-decoration: none;
+        }
+        .footer .empresa {
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+        .footer .divider {
+            margin: 8px 0;
+            border-top: 1px solid #2e4070;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- =============================================================== -->
+    <!-- ENCABEZADO: Logo + Empresa + Tipo de Servicio                    -->
+    <!-- =============================================================== -->
+    <div class="header">
+        <div class="header-inner">
+            <div>
+                {% if True %}{# Logo inline como imagen adjunta CID #}
+                <img src="cid:logo_sic" alt="SIC" class="logo-img">
+                {% endif %}
+            </div>
+            <div class="header-text" style="text-align: right;">
+                <h1>{{ empresa_nombre }}</h1>
+                <p>{{ fecha_envio_texto }}</p>
+                <p>Folio: {{ solicitud.numero_solicitud }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Banda del tipo de servicio -->
+    <div class="servicio-band">
+        {{ titulo_propuesta }}
+    </div>
+
+    <!-- =============================================================== -->
+    <!-- CUERPO PRINCIPAL                                                  -->
+    <!-- =============================================================== -->
+    <div class="content">
+
+        <!-- Saludo personalizado -->
+        <p class="saludo">
+            {% if nombre_cliente %}
+                Estimado/a {{ nombre_cliente }},
+            {% else %}
+                Estimado/a cliente,
+            {% endif %}
+        </p>
+        <p class="intro-text">
+            Adjunto encontrará la propuesta de cotización para su equipo.
+            El PDF incluye el detalle completo de las piezas y/o servicios con sus precios
+            individuales. A continuación le presentamos el resumen de los totales.
+        </p>
+
+        <!-- Datos del equipo (si están disponibles) -->
+        {% if info_equipo %}
+        <div class="equipo-card">
+            <div class="equipo-titulo">Datos del Equipo</div>
+            <div class="equipo-grid">
+                {% if info_equipo.marca %}
+                <div class="equipo-item">
+                    <span>Marca: </span><span>{{ info_equipo.marca }}</span>
+                </div>
+                {% endif %}
+                {% if info_equipo.modelo %}
+                <div class="equipo-item">
+                    <span>Modelo: </span><span>{{ info_equipo.modelo }}</span>
+                </div>
+                {% endif %}
+                {% if info_equipo.tipo %}
+                <div class="equipo-item">
+                    <span>Tipo: </span><span>{{ info_equipo.tipo }}</span>
+                </div>
+                {% endif %}
+                {% if info_equipo.service_tag %}
+                <div class="equipo-item">
+                    <span>Service Tag: </span><span>{{ info_equipo.service_tag }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Resumen de Totales (lo que el cliente necesita ver) -->
+        <div class="totales-box">
+            <div class="totales-header">Resumen de Cotización</div>
+            <div class="totales-body">
+
+                <!-- Total con IVA — siempre visible y destacado -->
+                <div class="total-row destacado">
+                    <span class="etiqueta">TOTAL CON IVA (16%)</span>
+                    <span class="monto">${{ calculo.precio_con_iva|floatformat:2 }} MXN</span>
+                </div>
+
+                <!-- Total a pagar con descuento diagnóstico — solo si aplica -->
+                {% if incluir_descuento and calculo.precio_menos_diagnostico %}
+                <div class="total-row" style="background-color: #f5f5f5;">
+                    <span class="etiqueta" style="color: #666; font-size: 13px;">
+                        Descuento diagnóstico incluido (diagnóstico ya pagado)
+                    </span>
+                    <span class="monto" style="color: #666; font-size: 13px;">
+                        - ${{ calculo.diagnostico|floatformat:2 }} + IVA
+                    </span>
+                </div>
+                <div class="total-row final">
+                    <span class="etiqueta">TOTAL A PAGAR (aplicando descuento diagnóstico)</span>
+                    <span class="monto">${{ calculo.precio_menos_diagnostico|floatformat:2 }} MXN</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Aviso del PDF adjunto -->
+        <div class="pdf-notice">
+            <strong>📎 PDF adjunto:</strong> El archivo <em>{{ solicitud.numero_solicitud }}.pdf</em>
+            incluye el desglose completo de piezas y servicios con precios individuales
+            (sin IVA), días estimados de entrega y tipo de cada componente.
+        </div>
+
+        <!-- Mensaje personalizado del técnico (si existe) -->
+        {% if mensaje_personalizado %}
+        <div class="mensaje-personalizado">{{ mensaje_personalizado }}</div>
+        {% endif %}
+
+        <!-- Nota de vigencia -->
+        <p style="font-size: 12px; color: #888; text-align: center; margin-top: 8px;">
+            Esta cotización tiene una vigencia de <strong>15 días hábiles</strong> a partir
+            de la fecha de emisión. Los precios están sujetos a disponibilidad de piezas.
+        </p>
+
+    </div>
+
+    <!-- =============================================================== -->
+    <!-- FOOTER                                                            -->
+    <!-- =============================================================== -->
+    <div class="footer">
+        <p class="empresa">{{ empresa_nombre }}</p>
+        {% if nombre_usuario %}
+        <p>Enviado por: <strong>{{ nombre_usuario }}</strong></p>
+        {% endif %}
+        {% if whatsapp_empleado %}
+        <p>
+            <img src="cid:icon_whatsapp" alt="WhatsApp" width="14" style="vertical-align: middle; margin-right: 4px;">
+            WhatsApp: <a href="https://wa.me/{{ whatsapp_empleado }}">{{ whatsapp_empleado }}</a>
+        </p>
+        {% endif %}
+        <div class="divider"></div>
+        <p>© {{ fecha_envio_texto|slice:":4" }} {{ empresa_nombre }} — Todos los derechos reservados.</p>
+    </div>
+
+</div>
+</body>
+</html>

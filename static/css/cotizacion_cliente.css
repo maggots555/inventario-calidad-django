@@ -1,0 +1,549 @@
+/*
+ * cotizacion_cliente.css
+ * ======================
+ * Estilos para el modal "Enviar Cotización al Cliente" en detalle_solicitud.html.
+ *
+ * EXPLICACIÓN:
+ * Contiene los estilos del modal de envío, calculadora de profit y cards de
+ * previsualización de propuestas. Sigue las reglas de dark mode del proyecto
+ * usando var(--nombre-variable) para colores y override [data-bs-theme="dark"].
+ *
+ * Organización:
+ * 1. Variables del módulo
+ * 2. Sección tipo de servicio (botones radiales)
+ * 3. Calculadora de profit (tabla de resultados)
+ * 4. Cards de previsualización de propuestas
+ * 5. Tabla de precios calculados en el modal
+ * 6. MODO OSCURO — Overrides para [data-bs-theme="dark"]
+ */
+
+/* ============================================================
+   ESTILOS BASE (modo claro — default)
+   ============================================================ */
+
+/* ----------------------------------------------------------
+   Botones de selección de tipo de servicio
+   Reemplazan los botones de radio nativos con tarjetas visuales
+   ---------------------------------------------------------- */
+.servicio-tipo-btn {
+    cursor: pointer;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 10px 14px;
+    background-color: var(--gray-50);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+    text-align: center;
+    flex: 1;
+    min-width: 80px;
+}
+
+.servicio-tipo-btn:hover {
+    border-color: var(--primary-color);
+    background-color: rgba(31, 99, 145, 0.05);
+}
+
+.servicio-tipo-btn.activo {
+    border-color: var(--primary-color);
+    background-color: rgba(31, 99, 145, 0.10);
+}
+
+.servicio-tipo-btn .nombre-servicio {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    display: block;
+    line-height: 1.2;
+    margin-top: 4px;
+}
+
+.servicio-tipo-btn .profit-badge {
+    font-size: 0.65rem;
+    color: var(--gray-500);
+    display: block;
+}
+
+.servicio-tipo-btn.activo .nombre-servicio {
+    color: var(--primary-color);
+}
+
+.servicio-tipo-btn.activo .profit-badge {
+    color: #1a7340;
+    font-weight: 600;
+}
+
+/* ----------------------------------------------------------
+   Panel calculadora de profit — recuadro de resultados
+   ---------------------------------------------------------- */
+.calc-resultado-panel {
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+.calc-resultado-header {
+    background-color: #003366;
+    color: #ffffff;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.calc-resultado-body {
+    padding: 0;
+}
+
+.calc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.calc-row:last-child {
+    border-bottom: none;
+}
+
+.calc-row .etq {
+    color: var(--gray-600);
+}
+
+.calc-row .val {
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+/* Fila toggle del desglose expandible */
+.calc-row-desglose-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+
+.calc-row-desglose-toggle:hover {
+    background-color: rgba(31, 99, 145, 0.06);
+}
+
+.desglose-chevron {
+    display: inline-block;
+    margin-left: 5px;
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    transition: transform 0.15s ease;
+}
+
+/* Panel expandible con las piezas y servicios individuales */
+.calc-desglose-panel {
+    background-color: var(--gray-50);
+    border-bottom: 1px solid var(--gray-100);
+    padding: 6px 0;
+}
+
+/* Encabezado de sección dentro del panel (Piezas / Servicios adicionales) */
+.calc-desglose-grupo-titulo {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray-400);
+    padding: 6px 28px 3px;
+}
+
+/* Fila individual de una pieza o servicio */
+.calc-desglose-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 4px 28px;
+    font-size: 0.80rem;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.calc-desglose-item:last-child {
+    border-bottom: none;
+}
+
+.desglose-nombre {
+    color: var(--gray-600);
+    flex: 1;
+    padding-right: 12px;
+}
+
+/* Texto "× N" de cantidad */
+.desglose-cant {
+    color: var(--gray-400);
+    font-size: 0.76rem;
+}
+
+.desglose-val {
+    color: var(--gray-700);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Mensaje cuando no hay piezas */
+.calc-desglose-vacio {
+    font-size: 0.78rem;
+    color: var(--gray-400);
+    padding: 8px 28px;
+    font-style: italic;
+}
+
+/* Fila de TOTAL CON IVA — siempre destacada */
+.calc-row.total-iva {
+    background-color: #003366;
+    padding: 10px 14px;
+}
+
+.calc-row.total-iva .etq,
+.calc-row.total-iva .val {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
+/* Fila de descuento diagnóstico */
+.calc-row.descuento {
+    background-color: var(--gray-50);
+    font-size: 0.78rem;
+}
+
+.calc-row.descuento .etq,
+.calc-row.descuento .val {
+    color: var(--gray-500);
+}
+
+/* Fila de TOTAL A PAGAR (con descuento) */
+.calc-row.total-pagar {
+    background-color: #1d4e8f;
+    padding: 10px 14px;
+}
+
+.calc-row.total-pagar .etq,
+.calc-row.total-pagar .val {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.88rem;
+}
+
+/* ----------------------------------------------------------
+   Cards de previsualización de propuestas
+   ---------------------------------------------------------- */
+.propuesta-preview-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+
+.propuesta-preview-header {
+    background-color: #003366;
+    color: #ffffff;
+    padding: 9px 14px;
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.propuesta-preview-body {
+    padding: 12px 14px;
+    font-size: 0.82rem;
+}
+
+.propuesta-item-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.propuesta-item-row:last-child {
+    border-bottom: none;
+}
+
+.propuesta-item-row .item-desc {
+    color: var(--gray-700);
+    flex: 1;
+}
+
+.propuesta-item-row .item-precio {
+    font-weight: 600;
+    color: var(--gray-800);
+    text-align: right;
+    min-width: 90px;
+}
+
+/* Etiqueta de tipo necesaria/opcional */
+.badge-necesaria {
+    background-color: #C6EFCE;
+    color: #375623;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.badge-opcional {
+    background-color: #FFF2CC;
+    color: #7D6608;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+/* Totales al pie de la card de propuesta */
+.propuesta-totales {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 2px solid var(--gray-200);
+}
+
+.propuesta-total-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.84rem;
+    padding: 3px 0;
+}
+
+.propuesta-total-row.final {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #003366;
+    margin-top: 4px;
+}
+
+/* ----------------------------------------------------------
+   Botones de opciones de agrupación
+   ---------------------------------------------------------- */
+.agrupacion-option {
+    cursor: pointer;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 12px 16px;
+    background-color: var(--gray-50);
+    transition: border-color 0.15s ease;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.agrupacion-option:hover {
+    border-color: var(--primary-color);
+    background-color: rgba(31, 99, 145, 0.04);
+}
+
+.agrupacion-option.activo {
+    border-color: var(--primary-color);
+    background-color: rgba(31, 99, 145, 0.08);
+}
+
+.agrupacion-option input[type="radio"] {
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+.agrupacion-option .opcion-titulo {
+    font-weight: 600;
+    font-size: 0.87rem;
+    color: var(--gray-800);
+    display: block;
+    margin-bottom: 2px;
+}
+
+.agrupacion-option .opcion-desc {
+    font-size: 0.77rem;
+    color: var(--gray-500);
+    display: block;
+}
+
+.agrupacion-option.activo .opcion-titulo {
+    color: var(--primary-color);
+}
+
+/* ----------------------------------------------------------
+   Destinatario — card de email del cliente
+   ---------------------------------------------------------- */
+.email-cliente-card {
+    border: 2px solid #28a745;
+    border-radius: 8px;
+    padding: 12px 16px;
+    background-color: rgba(40, 167, 69, 0.05);
+    margin-bottom: 4px;
+}
+
+.email-cliente-card.sin-email {
+    border-color: #ffc107;
+    background-color: rgba(255, 193, 7, 0.05);
+}
+
+/* ----------------------------------------------------------
+   Badge de gama del equipo en el modal
+   ---------------------------------------------------------- */
+.gama-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.gama-badge.alta   { background-color: #d4edda; color: #155724; }
+.gama-badge.media  { background-color: #fff3cd; color: #856404; }
+.gama-badge.baja   { background-color: #e2e3e5; color: #383d41; }
+.gama-badge.desconocida { background-color: var(--gray-100); color: var(--gray-600); }
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   ============================================================ */
+
+[data-bs-theme="dark"] .servicio-tipo-btn {
+    background-color: var(--card-bg);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .servicio-tipo-btn:hover {
+    border-color: #60a5fa;
+    background-color: rgba(96, 165, 250, 0.08);
+}
+
+[data-bs-theme="dark"] .servicio-tipo-btn.activo {
+    border-color: #60a5fa;
+    background-color: rgba(96, 165, 250, 0.12);
+}
+
+[data-bs-theme="dark"] .servicio-tipo-btn .nombre-servicio {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .servicio-tipo-btn .profit-badge {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .servicio-tipo-btn.activo .nombre-servicio {
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .calc-resultado-panel {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .calc-row {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .calc-row .etq {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .calc-row .val {
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .calc-row.descuento {
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .propuesta-preview-card {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .propuesta-item-row {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .propuesta-item-row .item-desc {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .propuesta-item-row .item-precio {
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .propuesta-totales {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .propuesta-total-row.final {
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .agrupacion-option {
+    background-color: var(--card-bg);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .agrupacion-option:hover {
+    border-color: #60a5fa;
+    background-color: rgba(96, 165, 250, 0.06);
+}
+
+[data-bs-theme="dark"] .agrupacion-option.activo {
+    border-color: #60a5fa;
+    background-color: rgba(96, 165, 250, 0.1);
+}
+
+[data-bs-theme="dark"] .agrupacion-option .opcion-titulo {
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .agrupacion-option .opcion-desc {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .agrupacion-option.activo .opcion-titulo {
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .email-cliente-card {
+    background-color: rgba(52, 211, 153, 0.08);
+    border-color: #34d399;
+}
+
+[data-bs-theme="dark"] .email-cliente-card.sin-email {
+    background-color: rgba(251, 191, 36, 0.08);
+    border-color: #fbbf24;
+}
+
+[data-bs-theme="dark"] .badge-necesaria {
+    background-color: rgba(198, 239, 206, 0.2);
+    color: #34d399;
+}
+
+[data-bs-theme="dark"] .badge-opcional {
+    background-color: rgba(255, 242, 204, 0.2);
+    color: #fbbf24;
+}
+
+[data-bs-theme="dark"] .calc-row-desglose-toggle:hover {
+    background-color: rgba(96, 165, 250, 0.07);
+}
+
+[data-bs-theme="dark"] .calc-desglose-panel {
+    background-color: #0f172a;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .calc-desglose-grupo-titulo {
+    color: #475569;
+}
+
+[data-bs-theme="dark"] .calc-desglose-item {
+    border-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .desglose-nombre {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .desglose-cant {
+    color: #475569;
+}
+
+[data-bs-theme="dark"] .desglose-val {
+    color: var(--text-primary);
+}

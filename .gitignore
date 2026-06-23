@@ -112,3 +112,6 @@ logs/
 scripts/poblado/*.csv
 scripts/poblado/*.xlsx
 .github/prompts/
+
+# Documentación interna con información confidencial de márgenes y precios
+docs/COTIZADOR_PROFIT.md

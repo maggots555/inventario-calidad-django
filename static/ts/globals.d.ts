@@ -9,4 +9,3 @@ interface Window {
     sigmaLoader: InstanceType<typeof DashboardLoader> | null;
 }
 
-

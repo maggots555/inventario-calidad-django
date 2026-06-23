@@ -34,6 +34,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from functools import wraps
 
 from .models import (
@@ -3396,6 +3397,42 @@ def editar_lineas_cotizacion(request, pk):
     return render(request, 'almacen/cotizaciones/editar_lineas.html', context)
 
 
+import json as _json  # alias para no colisionar con variables de vistas
+
+
+def _serializar_profit_config() -> str:
+    """
+    Lee PROFIT_CONFIG desde el módulo de PDF (que a su vez lo lee del .env)
+    y lo convierte a una cadena JSON lista para inyectar en el template.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    El template necesita pasar estos valores al JavaScript del navegador.
+    Al usar |safe en el template, Django inserta el JSON sin escapar las
+    comillas, de modo que el navegador lo interpreta como objeto JS válido.
+
+    Importamos dentro de la función (importación diferida) para evitar
+    importaciones circulares y para mantener el módulo ligero.
+
+    Returns:
+        str: Cadena JSON con la configuración de profit por perfil.
+    """
+    # Importación diferida para evitar ciclos de importación entre módulos
+    from .utils.pdf_cotizacion_cliente import PROFIT_CONFIG
+
+    # Construir un diccionario serializable (las listas de costos_fijos ya lo son)
+    datos = {
+        perfil: {
+            'profit_target':  cfg['profit_target'],
+            'costos_fijos':   cfg['costos_fijos'],
+            'diagnostico':    cfg['diagnostico'],
+        }
+        for perfil, cfg in PROFIT_CONFIG.items()
+    }
+    # Convertir a JSON compacto — se incrustará dentro de un <script>
+    return _json.dumps(datos, separators=(',', ':'))
+
+
 @login_required
 @permission_required_with_message('almacen.view_solicitudcotizacion')
 def detalle_solicitud_cotizacion(request, pk):
@@ -3438,8 +3475,38 @@ def detalle_solicitud_cotizacion(request, pk):
     if solicitud.orden_servicio:
         try:
             info_orden = solicitud.orden_servicio.detalle_equipo
-        except:
+        except Exception:
             pass
+
+    # --- Datos extra para el modal de envío de cotización al cliente ---
+    # Obtenemos gama, mano de obra y email del cliente para pre-llenar el modal
+
+    # Gama del equipo (alta/media/baja) — solo disponible si hay orden vinculada
+    gama_equipo = ''
+    if info_orden:
+        gama_equipo = getattr(info_orden, 'gama', '') or ''
+
+    # Costo de mano de obra desde la Cotizacion de Servicio Técnico
+    # (el usuario puede sobreescribirlo en el modal si lo desea)
+    costo_mano_obra = None
+    if solicitud.orden_servicio:
+        try:
+            # La Cotizacion está vinculada 1:1 a la OrdenServicio
+            cotizacion_st = solicitud.orden_servicio.cotizacion
+            costo_mano_obra = float(cotizacion_st.costo_mano_obra)
+        except Exception:
+            # La orden puede no tener cotización aún — es normal
+            pass
+
+    # Email del cliente para el campo "Destinatario" del modal
+    email_cliente_modal = ''
+    if info_orden:
+        email_raw = getattr(info_orden, 'email_cliente', '') or ''
+        # Excluir el email placeholder que usa ST cuando no hay email real
+        if email_raw and email_raw != 'cliente@ejemplo.com':
+            email_cliente_modal = email_raw
+    elif solicitud.email_cliente:
+        email_cliente_modal = solicitud.email_cliente
     
     # Procesar subida de imagen (solo en estado borrador)
     mensaje_imagen = None
@@ -3505,8 +3572,16 @@ def detalle_solicitud_cotizacion(request, pk):
         'max_imagenes_referencia': max_imagenes_referencia,
         'empleados_copia': empleados_copia,
         'usuario_en_lista_cc': usuario_en_lista_cc,
+        # Datos para el modal "Enviar Cotización al Cliente"
+        'gama_equipo': gama_equipo,
+        'costo_mano_obra': costo_mano_obra,
+        'email_cliente_modal': email_cliente_modal,
+        # Configuración de profit serializada como JSON para inyectarla en el
+        # template y leerla desde TypeScript. Los valores vienen del .env
+        # (nunca del código fuente), así que no aparecen en el repositorio.
+        'profit_config_json': _serializar_profit_config(),
     }
-    
+
     return render(request, 'almacen/cotizaciones/detalle_solicitud.html', context)
 
 
@@ -3579,6 +3654,356 @@ def enviar_solicitud_a_cliente(request, pk):
             )
     
     return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+# =============================================================================
+# NUEVAS VISTAS: ENVÍO DE COTIZACIÓN DIRECTAMENTE AL CLIENTE FINAL
+# =============================================================================
+
+@login_required
+@permission_required_with_message('almacen.change_solicitudcotizacion')
+@require_http_methods(["POST"])
+def api_enviar_cotizacion_cliente(request, pk):
+    """
+    Envía la cotización directamente al cliente final por correo con PDF adjunto.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista es el corazón del nuevo modal "Enviar Cotización al Cliente".
+    Recibe los parámetros del modal (tipo de servicio, modo de agrupación,
+    email del cliente, etc.), genera los PDF necesarios y los envía al cliente.
+
+    Flujo:
+    1. Valida los datos del POST (tipo_servicio, email_cliente, modo_agrupacion)
+    2. Cambia el estado de la solicitud a 'enviada_cliente'
+    3. Agrupa los ítems según el modo elegido (todo junto / piezas vs servicios / etc.)
+    4. Para cada grupo, dispara una tarea Celery que genera el PDF y lo envía por email
+    5. Retorna JsonResponse inmediato (el email se procesa en background)
+
+    Args:
+        request: HttpRequest POST con los datos del modal.
+        pk     : ID de la SolicitudCotizacion.
+
+    Returns:
+        JsonResponse con {'success': bool, 'mensaje': str}
+    """
+    import json as _json
+    from .tasks import enviar_cotizacion_cliente_task
+    from config.paises_config import get_pais_actual
+
+    try:
+        solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+
+        # --- 1. VALIDACIÓN DE ESTADO ---
+        # La solicitud debe estar en un estado que permita el envío al cliente
+        estados_validos = ['enviada_front', 'enviada_cliente', 'parcialmente_aprobada']
+        if solicitud.estado not in estados_validos:
+            return JsonResponse({
+                'success': False,
+                'error': f'Estado "{solicitud.get_estado_display()}" no permite envío al cliente. '
+                         f'La solicitud debe estar en estado "Enviada a Front", "Enviada al Cliente" '
+                         f'o "Parcialmente Aprobada".'
+            })
+
+        # --- 2. EXTRAER PARÁMETROS DEL POST ---
+        tipo_servicio  = request.POST.get('tipo_servicio', 'estandar')
+        email_cliente  = request.POST.get('email_cliente', '').strip()
+        modo_agrupacion = request.POST.get('modo_agrupacion', 'todo_junto')
+        mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
+        incluir_descuento = request.POST.get('incluir_descuento_diagnostico') == '1'
+
+        # Mano de obra override (valor editado por el usuario en el modal)
+        mano_obra_raw = request.POST.get('mano_de_obra_override', '')
+        mano_de_obra_override = None
+        if mano_obra_raw:
+            try:
+                mano_de_obra_override = float(mano_obra_raw)
+            except ValueError:
+                pass
+
+        # Emails con copia (CC) — pueden venir múltiples campos con el mismo nombre
+        copia_empleados = request.POST.getlist('copia_empleados')
+
+        # --- 3. VALIDAR EMAIL DEL CLIENTE ---
+        if not email_cliente:
+            return JsonResponse({'success': False, 'error': 'El email del cliente es requerido.'})
+
+        # Validación simple de formato email
+        import re as _re
+        if not _re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email_cliente):
+            return JsonResponse({'success': False, 'error': f'El email "{email_cliente}" no tiene formato válido.'})
+
+        # --- 4. VALIDAR TIPO DE SERVICIO ---
+        tipos_validos = ['mostrador', 'estandar', 'express', 'alta_gama', 'server']
+        if tipo_servicio not in tipos_validos:
+            return JsonResponse({'success': False, 'error': f'Tipo de servicio "{tipo_servicio}" no válido.'})
+
+        # --- 5. CAMBIAR ESTADO A 'enviada_cliente' (si aún no lo está) ---
+        if solicitud.estado == 'enviada_front':
+            # Avanzar el estado usando el método del modelo
+            solicitud.enviar_a_cliente()
+
+        # --- 6. CONSTRUIR GRUPOS DE ÍTEMS SEGÚN MODO DE AGRUPACIÓN ---
+        # Obtener todas las líneas de cotización (piezas) con sus datos
+        lineas = list(solicitud.lineas.select_related('producto').all())
+
+        # Obtener todos los servicios adicionales (limpieza, paquetes, etc.)
+        servicios = list(solicitud.servicios_adicionales.all())
+
+        # Función auxiliar para serializar un ítem de línea a dict
+        def linea_a_dict(linea, es_servicio=False):
+            """Convierte una LineaCotizacion o LineaServicioAdicional a dict serializable."""
+            if es_servicio:
+                return {
+                    'pk': linea.pk,
+                    'descripcion': linea.get_tipo_servicio_display(),
+                    'cantidad': 1,
+                    'costo_unitario': float(linea.costo),
+                    'es_necesaria': False,    # Los servicios adicionales van como "opcional"
+                    'dias_entrega': None,
+                    'es_servicio': True,
+                }
+            else:
+                costo = float(linea.costo_unitario or 0)
+                return {
+                    'pk': linea.pk,
+                    'descripcion': (
+                        f"{linea.producto.nombre}: {linea.descripcion_pieza}"
+                        if linea.descripcion_pieza
+                        else linea.producto.nombre
+                    ),
+                    'cantidad': int(linea.cantidad),
+                    'costo_unitario': costo,
+                    'es_necesaria': linea.es_necesaria,
+                    'dias_entrega': linea.tiempo_entrega_estimado,
+                    'es_servicio': False,
+                }
+
+        # Convertir todos los ítems a dicts para pasar a la tarea
+        items_piezas_todos   = [linea_a_dict(l) for l in lineas if float(l.costo_unitario or 0) > 0]
+        items_piezas_nec     = [d for d in items_piezas_todos if d['es_necesaria']]
+        items_piezas_opc     = [d for d in items_piezas_todos if not d['es_necesaria']]
+        items_servicios      = [linea_a_dict(s, es_servicio=True) for s in servicios]
+
+        # Configurar los grupos según el modo de agrupación elegido
+        if modo_agrupacion == 'todo_junto':
+            # Un solo PDF con todos los ítems (piezas + servicios)
+            grupos = [{'titulo': '', 'items': items_piezas_todos + items_servicios}]
+
+        elif modo_agrupacion == 'piezas_vs_servicios':
+            # Dos PDFs: uno de piezas y otro de servicios adicionales
+            grupos = []
+            if items_piezas_todos:
+                grupos.append({'titulo': 'Cotización de Piezas', 'items': items_piezas_todos})
+            if items_servicios:
+                grupos.append({'titulo': 'Cotización de Servicios Adicionales', 'items': items_servicios})
+            if not grupos:
+                grupos = [{'titulo': '', 'items': items_piezas_todos + items_servicios}]
+
+        elif modo_agrupacion == 'necesarias_vs_opcionales':
+            # Dos PDFs: piezas necesarias y piezas opcionales
+            grupos = []
+            if items_piezas_nec:
+                grupos.append({'titulo': 'Cotización — Piezas Necesarias', 'items': items_piezas_nec})
+            # Las opcionales incluyen piezas no-necesarias + servicios adicionales
+            items_opcionales = items_piezas_opc + items_servicios
+            if items_opcionales:
+                grupos.append({'titulo': 'Cotización — Piezas Opcionales y Servicios', 'items': items_opcionales})
+            if not grupos:
+                grupos = [{'titulo': '', 'items': items_piezas_todos + items_servicios}]
+
+        else:
+            # Fallback: todo junto
+            grupos = [{'titulo': '', 'items': items_piezas_todos + items_servicios}]
+
+        # --- 7. FILTRAR GRUPOS CON AL MENOS UN ÍTEM ---
+        grupos = [g for g in grupos if g['items']]
+        if not grupos:
+            return JsonResponse({
+                'success': False,
+                'error': 'No hay ítems con costo registrado para generar la cotización. '
+                         'Agrega precios a las líneas antes de enviar.'
+            })
+
+        # --- 8. DISPARAR TAREA CELERY PARA CADA GRUPO ---
+        _db = get_pais_actual()['db_alias']
+        usuario_id = request.user.pk
+
+        for grupo in grupos:
+            enviar_cotizacion_cliente_task.delay(
+                solicitud_id=solicitud.pk,
+                email_cliente=email_cliente,
+                copia_empleados=copia_empleados,
+                tipo_servicio=tipo_servicio,
+                items=grupo['items'],
+                titulo_propuesta=grupo['titulo'],
+                incluir_descuento_diagnostico=incluir_descuento,
+                mano_de_obra_override=mano_de_obra_override,
+                mensaje_personalizado=mensaje_personalizado,
+                usuario_id=usuario_id,
+                db_alias=_db,
+            )
+
+        # Mensaje de éxito según cuántos grupos se enviaron
+        n_grupos = len(grupos)
+        if n_grupos == 1:
+            mensaje = f'Cotización enviada al cliente {email_cliente}. El correo se procesa en segundo plano.'
+        else:
+            mensaje = (
+                f'{n_grupos} cotizaciones separadas enviadas a {email_cliente}. '
+                f'Los correos se procesan en segundo plano.'
+            )
+
+        return JsonResponse({'success': True, 'mensaje': mensaje, 'grupos_enviados': n_grupos})
+
+    except Exception as e:
+        import traceback as _tb
+        logger.error(f"[API_COTIZACION_CLIENTE] Error: {e}\n{_tb.format_exc()}")
+        return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'})
+
+
+@login_required
+@permission_required_with_message('almacen.view_solicitudcotizacion')
+@require_http_methods(["GET"])
+@xframe_options_sameorigin
+def preview_pdf_cotizacion(request, pk):
+    """
+    Genera y devuelve un PDF de previsualización para el modal de envío al cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Esta vista es la que llama el botón "Ver Previsualización" del modal.
+    Genera el PDF con los parámetros actuales del modal (tipo de servicio,
+    modo de agrupación) y lo devuelve directamente como respuesta PDF
+    para mostrarlo en el iframe del modal.
+
+    Args:
+        request: HttpRequest GET con parámetros:
+                 - tipo_servicio: str
+                 - modo_agrupacion: str
+                 - incluir_descuento: '1'/'0'
+                 - grupo_idx: int (0=primero, 1=segundo — para modo separado)
+        pk     : ID de la SolicitudCotizacion.
+
+    Returns:
+        HttpResponse con content_type='application/pdf'
+    """
+    from django.http import HttpResponse
+    from .utils.pdf_cotizacion_cliente import PDFCotizacionCliente
+    from config.paises_config import get_pais_actual
+
+    try:
+        solicitud = get_object_or_404(
+            SolicitudCotizacion.objects.select_related(
+                'orden_servicio',
+                'orden_servicio__detalle_equipo',
+            ).prefetch_related('lineas__producto', 'servicios_adicionales'),
+            pk=pk
+        )
+
+        tipo_servicio     = request.GET.get('tipo_servicio', 'estandar')
+        modo_agrupacion   = request.GET.get('modo_agrupacion', 'todo_junto')
+        incluir_descuento = request.GET.get('incluir_descuento_diagnostico', '0') == '1'
+        grupo_idx         = int(request.GET.get('grupo_idx', 0))
+
+        # Re-construir los grupos de ítems (mismo código que en api_enviar_cotizacion_cliente)
+        lineas    = list(solicitud.lineas.select_related('producto').all())
+        servicios = list(solicitud.servicios_adicionales.all())
+
+        def linea_a_dict_preview(linea, es_servicio=False):
+            """Serializa ítem para el preview del PDF."""
+            if es_servicio:
+                return {
+                    'pk': linea.pk,
+                    'descripcion': linea.get_tipo_servicio_display(),
+                    'cantidad': 1,
+                    'costo_unitario': float(linea.costo),
+                    'es_necesaria': False,
+                    'dias_entrega': None,
+                    'es_servicio': True,
+                }
+            return {
+                'pk': linea.pk,
+                'descripcion': (
+                    f"{linea.producto.nombre}: {linea.descripcion_pieza}"
+                    if linea.descripcion_pieza else linea.producto.nombre
+                ),
+                'cantidad': int(linea.cantidad),
+                'costo_unitario': float(linea.costo_unitario or 0),
+                'es_necesaria': linea.es_necesaria,
+                'dias_entrega': linea.tiempo_entrega_estimado,
+                'es_servicio': False,
+            }
+
+        items_todos_piezas = [linea_a_dict_preview(l) for l in lineas if float(l.costo_unitario or 0) > 0]
+        items_piezas_nec   = [d for d in items_todos_piezas if d['es_necesaria']]
+        items_piezas_opc   = [d for d in items_todos_piezas if not d['es_necesaria']]
+        items_servicios    = [linea_a_dict_preview(s, es_servicio=True) for s in servicios]
+
+        if modo_agrupacion == 'todo_junto':
+            grupos = [{'titulo': '', 'items': items_todos_piezas + items_servicios}]
+        elif modo_agrupacion == 'piezas_vs_servicios':
+            grupos = []
+            if items_todos_piezas:
+                grupos.append({'titulo': 'Cotización de Piezas', 'items': items_todos_piezas})
+            if items_servicios:
+                grupos.append({'titulo': 'Cotización de Servicios Adicionales', 'items': items_servicios})
+        elif modo_agrupacion == 'necesarias_vs_opcionales':
+            grupos = []
+            if items_piezas_nec:
+                grupos.append({'titulo': 'Cotización — Piezas Necesarias', 'items': items_piezas_nec})
+            opcionales = items_piezas_opc + items_servicios
+            if opcionales:
+                grupos.append({'titulo': 'Cotización — Piezas Opcionales y Servicios', 'items': opcionales})
+        else:
+            grupos = [{'titulo': '', 'items': items_todos_piezas + items_servicios}]
+
+        grupos = [g for g in grupos if g['items']]
+
+        if not grupos:
+            return HttpResponse(
+                b'%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n'
+                b'2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n'
+                b'3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n'
+                b'xref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n'
+                b'0000000058 00000 n \n0000000115 00000 n \n'
+                b'trailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF',
+                content_type='application/pdf'
+            )
+
+        # Elegir el grupo según el índice (para modo separado)
+        grupo_idx = min(grupo_idx, len(grupos) - 1)
+        grupo = grupos[grupo_idx]
+
+        _pais = get_pais_actual()
+        generador = PDFCotizacionCliente(
+            solicitud=solicitud,
+            tipo_servicio=tipo_servicio,
+            items=grupo['items'],
+            titulo_propuesta=grupo['titulo'],
+            incluir_descuento_diagnostico=incluir_descuento,
+            pais_config=_pais,
+        )
+
+        resultado = generador.generar_pdf()
+        if not resultado['success']:
+            return HttpResponse(
+                f'Error al generar PDF: {resultado.get("error", "desconocido")}'.encode(),
+                content_type='text/plain',
+                status=500
+            )
+
+        pdf_bytes = resultado['buffer'].getvalue()
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = (
+            f'inline; filename="{resultado["nombre_archivo"]}"'
+        )
+        return response
+
+    except Exception as e:
+        import traceback as _tb
+        logger.error(f"[PREVIEW_PDF_COTIZACION] Error: {e}\n{_tb.format_exc()}")
+        return HttpResponse(f'Error: {str(e)}'.encode(), content_type='text/plain', status=500)
 
 
 @login_required
