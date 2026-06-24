@@ -3193,13 +3193,25 @@ def crear_solicitud_cotizacion(request):
     else:
         form = SolicitudCotizacionForm()
         formset = LineaCotizacionFormSet()
-    
+
+    # Obtener la sucursal del usuario logueado para mostrarla en el formulario
+    # cuando se usa el modo "sin orden activa". Se muestra como dato informativo
+    # (solo lectura) para que el técnico sepa desde qué sucursal está cotizando.
+    sucursal_usuario = None
+    try:
+        sucursal_usuario = request.user.empleado.sucursal
+    except Exception:
+        # El usuario puede no tener perfil de empleado o sucursal asignada — es válido
+        pass
+
     context = {
         'form': form,
         'formset': formset,
         'titulo': 'Nueva Solicitud de Cotización',
         'es_creacion': True,
         'max_imagenes_referencia': ImagenSolicitudCotizacion.MAX_IMAGENES_POR_SOLICITUD,
+        # Sucursal del usuario actual, para pre-mostrar en modo sin orden activa
+        'sucursal_usuario': sucursal_usuario,
     }
     
     return render(request, 'almacen/cotizaciones/form_solicitud.html', context)
@@ -3459,7 +3471,10 @@ def detalle_solicitud_cotizacion(request, pk):
     solicitud = get_object_or_404(
         SolicitudCotizacion.objects.select_related(
             'orden_servicio',
-            'creado_por'
+            'orden_servicio__sucursal',        # Sucursal de la orden vinculada
+            'creado_por',
+            'creado_por__empleado',            # Perfil de empleado del creador
+            'creado_por__empleado__sucursal',  # Sucursal del creador (para sin_orden_activa)
         ).prefetch_related(
             'lineas__producto',
             'lineas__proveedor',
@@ -3561,7 +3576,23 @@ def detalle_solicitud_cotizacion(request, pk):
     usuario_en_lista_cc = False
     if hasattr(request.user, 'empleado') and request.user.empleado:
         usuario_en_lista_cc = empleados_copia.filter(id=request.user.empleado.id).exists()
-    
+
+    # --- Sucursal para mostrar en el encabezado de la solicitud ---
+    # Con orden: se obtiene directamente de la FK orden_servicio → sucursal
+    sucursal_orden = None
+    if solicitud.orden_servicio:
+        sucursal_orden = solicitud.orden_servicio.sucursal
+
+    # Sin orden activa: se obtiene del perfil de empleado de quien creó la solicitud.
+    # El select_related ya cargó el camino creado_por → empleado → sucursal,
+    # por lo que esto no genera queries adicionales.
+    sucursal_creador = None
+    try:
+        sucursal_creador = solicitud.creado_por.empleado.sucursal
+    except Exception:
+        # El usuario puede no tener perfil de empleado o sucursal asignada — es válido
+        pass
+
     context = {
         'solicitud': solicitud,
         'info_orden': info_orden,
@@ -3572,6 +3603,9 @@ def detalle_solicitud_cotizacion(request, pk):
         'max_imagenes_referencia': max_imagenes_referencia,
         'empleados_copia': empleados_copia,
         'usuario_en_lista_cc': usuario_en_lista_cc,
+        # Sucursal del encabezado: con orden → de la orden; sin orden → del creador
+        'sucursal_orden': sucursal_orden,
+        'sucursal_creador': sucursal_creador,
         # Datos para el modal "Enviar Cotización al Cliente"
         'gama_equipo': gama_equipo,
         'costo_mano_obra': costo_mano_obra,
@@ -3909,6 +3943,9 @@ def preview_pdf_cotizacion(request, pk):
             SolicitudCotizacion.objects.select_related(
                 'orden_servicio',
                 'orden_servicio__detalle_equipo',
+                'orden_servicio__sucursal',
+                'creado_por',
+                'creado_por__empleado__sucursal',
             ).prefetch_related('lineas__producto', 'servicios_adicionales'),
             pk=pk
         )

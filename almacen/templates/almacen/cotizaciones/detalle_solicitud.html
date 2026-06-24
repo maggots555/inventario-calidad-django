@@ -96,6 +96,17 @@ Muestra toda la información y acciones según el estado
                         </div>
                     </div>
                     {% endif %}
+                    <!-- Sucursal del empleado que creó la solicitud sin orden activa -->
+                    <div class="row mt-2">
+                        <div class="col-md-4">
+                            <strong><i class="bi bi-building me-1"></i>Sucursal:</strong><br>
+                            {% if sucursal_creador %}
+                                <span class="badge bg-secondary">{{ sucursal_creador.nombre }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
+                    </div>
                     {% else %}
                     <!-- Modo con Orden: mostrar datos de la orden -->
                     {% if solicitud.numero_orden_cliente %}
@@ -138,6 +149,15 @@ Muestra toda la información y acciones según el estado
                             <i class="bi bi-telephone me-1"></i>{{ info_orden.telefono_cliente }}
                         </div>
                         {% endif %}
+                        <!-- Sucursal registrada en la orden de servicio vinculada -->
+                        <div class="col-md-4">
+                            <strong><i class="bi bi-building me-1"></i>Sucursal:</strong><br>
+                            {% if sucursal_orden %}
+                                <span class="badge bg-secondary">{{ sucursal_orden.nombre }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
                         {% endif %}
                     </div>
                     {% else %}

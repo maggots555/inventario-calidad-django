@@ -555,7 +555,9 @@ def enviar_cotizacion_cliente_task(
             solicitud = SolicitudCotizacion.objects.select_related(
                 'orden_servicio',
                 'orden_servicio__detalle_equipo',
+                'orden_servicio__sucursal',
                 'creado_por',
+                'creado_por__empleado__sucursal',
             ).prefetch_related(
                 'lineas__producto',
                 'servicios_adicionales',

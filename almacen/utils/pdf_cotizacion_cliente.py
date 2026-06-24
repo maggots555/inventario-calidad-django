@@ -726,15 +726,35 @@ class PDFCotizacionCliente:
         Obtiene los datos del cliente de dos fuentes posibles:
         1. Si hay orden de servicio vinculada → usa DetalleEquipo de ST
         2. Si es "sin orden activa" → usa los campos directos de SolicitudCotizacion
+
+        El "Centro de servicio" proviene de la sucursal:
+        - Con orden vinculada → orden_servicio.sucursal
+        - Sin orden activa → creado_por.empleado.sucursal
         """
         # --- Extracción de datos del cliente ---
         nombre_cliente = ''
         email_cliente  = ''
         telefono       = ''
         rfc            = ''
-        centro_servicio = self.pais_config.get('centro_servicio', '')
+        centro_servicio = ''
 
         solicitud = self.solicitud
+
+        # Sucursal según el tipo de solicitud (misma lógica que detalle_solicitud.html)
+        if solicitud.orden_servicio:
+            try:
+                sucursal = solicitud.orden_servicio.sucursal
+                if sucursal:
+                    centro_servicio = sucursal.nombre
+            except Exception:
+                pass
+        else:
+            try:
+                sucursal = solicitud.creado_por.empleado.sucursal
+                if sucursal:
+                    centro_servicio = sucursal.nombre
+            except Exception:
+                pass
 
         if solicitud.orden_servicio:
             # Fuente: DetalleEquipo de la orden en servicio técnico
@@ -771,7 +791,7 @@ class PDFCotizacionCliente:
         filas = [
             # Fila 1
             [
-                self._celda_etiqueta_valor('Centro de servicio:', centro_servicio),
+                self._celda_etiqueta_valor('Centro de servicio:', centro_servicio or '—'),
                 self._celda_etiqueta_valor('Cliente:', nombre_cliente or '—'),
                 self._celda_etiqueta_valor('RFC:', rfc or '—'),
             ],
