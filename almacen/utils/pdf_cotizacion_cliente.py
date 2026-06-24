@@ -14,6 +14,7 @@ Estructura del PDF generado:
 4. Datos del equipo (marca, modelo, tipo, service tag)
 5. Tabla de productos/servicios (con precios ya con margen aplicado, sin IVA)
 6. Sección Cotización (totales: sin IVA, con IVA, descuento diagnóstico si aplica)
+7. Página adicional: Términos y condiciones legales + QR equipos reacondicionados
 
 Uso básico:
     from almacen.utils.pdf_cotizacion_cliente import PDFCotizacionCliente
@@ -35,10 +36,10 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
 from reportlab.platypus import (
     SimpleDocTemplate, Table, TableStyle, Paragraph,
-    Spacer, HRFlowable, Image as RLImage
+    Spacer, HRFlowable, Image as RLImage, PageBreak,
 )
 from reportlab.platypus.flowables import Flowable
 
@@ -75,6 +76,9 @@ COLOR_GRIS_BORDE    = colors.HexColor('#CCCCCC')   # Bordes de tabla
 COLOR_BLANCO        = colors.white
 COLOR_NEGRO         = colors.black
 COLOR_AZUL_TOTAL    = colors.HexColor('#003366')   # Filas de totales importantes
+COLOR_ROJO_ALERTA   = colors.HexColor('#C00000')   # Alertas en términos y condiciones
+COLOR_ROJO_BG       = colors.HexColor('#FDECEC')   # Fondo rojo claro (bloques de alerta)
+COLOR_ROJO_TEXTO    = colors.HexColor('#8B0000')   # Texto/borde sobre fondo rojo claro
 
 # Márgenes del documento
 MARGEN = 15 * mm
@@ -415,6 +419,64 @@ class PDFCotizacionCliente:
             textColor=COLOR_NEGRO,
             alignment=TA_RIGHT,
         ))
+        # Estilos para la página de términos y condiciones
+        self._estilos.add(ParagraphStyle(
+            'TerminosEmpresa',
+            fontName='Helvetica-Bold',
+            fontSize=10,
+            textColor=COLOR_NAVY,
+            alignment=TA_CENTER,
+            spaceAfter=2,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'TerminosAviso',
+            fontName='Helvetica-Bold',
+            fontSize=7.5,
+            textColor=COLOR_NEGRO,
+            alignment=TA_CENTER,
+            spaceAfter=4,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'TerminosItem',
+            fontName='Helvetica',
+            fontSize=7.5,
+            leading=10.5,
+            textColor=COLOR_NEGRO,
+            alignment=TA_JUSTIFY,
+            leftIndent=6,
+            spaceBefore=2,
+            spaceAfter=2,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'TerminosItemResaltado',
+            fontName='Helvetica',
+            fontSize=7.5,
+            leading=10.5,
+            textColor=COLOR_AMARILLO_TEXTO,
+            alignment=TA_JUSTIFY,
+            leftIndent=4,
+            spaceBefore=1,
+            spaceAfter=1,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'TerminosItemResaltadoRojo',
+            fontName='Helvetica-Bold',
+            fontSize=7.5,
+            leading=10.5,
+            textColor=COLOR_ROJO_TEXTO,
+            alignment=TA_JUSTIFY,
+            leftIndent=4,
+            spaceBefore=1,
+            spaceAfter=1,
+        ))
+        self._estilos.add(ParagraphStyle(
+            'TerminosQR',
+            fontName='Helvetica-Bold',
+            fontSize=8,
+            textColor=COLOR_NAVY,
+            alignment=TA_CENTER,
+            spaceBefore=4,
+        ))
 
     # -------------------------------------------------------------------------
     # MÉTODO PRINCIPAL
@@ -460,6 +522,9 @@ class PDFCotizacionCliente:
             elementos += self._construir_tabla_productos(calculo)
             elementos.append(Spacer(1, 3 * mm))
             elementos += self._construir_seccion_cotizacion(calculo)
+
+            # Página adicional: términos y condiciones legales para el cliente
+            elementos += self._construir_terminos_condiciones()
 
             # Construir el documento final
             doc.build(elementos)
@@ -1191,11 +1256,10 @@ class PDFCotizacionCliente:
         tabla_totales.setStyle(TableStyle(estilos_totales))
         elementos.append(tabla_totales)
 
-        # Nota final: vigencia de cotización
+        # Nota final: referencia a términos en página siguiente
         elementos.append(Spacer(1, 4 * mm))
         elementos.append(Paragraph(
-            "<i>Esta cotización tiene una vigencia de 15 días hábiles a partir de la fecha de emisión. "
-            "Los precios están sujetos a disponibilidad de las piezas.</i>",
+            "<i>Consulte los términos y condiciones en la página siguiente.</i>",
             ParagraphStyle(
                 'NotaFinal',
                 fontName='Helvetica-Oblique',
@@ -1206,6 +1270,187 @@ class PDFCotizacionCliente:
         ))
 
         return elementos
+
+    # -------------------------------------------------------------------------
+    # SECCIÓN 7: TÉRMINOS Y CONDICIONES (página adicional)
+    # -------------------------------------------------------------------------
+
+    def _construir_terminos_condiciones(self) -> List:
+        """
+        Construye la página adicional de términos y condiciones legales.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        Después de la cotización se inserta un salto de página (PageBreak) y
+        se muestran las condiciones comerciales de SIC. Algunos párrafos llevan
+        fondo rojo (vigencia/recotización), fondo amarillo (advertencias críticas)
+        o negritas (abandono de producto). Al final se incluye el código QR
+        de equipos reacondicionados centrado debajo del texto promocional.
+        """
+        elementos: List = [PageBreak()]
+
+        # Encabezado corporativo de la página legal
+        elementos.append(Paragraph(
+            'SIC COMERCIALIZACIÓN Y SERVICIOS MÉXICO SC',
+            self._estilos['TerminosEmpresa'],
+        ))
+        elementos.append(Paragraph(
+            'NO OLVIDE CONSULTAR NUESTRO AVISO DE PRIVACIDAD EN '
+            '<font color="#003366"><b>WWW.SIC.COM.MX</b></font>',
+            self._estilos['TerminosAviso'],
+        ))
+        elementos.append(Spacer(1, 2 * mm))
+        elementos.append(self._crear_header_seccion('Términos y Condiciones'))
+        elementos.append(Spacer(1, 3 * mm))
+
+        estilo_item = self._estilos['TerminosItem']
+        estilo_resaltado = self._estilos['TerminosItemResaltado']
+        estilo_resaltado_rojo = self._estilos['TerminosItemResaltadoRojo']
+
+        # Bloque rojo — vigencia de la cotización (5 días hábiles / recotización)
+        elementos.append(self._bloque_resaltado_terminos(
+            'LA VIGENCIA DE ESTA COTIZACIÓN ES DE <b>5 DÍAS HÁBILES</b>, POSTERIOR A ESTE '
+            'TIEMPO HAY QUE SOLICITAR <b>RECOTIZACIÓN</b>.',
+            estilo_resaltado_rojo,
+            fondo=COLOR_ROJO_BG,
+            borde=COLOR_ROJO_ALERTA,
+        ))
+        elementos.append(Paragraph(
+            '• PARA CONFIRMAR LA ACEPTACIÓN DEL SERVICIO, ES IMPORTANTE QUE POR FAVOR ENVÍE '
+            'EL COMPROBANTE DE DEPÓSITO O TRANSFERENCIA CON LA REFERENCIA DE PAGO '
+            'PROPORCIONADA POR SIC Y DEBIDAMENTE IDENTIFICADA AL CONTACTO QUE LE ENVIÓ '
+            'ESTA COTIZACIÓN, USANDO EL MISMO CORREO ELECTRÓNICO.',
+            estilo_item,
+        ))
+        elementos.append(Paragraph(
+            '• <b>NOTA:</b> SIN EL COMPROBANTE Y REFERENCIA CORRECTOS NO SE ORDENA NINGUNA '
+            'PARTE, NI SE REPARA EL EQUIPO.',
+            estilo_item,
+        ))
+        elementos.append(Paragraph(
+            '• ESTIMADO CLIENTE, SI REQUIERE FACTURA LE RECORDAMOS QUE ES IMPORTANTE NOS '
+            'NOTIFIQUE Y SEA SOLICITADA DESDE EL INGRESO DE SU EQUIPO Y EN ESTA MISMA ETAPA '
+            'NOS PROPORCIONE LOS DATOS FISCALES CORRESPONDIENTES; YA QUE UNA VEZ FACTURADO '
+            'A "PÚBLICO EN GENERAL" NO PODEMOS HACER CAMBIOS. '
+            '<b>NOTA:</b> DEBIDO A LAS NUEVAS NORMAS DE LA FACTURACIÓN 4.0 REQUERIMOS SU '
+            'CONSTANCIA DE SITUACIÓN FISCAL ACTUALIZADA DURANTE ESTE PROCESO.',
+            estilo_item,
+        ))
+
+        # Bloque con fondo amarillo — reinstalación / respaldo
+        elementos.append(Spacer(1, 2 * mm))
+        elementos.append(self._bloque_resaltado_terminos(
+            'CON LA REINSTALACIÓN Y/O CAMBIO DE DISCO, SU EQUIPO QUEDA EN MODO FÁBRICA, '
+            'SE PIERDE TODA LA INFORMACIÓN. EN CASO DE REQUERIR EL SERVICIO DE RESPALDO '
+            'ÚNICAMENTE SE RESPALDA LA INFORMACIÓN CONTENIDA EN EL DISCO DENTRO DEL PERFIL '
+            '(NO SE RESPALDAN PROGRAMAS, OFFICE, ANTIVIRUS, ETC.).',
+            estilo_resaltado,
+        ))
+
+        elementos.append(Paragraph(
+            '• SI USTED NO DESEA ACEPTAR LA COTIZACIÓN, FAVOR DE NOTIFICAR VÍA CORREO '
+            'ELECTRÓNICO PARA TENER LISTO EL EQUIPO EN EL CENTRO DE SERVICIO CORRESPONDIENTE.',
+            estilo_item,
+        ))
+
+        # Abandono de producto — título en negritas dentro del párrafo
+        elementos.append(Paragraph(
+            '• <b>ABANDONO DE PRODUCTO:</b> EN CASO DE QUE EL EQUIPO DEL CLIENTE PERMANEZCA '
+            'DENTRO DE LAS INSTALACIONES DE (SIC) POR MÁS DE 30 DÍAS HÁBILES, DESPUÉS DE '
+            'HABER SIDO ENVIADA LA COTIZACIÓN Y/O SE HAYA REPARADO Y/O SE LE HAYA NOTIFICADO '
+            'AL CLIENTE QUE PUEDE IR POR EL EQUIPO POR NO ACEPTAR LA REPARACIÓN, SE HARÁ UN '
+            'CARGO DE $23.50 (VEINTITRÉS PESOS 50/100 M.N.) POR CADA DÍA DE ALMACENAJE QUE '
+            'PERMANEZCA EN RESGUARDO EN NUESTRO ALMACÉN; PASADOS 45 DÍAS NATURALES (SIC) '
+            'PUEDE DISPONER LIBREMENTE DEL PRODUCTO DEL CLIENTE (EQUIPO) Y NO SE HARÁ '
+            'RESPONSABLE POR DAÑO ALGUNO O PÉRDIDA DE EQUIPO O INFORMACIÓN, O BIEN SE '
+            'PROCEDERÁ A SU DESTRUCCIÓN SIN RESPONSABILIDAD PARA (SIC). EN ESTOS CASOS, '
+            'POR LO CUAL RENUNCIO A RECLAMAR MI PRODUCTO O SU VALOR, INCLUYENDO TODA LA '
+            'INFORMACIÓN Y DATOS DENTRO DE MI PRODUCTO.',
+            estilo_item,
+        ))
+
+        # Bloque con fondo amarillo — garantía de piezas
+        elementos.append(Spacer(1, 2 * mm))
+        elementos.append(self._bloque_resaltado_terminos(
+            'LA GARANTÍA DE LAS PIEZAS REEMPLAZADAS ES DE 30 DÍAS NATURALES SIEMPRE Y CUANDO '
+            'EL FALLO QUE PRESENTE SEA POR DEFECTO DE FÁBRICA.',
+            estilo_resaltado,
+        ))
+
+        # Sección QR — equipos reacondicionados (texto arriba, QR centrado debajo)
+        elementos.append(Spacer(1, 4 * mm))
+        elementos.append(HRFlowable(width='100%', thickness=0.5, color=COLOR_GRIS_BORDE))
+        elementos.append(Spacer(1, 3 * mm))
+
+        elementos.append(Paragraph(
+            'No olvide consultar los equipos reacondicionados que tenemos disponibles',
+            self._estilos['TerminosQR'],
+        ))
+
+        qr_img = self._obtener_qr_reacondicionados()
+        if qr_img:
+            elementos.append(Spacer(1, 2 * mm))
+            ancho_util = letter[0] - 2 * MARGEN
+            tabla_qr = Table([[qr_img]], colWidths=[ancho_util])
+            tabla_qr.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ]))
+            elementos.append(tabla_qr)
+
+        return elementos
+
+    def _bloque_resaltado_terminos(
+        self,
+        texto: str,
+        estilo: ParagraphStyle,
+        *,
+        fondo=None,
+        borde=None,
+    ) -> Table:
+        """
+        Envuelve un párrafo en una tabla con fondo de color para advertencias legales.
+
+        Args:
+            texto  : Contenido del aviso (texto plano o HTML simple de ReportLab).
+            estilo : ParagraphStyle a aplicar dentro del bloque.
+            fondo  : Color de fondo (por defecto amarillo corporativo).
+            borde  : Color del borde (por defecto amarillo oscuro).
+
+        Returns:
+            Table con borde y fondo del color indicado.
+        """
+        fondo = fondo or COLOR_AMARILLO_BG
+        borde = borde or COLOR_AMARILLO_TEXTO
+        ancho_util = letter[0] - 2 * MARGEN
+        contenido = Paragraph(f'• {texto}', estilo)
+        tabla = Table([[contenido]], colWidths=[ancho_util])
+        tabla.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), fondo),
+            ('BOX', (0, 0), (-1, -1), 0.6, borde),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        return tabla
+
+    def _obtener_qr_reacondicionados(self) -> Optional[RLImage]:
+        """
+        Carga el código QR de equipos reacondicionados desde archivos estáticos.
+
+        Returns:
+            RLImage listo para insertar en el PDF, o None si no se encuentra el archivo.
+        """
+        try:
+            ruta_qr = finders.find('images/utilitys/QR_equipo_reacondicionados.png')
+            if ruta_qr:
+                return RLImage(ruta_qr, width=28 * mm, height=28 * mm, kind='proportional')
+        except Exception as e:
+            logger.warning(f"[PDF_COTIZACION] No se encontró QR de reacondicionados: {e}")
+        return None
 
     # -------------------------------------------------------------------------
     # HELPERS DE DISEÑO

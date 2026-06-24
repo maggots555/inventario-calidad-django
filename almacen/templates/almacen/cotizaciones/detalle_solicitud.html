@@ -1447,17 +1447,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <i class="bi bi-sliders me-1"></i>Tipo de Servicio (perfil de profit)
                             </label>
                             <div class="d-flex flex-wrap gap-2" id="tipoServicioContainer">
-                                <div class="servicio-tipo-btn {% if gama_equipo == 'ALTA' %}activo{% endif %}" data-tipo="alta_gama">
+                                {# Sin orden activa → Mostrador; con orden → según gama del equipo #}
+                                <div class="servicio-tipo-btn {% if not solicitud.sin_orden_activa and gama_equipo == 'ALTA' %}activo{% endif %}" data-tipo="alta_gama">
                                     <i class="bi bi-star-fill" style="font-size: 0.9rem; color: #f59e0b;"></i>
                                     <span class="nombre-servicio">Alta Gama</span>
                                     <span class="profit-badge">44% profit</span>
                                 </div>
-                                <div class="servicio-tipo-btn {% if gama_equipo not in 'ALTA,BAJA' and not gama_equipo %}activo{% elif gama_equipo == 'MEDIA' or gama_equipo == '' %}activo{% endif %}" data-tipo="estandar" id="btnEstandar">
+                                <div class="servicio-tipo-btn {% if not solicitud.sin_orden_activa and gama_equipo != 'ALTA' and gama_equipo != 'BAJA' %}activo{% endif %}" data-tipo="estandar" id="btnEstandar">
                                     <i class="bi bi-laptop" style="font-size: 0.9rem; color: #3b82f6;"></i>
                                     <span class="nombre-servicio">Estándar</span>
                                     <span class="profit-badge">36% profit</span>
                                 </div>
-                                <div class="servicio-tipo-btn {% if gama_equipo == 'BAJA' %}activo{% endif %}" data-tipo="mostrador">
+                                <div class="servicio-tipo-btn {% if solicitud.sin_orden_activa or gama_equipo == 'BAJA' %}activo{% endif %}" data-tipo="mostrador">
                                     <i class="bi bi-phone" style="font-size: 0.9rem; color: #10b981;"></i>
                                     <span class="nombre-servicio">Mostrador</span>
                                     <span class="profit-badge">42% profit</span>
@@ -1474,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                             </div>
                             <input type="hidden" id="tipoServicioInput" name="tipo_servicio"
-                                   value="{% if gama_equipo == 'ALTA' %}alta_gama{% elif gama_equipo == 'BAJA' %}mostrador{% else %}estandar{% endif %}">
+                                   value="{% if solicitud.sin_orden_activa %}mostrador{% elif gama_equipo == 'ALTA' %}alta_gama{% elif gama_equipo == 'BAJA' %}mostrador{% else %}estandar{% endif %}">
                         </div>
 
                         <!-- --- 2. MANO DE OBRA (solo informativo, no entra al cálculo) --- -->
