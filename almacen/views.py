@@ -3712,12 +3712,23 @@ def api_enviar_cotizacion_cliente(request, pk):
         mensaje_personalizado = request.POST.get('mensaje_personalizado', '').strip()
         incluir_descuento = request.POST.get('incluir_descuento_diagnostico') == '1'
 
-        # Mano de obra override (valor editado por el usuario en el modal)
+        # Asunto personalizado del correo.
+        # Si el usuario lo dejó vacío o con el prefijo por defecto sin texto adicional,
+        # la tarea lo generará automáticamente con el perfil y folio.
+        asunto_correo = request.POST.get('asunto_correo', '').strip()
+        # Normalizar: si solo enviaron el prefijo vacío, tratar como sin asunto personalizado
+        PREFIJO_DEFAULT = 'Cotización SIC —'
+        if asunto_correo == PREFIJO_DEFAULT or asunto_correo == f'{PREFIJO_DEFAULT} ':
+            asunto_correo = ''
+
+        # Mano de obra override — el campo es informativo, se envía como 0 desde el frontend.
+        # Se mantiene la lectura por compatibilidad con llamadas directas a la API.
         mano_obra_raw = request.POST.get('mano_de_obra_override', '')
         mano_de_obra_override = None
         if mano_obra_raw:
             try:
-                mano_de_obra_override = float(mano_obra_raw)
+                val = float(mano_obra_raw)
+                mano_de_obra_override = val if val > 0 else None
             except ValueError:
                 pass
 
@@ -3840,6 +3851,7 @@ def api_enviar_cotizacion_cliente(request, pk):
                 incluir_descuento_diagnostico=incluir_descuento,
                 mano_de_obra_override=mano_de_obra_override,
                 mensaje_personalizado=mensaje_personalizado,
+                asunto_correo=asunto_correo,
                 usuario_id=usuario_id,
                 db_alias=_db,
             )

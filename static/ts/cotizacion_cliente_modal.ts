@@ -34,6 +34,8 @@ interface CotizacionClienteConfig {
     urlPreview:  string;
     csrfToken:   string;
     gama:        string;
+    /** Email detectado automáticamente desde la orden o solicitud */
+    emailDetectado: string;
     /** Configuración de profit por perfil, inyectada desde .env vía Django */
     profitConfig: Record<string, PerfilProfit>;
     lineas: LineaItem[];
@@ -158,6 +160,11 @@ function fmtPct(valor: number): string {
     return `${(valor * 100).toFixed(0)}%`;
 }
 
+/** Valida formato básico de email (mismo criterio que el backend) */
+function esEmailValido(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 // ============================================================
 // INICIALIZACIÓN DEL MÓDULO
 // Se ejecuta cuando el DOM está listo
@@ -174,7 +181,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Referencias a elementos del DOM ---
     const tipoServicioInput  = document.querySelector<HTMLInputElement>('#tipoServicioInput');
-    const manoObraInput      = document.querySelector<HTMLInputElement>('#manoObraOverride');
+    // manoObraOverride ya no existe como input — el campo es solo informativo.
+    // La mano de obra NO entra en el cálculo de profit; el diagnóstico ya va incluido
+    // en el perfil seleccionado. Por eso se pasa siempre 0 a calcularPrecioCliente().
     const calcBody           = document.querySelector<HTMLElement>('#calcBody');
     const btnPreviewPDF      = document.querySelector<HTMLButtonElement>('#btnPreviewPDF');
     const iframePreview      = document.querySelector<HTMLIFrameElement>('#iframePreviewPDF');
@@ -183,6 +192,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnConfirmar       = document.querySelector<HTMLButtonElement>('#btnConfirmarEnvioCliente');
     const alertaDiv          = document.querySelector<HTMLElement>('#alertaEnvioModal');
     const checkDescuento     = document.querySelector<HTMLInputElement>('#checkDescuentoDiagnostico');
+    const emailClienteInput  = document.querySelector<HTMLInputElement>('#emailClienteInput');
+    const emailClienteCard   = document.querySelector<HTMLElement>('#emailClienteCard');
+    const emailEstadoLabel   = document.querySelector<HTMLElement>('#emailClienteEstadoLabel');
+    const emailDisplay       = document.querySelector<HTMLElement>('#emailClienteDisplay');
+    const emailHint          = document.querySelector<HTMLElement>('#emailClienteHint');
+
+    // Email original detectado por Django (referencia para comparar cambios)
+    const emailDetectado = (config.emailDetectado ?? '').trim();
 
     // --- Botones de tipo de servicio (visual radials) ---
     const botonesTipo = document.querySelectorAll<HTMLElement>('.servicio-tipo-btn');
@@ -190,6 +207,79 @@ document.addEventListener('DOMContentLoaded', () => {
     // Estado del desglose expandible: false = colapsado, true = expandido.
     // Se mantiene entre recalculaciones para no perder la posición del usuario.
     let desgloseAbierto = false;
+
+    // --------------------------------------------------------
+    // FUNCIÓN: Sincronizar tarjeta de email con el input editable
+    // Muestra en tiempo real qué correo se enviará al cliente.
+    // --------------------------------------------------------
+    function actualizarTarjetaEmail(): void {
+        if (!emailClienteCard || !emailEstadoLabel || !emailDisplay || !emailClienteInput) return;
+
+        const valorActual = emailClienteInput.value.trim();
+        const valorDetectado = emailDetectado;
+
+        // Limpiar estados visuales previos
+        emailClienteCard.classList.remove('sin-email', 'modificado', 'invalido');
+        if (emailHint) {
+            emailHint.style.display = 'none';
+            emailHint.textContent = '';
+        }
+
+        // Caso 1: campo vacío
+        if (!valorActual) {
+            emailClienteCard.classList.add('sin-email');
+            emailEstadoLabel.innerHTML = valorDetectado
+                ? '<i class="bi bi-exclamation-triangle me-1"></i>Email requerido'
+                : '<i class="bi bi-exclamation-triangle me-1"></i>Sin email detectado';
+            emailDisplay.textContent = 'Ingresa el correo del destinatario abajo';
+            emailClienteInput.classList.remove('is-valid', 'is-invalid');
+            return;
+        }
+
+        // Caso 2: formato inválido
+        if (!esEmailValido(valorActual)) {
+            emailClienteCard.classList.add('invalido');
+            emailEstadoLabel.textContent = 'Formato de correo inválido';
+            emailDisplay.textContent = valorActual;
+            if (emailHint) {
+                emailHint.style.display = 'block';
+                emailHint.textContent = 'Usa un formato como cliente@ejemplo.com';
+            }
+            emailClienteInput.classList.remove('is-valid');
+            emailClienteInput.classList.add('is-invalid');
+            return;
+        }
+
+        emailClienteInput.classList.remove('is-invalid');
+        emailClienteInput.classList.add('is-valid');
+
+        // Caso 3: coincide con el detectado (o se ingresó manualmente sin detección previa)
+        if (valorActual.toLowerCase() === valorDetectado.toLowerCase()) {
+            if (valorDetectado) {
+                emailEstadoLabel.textContent = 'Email detectado:';
+                emailDisplay.textContent = valorActual;
+            } else {
+                emailEstadoLabel.textContent = 'Email ingresado manualmente:';
+                emailDisplay.textContent = valorActual;
+            }
+            return;
+        }
+
+        // Caso 4: el usuario modificó el correo detectado
+        emailClienteCard.classList.add('modificado');
+        emailEstadoLabel.innerHTML = '<i class="bi bi-pencil-square me-1"></i>Email modificado:';
+        emailDisplay.textContent = valorActual;
+        if (emailHint && valorDetectado) {
+            emailHint.style.display = 'block';
+            emailHint.textContent = `Detectado originalmente: ${valorDetectado}`;
+        }
+    }
+
+    // --------------------------------------------------------
+    // EVENTO: Cambios en el email del cliente
+    // --------------------------------------------------------
+    emailClienteInput?.addEventListener('input', actualizarTarjetaEmail);
+    emailClienteInput?.addEventListener('blur', actualizarTarjetaEmail);
 
     // --------------------------------------------------------
     // EVENTO: Clic en botones de tipo de servicio
@@ -207,11 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
             actualizarCalculadora();
         });
     });
-
-    // --------------------------------------------------------
-    // EVENTO: Cambio en mano de obra
-    // --------------------------------------------------------
-    manoObraInput?.addEventListener('input', actualizarCalculadora);
 
     // --------------------------------------------------------
     // EVENTO: Cambio en checkbox de descuento diagnóstico
@@ -280,8 +365,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function actualizarCalculadora(): void {
         if (!calcBody || !tipoServicioInput) return;
 
-        const tipo     = tipoServicioInput.value || 'estandar';
-        const manoObra = parseFloat(manoObraInput?.value ?? '0') || 0;
+        const tipo = tipoServicioInput.value || 'estandar';
+        // Mano de obra = 0: el campo es solo informativo, no entra en el cálculo.
+        // El diagnóstico ya se incluye automáticamente al seleccionar el perfil de profit.
+        const manoObra = 0;
 
         // Calcular la suma de costos internos de todas las piezas
         const costoLineas = config.lineas.reduce((acc, l) => {
@@ -312,11 +399,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="calc-desglose-panel" style="display:${desgloseAbierto ? 'block' : 'none'}">
                 ${renderDesgloseHTML()}
             </div>
-            ${res.mano_obra > 0 ? `
-            <div class="calc-row">
-                <span class="etq">Mano de obra (costo interno, lleva profit)</span>
-                <span class="val">${fmtPeso(res.mano_obra)}</span>
-            </div>` : ''}
             <div class="calc-row">
                 <span class="etq">Costos fijos del perfil (${tipo})</span>
                 <span class="val">${fmtPeso(res.costos_fijos_total)}</span>
@@ -372,14 +454,14 @@ document.addEventListener('DOMContentLoaded', () => {
     btnPreviewPDF?.addEventListener('click', () => {
         if (!tipoServicioInput || !iframePreview || !previewContainer || !previewPlaceholder) return;
 
-        const tipo     = tipoServicioInput.value || 'estandar';
-        const manoObra = manoObraInput?.value ?? '';
+        const tipo      = tipoServicioInput.value || 'estandar';
         const descuento = checkDescuento?.checked ? '1' : '0';
 
-        // Construir la URL del preview con parámetros
+        // Construir la URL del preview con parámetros.
+        // mano_de_obra_override=0: la mano de obra ya no entra en la cotización al cliente.
         const params = new URLSearchParams({
             tipo_servicio: tipo,
-            mano_de_obra_override: manoObra,
+            mano_de_obra_override: '0',
             incluir_descuento_diagnostico: descuento,
         });
 
@@ -413,6 +495,21 @@ document.addEventListener('DOMContentLoaded', () => {
         alertaDiv.style.display = 'none';
         alertaDiv.innerHTML = '';
 
+        // Validar email antes de enviar (usa el valor del input, no el detectado)
+        const emailParaEnvio = (emailClienteInput?.value ?? '').trim();
+        if (!emailParaEnvio) {
+            mostrarAlerta('warning', '<i class="bi bi-envelope-exclamation me-1"></i>Debes ingresar el email del cliente.');
+            actualizarTarjetaEmail();
+            emailClienteInput?.focus();
+            return;
+        }
+        if (!esEmailValido(emailParaEnvio)) {
+            mostrarAlerta('warning', '<i class="bi bi-envelope-x me-1"></i>El email no tiene un formato válido.');
+            actualizarTarjetaEmail();
+            emailClienteInput?.focus();
+            return;
+        }
+
         // Mostrar spinner en el botón
         const textoBtn   = document.querySelector<HTMLElement>('#btnEnvioTexto');
         const spinnerBtn = document.querySelector<HTMLElement>('#btnEnvioSpinner');
@@ -425,9 +522,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('csrfmiddlewaretoken', config.csrfToken);
             formData.append('tipo_servicio',         tipoServicioInput.value || 'estandar');
-            formData.append('email_cliente',         document.querySelector<HTMLInputElement>('#emailClienteInput')?.value ?? '');
+            formData.append('email_cliente',         emailParaEnvio);
             formData.append('mensaje_personalizado', document.querySelector<HTMLTextAreaElement>('#mensajePersonalizado')?.value ?? '');
-            formData.append('mano_de_obra_override', manoObraInput?.value ?? '');
+            formData.append('asunto_correo',         document.querySelector<HTMLInputElement>('#asuntoCorreoInput')?.value ?? '');
+            // mano_de_obra_override = 0: la mano de obra es solo informativa en este flujo.
+            formData.append('mano_de_obra_override', '0');
 
             // Descuento diagnóstico (si el checkbox existe y está marcado)
             if (checkDescuento?.checked) {
@@ -504,6 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalEl = document.querySelector<HTMLElement>('#modalEnviarCotizacionCliente');
     modalEl?.addEventListener('show.bs.modal', () => {
         actualizarCalculadora();
+        actualizarTarjetaEmail();
         // Resetear alerta al abrir
         if (alertaDiv) {
             alertaDiv.style.display = 'none';
@@ -513,6 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         restaurarBoton();
     });
 
-    // Ejecutar calculadora inmediatamente por si el DOM ya tiene valores
+    // Ejecutar calculadora y tarjeta de email al cargar la página
     actualizarCalculadora();
+    actualizarTarjetaEmail();
 });

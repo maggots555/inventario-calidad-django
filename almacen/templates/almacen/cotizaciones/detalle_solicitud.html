@@ -1423,26 +1423,25 @@ document.addEventListener('DOMContentLoaded', function() {
                                    value="{% if gama_equipo == 'ALTA' %}alta_gama{% elif gama_equipo == 'BAJA' %}mostrador{% else %}estandar{% endif %}">
                         </div>
 
-                        <!-- --- 2. MANO DE OBRA (override) --- -->
+                        <!-- --- 2. MANO DE OBRA (solo informativo, no entra al cálculo) --- -->
                         <div class="mb-4">
-                            <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem;" for="manoObraOverride">
+                            <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem;">
                                 <i class="bi bi-wrench me-1"></i>Mano de Obra (MXN sin IVA)
+                                <span class="badge bg-secondary ms-1" style="font-size: 0.7rem; font-weight: 500;">Solo informativo</span>
                             </label>
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="manoObraOverride"
-                                       name="mano_de_obra_override"
-                                       step="0.01" min="0"
-                                       value="{{ costo_mano_obra|default:'' }}"
-                                       placeholder="0.00">
-                                <span class="input-group-text">MXN</span>
+                            <div class="form-control form-control-sm d-flex align-items-center gap-2"
+                                 style="background-color: var(--gray-50); cursor: default; color: var(--gray-700);">
+                                <i class="bi bi-info-circle text-muted" style="font-size: 0.85rem;"></i>
+                                {% if costo_mano_obra %}
+                                    <span>${{ costo_mano_obra }} MXN</span>
+                                {% else %}
+                                    <span class="text-muted">Sin mano de obra registrada en ST</span>
+                                {% endif %}
                             </div>
                             <div class="form-text" style="font-size: 0.75rem;">
-                                {% if costo_mano_obra %}
-                                    Valor de la cotización ST: ${{ costo_mano_obra }}. Puedes ajustarlo.
-                                {% else %}
-                                    Ingresa el costo de mano de obra si aplica.
-                                {% endif %}
+                                Valor registrado en la cotización de Servicio Técnico.
+                                Úsalo como referencia para elegir el perfil de profit correcto.
+                                El diagnóstico ya está incluido en cada perfil.
                             </div>
                         </div>
 
@@ -1528,23 +1527,34 @@ document.addEventListener('DOMContentLoaded', function() {
                             <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem;" for="emailClienteInput">
                                 <i class="bi bi-envelope me-1"></i>Email del Cliente
                             </label>
-                            {% if email_cliente_modal %}
-                            <div class="email-cliente-card mb-2">
-                                <div style="font-size: 0.8rem; color: var(--gray-500); margin-bottom: 2px;">Email detectado:</div>
-                                <strong style="font-size: 0.9rem;">{{ email_cliente_modal }}</strong>
-                            </div>
-                            {% else %}
-                            <div class="email-cliente-card sin-email mb-2">
-                                <div style="font-size: 0.8rem; color: #856404;">
-                                    <i class="bi bi-exclamation-triangle me-1"></i>
-                                    No se detectó email del cliente. Ingrésalo manualmente.
+                            {# Tarjeta dinámica: se actualiza al editar el input inferior #}
+                            <div class="email-cliente-card mb-2{% if not email_cliente_modal %} sin-email{% endif %}"
+                                 id="emailClienteCard">
+                                <div id="emailClienteEstadoLabel"
+                                     style="font-size: 0.8rem; color: var(--gray-500); margin-bottom: 2px;">
+                                    {% if email_cliente_modal %}
+                                        Email detectado:
+                                    {% else %}
+                                        <i class="bi bi-exclamation-triangle me-1"></i>Sin email detectado
+                                    {% endif %}
                                 </div>
+                                <strong id="emailClienteDisplay" style="font-size: 0.9rem;">
+                                    {% if email_cliente_modal %}
+                                        {{ email_cliente_modal }}
+                                    {% else %}
+                                        Ingresa el correo del destinatario abajo
+                                    {% endif %}
+                                </strong>
+                                <div id="emailClienteHint" class="mt-1 mb-0" style="font-size: 0.72rem; display: none;"></div>
                             </div>
-                            {% endif %}
                             <input type="email" class="form-control form-control-sm" id="emailClienteInput"
                                    name="email_cliente"
                                    value="{{ email_cliente_modal }}"
-                                   placeholder="cliente@ejemplo.com" required>
+                                   placeholder="cliente@ejemplo.com" required
+                                   autocomplete="email">
+                            <div class="form-text" style="font-size: 0.75rem;">
+                                Puedes corregir el correo aquí; la tarjeta de arriba se actualiza al instante.
+                            </div>
                         </div>
 
                         <!-- --- 7. CC (copia a empleados) --- -->
@@ -1573,7 +1583,22 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
 
-                        <!-- --- 8. MENSAJE PERSONALIZADO --- -->
+                        <!-- --- 8. ASUNTO DEL CORREO --- -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem;" for="asuntoCorreoInput">
+                                <i class="bi bi-pencil me-1"></i>Asunto del correo
+                            </label>
+                            <input type="text" class="form-control form-control-sm" id="asuntoCorreoInput"
+                                   name="asunto_correo"
+                                   value="Cotización SIC — "
+                                   maxlength="200"
+                                   placeholder="Cotización SIC — Tipo de servicio | S/T: XXXXX">
+                            <div class="form-text" style="font-size: 0.75rem;">
+                                Si lo dejas como está, se generará automáticamente con el perfil y folio.
+                            </div>
+                        </div>
+
+                        <!-- --- 9. MENSAJE PERSONALIZADO --- -->
                         <div class="mb-3">
                             <label class="form-label fw-semibold mb-1" style="font-size: 0.85rem;" for="mensajePersonalizado">
                                 <i class="bi bi-chat-text me-1"></i>Mensaje personalizado (opcional)
@@ -1583,7 +1608,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                       placeholder="Texto adicional que aparecerá en el correo al cliente..."></textarea>
                         </div>
 
-                        <!-- --- 9. PREVISUALIZACIÓN DEL PDF --- -->
+                        <!-- --- 10. PREVISUALIZACIÓN DEL PDF --- -->
                         <div class="mb-3">
                             <div class="d-flex align-items-center justify-content-between mb-2">
                                 <label class="form-label fw-semibold mb-0" style="font-size: 0.85rem;">
@@ -1640,6 +1665,7 @@ window.COTIZACION_CLIENTE_CONFIG = {
     urlPreview: "{% url 'almacen:preview_pdf_cotizacion' solicitud.pk %}",
     csrfToken:  "{{ csrf_token }}",
     gama:       "{{ gama_equipo }}",
+    emailDetectado: "{{ email_cliente_modal|default:''|escapejs }}",
     // profitConfig: valores de margen, costos fijos y diagnóstico por perfil.
     // Los números vienen del .env del servidor (nunca del código fuente),
     // los inyecta Django en tiempo de render. No aparecen en el repositorio.

@@ -496,6 +496,7 @@ def enviar_cotizacion_cliente_task(
     incluir_descuento_diagnostico=True,
     mano_de_obra_override=None,
     mensaje_personalizado='',
+    asunto_correo='',
     usuario_id=None,
     db_alias='default',
 ):
@@ -519,8 +520,9 @@ def enviar_cotizacion_cliente_task(
         items                        : Lista de dicts con los ítems del PDF (ya serializada).
         titulo_propuesta             : Título de la propuesta (vacío = usar nombre del perfil).
         incluir_descuento_diagnostico: Si True, muestra el precio con deducción de diagnóstico.
-        mano_de_obra_override        : Costo de mano de obra editado por el usuario (float).
+        mano_de_obra_override        : Costo de mano de obra (informativo, se ignora en cálculo).
         mensaje_personalizado        : Texto adicional para el cuerpo del email.
+        asunto_correo                : Asunto personalizado. Si está vacío se genera automáticamente.
         usuario_id                   : ID del usuario que disparó la acción.
         db_alias                     : Alias de BD del país activo (CRÍTICO para multi-tenant).
 
@@ -681,7 +683,12 @@ def enviar_cotizacion_cliente_task(
             except Exception:
                 pass
 
-        asunto = f'Cotización SIC — {titulo_display} | {numero_display}'
+        # Usar el asunto personalizado si fue proporcionado; de lo contrario,
+        # generarlo automáticamente con el perfil de servicio y el folio/serie.
+        if asunto_correo and asunto_correo.strip():
+            asunto = asunto_correo.strip()
+        else:
+            asunto = f'Cotización SIC — {titulo_display} | {numero_display}'
 
         # Correo remitente extraído desde DEFAULT_FROM_EMAIL
         import re as _re
