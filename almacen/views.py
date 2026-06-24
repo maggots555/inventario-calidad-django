@@ -4666,6 +4666,275 @@ def vincular_orden_solicitud(request, pk):
 
 @login_required
 @permission_required_with_message('almacen.change_solicitudcotizacion')
+def crear_orden_fl_desde_cotizacion(request, pk):
+    """
+    Crea una OrdenServicio tipo FL- (Venta Mostrador / Servicio Directo) directamente
+    desde el detalle de una SolicitudCotizacion que no tiene orden vinculada.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando una cotización se creó en modo "sin orden activa" (el cliente solicitó
+    precio antes de ingresar físicamente el equipo) y el cliente acepta la cotización,
+    en lugar de obligar al usuario a ir a Servicio Técnico a crear la orden manualmente,
+    esta vista crea la orden FL- (Servicio Directo sin Diagnóstico) aquí mismo,
+    usando todos los datos del cliente y equipo que ya fueron capturados en la solicitud.
+
+    Flujo:
+    1. GET  → muestra modal con el formulario mínimo (técnico + número FL- sugerido)
+    2. POST → crea OrdenServicio + DetalleEquipo con datos reales de la solicitud,
+              llama a solicitud.vincular_orden() para sincronizar con ST,
+              re-guarda las LineaCotizacion para que se sincronicen como PiezaCotizada,
+              redirige al detalle con mensaje de éxito.
+
+    Restricciones:
+    - Solo aplica si solicitud.puede_vincular_orden() es True (sin_orden_activa + no completada/cancelada)
+    - El tipo de servicio es siempre 'venta_mostrador' (Servicio Directo sin Diagnóstico)
+    - El número FL- se auto-sugiere pero puede ser editado por el usuario
+
+    Args:
+        request: HttpRequest de Django
+        pk     : PK de la SolicitudCotizacion
+
+    Efectos secundarios:
+        - Crea OrdenServicio y DetalleEquipo en servicio_tecnico
+        - Modifica SolicitudCotizacion (vincula orden, desactiva sin_orden_activa)
+        - Crea Cotizacion en servicio_tecnico (vía solicitud.vincular_orden → save)
+        - Re-sincroniza LineaCotizacion → PiezaCotizada en servicio_tecnico
+    """
+    from servicio_tecnico.models import OrdenServicio, DetalleEquipo
+
+    solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
+
+    # Validar que la solicitud esté en modo sin_orden_activa y pueda vincularse
+    if not solicitud.puede_vincular_orden():
+        messages.error(
+            request,
+            'No se puede crear una orden. La solicitud ya tiene orden activa '
+            'o está completada/cancelada.'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    if request.method == 'GET':
+        # ====== PREPARAR DATOS PARA EL MODAL ======
+
+        # Obtener lista de técnicos de laboratorio activos para el selector
+        tecnicos = Empleado.objects.filter(
+            activo=True,
+            cargo__icontains='TECNICO DE LABORATORIO'
+        ).select_related('sucursal').order_by('nombre_completo')
+
+        # Auto-generar sugerencia de número FL- con formato FL-YYYY-NNNN
+        # Busca el último FL- de este año en DetalleEquipo para sugerir el siguiente
+        año_actual = timezone.now().year
+        ultimo_fl = DetalleEquipo.objects.filter(
+            orden_cliente__startswith=f'FL-{año_actual}'
+        ).order_by('-orden_cliente').first()
+
+        if ultimo_fl:
+            # Extraer el número secuencial del último FL- y sumar 1
+            try:
+                ultimo_num = int(ultimo_fl.orden_cliente.split('-')[-1])
+                siguiente_num = ultimo_num + 1
+            except (ValueError, IndexError):
+                siguiente_num = 1
+        else:
+            # Si no hay ningún FL- este año, empezar desde 1
+            siguiente_num = 1
+
+        numero_fl_sugerido = f"FL-{año_actual}-{siguiente_num:04d}"
+
+        return JsonResponse({
+            'success': True,
+            'tecnicos': [
+                {
+                    'id': t.pk,
+                    'nombre': t.nombre_completo,
+                    'sucursal': t.sucursal.nombre if t.sucursal else 'Sin asignar',
+                }
+                for t in tecnicos
+            ],
+            'numero_fl_sugerido': numero_fl_sugerido,
+            # Datos del cliente/equipo para mostrar resumen en el modal
+            'resumen': {
+                'nombre_cliente': solicitud.nombre_cliente or '(sin nombre)',
+                'email_cliente': solicitud.email_cliente or '(sin email)',
+                'telefono_cliente': solicitud.telefono_cliente or '(sin teléfono)',
+                'tipo_equipo': solicitud.tipo_equipo or 'Por definir',
+                'marca': solicitud.marca or 'Por definir',
+                'modelo': solicitud.modelo or 'Por definir',
+                'numero_serie': solicitud.service_tag or '(sin service tag)',
+            }
+        })
+
+    # ====== POST: Crear la orden FL- ======
+    tecnico_id = request.POST.get('tecnico_id', '').strip()
+    numero_fl = request.POST.get('numero_fl', '').strip().upper()
+
+    # --- Validación de campos requeridos ---
+    if not tecnico_id:
+        messages.error(request, 'Debes seleccionar un técnico para crear la orden.')
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    if not numero_fl:
+        messages.error(request, 'El número de folio FL- es obligatorio.')
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    # Validar que el número FL- tenga el formato correcto
+    if not numero_fl.startswith('FL-'):
+        messages.error(request, 'El folio debe comenzar con "FL-" (ej: FL-2026-0001).')
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    # Verificar que el número FL- no esté ya en uso en DetalleEquipo
+    if DetalleEquipo.objects.filter(orden_cliente=numero_fl).exists():
+        messages.error(
+            request,
+            f'El folio {numero_fl} ya está registrado en otra orden. '
+            'Por favor usa un número diferente.'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    # --- Obtener el técnico ---
+    try:
+        tecnico = Empleado.objects.get(pk=tecnico_id)
+    except Empleado.DoesNotExist:
+        messages.error(request, 'El técnico seleccionado no es válido.')
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    # --- Determinar la sucursal desde el usuario que creó la solicitud ---
+    # Se intenta obtener la sucursal del empleado creador; si no tiene, se usa la del técnico
+    try:
+        empleado_creador = Empleado.objects.get(user=solicitud.creado_por)
+        sucursal = empleado_creador.sucursal
+    except (Empleado.DoesNotExist, AttributeError):
+        # Fallback: usar la sucursal del técnico asignado
+        sucursal = tecnico.sucursal
+
+    if not sucursal:
+        messages.error(
+            request,
+            'No se pudo determinar la sucursal. '
+            'El creador de la solicitud o el técnico no tienen sucursal asignada.'
+        )
+        return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+    # --- Obtener el responsable de seguimiento (el usuario actual) ---
+    try:
+        responsable = Empleado.objects.get(user=request.user)
+    except Empleado.DoesNotExist:
+        # Si el usuario actual no tiene empleado asociado, usar el técnico como responsable
+        responsable = tecnico
+
+    try:
+        # ====== PASO 1: Crear la OrdenServicio ======
+        # tipo_servicio='venta_mostrador' porque estas órdenes son Servicio Directo sin Diagnóstico
+        # estado='almacen' porque se origina desde el módulo Almacén
+        orden = OrdenServicio.objects.create(
+            sucursal=sucursal,
+            responsable_seguimiento=responsable,
+            tecnico_asignado_actual=tecnico,
+            estado='almacen',
+            tipo_servicio='venta_mostrador',
+        )
+
+        # ====== PASO 2: Crear el DetalleEquipo con los datos REALES del cliente ======
+        # A diferencia del flujo genérico de solicitudes de baja (que usa placeholders),
+        # aquí ya tenemos datos reales del cliente capturados en la SolicitudCotizacion.
+
+        # Determinar tipo_equipo: usar el de la solicitud o fallback a 'Laptop'
+        tipo_equipo_real = solicitud.tipo_equipo if solicitud.tipo_equipo else 'Laptop'
+
+        # Determinar marca: usar la de la solicitud o fallback a 'Otra'
+        marca_real = solicitud.marca if solicitud.marca else 'Otra'
+
+        # Determinar modelo: usar el de la solicitud o placeholder
+        modelo_real = solicitud.modelo if solicitud.modelo else 'Por definir'
+
+        # Determinar número de serie: usar service_tag de la solicitud o placeholder
+        numero_serie_real = solicitud.service_tag if solicitud.service_tag else f'ALMACEN-{numero_fl}'
+
+        # Determinar falla_principal: usar observaciones de la solicitud o texto genérico
+        falla_real = (
+            solicitud.observaciones
+            if solicitud.observaciones
+            else 'Servicio directo sin diagnóstico - Cotización aprobada por cliente'
+        )
+
+        # Email del cliente: usar el de la solicitud o placeholder
+        email_real = solicitud.email_cliente if solicitud.email_cliente else 'pendiente@actualizar.com'
+
+        DetalleEquipo.objects.create(
+            orden=orden,
+            orden_cliente=numero_fl,        # Número FL- define es_fuera_garantia=True automáticamente
+            tipo_equipo=tipo_equipo_real,
+            marca=marca_real,
+            modelo=modelo_real,
+            numero_serie=numero_serie_real,
+            gama='media',                   # Valor por defecto; el técnico puede ajustar después
+            falla_principal=falla_real,
+            email_cliente=email_real,
+            # Datos adicionales del cliente (campos opcionales en DetalleEquipo)
+            nombre_cliente=solicitud.nombre_cliente or '',
+            telefono_cliente=solicitud.telefono_cliente or '',
+            rfc_cliente=solicitud.rfc_cliente or '',
+        )
+
+        # ====== PASO 3: Vincular la solicitud con la nueva orden ======
+        # vincular_orden() hace:
+        #   - self.orden_servicio = orden
+        #   - self.sin_orden_activa = False
+        #   - Sincroniza numero_orden_cliente desde DetalleEquipo
+        #   - self.save() → crea Cotizacion en ST vía _sincronizar_cotizacion_st()
+        solicitud.vincular_orden(orden)
+
+        # ====== PASO 4: Re-sincronizar las LineaCotizacion → PiezaCotizada en ST ======
+        # La sincronización de líneas a PiezaCotizada ocurre en LineaCotizacion.save(),
+        # pero solo si ya existe orden_servicio. Al momento de crearlas, la solicitud
+        # no tenía orden, así que hay que re-guardar cada línea para forzar la sync.
+        lineas_sincronizadas = 0
+        for linea in solicitud.lineas.all():
+            linea.save()  # Dispara la sincronización a PiezaCotizada en ST
+            lineas_sincronizadas += 1
+
+        # Construir mensaje de éxito con información de la orden creada
+        mensaje = (
+            f'Orden {numero_fl} creada exitosamente y vinculada a la solicitud. '
+            f'Orden interna: {orden.numero_orden_interno}.'
+        )
+        if lineas_sincronizadas:
+            mensaje += f' {lineas_sincronizadas} pieza(s) sincronizada(s) con Servicio Técnico.'
+
+        messages.success(request, mensaje)
+
+        logger.info(
+            f"OrdenServicio {orden.numero_orden_interno} (FL: {numero_fl}) creada desde "
+            f"SolicitudCotizacion {solicitud.numero_solicitud} por usuario {request.user}"
+        )
+
+    except ValueError as e:
+        # Error de validación del método vincular_orden (ej: ya tiene otra solicitud activa)
+        messages.error(request, f'Error al vincular la orden: {str(e)}')
+        # Si la orden fue creada pero falló el vínculo, eliminarla para evitar órfanos
+        try:
+            orden.delete()
+        except Exception:
+            pass
+    except Exception as e:
+        messages.error(request, f'Error inesperado al crear la orden: {str(e)}')
+        logger.error(
+            f"Error al crear OrdenServicio desde SolicitudCotizacion {pk}: {e}",
+            exc_info=True
+        )
+        # Intentar eliminar la orden parcialmente creada si existe
+        try:
+            orden.delete()
+        except Exception:
+            pass
+
+    return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
+
+@login_required
+@permission_required_with_message('almacen.change_solicitudcotizacion')
 def cancelar_solicitud_cotizacion(request, pk):
     """
     Cancelar una solicitud de cotización.

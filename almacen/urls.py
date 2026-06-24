@@ -108,6 +108,7 @@ urlpatterns = [
     path('solicitudes-cotizacion/<int:pk>/notificar-front/', views.notificar_front, name='notificar_front'),
     path('solicitudes-cotizacion/<int:pk>/cancelar/', views.cancelar_solicitud_cotizacion, name='cancelar_solicitud_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/vincular-orden/', views.vincular_orden_solicitud, name='vincular_orden_solicitud'),
+    path('solicitudes-cotizacion/<int:pk>/crear-orden-fl/', views.crear_orden_fl_desde_cotizacion, name='crear_orden_fl_desde_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/generar-compras/', views.generar_compras_solicitud, name='generar_compras_solicitud'),
     
     # Respuestas del cliente por línea

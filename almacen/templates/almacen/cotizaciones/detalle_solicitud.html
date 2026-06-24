@@ -678,11 +678,23 @@ Muestra toda la información y acciones según el estado
                     </form>
                     {% endif %}
                     
-                    <!-- Vincular Orden (solo sin_orden_activa) -->
+                    <!-- Crear / Vincular Orden (solo sin_orden_activa) -->
                     {% if solicitud.puede_vincular_orden %}
-                    <a href="{% url 'almacen:vincular_orden_solicitud' solicitud.pk %}" 
-                       class="btn btn-info w-100">
-                        <i class="bi bi-link-45deg me-2"></i>Vincular a Orden de Servicio
+                    {# Botón principal: crea la orden FL- directamente desde aquí con los datos ya capturados #}
+                    <button type="button"
+                            class="btn btn-success w-100"
+                            id="btnCrearOrdenFL"
+                            data-solicitud-pk="{{ solicitud.pk }}"
+                            data-url-datos="{% url 'almacen:crear_orden_fl_desde_cotizacion' solicitud.pk %}"
+                            data-url-post="{% url 'almacen:crear_orden_fl_desde_cotizacion' solicitud.pk %}"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalCrearOrdenFL">
+                        <i class="bi bi-plus-circle me-2"></i>Crear Orden de Servicio
+                    </button>
+                    {# Enlace secundario: por si el equipo ya fue dado de alta manualmente en ST #}
+                    <a href="{% url 'almacen:vincular_orden_solicitud' solicitud.pk %}"
+                       class="btn btn-outline-info btn-sm w-100">
+                        <i class="bi bi-link-45deg me-1"></i>Vincular orden existente
                     </a>
                     {% endif %}
                     
@@ -1736,6 +1748,315 @@ window.COTIZACION_CLIENTE_CONFIG = {
 };
 </script>
 {% endif %}
+{% if solicitud.puede_vincular_orden %}
+<!-- Modal: Crear Orden FL- (Servicio Directo sin Diagnóstico) -->
+<div class="modal fade" id="modalCrearOrdenFL" tabindex="-1"
+     aria-labelledby="modalCrearOrdenFLLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+
+            <!-- ENCABEZADO -->
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalCrearOrdenFLLabel">
+                    <i class="bi bi-plus-circle me-2 text-success"></i>
+                    Crear Orden de Servicio Directo (FL-)
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body">
+
+                <!-- SPINNER mientras se cargan los datos -->
+                <div id="spinnerCrearOrden" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="text-muted mt-2 mb-0">Preparando formulario...</p>
+                </div>
+
+                <!-- CONTENIDO DEL FORMULARIO (oculto hasta que carguen los datos) -->
+                <div id="contenidoCrearOrden" style="display:none;">
+
+                    <!-- Resumen de datos del cliente y equipo que se usarán -->
+                    <div class="card mb-3" style="border-left: 4px solid var(--success-color, #28a745);">
+                        <div class="card-header py-2">
+                            <small class="fw-semibold text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Datos que se registrarán en la nueva orden
+                            </small>
+                        </div>
+                        <div class="card-body py-2">
+                            <div class="row g-2" style="font-size: 0.88rem;">
+                                <div class="col-sm-6">
+                                    <span class="text-muted">Cliente:</span>
+                                    <strong id="resNombreCliente">—</strong>
+                                </div>
+                                <div class="col-sm-6">
+                                    <span class="text-muted">Email:</span>
+                                    <strong id="resEmailCliente">—</strong>
+                                </div>
+                                <div class="col-sm-6">
+                                    <span class="text-muted">Teléfono:</span>
+                                    <strong id="resTelefonoCliente">—</strong>
+                                </div>
+                                <div class="col-sm-6">
+                                    <span class="text-muted">Equipo:</span>
+                                    <strong id="resTipoEquipo">—</strong>
+                                </div>
+                                <div class="col-sm-6">
+                                    <span class="text-muted">Marca / Modelo:</span>
+                                    <strong id="resMarcaModelo">—</strong>
+                                </div>
+                                <div class="col-sm-6">
+                                    <span class="text-muted">No. de Serie:</span>
+                                    <strong id="resNumeroSerie">—</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form id="formCrearOrdenFL"
+                          method="post"
+                          action="{% url 'almacen:crear_orden_fl_desde_cotizacion' solicitud.pk %}">
+                        {% csrf_token %}
+
+                        <div class="row g-3">
+
+                            <!-- Número FL- (sugerido, editable) -->
+                            <div class="col-md-6">
+                                <label for="inputNumeroFL" class="form-label fw-semibold">
+                                    <i class="bi bi-tag me-1"></i>Número de Folio FL-
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="inputNumeroFL"
+                                       name="numero_fl"
+                                       placeholder="FL-2026-0001"
+                                       required
+                                       style="font-family: monospace; font-size: 1.05rem;">
+                                <div class="form-text">
+                                    <i class="bi bi-magic me-1"></i>
+                                    Número auto-sugerido. Puedes editarlo si es necesario.
+                                    Debe comenzar con <code>FL-</code>.
+                                </div>
+                            </div>
+
+                            <!-- Selector de técnico -->
+                            <div class="col-md-6">
+                                <label for="selectTecnico" class="form-label fw-semibold">
+                                    <i class="bi bi-person-badge me-1"></i>Técnico Asignado
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-select"
+                                        id="selectTecnico"
+                                        name="tecnico_id"
+                                        required>
+                                    <option value="">-- Selecciona un técnico --</option>
+                                    {# Las opciones se cargan dinámicamente vía JS #}
+                                </select>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Solo técnicos de laboratorio activos.
+                                </div>
+                            </div>
+
+                        </div><!-- /row -->
+
+                        <!-- Nota informativa sobre el tipo de orden -->
+                        <div class="alert alert-info mt-3 mb-0 py-2" style="font-size: 0.85rem;">
+                            <i class="bi bi-lightbulb me-2"></i>
+                            <strong>Tipo de orden:</strong> Venta Mostrador / Servicio Directo sin Diagnóstico.
+                            La orden se creará en estado <em>"Proveniente de Almacén"</em>.
+                            Podrás completar los detalles del equipo desde Servicio Técnico.
+                        </div>
+
+                    </form>
+
+                </div><!-- /contenidoCrearOrden -->
+
+                <!-- Alerta de error al cargar datos -->
+                <div id="alertaErrorCargaOrden" class="alert alert-danger" style="display:none;">
+                    <i class="bi bi-exclamation-circle me-2"></i>
+                    <span id="mensajeErrorCargaOrden">Error al cargar los datos.</span>
+                </div>
+
+            </div><!-- /modal-body -->
+
+            <!-- PIE DEL MODAL -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x me-1"></i>Cancelar
+                </button>
+                <button type="button"
+                        class="btn btn-success"
+                        id="btnConfirmarCrearOrdenFL"
+                        style="min-width: 180px;"
+                        disabled>
+                    <span id="btnCrearOrdenTexto">
+                        <i class="bi bi-plus-circle me-2"></i>Crear Orden y Vincular
+                    </span>
+                    <span id="btnCrearOrdenSpinner" style="display:none;">
+                        <span class="spinner-border spinner-border-sm me-2"></span>Creando...
+                    </span>
+                </button>
+            </div>
+
+        </div><!-- /modal-content -->
+    </div><!-- /modal-dialog -->
+</div><!-- /modal -->
+
+<script>
+/**
+ * Lógica del modal "Crear Orden FL-"
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * --------------------------------
+ * Cuando el modal se abre, hace una petición GET al endpoint de la vista
+ * para obtener:
+ *   1. Lista de técnicos disponibles (para llenar el selector)
+ *   2. Número FL- sugerido para este año
+ *   3. Resumen de datos del cliente/equipo para confirmar visualmente
+ *
+ * Al confirmar, envía el formulario por POST a la misma URL.
+ * La vista crea la orden, la vincula y redirige al detalle actualizado.
+ */
+(function () {
+    'use strict';
+
+    // Referencias a elementos del DOM
+    const modal           = document.getElementById('modalCrearOrdenFL');
+    const spinner         = document.getElementById('spinnerCrearOrden');
+    const contenido       = document.getElementById('contenidoCrearOrden');
+    const alertaError     = document.getElementById('alertaErrorCargaOrden');
+    const mensajeError    = document.getElementById('mensajeErrorCargaOrden');
+    const inputFL         = document.getElementById('inputNumeroFL');
+    const selectTecnico   = document.getElementById('selectTecnico');
+    const btnConfirmar    = document.getElementById('btnConfirmarCrearOrdenFL');
+    const formCrearOrden  = document.getElementById('formCrearOrdenFL');
+    const btnTexto        = document.getElementById('btnCrearOrdenTexto');
+    const btnSpinner      = document.getElementById('btnCrearOrdenSpinner');
+
+    // URL para obtener datos (GET) y para enviar (POST)
+    const urlDatos = "{% url 'almacen:crear_orden_fl_desde_cotizacion' solicitud.pk %}";
+
+    // Al abrir el modal: cargar datos vía GET
+    if (modal) {
+        modal.addEventListener('show.bs.modal', function () {
+            // Restablecer estado del modal a "cargando"
+            spinner.style.display     = 'block';
+            contenido.style.display   = 'none';
+            alertaError.style.display = 'none';
+            btnConfirmar.disabled     = true;
+
+            // Petición GET para obtener técnicos, FL- sugerido y resumen del equipo
+            fetch(urlDatos, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                }
+            })
+            .then(function (resp) {
+                if (!resp.ok) throw new Error('Error en la respuesta del servidor: ' + resp.status);
+                return resp.json();
+            })
+            .then(function (data) {
+                if (!data.success) throw new Error(data.error || 'Error desconocido');
+
+                // --- Llenar el número FL- sugerido ---
+                inputFL.value = data.numero_fl_sugerido || '';
+
+                // --- Poblar el selector de técnicos ---
+                // Limpiar opciones previas (excepto la opción vacía inicial)
+                while (selectTecnico.options.length > 1) {
+                    selectTecnico.remove(1);
+                }
+                (data.tecnicos || []).forEach(function (tec) {
+                    const opt = document.createElement('option');
+                    opt.value = tec.id;
+                    opt.textContent = tec.nombre + ' — ' + tec.sucursal;
+                    selectTecnico.appendChild(opt);
+                });
+
+                // Si solo hay un técnico, pre-seleccionarlo automáticamente
+                if (data.tecnicos && data.tecnicos.length === 1) {
+                    selectTecnico.value = data.tecnicos[0].id;
+                }
+
+                // --- Mostrar resumen de datos del cliente/equipo ---
+                const r = data.resumen || {};
+                document.getElementById('resNombreCliente').textContent  = r.nombre_cliente  || '—';
+                document.getElementById('resEmailCliente').textContent   = r.email_cliente   || '—';
+                document.getElementById('resTelefonoCliente').textContent= r.telefono_cliente|| '—';
+                document.getElementById('resTipoEquipo').textContent     = r.tipo_equipo     || '—';
+                document.getElementById('resMarcaModelo').textContent    = (r.marca || '—') + ' / ' + (r.modelo || '—');
+                document.getElementById('resNumeroSerie').textContent    = r.numero_serie    || '—';
+
+                // Mostrar contenido y habilitar botón confirmar
+                spinner.style.display   = 'none';
+                contenido.style.display = 'block';
+                btnConfirmar.disabled   = false;
+            })
+            .catch(function (err) {
+                // Mostrar error amigable si algo falla al cargar
+                spinner.style.display     = 'none';
+                alertaError.style.display = 'block';
+                mensajeError.textContent  = 'No se pudieron cargar los datos: ' + err.message;
+                console.error('[CrearOrdenFL] Error al cargar datos:', err);
+            });
+        });
+    }
+
+    // Al hacer clic en "Crear Orden y Vincular": deshabilitar botón y enviar el formulario
+    if (btnConfirmar) {
+        btnConfirmar.addEventListener('click', function () {
+            // Validación básica antes de enviar
+            if (!inputFL.value.trim()) {
+                inputFL.focus();
+                inputFL.classList.add('is-invalid');
+                return;
+            }
+            if (!inputFL.value.trim().toUpperCase().startsWith('FL-')) {
+                inputFL.focus();
+                inputFL.classList.add('is-invalid');
+                alert('El folio debe comenzar con "FL-" (ej: FL-2026-0001)');
+                return;
+            }
+            if (!selectTecnico.value) {
+                selectTecnico.focus();
+                selectTecnico.classList.add('is-invalid');
+                return;
+            }
+
+            // Convertir FL- a mayúsculas antes de enviar
+            inputFL.value = inputFL.value.trim().toUpperCase();
+
+            // Mostrar spinner en el botón y deshabilitar para evitar doble envío
+            btnTexto.style.display   = 'none';
+            btnSpinner.style.display = 'inline-flex';
+            btnConfirmar.disabled    = true;
+
+            // Enviar el formulario por POST
+            formCrearOrden.submit();
+        });
+    }
+
+    // Quitar clase is-invalid al escribir en los campos
+    if (inputFL) {
+        inputFL.addEventListener('input', function () {
+            this.classList.remove('is-invalid');
+        });
+    }
+    if (selectTecnico) {
+        selectTecnico.addEventListener('change', function () {
+            this.classList.remove('is-invalid');
+        });
+    }
+})();
+</script>
+{% endif %}
+
 {% endblock almacen_content %}
 
 {% block extra_js %}
