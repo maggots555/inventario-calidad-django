@@ -41,6 +41,9 @@ class DetalleSolicitud {
         this.initImagenesModal();
         this.initRechazarModal();
         this.initNotificarFront();
+        this.initToggleCostosInternos();
+        this.initScrollShadow();
+        this.initMobileDock();
     }
     // ====================================================================
     // MODAL DE IMÁGENES DE LÍNEA
@@ -350,6 +353,64 @@ class DetalleSolicitud {
             const confirmModal = new bsConfirm.Modal(document.getElementById('modalConfirmacionNotificacion'));
             confirmModal.show();
         }
+    }
+    // ====================================================================
+    // UI/UX — Toggle costos, scroll shadow, dock móvil
+    // ====================================================================
+    /**
+     * Muestra u oculta las columnas de costo interno del proveedor.
+     * Guarda la preferencia en localStorage para persistir entre visitas.
+     */
+    initToggleCostosInternos() {
+        const toggle = document.getElementById('toggleCostosInternos');
+        const page = document.getElementById('detalleSolicitudPage');
+        if (!toggle || !page)
+            return;
+        const storageKey = 'detalleSolicitudMostrarCostos';
+        const saved = localStorage.getItem(storageKey);
+        if (saved === 'false') {
+            toggle.checked = false;
+            page.classList.add('costos-ocultos');
+        }
+        toggle.addEventListener('change', () => {
+            if (toggle.checked) {
+                page.classList.remove('costos-ocultos');
+                localStorage.setItem(storageKey, 'true');
+            }
+            else {
+                page.classList.add('costos-ocultos');
+                localStorage.setItem(storageKey, 'false');
+            }
+        });
+    }
+    /**
+     * Agrega sombra visual cuando la tabla tiene scroll horizontal pendiente.
+     */
+    initScrollShadow() {
+        const wraps = document.querySelectorAll('.detalle-table-wrap');
+        wraps.forEach((wrap) => {
+            const updateShadow = () => {
+                const hasScroll = wrap.scrollWidth > wrap.clientWidth + 2;
+                const atEnd = wrap.scrollLeft + wrap.clientWidth >= wrap.scrollWidth - 2;
+                wrap.classList.toggle('has-scroll-right', hasScroll && !atEnd);
+            };
+            wrap.addEventListener('scroll', updateShadow, { passive: true });
+            window.addEventListener('resize', updateShadow);
+            updateShadow();
+        });
+    }
+    /**
+     * Clona el panel de acciones al offcanvas móvil al abrirse.
+     */
+    initMobileDock() {
+        const source = document.getElementById('panelAccionesBody');
+        const target = document.getElementById('offcanvasAccionesBody');
+        const offcanvasEl = document.getElementById('offcanvasAcciones');
+        if (!source || !target || !offcanvasEl)
+            return;
+        offcanvasEl.addEventListener('show.bs.offcanvas', () => {
+            target.innerHTML = source.innerHTML;
+        });
     }
 }
 // ========================================================================

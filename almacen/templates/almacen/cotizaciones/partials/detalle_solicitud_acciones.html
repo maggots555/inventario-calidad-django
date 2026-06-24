@@ -1,0 +1,73 @@
+{% comment %}
+Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado via JS).
+{% endcomment %}
+<div id="panelAccionesBody" class="d-grid gap-2">
+    {% if solicitud.estado == 'borrador' %}
+    <a href="{% url 'almacen:editar_solicitud_cotizacion' solicitud.pk %}" class="btn btn-outline-primary">
+        <i class="bi bi-pencil me-2"></i>Editar Solicitud
+    </a>
+    <button type="button" class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#notificarFrontModal">
+        <i class="bi bi-send me-2"></i>Notificar a Front
+    </button>
+    {% endif %}
+
+    {% if solicitud.estado == 'enviada_front' %}
+    <button type="button" class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#notificarFrontModal">
+        <i class="bi bi-arrow-clockwise me-2"></i>Reenviar Notificación
+    </button>
+    <a href="{% url 'almacen:editar_lineas_cotizacion' solicitud.pk %}" class="btn btn-outline-primary w-100">
+        <i class="bi bi-pencil-square me-2"></i>Editar Líneas
+    </a>
+    <button type="button" class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
+        <i class="bi bi-send me-2"></i>Enviar Cotización al Cliente
+    </button>
+    {% endif %}
+
+    {% if solicitud.estado == 'enviada_cliente' %}
+    <a href="{% url 'almacen:editar_lineas_cotizacion' solicitud.pk %}" class="btn btn-outline-primary w-100">
+        <i class="bi bi-pencil-square me-2"></i>Editar Líneas
+    </a>
+    <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
+        <i class="bi bi-arrow-clockwise me-2"></i>Reenviar Cotización
+    </button>
+    {% endif %}
+
+    {% if solicitud.puede_generar_compras %}
+    <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary w-100"
+                onclick="return confirm('¿Generar compras para las líneas aprobadas?')">
+            <i class="bi bi-cart-plus me-2"></i>Generar Compras
+        </button>
+    </form>
+    {% endif %}
+
+    {% if solicitud.puede_vincular_orden %}
+    <button type="button" class="btn btn-success w-100"
+            data-solicitud-pk="{{ solicitud.pk }}"
+            data-url-datos="{% url 'almacen:crear_orden_fl_desde_cotizacion' solicitud.pk %}"
+            data-url-post="{% url 'almacen:crear_orden_fl_desde_cotizacion' solicitud.pk %}"
+            data-bs-toggle="modal" data-bs-target="#modalCrearOrdenFL">
+        <i class="bi bi-plus-circle me-2"></i>Crear Orden de Servicio
+    </button>
+    <a href="{% url 'almacen:vincular_orden_solicitud' solicitud.pk %}" class="btn btn-outline-info btn-sm w-100">
+        <i class="bi bi-link-45deg me-1"></i>Vincular orden existente
+    </a>
+    {% endif %}
+
+    {% if solicitud.estado not in 'completada,cancelada' %}
+    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelarModal">
+        <i class="bi bi-x-circle me-2"></i>Cancelar Solicitud
+    </button>
+    {% endif %}
+
+    {% if solicitud.estado in 'borrador,cancelada' %}
+    <form method="post" action="{% url 'almacen:eliminar_solicitud_cotizacion' solicitud.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger w-100"
+                onclick="return confirm('¿Eliminar esta solicitud permanentemente?')">
+            <i class="bi bi-trash me-2"></i>Eliminar
+        </button>
+    </form>
+    {% endif %}
+</div>

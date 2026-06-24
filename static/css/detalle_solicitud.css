@@ -1,0 +1,643 @@
+/*
+ * detalle_solicitud.css
+ * =====================
+ * Estilos de la vista detalle de Solicitud de Cotización (almacén).
+ * Layout sticky, tabla compacta, tarjetas móviles, tabs y dock inferior.
+ * Usa variables CSS del proyecto + overrides [data-bs-theme="dark"].
+ */
+
+/* ============================================================
+   ESTILOS BASE (modo claro — default)
+   ============================================================ */
+
+.detalle-solicitud-page {
+    padding-bottom: 5rem;
+}
+
+/* --- Encabezado compacto con chips de resumen --- */
+.detalle-solicitud-header {
+    margin-bottom: 1.25rem;
+}
+
+.detalle-solicitud-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.detalle-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background-color: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-200);
+}
+
+.detalle-chip.chip-success {
+    background-color: var(--success-light);
+    color: var(--success-dark);
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+.detalle-chip.chip-danger {
+    background-color: var(--danger-light);
+    color: var(--danger-dark);
+    border-color: rgba(239, 68, 68, 0.25);
+}
+
+.detalle-chip.chip-warning {
+    background-color: var(--warning-light);
+    color: var(--warning-dark);
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+.detalle-chip.chip-primary {
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    border-color: rgba(52, 152, 219, 0.25);
+}
+
+/* --- Sidebar sticky (desktop) --- */
+.detalle-solicitud-sidebar {
+    position: relative;
+}
+
+@media (min-width: 992px) {
+    .detalle-solicitud-sidebar {
+        position: sticky;
+        top: 1rem;
+        align-self: flex-start;
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+    }
+}
+
+.detalle-sidebar-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    background-color: var(--white);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1rem;
+}
+
+.detalle-sidebar-card .card-header {
+    background-color: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+/* Totales financieros en sidebar */
+.detalle-totales-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.detalle-totales-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 0.85rem;
+}
+
+.detalle-totales-list li:last-child {
+    border-bottom: none;
+}
+
+.detalle-totales-list .total-label {
+    color: var(--gray-600);
+    padding-right: 0.5rem;
+}
+
+.detalle-totales-list .total-val {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.detalle-totales-list .total-val.text-primary {
+    color: var(--primary-color);
+}
+
+.detalle-totales-list .total-val.text-success {
+    color: var(--success-color);
+}
+
+.detalle-totales-list .total-val.text-info {
+    color: var(--info-color);
+}
+
+/* Barra de progreso del resumen */
+.detalle-progress {
+    height: 1.5rem;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* --- Tabs de contenido principal --- */
+.detalle-tabs-nav {
+    border-bottom: 2px solid var(--gray-200);
+    gap: 0.25rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.detalle-tabs-nav::-webkit-scrollbar {
+    display: none;
+}
+
+.detalle-tabs-nav .nav-link {
+    white-space: nowrap;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    padding: 0.65rem 1rem;
+}
+
+.detalle-tabs-nav .nav-link.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background: transparent;
+}
+
+.detalle-tabs-nav .nav-link .badge {
+    font-size: 0.7rem;
+    vertical-align: middle;
+}
+
+/* --- Tabla compacta de líneas --- */
+.detalle-table-wrap {
+    position: relative;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.detalle-table-wrap.has-scroll-right {
+    box-shadow: inset -12px 0 12px -8px rgba(0, 0, 0, 0.08);
+}
+
+.detalle-lineas-table {
+    font-size: 0.84rem;
+    margin-bottom: 0;
+    min-width: 720px;
+}
+
+.detalle-lineas-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background-color: var(--gray-50);
+    border-bottom: 2px solid var(--gray-200);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--gray-600);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.detalle-lineas-table tbody tr {
+    border-left: 4px solid transparent;
+}
+
+.detalle-lineas-table tbody tr.estado-aprobada {
+    border-left-color: var(--success-color);
+}
+
+.detalle-lineas-table tbody tr.estado-rechazada {
+    border-left-color: var(--danger-color);
+}
+
+.detalle-lineas-table tbody tr.estado-compra {
+    border-left-color: var(--primary-color);
+}
+
+.detalle-lineas-table tbody tr.estado-pendiente {
+    border-left-color: var(--gray-300);
+}
+
+/* Columna Acciones pegada a la derecha */
+.detalle-lineas-table th.col-acciones,
+.detalle-lineas-table td.col-acciones {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background-color: var(--white);
+    box-shadow: -4px 0 10px rgba(0, 0, 0, 0.05);
+    min-width: 110px;
+}
+
+.detalle-lineas-table thead th.col-acciones {
+    z-index: 4;
+    background-color: var(--gray-50);
+}
+
+/* Columnas de costo interno — ocultables */
+.detalle-lineas-table th.col-costo-interno,
+.detalle-lineas-table td.col-costo-interno {
+    transition: opacity 0.15s ease;
+}
+
+.detalle-solicitud-page.costos-ocultos .col-costo-interno {
+    display: none;
+}
+
+/* Celdas de precio apiladas */
+.precio-stack {
+    line-height: 1.35;
+}
+
+.precio-stack .precio-unit {
+    font-size: 0.78rem;
+    color: var(--gray-500);
+}
+
+.precio-stack .precio-sub {
+    font-weight: 700;
+}
+
+.precio-stack .precio-sub.cliente {
+    color: var(--primary-color);
+}
+
+/* Celda de pieza con meta */
+.pieza-cell .pieza-nombre {
+    font-weight: 700;
+    color: var(--gray-900);
+    display: block;
+}
+
+.pieza-cell .pieza-desc {
+    font-size: 0.78rem;
+    color: var(--gray-500);
+}
+
+.pieza-cell .pieza-meta {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-top: 0.2rem;
+}
+
+.pieza-cell .pieza-notas {
+    font-size: 0.75rem;
+    color: var(--info-color);
+    margin-top: 0.2rem;
+}
+
+/* Toggle costos internos */
+.toggle-costos-label {
+    font-size: 0.8rem;
+    cursor: pointer;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+}
+
+/* --- Tarjetas móviles de línea --- */
+.linea-cards-container {
+    padding: 0.75rem;
+}
+
+.linea-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    background-color: var(--white);
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.linea-card.estado-aprobada {
+    border-left: 4px solid var(--success-color);
+}
+
+.linea-card.estado-rechazada {
+    border-left: 4px solid var(--danger-color);
+}
+
+.linea-card.estado-compra {
+    border-left: 4px solid var(--primary-color);
+}
+
+.linea-card.estado-pendiente {
+    border-left: 4px solid var(--gray-300);
+}
+
+.linea-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem 0.85rem 0.5rem;
+}
+
+.linea-card-num {
+    font-weight: 800;
+    color: var(--gray-400);
+    font-size: 0.85rem;
+    min-width: 1.5rem;
+}
+
+.linea-card-body {
+    padding: 0 0.85rem 0.65rem;
+}
+
+.linea-card-precios {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    padding: 0.5rem 0.85rem;
+    background-color: var(--gray-50);
+    border-top: 1px solid var(--gray-100);
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.linea-card-precio-block .label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gray-500);
+    display: block;
+}
+
+.linea-card-precio-block .valor {
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.linea-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.55rem 0.85rem;
+    gap: 0.5rem;
+}
+
+.linea-card-acciones {
+    display: flex;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+/* Tarjeta de servicio (móvil) — reutiliza linea-card */
+.servicio-card .linea-card-precios {
+    grid-template-columns: 1fr;
+}
+
+/* --- Card headers de sección --- */
+.detalle-section-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 0;
+}
+
+.detalle-section-card .card-header {
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.detalle-section-card .card-header h5,
+.detalle-section-card .card-header h6 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+/* Encabezado de líneas — tono neutro acorde al sidebar del sistema */
+.detalle-header-lineas {
+    background-color: var(--gray-50);
+    color: var(--gray-900);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.detalle-header-lineas .toggle-costos-label {
+    color: var(--gray-700);
+}
+
+.detalle-section-card .card-header.bg-success {
+    color: #ffffff;
+}
+
+/* Imágenes de referencia en tab observaciones */
+.detalle-ref-img {
+    height: 120px;
+    object-fit: cover;
+    width: 100%;
+}
+
+/* Acordeón datos cliente */
+.detalle-accordion .accordion-button {
+    font-weight: 700;
+    font-size: 0.92rem;
+    padding: 0.85rem 1rem;
+}
+
+.detalle-accordion .accordion-button:not(.collapsed) {
+    background-color: var(--gray-50);
+    color: var(--primary-color);
+}
+
+/* --- Dock móvil inferior --- */
+.detalle-mobile-dock {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1040;
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.65rem 0.85rem;
+    padding-bottom: calc(0.65rem + env(safe-area-inset-bottom, 0px));
+    background-color: var(--white);
+    border-top: 1px solid var(--gray-200);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.detalle-mobile-dock .btn {
+    min-height: 44px;
+    font-weight: 600;
+}
+
+.detalle-mobile-dock .btn-dock-primary {
+    flex: 1;
+}
+
+/* Espacio inferior para que el dock no tape contenido */
+@media (max-width: 991.98px) {
+    .detalle-solicitud-page {
+        padding-bottom: 5.5rem;
+    }
+}
+
+/* Offcanvas acciones móvil */
+.detalle-offcanvas-acciones .offcanvas-body {
+    padding: 1rem;
+}
+
+/* Badges compactos en tabla */
+.badge-compact {
+    font-size: 0.68rem;
+    padding: 0.2em 0.45em;
+}
+
+/* Historial en sidebar */
+.detalle-historial-list li {
+    font-size: 0.84rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.detalle-historial-list li:last-child {
+    border-bottom: none;
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   ============================================================ */
+
+[data-bs-theme="dark"] .detalle-chip {
+    background-color: #1e293b;
+    color: var(--text-secondary);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .detalle-chip.chip-success {
+    background-color: rgba(52, 211, 153, 0.12);
+    color: #34d399;
+    border-color: rgba(52, 211, 153, 0.3);
+}
+
+[data-bs-theme="dark"] .detalle-chip.chip-danger {
+    background-color: rgba(248, 113, 113, 0.12);
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.3);
+}
+
+[data-bs-theme="dark"] .detalle-chip.chip-warning {
+    background-color: rgba(251, 191, 36, 0.12);
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.3);
+}
+
+[data-bs-theme="dark"] .detalle-chip.chip-primary {
+    background-color: rgba(96, 165, 250, 0.12);
+    color: #60a5fa;
+    border-color: rgba(96, 165, 250, 0.3);
+}
+
+[data-bs-theme="dark"] .detalle-sidebar-card {
+    background-color: var(--card-bg);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .detalle-sidebar-card .card-header {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .detalle-totales-list li {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .detalle-totales-list .total-label {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .detalle-tabs-nav {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .detalle-tabs-nav .nav-link {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .detalle-tabs-nav .nav-link.active {
+    color: #60a5fa;
+    border-bottom-color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .detalle-lineas-table thead th {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .detalle-lineas-table th.col-acciones,
+[data-bs-theme="dark"] .detalle-lineas-table td.col-acciones {
+    background-color: var(--card-bg);
+    box-shadow: -4px 0 10px rgba(0, 0, 0, 0.25);
+}
+
+[data-bs-theme="dark"] .detalle-lineas-table thead th.col-acciones {
+    background-color: #0f172a;
+}
+
+[data-bs-theme="dark"] .pieza-cell .pieza-nombre {
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .linea-card {
+    background-color: var(--card-bg);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .linea-card-precios {
+    background-color: #0f172a;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .detalle-section-card {
+    border-color: #334155;
+    background-color: var(--card-bg);
+}
+
+[data-bs-theme="dark"] .detalle-mobile-dock {
+    background-color: #0f172a;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .detalle-accordion .accordion-button:not(.collapsed) {
+    background-color: #1e293b;
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .detalle-table-wrap.has-scroll-right {
+    box-shadow: inset -12px 0 12px -8px rgba(0, 0, 0, 0.35);
+}
+
+[data-bs-theme="dark"] .detalle-historial-list li {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .detalle-header-lineas {
+    background-color: #0f172a;
+    color: var(--text-primary);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .detalle-header-lineas .toggle-costos-label {
+    color: var(--text-secondary);
+}
