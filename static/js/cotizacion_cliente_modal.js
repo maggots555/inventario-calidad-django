@@ -25,14 +25,14 @@
  *
  * Fórmula (espejo exacto del backend Python en pdf_cotizacion_cliente.py):
  *
- *   base              = costoTotal + manoObra + costosFijosTotal
+ *   base              = costoPiezas + manoObra + costosFijosTotal
  *   precio_sin_iva    = (base / (1 - profit%)) + diagnostico
- *   precio_con_iva    = precio_sin_iva * 1.16
+ *   precio_con_iva    = precio_sin_iva * 1.16 + serviciosConIva
  *   precio_menos_diag = precio_con_iva - (diagnostico * 1.16)
  *
- * NOTA sobre mano de obra vs diagnóstico:
- *   - Mano de obra: va en la BASE antes del factor de profit (se vende con margen)
- *   - Diagnóstico:  se suma DESPUÉS del factor (cargo fijo sin margen adicional)
+ * NOTA sobre servicios adicionales:
+ *   - Ya traen IVA y profit incluidos al registrarse
+ *   - Se suman al final sin aplicar margen adicional
  *
  * @param tipo         - Perfil de servicio ('estandar', 'alta_gama', etc.)
  * @param costoTotal   - Suma de todos los costos internos (piezas + servicios)
@@ -248,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
         // --- Sección de servicios adicionales (solo si existen) ---
         const filasServicios = config.servicios.length > 0
-            ? `<div class="calc-desglose-grupo-titulo">Servicios adicionales</div>
+            ? `<div class="calc-desglose-grupo-titulo">Servicios adicionales (IVA incluido)</div>
                ${config.servicios.map(s => `
                <div class="calc-desglose-item">
                    <span class="desglose-nombre">${s.nombre}</span>
@@ -274,36 +274,62 @@ document.addEventListener('DOMContentLoaded', () => {
         // Mano de obra = 0: el campo es solo informativo, no entra en el cálculo.
         // El diagnóstico ya se incluye automáticamente al seleccionar el perfil de profit.
         const manoObra = 0;
-        // Calcular la suma de costos internos de todas las piezas
+        // Calcular la suma de costos internos de piezas (sin profit adicional en servicios)
         const costoLineas = config.lineas.reduce((acc, l) => {
             return acc + (l.costo * l.cantidad);
         }, 0);
-        // Suma de costos de servicios adicionales (cantidad = 1)
-        const costoServicios = config.servicios.reduce((acc, s) => acc + s.costo, 0);
-        // Costo total interno (piezas + servicios)
-        const costoTotal = costoLineas + costoServicios;
-        // Calcular usando el perfil
-        const res = calcularPrecioCliente(tipo, costoTotal, manoObra);
+        // Servicios adicionales: precio final con IVA incluido (sin profit adicional)
+        const serviciosConIva = config.servicios.reduce((acc, s) => acc + s.costo, 0);
+        const soloServicios = config.lineas.length === 0 && config.servicios.length > 0;
+        // PDF/cotización solo con servicios: suma directa, sin profit ni costos fijos
+        if (soloServicios) {
+            calcBody.innerHTML = `
+                <div class="calc-row">
+                    <span class="etq">Servicios adicionales (IVA incluido)</span>
+                    <span class="val">${fmtPeso(serviciosConIva)}</span>
+                </div>
+                <div class="calc-desglose-panel" style="display:block">
+                    ${renderDesgloseHTML()}
+                </div>
+                <div class="calc-row total-iva">
+                    <span class="etq">TOTAL CON IVA (16%)</span>
+                    <span class="val">${fmtPeso(serviciosConIva)}</span>
+                </div>
+            `;
+            return;
+        }
+        // Profit solo sobre piezas + costos fijos + diagnóstico del perfil
+        const res = calcularPrecioCliente(tipo, costoLineas, manoObra);
+        // Totales combinados: piezas (con profit) + servicios (precio fijo)
+        const precioConIvaTotal = res.precio_con_iva + serviciosConIva;
+        const precioMenosDiagTotal = res.diagnostico > 0
+            ? precioConIvaTotal - (res.diagnostico * 1.16)
+            : precioConIvaTotal;
         // Determinar si se muestra el descuento diagnóstico
         const mostrarDescuento = (_a = checkDescuento === null || checkDescuento === void 0 ? void 0 : checkDescuento.checked) !== null && _a !== void 0 ? _a : false;
         // Construir las filas de resultado en HTML
         calcBody.innerHTML = `
             <div class="calc-row calc-row-desglose-toggle" role="button" title="Ver desglose por pieza">
                 <span class="etq">
-                    Costo interno total (piezas + servicios)
+                    Costo interno piezas
                     <span class="desglose-chevron">${desgloseAbierto ? '▾' : '▸'}</span>
                 </span>
-                <span class="val">${fmtPeso(res.subtotal_costo)}</span>
+                <span class="val">${fmtPeso(costoLineas)}</span>
             </div>
             <div class="calc-desglose-panel" style="display:${desgloseAbierto ? 'block' : 'none'}">
                 ${renderDesgloseHTML()}
             </div>
+            ${serviciosConIva > 0 ? `
+            <div class="calc-row">
+                <span class="etq">Servicios adicionales (IVA incluido, sin profit)</span>
+                <span class="val">${fmtPeso(serviciosConIva)}</span>
+            </div>` : ''}
             <div class="calc-row">
                 <span class="etq">Costos fijos del perfil (${tipo})</span>
                 <span class="val">${fmtPeso(res.costos_fijos_total)}</span>
             </div>
             <div class="calc-row">
-                <span class="etq">Profit aplicado</span>
+                <span class="etq">Profit aplicado (solo piezas)</span>
                 <span class="val">${fmtPct(res.porcentaje_profit)}</span>
             </div>
             ${res.diagnostico > 0 ? `
@@ -317,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="calc-row total-iva">
                 <span class="etq">TOTAL CON IVA (16%)</span>
-                <span class="val">${fmtPeso(res.precio_con_iva)}</span>
+                <span class="val">${fmtPeso(precioConIvaTotal)}</span>
             </div>
             ${mostrarDescuento && res.diagnostico > 0 ? `
             <div class="calc-row descuento">
@@ -326,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="calc-row total-pagar">
                 <span class="etq">TOTAL A PAGAR (menos diagnóstico)</span>
-                <span class="val">${fmtPeso(res.precio_menos_diag_iva)}</span>
+                <span class="val">${fmtPeso(precioMenosDiagTotal)}</span>
             </div>` : ''}
         `;
     }

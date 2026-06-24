@@ -3445,6 +3445,33 @@ def _serializar_profit_config() -> str:
     return _json.dumps(datos, separators=(',', ':'))
 
 
+def _opciones_servicios_adicionales():
+    """
+    Construye la lista de servicios adicionales para el dropdown del modal.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Los nombres vienen de TIPO_SERVICIO_ADICIONAL_CHOICES y los precios de
+    PRECIOS_SERVICIOS_ADICIONALES (constants.py). Así el template no repite
+    valores hardcodeados que pueden quedar desactualizados.
+
+    Returns:
+        list[dict]: Opciones con codigo, nombre y precio (IVA incluido).
+    """
+    from config.constants import (
+        TIPO_SERVICIO_ADICIONAL_CHOICES,
+        PRECIOS_SERVICIOS_ADICIONALES,
+    )
+
+    return [
+        {
+            'codigo': codigo,
+            'nombre': nombre,
+            'precio': PRECIOS_SERVICIOS_ADICIONALES.get(codigo, 0),
+        }
+        for codigo, nombre in TIPO_SERVICIO_ADICIONAL_CHOICES
+    ]
+
+
 @login_required
 @permission_required_with_message('almacen.view_solicitudcotizacion')
 def detalle_solicitud_cotizacion(request, pk):
@@ -3614,6 +3641,8 @@ def detalle_solicitud_cotizacion(request, pk):
         # template y leerla desde TypeScript. Los valores vienen del .env
         # (nunca del código fuente), así que no aparecen en el repositorio.
         'profit_config_json': _serializar_profit_config(),
+        # Opciones del dropdown "Agregar Servicio Adicional" (precios desde constants.py)
+        'servicios_adicionales_opciones': _opciones_servicios_adicionales(),
     }
 
     return render(request, 'almacen/cotizaciones/detalle_solicitud.html', context)

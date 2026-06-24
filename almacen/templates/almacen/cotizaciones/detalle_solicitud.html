@@ -1192,16 +1192,13 @@ Muestra toda la información y acciones según el estado
                         <label class="form-label">Tipo de Servicio <span class="text-danger">*</span></label>
                         <select name="tipo_servicio" class="form-select" id="selectTipoServicio" required>
                             <option value="">-- Seleccionar Servicio --</option>
-                            <option value="paquete_premium" data-precio="5500.00">Solución Premium - $5,500</option>
-                            <option value="paquete_oro" data-precio="3850.00">Solución Oro - $3,850</option>
-                            <option value="paquete_plata" data-precio="3870.00">Solución Plata - $3,870</option>
-                            <option value="cambio_pieza" data-precio="350.00">Cambio de Pieza (sin diagnóstico) - $350</option>
-                            <option value="limpieza" data-precio="450.00">Limpieza y Mantenimiento - $450</option>
-                            <option value="kit_limpieza" data-precio="180.00">Kit de Limpieza Profesional - $180</option>
-                            <option value="reinstalacion_so" data-precio="650.00">Reinstalación de Sistema Operativo - $650</option>
-                            <option value="respaldo" data-precio="400.00">Respaldo de Información - $400</option>
+                            {% for opt in servicios_adicionales_opciones %}
+                            <option value="{{ opt.codigo }}" data-precio="{{ opt.precio|floatformat:2 }}">
+                                {{ opt.nombre }}{% if opt.precio %} — ${{ opt.precio|floatformat:2 }} (IVA incl.){% else %} — Consultar precio{% endif %}
+                            </option>
+                            {% endfor %}
                         </select>
-                        <small class="text-muted">Selecciona el servicio a cotizar. El precio se llena automáticamente.</small>
+                        <small class="text-muted">Selecciona el servicio a cotizar. El precio sugerido se llena automáticamente desde el catálogo.</small>
                     </div>
                     
                     <div class="mb-3">

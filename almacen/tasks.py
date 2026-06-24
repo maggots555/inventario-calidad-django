@@ -639,14 +639,21 @@ def enviar_cotizacion_cliente_task(
 
         # Calcular total con IVA para mostrar en el email (sin abrir el PDF)
         from .utils.pdf_cotizacion_cliente import calcular_precio_cliente
-        total_items_costo = sum(
+        total_piezas_costo = sum(
             float(item.get('costo_unitario', 0) or 0) * int(item.get('cantidad', 1) or 1)
             for item in items
+            if not item.get('es_servicio')
+        )
+        servicios_con_iva = sum(
+            float(item.get('costo_unitario', 0) or 0) * int(item.get('cantidad', 1) or 1)
+            for item in items
+            if item.get('es_servicio')
         )
         calculo_resumen = calcular_precio_cliente(
-            costo_piezas=total_items_costo,
+            costo_piezas=total_piezas_costo,
             tipo_servicio=tipo_servicio,
             incluir_descuento_diagnostico=incluir_descuento_diagnostico,
+            servicios_con_iva=servicios_con_iva,
         )
 
         # Construir el nombre del título de la propuesta para el asunto del email
