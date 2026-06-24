@@ -1,0 +1,426 @@
+/*
+ * form_solicitud.css
+ * Estilos para crear/editar Solicitud de Cotización (almacén).
+ * Layout sticky, headers neutros, tarjetas de línea y autocompletado de producto.
+ */
+
+.badge-compact {
+    font-size: 0.68rem;
+    padding: 0.2em 0.45em;
+}
+
+.form-solicitud-page {
+    padding-bottom: 5.5rem;
+}
+
+.form-solicitud-header {
+    margin-bottom: 1.25rem;
+}
+
+.form-solicitud-badge-modo {
+    font-size: 0.75rem;
+    vertical-align: middle;
+}
+
+/* Sidebar sticky */
+.form-solicitud-sidebar {
+    position: relative;
+}
+
+@media (min-width: 992px) {
+    .form-solicitud-sidebar {
+        position: sticky;
+        top: 1rem;
+        align-self: flex-start;
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+    }
+}
+
+.form-sidebar-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    background-color: var(--white);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1rem;
+}
+
+.form-sidebar-card .card-header {
+    background-color: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.form-sidebar-total {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--primary-color);
+}
+
+.form-sidebar-lineas-count {
+    font-size: 0.85rem;
+    color: var(--gray-600);
+}
+
+/* Cards de sección */
+.form-section-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1rem;
+}
+
+.form-section-card .card-header {
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.form-section-card .card-header h5,
+.form-section-card .card-header h6 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.form-solicitud-header-card,
+.form-solicitud-header-lineas {
+    background-color: var(--gray-50);
+    color: var(--gray-900);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+/* Líneas del formset */
+.linea-form {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    padding: 0.85rem;
+    margin-bottom: 0.75rem;
+    background-color: var(--white);
+    border-left: 4px solid var(--primary-color);
+}
+
+.linea-form.linea-eliminada {
+    border-left-color: var(--danger-color);
+    opacity: 0.45;
+}
+
+.linea-form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.linea-form-num {
+    font-weight: 800;
+    color: var(--gray-400);
+    font-size: 0.9rem;
+}
+
+/* Autocompletado de producto */
+.producto-autocomplete {
+    position: relative;
+}
+
+.producto-autocomplete-input.is-invalid-selection {
+    border-color: var(--danger-color);
+}
+
+.producto-autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    max-height: 220px;
+    overflow-y: auto;
+    display: none;
+    margin-top: 2px;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    background-color: var(--white);
+}
+
+.producto-autocomplete-dropdown.show {
+    display: block;
+}
+
+.producto-autocomplete-item {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border: none;
+    border-bottom: 1px solid var(--gray-100);
+    background: transparent;
+    width: 100%;
+    text-align: left;
+}
+
+.producto-autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.producto-autocomplete-item:hover,
+.producto-autocomplete-item.active {
+    background-color: var(--gray-100);
+}
+
+.producto-autocomplete-item .prod-codigo {
+    font-size: 0.72rem;
+    color: var(--gray-500);
+    font-weight: 600;
+}
+
+.producto-autocomplete-item .prod-nombre {
+    font-size: 0.84rem;
+    color: var(--gray-900);
+}
+
+.producto-autocomplete-item .prod-meta {
+    font-size: 0.7rem;
+    color: var(--gray-500);
+}
+
+.producto-autocomplete-empty {
+    padding: 0.65rem 0.75rem;
+    font-size: 0.82rem;
+    color: var(--gray-500);
+    font-style: italic;
+}
+
+/* Autocompletado de orden de servicio */
+.orden-autocomplete {
+    position: relative;
+}
+
+.orden-autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    max-height: 320px;
+    overflow-y: auto;
+    display: none;
+    margin-top: 2px;
+    border: 1px solid var(--gray-200);
+    border-top: 2px solid var(--primary-color);
+    border-radius: 0 0 8px 8px;
+    box-shadow: var(--shadow-md);
+    background-color: var(--white);
+}
+
+.orden-autocomplete-dropdown.show {
+    display: block;
+}
+
+.orden-autocomplete-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.orden-autocomplete-item {
+    padding: 0.6rem 0.75rem;
+    cursor: pointer;
+    border: none;
+    border-bottom: 1px solid var(--gray-100);
+    background: transparent;
+    width: 100%;
+    text-align: left;
+}
+
+.orden-autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.orden-autocomplete-item:hover,
+.orden-autocomplete-item.active {
+    background-color: var(--gray-100);
+}
+
+.orden-autocomplete-item-principal {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.orden-autocomplete-orden {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--gray-900);
+}
+
+.orden-autocomplete-marca {
+    font-size: 0.68rem;
+}
+
+.orden-autocomplete-item-secundario {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    font-size: 0.72rem;
+    color: var(--gray-500);
+}
+
+.orden-autocomplete-item mark {
+    background-color: #fef08a;
+    color: inherit;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+.orden-autocomplete-cargando,
+.orden-autocomplete-empty {
+    padding: 0.75rem;
+    font-size: 0.82rem;
+    color: var(--gray-500);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Imágenes referencia */
+.form-ref-img-thumb {
+    max-height: 80px;
+    object-fit: cover;
+    width: 100%;
+}
+
+.form-imagen-preview-img {
+    max-height: 60px;
+}
+
+/* Dock móvil */
+.form-solicitud-dock {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1040;
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.65rem 0.85rem;
+    padding-bottom: calc(0.65rem + env(safe-area-inset-bottom, 0px));
+    background-color: var(--white);
+    border-top: 1px solid var(--gray-200);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.form-solicitud-dock .btn {
+    min-height: 44px;
+    font-weight: 600;
+}
+
+.form-solicitud-dock .btn-dock-primary {
+    flex: 1;
+}
+
+.form-solicitud-actions-desktop .btn {
+    width: 100%;
+}
+
+/* Acordeón imágenes */
+.form-accordion .accordion-button {
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
+.form-accordion .accordion-button:not(.collapsed) {
+    background-color: var(--gray-50);
+    color: var(--primary-color);
+}
+
+/* ============================================================
+   MODO OSCURO
+   ============================================================ */
+
+[data-bs-theme="dark"] .form-sidebar-card,
+[data-bs-theme="dark"] .form-section-card {
+    background-color: var(--card-bg);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .form-sidebar-card .card-header,
+[data-bs-theme="dark"] .form-solicitud-header-card,
+[data-bs-theme="dark"] .form-solicitud-header-lineas {
+    background-color: #0f172a;
+    color: var(--text-primary);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .linea-form {
+    background-color: var(--card-bg);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .linea-form-header {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .producto-autocomplete-dropdown {
+    background-color: var(--card-bg);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .producto-autocomplete-item {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .producto-autocomplete-item:hover,
+[data-bs-theme="dark"] .producto-autocomplete-item.active {
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .producto-autocomplete-item .prod-nombre {
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .orden-autocomplete-dropdown {
+    background-color: var(--card-bg);
+    border-color: #334155;
+    border-top-color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .orden-autocomplete-item {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .orden-autocomplete-item:hover,
+[data-bs-theme="dark"] .orden-autocomplete-item.active {
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .orden-autocomplete-orden {
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .orden-autocomplete-item-secundario {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .orden-autocomplete-item mark {
+    background-color: #854d0e;
+    color: #fef08a;
+}
+
+[data-bs-theme="dark"] .form-solicitud-dock {
+    background-color: #0f172a;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .form-accordion .accordion-button:not(.collapsed) {
+    background-color: #1e293b;
+    color: #60a5fa;
+}

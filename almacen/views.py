@@ -76,6 +76,7 @@ from .forms import (
     SolicitudCotizacionForm,
     LineaCotizacionForm,
     LineaCotizacionFormSet,
+    LineaCotizacionFormSetCreacion,
     SolicitudCotizacionFiltroForm,
     RespuestaLineaCotizacionForm,
     ImagenLineaCotizacionForm,
@@ -3065,7 +3066,7 @@ def crear_solicitud_cotizacion(request):
     """
     if request.method == 'POST':
         form = SolicitudCotizacionForm(request.POST)
-        formset = LineaCotizacionFormSet(request.POST)
+        formset = LineaCotizacionFormSetCreacion(request.POST)
         
         if form.is_valid() and formset.is_valid():
             # Guardar la solicitud (cabecera)
@@ -3192,7 +3193,7 @@ def crear_solicitud_cotizacion(request):
             messages.error(request, 'Por favor corrige los errores en el formulario.')
     else:
         form = SolicitudCotizacionForm()
-        formset = LineaCotizacionFormSet()
+        formset = LineaCotizacionFormSetCreacion()
 
     # Obtener la sucursal del usuario logueado para mostrarla en el formulario
     # cuando se usa el modo "sin orden activa". Se muestra como dato informativo

@@ -1675,8 +1675,8 @@ class SolicitudCotizacionForm(forms.ModelForm):
         ]
         widgets = {
             'numero_orden_cliente': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Ej: OOW-12345 o FL-67890',
+                'class': 'form-control orden-autocomplete-input',
+                'placeholder': 'Buscar por serie, orden del cliente u orden interna...',
                 'id': 'numero_orden_cliente',
                 'autocomplete': 'off',
             }),
@@ -1749,7 +1749,7 @@ class SolicitudCotizacionForm(forms.ModelForm):
             'observaciones': 'Observaciones Internas',
         }
         help_texts = {
-            'numero_orden_cliente': 'Ingresa el número de orden y presiona Tab para buscar',
+            'numero_orden_cliente': 'Escribe número de serie, orden del cliente u orden interna',
             'sin_orden_activa': 'Marcar si aún no existe una orden de servicio para esta cotización',
             'service_tag': 'Número de serie o identificador del equipo - Se convertirá a mayúsculas',
             'nombre_cliente': 'Nombre completo del cliente que solicita la cotización',
@@ -1895,8 +1895,10 @@ class LineaCotizacionForm(forms.ModelForm):
             'notas',
         ]
         widgets = {
-            'producto': forms.Select(attrs={
-                'class': 'form-select form-select-sm producto-select',
+            # HiddenInput: el usuario elige producto vía autocompletado en el template;
+            # el POST sigue enviando lineas-N-producto=<pk> para ModelChoiceField.
+            'producto': forms.HiddenInput(attrs={
+                'class': 'producto-id-input',
             }),
             'descripcion_pieza': forms.TextInput(attrs={
                 'class': 'form-control form-control-sm',
@@ -2012,11 +2014,23 @@ class LineaCotizacionForm(forms.ModelForm):
 # - min_num: Mínimo de formularios (1 = al menos una línea)
 # - validate_min: Si validar el mínimo
 
+# Formset para CREAR solicitud: incluye 1 línea vacía para facilitar el primer alta.
+LineaCotizacionFormSetCreacion = inlineformset_factory(
+    SolicitudCotizacion,
+    LineaCotizacion,
+    form=LineaCotizacionForm,
+    extra=1,
+    can_delete=True,
+    min_num=1,
+    validate_min=True,
+)
+
+# Formset para EDITAR solicitud: solo líneas guardadas; agregar más es decisión del usuario.
 LineaCotizacionFormSet = inlineformset_factory(
     SolicitudCotizacion,  # Modelo padre
     LineaCotizacion,      # Modelo hijo
     form=LineaCotizacionForm,
-    extra=1,              # 1 formulario vacío inicial
+    extra=0,              # Sin formulario vacío automático al editar
     can_delete=True,      # Permite eliminar líneas
     min_num=1,            # Al menos 1 línea
     validate_min=True,    # Validar que haya al menos 1

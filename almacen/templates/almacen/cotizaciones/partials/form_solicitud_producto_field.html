@@ -1,0 +1,28 @@
+{% comment %}
+Campo Producto con autocompletado AJAX.
+Uso: {% include '...' with linea_form=linea_form %}  o  prefix='__prefix__'
+{% endcomment %}
+<div class="producto-autocomplete"
+     data-api-url="{% url 'almacen:api_buscar_productos' %}"
+     data-api-info-url="{% url 'almacen:api_info_producto' 0 %}">
+    {% if linea_form %}
+        {{ linea_form.producto }}
+        <input type="text"
+               class="form-control form-control-sm producto-autocomplete-input"
+               value="{% if linea_form.instance.producto %}{{ linea_form.instance.producto.codigo_producto }} — {{ linea_form.instance.producto.nombre }}{% endif %}"
+               placeholder="Buscar por código o nombre..."
+               autocomplete="off"
+               required>
+    {% else %}
+        <input type="hidden" name="lineas-{{ prefix }}-producto" class="producto-id-input" value="">
+        <input type="text"
+               class="form-control form-control-sm producto-autocomplete-input"
+               placeholder="Buscar por código o nombre..."
+               autocomplete="off"
+               required>
+    {% endif %}
+    <div class="producto-autocomplete-dropdown list-group"></div>
+</div>
+{% if linea_form and linea_form.producto.errors %}
+<div class="text-danger small">{{ linea_form.producto.errors.0 }}</div>
+{% endif %}
