@@ -4549,8 +4549,25 @@ def generar_compras_solicitud(request, pk):
             return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
         
         mensajes_exito = []
-        
-        # Generar compras para piezas
+
+        # ====== PASO ESPECIAL: Órdenes FL- (Venta Mostrador) ======
+        # Para cotizaciones vinculadas a órdenes de tipo 'venta_mostrador', las piezas
+        # aprobadas se crean como PiezaVentaMostrador en ST en lugar de PiezaCotizada.
+        # IMPORTANTE: se llama ANTES de generar_compras() porque generar_compras() cambia
+        # el estado de las líneas de 'aprobada' a 'compra_generada', y generar_piezas_venta_mostrador()
+        # filtra exclusivamente por estado='aprobada' para evitar duplicados.
+        if (
+            puede_generar_compras
+            and solicitud.orden_servicio
+            and solicitud.orden_servicio.tipo_servicio == 'venta_mostrador'
+        ):
+            n_piezas = solicitud.generar_piezas_venta_mostrador()
+            if n_piezas:
+                mensajes_exito.append(
+                    f'{n_piezas} pieza(s) registrada(s) en sección Venta Mostrador'
+                )
+
+        # Generar compras para piezas (CompraProducto para control de inventario/almacén)
         if puede_generar_compras:
             compras = solicitud.generar_compras(usuario=request.user)
             if compras:
@@ -4558,7 +4575,7 @@ def generar_compras_solicitud(request, pk):
                     f'{len(compras)} compra(s) de piezas generada(s)'
                 )
         
-        # Generar VentaMostrador para servicios adicionales
+        # Generar VentaMostrador para servicios adicionales (paquetes, limpieza, etc.)
         if puede_generar_venta:
             venta = solicitud.generar_venta_mostrador()
             if venta:
@@ -4886,22 +4903,24 @@ def crear_orden_fl_desde_cotizacion(request, pk):
         #   - self.save() → crea Cotizacion en ST vía _sincronizar_cotizacion_st()
         solicitud.vincular_orden(orden)
 
-        # ====== PASO 4: Re-sincronizar las LineaCotizacion → PiezaCotizada en ST ======
-        # La sincronización de líneas a PiezaCotizada ocurre en LineaCotizacion.save(),
-        # pero solo si ya existe orden_servicio. Al momento de crearlas, la solicitud
-        # no tenía orden, así que hay que re-guardar cada línea para forzar la sync.
-        lineas_sincronizadas = 0
-        for linea in solicitud.lineas.all():
-            linea.save()  # Dispara la sincronización a PiezaCotizada en ST
-            lineas_sincronizadas += 1
+        # ====== PASO 4: Crear VentaMostrador vacío para la nueva orden ======
+        # Para órdenes FL- (Venta Mostrador / Servicio Directo), NO se sincronizan
+        # las líneas a PiezaCotizada (flujo de diagnóstico). En su lugar se crea el
+        # VentaMostrador vacío ahora para que exista el objeto receptor; las piezas
+        # individuales se crearán como PiezaVentaMostrador cuando el usuario pulse
+        # "Generar Compras" en el detalle de la cotización.
+        from servicio_tecnico.models import VentaMostrador as VentaMostradorModel
+        VentaMostradorModel.objects.get_or_create(
+            orden=orden,
+            defaults={'fecha_venta': timezone.now()}
+        )
 
         # Construir mensaje de éxito con información de la orden creada
         mensaje = (
             f'Orden {numero_fl} creada exitosamente y vinculada a la solicitud. '
-            f'Orden interna: {orden.numero_orden_interno}.'
+            f'Orden interna: {orden.numero_orden_interno}. '
+            f'Las piezas aprobadas se registrarán en Venta Mostrador al generar compras.'
         )
-        if lineas_sincronizadas:
-            mensaje += f' {lineas_sincronizadas} pieza(s) sincronizada(s) con Servicio Técnico.'
 
         messages.success(request, mensaje)
 

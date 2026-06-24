@@ -2980,10 +2980,22 @@ class SolicitudCotizacion(models.Model):
         Si no existe, la crea con costo_mano_obra = 0.
         
         Las piezas (PiezaCotizada) se sincronizan desde LineaCotizacion.save()
+        
+        IMPORTANTE — Órdenes FL- (Venta Mostrador):
+        Para órdenes con tipo_servicio='venta_mostrador', NO se crea Cotizacion en ST.
+        La lógica de cotización surge del diagnóstico técnico (flujo OOW-). En una
+        venta mostrador directa (FL-) no hay diagnóstico previo, por lo que el objeto
+        Cotizacion no tiene sentido. Las piezas van directamente a PiezaVentaMostrador
+        y los servicios a VentaMostrador.
         """
         from servicio_tecnico.models import Cotizacion
         
         if not self.orden_servicio:
+            return
+
+        # Para órdenes de Venta Mostrador (FL-), no se crea Cotizacion en ST.
+        # La cotización es un concepto del flujo de diagnóstico (OOW-) únicamente.
+        if self.orden_servicio.tipo_servicio == 'venta_mostrador':
             return
         
         # Buscar o crear Cotizacion en ST
@@ -3465,6 +3477,102 @@ class SolicitudCotizacion(models.Model):
         
         return venta
     
+    def generar_piezas_venta_mostrador(self):
+        """
+        Crea registros PiezaVentaMostrador en ST a partir de las LineaCotizacion aprobadas.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        --------------------------------
+        Este método es exclusivo para cotizaciones vinculadas a órdenes FL-
+        (tipo_servicio='venta_mostrador' / Servicio Directo sin Diagnóstico).
+
+        En el flujo de diagnóstico (OOW-), las piezas cotizadas van a PiezaCotizada
+        dentro de la Cotizacion de servicio_tecnico. Pero en Venta Mostrador, no hay
+        diagnóstico ni cotización de ST; las piezas vendidas se registran directamente
+        en PiezaVentaMostrador, que es la sección "Piezas Vendidas Individualmente" que
+        aparece en el detalle de la orden en Servicio Técnico.
+
+        Flujo:
+        1. Verifica que la orden vinculada sea tipo 'venta_mostrador'
+        2. Obtiene o crea el VentaMostrador de la orden (debe existir)
+        3. Por cada LineaCotizacion con estado 'aprobada' (aún no procesada como compra),
+           crea una PiezaVentaMostrador con los datos de la pieza
+        4. Retorna el conteo de piezas creadas
+
+        Diseño anti-duplicados:
+        - Solo procesa líneas con estado_cliente='aprobada'. Una vez que generar_compras()
+          las marca como 'compra_generada', ya no vuelven a procesarse aquí.
+        - Por eso este método SIEMPRE debe llamarse ANTES de generar_compras() en la vista.
+
+        Args:
+            (ninguno, usa self)
+
+        Returns:
+            int: Número de PiezaVentaMostrador creadas (0 si no aplica o no hay líneas)
+        """
+        # Solo aplica para órdenes de tipo Venta Mostrador
+        if not self.orden_servicio:
+            return 0
+
+        if self.orden_servicio.tipo_servicio != 'venta_mostrador':
+            return 0
+
+        # Importación local de Decimal y modelos de ST (evitar circular imports)
+        from decimal import Decimal
+        from servicio_tecnico.models import VentaMostrador, PiezaVentaMostrador
+
+        # Obtener el VentaMostrador de la orden — debe existir (lo crea crear_orden_fl)
+        # Si por algún motivo no existe, lo creamos aquí como medida de seguridad
+        vm, _ = VentaMostrador.objects.get_or_create(
+            orden=self.orden_servicio,
+            defaults={'fecha_venta': timezone.now()}
+        )
+
+        # Obtener las líneas aprobadas que aún no han sido procesadas como compra
+        # El estado 'aprobada' indica que el cliente aprobó la pieza pero aún no se
+        # generó la CompraProducto (ni por ende la PiezaVentaMostrador)
+        lineas_pendientes = self.lineas.filter(estado_cliente='aprobada')
+
+        if not lineas_pendientes.exists():
+            return 0
+
+        piezas_creadas = 0
+
+        for linea in lineas_pendientes:
+            # Construir descripción combinando nombre del producto y descripción de pieza
+            nombre_producto = linea.producto.nombre if linea.producto else 'Pieza sin nombre'
+            descripcion_extra = linea.descripcion_pieza or ''
+            if descripcion_extra:
+                descripcion_completa = f"{nombre_producto} — {descripcion_extra}"
+            else:
+                descripcion_completa = nombre_producto
+
+            # Truncar a 200 caracteres (límite del campo descripcion_pieza)
+            descripcion_completa = descripcion_completa[:200]
+
+            # Crear la pieza en Venta Mostrador de ST
+            # precio_unitario = costo_unitario de almacén como punto de partida;
+            # el técnico puede ajustar el precio de venta final desde ST
+            PiezaVentaMostrador.objects.create(
+                venta_mostrador=vm,
+                descripcion_pieza=descripcion_completa,
+                cantidad=linea.cantidad,
+                precio_unitario=linea.costo_unitario or Decimal('0.00'),
+                notas=(
+                    f"Generada desde cotización {self.numero_solicitud}. "
+                    f"Proveedor: {linea.proveedor.nombre if linea.proveedor else 'N/A'}."
+                ),
+            )
+            piezas_creadas += 1
+
+        logger.info(
+            f"SolicitudCotizacion {self.numero_solicitud}: "
+            f"{piezas_creadas} PiezaVentaMostrador creada(s) en orden "
+            f"{self.orden_servicio.numero_orden_interno}"
+        )
+
+        return piezas_creadas
+
     def cancelar(self, motivo=''):
         """
         Cancela la solicitud.
@@ -3855,12 +3963,24 @@ class LineaCotizacion(models.Model):
         
         Si ya existe PiezaCotizada vinculada (pieza_cotizada_origen), la actualiza.
         Si no existe, busca una que coincida o crea una nueva.
+        
+        IMPORTANTE — Órdenes FL- (Venta Mostrador):
+        Para órdenes con tipo_servicio='venta_mostrador', las piezas NO van a
+        PiezaCotizada sino a PiezaVentaMostrador. Este método sale inmediatamente
+        para ese tipo de órdenes, evitando duplicados en la sección de cotización.
+        El destino correcto (PiezaVentaMostrador) es gestionado por
+        SolicitudCotizacion.generar_piezas_venta_mostrador().
         """
         from servicio_tecnico.models import Cotizacion, PiezaCotizada
         from scorecard.models import ComponenteEquipo
         from decimal import Decimal
         
         if not self.solicitud.orden_servicio:
+            return
+
+        # Para órdenes de Venta Mostrador (FL-), las piezas van a PiezaVentaMostrador,
+        # NO a PiezaCotizada. Salir sin hacer nada para evitar duplicados.
+        if self.solicitud.orden_servicio.tipo_servicio == 'venta_mostrador':
             return
         
         # Obtener o crear Cotizacion en ST
