@@ -1264,6 +1264,35 @@ class Cotizacion(models.Model):
         - Solo mano obra: $100, CON descuento → $0 (todo gratis)
         """
         return self.costo_piezas_aceptadas + self.costo_mano_obra_aplicado
+
+    @property
+    def precio_piezas_aceptadas_cliente(self):
+        """
+        Suma precios al cliente (sin IVA) de piezas aceptadas con precio persistido.
+
+        Returns:
+            Decimal: Total precio cliente de piezas aceptadas
+        """
+        from decimal import Decimal
+        total = Decimal('0.00')
+        for pieza in self.piezas_cotizadas.filter(aceptada_por_cliente=True):
+            if pieza.precio_unitario_cliente is not None:
+                total += pieza.cantidad * pieza.precio_unitario_cliente
+        return total
+
+    @property
+    def margen_estimado(self):
+        """
+        Diferencia entre precio cliente y costo proveedor en piezas aceptadas (sin IVA).
+
+        Solo aplica cuando hay precios al cliente sincronizados desde Almacén.
+        """
+        from decimal import Decimal
+        precio = self.precio_piezas_aceptadas_cliente
+        costo = self.costo_piezas_aceptadas
+        if precio <= 0:
+            return Decimal('0.00')
+        return precio - costo
     
     @property
     def dias_sin_respuesta(self):
@@ -1333,6 +1362,14 @@ class PiezaCotizada(models.Model):
         validators=[MinValueValidator(Decimal('0.00'))],
         help_text="Costo unitario de la pieza"
     )
+    precio_unitario_cliente = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Precio cotizado al cliente por unidad (sin IVA), sincronizado desde Almacén"
+    )
     
     # PROVEEDOR SELECCIONADO (Noviembre 2025)
     # ========================================================================
@@ -1377,6 +1414,13 @@ class PiezaCotizada(models.Model):
     def costo_total(self):
         """Calcula el costo total de esta pieza (cantidad × costo unitario)"""
         return self.cantidad * self.costo_unitario
+
+    @property
+    def precio_total_cliente(self):
+        """Total al cliente sin IVA (cantidad × precio unitario cliente)"""
+        if self.precio_unitario_cliente is None:
+            return None
+        return self.cantidad * self.precio_unitario_cliente
     
     def __str__(self):
         """

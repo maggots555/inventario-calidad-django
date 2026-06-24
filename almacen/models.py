@@ -2868,6 +2868,58 @@ class SolicitudCotizacion(models.Model):
         verbose_name='Modelo del Equipo',
         help_text='Modelo del equipo del cliente (texto libre)'
     )
+
+    # ========== PRECIOS AL CLIENTE (snapshot envío + totales al aprobar) ==========
+    TIPO_SERVICIO_CLIENTE_CHOICES = [
+        ('mostrador', 'Mostrador'),
+        ('estandar', 'Estándar'),
+        ('express', 'Express'),
+        ('alta_gama', 'Alta Gama'),
+        ('server', 'Server'),
+    ]
+    tipo_servicio_cliente = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        choices=TIPO_SERVICIO_CLIENTE_CHOICES,
+        verbose_name='Perfil de profit enviado al cliente',
+        help_text='Perfil de servicio usado al enviar la cotización por correo/PDF'
+    )
+    incluir_descuento_diagnostico_cliente = models.BooleanField(
+        default=True,
+        verbose_name='Descontar diagnóstico (envío al cliente)',
+        help_text='Si el PDF enviado al cliente incluía descuento de diagnóstico'
+    )
+    fecha_precios_cliente = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha precios cliente',
+        help_text='Cuándo se calcularon y guardaron los precios al cliente (al aprobar)'
+    )
+    precio_total_sin_iva_cliente = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Total cliente sin IVA',
+        help_text='Total cotizado al cliente sin IVA (todas las líneas con costo)'
+    )
+    precio_total_con_iva_cliente = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Total cliente con IVA',
+        help_text='Total cotizado al cliente con IVA incluido'
+    )
+    precio_total_menos_diagnostico_cliente = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Total cliente menos diagnóstico',
+        help_text='Total con IVA restando diagnóstico ya pagado (si aplica)'
+    )
     
     # ========== AUDITORÍA ==========
     creado_por = models.ForeignKey(
@@ -3058,10 +3110,46 @@ class SolicitudCotizacion(models.Model):
             Decimal: Suma solo de líneas con estado_cliente='aprobada'
         """
         from django.db.models import Sum, F
-        total = self.lineas.filter(estado_cliente='aprobada').aggregate(
+        total = self.lineas.filter(
+            estado_cliente__in=['aprobada', 'compra_generada']
+        ).aggregate(
             total=Sum(F('cantidad') * F('costo_unitario'))
         )['total']
         return total or 0
+
+    @property
+    def precio_cliente_aprobado_sin_iva(self):
+        """
+        Suma del precio al cliente (sin IVA) de líneas aprobadas o con compra generada.
+
+        Returns:
+            Decimal: Total precio cliente de piezas aceptadas
+        """
+        from django.db.models import Sum
+        total = self.lineas.filter(
+            estado_cliente__in=['aprobada', 'compra_generada']
+        ).aggregate(total=Sum('subtotal_cliente_sin_iva'))['total']
+        return total or 0
+
+    @property
+    def margen_aprobado_estimado(self):
+        """Diferencia entre precio cliente y costo proveedor en líneas aprobadas (sin IVA)."""
+        from decimal import Decimal
+        costo = self.costo_aprobado or Decimal('0')
+        precio = self.precio_cliente_aprobado_sin_iva or Decimal('0')
+        if precio <= 0:
+            return Decimal('0')
+        return precio - costo
+
+    def persistir_precios_cliente(self):
+        """
+        Calcula y guarda los precios al cliente en líneas y cabecera.
+
+        Se invoca al aprobar la primera línea. Delega en el módulo de utilidades
+        que replica la fórmula del PDF de cotización.
+        """
+        from almacen.utils.cotizacion_precios_cliente import persistir_precios_cliente_solicitud
+        return persistir_precios_cliente_solicitud(self)
     
     # ========== PROPIEDADES DE SERVICIOS ADICIONALES ==========
     
@@ -3550,14 +3638,17 @@ class SolicitudCotizacion(models.Model):
             # Truncar a 200 caracteres (límite del campo descripcion_pieza)
             descripcion_completa = descripcion_completa[:200]
 
-            # Crear la pieza en Venta Mostrador de ST
-            # precio_unitario = costo_unitario de almacén como punto de partida;
-            # el técnico puede ajustar el precio de venta final desde ST
+            # precio_unitario = precio cotizado al cliente; fallback a costo proveedor
+            precio_venta = (
+                linea.precio_unitario_cliente
+                if linea.precio_unitario_cliente is not None
+                else (linea.costo_unitario or Decimal('0.00'))
+            )
             PiezaVentaMostrador.objects.create(
                 venta_mostrador=vm,
                 descripcion_pieza=descripcion_completa,
                 cantidad=linea.cantidad,
-                precio_unitario=linea.costo_unitario or Decimal('0.00'),
+                precio_unitario=precio_venta,
                 notas=(
                     f"Generada desde cotización {self.numero_solicitud}. "
                     f"Proveedor: {linea.proveedor.nombre if linea.proveedor else 'N/A'}."
@@ -3807,6 +3898,22 @@ class LineaCotizacion(models.Model):
         verbose_name='Costo Unitario',
         help_text='Precio por unidad (opcional, puede dejarse en 0 si aún no se conoce)'
     )
+    precio_unitario_cliente = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Precio unitario al cliente (sin IVA)',
+        help_text='Precio cotizado al cliente por unidad, calculado al aprobar la línea'
+    )
+    subtotal_cliente_sin_iva = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Subtotal cliente sin IVA',
+        help_text='cantidad × precio_unitario_cliente, guardado al aprobar'
+    )
     
     # ========== ESTADO DEL CLIENTE ==========
     estado_cliente = models.CharField(
@@ -3944,6 +4051,20 @@ class LineaCotizacion(models.Model):
         """
         costo = self.costo_unitario or 0
         return self.cantidad * costo
+
+    @property
+    def subtotal_cliente(self):
+        """
+        Subtotal al cliente sin IVA para esta línea.
+
+        Returns:
+            Decimal o None si aún no se ha calculado el precio al cliente
+        """
+        if self.subtotal_cliente_sin_iva is not None:
+            return self.subtotal_cliente_sin_iva
+        if self.precio_unitario_cliente is not None:
+            return self.cantidad * self.precio_unitario_cliente
+        return None
     
     def _sincronizar_pieza_st(self):
         """
@@ -3959,6 +4080,7 @@ class LineaCotizacion(models.Model):
         - LineaCotizacion.descripcion_pieza → PiezaCotizada.descripcion_adicional
         - LineaCotizacion.cantidad → PiezaCotizada.cantidad
         - LineaCotizacion.costo_unitario → PiezaCotizada.costo_unitario
+        - LineaCotizacion.precio_unitario_cliente → PiezaCotizada.precio_unitario_cliente
         - LineaCotizacion.proveedor.nombre → PiezaCotizada.proveedor (CharField)
         
         Si ya existe PiezaCotizada vinculada (pieza_cotizada_origen), la actualiza.
@@ -4037,6 +4159,7 @@ class LineaCotizacion(models.Model):
         pieza.descripcion_adicional = self.descripcion_pieza
         pieza.cantidad = self.cantidad
         pieza.costo_unitario = self.costo_unitario or Decimal('0.00')
+        pieza.precio_unitario_cliente = self.precio_unitario_cliente
         pieza.proveedor = self.proveedor.nombre if self.proveedor else ''
         # Usar el valor real del campo (ya no hardcodeado)
         pieza.sugerida_por_tecnico = self.sugerida_por_tecnico
@@ -4127,6 +4250,7 @@ class LineaCotizacion(models.Model):
         
         Efectos:
         - Cambia estado_cliente a 'aprobada'
+        - Calcula y persiste precios al cliente (primera aprobación de la solicitud)
         - Sincroniza con PiezaCotizada en ST (aceptada_por_cliente=True)
         - Actualiza estado general de Cotizacion en ST si todas tienen respuesta
         
@@ -4138,6 +4262,12 @@ class LineaCotizacion(models.Model):
         
         self.estado_cliente = 'aprobada'
         self.fecha_respuesta = timezone.now()
+
+        # Calcular y guardar precios al cliente la primera vez que se aprueba una línea
+        if not self.solicitud.fecha_precios_cliente:
+            self.solicitud.persistir_precios_cliente()
+            self.refresh_from_db()
+
         self.save()
         
         # Actualizar estado de la solicitud

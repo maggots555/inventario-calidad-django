@@ -237,9 +237,11 @@ Muestra toda la información y acciones según el estado
                                     <th width="20%">Producto / Descripción</th>
                                     <th width="13%">Proveedor</th>
                                     <th width="6%" class="text-center">Cant.</th>
-                                    <th width="9%" class="text-end">Costo Unit.</th>
-                                    <th width="9%" class="text-end">Subtotal</th>
-                                    <th width="8%" class="text-center">Tipo</th>
+                                    <th width="8%" class="text-end" title="Costo del proveedor">Costo prov.</th>
+                                    <th width="8%" class="text-end" title="Subtotal costo proveedor">Sub. prov.</th>
+                                    <th width="8%" class="text-end" title="Precio cotizado al cliente (sin IVA)">Precio cliente</th>
+                                    <th width="8%" class="text-end" title="Subtotal precio al cliente (sin IVA)">Sub. cliente</th>
+                                    <th width="7%" class="text-center">Tipo</th>
                                     <th width="9%">Estado</th>
                                     <th width="11%" class="text-center">Imágenes</th>
                                     <th width="10%" class="text-end">Acciones</th>
@@ -274,7 +276,7 @@ Muestra toda la información y acciones según el estado
                                     <td class="text-center">{{ linea.cantidad }}</td>
                                     <td class="text-end">
                                         {% if linea.costo_unitario and linea.costo_unitario > 0 %}
-                                        ${{ linea.costo_unitario|floatformat:2 }}
+                                        <span class="text-muted">${{ linea.costo_unitario|floatformat:2 }}</span>
                                         {% else %}
                                         <span class="badge bg-warning text-dark">Pendiente</span>
                                         {% endif %}
@@ -284,6 +286,20 @@ Muestra toda la información y acciones según el estado
                                          ${{ linea.subtotal|floatformat:2 }}
                                          {% else %}
                                          <span class="text-muted">-</span>
+                                         {% endif %}
+                                     </td>
+                                     <td class="text-end">
+                                         {% if linea.precio_unitario_cliente %}
+                                         <strong class="text-primary">${{ linea.precio_unitario_cliente|floatformat:2 }}</strong>
+                                         {% else %}
+                                         <small class="text-muted">Pendiente</small>
+                                         {% endif %}
+                                     </td>
+                                     <td class="text-end">
+                                         {% if linea.subtotal_cliente %}
+                                         <strong class="text-primary">${{ linea.subtotal_cliente|floatformat:2 }}</strong>
+                                         {% else %}
+                                         <small class="text-muted">—</small>
                                          {% endif %}
                                      </td>
                                      <!-- Columna Tipo: indica si la pieza es necesaria o mejora opcional -->
@@ -366,7 +382,7 @@ Muestra toda la información y acciones según el estado
                                 </tr>
                                 {% empty %}
                                  <tr>
-                                    <td colspan="10" class="text-center text-muted py-4">
+                                    <td colspan="12" class="text-center text-muted py-4">
                                         No hay líneas en esta solicitud
                                     </td>
                                 </tr>
@@ -374,16 +390,46 @@ Muestra toda la información y acciones según el estado
                             </tbody>
                             <tfoot class="table-light">
                                 <tr>
-                                    <td colspan="5" class="text-end"><strong>Total:</strong></td>
-                                    <td class="text-end"><strong class="fs-5">${{ solicitud.costo_total|floatformat:2 }}</strong></td>
+                                    <td colspan="5" class="text-end"><strong>Total costo proveedor:</strong></td>
+                                    <td class="text-end"><strong class="fs-6">${{ solicitud.costo_total|floatformat:2 }}</strong></td>
+                                    <td colspan="2" class="text-end"><strong>Total precio cliente (sin IVA):</strong></td>
+                                    <td class="text-end">
+                                        {% if solicitud.precio_total_sin_iva_cliente %}
+                                        <strong class="fs-6 text-primary">${{ solicitud.precio_total_sin_iva_cliente|floatformat:2 }}</strong>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
                                     <td colspan="3"></td>
                                 </tr>
-                                {% if solicitud.costo_aprobado > 0 %}
+                                {% if solicitud.costo_aprobado > 0 or solicitud.precio_cliente_aprobado_sin_iva > 0 %}
                                 <tr>
-                                    <td colspan="5" class="text-end text-success"><strong>Total Aprobado:</strong></td>
-                                    <td class="text-end text-success"><strong class="fs-5">${{ solicitud.costo_aprobado|floatformat:2 }}</strong></td>
+                                    <td colspan="5" class="text-end text-success"><strong>Aprobado (costo prov.):</strong></td>
+                                    <td class="text-end text-success"><strong>${{ solicitud.costo_aprobado|floatformat:2 }}</strong></td>
+                                    <td colspan="2" class="text-end text-success"><strong>Aprobado (precio cliente):</strong></td>
+                                    <td class="text-end text-success">
+                                        {% if solicitud.precio_cliente_aprobado_sin_iva > 0 %}
+                                        <strong>${{ solicitud.precio_cliente_aprobado_sin_iva|floatformat:2 }}</strong>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
                                     <td colspan="3"></td>
                                 </tr>
+                                {% if solicitud.precio_total_con_iva_cliente %}
+                                <tr>
+                                    <td colspan="7" class="text-end text-primary"><strong>Total cliente con IVA:</strong></td>
+                                    <td class="text-end text-primary"><strong>${{ solicitud.precio_total_con_iva_cliente|floatformat:2 }}</strong></td>
+                                    <td colspan="3"></td>
+                                </tr>
+                                {% endif %}
+                                {% if solicitud.margen_aprobado_estimado > 0 %}
+                                <tr>
+                                    <td colspan="7" class="text-end"><strong>Margen estimado (aprobado, sin IVA):</strong></td>
+                                    <td class="text-end"><strong class="text-info">${{ solicitud.margen_aprobado_estimado|floatformat:2 }}</strong></td>
+                                    <td colspan="3"></td>
+                                </tr>
+                                {% endif %}
                                 {% endif %}
                             </tfoot>
                         </table>

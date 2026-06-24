@@ -3817,6 +3817,15 @@ def api_enviar_cotizacion_cliente(request, pk):
             # Avanzar el estado usando el método del modelo
             solicitud.enviar_a_cliente()
 
+        # Snapshot del perfil de profit (los precios se calculan al aprobar líneas)
+        if not solicitud.fecha_precios_cliente:
+            solicitud.tipo_servicio_cliente = tipo_servicio
+            solicitud.incluir_descuento_diagnostico_cliente = incluir_descuento
+            solicitud.save(update_fields=[
+                'tipo_servicio_cliente',
+                'incluir_descuento_diagnostico_cliente',
+            ])
+
         # --- 6. CONSTRUIR GRUPOS DE ÍTEMS SEGÚN MODO DE AGRUPACIÓN ---
         # Obtener todas las líneas de cotización (piezas) con sus datos
         lineas = list(solicitud.lineas.select_related('producto').all())

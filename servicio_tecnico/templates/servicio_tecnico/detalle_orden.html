@@ -1012,9 +1012,21 @@
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td class="text-muted">Total Piezas Cotizadas:</td>
+                                                <td class="text-muted">Total Piezas Cotizadas (costo empresa):</td>
                                                 <td class="text-end"><strong>${{ cotizacion.costo_total_piezas|floatformat:2 }}</strong></td>
                                             </tr>
+                                            {% if cotizacion.precio_piezas_aceptadas_cliente > 0 %}
+                                            <tr>
+                                                <td class="text-muted">Total piezas aceptadas (precio cliente, sin IVA):</td>
+                                                <td class="text-end text-primary"><strong>${{ cotizacion.precio_piezas_aceptadas_cliente|floatformat:2 }}</strong></td>
+                                            </tr>
+                                            {% if cotizacion.margen_estimado > 0 %}
+                                            <tr>
+                                                <td class="text-muted">Margen estimado (piezas aceptadas, sin IVA):</td>
+                                                <td class="text-end text-info"><strong>${{ cotizacion.margen_estimado|floatformat:2 }}</strong></td>
+                                            </tr>
+                                            {% endif %}
+                                            {% endif %}
                                             {% if cotizacion.usuario_acepto is not None %}
                                                 <!-- Mostrar desglose de piezas solo si hay decisión -->
                                                 {% if cotizacion.costo_piezas_aceptadas != cotizacion.costo_total_piezas %}
@@ -1189,8 +1201,10 @@
                                                     <th>Componente</th>
                                                     <th>Descripción</th>
                                                     <th class="text-center">Cantidad</th>
-                                                    <th class="text-end">Precio Unit.</th>
-                                                    <th class="text-end">Total</th>
+                                                    <th class="text-end" title="Costo proveedor / empresa">Costo empresa</th>
+                                                    <th class="text-end" title="Costo total proveedor">Total empresa</th>
+                                                    <th class="text-end" title="Precio cotizado al cliente (sin IVA)">Precio cliente</th>
+                                                    <th class="text-end" title="Total precio al cliente (sin IVA)">Total cliente</th>
                                                     <th class="text-center">Proveedor</th>
                                                     <th class="text-center">Necesaria</th>
                                                     <th class="text-center">Cliente</th>
@@ -1224,8 +1238,22 @@
                                                             </small>
                                                         </td>
                                                         <td class="text-center">{{ pieza.cantidad }}</td>
-                                                        <td class="text-end">${{ pieza.costo_unitario|floatformat:2 }}</td>
-                                                        <td class="text-end"><strong>${{ pieza.costo_total|floatformat:2 }}</strong></td>
+                                                        <td class="text-end text-muted">${{ pieza.costo_unitario|floatformat:2 }}</td>
+                                                        <td class="text-end text-muted"><strong>${{ pieza.costo_total|floatformat:2 }}</strong></td>
+                                                        <td class="text-end">
+                                                            {% if pieza.precio_unitario_cliente %}
+                                                            <strong class="text-primary">${{ pieza.precio_unitario_cliente|floatformat:2 }}</strong>
+                                                            {% else %}
+                                                            <small class="text-muted">Pendiente</small>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-end">
+                                                            {% if pieza.precio_total_cliente %}
+                                                            <strong class="text-primary">${{ pieza.precio_total_cliente|floatformat:2 }}</strong>
+                                                            {% else %}
+                                                            <small class="text-muted">—</small>
+                                                            {% endif %}
+                                                        </td>
                                                         <td class="text-center">
                                                             {% if pieza.proveedor %}
                                                                 <span class="badge bg-secondary" style="font-size: 0.75rem;">🏪 {{ pieza.proveedor }}</span>

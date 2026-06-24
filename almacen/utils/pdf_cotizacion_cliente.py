@@ -266,6 +266,159 @@ def calcular_precio_unitario_cliente(costo_unitario: float, tipo_servicio: str) 
     return float(costo_unitario) / factor
 
 
+def calcular_precios_items_cotizacion(
+    items: List[Dict],
+    tipo_servicio: str,
+    incluir_descuento_diagnostico: bool = True,
+    mano_de_obra_override: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Calcula precios al cliente por ítem y totales (misma lógica que el PDF).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta función centraliza el cálculo de profit usado por el PDF y por la
+    persistencia de precios al aprobar líneas en Almacén.
+
+    Args:
+        items                         : Lista de dicts con costo_unitario, cantidad, es_servicio, etc.
+        tipo_servicio                 : Perfil de profit (mostrador, estandar, etc.).
+        incluir_descuento_diagnostico : Si aplica deducción de diagnóstico en totales.
+        mano_de_obra_override         : Mano de obra sin IVA (opcional).
+
+    Returns:
+        Dict con items_calculados y totales (precio_sin_iva, precio_con_iva, etc.).
+    """
+    IVA_FACTOR = 1.16
+    if tipo_servicio not in PROFIT_CONFIG:
+        tipo_servicio = 'estandar'
+    perfil = PROFIT_CONFIG[tipo_servicio]
+    factor = 1 - perfil['profit_target']
+    mano_obra = float(mano_de_obra_override or 0)
+
+    items_piezas = [i for i in items if not i.get('es_servicio')]
+    items_servicios = [i for i in items if i.get('es_servicio')]
+    solo_servicios = len(items_piezas) == 0 and len(items_servicios) > 0
+
+    items_calculados_map: Dict[int, Dict] = {}
+    precio_sin_iva_piezas = 0.0
+    precio_con_iva_piezas = 0.0
+    total_cliente_sin_iva_sin_diag = 0.0
+    suma_costos_fijos = 0.0
+
+    if not solo_servicios:
+        items_brutos: List[Dict] = []
+        suma_costos_brutos = 0.0
+
+        for idx, item in enumerate(items):
+            if item.get('es_servicio'):
+                continue
+            costo_unit = float(item.get('costo_unitario', 0) or 0)
+            cantidad = int(item.get('cantidad', 1) or 1)
+            subtotal_bruto = costo_unit * cantidad
+            suma_costos_brutos += subtotal_bruto
+            items_brutos.append({
+                'idx': idx,
+                **item,
+                '_costo_unit_bruto': costo_unit,
+                '_subtotal_bruto': subtotal_bruto,
+                '_cantidad': cantidad,
+            })
+
+        suma_costos_fijos = sum(perfil['costos_fijos'])
+        total_distribuible = suma_costos_brutos + mano_obra + suma_costos_fijos
+        total_cliente_sin_iva_sin_diag = (
+            total_distribuible / factor if factor > 0 else total_distribuible
+        )
+        precio_sin_iva_piezas = total_cliente_sin_iva_sin_diag + perfil['diagnostico']
+
+        if suma_costos_brutos > 0:
+            factor_redistrib = precio_sin_iva_piezas / suma_costos_brutos
+            for item in items_brutos:
+                costo_unit = item['_costo_unit_bruto']
+                cantidad = item['_cantidad']
+                precio_unit_cliente = costo_unit * factor_redistrib
+                subtotal_cliente = precio_unit_cliente * cantidad
+                item_limpio = {
+                    k: v for k, v in item.items()
+                    if not k.startswith('_') and k != 'idx'
+                }
+                items_calculados_map[item['idx']] = {
+                    **item_limpio,
+                    'precio_unitario_cliente': round(precio_unit_cliente, 2),
+                    'subtotal_cliente': round(subtotal_cliente, 2),
+                }
+
+        if not items_calculados_map and precio_sin_iva_piezas > 0:
+            items_calculados_map[-1] = {
+                'descripcion': 'Servicio de reparación',
+                'cantidad': 1,
+                'precio_unitario_cliente': round(precio_sin_iva_piezas, 2),
+                'subtotal_cliente': round(precio_sin_iva_piezas, 2),
+                'tiempo_entrega_estimado': None,
+                'es_necesaria': True,
+            }
+
+        precio_con_iva_piezas = precio_sin_iva_piezas * IVA_FACTOR
+
+    suma_servicios_con_iva = 0.0
+    suma_servicios_sin_iva = 0.0
+
+    for idx, item in enumerate(items):
+        if not item.get('es_servicio'):
+            continue
+        costo_con_iva = float(item.get('costo_unitario', 0) or 0)
+        cantidad = int(item.get('cantidad', 1) or 1)
+        precio_unit_sin_iva = costo_con_iva / IVA_FACTOR if costo_con_iva > 0 else 0.0
+        subtotal_sin_iva = precio_unit_sin_iva * cantidad
+        subtotal_con_iva = costo_con_iva * cantidad
+
+        suma_servicios_con_iva += subtotal_con_iva
+        suma_servicios_sin_iva += subtotal_sin_iva
+
+        item_limpio = {k: v for k, v in item.items() if not k.startswith('_')}
+        items_calculados_map[idx] = {
+            **item_limpio,
+            'precio_unitario_cliente': round(precio_unit_sin_iva, 2),
+            'subtotal_cliente': round(subtotal_sin_iva, 2),
+        }
+
+    items_calculados: List[Dict] = []
+    for idx in range(len(items)):
+        if idx in items_calculados_map:
+            items_calculados.append(items_calculados_map[idx])
+    if -1 in items_calculados_map:
+        items_calculados.append(items_calculados_map[-1])
+
+    precio_sin_iva = precio_sin_iva_piezas + suma_servicios_sin_iva
+    precio_con_iva = precio_con_iva_piezas + suma_servicios_con_iva
+    iva = precio_con_iva - precio_sin_iva
+
+    precio_menos_diagnostico = None
+    if (
+        not solo_servicios
+        and incluir_descuento_diagnostico
+        and perfil['diagnostico'] > 0
+    ):
+        diagnostico_con_iva = perfil['diagnostico'] * IVA_FACTOR
+        precio_menos_diagnostico = precio_con_iva - diagnostico_con_iva
+
+    return {
+        'items_calculados': items_calculados,
+        'mano_obra': round(mano_obra, 2),
+        'precio_piezas_sin_iva': round(total_cliente_sin_iva_sin_diag, 2),
+        'precio_fijos_sin_iva': round(
+            suma_costos_fijos / factor if factor > 0 else 0, 2
+        ),
+        'diagnostico': 0 if solo_servicios else perfil['diagnostico'],
+        'precio_sin_iva': round(precio_sin_iva, 2),
+        'iva': round(iva, 2),
+        'precio_con_iva': round(precio_con_iva, 2),
+        'precio_menos_diagnostico': (
+            round(precio_menos_diagnostico, 2) if precio_menos_diagnostico else None
+        ),
+    }
+
+
 # =============================================================================
 # CLASE PRINCIPAL DEL GENERADOR PDF
 # =============================================================================
@@ -548,152 +701,15 @@ class PDFCotizacionCliente:
         """
         Aplica la lógica de profit y calcula los totales para el PDF.
 
-        EXPLICACIÓN:
-        ─────────────────────────────────────────────────────────────────
-        PIEZAS (es_servicio=False):
-            Costo interno → profit + costos fijos + diagnóstico → redistribución.
-
-        SERVICIOS ADICIONALES (es_servicio=True):
-            El `costo` registrado ya incluye IVA y profit. Se muestra tal cual:
-            - Precio unitario sin IVA = costo / 1.16
-            - Total con IVA = costo registrado
-
-        PDF SOLO SERVICIOS (sin piezas):
-            Suma directa de precios registrados, sin costos fijos ni diagnóstico.
-
-        Returns:
-            Dict con todos los valores calculados para mostrar en el PDF.
+        Delega en calcular_precios_items_cotizacion() para compartir la misma
+        fórmula con la persistencia de precios al aprobar en Almacén.
         """
-        IVA_FACTOR = 1.16
-        perfil = PROFIT_CONFIG[self.tipo_servicio]
-        factor = 1 - perfil['profit_target']
-        mano_obra = float(self.mano_de_obra_override or 0)
-
-        # Separar piezas de servicios adicionales
-        items_piezas = [i for i in self.items if not i.get('es_servicio')]
-        items_servicios = [i for i in self.items if i.get('es_servicio')]
-        solo_servicios = len(items_piezas) == 0 and len(items_servicios) > 0
-
-        items_calculados_map: Dict[int, Dict] = {}
-        precio_sin_iva_piezas = 0.0
-        precio_con_iva_piezas = 0.0
-        total_cliente_sin_iva_sin_diag = 0.0
-        suma_costos_fijos = 0.0
-
-        # ── Bloque A: piezas con profit (omitido si el PDF es solo servicios) ──
-        if not solo_servicios:
-            items_brutos: List[Dict] = []
-            suma_costos_brutos = 0.0
-
-            for idx, item in enumerate(self.items):
-                if item.get('es_servicio'):
-                    continue
-                costo_unit = float(item.get('costo_unitario', 0) or 0)
-                cantidad = int(item.get('cantidad', 1) or 1)
-                subtotal_bruto = costo_unit * cantidad
-                suma_costos_brutos += subtotal_bruto
-                items_brutos.append({
-                    'idx': idx,
-                    **item,
-                    '_costo_unit_bruto': costo_unit,
-                    '_subtotal_bruto': subtotal_bruto,
-                    '_cantidad': cantidad,
-                })
-
-            suma_costos_fijos = sum(perfil['costos_fijos'])
-            total_distribuible = suma_costos_brutos + mano_obra + suma_costos_fijos
-            total_cliente_sin_iva_sin_diag = (
-                total_distribuible / factor if factor > 0 else total_distribuible
-            )
-            precio_sin_iva_piezas = total_cliente_sin_iva_sin_diag + perfil['diagnostico']
-
-            if suma_costos_brutos > 0:
-                factor_redistrib = precio_sin_iva_piezas / suma_costos_brutos
-                for item in items_brutos:
-                    costo_unit = item['_costo_unit_bruto']
-                    cantidad = item['_cantidad']
-                    precio_unit_cliente = costo_unit * factor_redistrib
-                    subtotal_cliente = precio_unit_cliente * cantidad
-                    item_limpio = {k: v for k, v in item.items() if not k.startswith('_') and k != 'idx'}
-                    items_calculados_map[item['idx']] = {
-                        **item_limpio,
-                        'precio_unitario_cliente': round(precio_unit_cliente, 2),
-                        'subtotal_cliente': round(subtotal_cliente, 2),
-                    }
-
-            # Caso sin piezas pero con mano de obra / costos fijos del perfil
-            if not items_calculados_map and precio_sin_iva_piezas > 0:
-                items_calculados_map[-1] = {
-                    'descripcion': 'Servicio de reparación',
-                    'cantidad': 1,
-                    'precio_unitario_cliente': round(precio_sin_iva_piezas, 2),
-                    'subtotal_cliente': round(precio_sin_iva_piezas, 2),
-                    'tiempo_entrega_estimado': None,
-                    'es_necesaria': True,
-                }
-
-            precio_con_iva_piezas = precio_sin_iva_piezas * IVA_FACTOR
-
-        # ── Bloque B: servicios adicionales (precio fijo, IVA incluido) ──
-        suma_servicios_con_iva = 0.0
-        suma_servicios_sin_iva = 0.0
-
-        for idx, item in enumerate(self.items):
-            if not item.get('es_servicio'):
-                continue
-            costo_con_iva = float(item.get('costo_unitario', 0) or 0)
-            cantidad = int(item.get('cantidad', 1) or 1)
-            precio_unit_sin_iva = costo_con_iva / IVA_FACTOR if costo_con_iva > 0 else 0.0
-            subtotal_sin_iva = precio_unit_sin_iva * cantidad
-            subtotal_con_iva = costo_con_iva * cantidad
-
-            suma_servicios_con_iva += subtotal_con_iva
-            suma_servicios_sin_iva += subtotal_sin_iva
-
-            item_limpio = {k: v for k, v in item.items() if not k.startswith('_')}
-            items_calculados_map[idx] = {
-                **item_limpio,
-                'precio_unitario_cliente': round(precio_unit_sin_iva, 2),
-                'subtotal_cliente': round(subtotal_sin_iva, 2),
-            }
-
-        # Preservar el orden original de los ítems en la tabla del PDF
-        items_calculados: List[Dict] = []
-        for idx in range(len(self.items)):
-            if idx in items_calculados_map:
-                items_calculados.append(items_calculados_map[idx])
-        if -1 in items_calculados_map:
-            items_calculados.append(items_calculados_map[-1])
-
-        # ── Totales finales combinados ──
-        precio_sin_iva = precio_sin_iva_piezas + suma_servicios_sin_iva
-        precio_con_iva = precio_con_iva_piezas + suma_servicios_con_iva
-        iva = precio_con_iva - precio_sin_iva
-
-        precio_menos_diagnostico = None
-        if (
-            not solo_servicios
-            and self.incluir_descuento_diagnostico
-            and perfil['diagnostico'] > 0
-        ):
-            diagnostico_con_iva = perfil['diagnostico'] * IVA_FACTOR
-            precio_menos_diagnostico = precio_con_iva - diagnostico_con_iva
-
-        return {
-            'items_calculados': items_calculados,
-            'mano_obra': round(mano_obra, 2),
-            'precio_piezas_sin_iva': round(total_cliente_sin_iva_sin_diag, 2),
-            'precio_fijos_sin_iva': round(
-                suma_costos_fijos / factor if factor > 0 else 0, 2
-            ),
-            'diagnostico': 0 if solo_servicios else perfil['diagnostico'],
-            'precio_sin_iva': round(precio_sin_iva, 2),
-            'iva': round(iva, 2),
-            'precio_con_iva': round(precio_con_iva, 2),
-            'precio_menos_diagnostico': (
-                round(precio_menos_diagnostico, 2) if precio_menos_diagnostico else None
-            ),
-        }
+        return calcular_precios_items_cotizacion(
+            items=self.items,
+            tipo_servicio=self.tipo_servicio,
+            incluir_descuento_diagnostico=self.incluir_descuento_diagnostico,
+            mano_de_obra_override=self.mano_de_obra_override,
+        )
 
     # -------------------------------------------------------------------------
     # SECCIÓN 1: HEADER (Logo + Empresa + Fecha + Folio)
