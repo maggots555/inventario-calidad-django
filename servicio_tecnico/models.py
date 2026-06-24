@@ -1249,21 +1249,40 @@ class Cotizacion(models.Model):
         return Decimal('0.00')
     
     @property
+    def monto_piezas_aceptadas_cobro(self):
+        """
+        Monto a cobrar por piezas aceptadas (lo que paga el cliente por piezas).
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        - Si la pieza tiene precio_unitario_cliente (sincronizado desde Almacén),
+          usa ese precio (con margen aplicado).
+        - Si no tiene precio al cliente (cotización legacy solo en ST),
+          usa el costo de proveedor como fallback.
+        """
+        total = Decimal('0.00')
+        for pieza in self.piezas_cotizadas.filter(aceptada_por_cliente=True):
+            if pieza.precio_unitario_cliente is not None:
+                total += pieza.cantidad * pieza.precio_unitario_cliente
+            else:
+                total += pieza.costo_total
+        return total
+
+    @property
     def costo_total_final(self):
         """
         Calcula el costo total FINAL que pagará el cliente.
         
         EXPLICACIÓN PARA PRINCIPIANTES:
         Esta es la propiedad más importante para facturación.
-        - Suma las piezas aceptadas
+        - Suma las piezas aceptadas al precio cliente (o costo si no hay precio)
         - Suma la mano de obra (aplicando descuento si corresponde)
         
         Ejemplos:
-        - Piezas: $500, Mano obra: $100, Sin descuento → $600
-        - Piezas: $500, Mano obra: $100, CON descuento → $500 (ahorro de $100)
+        - Piezas cliente: $500, Mano obra: $100, Sin descuento → $600
+        - Piezas cliente: $500, Mano obra: $100, CON descuento → $500 (ahorro de $100)
         - Solo mano obra: $100, CON descuento → $0 (todo gratis)
         """
-        return self.costo_piezas_aceptadas + self.costo_mano_obra_aplicado
+        return self.monto_piezas_aceptadas_cobro + self.costo_mano_obra_aplicado
 
     @property
     def precio_piezas_aceptadas_cliente(self):

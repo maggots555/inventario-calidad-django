@@ -1043,7 +1043,7 @@
                                                 {% endif %}
                                             {% endif %}
                                             <tr style="border-top: 2px solid #dee2e6;">
-                                                <td class="text-muted"><strong>TOTAL COTIZACIÓN:</strong></td>
+                                                <td class="text-muted"><strong>{% if cotizacion.precio_piezas_aceptadas_cliente > 0 %}TOTAL COTIZACIÓN (costo interno):{% else %}TOTAL COTIZACIÓN:{% endif %}</strong></td>
                                                 <td class="text-end"><h5 class="mb-0 text-primary">${{ cotizacion.costo_total|floatformat:2 }}</h5></td>
                                             </tr>
                                             
