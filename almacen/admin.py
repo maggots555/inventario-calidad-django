@@ -1532,12 +1532,14 @@ class LineaServicioAdicionalAdmin(admin.ModelAdmin):
         'solicitud_display',
         'tipo_servicio',
         'costo',
+        'es_necesaria',
         'estado_cliente',
         'fecha_creacion',
     )
     
     list_filter = (
         'tipo_servicio',
+        'es_necesaria',
         'estado_cliente',
         'fecha_creacion',
     )
@@ -1561,6 +1563,7 @@ class LineaServicioAdicionalAdmin(admin.ModelAdmin):
                 'numero_linea',
                 'tipo_servicio',
                 'costo',
+                'es_necesaria',
                 'notas',
             )
         }),

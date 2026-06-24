@@ -4761,6 +4761,7 @@ class LineaServicioAdicional(models.Model):
     - solicitud: FK a SolicitudCotizacion (la cabecera)
     - tipo_servicio: Tipo de servicio (paquete, limpieza, etc.)
     - costo: Precio del servicio
+    - es_necesaria: Clasificación para PDF (verde/amarillo); no va a VentaMostrador
     - estado_cliente: Si el cliente aprobó/rechazó este servicio
     """
     
@@ -4793,7 +4794,16 @@ class LineaServicioAdicional(models.Model):
         verbose_name='Costo del Servicio',
         help_text='Precio del servicio (IVA incluido)'
     )
-    
+
+    # ========== CLASIFICACIÓN PARA PDF DE COTIZACIÓN ==========
+    # Solo afecta el color/fila en el PDF al cliente (verde=necesaria, amarillo=opcional).
+    # NO se sincroniza con VentaMostrador en Servicio Técnico.
+    es_necesaria = models.BooleanField(
+        default=False,
+        verbose_name='¿Es necesaria?',
+        help_text='Marcar si el servicio es indispensable. Desmarcado = opcional (ej. limpieza)'
+    )
+
     # ========== ESTADO DEL CLIENTE ==========
     estado_cliente = models.CharField(
         max_length=20,

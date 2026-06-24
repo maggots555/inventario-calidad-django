@@ -2457,6 +2457,7 @@ class LineaServicioAdicionalForm(forms.ModelForm):
         fields = [
             'tipo_servicio',
             'costo',
+            'es_necesaria',
             'notas',
         ]
         widgets = {
@@ -2469,6 +2470,9 @@ class LineaServicioAdicionalForm(forms.ModelForm):
                 'step': '0.01',
                 'placeholder': '0.00',
             }),
+            'es_necesaria': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
             'notas': forms.Textarea(attrs={
                 'class': 'form-control form-control-sm',
                 'rows': 2,
@@ -2478,6 +2482,7 @@ class LineaServicioAdicionalForm(forms.ModelForm):
         labels = {
             'tipo_servicio': 'Servicio',
             'costo': 'Costo',
+            'es_necesaria': '¿Es necesaria?',
             'notas': 'Notas',
         }
     

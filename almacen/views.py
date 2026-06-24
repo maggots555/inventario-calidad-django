@@ -3833,7 +3833,7 @@ def api_enviar_cotizacion_cliente(request, pk):
                     'descripcion': linea.get_tipo_servicio_display(),
                     'cantidad': 1,
                     'costo_unitario': float(linea.costo),
-                    'es_necesaria': False,    # Los servicios adicionales van como "opcional"
+                    'es_necesaria': linea.es_necesaria,
                     'dias_entrega': None,
                     'es_servicio': True,
                 }
@@ -3858,6 +3858,8 @@ def api_enviar_cotizacion_cliente(request, pk):
         items_piezas_nec     = [d for d in items_piezas_todos if d['es_necesaria']]
         items_piezas_opc     = [d for d in items_piezas_todos if not d['es_necesaria']]
         items_servicios      = [linea_a_dict(s, es_servicio=True) for s in servicios]
+        items_servicios_nec  = [d for d in items_servicios if d['es_necesaria']]
+        items_servicios_opc  = [d for d in items_servicios if not d['es_necesaria']]
 
         # Configurar los grupos según el modo de agrupación elegido
         if modo_agrupacion == 'todo_junto':
@@ -3875,14 +3877,14 @@ def api_enviar_cotizacion_cliente(request, pk):
                 grupos = [{'titulo': '', 'items': items_piezas_todos + items_servicios}]
 
         elif modo_agrupacion == 'necesarias_vs_opcionales':
-            # Dos PDFs: piezas necesarias y piezas opcionales
+            # Dos PDFs: piezas/servicios necesarios y opcionales
             grupos = []
-            if items_piezas_nec:
-                grupos.append({'titulo': 'Cotización — Piezas Necesarias', 'items': items_piezas_nec})
-            # Las opcionales incluyen piezas no-necesarias + servicios adicionales
-            items_opcionales = items_piezas_opc + items_servicios
+            items_necesarios = items_piezas_nec + items_servicios_nec
+            items_opcionales = items_piezas_opc + items_servicios_opc
+            if items_necesarios:
+                grupos.append({'titulo': 'Cotización — Piezas y Servicios Necesarios', 'items': items_necesarios})
             if items_opcionales:
-                grupos.append({'titulo': 'Cotización — Piezas Opcionales y Servicios', 'items': items_opcionales})
+                grupos.append({'titulo': 'Cotización — Piezas y Servicios Opcionales', 'items': items_opcionales})
             if not grupos:
                 grupos = [{'titulo': '', 'items': items_piezas_todos + items_servicios}]
 
@@ -3996,7 +3998,7 @@ def preview_pdf_cotizacion(request, pk):
                     'descripcion': linea.get_tipo_servicio_display(),
                     'cantidad': 1,
                     'costo_unitario': float(linea.costo),
-                    'es_necesaria': False,
+                    'es_necesaria': linea.es_necesaria,
                     'dias_entrega': None,
                     'es_servicio': True,
                 }
@@ -4017,6 +4019,8 @@ def preview_pdf_cotizacion(request, pk):
         items_piezas_nec   = [d for d in items_todos_piezas if d['es_necesaria']]
         items_piezas_opc   = [d for d in items_todos_piezas if not d['es_necesaria']]
         items_servicios    = [linea_a_dict_preview(s, es_servicio=True) for s in servicios]
+        items_servicios_nec = [d for d in items_servicios if d['es_necesaria']]
+        items_servicios_opc = [d for d in items_servicios if not d['es_necesaria']]
 
         if modo_agrupacion == 'todo_junto':
             grupos = [{'titulo': '', 'items': items_todos_piezas + items_servicios}]
@@ -4028,11 +4032,12 @@ def preview_pdf_cotizacion(request, pk):
                 grupos.append({'titulo': 'Cotización de Servicios Adicionales', 'items': items_servicios})
         elif modo_agrupacion == 'necesarias_vs_opcionales':
             grupos = []
-            if items_piezas_nec:
-                grupos.append({'titulo': 'Cotización — Piezas Necesarias', 'items': items_piezas_nec})
-            opcionales = items_piezas_opc + items_servicios
-            if opcionales:
-                grupos.append({'titulo': 'Cotización — Piezas Opcionales y Servicios', 'items': opcionales})
+            items_necesarios = items_piezas_nec + items_servicios_nec
+            items_opcionales = items_piezas_opc + items_servicios_opc
+            if items_necesarios:
+                grupos.append({'titulo': 'Cotización — Piezas y Servicios Necesarios', 'items': items_necesarios})
+            if items_opcionales:
+                grupos.append({'titulo': 'Cotización — Piezas y Servicios Opcionales', 'items': items_opcionales})
         else:
             grupos = [{'titulo': '', 'items': items_todos_piezas + items_servicios}]
 
