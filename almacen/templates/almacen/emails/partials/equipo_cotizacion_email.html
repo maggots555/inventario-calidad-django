@@ -1,0 +1,28 @@
+{# Tarjeta de datos del equipo — una fila por dato (compatible con clientes de correo) #}
+<div class="equipo-card">
+    <div class="equipo-titulo">Datos del Equipo</div>
+    {% if info_equipo.marca %}
+    <p class="equipo-fila">
+        <span class="equipo-label">Marca:</span>
+        <span class="equipo-valor">{{ info_equipo.marca }}</span>
+    </p>
+    {% endif %}
+    {% if info_equipo.modelo %}
+    <p class="equipo-fila">
+        <span class="equipo-label">Modelo:</span>
+        <span class="equipo-valor">{{ info_equipo.modelo }}</span>
+    </p>
+    {% endif %}
+    {% if info_equipo.tipo %}
+    <p class="equipo-fila">
+        <span class="equipo-label">Tipo:</span>
+        <span class="equipo-valor">{{ info_equipo.tipo }}</span>
+    </p>
+    {% endif %}
+    {% if info_equipo.service_tag %}
+    <p class="equipo-fila">
+        <span class="equipo-label">Service Tag:</span>
+        <span class="equipo-valor">{{ info_equipo.service_tag }}</span>
+    </p>
+    {% endif %}
+</div>

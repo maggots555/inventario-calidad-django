@@ -89,34 +89,62 @@
             color: #555;
             margin-bottom: 24px;
         }
-        /* Datos del equipo — tarjeta pequeña */
+        /* Datos del equipo — una fila por campo (mejor en clientes de correo) */
         .equipo-card {
             background-color: #f0f4fa;
             border-left: 4px solid #003366;
-            border-radius: 4px;
-            padding: 14px 18px;
+            border-radius: 6px;
+            padding: 18px 20px;
             margin-bottom: 24px;
-            font-size: 13px;
+            font-size: 14px;
         }
         .equipo-card .equipo-titulo {
             font-weight: 700;
             color: #003366;
-            margin-bottom: 6px;
+            margin-bottom: 14px;
             font-size: 13px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        .equipo-card .equipo-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px 24px;
+        .equipo-fila {
+            margin: 0 0 10px 0;
+            line-height: 1.6;
+            font-size: 14px;
         }
-        .equipo-item span:first-child {
+        .equipo-fila:last-child {
+            margin-bottom: 0;
+        }
+        .equipo-label {
             font-weight: 600;
             color: #333;
+            display: inline-block;
+            min-width: 120px;
         }
-        .equipo-item span:last-child {
+        .equipo-valor {
             color: #555;
+        }
+        /* Aviso importante — vigencia de la cotización */
+        .aviso-vigencia {
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin: 24px 0;
+            text-align: center;
+        }
+        .aviso-vigencia-titulo {
+            font-weight: 700;
+            color: #856404;
+            font-size: 14px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .aviso-vigencia-texto {
+            font-size: 13px;
+            color: #664d03;
+            line-height: 1.6;
+            margin: 0;
         }
         /* Totales de la cotización — caja destacada */
         .totales-box {
@@ -368,6 +396,7 @@
             .logo { font-size: 20px; }
             .subtitle { font-size: 13px; }
             .equipo-grid { flex-direction: column; }
+            .equipo-label { min-width: 100px; display: block; margin-bottom: 2px; }
             .total-row { flex-direction: column; gap: 4px; text-align: center; }
             .social-media { padding: 15px 5px; }
             .social-links { gap: 8px; padding: 0 5px; }
@@ -407,6 +436,12 @@
         <!-- Cuerpo del mensaje: México (texto legal) o genérico (otros países) -->
         {% if pais_codigo == 'MX' and cotizacion_email %}
             {% include 'almacen/emails/partials/cuerpo_cotizacion_mexico.html' %}
+
+            <!-- Datos del equipo — justo después del aviso de factura -->
+            {% if info_equipo %}
+            {% include 'almacen/emails/partials/equipo_cotizacion_email.html' %}
+            {% endif %}
+
         {% else %}
         <p class="saludo">
             {% if nombre_cliente %}
@@ -420,35 +455,10 @@
             El PDF incluye el detalle completo de las piezas y/o servicios con sus precios
             individuales. A continuación le presentamos el resumen de los totales.
         </p>
-        {% endif %}
 
-        <!-- Datos del equipo (si están disponibles) -->
         {% if info_equipo %}
-        <div class="equipo-card">
-            <div class="equipo-titulo">Datos del Equipo</div>
-            <div class="equipo-grid">
-                {% if info_equipo.marca %}
-                <div class="equipo-item">
-                    <span>Marca: </span><span>{{ info_equipo.marca }}</span>
-                </div>
-                {% endif %}
-                {% if info_equipo.modelo %}
-                <div class="equipo-item">
-                    <span>Modelo: </span><span>{{ info_equipo.modelo }}</span>
-                </div>
-                {% endif %}
-                {% if info_equipo.tipo %}
-                <div class="equipo-item">
-                    <span>Tipo: </span><span>{{ info_equipo.tipo }}</span>
-                </div>
-                {% endif %}
-                {% if info_equipo.service_tag %}
-                <div class="equipo-item">
-                    <span>Service Tag: </span><span>{{ info_equipo.service_tag }}</span>
-                </div>
-                {% endif %}
-            </div>
-        </div>
+        {% include 'almacen/emails/partials/equipo_cotizacion_email.html' %}
+        {% endif %}
         {% endif %}
 
         <!-- Resumen de Totales (lo que el cliente necesita ver) -->
@@ -493,10 +503,24 @@
         {% endif %}
 
         <!-- Nota de vigencia -->
+        {% if pais_codigo == 'MX' and cotizacion_email %}
+        <div class="aviso-vigencia">
+            <p class="aviso-vigencia-titulo">⚠️ Aviso importante — Vigencia de la cotización</p>
+            <p class="aviso-vigencia-texto">
+                Esta cotización tiene una vigencia de <strong>5 días hábiles</strong> a partir
+                de la fecha de emisión. Los precios están sujetos a disponibilidad de piezas.
+                Posterior a este plazo deberá solicitarse recotización.
+            </p>
+        </div>
+
+        <!-- Cierre del mensaje (Nota / Saludos) — al final del correo México -->
+        {% include 'almacen/emails/partials/cierre_cotizacion_mexico.html' %}
+        {% else %}
         <p style="font-size: 12px; color: #888; text-align: center; margin-top: 8px;">
             Esta cotización tiene una vigencia de <strong>15 días hábiles</strong> a partir
             de la fecha de emisión. Los precios están sujetos a disponibilidad de piezas.
         </p>
+        {% endif %}
 
     </div>
 
