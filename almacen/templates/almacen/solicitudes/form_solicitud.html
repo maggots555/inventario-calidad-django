@@ -1,7 +1,7 @@
 {% extends 'almacen/base_almacen.html' %}
 {% load static %}
 
-{% block title %}Nueva Solicitud - Almacén{% endblock %}
+{% block title %}Nueva solicitud - Almacén{% endblock %}
 
 {% block almacen_content %}
 <div class="container py-4">
@@ -10,30 +10,42 @@
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'almacen:dashboard' %}">Almacén</a></li>
             <li class="breadcrumb-item"><a href="{% url 'almacen:lista_solicitudes' %}">Solicitudes</a></li>
-            <li class="breadcrumb-item active">Nueva Solicitud</li>
+            <li class="breadcrumb-item active">Nueva solicitud</li>
         </ol>
     </nav>
 
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card shadow-sm">
+            <div class="card shadow-sm solicitud-baja-form-card">
                 <div class="card-header bg-white">
                     <h5 class="mb-0">
                         <i class="bi bi-cart-plus me-2"></i>{{ titulo }}
                     </h5>
                 </div>
                 <div class="card-body">
-                    <form method="post" id="solicitud-baja-form">
+                    <form method="post" id="solicitud-baja-form"
+                          data-api-buscar-productos="{% url 'almacen:api_buscar_productos' %}"
+                          data-api-info-producto="{% url 'almacen:api_info_producto' 0 %}">
                         {% csrf_token %}
                         
                         <!-- Campo oculto para orden_servicio (se llena automáticamente) -->
                         {{ form.orden_servicio }}
                         
                         <div class="row">
-                            <!-- Producto -->
+                            <!-- Producto: autocompletado AJAX (ID en campo oculto) -->
                             <div class="col-md-8 mb-3">
                                 <label class="form-label">Producto *</label>
-                                {{ form.producto }}
+                                <div class="producto-autocomplete" id="producto-autocomplete-wrapper"
+                                     data-api-url="{% url 'almacen:api_buscar_productos' %}"
+                                     data-api-info-url="{% url 'almacen:api_info_producto' 0 %}">
+                                    {{ form.producto }}
+                                    <input type="text"
+                                           class="form-control producto-autocomplete-input"
+                                           placeholder="Buscar por código o nombre..."
+                                           autocomplete="off"
+                                           required>
+                                    <div class="producto-autocomplete-dropdown list-group"></div>
+                                </div>
                                 {% if form.producto.errors %}
                                     <div class="invalid-feedback d-block">{{ form.producto.errors.0 }}</div>
                                 {% endif %}
@@ -142,30 +154,40 @@
                             </div>
                             
                             <!-- ============================================= -->
-                            <!-- SECCIÓN: ORDEN DE SERVICIO (Servicio Técnico) -->
+                            <!-- SECCIÓN: ORDEN DE SERVICIO (ST / Venta Mostrador) -->
+                            <!-- Autocompletado typeahead; prefijo OOW o FL según tipo -->
                             <!-- ============================================= -->
                             <div class="col-12 mb-3" id="orden-container" style="display: none;">
-                                <div class="card bg-light">
+                                <div class="card bg-light orden-vinculo-card">
                                     <div class="card-body">
                                         <h6 class="card-title mb-3">
                                             <i class="bi bi-link-45deg me-1"></i>Vincular a Orden de Servicio
                                         </h6>
                                         
-                                        <!-- Número de Orden del Cliente -->
+                                        <!-- Typeahead: data-prefijo lo actualiza solicitud_baja_form.ts -->
                                         <div class="mb-3">
                                             <label class="form-label">
                                                 <i class="bi bi-hash me-1"></i>Número de Orden del Cliente
                                             </label>
-                                            {{ form.orden_cliente_input }}
+                                            <div class="orden-autocomplete position-relative" id="orden-autocomplete-wrapper"
+                                                 data-api-url="{% url 'servicio_tecnico:api_buscar_ordenes_autocomplete' %}"
+                                                 data-tipo="activas"
+                                                 data-prefijo="">
+                                                {{ form.orden_cliente_input }}
+                                                <div class="orden-autocomplete-dropdown" role="listbox"
+                                                     aria-label="Resultados de búsqueda de orden"></div>
+                                            </div>
                                             {% if form.orden_cliente_input.errors %}
                                                 <div class="invalid-feedback d-block">{{ form.orden_cliente_input.errors.0 }}</div>
                                             {% endif %}
-                                            <small class="text-muted">
-                                                Escriba el número de orden (debe empezar con <strong>OOW-</strong> o <strong>FL-</strong>).
-                                                Si la orden no existe, se creará automáticamente.
+                                            <small class="text-muted" id="orden-help-text">
+                                                Seleccione el tipo de solicitud para ver las órdenes disponibles.
                                             </small>
-                                            
-                                            <!-- Div para mostrar estado de búsqueda -->
+                                            <div id="ordenInfo" class="alert alert-info mt-2 d-none">
+                                                <strong>Orden vinculada:</strong>
+                                                <span id="ordenInfoTexto"></span>
+                                            </div>
+                                            <!-- Div para mostrar estado de búsqueda / creación -->
                                             <div id="orden-status" class="mt-2"></div>
                                         </div>
                                         
@@ -214,27 +236,29 @@
 {% endblock almacen_content %}
 
 {% block extra_css %}
+<!-- Autocompletado producto + orden (compartido con cotizaciones) -->
+<link rel="stylesheet" href="{% static 'css/form_solicitud.css' %}">
 <!-- Estilos para unidades agrupadas -->
 <link rel="stylesheet" href="{% static 'css/unidades_agrupadas.css' %}">
 {% endblock %}
 
 {% block extra_js %}
-<!-- Cargar el script TypeScript compilado para el formulario de solicitud de baja -->
-<!-- ManifestStaticFilesStorage añade el hash automáticamente al compilar -->
+<!-- Lógica del formulario: producto/orden autocomplete, unidades, OOW/FL -->
 <script src="{% static 'js/solicitud_baja_form.js' %}"></script>
 <script>
     /**
-     * Inicializar el formulario de solicitud de baja
-     * 
+     * Inicializar el formulario de Nueva solicitud.
+     *
      * EXPLICACIÓN PARA PRINCIPIANTES:
      * --------------------------------
-     * Esta función inicializa el handler de TypeScript que maneja:
-     * 1. Carga dinámica de unidades cuando se selecciona un producto
-     * 2. Mostrar/ocultar el campo de técnico según el tipo de solicitud
-     * 3. Búsqueda y creación automática de órdenes de servicio por orden_cliente
-     * 
-     * Pasamos las URLs de Django al JavaScript usando la etiqueta url para que
-     * siempre apunten a las rutas correctas, incluso si cambian en urls.py
+     * initSolicitudBajaForm configura en TypeScript:
+     * 1. Autocompletado de producto (búsqueda AJAX + stock)
+     * 2. Carga dinámica de unidades al elegir producto
+     * 3. Campos visibles según tipo (técnico, orden, sucursal destino)
+     * 4. Autocompletado de orden con filtro OOW- (ST) o FL- (venta mostrador)
+     * 5. Creación automática de orden si no existe al enviar
+     *
+     * Las URLs vienen de Django (etiqueta url) para no hardcodear rutas.
      */
     initSolicitudBajaForm(
         "{% url 'almacen:api_unidades_producto' %}",

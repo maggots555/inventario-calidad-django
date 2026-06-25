@@ -207,7 +207,7 @@
     top: 100%;
     left: 0;
     right: 0;
-    z-index: 1050;
+    z-index: 1080;
     max-height: 320px;
     overflow-y: auto;
     display: none;
@@ -340,6 +340,34 @@
 .form-accordion .accordion-button:not(.collapsed) {
     background-color: var(--gray-50);
     color: var(--primary-color);
+}
+
+/* ============================================================
+   FORMULARIO NUEVA SOLICITUD (almacén/solicitudes)
+   Las .card globales usan overflow:hidden (base.css) y recortan
+   los dropdowns de autocompletado. Estas clases lo corrigen.
+   ============================================================ */
+.solicitud-baja-form-card,
+.orden-vinculo-card {
+    overflow: visible;
+}
+
+.solicitud-baja-form-card .card-body {
+    overflow: visible;
+}
+
+/* Elevar toda la sección de orden sobre los campos siguientes (Motivo, botones) */
+#orden-container {
+    position: relative;
+    z-index: 10;
+}
+
+#orden-container.orden-autocomplete-activo {
+    z-index: 200;
+}
+
+#orden-container .orden-autocomplete-dropdown.show {
+    z-index: 201;
 }
 
 /* ============================================================

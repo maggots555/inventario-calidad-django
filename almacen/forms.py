@@ -834,33 +834,35 @@ class MovimientoAlmacenForm(forms.ModelForm):
 # ============================================================================
 class SolicitudBajaForm(forms.ModelForm):
     """
-    Formulario para crear solicitudes de baja de productos.
+    Formulario para crear solicitudes de salida de productos del almacén.
     
-    Los empleados usan este formulario para solicitar productos del almacén.
+    Los empleados usan este formulario para solicitar productos.
     El agente de almacén posteriormente aprueba o rechaza la solicitud.
     
-    FLUJO MEJORADO (Diciembre 2025):
-    1. Usuario selecciona un Producto (tipo genérico: "SSD 1TB")
-    2. Se cargan dinámicamente las UnidadInventario disponibles de ese producto
-    3. Usuario puede elegir una unidad específica (opcional) o dejar genérico
-    4. Si tipo_solicitud es 'servicio_tecnico', se muestra selector de técnico (obligatorio)
-    5. Usuario puede escribir el número de orden del cliente (OOW-xxx o FL-xxx)
-       - Si existe: se vincula automáticamente
-       - Si no existe: se crea automáticamente con estado "Proveniente de Almacén"
+    FLUJO ACTUALIZADO (Junio 2026):
+    1. Producto: campo oculto (#id_producto) + input de búsqueda AJAX con stock visible
+    2. Unidades: se cargan dinámicamente al elegir producto (opcional, agrupadas por marca/modelo)
+    3. Tipo servicio_tecnico / venta_mostrador → técnico obligatorio + vincular orden
+    4. Orden: autocompletado typeahead con prefijo según tipo:
+       - servicio_tecnico  → solo OOW- (diagnóstico)
+       - venta_mostrador   → solo FL-  (venta mostrador)
+       - Si no existe la orden → se crea al enviar con estado "Proveniente de Almacén"
+    5. Tipo transferencia → sucursal destino obligatoria (solo agentes de almacén)
     """
     
-    # Campo extra para capturar el número de orden del cliente (texto libre)
+    # Campo de texto para búsqueda typeahead de orden (no es campo del modelo).
+    # El ID real de OrdenServicio se guarda en orden_servicio (HiddenInput).
     orden_cliente_input = forms.CharField(
         max_length=50,
         required=False,
         widget=forms.TextInput(attrs={
-            'class': 'form-control',
+            'class': 'form-control orden-autocomplete-input',
             'id': 'id_orden_cliente_input',
-            'placeholder': 'Ej: OOW-12345 o FL-2025-001',
+            'placeholder': 'Buscar orden...',
             'autocomplete': 'off',
         }),
         label='Número de Orden del Cliente',
-        help_text='Escriba el número de orden (OOW-xxx o FL-xxx). Si no existe, se creará automáticamente.',
+        help_text='Busque la orden por número. Si no existe, se creará al enviar.',
     )
     
     # Campo extra para seleccionar sucursal (necesario para crear órdenes nuevas)
@@ -891,8 +893,7 @@ class SolicitudBajaForm(forms.ModelForm):
             'tipo_solicitud': forms.Select(attrs={
                 'class': 'form-control form-select',
             }),
-            'producto': forms.Select(attrs={
-                'class': 'form-control form-select',
+            'producto': forms.HiddenInput(attrs={
                 'id': 'id_producto',
             }),
             'unidad_inventario': forms.Select(attrs={
@@ -948,6 +949,11 @@ class SolicitudBajaForm(forms.ModelForm):
         # Importar Empleado y Sucursal aquí para evitar importación circular
         from inventario.models import Empleado, Sucursal
         
+        # ========== CONFIGURACIÓN PRODUCTO (autocompletado AJAX) ==========
+        # El widget es HiddenInput: el template muestra un input de búsqueda y
+        # TypeScript escribe el ID seleccionado en #id_producto antes del submit.
+        self.fields['producto'].queryset = ProductoAlmacen.objects.filter(activo=True)
+        
         # ========== CONFIGURACIÓN SUCURSAL_ORDEN ==========
         # Cargar todas las sucursales activas para el campo de selección
         self.fields['sucursal_orden'].queryset = Sucursal.objects.filter(
@@ -961,8 +967,8 @@ class SolicitudBajaForm(forms.ModelForm):
         self.fields['unidad_inventario'].required = False
         
         # ========== CONFIGURACIÓN ORDEN_SERVICIO ==========
-        # El campo orden_servicio es oculto y se llenará automáticamente vía JavaScript
-        # No mostramos todas las órdenes, se busca/crea por orden_cliente
+        # Campo oculto: se llena vía autocompletado de orden_cliente_input (JS).
+        # No se listan todas las órdenes en un <select>; se busca/crea por número.
         self.fields['orden_servicio'].required = False
         
         # ========== FILTRADO DE UNIDADES POR SUCURSAL (NUEVO - Enero 2026) ==========
@@ -1052,12 +1058,14 @@ class SolicitudBajaForm(forms.ModelForm):
         
         EXPLICACIÓN PARA PRINCIPIANTES:
         --------------------------------
-        El método clean() se ejecuta después de validar cada campo individualmente.
-        Aquí validamos reglas que dependen de múltiples campos.
+        Se ejecuta después de validar cada campo. Aquí aplicamos reglas que
+        dependen de varios campos a la vez.
         
-        ACTUALIZADO (Enero 2026):
-        - Valida que técnico sea obligatorio para servicio_tecnico
-        - Valida que se hayan seleccionado exactamente la cantidad de unidades solicitada
+        Reglas principales:
+        - Técnico obligatorio para servicio_tecnico y venta_mostrador
+        - Prefijo de orden según tipo: OOW- (ST) o FL- (venta mostrador)
+        - Sucursal destino obligatoria en transferencias
+        - Cantidad de unidades seleccionadas debe coincidir con cantidad solicitada
         """
         cleaned_data = super().clean()
         tipo_solicitud = cleaned_data.get('tipo_solicitud')
@@ -1074,6 +1082,18 @@ class SolicitudBajaForm(forms.ModelForm):
             raise ValidationError({
                 'tecnico_asignado': f'Debe seleccionar un técnico de laboratorio para solicitudes de {tipo_display}.'
             })
+        
+        # ========== VALIDACIÓN: Prefijo de orden según tipo de solicitud ==========
+        orden_cliente_input = self.data.get('orden_cliente_input', '').strip().upper()
+        if orden_cliente_input and tipo_solicitud in tipos_requieren_tecnico:
+            if tipo_solicitud == 'servicio_tecnico' and not orden_cliente_input.startswith('OOW-'):
+                raise ValidationError({
+                    'orden_cliente_input': 'Para Servicio Técnico el número de orden debe empezar con "OOW-"'
+                })
+            if tipo_solicitud == 'venta_mostrador' and not orden_cliente_input.startswith('FL-'):
+                raise ValidationError({
+                    'orden_cliente_input': 'Para Venta Mostrador el número de orden debe empezar con "FL-"'
+                })
         
         # ========== VALIDACIÓN: Sucursal destino para transferencias ==========
         if tipo_solicitud == 'transferencia' and not sucursal_destino:

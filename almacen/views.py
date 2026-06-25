@@ -688,12 +688,18 @@ def lista_solicitudes(request):
 @permission_required_with_message('almacen.add_solicitudbaja')
 def crear_solicitud(request):
     """
-    Crea una nueva solicitud de baja.
-    
-    ACTUALIZADO (Enero 2026): 
+    Crea una nueva solicitud de salida de productos del almacén.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Renderiza el formulario SolicitudBajaForm con autocompletado de producto
+    y orden (TypeScript en solicitud_baja_form.ts). Al enviar POST valida
+    stock, técnico, prefijo OOW/FL y unidades seleccionadas.
+
+    ACTUALIZADO (Enero 2026):
     - Procesa unidades seleccionadas del formulario
     - Valida que el empleado tenga sucursal asignada
-    - Filtra unidades por sucursal (empleados normales) o muestra todas (agentes)
+    - Filtra unidades por sucursal (empleados) o todas (agentes de almacén)
     """
     # Obtener empleado del usuario actual
     try:
@@ -754,7 +760,7 @@ def crear_solicitud(request):
     
     context = {
         'form': form,
-        'titulo': 'Nueva Solicitud de Baja',
+        'titulo': 'Nueva solicitud',
         'empleado': empleado,
         'es_agente_almacen': es_agente_almacen,
     }
@@ -1780,41 +1786,43 @@ def api_buscar_crear_orden_cliente(request):
     
     EXPLICACIÓN PARA PRINCIPIANTES:
     --------------------------------
-    Esta API se usa en el formulario de solicitud de baja del almacén.
-    Permite al usuario:
-    1. Buscar órdenes existentes escribiendo el número de orden del cliente
-    2. Si no existe, crear automáticamente una nueva orden de servicio
+    Usada en el formulario de Nueva solicitud del almacén. Permite:
+    1. Buscar órdenes existentes por número de orden del cliente (coincidencia exacta)
+    2. Crear automáticamente una orden si no existe al enviar el formulario
     
-    El campo orden_cliente está en el modelo DetalleEquipo (no en OrdenServicio),
-    por eso buscamos en DetalleEquipo y accedemos a la orden a través de la relación.
+    El campo orden_cliente vive en DetalleEquipo; la búsqueda cruza esa relación.
     
-    VALIDACIÓN DE FORMATO:
-    - El número de orden debe empezar con 'OOW-' o 'FL-'
-    - Ejemplo válido: 'OOW-12345' o 'FL-2025-001'
+    VALIDACIÓN DE FORMATO Y PREFIJO:
+    - Formato base: debe empezar con 'OOW-' o 'FL-'
+    - Con tipo_solicitud en GET/POST:
+      - servicio_tecnico  → solo acepta OOW-
+      - venta_mostrador   → solo acepta FL-
     
     MÉTODOS HTTP:
-    - GET: Buscar orden existente por orden_cliente
+    - GET: Buscar orden existente
     - POST: Crear nueva orden si no existe
     
     PARÁMETROS GET:
-    - orden_cliente: Número de orden del cliente a buscar
+    - orden_cliente (str): Número a buscar (ej. OOW-12345)
+    - tipo_solicitud (str, opcional): 'servicio_tecnico' o 'venta_mostrador' para validar prefijo
     
     PARÁMETROS POST (JSON):
-    - orden_cliente: Número de orden del cliente
-    - sucursal_id: ID de la sucursal donde se registra
-    - tecnico_id: ID del técnico asignado (obligatorio para servicio técnico)
+    - orden_cliente (str): Número de orden del cliente
+    - tipo_solicitud (str, opcional): Valida prefijo OOW/FL según tipo
+    - sucursal_id (int): Sucursal donde se registra la orden nueva
+    - tecnico_id (int): Técnico asignado (obligatorio para servicio técnico)
     
     RETORNA:
     {
         "success": true/false,
-        "found": true/false (si se encontró orden existente),
-        "created": true/false (si se creó nueva orden),
-        "orden_id": int (ID de OrdenServicio),
+        "found": true/false,
+        "created": true/false,
+        "orden_id": int,
         "orden_cliente": str,
         "numero_orden_interno": str,
         "estado": str,
         "sucursal": str,
-        "error": str (si hay error)
+        "error": str
     }
     """
     import re
@@ -1842,9 +1850,29 @@ def api_buscar_crear_orden_cliente(request):
         
         return True, ''
     
+    def validar_prefijo_por_tipo(orden_cliente: str, tipo_solicitud: str) -> tuple[bool, str]:
+        """
+        Valida que el prefijo de la orden coincida con el tipo de solicitud.
+        
+        - servicio_tecnico → solo OOW- (diagnóstico)
+        - venta_mostrador → solo FL- (venta mostrador)
+        """
+        if not tipo_solicitud or not orden_cliente:
+            return True, ''
+        
+        orden_cliente = orden_cliente.strip().upper()
+        
+        if tipo_solicitud == 'servicio_tecnico' and not orden_cliente.startswith('OOW-'):
+            return False, 'Para Servicio Técnico el número de orden debe empezar con "OOW-"'
+        if tipo_solicitud == 'venta_mostrador' and not orden_cliente.startswith('FL-'):
+            return False, 'Para Venta Mostrador el número de orden debe empezar con "FL-"'
+        
+        return True, ''
+    
     if request.method == 'GET':
         # ========== MODO BÚSQUEDA ==========
         orden_cliente = request.GET.get('orden_cliente', '').strip().upper()
+        tipo_solicitud = request.GET.get('tipo_solicitud', '').strip()
         
         if not orden_cliente:
             return JsonResponse({
@@ -1859,6 +1887,16 @@ def api_buscar_crear_orden_cliente(request):
             return JsonResponse({
                 'success': False,
                 'error': error_formato,
+                'found': False,
+                'formato_invalido': True
+            })
+        
+        # Validar prefijo según tipo de solicitud (si se envía)
+        prefijo_valido, error_prefijo = validar_prefijo_por_tipo(orden_cliente, tipo_solicitud)
+        if not prefijo_valido:
+            return JsonResponse({
+                'success': False,
+                'error': error_prefijo,
                 'found': False,
                 'formato_invalido': True
             })
@@ -1921,6 +1959,16 @@ def api_buscar_crear_orden_cliente(request):
                 return JsonResponse({
                     'success': False,
                     'error': error_formato,
+                    'created': False,
+                    'formato_invalido': True
+                })
+            
+            # Validar prefijo según tipo de solicitud
+            prefijo_valido, error_prefijo = validar_prefijo_por_tipo(orden_cliente, tipo_solicitud)
+            if not prefijo_valido:
+                return JsonResponse({
+                    'success': False,
+                    'error': error_prefijo,
                     'created': False,
                     'formato_invalido': True
                 })

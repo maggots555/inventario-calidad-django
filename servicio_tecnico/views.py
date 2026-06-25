@@ -13496,23 +13496,25 @@ def exportar_analisis_aceptaciones(request):
 @require_http_methods(["GET"])
 def api_buscar_ordenes_autocomplete(request):
     """
-    API endpoint para autocompletado de búsqueda en lista de órdenes.
+    API endpoint para autocompletado typeahead de órdenes de servicio.
     
     EXPLICACIÓN PARA PRINCIPIANTES:
-    Este endpoint recibe lo que el usuario va tecleando en el buscador
-    y devuelve las órdenes que coinciden, mostrando la orden del cliente
-    y el service tag como complemento. Responde en formato JSON para
-    que el frontend pueda mostrar las sugerencias sin recargar la página.
+    --------------------------------
+    Recibe lo que el usuario escribe y devuelve hasta 10 coincidencias en JSON.
+    Se usa en lista de órdenes ST, cotizaciones y el formulario de Nueva solicitud
+    del almacén (con filtro de prefijo OOW/FL según tipo de solicitud).
     
     Parámetros GET:
         q (str): Texto de búsqueda (mínimo 2 caracteres)
-        tipo (str): 'activas' o 'finalizadas' para filtrar según la vista
+        tipo (str): 'activas' (default) o 'finalizadas'
+        prefijo (str, opcional): 'OOW' o 'FL' — filtra orden_cliente por prefijo
     
     Returns:
-        JsonResponse con lista de coincidencias (máximo 10)
+        JsonResponse: { "resultados": [ { id, orden_cliente, numero_serie, ... } ] }
     """
     query = request.GET.get('q', '').strip()
     tipo = request.GET.get('tipo', 'activas').strip()
+    prefijo = request.GET.get('prefijo', '').strip().upper()
     
     # Requerir mínimo 2 caracteres para buscar
     if len(query) < 2:
@@ -13527,6 +13529,12 @@ def api_buscar_ordenes_autocomplete(request):
         ordenes = OrdenServicio.objects.exclude(
             estado__in=['entregado', 'cancelado']
         )
+    
+    # Filtro opcional por prefijo de orden del cliente (OOW- diagnóstico, FL- venta mostrador)
+    if prefijo == 'OOW':
+        ordenes = ordenes.filter(detalle_equipo__orden_cliente__istartswith='OOW-')
+    elif prefijo == 'FL':
+        ordenes = ordenes.filter(detalle_equipo__orden_cliente__istartswith='FL-')
     
     # Aplicar filtro de búsqueda en los 3 campos relevantes
     ordenes = ordenes.filter(

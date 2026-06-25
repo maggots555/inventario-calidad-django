@@ -1,39 +1,40 @@
 /* =============================================================================
-   SOLICITUD BAJA FORM - TypeScript para el formulario de Solicitud de Baja
+   SOLICITUD BAJA FORM - TypeScript para el formulario de Nueva solicitud
    
    EXPLICACIÓN PARA PRINCIPIANTES:
    --------------------------------
    Este archivo TypeScript maneja la lógica dinámica del formulario de solicitud
-   de baja del almacén. Específicamente:
+   del almacén. Específicamente:
    
-   1. Carga dinámica de unidades: Cuando seleccionas un producto, se cargan las
-      unidades disponibles de ese producto vía AJAX.
+   1. Autocompletado de producto: Búsqueda AJAX por código o nombre con stock
+      visible en tiempo real. El ID seleccionado se guarda en un campo oculto.
    
-   2. Mostrar/ocultar campo de técnico: Cuando seleccionas "Servicio Técnico"
-      como tipo de solicitud, aparece el campo para seleccionar el técnico.
-      Este campo es obligatorio solo para ese tipo de solicitud.
+   2. Carga dinámica de unidades: Al elegir un producto, se cargan las unidades
+      disponibles (agrupadas por marca/modelo) vía AJAX.
    
-   3. Búsqueda/Creación de Orden de Servicio: Permite buscar órdenes por número
-      de orden del cliente (OOW-xxx o FL-xxx). Si no existe, se puede crear
-      automáticamente una nueva orden con estado "Proveniente de Almacén".
+   3. Mostrar/ocultar campos según tipo de solicitud:
+      - servicio_tecnico / venta_mostrador → técnico + vincular orden
+      - transferencia → sucursal destino
    
-   FLUJO:
-   - Usuario selecciona tipo de solicitud
-   - Si es "servicio_tecnico" → Muestra selector de técnico (obligatorio)
-   - Si es otro tipo → Oculta selector de técnico
+   4. Autocompletado de orden de servicio (Junio 2026):
+      - servicio_tecnico → solo busca órdenes OOW- (diagnóstico)
+      - venta_mostrador → solo busca órdenes FL- (venta mostrador)
+      - Typeahead parcial vía servicio_tecnico:api_buscar_ordenes_autocomplete
+      - Coincidencia exacta / creación vía almacen:api_buscar_crear_orden
    
-   - Usuario selecciona producto
-   - Se hace petición AJAX para obtener unidades disponibles
-   - Se actualiza el dropdown de unidades
+   FLUJO PRODUCTO:
+   - Usuario escribe en el campo de búsqueda (mín. 2 caracteres)
+   - Se muestran sugerencias con stock disponible
+   - Al seleccionar → carga unidades y valida cantidad vs stock
    
-   - Usuario escribe número de orden del cliente
-   - Se valida formato (debe empezar con OOW- o FL-)
-   - Se busca en el servidor si existe
-   - Si no existe → Se muestra opción de crear automáticamente
-   - Al enviar el formulario → Se crea la orden si es necesario
+   FLUJO ORDEN:
+   - Usuario elige tipo de solicitud (define prefijo OOW o FL)
+   - Escribe en el campo de orden → dropdown con órdenes activas filtradas
+   - Al seleccionar del dropdown → vincula id_orden_servicio automáticamente
+   - Si escribe número completo no listado → blur busca coincidencia exacta
+   - Si no existe → al enviar se crea orden con estado "Proveniente de Almacén"
    
-   ACTUALIZADO: Diciembre 2025 - Agregada funcionalidad de búsqueda/creación
-   de órdenes por orden_cliente
+   ACTUALIZADO: Junio 2026 - Autocompletado de producto y orden con filtro OOW/FL
    ============================================================================= */
 
 /**
@@ -142,17 +143,49 @@ interface OrdenClienteApiResponse {
     formato_invalido?: boolean;
 }
 
+/** Producto retornado por api_buscar_productos */
+interface ProductoBusqueda {
+    id: number;
+    codigo: string;
+    nombre: string;
+    stock: number;
+    costo: number;
+    tipo: string;
+}
+
+interface ProductoBusquedaResponse {
+    productos: ProductoBusqueda[];
+}
+
+/** Resultado de api_buscar_ordenes_autocomplete (typeahead de órdenes ST) */
+interface OrdenAutocompleteResultado {
+    id: number;
+    orden_cliente: string;
+    numero_serie: string;
+    numero_orden_interno: string;
+    marca: string;
+    modelo: string;
+    estado: string;
+}
+
+interface OrdenAutocompleteResponse {
+    resultados: OrdenAutocompleteResultado[];
+}
+
 /**
- * Clase principal que maneja el formulario de solicitud de baja
- * 
- * EXPLICACIÓN: Usamos una clase para organizar todo el código relacionado
- * con el formulario. Esto hace el código más limpio y fácil de mantener.
+ * Clase principal que maneja el formulario de Nueva solicitud.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Centraliza autocompletado de producto y orden, carga de unidades,
+ * visibilidad de campos según tipo_solicitud y creación automática de órdenes.
  */
 class SolicitudBajaFormHandler {
     // Elementos del DOM - Campos principales
     private tipoSolicitudSelect: HTMLSelectElement | null;
-    private productoSelect: HTMLSelectElement | null;
-    private cantidadInput: HTMLInputElement | null;  // NUEVO
+    private productoHidden: HTMLInputElement | null;
+    private productoTextInput: HTMLInputElement | null;
+    private productoAutocompleteWrapper: HTMLElement | null;
+    private cantidadInput: HTMLInputElement | null;
     private unidadSelect: HTMLSelectElement | null;
     private tecnicoSelect: HTMLSelectElement | null;
     private sucursalDestinoSelect: HTMLSelectElement | null;  // NUEVO
@@ -173,17 +206,33 @@ class SolicitudBajaFormHandler {
     private ordenServicioHidden: HTMLInputElement | null;
     private sucursalOrdenSelect: HTMLSelectElement | null;
     private ordenStatusDiv: HTMLElement | null;
+    private ordenInfo: HTMLElement | null;
+    private ordenInfoTexto: HTMLElement | null;
+    private ordenHelpText: HTMLElement | null;
+    private ordenAutocompleteWrapper: HTMLElement | null;
+    private ordenAutocompleteDropdown: HTMLElement | null;
     private sucursalContainer: HTMLElement | null;
     
     // URLs de los APIs (se establecen desde el template)
     private apiUnidadesUrl: string;
     private apiTecnicosUrl: string;
     private apiBuscarCrearOrdenUrl: string;
+    private apiBuscarProductosUrl: string;
+    private apiBuscarOrdenesUrl: string;
     
     // Estado interno
     private ordenEncontrada: boolean = false;
     private ordenId: number | null = null;
-    private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private productoDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private productoAbortController: AbortController | null = null;
+    private ordenDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private ordenAbortController: AbortController | null = null;
+    private ordenAutocompleteResultados: OrdenAutocompleteResultado[] = [];
+    private ordenIndiceActivo: number = -1;
+    private ordenTextoSeleccionado: string = '';
+    private prefijoOrdenRequerido: 'OOW' | 'FL' | null = null;
+    private stockActual: number = 0;
+    private productoTextoSeleccionado: string = '';
     
     // Estado de selección de unidades (NUEVO)
     private unidadesSeleccionadas: Set<number> = new Set();
@@ -197,7 +246,11 @@ class SolicitudBajaFormHandler {
         
         // Obtener referencias a los elementos del DOM - Campos principales
         this.tipoSolicitudSelect = document.getElementById('id_tipo_solicitud') as HTMLSelectElement;
-        this.productoSelect = document.getElementById('id_producto') as HTMLSelectElement;
+        this.productoHidden = document.getElementById('id_producto') as HTMLInputElement;
+        this.productoAutocompleteWrapper = document.getElementById('producto-autocomplete-wrapper');
+        this.productoTextInput = this.productoAutocompleteWrapper?.querySelector(
+            '.producto-autocomplete-input'
+        ) as HTMLInputElement | null;
         this.cantidadInput = document.getElementById('id_cantidad') as HTMLInputElement;
         this.unidadSelect = document.getElementById('id_unidad_inventario') as HTMLSelectElement;
         this.tecnicoSelect = document.getElementById('id_tecnico_asignado') as HTMLSelectElement;
@@ -219,7 +272,20 @@ class SolicitudBajaFormHandler {
         this.ordenServicioHidden = document.getElementById('id_orden_servicio') as HTMLInputElement;
         this.sucursalOrdenSelect = document.getElementById('id_sucursal_orden') as HTMLSelectElement;
         this.ordenStatusDiv = document.getElementById('orden-status');
+        this.ordenInfo = document.getElementById('ordenInfo');
+        this.ordenInfoTexto = document.getElementById('ordenInfoTexto');
+        this.ordenHelpText = document.getElementById('orden-help-text');
+        this.ordenAutocompleteWrapper = document.getElementById('orden-autocomplete-wrapper');
+        this.ordenAutocompleteDropdown = this.ordenAutocompleteWrapper?.querySelector(
+            '.orden-autocomplete-dropdown'
+        ) as HTMLElement | null;
         this.sucursalContainer = document.getElementById('sucursal-container');
+        
+        const form = document.getElementById('solicitud-baja-form') as HTMLFormElement | null;
+        this.apiBuscarProductosUrl = form?.dataset.apiBuscarProductos
+            || this.productoAutocompleteWrapper?.dataset.apiUrl
+            || '';
+        this.apiBuscarOrdenesUrl = this.ordenAutocompleteWrapper?.dataset.apiUrl || '';
         
         // ========== DESHABILITAR OPCIÓN TRANSFERENCIA PARA NO-AGENTES (NUEVO) ==========
         // Si el campo tiene el atributo data-es-agente="false", deshabilitar la opción transferencia
@@ -232,10 +298,12 @@ class SolicitudBajaFormHandler {
         
         // Inicializar eventos
         this.initEventListeners();
+        this.initProductoAutocomplete();
+        this.initOrdenAutocomplete();
         
         // Configuración inicial basada en valores actuales
         this.handleTipoSolicitudChange();
-        if (this.productoSelect?.value) {
+        if (this.productoHidden?.value) {
             this.handleProductoChange();
         }
     }
@@ -260,6 +328,486 @@ class SolicitudBajaFormHandler {
             }
         }
     }
+
+    /**
+     * Inicializa el autocompletado AJAX del campo Producto.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * Reemplaza el antiguo <select> gigante. El usuario escribe y el servidor
+     * devuelve coincidencias con stock. El ID real va en #id_producto (oculto).
+     */
+    private initProductoAutocomplete(): void {
+        const wrapper = this.productoAutocompleteWrapper;
+        const hiddenInput = this.productoHidden;
+        const textInput = this.productoTextInput;
+        if (!wrapper || !hiddenInput || !textInput) return;
+
+        const dropdown = wrapper.querySelector<HTMLElement>('.producto-autocomplete-dropdown');
+        if (!dropdown) return;
+
+        const minChars = 2;
+        const debounceMs = 300;
+        let resultados: ProductoBusqueda[] = [];
+        let indiceActivo = -1;
+        this.productoTextoSeleccionado = textInput.value;
+
+        const cerrarDropdown = (): void => {
+            dropdown.classList.remove('show');
+            indiceActivo = -1;
+        };
+
+        const marcarInvalido = (invalido: boolean): void => {
+            textInput.classList.toggle('is-invalid-selection', invalido);
+        };
+
+        const getStockMetaClass = (stock: number): string => {
+            if (stock === 0) return 'text-danger';
+            return 'text-muted';
+        };
+
+        const renderResultados = (items: ProductoBusqueda[]): void => {
+            dropdown.innerHTML = '';
+            resultados = items;
+            indiceActivo = -1;
+
+            if (items.length === 0) {
+                const vacio = document.createElement('div');
+                vacio.className = 'producto-autocomplete-empty';
+                vacio.textContent = 'Sin coincidencias';
+                dropdown.appendChild(vacio);
+                dropdown.classList.add('show');
+                return;
+            }
+
+            items.forEach((prod, idx) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'producto-autocomplete-item';
+                const stockClass = getStockMetaClass(prod.stock);
+                btn.innerHTML = `
+                    <div class="prod-codigo">${prod.codigo}</div>
+                    <div class="prod-nombre">${prod.nombre}</div>
+                    <div class="prod-meta ${stockClass}">Stock: ${prod.stock} · $${prod.costo.toFixed(2)}</div>
+                `;
+                btn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    seleccionar(prod);
+                });
+                btn.dataset.index = String(idx);
+                dropdown.appendChild(btn);
+            });
+            dropdown.classList.add('show');
+        };
+
+        const seleccionar = (prod: ProductoBusqueda): void => {
+            hiddenInput.value = String(prod.id);
+            textInput.value = `${prod.codigo} — ${prod.nombre}`;
+            this.productoTextoSeleccionado = textInput.value;
+            this.stockActual = prod.stock;
+            marcarInvalido(false);
+            cerrarDropdown();
+            this.actualizarStockInfoDisplay();
+            this.handleProductoChange();
+        };
+
+        const buscar = async (termino: string): Promise<void> => {
+            if (!this.apiBuscarProductosUrl || termino.length < minChars) {
+                cerrarDropdown();
+                return;
+            }
+
+            if (this.productoAbortController) this.productoAbortController.abort();
+            this.productoAbortController = new AbortController();
+
+            try {
+                const url = `${this.apiBuscarProductosUrl}?q=${encodeURIComponent(termino)}`;
+                const resp = await fetch(url, {
+                    signal: this.productoAbortController.signal,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data: ProductoBusquedaResponse = await resp.json();
+                renderResultados(data.productos || []);
+            } catch (err) {
+                if (err instanceof Error && err.name === 'AbortError') return;
+                cerrarDropdown();
+            }
+        };
+
+        textInput.addEventListener('input', () => {
+            const valor = textInput.value.trim();
+            if (valor !== this.productoTextoSeleccionado) {
+                hiddenInput.value = '';
+                this.stockActual = 0;
+                marcarInvalido(false);
+                if (this.stockInfo) this.stockInfo.innerHTML = '';
+            }
+            if (this.productoDebounceTimer) clearTimeout(this.productoDebounceTimer);
+            this.productoDebounceTimer = setTimeout(() => { void buscar(valor); }, debounceMs);
+        });
+
+        textInput.addEventListener('focus', () => {
+            const valor = textInput.value.trim();
+            if (valor.length >= minChars && valor !== this.productoTextoSeleccionado) {
+                void buscar(valor);
+            }
+        });
+
+        textInput.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (!dropdown.classList.contains('show')) return;
+            const items = dropdown.querySelectorAll<HTMLButtonElement>('.producto-autocomplete-item');
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                indiceActivo = Math.min(indiceActivo + 1, items.length - 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                indiceActivo = Math.max(indiceActivo - 1, 0);
+            } else if (e.key === 'Enter' && indiceActivo >= 0) {
+                e.preventDefault();
+                const prod = resultados[indiceActivo];
+                if (prod) seleccionar(prod);
+                return;
+            } else if (e.key === 'Escape') {
+                cerrarDropdown();
+                return;
+            } else {
+                return;
+            }
+
+            items.forEach((item, i) => item.classList.toggle('active', i === indiceActivo));
+            items[indiceActivo]?.scrollIntoView({ block: 'nearest' });
+        });
+
+        document.addEventListener('click', (e: Event) => {
+            if (!wrapper.contains(e.target as Node)) cerrarDropdown();
+        });
+    }
+
+    /**
+     * Muestra el stock disponible y valida cantidad vs stock en el cliente.
+     */
+    private actualizarStockInfoDisplay(): void {
+        if (!this.stockInfo) return;
+
+        if (!this.productoHidden?.value) {
+            this.stockInfo.innerHTML = '';
+            return;
+        }
+
+        const cantidad = parseInt(this.cantidadInput?.value || '0', 10);
+        let stockClass = 'text-success';
+        if (this.stockActual === 0) {
+            stockClass = 'text-danger';
+        } else if (cantidad > this.stockActual) {
+            stockClass = 'text-warning';
+        }
+
+        let mensaje = `<span class="${stockClass}"><i class="bi bi-box-seam me-1"></i>Stock disponible: ${this.stockActual} unidad(es)</span>`;
+        if (cantidad > 0 && cantidad > this.stockActual) {
+            mensaje += `<br><span class="text-danger small">La cantidad solicitada (${cantidad}) supera el stock disponible.</span>`;
+        }
+        this.stockInfo.innerHTML = mensaje;
+    }
+
+    /**
+     * Obtiene el prefijo de orden requerido según el tipo de solicitud actual.
+     *
+     * Regla de negocio:
+     * - servicio_tecnico  → OOW- (diagnóstico técnico)
+     * - venta_mostrador   → FL-  (venta mostrador)
+     */
+    private getPrefijoRequerido(): 'OOW' | 'FL' | null {
+        const tipo = this.tipoSolicitudSelect?.value;
+        if (tipo === 'servicio_tecnico') return 'OOW';
+        if (tipo === 'venta_mostrador') return 'FL';
+        return null;
+    }
+
+    /**
+     * Actualiza placeholder, texto de ayuda y data-prefijo del autocompletado de orden.
+     *
+     * Si el usuario cambia entre Servicio Técnico y Venta Mostrador, limpia el
+     * campo porque cada tipo usa un prefijo distinto (OOW vs FL).
+     */
+    private actualizarConfigOrden(limpiarSiCambiaPrefijo: boolean = true): void {
+        const nuevoPrefijo = this.getPrefijoRequerido();
+        const prefijoAnterior = this.prefijoOrdenRequerido;
+
+        if (limpiarSiCambiaPrefijo && prefijoAnterior !== null && nuevoPrefijo !== prefijoAnterior) {
+            this.limpiarCamposOrden();
+        }
+
+        this.prefijoOrdenRequerido = nuevoPrefijo;
+
+        if (this.ordenAutocompleteWrapper) {
+            this.ordenAutocompleteWrapper.dataset.prefijo = nuevoPrefijo || '';
+        }
+
+        if (this.ordenClienteInput) {
+            if (nuevoPrefijo === 'OOW') {
+                this.ordenClienteInput.placeholder = 'Buscar orden OOW- (diagnóstico)...';
+            } else if (nuevoPrefijo === 'FL') {
+                this.ordenClienteInput.placeholder = 'Buscar orden FL- (venta mostrador)...';
+            } else {
+                this.ordenClienteInput.placeholder = 'Buscar orden...';
+            }
+        }
+
+        if (this.ordenHelpText) {
+            if (nuevoPrefijo === 'OOW') {
+                this.ordenHelpText.innerHTML =
+                    'Busca órdenes <strong>OOW-</strong> (diagnóstico). Si no existe, se creará al enviar.';
+            } else if (nuevoPrefijo === 'FL') {
+                this.ordenHelpText.innerHTML =
+                    'Busca órdenes <strong>FL-</strong> (venta mostrador). Si no existe, se creará al enviar.';
+            } else {
+                this.ordenHelpText.textContent =
+                    'Seleccione el tipo de solicitud para ver las órdenes disponibles.';
+            }
+        }
+    }
+
+    /**
+     * Inicializa el autocompletado typeahead de órdenes de servicio.
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * - Búsqueda parcial en órdenes activas (api_buscar_ordenes_autocomplete)
+     * - Filtra por prefijo OOW o FL según tipo_solicitud
+     * - Al elegir del dropdown: guarda orden_id en #id_orden_servicio
+     * - Al salir del campo (blur): si no hubo selección, busca coincidencia exacta
+     */
+    private initOrdenAutocomplete(): void {
+        if (!this.ordenClienteInput || !this.ordenAutocompleteDropdown || !this.ordenAutocompleteWrapper) {
+            return;
+        }
+
+        const input = this.ordenClienteInput;
+        const dropdown = this.ordenAutocompleteDropdown;
+        const wrapper = this.ordenAutocompleteWrapper;
+        const ordenContainer = document.getElementById('orden-container');
+        const minChars = 2;
+        const debounceMs = 300;
+        this.ordenTextoSeleccionado = input.value.trim();
+
+        const cerrarDropdown = (): void => {
+            dropdown.classList.remove('show');
+            ordenContainer?.classList.remove('orden-autocomplete-activo');
+            this.ordenIndiceActivo = -1;
+        };
+
+        const abrirDropdown = (): void => {
+            ordenContainer?.classList.add('orden-autocomplete-activo');
+            dropdown.classList.add('show');
+        };
+
+        const escaparHtml = (texto: string): string => {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(texto));
+            return div.innerHTML;
+        };
+
+        const resaltarCoincidencia = (texto: string, query: string): string => {
+            const safe = escaparHtml(texto || '');
+            if (!query) return safe;
+            const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${q})`, 'gi');
+            return safe.replace(regex, '<mark>$1</mark>');
+        };
+
+        const filtrarPorPrefijo = (items: OrdenAutocompleteResultado[]): OrdenAutocompleteResultado[] => {
+            if (!this.prefijoOrdenRequerido) return items;
+            const prefijo = `${this.prefijoOrdenRequerido}-`;
+            return items.filter((r) => r.orden_cliente.toUpperCase().startsWith(prefijo));
+        };
+
+        const mostrarInfoSeleccion = (r: OrdenAutocompleteResultado): void => {
+            if (!this.ordenInfo || !this.ordenInfoTexto) return;
+            this.ordenInfo.classList.remove('d-none', 'alert-warning');
+            this.ordenInfo.classList.add('alert-info');
+            this.ordenInfoTexto.innerHTML = `
+                <strong>${escaparHtml(r.orden_cliente)}</strong><br>
+                Estado: ${escaparHtml(r.estado)}<br>
+                Marca: ${escaparHtml(r.marca)}${r.modelo ? ` · ${escaparHtml(r.modelo)}` : ''}<br>
+                Orden interna: ${escaparHtml(r.numero_orden_interno)} · Serie: ${escaparHtml(r.numero_serie)}
+            `;
+        };
+
+        const seleccionar = (r: OrdenAutocompleteResultado): void => {
+            input.value = r.orden_cliente;
+            this.ordenTextoSeleccionado = r.orden_cliente;
+            if (this.ordenServicioHidden) {
+                this.ordenServicioHidden.value = String(r.id);
+            }
+            this.ordenEncontrada = true;
+            this.ordenId = r.id;
+            cerrarDropdown();
+            if (this.ordenStatusDiv) {
+                this.ordenStatusDiv.innerHTML = '';
+            }
+            if (this.sucursalContainer) {
+                this.sucursalContainer.style.display = 'none';
+            }
+            mostrarInfoSeleccion(r);
+        };
+
+        const renderResultados = (query: string, items: OrdenAutocompleteResultado[]): void => {
+            dropdown.innerHTML = '';
+            this.ordenAutocompleteResultados = filtrarPorPrefijo(items);
+            this.ordenIndiceActivo = -1;
+
+            if (this.ordenAutocompleteResultados.length === 0) {
+                dropdown.innerHTML = `
+                    <div class="orden-autocomplete-empty">
+                        <i class="bi bi-search"></i>
+                        <span>Sin coincidencias para "<strong>${escaparHtml(query)}</strong>"</span>
+                    </div>
+                `;
+                abrirDropdown();
+                return;
+            }
+
+            const lista = document.createElement('ul');
+            lista.className = 'orden-autocomplete-lista';
+            lista.setAttribute('role', 'listbox');
+
+            this.ordenAutocompleteResultados.forEach((r, idx) => {
+                const li = document.createElement('li');
+                li.className = 'orden-autocomplete-item';
+                li.setAttribute('role', 'option');
+                li.dataset.index = String(idx);
+                li.innerHTML = `
+                    <div class="orden-autocomplete-item-principal">
+                        <span class="orden-autocomplete-orden">${resaltarCoincidencia(r.orden_cliente, query)}</span>
+                        <span class="orden-autocomplete-marca badge bg-secondary">${escaparHtml(r.marca)}</span>
+                    </div>
+                    <div class="orden-autocomplete-item-secundario">
+                        <span><i class="bi bi-upc-scan"></i> ${resaltarCoincidencia(r.numero_serie, query)}</span>
+                        <span><i class="bi bi-hash"></i> ${resaltarCoincidencia(r.numero_orden_interno, query)}</span>
+                        <span class="badge bg-light text-dark">${escaparHtml(r.estado)}</span>
+                    </div>
+                `;
+                li.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    seleccionar(r);
+                });
+                li.addEventListener('mouseenter', () => {
+                    this.ordenIndiceActivo = idx;
+                    lista.querySelectorAll('.orden-autocomplete-item').forEach((item, i) => {
+                        item.classList.toggle('active', i === idx);
+                    });
+                });
+                lista.appendChild(li);
+            });
+
+            dropdown.appendChild(lista);
+            abrirDropdown();
+        };
+
+        const buscar = async (query: string): Promise<void> => {
+            if (!this.apiBuscarOrdenesUrl || query.length < minChars || !this.prefijoOrdenRequerido) {
+                cerrarDropdown();
+                return;
+            }
+
+            if (this.ordenAbortController) this.ordenAbortController.abort();
+            this.ordenAbortController = new AbortController();
+
+            dropdown.innerHTML = `
+                <div class="orden-autocomplete-cargando">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Buscando...</span>
+                    </div>
+                    <span>Buscando...</span>
+                </div>
+            `;
+            abrirDropdown();
+
+            try {
+                const url = `${this.apiBuscarOrdenesUrl}?q=${encodeURIComponent(query)}&tipo=activas&prefijo=${encodeURIComponent(this.prefijoOrdenRequerido)}`;
+                const resp = await fetch(url, {
+                    signal: this.ordenAbortController.signal,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data: OrdenAutocompleteResponse = await resp.json();
+                renderResultados(query, data.resultados || []);
+            } catch (err) {
+                if (err instanceof Error && err.name === 'AbortError') return;
+                cerrarDropdown();
+            }
+        };
+
+        input.addEventListener('input', () => {
+            const query = input.value.trim();
+
+            if (query !== this.ordenTextoSeleccionado) {
+                if (this.ordenServicioHidden) this.ordenServicioHidden.value = '';
+                this.ordenEncontrada = false;
+                this.ordenId = null;
+                this.ocultarOrdenInfo();
+                if (this.ordenStatusDiv) this.ordenStatusDiv.innerHTML = '';
+            }
+
+            if (this.ordenDebounceTimer) clearTimeout(this.ordenDebounceTimer);
+
+            if (query.length < minChars) {
+                cerrarDropdown();
+                return;
+            }
+
+            this.ordenDebounceTimer = setTimeout(() => { void buscar(query); }, debounceMs);
+        });
+
+        input.addEventListener('focus', () => {
+            const query = input.value.trim();
+            if (query.length >= minChars && query !== this.ordenTextoSeleccionado && this.ordenAutocompleteResultados.length > 0) {
+                abrirDropdown();
+            }
+        });
+
+        input.addEventListener('keydown', (e: KeyboardEvent) => {
+            const visible = dropdown.classList.contains('show') && this.ordenAutocompleteResultados.length > 0;
+            if (!visible) return;
+
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cerrarDropdown();
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.ordenIndiceActivo = Math.min(this.ordenIndiceActivo + 1, this.ordenAutocompleteResultados.length - 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.ordenIndiceActivo = Math.max(this.ordenIndiceActivo - 1, 0);
+            } else if (e.key === 'Enter' && this.ordenIndiceActivo >= 0) {
+                e.preventDefault();
+                const r = this.ordenAutocompleteResultados[this.ordenIndiceActivo];
+                if (r) seleccionar(r);
+                return;
+            } else {
+                return;
+            }
+
+            dropdown.querySelectorAll<HTMLElement>('.orden-autocomplete-item').forEach((item, i) => {
+                item.classList.toggle('active', i === this.ordenIndiceActivo);
+                if (i === this.ordenIndiceActivo) item.scrollIntoView({ block: 'nearest' });
+            });
+        });
+
+        document.addEventListener('click', (e: Event) => {
+            if (!wrapper.contains(e.target as Node)) cerrarDropdown();
+        });
+    }
+
+    private ocultarOrdenInfo(): void {
+        if (this.ordenInfo) {
+            this.ordenInfo.classList.add('d-none');
+        }
+        if (this.ordenInfoTexto) {
+            this.ordenInfoTexto.innerHTML = '';
+        }
+    }
     
     /**
      * Inicializa los event listeners para los campos del formulario
@@ -272,13 +820,6 @@ class SolicitudBajaFormHandler {
             });
         }
         
-        // Evento: Cambio en producto
-        if (this.productoSelect) {
-            this.productoSelect.addEventListener('change', () => {
-                this.handleProductoChange();
-            });
-        }
-        
         // Evento: Cambio en cantidad (NUEVO)
         if (this.cantidadInput) {
             this.cantidadInput.addEventListener('input', () => {
@@ -286,15 +827,12 @@ class SolicitudBajaFormHandler {
             });
         }
         
-        // Evento: Input en orden_cliente (con debounce para no hacer muchas peticiones)
+        // Evento: Input en orden_cliente — blur para búsqueda exacta si no se eligió del dropdown
         if (this.ordenClienteInput) {
-            this.ordenClienteInput.addEventListener('input', () => {
-                this.handleOrdenClienteInput();
-            });
-            
-            // También buscar al perder el foco
             this.ordenClienteInput.addEventListener('blur', () => {
-                this.buscarOrdenCliente();
+                if (!this.ordenId && this.ordenClienteInput?.value.trim()) {
+                    this.buscarOrdenCliente();
+                }
             });
         }
         
@@ -325,6 +863,9 @@ class SolicitudBajaFormHandler {
         
         const tipoSolicitud = this.tipoSolicitudSelect.value;
         const ordenContainer = document.getElementById('orden-container');
+        
+        // Actualizar prefijo y textos del autocompletado de orden
+        this.actualizarConfigOrden(true);
         
         // ========== TÉCNICO Y ORDEN (servicio_tecnico, venta_mostrador) ==========
         if (this.tecnicoContainer && this.tecnicoSelect) {
@@ -382,44 +923,33 @@ class SolicitudBajaFormHandler {
             this.ordenStatusDiv.innerHTML = '';
             this.ordenStatusDiv.className = '';
         }
+        if (this.ordenAutocompleteDropdown) {
+            this.ordenAutocompleteDropdown.classList.remove('show');
+            this.ordenAutocompleteDropdown.innerHTML = '';
+        }
+        document.getElementById('orden-container')?.classList.remove('orden-autocomplete-activo');
+        this.ocultarOrdenInfo();
         if (this.sucursalContainer) {
             this.sucursalContainer.style.display = 'none';
         }
         this.ordenEncontrada = false;
         this.ordenId = null;
+        this.ordenTextoSeleccionado = '';
+        this.ordenAutocompleteResultados = [];
     }
     
     /**
-     * Maneja el input en el campo orden_cliente con debounce
-     * 
-     * EXPLICACIÓN: Debounce significa que esperamos un poco después de que
-     * el usuario deje de escribir antes de hacer la búsqueda. Esto evita
-     * hacer muchas peticiones al servidor mientras el usuario escribe.
+     * Valida el formato del número de orden según el tipo de solicitud.
+     *
+     * @returns true si el formato es válido para el tipo actual; false si hay error mostrado en UI
      */
-    private handleOrdenClienteInput(): void {
-        // Cancelar timer anterior si existe
-        if (this.debounceTimer) {
-            clearTimeout(this.debounceTimer);
-        }
-        
-        // Validar formato mientras escribe
-        this.validarFormatoOrden();
-        
-        // Esperar 500ms después de que el usuario deje de escribir
-        this.debounceTimer = setTimeout(() => {
-            this.buscarOrdenCliente();
-        }, 500);
-    }
-    
-    /**
-     * Valida el formato del número de orden mientras el usuario escribe
-     */
-    private validarFormatoOrden(): void {
+    private validarFormatoOrden(): boolean {
         if (!this.ordenClienteInput || !this.ordenStatusDiv) {
-            return;
+            return false;
         }
         
         const valor = this.ordenClienteInput.value.trim().toUpperCase();
+        const prefijo = this.prefijoOrdenRequerido;
         
         if (!valor) {
             this.ordenStatusDiv.innerHTML = '';
@@ -427,32 +957,39 @@ class SolicitudBajaFormHandler {
             if (this.sucursalContainer) {
                 this.sucursalContainer.style.display = 'none';
             }
-            return;
+            return false;
         }
         
-        // Verificar formato OOW- o FL-
-        if (!valor.startsWith('OOW-') && !valor.startsWith('FL-')) {
+        if (prefijo === 'OOW' && !valor.startsWith('OOW-')) {
             this.ordenStatusDiv.innerHTML = `
                 <span class="text-warning">
                     <i class="bi bi-exclamation-triangle me-1"></i>
-                    El número debe empezar con "OOW-" o "FL-"
+                    Para Servicio Técnico el número debe empezar con "OOW-"
                 </span>
             `;
             this.ordenStatusDiv.className = 'mt-2';
-            return;
+            return false;
         }
         
-        // Formato válido, mostrar indicador de búsqueda
-        this.ordenStatusDiv.innerHTML = `
-            <span class="text-muted">
-                <i class="bi bi-search me-1"></i>
-                Buscando orden...
-            </span>
-        `;
+        if (prefijo === 'FL' && !valor.startsWith('FL-')) {
+            this.ordenStatusDiv.innerHTML = `
+                <span class="text-warning">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Para Venta Mostrador el número debe empezar con "FL-"
+                </span>
+            `;
+            this.ordenStatusDiv.className = 'mt-2';
+            return false;
+        }
+        
+        return true;
     }
     
     /**
-     * Busca una orden de servicio por orden_cliente
+     * Busca una orden por coincidencia exacta de orden_cliente.
+     *
+     * Se ejecuta en blur cuando el usuario escribió un número completo pero no
+     * lo eligió del dropdown. Usa api_buscar_crear_orden con tipo_solicitud.
      */
     private buscarOrdenCliente(): void {
         if (!this.ordenClienteInput || !this.ordenStatusDiv) {
@@ -466,13 +1003,14 @@ class SolicitudBajaFormHandler {
             return;
         }
         
-        // Verificar formato antes de buscar
-        if (!valor.startsWith('OOW-') && !valor.startsWith('FL-')) {
+        if (!this.validarFormatoOrden()) {
             return;
         }
         
-        // Hacer petición al API
-        fetch(`${this.apiBuscarCrearOrdenUrl}?orden_cliente=${encodeURIComponent(valor)}`)
+        const tipoSolicitud = this.tipoSolicitudSelect?.value || '';
+        const url = `${this.apiBuscarCrearOrdenUrl}?orden_cliente=${encodeURIComponent(valor)}&tipo_solicitud=${encodeURIComponent(tipoSolicitud)}`;
+        
+        fetch(url)
             .then(response => response.json())
             .then((data: OrdenClienteApiResponse) => {
                 this.procesarRespuestaBusqueda(data);
@@ -520,27 +1058,27 @@ class SolicitudBajaFormHandler {
         }
         
         if (data.found) {
-            // ✅ Orden encontrada
-            this.ordenStatusDiv.innerHTML = `
-                <div class="alert alert-success py-2 mb-0">
-                    <i class="bi bi-check-circle me-1"></i>
-                    <strong>Orden encontrada:</strong> ${data.numero_orden_interno}
-                    <br>
-                    <small class="text-muted">
-                        Estado: ${data.estado_display} | Sucursal: ${data.sucursal}
-                    </small>
-                </div>
-            `;
             this.ordenEncontrada = true;
             this.ordenId = data.orden_id || null;
+            this.ordenTextoSeleccionado = data.orden_cliente || this.ordenClienteInput?.value || '';
             
-            // Guardar el ID en el campo oculto
             if (this.ordenServicioHidden && data.orden_id) {
                 this.ordenServicioHidden.value = data.orden_id.toString();
             }
             
-            // Ocultar selector de sucursal (no es necesario)
+            this.ordenStatusDiv.innerHTML = '';
             this.sucursalContainer.style.display = 'none';
+            
+            if (this.ordenInfo && this.ordenInfoTexto) {
+                this.ordenInfo.classList.remove('d-none', 'alert-warning');
+                this.ordenInfo.classList.add('alert-info');
+                this.ordenInfoTexto.innerHTML = `
+                    <strong>${data.orden_cliente || ''}</strong><br>
+                    Estado: ${data.estado_display || data.estado || ''}<br>
+                    Orden interna: ${data.numero_orden_interno || ''}<br>
+                    Sucursal: ${data.sucursal || 'Sin asignar'}
+                `;
+            }
         } else {
             // ⚠️ Orden no encontrada - mostrar opción de crear
             this.ordenStatusDiv.innerHTML = `
@@ -556,6 +1094,7 @@ class SolicitudBajaFormHandler {
             `;
             this.ordenEncontrada = false;
             this.ordenId = null;
+            this.ocultarOrdenInfo();
             
             // Limpiar campo oculto
             if (this.ordenServicioHidden) {
@@ -574,6 +1113,20 @@ class SolicitudBajaFormHandler {
      * ACTUALIZADO (Enero 2026): Valida selección de unidades obligatoria
      */
     private handleFormSubmit(e: Event, form: HTMLFormElement): void {
+        // ========== VALIDACIÓN: Producto seleccionado desde autocompletado ==========
+        const productoTexto = this.productoTextInput?.value.trim() || '';
+        if (!this.productoHidden?.value) {
+            e.preventDefault();
+            this.productoTextInput?.classList.add('is-invalid-selection');
+            if (productoTexto) {
+                alert('Selecciona un producto de la lista de resultados.');
+            } else {
+                alert('Debes buscar y seleccionar un producto.');
+            }
+            this.productoTextInput?.focus();
+            return;
+        }
+
         // ========== VALIDACIÓN: Unidades seleccionadas (NUEVO) ==========
         const cantidad = this.cantidadSolicitada;
         const seleccionadas = this.unidadesSeleccionadas.size;
@@ -607,9 +1160,14 @@ class SolicitudBajaFormHandler {
         // A partir de aquí, hay una orden que crear - PREVENIR ENVÍO
         e.preventDefault();
         
-        // Validar formato
-        if (!ordenCliente.startsWith('OOW-') && !ordenCliente.startsWith('FL-')) {
-            alert('El número de orden debe empezar con "OOW-" o "FL-"');
+        // Validar formato según tipo de solicitud
+        const prefijoEsperado = tipoSolicitud === 'venta_mostrador' ? 'FL-' : 'OOW-';
+        const mensajePrefijo = tipoSolicitud === 'venta_mostrador'
+            ? 'Para Venta Mostrador el número de orden debe empezar con "FL-"'
+            : 'Para Servicio Técnico el número de orden debe empezar con "OOW-"';
+        
+        if (!ordenCliente.startsWith(prefijoEsperado)) {
+            alert(mensajePrefijo);
             return;
         }
         
@@ -726,12 +1284,17 @@ class SolicitudBajaFormHandler {
      * NUEVO (Enero 2026): Actualiza el display y revalida selección
      */
     private handleCantidadChange(): void {
-        const cantidad = parseInt(this.cantidadInput?.value || '0');
+        const cantidad = parseInt(this.cantidadInput?.value || '0', 10);
         this.cantidadSolicitada = cantidad;
         
         // Actualizar display
         if (this.cantidadSolicitadaDisplay) {
             this.cantidadSolicitadaDisplay.textContent = cantidad.toString();
+        }
+        
+        // Validar cantidad vs stock si hay producto seleccionado
+        if (this.productoHidden?.value) {
+            this.actualizarStockInfoDisplay();
         }
         
         // Si hay unidades agrupadas cargadas, actualizar validación
@@ -972,11 +1535,11 @@ class SolicitudBajaFormHandler {
      * Carga las unidades disponibles vía AJAX
      */
     private handleProductoChange(): void {
-        if (!this.productoSelect || !this.unidadSelect || !this.unidadContainer) {
+        if (!this.productoHidden || !this.unidadSelect || !this.unidadContainer) {
             return;
         }
         
-        const productoId = this.productoSelect.value;
+        const productoId = this.productoHidden.value;
         
         // Limpiar selección anterior
         this.unidadesSeleccionadas.clear();
@@ -992,6 +1555,7 @@ class SolicitudBajaFormHandler {
             if (this.unidadesAgrupadasContainer) {
                 this.unidadesAgrupadasContainer.style.display = 'none';
             }
+            this.stockActual = 0;
             if (this.stockInfo) {
                 this.stockInfo.textContent = '';
             }
@@ -1020,9 +1584,13 @@ class SolicitudBajaFormHandler {
             return;
         }
         
-        // Mostrar info de stock
+        // Mostrar info de stock (el API puede refinar el mensaje con unidades individuales)
         if (this.stockInfo && data.stock_info) {
             this.stockInfo.innerHTML = `<span class="text-success"><i class="bi bi-box-seam me-1"></i>${data.stock_info}</span>`;
+        }
+        if (typeof data.stock_actual === 'number') {
+            this.stockActual = data.stock_actual;
+            this.actualizarStockInfoDisplay();
         }
         
         // Actualizar cantidad solicitada en el display
@@ -1057,16 +1625,16 @@ class SolicitudBajaFormHandler {
 let solicitudBajaHandler: SolicitudBajaFormHandler | null = null;
 
 /**
- * Función de inicialización que se llama desde el template
- * 
- * EXPLICACIÓN:
- * Esta función se exporta para que el template pueda llamarla con las URLs
- * de los APIs como parámetros. Esto permite que Django genere las URLs
- * correctamente usando {% url 'nombre_url' %}.
- * 
- * @param apiUnidadesUrl - URL del API para obtener unidades de un producto
- * @param apiTecnicosUrl - URL del API para obtener técnicos disponibles
- * @param apiBuscarCrearOrdenUrl - URL del API para buscar/crear órdenes por orden_cliente
+ * Función de inicialización que se llama desde el template.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Django genera las URLs de los APIs y las pasa aquí para que JavaScript
+ * no tenga rutas hardcodeadas. El handler configura autocompletado de producto
+ * y orden, además del flujo de creación automática de órdenes OOW-/FL-.
+ *
+ * @param apiUnidadesUrl - Unidades disponibles de un producto seleccionado
+ * @param apiTecnicosUrl - Técnicos de laboratorio para asignar
+ * @param apiBuscarCrearOrdenUrl - Búsqueda exacta y creación de orden si no existe
  */
 function initSolicitudBajaForm(
     apiUnidadesUrl: string, 

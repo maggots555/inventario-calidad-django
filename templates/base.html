@@ -134,7 +134,7 @@
                             <i class="bi bi-box-seam"></i> Inventario • 
                             <i class="bi bi-shield-check"></i> Scorecard • 
                             <i class="bi bi-tools"></i> Servicio Técnico • 
-                            <i class="bi bi-box-seam-fill"></i> Almacén
+                            <i class="bi bi-box-seam-fill"></i> Almacén/Compras
                         </span>
                     </div>
                 </a>
@@ -299,10 +299,10 @@
                     </div>
                 </div>
 
-                <!-- MÓDULO: ALMACÉN CENTRAL -->
+                <!-- MÓDULO: ALMACÉN / COMPRAS -->
                 <div class="navbar-menu-item dropdown">
-                    <a href="#" class="navbar-menu-link" data-dropdown="almacen" title="Almacén">
-                        <i class="bi bi-box-seam-fill"></i> <span class="menu-text">Almacén</span><span class="menu-text-full">Almacén Central</span>
+                    <a href="#" class="navbar-menu-link" data-dropdown="almacen" title="Almacén/Compras">
+                        <i class="bi bi-box-seam-fill"></i> <span class="menu-text">Almacén/Compras</span><span class="menu-text-full">Almacén/Compras</span>
                         <i class="bi bi-chevron-down ms-1 menu-chevron"></i>
                     </a>
                     <div class="navbar-dropdown dropdown-mega dropdown-mega-3col" id="dropdown-almacen">
@@ -327,7 +327,7 @@
                                 </a>
                             </div>
                         </div>
-                        <!-- Columna 2: Movimientos + Solicitudes de Baja -->
+                        <!-- Columna 2: Movimientos + Solicitudes -->
                         <div class="dropdown-column">
                             <div class="dropdown-section">
                                 <h6 class="dropdown-header"><i class="bi bi-arrow-left-right"></i> Movimientos</h6>
@@ -336,21 +336,21 @@
                                 </a>
                             </div>
                             <div class="dropdown-section">
-                                <h6 class="dropdown-header"><i class="bi bi-cart-dash"></i> Solicitudes de Baja</h6>
+                                <h6 class="dropdown-header"><i class="bi bi-cart-dash"></i> Solicitudes</h6>
+                                <a href="{% url 'almacen:crear_solicitud' %}" class="dropdown-item">
+                                    <i class="bi bi-plus-circle text-success"></i> Nueva solicitud
+                                </a>
                                 <a href="{% url 'almacen:lista_solicitudes' %}" class="dropdown-item">
                                     <i class="bi bi-list-ul text-primary"></i> Lista de Solicitudes
-                                </a>
-                                <a href="{% url 'almacen:crear_solicitud' %}" class="dropdown-item">
-                                    <i class="bi bi-plus-circle text-success"></i> Nueva Solicitud de Baja
                                 </a>
                             </div>
                             <div class="dropdown-section">
                                 <h6 class="dropdown-header"><i class="bi bi-cart4"></i> Compras Directas</h6>
-                                <a href="{% url 'almacen:lista_compras' %}" class="dropdown-item">
-                                    <i class="bi bi-list-check text-primary"></i> Lista de Compras
-                                </a>
                                 <a href="{% url 'almacen:crear_compra' %}" class="dropdown-item">
                                     <i class="bi bi-cart-plus text-success"></i> Nueva Compra Directa
+                                </a>
+                                <a href="{% url 'almacen:lista_compras' %}" class="dropdown-item">
+                                    <i class="bi bi-list-check text-primary"></i> Lista de Compras
                                 </a>
                             </div>
                         </div>
@@ -358,14 +358,14 @@
                         <div class="dropdown-column">
                             <div class="dropdown-section">
                                 <h6 class="dropdown-header"><i class="bi bi-file-earmark-text"></i> Cotizaciones Multi-Proveedor</h6>
-                                <a href="{% url 'almacen:panel_cotizaciones' %}" class="dropdown-item">
-                                    <i class="bi bi-clipboard-data text-info"></i> Panel de Cotizaciones
+                                <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="dropdown-item">
+                                    <i class="bi bi-plus-circle text-success"></i> Nueva Solicitud de Cotización
                                 </a>
                                 <a href="{% url 'almacen:lista_solicitudes_cotizacion' %}" class="dropdown-item">
                                     <i class="bi bi-list-ul text-primary"></i> Lista de Solicitudes
                                 </a>
-                                <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="dropdown-item">
-                                    <i class="bi bi-plus-circle text-success"></i> Nueva Solicitud de Cotización
+                                <a href="{% url 'almacen:panel_cotizaciones' %}" class="dropdown-item">
+                                    <i class="bi bi-clipboard-data text-info"></i> Panel de Cotizaciones
                                 </a>
                             </div>
                             <div class="dropdown-section">
@@ -726,15 +726,15 @@
                 </div>
             </li>
 
-            <!-- Almacén -->
+            <!-- Almacén / Compras -->
             <li class="sidebar-section">
-                <div class="sidebar-section-title">Almacén</div>
+                <div class="sidebar-section-title">Almacén/Compras</div>
                 <div class="sidebar-item has-submenu" id="almacen-menu">
                     <a href="#" class="sidebar-link">
                         <i class="sidebar-icon bi bi-box-seam-fill"></i>
-                        <span class="sidebar-text">Almacén Central</span>
+                        <span class="sidebar-text">Almacén/Compras</span>
                         <i class="sidebar-arrow bi bi-chevron-right"></i>
-                        <span class="sidebar-tooltip">Módulo de Almacén</span>
+                        <span class="sidebar-tooltip">Módulo Almacén/Compras</span>
                     </a>
                     <ul class="sidebar-submenu">
                         <li class="sidebar-submenu-item">
@@ -762,9 +762,21 @@
                             </a>
                         </li>
                         <li class="sidebar-submenu-item">
+                            <a href="{% url 'almacen:crear_solicitud' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-plus-circle"></i>
+                                <span class="sidebar-text">Nueva solicitud</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
                             <a href="{% url 'almacen:lista_solicitudes' %}" class="sidebar-link">
                                 <i class="sidebar-icon bi bi-hourglass-split"></i>
-                                <span class="sidebar-text">Solicitudes Baja</span>
+                                <span class="sidebar-text">Solicitudes</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'almacen:crear_compra' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-cart-plus"></i>
+                                <span class="sidebar-text">Nueva Compra</span>
                             </a>
                         </li>
                         <li class="sidebar-submenu-item">
@@ -774,9 +786,21 @@
                             </a>
                         </li>
                         <li class="sidebar-submenu-item">
+                            <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-plus-circle"></i>
+                                <span class="sidebar-text">Nueva Cotización</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
                             <a href="{% url 'almacen:lista_solicitudes_cotizacion' %}" class="sidebar-link">
                                 <i class="sidebar-icon bi bi-file-earmark-text"></i>
                                 <span class="sidebar-text">Cotizaciones Multi</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-submenu-item">
+                            <a href="{% url 'almacen:panel_cotizaciones' %}" class="sidebar-link">
+                                <i class="sidebar-icon bi bi-clipboard-data"></i>
+                                <span class="sidebar-text">Panel Cotizaciones</span>
                             </a>
                         </li>
                     </ul>
@@ -893,7 +917,7 @@
                                 <i class="bi bi-box-seam"></i> Inventario • 
                                 <i class="bi bi-shield-check"></i> Scorecard • 
                                 <i class="bi bi-tools"></i> Servicio Técnico • 
-                                <i class="bi bi-box-seam-fill"></i> Almacén
+                                <i class="bi bi-box-seam-fill"></i> Almacén/Compras
                             </p>
                         </div>
                     </div>
@@ -926,7 +950,7 @@
                             </li>
                             <li>
                                 <a href="{% url 'almacen:dashboard' %}">
-                                    <i class="bi bi-box-seam-fill"></i> Almacén Central
+                                    <i class="bi bi-box-seam-fill"></i> Almacén/Compras
                                 </a>
                             </li>
                             <li>
