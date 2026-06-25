@@ -2191,7 +2191,7 @@ def panel_cotizaciones(request):
         }
     }
     
-    return render(request, 'almacen/compras/panel_cotizaciones.html', context)
+    return render(request, 'almacen/cotizaciones/panel_cotizaciones.html', context)
 
 
 @login_required
@@ -3029,6 +3029,9 @@ def lista_solicitudes_cotizacion(request):
         'filtro_form': filtro_form,
         'contadores': contadores_dict,
         'titulo': 'Solicitudes de Cotización',
+        # Para resaltar el KPI activo y mostrar el total en el encabezado
+        'estado_filtro': request.GET.get('estado', ''),
+        'total_general': sum(contadores_dict.values()),
     }
     
     return render(request, 'almacen/cotizaciones/lista_solicitudes.html', context)

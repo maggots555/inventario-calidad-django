@@ -8,91 +8,125 @@ Muestra todas las solicitudes con filtros y contadores por estado
 
 {% block title %}Solicitudes de Cotización - Almacén{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/lista_solicitudes_cotizacion.css' %}">
+{% endblock extra_css %}
+
 {% block almacen_content %}
-<div class="container-fluid py-4">
-    <!-- Encabezado -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
+<div class="container-fluid py-4 lista-cotizaciones-page">
+
+    {# --- Encabezado con chip de total --- #}
+    <div class="lista-cot-header">
+        <div class="lista-cot-header-title">
             <h1 class="h2 mb-0">
                 <i class="bi bi-file-earmark-text me-2"></i>Solicitudes de Cotización
             </h1>
-            <p class="text-muted mb-0">Cotizaciones con múltiples productos y proveedores</p>
+            <p class="lista-cot-header-subtitle mb-0">
+                Cotizaciones con múltiples productos y proveedores — flujo Borrador → Cliente → Compra
+            </p>
+            <span class="lista-cot-total-chip mt-2">
+                <i class="bi bi-collection"></i>
+                {{ total_general }} solicitud{{ total_general|pluralize:" ,es" }} en total
+            </span>
         </div>
-        <div>
-            <a href="{% url 'almacen:lista_compras' %}" class="btn btn-outline-secondary me-2">
-                <i class="bi bi-cart3 me-1"></i>Compras Directas
+        <div class="lista-cot-header-actions">
+            <a href="{% url 'almacen:panel_cotizaciones' %}" class="btn btn-outline-warning btn-sm">
+                <i class="bi bi-clipboard-check me-1"></i>Panel Cotizaciones
             </a>
-            <a href="{% url 'almacen:dashboard' %}" class="btn btn-outline-secondary me-2">
+            <a href="{% url 'almacen:lista_compras' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-cart3 me-1"></i>Compras
+            </a>
+            <a href="{% url 'almacen:dashboard' %}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left me-1"></i>Dashboard
             </a>
-            <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="btn btn-primary">
+            <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="btn btn-primary btn-sm">
                 <i class="bi bi-plus-lg me-1"></i>Nueva Solicitud
             </a>
         </div>
     </div>
 
-    <!-- Contadores por estado -->
-    <div class="row mb-4">
-        <div class="col-md-2">
-            <div class="card bg-secondary text-white">
-                <div class="card-body text-center py-2">
-                    <h3 class="mb-0">{{ contadores.borrador|default:0 }}</h3>
-                    <small>Borrador</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-2">
-            <div class="card bg-info text-white">
-                <div class="card-body text-center py-2">
-                    <h3 class="mb-0">{{ contadores.enviada_front|default:0 }}</h3>
-                    <small>En Front</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-2">
-            <div class="card bg-primary text-white">
-                <div class="card-body text-center py-2">
-                    <h3 class="mb-0">{{ contadores.enviada_cliente|default:0 }}</h3>
-                    <small>Con Cliente</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-2">
-            <div class="card bg-warning text-dark">
-                <div class="card-body text-center py-2">
-                    <h3 class="mb-0">{{ contadores.parcialmente_aprobada|default:0 }}</h3>
-                    <small>Parciales</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-2">
-            <div class="card bg-success text-white">
-                <div class="card-body text-center py-2">
-                    <h3 class="mb-0">{{ contadores.totalmente_aprobada|default:0 }}</h3>
-                    <small>Aprobadas</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-2">
-            <div class="card bg-primary text-white">
-                <div class="card-body text-center py-2">
-                    <h3 class="mb-0">{{ contadores.completada|default:0 }}</h3>
-                    <small>Completadas</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-2">
-            <div class="card bg-danger text-white">
-                <div class="card-body text-center py-2">
-                    <h3 class="mb-0">{{ contadores.totalmente_rechazada|default:0 }}</h3>
-                    <small>Rechazadas</small>
-                </div>
-            </div>
-        </div>
+    {# --- KPIs clicables por estado (10 cards: Todas + 9 estados) --- #}
+    <div class="lista-cot-kpi-grid" role="navigation" aria-label="Filtrar por estado">
+
+        <a href="?" class="lista-cot-kpi lista-cot-kpi--todas{% if not estado_filtro %} is-active{% endif %}"
+           title="Ver todas las solicitudes">
+            <div class="lista-cot-kpi-icon"><i class="bi bi-grid-3x3-gap"></i></div>
+            <span class="lista-cot-kpi-value">{{ total_general }}</span>
+            <span class="lista-cot-kpi-label">Todas</span>
+        </a>
+
+        <a href="?estado=borrador" class="lista-cot-kpi lista-cot-kpi--borrador{% if estado_filtro == 'borrador' %} is-active{% endif %}"
+           title="Filtrar borradores">
+            <div class="lista-cot-kpi-icon"><i class="bi bi-pencil-square"></i></div>
+            <span class="lista-cot-kpi-value">{{ contadores.borrador|default:0 }}</span>
+            <span class="lista-cot-kpi-label">Borrador</span>
+        </a>
+
+        <a href="?estado=enviada_front" class="lista-cot-kpi lista-cot-kpi--enviada_front{% if estado_filtro == 'enviada_front' %} is-active{% endif %}"
+           title="Filtrar enviadas a Front">
+            <div class="lista-cot-kpi-icon"><i class="bi bi-send"></i></div>
+            <span class="lista-cot-kpi-value">{{ contadores.enviada_front|default:0 }}</span>
+            <span class="lista-cot-kpi-label">En Front</span>
+        </a>
+
+        <a href="?estado=enviada_cliente" class="lista-cot-kpi lista-cot-kpi--enviada_cliente{% if estado_filtro == 'enviada_cliente' %} is-active{% endif %}"
+           title="Filtrar enviadas al cliente">
+            <div class="lista-cot-kpi-icon"><i class="bi bi-person-check"></i></div>
+            <span class="lista-cot-kpi-value">{{ contadores.enviada_cliente|default:0 }}</span>
+            <span class="lista-cot-kpi-label">Con Cliente</span>
+        </a>
+
+        <a href="?estado=parcialmente_aprobada" class="lista-cot-kpi lista-cot-kpi--parcialmente_aprobada{% if estado_filtro == 'parcialmente_aprobada' %} is-active{% endif %}"
+           title="Filtrar parcialmente aprobadas">
+            <div class="lista-cot-kpi-icon"><i class="bi bi-check2-all"></i></div>
+            <span class="lista-cot-kpi-value">{{ contadores.parcialmente_aprobada|default:0 }}</span>
+            <span class="lista-cot-kpi-label">Parciales</span>
+        </a>
+
+        <a href="?estado=totalmente_aprobada" class="lista-cot-kpi lista-cot-kpi--totalmente_aprobada{% if estado_filtro == 'totalmente_aprobada' %} is-active{% endif %}"
+           title="Filtrar totalmente aprobadas">
+            <div class="lista-cot-kpi-icon"><i class="bi bi-check-circle"></i></div>
+            <span class="lista-cot-kpi-value">{{ contadores.totalmente_aprobada|default:0 }}</span>
+            <span class="lista-cot-kpi-label">Aprobadas</span>
+        </a>
+
+        <a href="?estado=totalmente_rechazada" class="lista-cot-kpi lista-cot-kpi--totalmente_rechazada{% if estado_filtro == 'totalmente_rechazada' %} is-active{% endif %}"
+           title="Filtrar totalmente rechazadas">
+            <div class="lista-cot-kpi-icon"><i class="bi bi-x-circle"></i></div>
+            <span class="lista-cot-kpi-value">{{ contadores.totalmente_rechazada|default:0 }}</span>
+            <span class="lista-cot-kpi-label">Rechazadas</span>
+        </a>
+
+        <a href="?estado=en_proceso" class="lista-cot-kpi lista-cot-kpi--en_proceso{% if estado_filtro == 'en_proceso' %} is-active{% endif %}"
+           title="Filtrar en proceso de compra">
+            <div class="lista-cot-kpi-icon"><i class="bi bi-cart-check"></i></div>
+            <span class="lista-cot-kpi-value">{{ contadores.en_proceso|default:0 }}</span>
+            <span class="lista-cot-kpi-label">En Proceso</span>
+        </a>
+
+        <a href="?estado=completada" class="lista-cot-kpi lista-cot-kpi--completada{% if estado_filtro == 'completada' %} is-active{% endif %}"
+           title="Filtrar completadas">
+            <div class="lista-cot-kpi-icon"><i class="bi bi-flag-fill"></i></div>
+            <span class="lista-cot-kpi-value">{{ contadores.completada|default:0 }}</span>
+            <span class="lista-cot-kpi-label">Completadas</span>
+        </a>
+
+        <a href="?estado=cancelada" class="lista-cot-kpi lista-cot-kpi--cancelada{% if estado_filtro == 'cancelada' %} is-active{% endif %}"
+           title="Filtrar canceladas">
+            <div class="lista-cot-kpi-icon"><i class="bi bi-slash-circle"></i></div>
+            <span class="lista-cot-kpi-value">{{ contadores.cancelada|default:0 }}</span>
+            <span class="lista-cot-kpi-label">Canceladas</span>
+        </a>
     </div>
 
-    <!-- Filtros -->
-    <div class="card shadow-sm mb-4">
+    {# --- Panel de filtros avanzados --- #}
+    <div class="lista-cot-filtros">
+        <div class="lista-cot-filtros-header">
+            <h6><i class="bi bi-funnel me-2"></i>Filtros de búsqueda</h6>
+            <a href="?" class="lista-cot-filtros-limpiar">
+                <i class="bi bi-x-lg me-1"></i>Limpiar filtros
+            </a>
+        </div>
         <div class="card-body">
             <form method="get" class="row g-3">
                 <div class="col-md-3">
@@ -120,13 +154,22 @@ Muestra todas las solicitudes con filtros y contadores por estado
         </div>
     </div>
 
-    <!-- Tabla de Solicitudes -->
-    <div class="card shadow-sm">
+    {# --- Tabla de solicitudes --- #}
+    <div class="lista-cot-tabla">
+        <div class="lista-cot-tabla-header">
+            <h6><i class="bi bi-table me-2"></i>Resultados</h6>
+            {% if solicitudes %}
+            <small class="text-muted">
+                Mostrando {{ solicitudes.start_index }}–{{ solicitudes.end_index }} de {{ solicitudes.paginator.count }}
+            </small>
+            {% endif %}
+        </div>
+
         <div class="card-body p-0">
             {% if solicitudes %}
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
-                    <thead class="table-light">
+                    <thead>
                         <tr>
                             <th>N° Solicitud</th>
                             <th>Orden Cliente</th>
@@ -142,8 +185,8 @@ Muestra todas las solicitudes con filtros y contadores por estado
                         {% for solicitud in solicitudes %}
                         <tr>
                             <td>
-                                <a href="{% url 'almacen:detalle_solicitud_cotizacion' solicitud.pk %}" 
-                                   class="fw-bold text-decoration-none">
+                                <a href="{% url 'almacen:detalle_solicitud_cotizacion' solicitud.pk %}"
+                                   class="lista-cot-numero">
                                     {{ solicitud.numero_solicitud }}
                                 </a>
                             </td>
@@ -153,7 +196,7 @@ Muestra todas las solicitudes con filtros y contadores por estado
                                     <i class="bi bi-exclamation-triangle me-1"></i>{{ solicitud.folio_referencia|default:"Sin orden" }}
                                 </span>
                                 {% elif solicitud.numero_orden_cliente %}
-                                <span class="badge bg-light text-dark">
+                                <span class="badge bg-light text-dark border">
                                     {{ solicitud.numero_orden_cliente }}
                                 </span>
                                 {% else %}
@@ -161,21 +204,23 @@ Muestra todas las solicitudes con filtros y contadores por estado
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-secondary">
-                                    {{ solicitud.total_lineas }}
-                                </span>
-                                {% if solicitud.lineas_aprobadas > 0 %}
-                                <span class="badge bg-success" title="Aprobadas">
-                                    {{ solicitud.lineas_aprobadas }} ✓
-                                </span>
-                                {% endif %}
-                                {% if solicitud.lineas_rechazadas > 0 %}
-                                <span class="badge bg-danger" title="Rechazadas">
-                                    {{ solicitud.lineas_rechazadas }} ✗
-                                </span>
-                                {% endif %}
+                                <div class="lista-cot-lineas-badges">
+                                    <span class="badge bg-secondary">
+                                        {{ solicitud.total_lineas }}
+                                    </span>
+                                    {% if solicitud.lineas_aprobadas > 0 %}
+                                    <span class="badge bg-success" title="Aprobadas">
+                                        {{ solicitud.lineas_aprobadas }} ✓
+                                    </span>
+                                    {% endif %}
+                                    {% if solicitud.lineas_rechazadas > 0 %}
+                                    <span class="badge bg-danger" title="Rechazadas">
+                                        {{ solicitud.lineas_rechazadas }} ✗
+                                    </span>
+                                    {% endif %}
+                                </div>
                             </td>
-                            <td class="text-end fw-bold">
+                            <td class="text-end lista-cot-total-monto">
                                 ${{ solicitud.costo_total|floatformat:2 }}
                             </td>
                             <td>
@@ -191,27 +236,29 @@ Muestra todas las solicitudes con filtros y contadores por estado
                                 {% endif %}
                             </td>
                             <td>
-                                <small>{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                                <small class="text-muted">{{ solicitud.fecha_creacion|date:"d/m/Y H:i" }}</small>
                             </td>
                             <td class="text-end">
-                                <a href="{% url 'almacen:detalle_solicitud_cotizacion' solicitud.pk %}" 
-                                   class="btn btn-sm btn-outline-primary" title="Ver detalle">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                {% if solicitud.estado == 'borrador' %}
-                                <a href="{% url 'almacen:editar_solicitud_cotizacion' solicitud.pk %}" 
-                                   class="btn btn-sm btn-outline-secondary" title="Editar">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                {% endif %}
+                                <div class="lista-cot-acciones">
+                                    <a href="{% url 'almacen:detalle_solicitud_cotizacion' solicitud.pk %}"
+                                       class="btn btn-sm btn-outline-primary" title="Ver detalle">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if solicitud.estado == 'borrador' %}
+                                    <a href="{% url 'almacen:editar_solicitud_cotizacion' solicitud.pk %}"
+                                       class="btn btn-sm btn-outline-secondary" title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-            
-            <!-- Paginación -->
+
+            {# Paginación — conserva filtros activos en la URL #}
             {% if solicitudes.has_other_pages %}
             <div class="card-footer">
                 <nav aria-label="Paginación">
@@ -223,13 +270,13 @@ Muestra todas las solicitudes con filtros y contadores por estado
                             </a>
                         </li>
                         {% endif %}
-                        
+
                         <li class="page-item disabled">
                             <span class="page-link">
                                 Página {{ solicitudes.number }} de {{ solicitudes.paginator.num_pages }}
                             </span>
                         </li>
-                        
+
                         {% if solicitudes.has_next %}
                         <li class="page-item">
                             <a class="page-link" href="?page={{ solicitudes.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
@@ -241,12 +288,20 @@ Muestra todas las solicitudes con filtros y contadores por estado
                 </nav>
             </div>
             {% endif %}
-            
+
             {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-inbox display-1 text-muted"></i>
-                <h4 class="text-muted mt-3">No hay solicitudes de cotización</h4>
-                <p class="text-muted">Crea una nueva solicitud para comenzar</p>
+            <div class="lista-cot-empty">
+                <div class="lista-cot-empty-icon-ring">
+                    <i class="bi bi-inbox"></i>
+                </div>
+                <h4>No hay solicitudes de cotización</h4>
+                <p>
+                    {% if estado_filtro %}
+                    No se encontraron solicitudes con el filtro aplicado. Prueba otro estado o limpia los filtros.
+                    {% else %}
+                    Crea una nueva solicitud para comenzar a cotizar piezas con múltiples proveedores.
+                    {% endif %}
+                </p>
                 <a href="{% url 'almacen:crear_solicitud_cotizacion' %}" class="btn btn-primary">
                     <i class="bi bi-plus-lg me-1"></i>Nueva Solicitud
                 </a>

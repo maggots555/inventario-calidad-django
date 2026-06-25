@@ -1,0 +1,686 @@
+/*
+ * lista_solicitudes_cotizacion.css
+ * ===================================
+ * Estilos de la vista lista de Solicitudes de Cotización (almacén).
+ * KPIs clicables por estado, panel de filtros, tabla y estado vacío.
+ * Usa variables CSS del proyecto + overrides [data-bs-theme="dark"].
+ */
+
+/* ============================================================
+   ESTILOS BASE (modo claro — default)
+   ============================================================ */
+
+.lista-cotizaciones-page {
+    padding-bottom: 2rem;
+}
+
+/* --- Encabezado --- */
+.lista-cot-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.lista-cot-header-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.lista-cot-header-title h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 0.25rem;
+}
+
+.lista-cot-header-title h1 i {
+    color: var(--primary-color);
+}
+
+.lista-cot-header-subtitle {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    margin-bottom: 0.5rem;
+}
+
+.lista-cot-total-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    border: 1px solid rgba(52, 152, 219, 0.25);
+}
+
+.lista-cot-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* --- Grid de KPIs --- */
+.lista-cot-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.lista-cot-kpi {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding: 0.875rem 1rem;
+    background-color: var(--white);
+    border: 1px solid var(--gray-200);
+    border-left-width: 4px;
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    animation: listaCotFadeSlideUp 0.45s ease both;
+}
+
+.lista-cot-kpi:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    color: inherit;
+    text-decoration: none;
+}
+
+.lista-cot-kpi.is-active {
+    border-color: var(--gray-300);
+    box-shadow: var(--shadow-md);
+}
+
+.lista-cot-kpi-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-bottom: 0.15rem;
+}
+
+.lista-cot-kpi-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--gray-900);
+    font-variant-numeric: tabular-nums;
+}
+
+.lista-cot-kpi-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gray-500);
+    line-height: 1.2;
+}
+
+/* Colores por estado — borde izquierdo + icono */
+.lista-cot-kpi--todas {
+    border-left-color: var(--gray-400);
+}
+.lista-cot-kpi--todas .lista-cot-kpi-icon {
+    background-color: var(--gray-100);
+    color: var(--gray-600);
+}
+.lista-cot-kpi--todas.is-active {
+    background-color: var(--gray-50);
+}
+
+.lista-cot-kpi--borrador {
+    border-left-color: var(--gray-500);
+}
+.lista-cot-kpi--borrador .lista-cot-kpi-icon {
+    background-color: var(--gray-100);
+    color: var(--gray-600);
+}
+.lista-cot-kpi--borrador.is-active {
+    background-color: var(--gray-50);
+}
+
+.lista-cot-kpi--enviada_front {
+    border-left-color: var(--info-color);
+}
+.lista-cot-kpi--enviada_front .lista-cot-kpi-icon {
+    background-color: var(--info-light);
+    color: var(--info-dark);
+}
+.lista-cot-kpi--enviada_front.is-active {
+    background-color: var(--info-light);
+}
+
+.lista-cot-kpi--enviada_cliente {
+    border-left-color: var(--primary-color);
+}
+.lista-cot-kpi--enviada_cliente .lista-cot-kpi-icon {
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+}
+.lista-cot-kpi--enviada_cliente.is-active {
+    background-color: var(--primary-light);
+}
+
+.lista-cot-kpi--parcialmente_aprobada {
+    border-left-color: var(--warning-color);
+}
+.lista-cot-kpi--parcialmente_aprobada .lista-cot-kpi-icon {
+    background-color: var(--warning-light);
+    color: var(--warning-dark);
+}
+.lista-cot-kpi--parcialmente_aprobada.is-active {
+    background-color: var(--warning-light);
+}
+
+.lista-cot-kpi--totalmente_aprobada {
+    border-left-color: var(--success-color);
+}
+.lista-cot-kpi--totalmente_aprobada .lista-cot-kpi-icon {
+    background-color: var(--success-light);
+    color: var(--success-dark);
+}
+.lista-cot-kpi--totalmente_aprobada.is-active {
+    background-color: var(--success-light);
+}
+
+.lista-cot-kpi--totalmente_rechazada {
+    border-left-color: var(--danger-color);
+}
+.lista-cot-kpi--totalmente_rechazada .lista-cot-kpi-icon {
+    background-color: var(--danger-light);
+    color: var(--danger-dark);
+}
+.lista-cot-kpi--totalmente_rechazada.is-active {
+    background-color: var(--danger-light);
+}
+
+.lista-cot-kpi--en_proceso {
+    border-left-color: #6366f1;
+}
+.lista-cot-kpi--en_proceso .lista-cot-kpi-icon {
+    background-color: #eef2ff;
+    color: #4338ca;
+}
+.lista-cot-kpi--en_proceso.is-active {
+    background-color: #eef2ff;
+}
+
+.lista-cot-kpi--completada {
+    border-left-color: #059669;
+}
+.lista-cot-kpi--completada .lista-cot-kpi-icon {
+    background-color: #ecfdf5;
+    color: #047857;
+}
+.lista-cot-kpi--completada.is-active {
+    background-color: #ecfdf5;
+}
+
+.lista-cot-kpi--cancelada {
+    border-left-color: var(--gray-600);
+}
+.lista-cot-kpi--cancelada .lista-cot-kpi-icon {
+    background-color: var(--gray-100);
+    color: var(--gray-700);
+}
+.lista-cot-kpi--cancelada.is-active {
+    background-color: var(--gray-100);
+}
+
+/* Animación escalonada en KPIs */
+.lista-cot-kpi:nth-child(1)  { animation-delay: 0.03s; }
+.lista-cot-kpi:nth-child(2)  { animation-delay: 0.06s; }
+.lista-cot-kpi:nth-child(3)  { animation-delay: 0.09s; }
+.lista-cot-kpi:nth-child(4)  { animation-delay: 0.12s; }
+.lista-cot-kpi:nth-child(5)  { animation-delay: 0.15s; }
+.lista-cot-kpi:nth-child(6)  { animation-delay: 0.18s; }
+.lista-cot-kpi:nth-child(7)  { animation-delay: 0.21s; }
+.lista-cot-kpi:nth-child(8)  { animation-delay: 0.24s; }
+.lista-cot-kpi:nth-child(9)  { animation-delay: 0.27s; }
+.lista-cot-kpi:nth-child(10) { animation-delay: 0.30s; }
+
+@keyframes listaCotFadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- Panel de filtros --- */
+.lista-cot-filtros {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    background-color: var(--white);
+}
+
+.lista-cot-filtros-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background-color: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.lista-cot-filtros-header h6 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--gray-700);
+}
+
+.lista-cot-filtros-header h6 i {
+    color: var(--primary-color);
+}
+
+.lista-cot-filtros-limpiar {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.lista-cot-filtros-limpiar:hover {
+    color: var(--danger-color);
+}
+
+.lista-cot-filtros .card-body {
+    padding: 1.25rem;
+}
+
+.lista-cot-filtros .form-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-bottom: 0.35rem;
+}
+
+/* --- Tabla --- */
+.lista-cot-tabla {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    background-color: var(--white);
+}
+
+.lista-cot-tabla-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background-color: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.lista-cot-tabla-header h6 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--gray-700);
+}
+
+.lista-cot-tabla .table {
+    margin-bottom: 0;
+}
+
+.lista-cot-tabla .table thead th {
+    background-color: var(--gray-50);
+    border-bottom: 2px solid var(--gray-200);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gray-600);
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+}
+
+.lista-cot-tabla .table tbody td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+    border-color: var(--gray-100);
+    font-size: 0.875rem;
+}
+
+.lista-cot-tabla .table tbody tr {
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lista-cot-tabla .table tbody tr:hover td {
+    background-color: var(--gray-50);
+}
+
+.lista-cot-tabla .table tbody tr:hover td:first-child {
+    box-shadow: inset 3px 0 0 var(--primary-color);
+}
+
+.lista-cot-numero {
+    font-weight: 700;
+    color: var(--primary-color);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+}
+
+.lista-cot-numero:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+}
+
+.lista-cot-lineas-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: center;
+}
+
+.lista-cot-lineas-badges .badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.lista-cot-total-monto {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--gray-800);
+}
+
+.lista-cot-acciones {
+    display: inline-flex;
+    gap: 0.35rem;
+}
+
+.lista-cot-acciones .btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.5rem;
+}
+
+.lista-cot-tabla .card-footer {
+    background-color: var(--gray-50);
+    border-top: 1px solid var(--gray-200);
+    padding: 0.75rem 1rem;
+}
+
+/* --- Estado vacío --- */
+.lista-cot-empty {
+    text-align: center;
+    padding: 3.5rem 1.5rem;
+}
+
+.lista-cot-empty-icon-ring {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 5rem;
+    height: 5rem;
+    border-radius: 50%;
+    background-color: var(--gray-100);
+    border: 2px dashed var(--gray-300);
+    margin-bottom: 1.25rem;
+}
+
+.lista-cot-empty-icon-ring i {
+    font-size: 2rem;
+    color: var(--gray-400);
+}
+
+.lista-cot-empty h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.lista-cot-empty p {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+    margin-bottom: 1.25rem;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+    .lista-cot-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .lista-cot-header-actions {
+        width: 100%;
+    }
+
+    .lista-cot-header-actions .btn {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 400px) {
+    .lista-cot-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides para [data-bs-theme="dark"]
+   ============================================================ */
+
+[data-bs-theme="dark"] .lista-cot-header-title h1 {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .lista-cot-header-subtitle {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .lista-cot-total-chip {
+    background-color: rgba(96, 165, 250, 0.15);
+    color: #93c5fd;
+    border-color: rgba(96, 165, 250, 0.3);
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi-value {
+    color: #f1f5f9;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi-label {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--todas.is-active,
+[data-bs-theme="dark"] .lista-cot-kpi--borrador.is-active {
+    background-color: #334155;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--enviada_front.is-active {
+    background-color: rgba(34, 211, 238, 0.12);
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--enviada_cliente.is-active {
+    background-color: rgba(96, 165, 250, 0.12);
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--parcialmente_aprobada.is-active {
+    background-color: rgba(251, 191, 36, 0.12);
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--totalmente_aprobada.is-active,
+[data-bs-theme="dark"] .lista-cot-kpi--completada.is-active {
+    background-color: rgba(52, 211, 153, 0.12);
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--totalmente_rechazada.is-active {
+    background-color: rgba(248, 113, 113, 0.12);
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--en_proceso.is-active {
+    background-color: rgba(129, 140, 248, 0.12);
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--cancelada.is-active {
+    background-color: #334155;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--borrador .lista-cot-kpi-icon,
+[data-bs-theme="dark"] .lista-cot-kpi--todas .lista-cot-kpi-icon,
+[data-bs-theme="dark"] .lista-cot-kpi--cancelada .lista-cot-kpi-icon {
+    background-color: #334155;
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--enviada_front .lista-cot-kpi-icon {
+    background-color: rgba(34, 211, 238, 0.15);
+    color: #22d3ee;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--enviada_cliente .lista-cot-kpi-icon {
+    background-color: rgba(96, 165, 250, 0.15);
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--parcialmente_aprobada .lista-cot-kpi-icon {
+    background-color: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--totalmente_aprobada .lista-cot-kpi-icon,
+[data-bs-theme="dark"] .lista-cot-kpi--completada .lista-cot-kpi-icon {
+    background-color: rgba(52, 211, 153, 0.15);
+    color: #34d399;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--totalmente_rechazada .lista-cot-kpi-icon {
+    background-color: rgba(248, 113, 113, 0.15);
+    color: #f87171;
+}
+
+[data-bs-theme="dark"] .lista-cot-kpi--en_proceso .lista-cot-kpi-icon {
+    background-color: rgba(129, 140, 248, 0.15);
+    color: #a5b4fc;
+}
+
+[data-bs-theme="dark"] .lista-cot-filtros {
+    background-color: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .lista-cot-filtros-header {
+    background-color: #0f172a;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .lista-cot-filtros-header h6 {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .lista-cot-filtros-limpiar {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .lista-cot-filtros-limpiar:hover {
+    color: #f87171;
+}
+
+[data-bs-theme="dark"] .lista-cot-filtros .form-label {
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .lista-cot-tabla {
+    background-color: #1e293b;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .lista-cot-tabla-header {
+    background-color: #0f172a;
+    border-bottom-color: #334155;
+}
+
+[data-bs-theme="dark"] .lista-cot-tabla-header h6 {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .lista-cot-tabla .table thead th {
+    background-color: #0f172a;
+    border-bottom-color: #334155;
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .lista-cot-tabla .table tbody td {
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .lista-cot-tabla .table tbody tr:hover td {
+    background-color: #334155;
+}
+
+[data-bs-theme="dark"] .lista-cot-numero {
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .lista-cot-numero:hover {
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .lista-cot-total-monto {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .lista-cot-tabla .card-footer {
+    background-color: #0f172a;
+    border-top-color: #334155;
+}
+
+[data-bs-theme="dark"] .lista-cot-empty-icon-ring {
+    background-color: #334155;
+    border-color: #475569;
+}
+
+[data-bs-theme="dark"] .lista-cot-empty-icon-ring i {
+    color: #64748b;
+}
+
+[data-bs-theme="dark"] .lista-cot-empty h4 {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .lista-cot-empty p {
+    color: #94a3b8;
+}
