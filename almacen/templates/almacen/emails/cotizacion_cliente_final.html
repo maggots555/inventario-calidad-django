@@ -20,34 +20,52 @@
             border-radius: 8px;
             overflow: hidden;
         }
-        /* Encabezado navy — mismo color que los headers del PDF */
+        /* Encabezado estándar del sistema — gradiente azul claro igual que los demás correos */
         .header {
-            background-color: #003366;
-            color: #ffffff;
-            padding: 28px 32px;
-            text-align: left;
+            background: linear-gradient(180deg, #ffffff 0%, #e3f2fd 50%, #90caf9 100%);
+            color: #051d63;
+            padding: 30px;
+            text-align: center;
+            position: relative;
         }
-        .header-inner {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+        /* Patrón de puntos decorativo en el fondo del header */
+        .header::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231976d2' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
         }
-        .logo-img {
-            max-width: 140px;
+        /* Contenedor del logo para posicionarlo sobre el ::before */
+        .logo-container {
+            position: relative;
+            z-index: 1;
+            margin-bottom: 15px;
+        }
+        .logo-image {
+            max-width: 180px;
             height: auto;
-            filter: brightness(0) invert(1);
+            display: block;
+            margin: 0 auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
         }
-        .header-text h1 {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 4px;
-            color: #ffffff;
+        /* Título del tipo de documento */
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+            color: #051d63;
         }
-        .header-text p {
-            font-size: 13px;
-            color: #c8d8f0;
+        /* Subtítulo: empresa + folio */
+        .subtitle {
+            font-size: 14px;
+            opacity: 0.85;
+            position: relative;
+            z-index: 1;
+            color: #1a3a6b;
         }
-        /* Banda con el tipo de servicio */
+        /* Banda con el tipo de servicio — debajo del header */
         .servicio-band {
             background-color: #1d4e8f;
             color: #ffffff;
@@ -182,27 +200,104 @@
             margin-bottom: 24px;
             white-space: pre-wrap;
         }
-        /* Footer con información de contacto */
+        /* Footer — idéntico al estándar del sistema */
         .footer {
-            background-color: #1a2a4a;
-            color: #c0cfe8;
-            padding: 20px 32px;
-            font-size: 12px;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
             text-align: center;
         }
         .footer a {
-            color: #90b8f8;
+            color: #ffffff;
             text-decoration: none;
         }
-        .footer .empresa {
-            font-size: 13px;
-            font-weight: 600;
-            color: #ffffff;
-            margin-bottom: 4px;
+        /* Bloque de firma */
+        .signature {
+            margin-bottom: 15px;
         }
-        .footer .divider {
-            margin: 8px 0;
-            border-top: 1px solid #2e4070;
+        .signature-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        .signature-role {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        .signature-area {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+        /* Nombre de empresa con separador superior */
+        .company {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 20px 0 5px 0;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        /* Timestamp de envío */
+        .timestamp {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+        /* Sección de redes sociales */
+        .social-media {
+            margin: 20px 0;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+        .social-title {
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+            text-align: center;
+        }
+        .social-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            text-align: center;
+        }
+        .social-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            text-decoration: none;
+            color: #ffffff !important;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+        .social-link:hover {
+            background-color: rgba(255, 255, 255, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+        /* Responsive: ajustes para pantallas pequeñas (móvil) */
+        @media only screen and (max-width: 600px) {
+            .container { margin: 10px; }
+            .content { padding: 20px; }
+            .header { padding: 20px; }
+            .logo { font-size: 20px; }
+            .subtitle { font-size: 13px; }
+            .equipo-grid { flex-direction: column; }
+            .total-row { flex-direction: column; gap: 4px; text-align: center; }
+            .social-media { padding: 15px 5px; }
+            .social-links { gap: 8px; padding: 0 5px; }
+            .social-link { padding: 6px 10px; font-size: 11px; gap: 6px; flex: 0 1 auto; min-width: 0; }
         }
     </style>
 </head>
@@ -210,24 +305,22 @@
 <div class="container">
 
     <!-- =============================================================== -->
-    <!-- ENCABEZADO: Logo + Empresa + Tipo de Servicio                    -->
+    <!-- ENCABEZADO: Logo centrado + Título del documento + Folio        -->
+    <!-- Mismo estilo que los demás correos del sistema                   -->
     <!-- =============================================================== -->
     <div class="header">
-        <div class="header-inner">
-            <div>
-                {% if True %}{# Logo inline como imagen adjunta CID #}
-                <img src="cid:logo_sic" alt="SIC" class="logo-img">
-                {% endif %}
-            </div>
-            <div class="header-text" style="text-align: right;">
-                <h1>{{ empresa_nombre }}</h1>
-                <p>{{ fecha_envio_texto }}</p>
-                <p>Folio: {{ solicitud.numero_solicitud }}</p>
-            </div>
+        <!-- Logo SIC adjunto como imagen inline (CID) -->
+        <div class="logo-container">
+            <img src="cid:logo_sic" alt="SIC Logo" class="logo-image" />
         </div>
+        <!-- Título del tipo de documento con emoji identificador -->
+        <div class="logo">💼 COTIZACIÓN DE SERVICIO</div>
+        <!-- Empresa + folio de la solicitud -->
+        <div class="subtitle">{{ empresa_nombre }} &nbsp;·&nbsp; Folio: {{ solicitud.numero_solicitud }}</div>
+        <div class="subtitle">{{ fecha_envio_texto }}</div>
     </div>
 
-    <!-- Banda del tipo de servicio -->
+    <!-- Banda con el tipo específico de propuesta (Diagnóstico / Venta Mostrador, etc.) -->
     <div class="servicio-band">
         {{ titulo_propuesta }}
     </div>
@@ -330,21 +423,70 @@
     </div>
 
     <!-- =============================================================== -->
-    <!-- FOOTER                                                            -->
+    <!-- FOOTER — Idéntico al estándar del sistema                        -->
     <!-- =============================================================== -->
     <div class="footer">
-        <p class="empresa">{{ empresa_nombre }}</p>
-        {% if nombre_usuario %}
-        <p>Enviado por: <strong>{{ nombre_usuario }}</strong></p>
+
+        <!-- Bloque de firma del responsable -->
+        <div class="signature">
+            <div class="signature-name">
+                Sistema de Cotizaciones
+            </div>
+            {% if nombre_usuario %}
+            <div class="signature-role" style="margin-top: 10px; font-size: 14px;">
+                👤 Enviado por: {{ nombre_usuario }}
+            </div>
+            {% endif %}
+            <!-- Aviso correo automático NO RESPONDA -->
+            <div class="signature-role" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-size: 18.2px;">
+                ⚠️ <strong>IMPORTANTE:</strong> Este es un correo automático no supervisado.
+            </div>
+            <div class="signature-area" style="margin-top: 10px; font-size: 16.9px; line-height: 1.5;">
+                Por favor, <strong>NO RESPONDA</strong> a este correo.<br>
+                Para seguimiento de su cotización, contacte directamente a
+                {% if nombre_usuario %}
+                    <strong>{{ nombre_usuario }}</strong>
+                {% else %}
+                    su responsable de seguimiento
+                {% endif %}.
+            </div>
+        </div>
+
+        <!-- Nombre de la empresa + país -->
+        <div class="company">{{ empresa_nombre }}</div>
+        {% if pais_nombre %}
+        <div style="font-size: 14px; opacity: 0.9;">{{ pais_nombre }}</div>
         {% endif %}
-        {% if whatsapp_empleado %}
-        <p>
-            <img src="cid:icon_whatsapp" alt="WhatsApp" width="14" style="vertical-align: middle; margin-right: 4px;">
-            WhatsApp: <a href="https://wa.me/{{ whatsapp_empleado }}">{{ whatsapp_empleado }}</a>
-        </p>
-        {% endif %}
-        <div class="divider"></div>
-        <p>© {{ fecha_envio_texto|slice:":4" }} {{ empresa_nombre }} — Todos los derechos reservados.</p>
+
+        <!-- Redes sociales con íconos CID (adjuntados por el backend) -->
+        <div class="social-media">
+            <div class="social-title">Visítanos y síguenos en nuestras redes sociales</div>
+            <div class="social-links">
+                <a href="https://sicfix.mx/" class="social-link" target="_blank">
+                    <img src="cid:icon_link" alt="Web" style="width: 18px; height: 18px; vertical-align: middle;">
+                    <span>Sitio Web</span>
+                </a>
+                <a href="https://www.instagram.com/sic_mexico/?hl=es" class="social-link" target="_blank">
+                    <img src="cid:icon_instagram" alt="Instagram" style="width: 18px; height: 18px; vertical-align: middle;">
+                    <span>Instagram</span>
+                </a>
+                <a href="https://www.facebook.com/LatAmSic" class="social-link" target="_blank">
+                    <img src="cid:icon_facebook" alt="Facebook" style="width: 18px; height: 18px; vertical-align: middle;">
+                    <span>Facebook</span>
+                </a>
+                {% if whatsapp_empleado %}
+                <a href="https://wa.me/{{ whatsapp_empleado }}" class="social-link" target="_blank">
+                    <img src="cid:icon_whatsapp" alt="WhatsApp" style="width: 18px; height: 18px; vertical-align: middle;">
+                    <span>WhatsApp</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Timestamp completo: fecha Y hora -->
+        <div class="timestamp">
+            📅 Enviado el {{ fecha_envio_texto }} a las {{ hora_envio_texto }}
+        </div>
     </div>
 
 </div>
