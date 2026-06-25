@@ -348,29 +348,17 @@ class CompraProductoForm(forms.ModelForm):
     que permite múltiples proveedores por cotización. Este formulario es 
     EXCLUSIVAMENTE para compras directas.
     
-    El campo 'orden_cliente' permite buscar por el número visible al cliente
-    (ej: OS-2024-0001, OOW-12345, FL-67890) en lugar del ID interno de la BD.
+    El campo 'orden_cliente' guarda una referencia opcional de orden interna.
+    La vinculación formal con Servicio Técnico se realiza después.
     
     Campos importantes:
     - producto: Qué producto se compra
     - cantidad: Número de unidades
-    - costo_unitario: Precio por unidad
-    - orden_cliente: Para vincular con orden de servicio por número visible
+    - costo_unitario: Precio por unidad (calculado del detalle)
+    - orden_cliente: Referencia opcional de orden interna
     
     NOTA: El campo 'tipo' se asigna automáticamente como 'compra' en la vista.
     """
-    
-    # Campo adicional para buscar orden por número de cliente
-    buscar_orden_cliente = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Ej: OS-2024-0001',
-            'autocomplete': 'off',
-        }),
-        label='Buscar por Orden Cliente',
-        help_text='Ingresa el número de orden visible para el cliente'
-    )
     
     class Meta:
         model = CompraProducto
@@ -388,8 +376,11 @@ class CompraProductoForm(forms.ModelForm):
             'observaciones',
         ]
         widgets = {
-            'producto': forms.Select(attrs={
-                'class': 'form-control form-select',
+            # HiddenInput: el usuario elige producto vía autocompletado en el template;
+            # el POST sigue enviando producto=<pk> para ModelChoiceField.
+            'producto': forms.HiddenInput(attrs={
+                'class': 'producto-id-input',
+                'id': 'id_producto',
             }),
             'proveedor': forms.Select(attrs={
                 'class': 'form-control form-select',
@@ -400,10 +391,11 @@ class CompraProductoForm(forms.ModelForm):
                 'placeholder': '1',
             }),
             'costo_unitario': forms.NumberInput(attrs={
-                'class': 'form-control',
+                'class': 'form-control bg-light',
                 'min': 0,
                 'step': '0.01',
                 'placeholder': '0.00',
+                'readonly': 'readonly',
             }),
             'fecha_pedido': forms.DateInput(attrs={
                 'class': 'form-control',
@@ -419,12 +411,13 @@ class CompraProductoForm(forms.ModelForm):
             }),
             'orden_cliente': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Ej: OS-2024-0001 (opcional)',
+                'placeholder': 'Ej: 12345 o ORD-2026-0042 (solo referencia)',
+                'autocomplete': 'off',
             }),
             'observaciones': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 2,
-                'placeholder': 'Notas sobre esta compra/cotización...',
+                'placeholder': 'Notas sobre esta compra...',
             }),
         }
         labels = {
@@ -435,24 +428,43 @@ class CompraProductoForm(forms.ModelForm):
             'fecha_pedido': 'Fecha de Pedido',
             'numero_factura': 'Número de Factura',
             'numero_orden_compra': 'Orden de Compra Interna',
-            'orden_cliente': 'Número de Orden (Cliente)',
+            'orden_cliente': 'Número de Orden Interna (referencia)',
             'observaciones': 'Observaciones',
         }
         help_texts = {
             'cantidad': 'Cantidad total de piezas a comprar',
             'costo_unitario': 'Calculado automáticamente del promedio de las unidades',
-            'orden_cliente': 'Número de orden de servicio visible para el cliente (ej: OOW-12345)',
+            'orden_cliente': 'Opcional. Solo anotación; la vinculación formal con Servicio Técnico se hace después.',
         }
     
     def clean_orden_cliente(self):
         """
-        Valida y normaliza el número de orden cliente.
+        Normaliza la referencia de orden interna (texto libre).
         Convierte a mayúsculas para consistencia.
         """
         orden_cliente = self.cleaned_data.get('orden_cliente', '')
         if orden_cliente:
             return orden_cliente.upper().strip()
         return orden_cliente
+
+    def __init__(self, *args, **kwargs):
+        """
+        Personaliza querysets de campos relacionales.
+
+        EXPLICACIÓN PARA PRINCIPIANTES:
+        El campo producto es un input oculto; el usuario busca en el template
+        con autocompletado AJAX. El queryset activo sigue validando en servidor.
+        """
+        super().__init__(*args, **kwargs)
+
+        self.fields['producto'].queryset = ProductoAlmacen.objects.filter(
+            activo=True
+        ).order_by('nombre')
+
+        self.fields['proveedor'].queryset = Proveedor.objects.filter(
+            activo=True
+        ).order_by('nombre')
+        self.fields['proveedor'].empty_label = '-- Seleccionar Proveedor --'
 
 
 # ============================================================================

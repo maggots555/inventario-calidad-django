@@ -1,0 +1,19 @@
+{% comment %}
+Campo Producto con autocompletado AJAX para compra directa.
+{% endcomment %}
+<div class="producto-autocomplete" id="producto-autocomplete-wrapper"
+     data-api-url="{% url 'almacen:api_buscar_productos' %}"
+     data-api-info-url="{% url 'almacen:api_info_producto' 0 %}">
+    {{ form.producto }}
+    <input type="text"
+           class="form-control producto-autocomplete-input"
+           value="{% if form.instance.pk and form.instance.producto %}{{ form.instance.producto.codigo_producto }} — {{ form.instance.producto.nombre }}{% endif %}"
+           placeholder="Buscar por código o nombre..."
+           autocomplete="off"
+           required>
+    <div class="producto-autocomplete-dropdown list-group"></div>
+</div>
+{% if form.producto.errors %}
+<div class="invalid-feedback d-block">{{ form.producto.errors.0 }}</div>
+{% endif %}
+<small class="text-muted" id="stock-info"></small>

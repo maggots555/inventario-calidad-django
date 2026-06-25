@@ -1,0 +1,333 @@
+{% comment %}
+Contenido principal del formulario crear/editar compra directa.
+Layout 8+4 con sidebar sticky de resumen de costos (patrón form_solicitud).
+{% endcomment %}
+
+<div class="container-fluid py-4 form-compra-page">
+
+    <div class="form-solicitud-header d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="bi bi-{% if es_creacion %}plus-circle{% else %}pencil{% endif %} me-2"></i>{{ titulo }}
+                <span class="badge {% if es_creacion %}bg-primary{% else %}bg-warning text-dark{% endif %} form-solicitud-badge-modo">
+                    {% if es_creacion %}Nueva{% else %}Edición{% endif %}
+                </span>
+            </h1>
+            <p class="text-muted mb-0 small">
+                {% if es_creacion %}
+                Registra una nueva compra directa de productos
+                {% else %}
+                Modifica los datos de la compra
+                {% endif %}
+            </p>
+        </div>
+        <a href="{% url 'almacen:lista_compras' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Volver
+        </a>
+    </div>
+
+    <form method="post" id="compraForm"
+          data-api-buscar-productos="{% url 'almacen:api_buscar_productos' %}"
+          data-api-info-producto="{% url 'almacen:api_info_producto' 0 %}">
+        {% csrf_token %}
+
+        <div class="row g-4">
+            <!-- Columna principal -->
+            <div class="col-lg-8 order-2 order-lg-1">
+
+                <!-- Datos de la compra -->
+                <div class="form-section-card card mb-4">
+                    <div class="card-header form-solicitud-header-card">
+                        <h5><i class="bi bi-info-circle me-2"></i>Datos de la Compra Directa</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6 form-compra-producto-field">
+                                <label class="form-label">{{ form.producto.label }} <span class="text-danger">*</span></label>
+                                {% include 'almacen/compras/partials/form_compra_producto_field.html' %}
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">{{ form.cantidad.label }} <span class="text-danger">*</span></label>
+                                {{ form.cantidad }}
+                                <div class="form-text">{{ form.cantidad.help_text }}</div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label">{{ form.fecha_pedido.label }} <span class="text-danger">*</span></label>
+                                {{ form.fecha_pedido }}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">{{ form.proveedor.label }}</label>
+                                {{ form.proveedor }}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">{{ form.orden_cliente.label }}</label>
+                                {{ form.orden_cliente }}
+                                <div class="form-text">{{ form.orden_cliente.help_text }}</div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">{{ form.numero_factura.label }}</label>
+                                {{ form.numero_factura }}
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">{{ form.numero_orden_compra.label }}</label>
+                                {{ form.numero_orden_compra }}
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">{{ form.observaciones.label }}</label>
+                                {{ form.observaciones }}
+                            </div>
+                        </div>
+
+                        {% if form.errors %}
+                        <div class="alert alert-danger mt-3 mb-0">
+                            <strong>Errores en el formulario:</strong>
+                            <ul class="mb-0">
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                <li>{{ field }}: {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Detalle por unidad (formset) -->
+                <div class="form-section-card card mb-0">
+                    <div class="card-header form-solicitud-header-lineas">
+                        <h5>
+                            <i class="bi bi-boxes me-2"></i>Detalle por Unidad
+                            <span class="badge bg-danger badge-compact ms-1">OBLIGATORIO</span>
+                        </h5>
+                        <button type="button" id="addUnidadBtn" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-plus-lg me-1"></i>Agregar Línea
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info small mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>Obligatorio:</strong> Debes especificar al menos una línea con marca y costo.
+                            La suma de cantidades debe coincidir con la cantidad total de la compra.
+                        </div>
+
+                        {{ formset.management_form }}
+
+                        {% if formset.non_form_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in formset.non_form_errors %}
+                            <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div id="unidadesContainer">
+                            {% for unidad_form in formset %}
+                            <div class="unidad-form {% if unidad_form.instance.pk %}unidad-form-existente{% endif %}">
+                                <div class="unidad-form-header">
+                                    <span class="unidad-form-num">Línea <span class="unidad-numero">{{ forloop.counter }}</span></span>
+                                    <div>
+                                        {% if unidad_form.instance.pk %}
+                                        <div class="d-none">{{ unidad_form.DELETE }}</div>
+                                        {{ unidad_form.id }}
+                                        {% endif %}
+                                        <button type="button" class="btn btn-sm btn-outline-secondary remove-unidad-btn">
+                                            <i class="bi bi-eye-slash"></i> Desactivar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-1 d-none">
+                                        {{ unidad_form.numero_linea }}
+                                    </div>
+
+                                    <div class="col-6 col-md-1">
+                                        <label class="form-label small">Cant. <span class="text-danger">*</span></label>
+                                        {{ unidad_form.cantidad }}
+                                    </div>
+
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small">Marca <span class="text-danger">*</span></label>
+                                        {{ unidad_form.marca }}
+                                    </div>
+
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small">Modelo</label>
+                                        {{ unidad_form.modelo }}
+                                    </div>
+
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small">N° Serie</label>
+                                        {{ unidad_form.numero_serie }}
+                                    </div>
+
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small">Costo ($) <span class="text-danger">*</span></label>
+                                        {{ unidad_form.costo_unitario }}
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label small">Especificaciones / Notas</label>
+                                        {{ unidad_form.especificaciones }}
+                                    </div>
+                                </div>
+
+                                {% if unidad_form.errors %}
+                                <div class="alert alert-danger mt-2 mb-0 py-1 small">
+                                    {% for field, errors in unidad_form.errors.items %}
+                                        {% for error in errors %}
+                                        <span class="me-3"><strong>{{ field }}:</strong> {{ error }}</span>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <template id="unidadTemplate">
+                            <div class="unidad-form">
+                                <div class="unidad-form-header">
+                                    <span class="unidad-form-num">Línea <span class="unidad-numero">1</span></span>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary remove-unidad-btn">
+                                        <i class="bi bi-eye-slash"></i> Desactivar
+                                    </button>
+                                </div>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-1 d-none">
+                                        <input type="number" name="unidades-__prefix__-numero_linea"
+                                               class="form-control form-control-sm" min="1" readonly>
+                                    </div>
+                                    <div class="col-6 col-md-1">
+                                        <label class="form-label small">Cant. <span class="text-danger">*</span></label>
+                                        <input type="number" name="unidades-__prefix__-cantidad"
+                                               class="form-control form-control-sm cantidad-input" min="1" value="1" required>
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small">Marca <span class="text-danger">*</span></label>
+                                        <select name="unidades-__prefix__-marca" class="form-control form-select form-select-sm marca-input" required>
+                                            <option value="">-- Seleccionar --</option>
+                                            {% for value, label in formset.form.base_fields.marca.choices %}
+                                            {% if value %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small">Modelo</label>
+                                        <input type="text" name="unidades-__prefix__-modelo"
+                                               class="form-control form-control-sm" placeholder="Ej: 870 EVO">
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small">N° Serie</label>
+                                        <input type="text" name="unidades-__prefix__-numero_serie"
+                                               class="form-control form-control-sm" placeholder="S/N">
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label small">Costo ($) <span class="text-danger">*</span></label>
+                                        <input type="number" name="unidades-__prefix__-costo_unitario"
+                                               class="form-control form-control-sm costo-unidad-input"
+                                               step="0.01" min="0.01" placeholder="$0.00" required>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small">Especificaciones / Notas</label>
+                                        <textarea name="unidades-__prefix__-especificaciones"
+                                                  class="form-control form-control-sm" rows="1"
+                                                  placeholder="Detalles técnicos adicionales..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar sticky -->
+            <div class="col-lg-4 order-1 order-lg-2 form-solicitud-sidebar">
+                <div class="form-sidebar-card card border-0">
+                    <div class="card-header"><i class="bi bi-calculator me-2"></i>Resumen</div>
+                    <div class="card-body">
+                        <p class="form-sidebar-lineas-count mb-3">
+                            <i class="bi bi-list-ul me-1"></i>
+                            <span id="lineasActivasCount">0</span> línea(s) activa(s)
+                        </p>
+
+                        <div class="form-compra-costo-row mb-2">
+                            <span class="small text-muted">{{ form.costo_unitario.label }}</span>
+                            <div class="input-group input-group-sm mt-1">
+                                <span class="input-group-text">$</span>
+                                {{ form.costo_unitario }}
+                            </div>
+                            <div class="form-text">
+                                <i class="bi bi-calculator me-1"></i>Calculado del detalle por unidad
+                            </div>
+                        </div>
+
+                        <div class="form-compra-costo-row mb-3">
+                            <span class="small text-muted">Costo Total</span>
+                            <div class="input-group input-group-sm mt-1">
+                                <span class="input-group-text">$</span>
+                                <input type="text" id="costoTotalDisplay" class="form-control bg-light fw-bold"
+                                       readonly value="0.00">
+                            </div>
+                            <div class="form-text">Cantidad × Costo Promedio</div>
+                        </div>
+
+                        <div id="validacionResumen" class="form-compra-validacion alert alert-secondary mb-0" style="display: none;">
+                            <div class="small">
+                                <div class="mb-1">
+                                    <strong>Cantidad total:</strong> <span id="cantidadTotalDisplay">0</span>
+                                </div>
+                                <div class="mb-1">
+                                    <strong>Suma unidades:</strong> <span id="sumaUnidadesDisplay">0</span>
+                                </div>
+                                <div>
+                                    <strong>Estado:</strong> <span id="estadoValidacionDisplay">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-sidebar-card card border-0 form-solicitud-actions-desktop d-none d-lg-block">
+                    <div class="card-header"><i class="bi bi-lightning me-2"></i>Acciones</div>
+                    <div class="card-body d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg btn-submit-compra">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {% if es_creacion %}Crear Compra{% else %}Guardar Cambios{% endif %}
+                        </button>
+                        <a href="{% url 'almacen:lista_compras' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-x-lg me-1"></i>Cancelar
+                        </a>
+                    </div>
+                </div>
+
+                <div class="form-sidebar-card card border-0 d-none d-lg-block">
+                    <div class="card-body small text-muted">
+                        <i class="bi bi-lightbulb me-1"></i>
+                        <strong>Tip:</strong> El costo promedio se calcula automáticamente al llenar las líneas de detalle.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dock móvil -->
+        <div class="form-solicitud-dock d-lg-none">
+            <a href="{% url 'almacen:lista_compras' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-x-lg"></i>
+            </a>
+            <button type="submit" class="btn btn-primary btn-dock-primary btn-submit-compra">
+                <i class="bi bi-check-lg me-1"></i>
+                {% if es_creacion %}Crear{% else %}Guardar{% endif %}
+            </button>
+        </div>
+    </form>
+</div>

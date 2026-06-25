@@ -1,0 +1,112 @@
+/*
+ * form_compra.css
+ * Estilos para crear/editar Compra Directa (almacén).
+ * Reutiliza layout de form_solicitud.css; aquí solo reglas específicas de compra.
+ */
+
+.form-compra-page {
+    padding-bottom: 5.5rem;
+}
+
+/* El dropdown de producto no debe recortarse por overflow de la card */
+.form-compra-page .form-section-card {
+    overflow: visible;
+}
+
+.form-compra-producto-field,
+.form-compra-page .form-section-card .card-body {
+    overflow: visible;
+}
+
+.form-compra-producto-field {
+    position: relative;
+    z-index: 5;
+}
+
+.form-compra-producto-field .producto-autocomplete-dropdown.show {
+    z-index: 1060;
+}
+
+/* Ocultar checkboxes DELETE — se manejan con botones */
+input[name$="-DELETE"] {
+    display: none;
+}
+
+/* Tarjetas de línea del formset de unidades */
+.unidad-form {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    padding: 0.85rem;
+    margin-bottom: 0.75rem;
+    background-color: var(--white);
+    border-left: 4px solid var(--primary-color);
+    transition: opacity 0.3s ease, background-color 0.3s ease;
+}
+
+.unidad-form.unidad-form-existente {
+    background-color: var(--gray-50);
+}
+
+.unidad-form.unidad-desactivada {
+    border-left-color: var(--danger-color);
+    opacity: 0.5;
+}
+
+.unidad-form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.unidad-form-num {
+    font-weight: 800;
+    color: var(--gray-400);
+    font-size: 0.9rem;
+}
+
+/* Bloque de costos en sidebar */
+.form-compra-costo-row .form-control[readonly] {
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.form-compra-validacion {
+    font-size: 0.82rem;
+    padding: 0.65rem 0.75rem;
+}
+
+/* Botón submit: estado warning cuando validación incompleta */
+.btn-submit-compra.btn-warning {
+    color: var(--gray-900);
+}
+
+/* ============================================================
+   MODO OSCURO
+   ============================================================ */
+
+[data-bs-theme="dark"] .unidad-form {
+    background-color: var(--card-bg);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .unidad-form.unidad-form-existente {
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .unidad-form-header {
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .form-compra-costo-row .form-control[readonly] {
+    color: #60a5fa;
+    background-color: #0f172a;
+}
+
+[data-bs-theme="dark"] .form-compra-validacion {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: var(--text-primary);
+}
