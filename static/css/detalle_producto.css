@@ -1,0 +1,237 @@
+/*
+ * detalle_producto.css
+ * Estilos específicos del detalle de Producto (almacén).
+ * Reutiliza layout de detalle_solicitud.css; aquí solo reglas propias.
+ */
+
+.detalle-producto-page {
+    padding-bottom: 5.5rem;
+}
+
+/* Número hero de stock en sidebar */
+.detalle-producto-stock-num {
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 0.25rem;
+}
+
+.detalle-producto-stock-num.text-success {
+    color: var(--success-color);
+}
+
+.detalle-producto-stock-num.text-danger {
+    color: var(--danger-color);
+}
+
+.detalle-producto-stock-num.text-secondary {
+    color: var(--gray-600);
+}
+
+/* Acento semántico por borde izquierdo (sin headers saturados) */
+.detalle-producto-stock--ok {
+    border-left: 4px solid var(--success-color);
+}
+
+.detalle-producto-stock--bajo {
+    border-left: 4px solid var(--danger-color);
+}
+
+.detalle-producto-stock--agotado {
+    border-left: 4px solid var(--gray-700);
+}
+
+.detalle-producto-stock-alert {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    margin-top: 0.75rem;
+}
+
+.detalle-producto-stock-alert.alert-agotado {
+    background-color: var(--gray-100);
+    color: var(--gray-800);
+    border: 1px solid var(--gray-300);
+}
+
+.detalle-producto-stock-alert.alert-bajo {
+    background-color: var(--danger-light);
+    color: var(--danger-dark);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* Portada tipo perfil (cover difuminado + avatar del producto) */
+.detalle-producto-hero-card {
+    padding: 0;
+}
+
+.detalle-producto-cover {
+    position: relative;
+    height: 100px;
+    overflow: hidden;
+    background-color: var(--gray-200);
+}
+
+.detalle-producto-cover--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--gray-100);
+}
+
+.detalle-producto-cover-icon {
+    font-size: 2rem;
+    color: var(--gray-400);
+}
+
+/* Capa difuminada: misma imagen escalada y con blur */
+.detalle-producto-cover-blur {
+    position: absolute;
+    inset: -20px;
+    background-size: cover;
+    background-position: center;
+    filter: blur(18px);
+    transform: scale(1.1);
+}
+
+/* Velo suave para legibilidad sobre el blur */
+.detalle-producto-cover-overlay {
+    position: absolute;
+    inset: 0;
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Avatar superpuesto, centrado sobre el borde inferior del cover */
+.detalle-producto-avatar-wrap {
+    display: flex;
+    justify-content: center;
+    margin-top: -48px;
+    position: relative;
+    z-index: 2;
+    padding: 0 1rem;
+}
+
+.detalle-producto-avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 4px solid var(--card-bg, #fff);
+    box-shadow: var(--shadow-md);
+    background-color: var(--card-bg, #fff);
+}
+
+.detalle-producto-avatar--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: var(--gray-400);
+    background-color: var(--gray-100);
+}
+
+.detalle-producto-hero-caption {
+    margin-top: 0.5rem;
+    padding-top: 0.25rem;
+}
+
+/* Unidades rastreadas — acento info sin header saturado */
+.detalle-producto-unidades-card {
+    border-left: 4px solid var(--info-color);
+}
+
+.detalle-producto-unidades-stats .stat-val {
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+
+.detalle-producto-unidades-stats .stat-label {
+    font-size: 0.72rem;
+    color: var(--gray-500);
+}
+
+/* Card vacía para iniciar rastreo */
+.detalle-producto-empty-track {
+    border: 1px dashed var(--gray-300);
+    border-radius: 10px;
+    background-color: var(--gray-50);
+}
+
+/* Solicitudes pendientes — acento warning en sección principal */
+.detalle-producto-solicitudes-card {
+    border-left: 4px solid var(--warning-color);
+}
+
+/* Lista de distribución por sucursal */
+.detalle-producto-ubicacion-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 0.85rem;
+}
+
+.detalle-producto-ubicacion-item:last-child {
+    border-bottom: none;
+}
+
+/* ============================================================
+   MODO OSCURO
+   ============================================================ */
+
+[data-bs-theme="dark"] .detalle-producto-stock--agotado {
+    border-left-color: var(--gray-400);
+}
+
+[data-bs-theme="dark"] .detalle-producto-stock-num.text-secondary {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .detalle-producto-stock-alert.alert-agotado {
+    background-color: #1e293b;
+    color: var(--text-primary);
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .detalle-producto-stock-alert.alert-bajo {
+    background-color: #450a0a;
+    color: #fecaca;
+    border-color: #7f1d1d;
+}
+
+[data-bs-theme="dark"] .detalle-producto-cover {
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .detalle-producto-cover--placeholder {
+    background-color: #0f172a;
+}
+
+[data-bs-theme="dark"] .detalle-producto-cover-icon {
+    color: #475569;
+}
+
+[data-bs-theme="dark"] .detalle-producto-cover-overlay {
+    background-color: rgba(15, 23, 42, 0.45);
+}
+
+[data-bs-theme="dark"] .detalle-producto-avatar {
+    border-color: #1e293b;
+    background-color: #1e293b;
+}
+
+[data-bs-theme="dark"] .detalle-producto-avatar--placeholder {
+    background-color: #334155;
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .detalle-producto-empty-track {
+    background-color: #0f172a;
+    border-color: #334155;
+}
+
+[data-bs-theme="dark"] .detalle-producto-ubicacion-item {
+    border-color: #334155;
+}
