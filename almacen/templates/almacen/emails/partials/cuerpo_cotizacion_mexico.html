@@ -1,0 +1,75 @@
+{# Cuerpo del correo de cotización — México (texto legal y comercial) #}
+
+<p class="saludo">Buenos días:</p>
+
+<p class="intro-text">
+    Me dirijo de <strong>{{ empresa_nombre_mayus }}</strong>; por medio del presente me permito
+    hacer de su conocimiento la cotización.
+</p>
+
+<p class="intro-text">
+    En caso de aceptar la cotización o cotizaciones, solicitamos por favor nos confirme por este
+    medio qué cotización va aceptar, realice el pago y nos adjunte su comprobante (incluyendo la
+    referencia en el recuadro azul, líneas abajo) para que éste sea aplicado inmediatamente.
+    <strong>NO SERÁ POSIBLE INICIAR EL PROCESO SI NO SE CUENTA CON SU COMPROBANTE DE PAGO Y
+    REFERENCIAS COMPLETAS.</strong>
+</p>
+
+<div class="condiciones-pago">
+    <p class="condiciones-titulo">Nuestras condiciones de pago</p>
+    <ul class="condiciones-lista">
+        <li>50% por concepto de anticipo para proceder a solicitar la(s) pieza(s).</li>
+        <li>50% restante a la entrega de su equipo ya reparado.</li>
+        <li>O pago en una sola exhibición antes de la reparación.</li>
+    </ul>
+</div>
+
+<div class="datos-bancarios">
+    <p class="banco-titular">
+        <strong>{{ cotizacion_email.banco }}</strong> a nombre de
+        <strong>{{ cotizacion_email.titular_cuenta }}</strong>
+    </p>
+    <p class="banco-linea">Cuenta <strong>{{ cotizacion_email.numero_cuenta }}</strong></p>
+    <p class="banco-linea">CLABE <strong>{{ cotizacion_email.clabe }}</strong></p>
+
+    {% if referencia_pago %}
+    <div class="referencia-pago">
+        <p class="referencia-etiqueta">COLOCAR COMO REFERENCIA:</p>
+        <p class="referencia-valor">{{ referencia_pago }}</p>
+    </div>
+    {% else %}
+    <div class="referencia-pago referencia-pendiente">
+        <p class="referencia-etiqueta">REFERENCIA DE PAGO</p>
+        <p class="referencia-valor" style="font-size: 14px;">
+            Pendiente — contacte a su responsable de seguimiento para obtenerla.
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="factura-box">
+    <p class="intro-text" style="margin-bottom: 12px;">
+        <strong>SI REQUIERE FACTURA</strong> favor de enviar su cédula fiscal no mayor a 30 días
+        y uso de CFDI en el enlace que a continuación se indica:
+    </p>
+    <p class="factura-link">
+        <a href="{{ cotizacion_email.formulario_factura_url }}" target="_blank">
+            Formulario de datos fiscales (Google Forms)
+        </a>
+    </p>
+    <p class="intro-text" style="margin-top: 12px; margin-bottom: 0;">
+        <strong>TIENE HASTA EL DÍA {{ fecha_limite_factura_texto|upper }}</strong>
+        EN EL QUE HA REALIZADO SU PAGO PARA SUBIR SUS DATOS FISCALES Y PODER RECIBIR SU FACTURA.
+    </p>
+</div>
+
+<p class="intro-text">
+    <strong>Nota:</strong> En caso de no aceptar la cotización, favor de notificar por este medio,
+    para que el equipo sea enviado al centro de servicio donde lo ingresó.
+</p>
+
+<p class="intro-text" style="margin-bottom: 8px;">
+    Agradezco de antemano su preferencia y quedo en espera de su pronta respuesta o dudas por este medio.
+</p>
+
+<p class="saludo" style="margin-bottom: 24px;">Saludos cordiales.</p>

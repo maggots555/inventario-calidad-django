@@ -3550,6 +3550,10 @@ def detalle_solicitud_cotizacion(request, pk):
             email_cliente_modal = email_raw
     elif solicitud.email_cliente:
         email_cliente_modal = solicitud.email_cliente
+
+    # Asunto sugerido para el modal: prefijo + orden cliente o service tag
+    from .utils.cotizacion_email_context import construir_asunto_correo_default
+    asunto_correo_modal = construir_asunto_correo_default(solicitud, info_orden=info_orden)
     
     # Procesar subida de imagen (solo en estado borrador)
     mensaje_imagen = None
@@ -3638,6 +3642,7 @@ def detalle_solicitud_cotizacion(request, pk):
         'gama_equipo': gama_equipo,
         'costo_mano_obra': costo_mano_obra,
         'email_cliente_modal': email_cliente_modal,
+        'asunto_correo_modal': asunto_correo_modal,
         # Configuración de profit serializada como JSON para inyectarla en el
         # template y leerla desde TypeScript. Los valores vienen del .env
         # (nunca del código fuente), así que no aparecen en el repositorio.
@@ -3781,8 +3786,8 @@ def api_enviar_cotizacion_cliente(request, pk):
         # la tarea lo generará automáticamente con el perfil y folio.
         asunto_correo = request.POST.get('asunto_correo', '').strip()
         # Normalizar: si solo enviaron el prefijo vacío, tratar como sin asunto personalizado
-        PREFIJO_DEFAULT = 'Cotización SIC —'
-        if asunto_correo == PREFIJO_DEFAULT or asunto_correo == f'{PREFIJO_DEFAULT} ':
+        from .utils.cotizacion_email_context import es_asunto_correo_vacio
+        if es_asunto_correo_vacio(asunto_correo):
             asunto_correo = ''
 
         # Mano de obra override — el campo es informativo, se envía como 0 desde el frontend.

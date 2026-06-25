@@ -490,6 +490,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     // --------------------------------------------------------
+    // FUNCIÓN: Restablecer asunto del correo al abrir el modal
+    // --------------------------------------------------------
+    function actualizarAsuntoCorreo() {
+        const inputAsunto = document.querySelector('#asuntoCorreoInput');
+        if (!inputAsunto)
+            return;
+        inputAsunto.value = config.asuntoCorreoDefault || 'Cotización SIC — ';
+    }
+    // --------------------------------------------------------
     // FUNCIÓN: Mostrar alerta en el footer del modal
     // --------------------------------------------------------
     function mostrarAlerta(tipo, html) {
@@ -519,6 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
     modalEl === null || modalEl === void 0 ? void 0 : modalEl.addEventListener('show.bs.modal', () => {
         actualizarCalculadora();
         actualizarTarjetaEmail();
+        actualizarAsuntoCorreo();
         // Resetear alerta al abrir
         if (alertaDiv) {
             alertaDiv.style.display = 'none';

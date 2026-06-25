@@ -900,11 +900,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             </label>
                             <input type="text" class="form-control form-control-sm" id="asuntoCorreoInput"
                                    name="asunto_correo"
-                                   value="Cotización SIC — "
+                                   value="{{ asunto_correo_modal|escape }}"
                                    maxlength="200"
-                                   placeholder="Cotización SIC — Tipo de servicio | S/T: XXXXX">
+                                   placeholder="Cotización SIC — OOW-11902">
                             <div class="form-text" style="font-size: 0.75rem;">
-                                Si lo dejas como está, se generará automáticamente con el perfil y folio.
+                                Si dejas solo «Cotización SIC —», se generará automáticamente con el perfil y folio.
                             </div>
                         </div>
 
@@ -976,6 +976,7 @@ window.COTIZACION_CLIENTE_CONFIG = {
     csrfToken:  "{{ csrf_token }}",
     gama:       "{{ gama_equipo }}",
     emailDetectado: "{{ email_cliente_modal|default:''|escapejs }}",
+    asuntoCorreoDefault: "{{ asunto_correo_modal|default:'Cotización SIC — '|escapejs }}",
     // profitConfig: valores de margen, costos fijos y diagnóstico por perfil.
     // Los números vienen del .env del servidor (nunca del código fuente),
     // los inyecta Django en tiempo de render. No aparecen en el repositorio.

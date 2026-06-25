@@ -36,6 +36,8 @@ interface CotizacionClienteConfig {
     gama:        string;
     /** Email detectado automáticamente desde la orden o solicitud */
     emailDetectado: string;
+    /** Asunto sugerido al abrir el modal (prefijo + orden o service tag) */
+    asuntoCorreoDefault: string;
     /** Configuración de profit por perfil, inyectada desde .env vía Django */
     profitConfig: Record<string, PerfilProfit>;
     lineas: LineaItem[];
@@ -604,6 +606,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --------------------------------------------------------
+    // FUNCIÓN: Restablecer asunto del correo al abrir el modal
+    // --------------------------------------------------------
+    function actualizarAsuntoCorreo(): void {
+        const inputAsunto = document.querySelector<HTMLInputElement>('#asuntoCorreoInput');
+        if (!inputAsunto) return;
+        inputAsunto.value = config.asuntoCorreoDefault || 'Cotización SIC — ';
+    }
+
+    // --------------------------------------------------------
     // FUNCIÓN: Mostrar alerta en el footer del modal
     // --------------------------------------------------------
     function mostrarAlerta(tipo: 'success' | 'danger' | 'warning', html: string): void {
@@ -631,6 +642,7 @@ document.addEventListener('DOMContentLoaded', () => {
     modalEl?.addEventListener('show.bs.modal', () => {
         actualizarCalculadora();
         actualizarTarjetaEmail();
+        actualizarAsuntoCorreo();
         // Resetear alerta al abrir
         if (alertaDiv) {
             alertaDiv.style.display = 'none';

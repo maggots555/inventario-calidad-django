@@ -77,6 +77,19 @@ PAISES_CONFIG = {
 
         # --- Media ---
         'media_subdir': 'mexico',           # Subcarpeta dentro de MEDIA_ROOT
+
+        # --- Correo de cotización al cliente (contenido específico México) ---
+        'cotizacion_email': {
+            'habilitado': True,
+            'banco': 'BBVA Bancomer',
+            'titular_cuenta': 'SIC COMERCIALIZACIÓN Y SERVICIOS MÉXICO SC',
+            'numero_cuenta': '0117449143',
+            'clabe': '012180001174491436',
+            'formulario_factura_url': (
+                'https://docs.google.com/forms/d/e/1FAIpQLSe-wjBrWviN4KgBOZS7Xt_0VyGqfEPRUq27bYPQ1d64JDFQ0w/viewform'
+            ),
+            'dia_limite_factura_mes': 25,
+        },
     },
 
     'argentina': {

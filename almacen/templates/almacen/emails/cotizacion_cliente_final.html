@@ -200,6 +200,80 @@
             margin-bottom: 24px;
             white-space: pre-wrap;
         }
+        /* Bloques del cuerpo México — condiciones de pago y datos bancarios */
+        .condiciones-pago {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 18px 20px;
+            margin-bottom: 24px;
+            border-left: 4px solid #1565c0;
+        }
+        .condiciones-titulo {
+            font-weight: 700;
+            color: #1565c0;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+        .condiciones-lista {
+            margin: 0;
+            padding-left: 22px;
+            font-size: 14px;
+            color: #444;
+            line-height: 1.8;
+        }
+        .datos-bancarios {
+            background-color: #f0f4fa;
+            border: 1px solid #c5d5ea;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .banco-titular, .banco-linea {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 6px;
+            line-height: 1.6;
+        }
+        /* Recuadro azul de referencia de pago */
+        .referencia-pago {
+            background-color: #e3f2fd;
+            border: 2px solid #1565c0;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-top: 16px;
+        }
+        .referencia-pago.referencia-pendiente {
+            background-color: #fff8e1;
+            border-color: #ffc107;
+        }
+        .referencia-etiqueta {
+            font-size: 12px;
+            font-weight: 700;
+            color: #1565c0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .referencia-valor {
+            font-size: 22px;
+            font-weight: 800;
+            color: #0d47a1;
+            letter-spacing: 1px;
+            margin: 0;
+        }
+        .factura-box {
+            background-color: #fff8e1;
+            border: 1px solid #ffe082;
+            border-radius: 8px;
+            padding: 18px 20px;
+            margin-bottom: 24px;
+        }
+        .factura-link a {
+            color: #1565c0;
+            font-weight: 600;
+            word-break: break-all;
+        }
         /* Footer — idéntico al estándar del sistema */
         .footer {
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
@@ -330,7 +404,10 @@
     <!-- =============================================================== -->
     <div class="content">
 
-        <!-- Saludo personalizado -->
+        <!-- Cuerpo del mensaje: México (texto legal) o genérico (otros países) -->
+        {% if pais_codigo == 'MX' and cotizacion_email %}
+            {% include 'almacen/emails/partials/cuerpo_cotizacion_mexico.html' %}
+        {% else %}
         <p class="saludo">
             {% if nombre_cliente %}
                 Estimado/a {{ nombre_cliente }},
@@ -343,6 +420,7 @@
             El PDF incluye el detalle completo de las piezas y/o servicios con sus precios
             individuales. A continuación le presentamos el resumen de los totales.
         </p>
+        {% endif %}
 
         <!-- Datos del equipo (si están disponibles) -->
         {% if info_equipo %}

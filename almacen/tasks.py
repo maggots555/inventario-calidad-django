@@ -659,6 +659,30 @@ def enviar_cotizacion_cliente_task(
         # Construir el nombre del título de la propuesta para el asunto del email
         titulo_display = titulo_propuesta or calculo_resumen['servicio_nombre']
 
+        # Asunto base (sin referencia) — se usa para fallback de referencia de pago
+        numero_display = solicitud.numero_solicitud
+        if solicitud.orden_servicio:
+            try:
+                st = solicitud.orden_servicio.detalle_equipo.numero_serie
+                if st:
+                    numero_display = f"S/T: {st}"
+            except Exception:
+                pass
+
+        if asunto_correo and asunto_correo.strip():
+            asunto_base = asunto_correo.strip()
+        else:
+            asunto_base = f'Cotización SIC — {titulo_display} | {numero_display}'
+
+        # Variables adicionales según país (referencia de pago, textos México, etc.)
+        from .utils.cotizacion_email_context import construir_contexto_email_cotizacion
+        contexto_pais = construir_contexto_email_cotizacion(
+            solicitud=solicitud,
+            pais_config=_pais,
+            fecha_local=ahora_local,
+            asunto_fallback=asunto_base,
+        )
+
         context_email = {
             'solicitud':             solicitud,
             'titulo_propuesta':      titulo_display,
@@ -673,6 +697,7 @@ def enviar_cotizacion_cliente_task(
             'whatsapp_empleado':     whatsapp_empleado,
             'nombre_usuario':        nombre_usuario,
             'incluir_descuento':     incluir_descuento_diagnostico,
+            **contexto_pais,
         }
 
         # Renderizar el template HTML del email
@@ -682,22 +707,17 @@ def enviar_cotizacion_cliente_task(
         )
 
         # --- PASO 5: COMPONER Y ENVIAR EL CORREO ---
-        # Construir el asunto del email con el folio/número de solicitud
-        numero_display = solicitud.numero_solicitud
-        if solicitud.orden_servicio:
-            try:
-                st = solicitud.orden_servicio.detalle_equipo.numero_serie
-                if st:
-                    numero_display = f"S/T: {st}"
-            except Exception:
-                pass
-
-        # Usar el asunto personalizado si fue proporcionado; de lo contrario,
-        # generarlo automáticamente con el perfil de servicio y el folio/serie.
+        # Asunto final: agregar referencia si no venía en asunto personalizado
+        referencia_pago = contexto_pais.get('referencia_pago', '')
         if asunto_correo and asunto_correo.strip():
             asunto = asunto_correo.strip()
+            # Si el asunto personalizado no incluye la referencia, agregarla al final
+            if referencia_pago and referencia_pago.upper() not in asunto.upper():
+                asunto = f'{asunto} - {referencia_pago}'
         else:
-            asunto = f'Cotización SIC — {titulo_display} | {numero_display}'
+            asunto = asunto_base
+            if referencia_pago:
+                asunto = f'{asunto} - {referencia_pago}'
 
         # Correo remitente extraído desde DEFAULT_FROM_EMAIL
         import re as _re
