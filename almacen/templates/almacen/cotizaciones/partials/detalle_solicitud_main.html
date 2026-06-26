@@ -87,54 +87,90 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                 </div>
             </div>
 
-            <!-- Totales financieros (antes en tfoot de la tabla) -->
+            <!-- Totales financieros: cotización enviada vs. lo aprobado por el cliente -->
             <div class="detalle-sidebar-card card border-0">
                 <div class="card-header">
                     <i class="bi bi-calculator me-2"></i>Totales
                 </div>
                 <div class="card-body py-2">
-                    <ul class="detalle-totales-list">
+                    {% if solicitud.cotizacion_precios_persistidos %}
+                    <p class="detalle-totales-section-title">Cotización enviada</p>
+                    <ul class="detalle-totales-list{% if solicitud.tiene_items_aprobados_cliente %} mb-3{% endif %}">
                         <li>
-                            <span class="total-label">Costo proveedor</span>
+                            <span class="total-label">Costo proveedor (piezas)</span>
                             <span class="total-val">${{ solicitud.costo_total|floatformat:2 }}</span>
                         </li>
-                        <li>
-                            <span class="total-label">Precio cliente (sin IVA)</span>
-                            <span class="total-val text-primary">
-                                {% if solicitud.precio_total_sin_iva_cliente %}${{ solicitud.precio_total_sin_iva_cliente|floatformat:2 }}{% else %}—{% endif %}
-                            </span>
-                        </li>
-                        {% if solicitud.costo_aprobado > 0 or solicitud.precio_cliente_aprobado_sin_iva > 0 %}
-                        <li>
-                            <span class="total-label text-success">Aprobado (costo prov.)</span>
-                            <span class="total-val text-success">${{ solicitud.costo_aprobado|floatformat:2 }}</span>
-                        </li>
-                        <li>
-                            <span class="total-label text-success">Aprobado (precio cliente)</span>
-                            <span class="total-val text-success">
-                                {% if solicitud.precio_cliente_aprobado_sin_iva > 0 %}${{ solicitud.precio_cliente_aprobado_sin_iva|floatformat:2 }}{% else %}—{% endif %}
-                            </span>
-                        </li>
-                        {% if solicitud.precio_total_con_iva_cliente %}
-                        <li>
-                            <span class="total-label text-primary">Total con IVA</span>
-                            <span class="total-val text-primary">${{ solicitud.precio_total_con_iva_cliente|floatformat:2 }}</span>
-                        </li>
-                        {% endif %}
-                        {% if solicitud.margen_aprobado_estimado > 0 %}
-                        <li>
-                            <span class="total-label">Margen estimado</span>
-                            <span class="total-val text-info">${{ solicitud.margen_aprobado_estimado|floatformat:2 }}</span>
-                        </li>
-                        {% endif %}
-                        {% endif %}
                         {% if solicitud.total_servicios_adicionales > 0 %}
                         <li>
-                            <span class="total-label">Servicios adicionales</span>
+                            <span class="total-label">Servicios (con IVA)</span>
                             <span class="total-val">${{ solicitud.costo_servicios_adicionales|floatformat:2 }}</span>
                         </li>
                         {% endif %}
+                        <li>
+                            <span class="total-label">Precio cliente (sin IVA)</span>
+                            <span class="total-val text-primary">${{ solicitud.precio_total_sin_iva_cliente|floatformat:2 }}</span>
+                        </li>
+                        <li>
+                            <span class="total-label">Total con IVA</span>
+                            <span class="total-val text-primary">${{ solicitud.precio_total_con_iva_cliente|floatformat:2 }}</span>
+                        </li>
                     </ul>
+                    {% else %}
+                    <ul class="detalle-totales-list{% if solicitud.tiene_items_aprobados_cliente %} mb-3{% endif %}">
+                        <li>
+                            <span class="total-label">Costo proveedor (piezas)</span>
+                            <span class="total-val">${{ solicitud.costo_total|floatformat:2 }}</span>
+                        </li>
+                        {% if solicitud.total_servicios_adicionales > 0 %}
+                        <li>
+                            <span class="total-label">Servicios (con IVA)</span>
+                            <span class="total-val">${{ solicitud.costo_servicios_adicionales|floatformat:2 }}</span>
+                        </li>
+                        {% endif %}
+                        <li>
+                            <span class="total-label">Precio cliente</span>
+                            <span class="total-val text-muted">—</span>
+                        </li>
+                    </ul>
+                    {% endif %}
+
+                    {% if solicitud.tiene_items_aprobados_cliente %}
+                    <p class="detalle-totales-section-title text-success">Aprobado por el cliente</p>
+                    <ul class="detalle-totales-list">
+                        {% if solicitud.precio_cliente_aprobado_sin_iva > 0 %}
+                        <li>
+                            <span class="total-label">Piezas (sin IVA)</span>
+                            <span class="total-val text-success">${{ solicitud.precio_cliente_aprobado_sin_iva|floatformat:2 }}</span>
+                        </li>
+                        {% endif %}
+                        {% if solicitud.servicios_aprobados_con_iva > 0 %}
+                        <li>
+                            <span class="total-label">Servicios (con IVA)</span>
+                            <span class="total-val text-success">${{ solicitud.servicios_aprobados_con_iva|floatformat:2 }}</span>
+                        </li>
+                        {% endif %}
+                        {% if solicitud.costo_aprobado > 0 %}
+                        <li>
+                            <span class="total-label">Costo proveedor (piezas)</span>
+                            <span class="total-val">${{ solicitud.costo_aprobado|floatformat:2 }}</span>
+                        </li>
+                        {% endif %}
+                        <li class="detalle-totales-item-highlight">
+                            <span class="total-label fw-semibold">Total a cobrar (con IVA)</span>
+                            <span class="total-val text-success fs-6">${{ solicitud.total_aprobado_con_iva|floatformat:2 }}</span>
+                        </li>
+                        <li>
+                            <span class="total-label">Equivalente sin IVA</span>
+                            <span class="total-val">${{ solicitud.total_aprobado_sin_iva|floatformat:2 }}</span>
+                        </li>
+                        {% if solicitud.margen_aprobado_estimado > 0 %}
+                        <li>
+                            <span class="total-label">Margen estimado (piezas)</span>
+                            <span class="total-val text-info">${{ solicitud.margen_aprobado_estimado|floatformat:2 }}</span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                    {% endif %}
                 </div>
             </div>
 

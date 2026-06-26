@@ -136,6 +136,23 @@
     color: var(--info-color);
 }
 
+.detalle-totales-section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gray-600);
+    margin: 0 0 0.35rem;
+}
+
+.detalle-totales-item-highlight {
+    background-color: var(--gray-50);
+    margin: 0.25rem -0.5rem 0;
+    padding: 0.55rem 0.5rem !important;
+    border-radius: 6px;
+    border-bottom: none !important;
+}
+
 /* Barra de progreso del resumen */
 .detalle-progress {
     height: 1.5rem;
@@ -564,6 +581,14 @@
 
 [data-bs-theme="dark"] .detalle-totales-list .total-label {
     color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .detalle-totales-section-title {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .detalle-totales-item-highlight {
+    background-color: #1e293b;
 }
 
 [data-bs-theme="dark"] .detalle-tabs-nav {

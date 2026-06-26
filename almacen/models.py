@@ -3141,6 +3141,91 @@ class SolicitudCotizacion(models.Model):
             return Decimal('0')
         return precio - costo
 
+    @property
+    def cotizacion_precios_persistidos(self):
+        """
+        Indica si ya se calcularon y guardaron los precios al cliente.
+
+        Returns:
+            bool: True cuando existe fecha_precios_cliente y total sin IVA.
+        """
+        return bool(
+            self.fecha_precios_cliente
+            and self.precio_total_sin_iva_cliente
+        )
+
+    @property
+    def servicios_aprobados_con_iva(self):
+        """
+        Suma de servicios adicionales aceptados por el cliente (precio con IVA).
+
+        Los servicios se cotizan con IVA incluido; este monto es lo que paga el cliente.
+        """
+        from decimal import Decimal
+        from django.db.models import Sum
+        from config.constants import ESTADOS_LINEA_COTIZACION_ACEPTADA
+
+        total = self.servicios_adicionales.filter(
+            estado_cliente__in=ESTADOS_LINEA_COTIZACION_ACEPTADA
+        ).aggregate(total=Sum('costo'))['total']
+        return total or Decimal('0')
+
+    @property
+    def servicios_aprobados_sin_iva(self):
+        """Servicios aceptados expresados sin IVA (costo con IVA ÷ 1.16)."""
+        from decimal import Decimal, ROUND_HALF_UP
+
+        con_iva = self.servicios_aprobados_con_iva or Decimal('0')
+        if con_iva <= 0:
+            return Decimal('0')
+        return (con_iva / Decimal('1.16')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    @property
+    def piezas_aprobadas_con_iva(self):
+        """Precio al cliente de piezas aceptadas, con IVA (16%)."""
+        from decimal import Decimal, ROUND_HALF_UP
+
+        sin_iva = self.precio_cliente_aprobado_sin_iva or Decimal('0')
+        if sin_iva <= 0:
+            return Decimal('0')
+        return (sin_iva * Decimal('1.16')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    @property
+    def total_aprobado_sin_iva(self):
+        """
+        Total aceptado sin IVA: piezas (con profit) + servicios (sin IVA).
+
+        Returns:
+            Decimal: Monto neto de todo lo que el cliente aprobó.
+        """
+        from decimal import Decimal
+
+        piezas = self.precio_cliente_aprobado_sin_iva or Decimal('0')
+        servicios = self.servicios_aprobados_sin_iva or Decimal('0')
+        return piezas + servicios
+
+    @property
+    def total_aprobado_con_iva(self):
+        """
+        Total real a cobrar al cliente por ítems aceptados (con IVA).
+
+        Piezas: subtotal persistido × 1.16. Servicios: costo ya incluye IVA.
+        """
+        from decimal import Decimal
+
+        return self.piezas_aprobadas_con_iva + (self.servicios_aprobados_con_iva or Decimal('0'))
+
+    @property
+    def tiene_items_aprobados_cliente(self):
+        """True si hay al menos una pieza o servicio aceptado por el cliente."""
+        from decimal import Decimal
+
+        return (
+            (self.costo_aprobado or Decimal('0')) > 0
+            or (self.precio_cliente_aprobado_sin_iva or Decimal('0')) > 0
+            or (self.servicios_aprobados_con_iva or Decimal('0')) > 0
+        )
+
     def persistir_precios_cliente(self):
         """
         Calcula y guarda los precios al cliente en líneas y cabecera.
@@ -3190,16 +3275,11 @@ class SolicitudCotizacion(models.Model):
     @property
     def costo_servicios_aprobados(self):
         """
-        Suma de los servicios adicionales aprobados.
-        
-        Returns:
-            Decimal: Suma solo de servicios con estado_cliente='aprobada'
+        Suma de los servicios adicionales aceptados (con IVA).
+
+        Alias de servicios_aprobados_con_iva para compatibilidad con código existente.
         """
-        from django.db.models import Sum
-        total = self.servicios_adicionales.filter(estado_cliente='aprobada').aggregate(
-            total=Sum('costo')
-        )['total']
-        return total or 0
+        return self.servicios_aprobados_con_iva
     
     @property
     def costo_total_con_servicios(self):
