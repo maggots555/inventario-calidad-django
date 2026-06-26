@@ -3702,6 +3702,13 @@ def detalle_solicitud_cotizacion(request, pk):
         'servicios_adicionales_opciones': _opciones_servicios_adicionales(),
     }
 
+    from .utils.cotizacion_items_cliente import (
+        solicitud_puede_descargar_pdf_final,
+        solicitud_tiene_items_cotizables,
+    )
+    context['puede_descargar_pdf_final'] = solicitud_puede_descargar_pdf_final(solicitud)
+    context['tiene_items_cotizables'] = solicitud_tiene_items_cotizables(solicitud)
+
     return render(request, 'almacen/cotizaciones/detalle_solicitud.html', context)
 
 
@@ -3883,88 +3890,42 @@ def api_enviar_cotizacion_cliente(request, pk):
                 'incluir_descuento_diagnostico_cliente',
             ])
 
-        # --- 6. CONSTRUIR GRUPOS DE ÍTEMS SEGÚN MODO DE AGRUPACIÓN ---
-        # Obtener todas las líneas de cotización (piezas) con sus datos
-        lineas = list(solicitud.lineas.select_related('producto').all())
+        # --- 6. CONSTRUIR GRUPOS DE ÍTEMS (solo pendiente + aprobada; excluye rechazadas) ---
+        from .utils.cotizacion_items_cliente import (
+            construir_grupos_cotizacion,
+            obtener_lineas_cotizables,
+            obtener_servicios_cotizables,
+            serializar_linea_cotizacion,
+            serializar_servicio_cotizacion,
+            solicitud_tiene_items_cotizables,
+        )
 
-        # Obtener todos los servicios adicionales (limpieza, paquetes, etc.)
-        servicios = list(solicitud.servicios_adicionales.all())
+        if not solicitud_tiene_items_cotizables(solicitud):
+            return JsonResponse({
+                'success': False,
+                'error': (
+                    'No hay piezas ni servicios pendientes o aprobados para cotizar. '
+                    'Las líneas rechazadas no se incluyen.'
+                ),
+            })
 
-        # Función auxiliar para serializar un ítem de línea a dict
-        def linea_a_dict(linea, es_servicio=False):
-            """Convierte una LineaCotizacion o LineaServicioAdicional a dict serializable."""
-            if es_servicio:
-                return {
-                    'pk': linea.pk,
-                    'descripcion': linea.get_tipo_servicio_display(),
-                    'cantidad': 1,
-                    'costo_unitario': float(linea.costo),
-                    'es_necesaria': linea.es_necesaria,
-                    'dias_entrega': None,
-                    'es_servicio': True,
-                }
-            else:
-                costo = float(linea.costo_unitario or 0)
-                return {
-                    'pk': linea.pk,
-                    'descripcion': (
-                        f"{linea.producto.nombre}: {linea.descripcion_pieza}"
-                        if linea.descripcion_pieza
-                        else linea.producto.nombre
-                    ),
-                    'cantidad': int(linea.cantidad),
-                    'costo_unitario': costo,
-                    'es_necesaria': linea.es_necesaria,
-                    'dias_entrega': linea.tiempo_entrega_estimado,
-                    'es_servicio': False,
-                }
+        items_piezas_todos = [
+            serializar_linea_cotizacion(l) for l in obtener_lineas_cotizables(solicitud)
+        ]
+        items_servicios = [
+            serializar_servicio_cotizacion(s) for s in obtener_servicios_cotizables(solicitud)
+        ]
+        grupos = construir_grupos_cotizacion(
+            items_piezas_todos, items_servicios, modo_agrupacion
+        )
 
-        # Convertir todos los ítems a dicts para pasar a la tarea
-        items_piezas_todos   = [linea_a_dict(l) for l in lineas if float(l.costo_unitario or 0) > 0]
-        items_piezas_nec     = [d for d in items_piezas_todos if d['es_necesaria']]
-        items_piezas_opc     = [d for d in items_piezas_todos if not d['es_necesaria']]
-        items_servicios      = [linea_a_dict(s, es_servicio=True) for s in servicios]
-        items_servicios_nec  = [d for d in items_servicios if d['es_necesaria']]
-        items_servicios_opc  = [d for d in items_servicios if not d['es_necesaria']]
-
-        # Configurar los grupos según el modo de agrupación elegido
-        if modo_agrupacion == 'todo_junto':
-            # Un solo PDF con todos los ítems (piezas + servicios)
-            grupos = [{'titulo': '', 'items': items_piezas_todos + items_servicios}]
-
-        elif modo_agrupacion == 'piezas_vs_servicios':
-            # Dos PDFs: uno de piezas y otro de servicios adicionales
-            grupos = []
-            if items_piezas_todos:
-                grupos.append({'titulo': 'Cotización de Piezas', 'items': items_piezas_todos})
-            if items_servicios:
-                grupos.append({'titulo': 'Cotización de Servicios Adicionales', 'items': items_servicios})
-            if not grupos:
-                grupos = [{'titulo': '', 'items': items_piezas_todos + items_servicios}]
-
-        elif modo_agrupacion == 'necesarias_vs_opcionales':
-            # Dos PDFs: piezas/servicios necesarios y opcionales
-            grupos = []
-            items_necesarios = items_piezas_nec + items_servicios_nec
-            items_opcionales = items_piezas_opc + items_servicios_opc
-            if items_necesarios:
-                grupos.append({'titulo': 'Cotización — Piezas y Servicios Necesarios', 'items': items_necesarios})
-            if items_opcionales:
-                grupos.append({'titulo': 'Cotización — Piezas y Servicios Opcionales', 'items': items_opcionales})
-            if not grupos:
-                grupos = [{'titulo': '', 'items': items_piezas_todos + items_servicios}]
-
-        else:
-            # Fallback: todo junto
-            grupos = [{'titulo': '', 'items': items_piezas_todos + items_servicios}]
-
-        # --- 7. FILTRAR GRUPOS CON AL MENOS UN ÍTEM ---
-        grupos = [g for g in grupos if g['items']]
         if not grupos:
             return JsonResponse({
                 'success': False,
-                'error': 'No hay ítems con costo registrado para generar la cotización. '
-                         'Agrega precios a las líneas antes de enviar.'
+                'error': (
+                    'No hay piezas ni servicios pendientes o aprobados para cotizar. '
+                    'Las líneas rechazadas no se incluyen.'
+                ),
             })
 
         # --- 8. DISPARAR TAREA CELERY PARA CADA GRUPO ---
@@ -4052,62 +4013,23 @@ def preview_pdf_cotizacion(request, pk):
         incluir_descuento = request.GET.get('incluir_descuento_diagnostico', '0') == '1'
         grupo_idx         = int(request.GET.get('grupo_idx', 0))
 
-        # Re-construir los grupos de ítems (mismo código que en api_enviar_cotizacion_cliente)
-        lineas    = list(solicitud.lineas.select_related('producto').all())
-        servicios = list(solicitud.servicios_adicionales.all())
+        from .utils.cotizacion_items_cliente import (
+            construir_grupos_cotizacion,
+            obtener_lineas_cotizables,
+            obtener_servicios_cotizables,
+            serializar_linea_cotizacion,
+            serializar_servicio_cotizacion,
+        )
 
-        def linea_a_dict_preview(linea, es_servicio=False):
-            """Serializa ítem para el preview del PDF."""
-            if es_servicio:
-                return {
-                    'pk': linea.pk,
-                    'descripcion': linea.get_tipo_servicio_display(),
-                    'cantidad': 1,
-                    'costo_unitario': float(linea.costo),
-                    'es_necesaria': linea.es_necesaria,
-                    'dias_entrega': None,
-                    'es_servicio': True,
-                }
-            return {
-                'pk': linea.pk,
-                'descripcion': (
-                    f"{linea.producto.nombre}: {linea.descripcion_pieza}"
-                    if linea.descripcion_pieza else linea.producto.nombre
-                ),
-                'cantidad': int(linea.cantidad),
-                'costo_unitario': float(linea.costo_unitario or 0),
-                'es_necesaria': linea.es_necesaria,
-                'dias_entrega': linea.tiempo_entrega_estimado,
-                'es_servicio': False,
-            }
-
-        items_todos_piezas = [linea_a_dict_preview(l) for l in lineas if float(l.costo_unitario or 0) > 0]
-        items_piezas_nec   = [d for d in items_todos_piezas if d['es_necesaria']]
-        items_piezas_opc   = [d for d in items_todos_piezas if not d['es_necesaria']]
-        items_servicios    = [linea_a_dict_preview(s, es_servicio=True) for s in servicios]
-        items_servicios_nec = [d for d in items_servicios if d['es_necesaria']]
-        items_servicios_opc = [d for d in items_servicios if not d['es_necesaria']]
-
-        if modo_agrupacion == 'todo_junto':
-            grupos = [{'titulo': '', 'items': items_todos_piezas + items_servicios}]
-        elif modo_agrupacion == 'piezas_vs_servicios':
-            grupos = []
-            if items_todos_piezas:
-                grupos.append({'titulo': 'Cotización de Piezas', 'items': items_todos_piezas})
-            if items_servicios:
-                grupos.append({'titulo': 'Cotización de Servicios Adicionales', 'items': items_servicios})
-        elif modo_agrupacion == 'necesarias_vs_opcionales':
-            grupos = []
-            items_necesarios = items_piezas_nec + items_servicios_nec
-            items_opcionales = items_piezas_opc + items_servicios_opc
-            if items_necesarios:
-                grupos.append({'titulo': 'Cotización — Piezas y Servicios Necesarios', 'items': items_necesarios})
-            if items_opcionales:
-                grupos.append({'titulo': 'Cotización — Piezas y Servicios Opcionales', 'items': items_opcionales})
-        else:
-            grupos = [{'titulo': '', 'items': items_todos_piezas + items_servicios}]
-
-        grupos = [g for g in grupos if g['items']]
+        items_todos_piezas = [
+            serializar_linea_cotizacion(l) for l in obtener_lineas_cotizables(solicitud)
+        ]
+        items_servicios = [
+            serializar_servicio_cotizacion(s) for s in obtener_servicios_cotizables(solicitud)
+        ]
+        grupos = construir_grupos_cotizacion(
+            items_todos_piezas, items_servicios, modo_agrupacion
+        )
 
         if not grupos:
             return HttpResponse(
@@ -4152,6 +4074,93 @@ def preview_pdf_cotizacion(request, pk):
     except Exception as e:
         import traceback as _tb
         logger.error(f"[PREVIEW_PDF_COTIZACION] Error: {e}\n{_tb.format_exc()}")
+        return HttpResponse(f'Error: {str(e)}'.encode(), content_type='text/plain', status=500)
+
+
+@login_required
+@permission_required_with_message('almacen.view_solicitudcotizacion')
+@require_http_methods(["GET"])
+def descargar_pdf_cotizacion_final(request, pk):
+    """
+    Genera y descarga el PDF final con piezas/servicios aceptados y precios persistidos.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cuando el cliente ya aprobó líneas y se generaron compras, este PDF muestra
+    únicamente lo aceptado con los precios guardados al aprobar (sin recalcular profit).
+
+    Args:
+        request: HttpRequest GET.
+        pk     : ID de la SolicitudCotizacion.
+
+    Returns:
+        HttpResponse PDF inline o error en texto plano.
+    """
+    from django.http import HttpResponse
+    from .utils.pdf_cotizacion_cliente import PDFCotizacionCliente
+    from .utils.cotizacion_items_cliente import (
+        construir_items_cotizacion_final,
+        solicitud_puede_descargar_pdf_final,
+    )
+    from .utils.cotizacion_precios_cliente import obtener_tipo_servicio_solicitud
+    from config.paises_config import get_pais_actual
+
+    try:
+        solicitud = get_object_or_404(
+            SolicitudCotizacion.objects.select_related(
+                'orden_servicio',
+                'orden_servicio__detalle_equipo',
+            ).prefetch_related('lineas__producto', 'servicios_adicionales'),
+            pk=pk,
+        )
+
+        if not solicitud_puede_descargar_pdf_final(solicitud):
+            return HttpResponse(
+                'No hay ítems aceptados con precios guardados para generar el PDF final.'.encode(),
+                content_type='text/plain',
+                status=400,
+            )
+
+        items = construir_items_cotizacion_final(solicitud)
+        if not items:
+            return HttpResponse(
+                'No se encontraron líneas aceptadas con precio al cliente.'.encode(),
+                content_type='text/plain',
+                status=400,
+            )
+
+        tipo_servicio = obtener_tipo_servicio_solicitud(solicitud)
+        incluir_descuento = bool(
+            getattr(solicitud, 'incluir_descuento_diagnostico_cliente', True)
+        )
+
+        generador = PDFCotizacionCliente(
+            solicitud=solicitud,
+            tipo_servicio=tipo_servicio,
+            items=items,
+            incluir_descuento_diagnostico=incluir_descuento,
+            pais_config=get_pais_actual(),
+            modo_final=True,
+        )
+
+        resultado = generador.generar_pdf()
+        if not resultado['success']:
+            return HttpResponse(
+                f'Error al generar PDF: {resultado.get("error", "desconocido")}'.encode(),
+                content_type='text/plain',
+                status=500,
+            )
+
+        pdf_bytes = resultado['buffer'].getvalue()
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = (
+            f'inline; filename="{resultado["nombre_archivo"]}"'
+        )
+        return response
+
+    except Exception as e:
+        import traceback as _tb
+        logger.error(f"[PDF_COTIZACION_FINAL] Error: {e}\n{_tb.format_exc()}")
         return HttpResponse(f'Error: {str(e)}'.encode(), content_type='text/plain', status=500)
 
 

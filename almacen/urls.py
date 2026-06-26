@@ -105,6 +105,7 @@ urlpatterns = [
     path('solicitudes-cotizacion/<int:pk>/enviar-a-cliente/', views.enviar_solicitud_a_cliente, name='enviar_solicitud_a_cliente'),
     path('solicitudes-cotizacion/<int:pk>/api-enviar-cotizacion-cliente/', views.api_enviar_cotizacion_cliente, name='api_enviar_cotizacion_cliente'),
     path('solicitudes-cotizacion/<int:pk>/preview-pdf-cotizacion/', views.preview_pdf_cotizacion, name='preview_pdf_cotizacion'),
+    path('solicitudes-cotizacion/<int:pk>/pdf-cotizacion-final/', views.descargar_pdf_cotizacion_final, name='descargar_pdf_cotizacion_final'),
     path('solicitudes-cotizacion/<int:pk>/notificar-front/', views.notificar_front, name='notificar_front'),
     path('solicitudes-cotizacion/<int:pk>/cancelar/', views.cancelar_solicitud_cotizacion, name='cancelar_solicitud_cotizacion'),
     path('solicitudes-cotizacion/<int:pk>/vincular-orden/', views.vincular_orden_solicitud, name='vincular_orden_solicitud'),

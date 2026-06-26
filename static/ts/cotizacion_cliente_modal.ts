@@ -59,6 +59,7 @@ interface LineaItem {
     cantidad:    number;
     costo:       number;       // costo unitario sin IVA (costo interno)
     es_necesaria: boolean;
+    estado_cliente: string;   // pendiente, aprobada, rechazada, compra_generada
 }
 
 /** Un servicio adicional (limpieza, reinstalación SO, etc.) */
@@ -66,18 +67,22 @@ interface ServicioItem {
     pk:     number;
     nombre: string;
     costo:  number;            // precio final con IVA incluido (sin profit adicional)
+    estado_cliente: string;
 }
 
 /** Resultado de la calculadora de profit */
 interface ResultadoCalculo {
-    subtotal_costo:         number;   // suma de todos los costos internos
-    precio_sin_iva:         number;   // precio al cliente sin IVA (con profit aplicado)
+    subtotal_costo:         number;   // suma de costos internos de piezas
+    precio_piezas_sin_iva:  number;   // piezas con margen, sin diagnóstico
+    precio_sin_iva:         number;   // precio al cliente sin IVA (piezas + diagnóstico)
     precio_con_iva:         number;   // precio al cliente con IVA 16%
     diagnostico:            number;   // costo del diagnóstico del perfil
     precio_menos_diag_iva:  number;   // precio_con_iva - diagnostico*(1+0.16)
-    costos_fijos_total:     number;   // suma de costos fijos del perfil
+    costos_fijos_total:     number;   // suma de costos fijos internos (auditoría)
     porcentaje_profit:      number;   // ej. 0.36 para estándar
-    mano_obra:              number;   // mano de obra ingresada (sin IVA)
+    mano_obra:              number;   // mano de obra interna (auditoría)
+    ganancia_bruta_dinero:  number;   // control interno Excel
+    ganancia_bruta_pct:     number;   // control interno Excel
 }
 
 // ============================================================
@@ -90,18 +95,17 @@ interface ResultadoCalculo {
  *
  * Fórmula (espejo exacto del backend Python en pdf_cotizacion_cliente.py):
  *
- *   base              = costoPiezas + manoObra + costosFijosTotal
- *   precio_sin_iva    = (base / (1 - profit%)) + diagnostico
- *   precio_con_iva    = precio_sin_iva * 1.16 + serviciosConIva
- *   precio_menos_diag = precio_con_iva - (diagnostico * 1.16)
+ *   precio_piezas_sin_iva = costoPiezas / (1 - profit%)
+ *   precio_sin_iva        = precio_piezas_sin_iva + diagnostico
+ *   precio_con_iva        = precio_sin_iva * 1.16
+ *   precio_menos_diag     = precio_con_iva - (diagnostico * 1.16)
  *
- * NOTA sobre servicios adicionales:
- *   - Ya traen IVA y profit incluidos al registrarse
- *   - Se suman al final sin aplicar margen adicional
+ * Los costos fijos y la mano de obra NO inflan el precio al cliente; solo
+ * alimentan la ganancia bruta de control interno (bloque BRUTO del Excel).
  *
  * @param tipo         - Perfil de servicio ('estandar', 'alta_gama', etc.)
- * @param costoTotal   - Suma de todos los costos internos (piezas + servicios)
- * @param manoObra     - Costo de mano de obra sin IVA
+ * @param costoTotal   - Suma de costos internos de piezas (sin servicios adicionales)
+ * @param manoObra     - Mano de obra interna (solo auditoría, no precio cliente)
  * @returns ResultadoCalculo con todos los valores
  */
 function calcularPrecioCliente(
@@ -109,35 +113,31 @@ function calcularPrecioCliente(
     costoTotal: number,
     manoObra: number
 ): ResultadoCalculo {
-    // Leer la configuración de profit del objeto inyectado por Django en el template.
-    // Los valores vienen del .env del servidor, nunca del código fuente del repositorio.
     const cfg = window.COTIZACION_CLIENTE_CONFIG?.profitConfig?.[tipo];
 
-    // Fallback defensivo: si por algún motivo el perfil no existe, usar valores
-    // del perfil 'estandar' para no romper la calculadora silenciosamente.
     const profit      = cfg?.profit_target  ?? 0.36;
     const costosFijos = cfg?.costos_fijos   ?? [25, 160];
     const diagnostico = cfg?.diagnostico    ?? 570;
 
-    // Sumar los costos fijos del perfil
     const costosFijosTotal = costosFijos.reduce((a: number, b: number) => a + b, 0);
 
-    // Base de costos que llevan profit: piezas + mano de obra + costos fijos
-    // La mano de obra va aquí porque también se vende con margen de ganancia
-    const baseCosto = costoTotal + manoObra + costosFijosTotal;
+    // Regla Excel: margen SOLO sobre piezas; diagnóstico se suma después
+    const precioPiezasSinIva = profit < 1 ? costoTotal / (1 - profit) : costoTotal;
+    const precioSinIva = precioPiezasSinIva + diagnostico;
 
-    // Precio sin IVA = base con profit + diagnóstico (sin profit, es cargo fijo)
-    // El diagnóstico se suma DESPUÉS del factor, igual que en el Python
-    const precioSinIva = (profit < 1 ? baseCosto / (1 - profit) : baseCosto) + diagnostico;
-
-    // Precio al cliente con IVA 16%
     const precioConIva = precioSinIva * 1.16;
-
-    // Precio con descuento diagnóstico (si el cliente ya lo pagó al ingreso)
     const precioMenosDiagIva = precioConIva - (diagnostico * 1.16);
+
+    // Métricas de control interno (no van al cliente)
+    const totalCostosExcel = costoTotal + manoObra + costosFijosTotal;
+    const gananciaBrutaDinero = precioPiezasSinIva - totalCostosExcel;
+    const gananciaBrutaPct = precioPiezasSinIva > 0
+        ? gananciaBrutaDinero / precioPiezasSinIva
+        : 0;
 
     return {
         subtotal_costo:        costoTotal,
+        precio_piezas_sin_iva: precioPiezasSinIva,
         precio_sin_iva:        precioSinIva,
         precio_con_iva:        precioConIva,
         diagnostico:           diagnostico,
@@ -145,6 +145,8 @@ function calcularPrecioCliente(
         costos_fijos_total:    costosFijosTotal,
         porcentaje_profit:     profit,
         mano_obra:             manoObra,
+        ganancia_bruta_dinero: gananciaBrutaDinero,
+        ganancia_bruta_pct:    gananciaBrutaPct,
     };
 }
 
@@ -165,6 +167,11 @@ function fmtPct(valor: number): string {
 /** Valida formato básico de email (mismo criterio que el backend) */
 function esEmailValido(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/** True si el ítem entra al cálculo (pendiente o aprobada; excluye rechazada y compra_generada) */
+function esItemCotizable(estado: string): boolean {
+    return estado === 'pendiente' || estado === 'aprobada';
 }
 
 // ============================================================
@@ -330,10 +337,12 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns Cadena HTML con el contenido del panel .calc-desglose-panel
      */
     function renderDesgloseHTML(): string {
-        // --- Sección de piezas ---
-        // Cada pieza muestra: nombre, "× cantidad" si es > 1, y el subtotal
-        const filasLineas = config.lineas.map(l => {
-            // Texto de cantidad solo si hay más de una unidad de la misma pieza
+        const lineasCotizables = config.lineas.filter(l => esItemCotizable(l.estado_cliente || 'pendiente'));
+        const lineasExcluidas = config.lineas.filter(l => !esItemCotizable(l.estado_cliente || 'pendiente'));
+        const serviciosCotizables = config.servicios.filter(s => esItemCotizable(s.estado_cliente || 'pendiente'));
+        const serviciosExcluidos = config.servicios.filter(s => !esItemCotizable(s.estado_cliente || 'pendiente'));
+
+        const filasLineas = lineasCotizables.map(l => {
             const cantTxt = l.cantidad > 1 ? ` <span class="desglose-cant">× ${l.cantidad}</span>` : '';
             return `
             <div class="calc-desglose-item">
@@ -342,21 +351,36 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
         }).join('');
 
-        // --- Sección de servicios adicionales (solo si existen) ---
-        const filasServicios = config.servicios.length > 0
+        const filasLineasExcluidas = lineasExcluidas.map(l => `
+            <div class="calc-desglose-item text-muted" style="text-decoration: line-through; opacity: 0.75;">
+                <span class="desglose-nombre">${l.nombre} <small>(rechazada — no incluida)</small></span>
+                <span class="desglose-val">${fmtPeso(l.costo * l.cantidad)}</span>
+            </div>`).join('');
+
+        const filasServicios = serviciosCotizables.length > 0
             ? `<div class="calc-desglose-grupo-titulo">Servicios adicionales (IVA incluido)</div>
-               ${config.servicios.map(s => `
+               ${serviciosCotizables.map(s => `
                <div class="calc-desglose-item">
                    <span class="desglose-nombre">${s.nombre}</span>
                    <span class="desglose-val">${fmtPeso(s.costo)}</span>
                </div>`).join('')}`
             : '';
 
+        const filasServiciosExcluidos = serviciosExcluidos.length > 0
+            ? serviciosExcluidos.map(s => `
+               <div class="calc-desglose-item text-muted" style="text-decoration: line-through; opacity: 0.75;">
+                   <span class="desglose-nombre">${s.nombre} <small>(rechazado — no incluido)</small></span>
+                   <span class="desglose-val">${fmtPeso(s.costo)}</span>
+               </div>`).join('')
+            : '';
+
         return `
-            ${config.lineas.length > 0
-                ? `<div class="calc-desglose-grupo-titulo">Piezas (${config.lineas.length})</div>${filasLineas}`
-                : '<div class="calc-desglose-vacio">Sin piezas registradas</div>'}
-            ${filasServicios}`;
+            ${lineasCotizables.length > 0
+                ? `<div class="calc-desglose-grupo-titulo">Piezas en cotización (${lineasCotizables.length})</div>${filasLineas}`
+                : '<div class="calc-desglose-vacio">Sin piezas activas para cotizar</div>'}
+            ${filasLineasExcluidas}
+            ${filasServicios}
+            ${filasServiciosExcluidos}`;
     }
 
     // --------------------------------------------------------
@@ -372,16 +396,29 @@ document.addEventListener('DOMContentLoaded', () => {
         // El diagnóstico ya se incluye automáticamente al seleccionar el perfil de profit.
         const manoObra = 0;
 
-        // Calcular la suma de costos internos de piezas (sin profit adicional en servicios)
-        const costoLineas = config.lineas.reduce((acc, l) => {
-            return acc + (l.costo * l.cantidad);
-        }, 0);
+        const lineasActivas = config.lineas.filter(l => esItemCotizable(l.estado_cliente || 'pendiente'));
+        const serviciosActivos = config.servicios.filter(s => esItemCotizable(s.estado_cliente || 'pendiente'));
 
-        // Servicios adicionales: precio final con IVA incluido (sin profit adicional)
-        const serviciosConIva = config.servicios.reduce((acc, s) => acc + s.costo, 0);
-        const soloServicios = config.lineas.length === 0 && config.servicios.length > 0;
+        const costoLineas = lineasActivas.reduce((acc, l) => acc + (l.costo * l.cantidad), 0);
+        const serviciosConIva = serviciosActivos.reduce((acc, s) => acc + s.costo, 0);
+        const soloServicios = lineasActivas.length === 0 && serviciosActivos.length > 0;
+        const sinItemsActivos = lineasActivas.length === 0 && serviciosActivos.length === 0;
 
-        // PDF/cotización solo con servicios: suma directa, sin profit ni costos fijos
+        if (sinItemsActivos) {
+            calcBody.innerHTML = `
+                <div class="alert alert-warning mb-0 py-2 px-3" style="font-size: 0.85rem;">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    No hay piezas ni servicios pendientes o aprobados para cotizar.
+                    Las líneas rechazadas no se incluyen.
+                </div>
+                <div class="calc-desglose-panel" style="display:block; margin-top: 0.5rem;">
+                    ${renderDesgloseHTML()}
+                </div>
+            `;
+            return;
+        }
+
+        // PDF/cotización solo con servicios activos: suma directa
         if (soloServicios) {
             calcBody.innerHTML = `
                 <div class="calc-row">
@@ -399,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Profit solo sobre piezas + costos fijos + diagnóstico del perfil
+        // Profit solo sobre piezas; diagnóstico del perfil se suma aparte
         const res = calcularPrecioCliente(tipo, costoLineas, manoObra);
 
         // Totales combinados: piezas (con profit) + servicios (precio fijo)
@@ -429,11 +466,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="val">${fmtPeso(serviciosConIva)}</span>
             </div>` : ''}
             <div class="calc-row">
-                <span class="etq">Costos fijos del perfil (${tipo})</span>
+                <span class="etq">Costos fijos internos (${tipo}) — no se cobran al cliente</span>
                 <span class="val">${fmtPeso(res.costos_fijos_total)}</span>
             </div>
             <div class="calc-row">
-                <span class="etq">Profit aplicado (solo piezas)</span>
+                <span class="etq">Profit aplicado (solo sobre costo de piezas)</span>
                 <span class="val">${fmtPct(res.porcentaje_profit)}</span>
             </div>
             ${res.diagnostico > 0 ? `
@@ -442,8 +479,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="val">${fmtPeso(res.diagnostico)}</span>
             </div>` : ''}
             <div class="calc-row">
-                <span class="etq">Reparación y piezas (sin IVA)</span>
-                <span class="val">${fmtPeso(res.precio_sin_iva - res.diagnostico)}</span>
+                <span class="etq">Reparación y piezas (sin IVA, con margen)</span>
+                <span class="val">${fmtPeso(res.precio_piezas_sin_iva)}</span>
             </div>
             <div class="calc-row total-iva">
                 <span class="etq">TOTAL CON IVA (16%)</span>

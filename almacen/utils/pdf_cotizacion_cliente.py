@@ -26,7 +26,7 @@ Uso básico:
 
 import io
 import logging
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import date
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -148,43 +148,201 @@ PROFIT_CONFIG: Dict[str, Dict] = _cargar_profit_config()
 # FUNCIÓN AUXILIAR DE CÁLCULO DE PROFIT
 # =============================================================================
 
+IVA_FACTOR = 1.16
+_DECIMAL_DOS = Decimal('0.01')
+
+
+def _a_decimal(valor: float) -> Decimal:
+    """Convierte un número a Decimal para evitar errores de punto flotante."""
+    return Decimal(str(valor))
+
+
+def _redondear_2(valor: Decimal) -> Decimal:
+    """Redondea a 2 decimales con regla comercial (half up)."""
+    return valor.quantize(_DECIMAL_DOS, rounding=ROUND_HALF_UP)
+
+
+def _calcular_matematica_profit(
+    suma_costos_brutos: float,
+    profit_target: float,
+    diagnostico: float,
+    costos_fijos: List[float],
+    mano_obra: float = 0.0,
+) -> Dict[str, float]:
+    """
+    Núcleo matemático alineado con el libro de Excel operativo.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    El margen (profit_target) SOLO se aplica sobre el costo de piezas físicas.
+    El diagnóstico se suma después, sin margen.
+    Los costos fijos y la mano de obra NO inflan el precio al cliente; solo
+    reducen la ganancia bruta real en el bloque de control interno.
+
+    Args:
+        suma_costos_brutos : Σ(costo_unitario × cantidad) de piezas.
+        profit_target      : Margen esperado (ej. 0.36 = 36%).
+        diagnostico        : Cargo plano por revisión técnica (MXN sin IVA).
+        costos_fijos       : Gastos operativos internos del perfil (MXN sin IVA).
+        mano_obra          : Mano de obra interna (solo auditoría, no precio cliente).
+
+    Returns:
+        Dict con precios al cliente y métricas de control (ganancia bruta).
+    """
+    costos_brutos = _a_decimal(suma_costos_brutos)
+    target = _a_decimal(profit_target)
+    diag = _a_decimal(diagnostico)
+    mo = _a_decimal(mano_obra)
+    suma_fijos = sum((_a_decimal(c) for c in costos_fijos), Decimal('0'))
+
+    # Divisor del margen: si target=0.36 → factor=0.64
+    factor = Decimal('1') - target
+    if factor <= 0:
+        factor = Decimal('1')
+
+    # Regla Excel: margen solo sobre piezas
+    precio_piezas_sin_iva = costos_brutos / factor if costos_brutos > 0 else Decimal('0')
+    precio_final_sin_iva = precio_piezas_sin_iva + diag
+
+    # Factor para repartir diagnóstico entre líneas proporcionalmente al costo
+    if costos_brutos > 0:
+        factor_redistrib = precio_final_sin_iva / costos_brutos
+    else:
+        factor_redistrib = Decimal('0')
+
+    # Bloque BRUTO del Excel — solo control interno
+    total_costos_excel = costos_brutos + mo + suma_fijos
+    ganancia_bruta_dinero = precio_piezas_sin_iva - total_costos_excel
+    ganancia_bruta_pct = (
+        ganancia_bruta_dinero / precio_piezas_sin_iva
+        if precio_piezas_sin_iva > 0
+        else Decimal('0')
+    )
+
+    return {
+        'precio_piezas_sin_iva': float(_redondear_2(precio_piezas_sin_iva)),
+        'precio_final_sin_iva': float(_redondear_2(precio_final_sin_iva)),
+        'factor_redistrib': float(factor_redistrib),
+        'suma_costos_fijos': float(_redondear_2(suma_fijos)),
+        'total_costos_excel': float(_redondear_2(total_costos_excel)),
+        'ganancia_bruta_dinero': float(_redondear_2(ganancia_bruta_dinero)),
+        'ganancia_bruta_porcentaje': float(ganancia_bruta_pct),
+        'factor_ganancia': float(factor),
+        'profit_target': profit_target,
+    }
+
+
+def _redistribuir_precios_items(
+    items_brutos: List[Dict],
+    precio_final_sin_iva: float,
+    factor_redistrib: float,
+) -> Dict[int, Dict]:
+    """
+    Asigna precio al cliente por pieza con redondeo y ajuste de centavos.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    Cada pieza recibe un precio proporcional a su costo × factor_redistribución.
+    Tras redondear cada subtotal a 2 decimales, se ajusta la última línea para
+    que la suma coincida exactamente con PRECIO_FINAL_SIN_IVA del Excel.
+
+    Args:
+        items_brutos         : Lista interna con costo, cantidad e índice original.
+        precio_final_sin_iva : Total sin IVA que deben sumar las piezas.
+        factor_redistrib     : Multiplicador = precio_final / Σ costos brutos.
+
+    Returns:
+        Dict {idx_original: item con precio_unitario_cliente y subtotal_cliente}.
+    """
+    if not items_brutos:
+        return {}
+
+    objetivo = _a_decimal(precio_final_sin_iva)
+    factor = _a_decimal(factor_redistrib)
+    resultado: Dict[int, Dict] = {}
+    lineas_redondeadas: List[Dict] = []
+
+    for item in items_brutos:
+        costo_unit = _a_decimal(item['_costo_unit_bruto'])
+        cantidad = int(item['_cantidad'])
+        # Precio sin redondear para máxima precisión intermedia
+        subtotal_exacto = costo_unit * factor * cantidad
+        subtotal_redondeado = _redondear_2(subtotal_exacto)
+        precio_unit_redondeado = (
+            _redondear_2(subtotal_redondeado / cantidad) if cantidad > 0 else Decimal('0')
+        )
+
+        item_limpio = {
+            k: v for k, v in item.items()
+            if not k.startswith('_') and k != 'idx'
+        }
+        entrada = {
+            'idx': item['idx'],
+            'item_limpio': item_limpio,
+            'cantidad': cantidad,
+            'subtotal': subtotal_redondeado,
+            'precio_unit': precio_unit_redondeado,
+        }
+        lineas_redondeadas.append(entrada)
+
+    # Ajuste de centavos en la última línea para cuadrar el total
+    suma_subtotales = sum(l['subtotal'] for l in lineas_redondeadas)
+    diferencia = objetivo - suma_subtotales
+    if lineas_redondeadas and diferencia != 0:
+        ultima = lineas_redondeadas[-1]
+        nuevo_subtotal = _redondear_2(ultima['subtotal'] + diferencia)
+        cantidad_ultima = ultima['cantidad']
+        ultima['subtotal'] = nuevo_subtotal
+        ultima['precio_unit'] = (
+            _redondear_2(nuevo_subtotal / cantidad_ultima)
+            if cantidad_ultima > 0
+            else Decimal('0')
+        )
+
+    for linea in lineas_redondeadas:
+        resultado[linea['idx']] = {
+            **linea['item_limpio'],
+            'precio_unitario_cliente': float(linea['precio_unit']),
+            'subtotal_cliente': float(linea['subtotal']),
+        }
+
+    return resultado
+
+
 def calcular_precio_cliente(
     costo_piezas: float,
     tipo_servicio: str = 'estandar',
     incluir_descuento_diagnostico: bool = True,
     servicios_con_iva: float = 0,
+    mano_de_obra_override: float = 0,
 ) -> Dict[str, Any]:
     """
-    Calcula los precios al cliente según la matriz de profit de SIC.
+    Calcula los precios al cliente según la matriz de profit de SIC (reglas Excel).
 
     EXPLICACIÓN:
-    Esta función implementa exactamente la misma lógica de la función Python
-    definida en el diseño del módulo. Aplica el profit_target para calcular
-    el precio al público (sin margen visible).
+    El margen se aplica ÚNICAMENTE sobre el costo de piezas físicas.
+    El diagnóstico se suma después sin margen.
+    Los costos fijos y la mano de obra NO inflan el precio; solo alimentan
+    las métricas de ganancia bruta para control interno.
 
     Los servicios adicionales (servicios_con_iva) ya traen IVA y profit incluidos
     al registrarse; se suman al final sin aplicar margen adicional.
 
     Args:
-        costo_piezas   : Costo interno total de piezas (puede ser lista o número).
-        tipo_servicio  : Clave del tipo ('mostrador', 'estandar', 'express', etc.)
-        incluir_descuento_diagnostico: Si True, calcula el precio con deducción.
-        servicios_con_iva: Suma de precios de servicios adicionales (IVA incluido).
+        costo_piezas                  : Costo interno total de piezas (lista o número).
+        tipo_servicio                 : Clave del tipo ('mostrador', 'estandar', etc.)
+        incluir_descuento_diagnostico : Si True, calcula el precio con deducción.
+        servicios_con_iva             : Suma de servicios adicionales (IVA incluido).
+        mano_de_obra_override         : Mano de obra interna (solo auditoría).
 
     Returns:
-        Dict con los resultados del cálculo (precios sin IVA y con IVA).
+        Dict con precios sin IVA, con IVA y métricas de control.
     """
-    IVA_FACTOR = 1.16
-
-    # Validar que el tipo de servicio exista en la configuración
     if tipo_servicio not in PROFIT_CONFIG:
         tipo_servicio = 'estandar'
 
     perfil = PROFIT_CONFIG[tipo_servicio]
-    target = perfil['profit_target']
-    factor_ganancia = 1 - target  # Divisor para aplicar el margen
 
-    # Convertir a float para operaciones numéricas
     if isinstance(costo_piezas, (list, tuple)):
         costo_total = float(sum(costo_piezas))
     else:
@@ -192,73 +350,81 @@ def calcular_precio_cliente(
 
     servicios_con_iva = float(servicios_con_iva or 0)
     servicios_sin_iva = servicios_con_iva / IVA_FACTOR if servicios_con_iva > 0 else 0.0
+    mano_obra = float(mano_de_obra_override or 0)
 
     # PDF/cotización solo con servicios adicionales: sin profit, fijos ni diagnóstico
     if costo_total == 0 and servicios_con_iva > 0:
         return {
-            'servicio_nombre':           TIPO_SERVICIO_NOMBRES.get(tipo_servicio, 'Cotización'),
-            'total_costos_internos':     round(servicios_con_iva, 2),
-            'precio_piezas_sin_iva':     0.0,
-            'precio_fijos_sin_iva':      0.0,
-            'diagnostico':               0.0,
-            'precio_sin_iva':            round(servicios_sin_iva, 2),
-            'precio_con_iva':            round(servicios_con_iva, 2),
-            'precio_menos_diagnostico':  None,
-            'factor_ganancia':           factor_ganancia,
-            'profit_target':             target,
+            'servicio_nombre': TIPO_SERVICIO_NOMBRES.get(tipo_servicio, 'Cotización'),
+            'total_costos_internos': round(servicios_con_iva, 2),
+            'total_costos_excel': 0.0,
+            'precio_piezas_sin_iva': 0.0,
+            'precio_fijos_sin_iva': 0.0,
+            'diagnostico': 0.0,
+            'precio_sin_iva': round(servicios_sin_iva, 2),
+            'precio_con_iva': round(servicios_con_iva, 2),
+            'precio_menos_diagnostico': None,
+            'ganancia_bruta_dinero': 0.0,
+            'ganancia_bruta_porcentaje': 0.0,
+            'factor_ganancia': 1 - perfil['profit_target'],
+            'profit_target': perfil['profit_target'],
         }
 
-    # Precio de piezas al cliente (con margen aplicado)
-    precio_piezas_cliente = costo_total / factor_ganancia if factor_ganancia > 0 else costo_total
+    matematica = _calcular_matematica_profit(
+        suma_costos_brutos=costo_total,
+        profit_target=perfil['profit_target'],
+        diagnostico=perfil['diagnostico'],
+        costos_fijos=perfil['costos_fijos'],
+        mano_obra=mano_obra,
+    )
 
-    # Precio de costos fijos al cliente (con mismo margen)
-    precio_fijos_cliente = sum(c / factor_ganancia for c in perfil['costos_fijos']) if factor_ganancia > 0 else sum(perfil['costos_fijos'])
-
-    # Total de costos internos (solo para auditoría, no se muestra al cliente)
-    total_costos_internos = costo_total + sum(perfil['costos_fijos'])
-
-    # Precio sin IVA de piezas = piezas con margen + fijos con margen + diagnóstico (sin margen)
-    precio_sin_iva_piezas = precio_piezas_cliente + precio_fijos_cliente + perfil['diagnostico']
+    precio_sin_iva_piezas = matematica['precio_final_sin_iva']
     precio_con_iva_piezas = precio_sin_iva_piezas * IVA_FACTOR
 
-    # Totales combinados: piezas (con profit) + servicios (precio fijo con IVA incluido)
     precio_sin_iva = precio_sin_iva_piezas + servicios_sin_iva
     precio_con_iva = precio_con_iva_piezas + servicios_con_iva
 
-    # Deducción de diagnóstico (solo afecta la porción de piezas/reparación)
     precio_menos_diagnostico_iva = None
     if incluir_descuento_diagnostico and perfil['diagnostico'] > 0:
         diagnostico_con_iva = perfil['diagnostico'] * IVA_FACTOR
         precio_menos_diagnostico_iva = precio_con_iva - diagnostico_con_iva
 
     return {
-        'servicio_nombre':           TIPO_SERVICIO_NOMBRES.get(tipo_servicio, 'Cotización'),
-        'total_costos_internos':     round(total_costos_internos, 2),
-        'precio_piezas_sin_iva':     round(precio_piezas_cliente, 2),
-        'precio_fijos_sin_iva':      round(precio_fijos_cliente, 2),
-        'diagnostico':               perfil['diagnostico'],
-        'precio_sin_iva':            round(precio_sin_iva, 2),
-        'precio_con_iva':            round(precio_con_iva, 2),
-        'precio_menos_diagnostico':  round(precio_menos_diagnostico_iva, 2) if precio_menos_diagnostico_iva is not None else None,
-        'factor_ganancia':           factor_ganancia,
-        'profit_target':             target,
+        'servicio_nombre': TIPO_SERVICIO_NOMBRES.get(tipo_servicio, 'Cotización'),
+        'total_costos_internos': matematica['total_costos_excel'],
+        'total_costos_excel': matematica['total_costos_excel'],
+        'precio_piezas_sin_iva': matematica['precio_piezas_sin_iva'],
+        'precio_fijos_sin_iva': matematica['suma_costos_fijos'],
+        'diagnostico': perfil['diagnostico'],
+        'precio_sin_iva': round(precio_sin_iva, 2),
+        'precio_con_iva': round(precio_con_iva, 2),
+        'precio_menos_diagnostico': (
+            round(precio_menos_diagnostico_iva, 2)
+            if precio_menos_diagnostico_iva is not None
+            else None
+        ),
+        'ganancia_bruta_dinero': matematica['ganancia_bruta_dinero'],
+        'ganancia_bruta_porcentaje': matematica['ganancia_bruta_porcentaje'],
+        'factor_ganancia': matematica['factor_ganancia'],
+        'profit_target': matematica['profit_target'],
     }
 
 
 def calcular_precio_unitario_cliente(costo_unitario: float, tipo_servicio: str) -> float:
     """
-    Calcula el precio unitario al cliente para UN solo ítem.
+    Calcula el precio unitario al cliente para UN solo ítem (aproximación).
 
     EXPLICACIÓN:
-    Usa el mismo factor de ganancia que calcular_precio_cliente() pero
-    aplicado a un costo individual (para mostrar precios por pieza en la tabla).
+    Aplica solo el factor de margen sobre el costo unitario, SIN redistribución
+    del diagnóstico entre líneas. Para cotizaciones completas usar siempre
+    calcular_precios_items_cotizacion(), que absorbe el diagnóstico en el breakdown.
 
     Args:
         costo_unitario  : Costo interno de la pieza/servicio.
         tipo_servicio   : Clave del tipo de servicio.
 
     Returns:
-        float: Precio al cliente sin IVA.
+        float: Precio al cliente sin IVA (aproximado, sin contexto de cotización).
     """
     if tipo_servicio not in PROFIT_CONFIG:
         tipo_servicio = 'estandar'
@@ -273,26 +439,28 @@ def calcular_precios_items_cotizacion(
     mano_de_obra_override: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
-    Calcula precios al cliente por ítem y totales (misma lógica que el PDF).
+    Calcula precios al cliente por ítem y totales (misma lógica Excel que el PDF).
 
     EXPLICACIÓN PARA PRINCIPIANTES:
     Esta función centraliza el cálculo de profit usado por el PDF y por la
     persistencia de precios al aprobar líneas en Almacén.
 
+    El margen solo aplica sobre piezas; el diagnóstico se reparte proporcionalmente
+    entre líneas vía factor_redistribución. Costos fijos y mano de obra son
+    métricas internas que no inflan el precio al cliente.
+
     Args:
         items                         : Lista de dicts con costo_unitario, cantidad, es_servicio, etc.
         tipo_servicio                 : Perfil de profit (mostrador, estandar, etc.).
         incluir_descuento_diagnostico : Si aplica deducción de diagnóstico en totales.
-        mano_de_obra_override         : Mano de obra sin IVA (opcional).
+        mano_de_obra_override         : Mano de obra sin IVA (solo auditoría interna).
 
     Returns:
         Dict con items_calculados y totales (precio_sin_iva, precio_con_iva, etc.).
     """
-    IVA_FACTOR = 1.16
     if tipo_servicio not in PROFIT_CONFIG:
         tipo_servicio = 'estandar'
     perfil = PROFIT_CONFIG[tipo_servicio]
-    factor = 1 - perfil['profit_target']
     mano_obra = float(mano_de_obra_override or 0)
 
     items_piezas = [i for i in items if not i.get('es_servicio')]
@@ -302,8 +470,7 @@ def calcular_precios_items_cotizacion(
     items_calculados_map: Dict[int, Dict] = {}
     precio_sin_iva_piezas = 0.0
     precio_con_iva_piezas = 0.0
-    total_cliente_sin_iva_sin_diag = 0.0
-    suma_costos_fijos = 0.0
+    matematica: Dict[str, float] = {}
 
     if not solo_servicios:
         items_brutos: List[Dict] = []
@@ -324,29 +491,21 @@ def calcular_precios_items_cotizacion(
                 '_cantidad': cantidad,
             })
 
-        suma_costos_fijos = sum(perfil['costos_fijos'])
-        total_distribuible = suma_costos_brutos + mano_obra + suma_costos_fijos
-        total_cliente_sin_iva_sin_diag = (
-            total_distribuible / factor if factor > 0 else total_distribuible
+        matematica = _calcular_matematica_profit(
+            suma_costos_brutos=suma_costos_brutos,
+            profit_target=perfil['profit_target'],
+            diagnostico=perfil['diagnostico'],
+            costos_fijos=perfil['costos_fijos'],
+            mano_obra=mano_obra,
         )
-        precio_sin_iva_piezas = total_cliente_sin_iva_sin_diag + perfil['diagnostico']
+        precio_sin_iva_piezas = matematica['precio_final_sin_iva']
 
         if suma_costos_brutos > 0:
-            factor_redistrib = precio_sin_iva_piezas / suma_costos_brutos
-            for item in items_brutos:
-                costo_unit = item['_costo_unit_bruto']
-                cantidad = item['_cantidad']
-                precio_unit_cliente = costo_unit * factor_redistrib
-                subtotal_cliente = precio_unit_cliente * cantidad
-                item_limpio = {
-                    k: v for k, v in item.items()
-                    if not k.startswith('_') and k != 'idx'
-                }
-                items_calculados_map[item['idx']] = {
-                    **item_limpio,
-                    'precio_unitario_cliente': round(precio_unit_cliente, 2),
-                    'subtotal_cliente': round(subtotal_cliente, 2),
-                }
+            items_calculados_map = _redistribuir_precios_items(
+                items_brutos=items_brutos,
+                precio_final_sin_iva=precio_sin_iva_piezas,
+                factor_redistrib=matematica['factor_redistrib'],
+            )
 
         if not items_calculados_map and precio_sin_iva_piezas > 0:
             items_calculados_map[-1] = {
@@ -405,16 +564,95 @@ def calcular_precios_items_cotizacion(
     return {
         'items_calculados': items_calculados,
         'mano_obra': round(mano_obra, 2),
-        'precio_piezas_sin_iva': round(total_cliente_sin_iva_sin_diag, 2),
-        'precio_fijos_sin_iva': round(
-            suma_costos_fijos / factor if factor > 0 else 0, 2
-        ),
+        'precio_piezas_sin_iva': matematica.get('precio_piezas_sin_iva', 0.0),
+        'precio_fijos_sin_iva': matematica.get('suma_costos_fijos', 0.0),
+        'total_costos_excel': matematica.get('total_costos_excel', 0.0),
+        'ganancia_bruta_dinero': matematica.get('ganancia_bruta_dinero', 0.0),
+        'ganancia_bruta_porcentaje': matematica.get('ganancia_bruta_porcentaje', 0.0),
         'diagnostico': 0 if solo_servicios else perfil['diagnostico'],
         'precio_sin_iva': round(precio_sin_iva, 2),
         'iva': round(iva, 2),
         'precio_con_iva': round(precio_con_iva, 2),
         'precio_menos_diagnostico': (
             round(precio_menos_diagnostico, 2) if precio_menos_diagnostico else None
+        ),
+    }
+
+
+def calcular_totales_items_finales(
+    items: List[Dict],
+    incluir_descuento_diagnostico: bool = True,
+    diagnostico: float = 0,
+) -> Dict[str, Any]:
+    """
+    Suma totales de ítems con precios ya persistidos (PDF final, sin profit).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    --------------------------------
+    El PDF final no recalcula margen: usa los precios guardados al aprobar
+    cada línea. Solo suma subtotales y aplica IVA / descuento diagnóstico.
+
+    Args:
+        items                         : Ítems con precio_unitario_cliente y subtotal_cliente.
+        incluir_descuento_diagnostico : Si muestra total menos diagnóstico.
+        diagnostico                   : Cargo de diagnóstico del perfil (MXN sin IVA).
+
+    Returns:
+        Dict compatible con el generador PDF (items_calculados, totales, etc.).
+    """
+    items_calculados: List[Dict] = []
+    suma_piezas_sin_iva = 0.0
+    suma_servicios_sin_iva = 0.0
+    suma_servicios_con_iva = 0.0
+    hay_piezas = False
+
+    for item in items:
+        item_limpio = {k: v for k, v in item.items() if not k.startswith('_')}
+        precio_unit = float(item.get('precio_unitario_cliente', 0) or 0)
+        subtotal = float(item.get('subtotal_cliente', 0) or 0)
+        entrada = {
+            **item_limpio,
+            'precio_unitario_cliente': round(precio_unit, 2),
+            'subtotal_cliente': round(subtotal, 2),
+        }
+        items_calculados.append(entrada)
+
+        if item.get('es_servicio'):
+            suma_servicios_sin_iva += subtotal
+            costo_con_iva = float(item.get('costo_unitario', 0) or 0)
+            suma_servicios_con_iva += costo_con_iva * int(item.get('cantidad', 1) or 1)
+        else:
+            hay_piezas = True
+            suma_piezas_sin_iva += subtotal
+
+    precio_sin_iva_piezas = suma_piezas_sin_iva
+    precio_con_iva_piezas = precio_sin_iva_piezas * IVA_FACTOR
+    precio_sin_iva = precio_sin_iva_piezas + suma_servicios_sin_iva
+    precio_con_iva = precio_con_iva_piezas + suma_servicios_con_iva
+    iva = precio_con_iva - precio_sin_iva
+
+    precio_menos_diagnostico = None
+    if (
+        hay_piezas
+        and incluir_descuento_diagnostico
+        and diagnostico > 0
+    ):
+        precio_menos_diagnostico = precio_con_iva - (diagnostico * IVA_FACTOR)
+
+    return {
+        'items_calculados': items_calculados,
+        'mano_obra': 0.0,
+        'precio_piezas_sin_iva': round(precio_sin_iva_piezas, 2),
+        'precio_fijos_sin_iva': 0.0,
+        'total_costos_excel': 0.0,
+        'ganancia_bruta_dinero': 0.0,
+        'ganancia_bruta_porcentaje': 0.0,
+        'diagnostico': diagnostico if hay_piezas else 0,
+        'precio_sin_iva': round(precio_sin_iva, 2),
+        'iva': round(iva, 2),
+        'precio_con_iva': round(precio_con_iva, 2),
+        'precio_menos_diagnostico': (
+            round(precio_menos_diagnostico, 2) if precio_menos_diagnostico is not None else None
         ),
     }
 
@@ -454,6 +692,7 @@ class PDFCotizacionCliente:
         incluir_descuento_diagnostico: bool = True,
         mano_de_obra_override: Optional[float] = None,
         pais_config: Optional[Dict] = None,
+        modo_final: bool = False,
     ):
         """
         Inicializa el generador con todos los parámetros de la propuesta.
@@ -466,6 +705,7 @@ class PDFCotizacionCliente:
             incluir_descuento_diagnostico: Si True y hay diagnóstico, muestra precio con deducción.
             mano_de_obra_override       : Si el usuario editó la mano de obra en el modal (float).
             pais_config                 : Dict con info del país activo (empresa, ciudad, etc.).
+            modo_final                  : Si True, usa precios persistidos sin recalcular profit.
         """
         self.solicitud = solicitud
         self.tipo_servicio = tipo_servicio if tipo_servicio in PROFIT_CONFIG else 'estandar'
@@ -473,12 +713,15 @@ class PDFCotizacionCliente:
         self.incluir_descuento_diagnostico = incluir_descuento_diagnostico
         self.mano_de_obra_override = mano_de_obra_override
         self.pais_config = pais_config or {}
+        self.modo_final = modo_final
 
-        # Título del PDF: personalizado o nombre del perfil
-        self.titulo = (
-            titulo_propuesta
-            or TIPO_SERVICIO_NOMBRES.get(self.tipo_servicio, 'Cotización de Servicio')
-        )
+        if modo_final:
+            self.titulo = titulo_propuesta or 'Cotización Final — Piezas y Servicios Aceptados'
+        else:
+            self.titulo = (
+                titulo_propuesta
+                or TIPO_SERVICIO_NOMBRES.get(self.tipo_servicio, 'Cotización de Servicio')
+            )
 
         # Estilos de texto para Platypus
         self._estilos = getSampleStyleSheet()
@@ -685,7 +928,10 @@ class PDFCotizacionCliente:
 
             # Nombre del archivo para el adjunto del email
             numero = self.solicitud.numero_solicitud
-            nombre_archivo = f"Cotizacion_{numero}_{self.tipo_servicio}.pdf"
+            if self.modo_final:
+                nombre_archivo = f"CotizacionFinal_{numero}.pdf"
+            else:
+                nombre_archivo = f"Cotizacion_{numero}_{self.tipo_servicio}.pdf"
 
             return {'success': True, 'buffer': buffer, 'nombre_archivo': nombre_archivo}
 
@@ -699,11 +945,17 @@ class PDFCotizacionCliente:
 
     def _calcular_totales(self) -> Dict[str, Any]:
         """
-        Aplica la lógica de profit y calcula los totales para el PDF.
+        Calcula totales para el PDF (profit o precios finales persistidos).
 
-        Delega en calcular_precios_items_cotizacion() para compartir la misma
-        fórmula con la persistencia de precios al aprobar en Almacén.
+        En modo_final suma precios guardados en BD; en modo normal aplica profit Excel.
         """
+        if self.modo_final:
+            perfil = PROFIT_CONFIG.get(self.tipo_servicio, PROFIT_CONFIG['estandar'])
+            return calcular_totales_items_finales(
+                items=self.items,
+                incluir_descuento_diagnostico=self.incluir_descuento_diagnostico,
+                diagnostico=perfil['diagnostico'],
+            )
         return calcular_precios_items_cotizacion(
             items=self.items,
             tipo_servicio=self.tipo_servicio,

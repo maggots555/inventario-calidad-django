@@ -31,6 +31,26 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
         </a>
     </div>
 
+    {% if solicitud.estado == 'totalmente_rechazada' %}
+    <div class="alert alert-secondary border mt-3 mb-0" role="status">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>Cotización finalizada.</strong>
+        El cliente rechazó todas las piezas y servicios. No es posible reenviar la cotización.
+    </div>
+    {% elif solicitud.estado == 'completada' %}
+    <div class="alert alert-success border mt-3 mb-0" role="status">
+        <i class="bi bi-check-circle me-2"></i>
+        <strong>Cotización finalizada.</strong>
+        Las compras fueron generadas para las líneas aceptadas por el cliente.
+    </div>
+    {% elif solicitud.estado == 'cancelada' %}
+    <div class="alert alert-warning border mt-3 mb-0" role="status">
+        <i class="bi bi-slash-circle me-2"></i>
+        <strong>Cotización cancelada.</strong>
+        Esta solicitud ya no admite cambios ni reenvíos al cliente.
+    </div>
+    {% endif %}
+
     <div class="row g-4">
         <!-- Sidebar: primero en móvil, sticky en desktop -->
         <div class="col-lg-4 order-1 order-lg-2 detalle-solicitud-sidebar">
@@ -598,7 +618,11 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
             <i class="bi bi-cart-plus me-1"></i>Generar Compras
         </button>
     </form>
-    {% elif solicitud.estado == 'enviada_cliente' %}
+    {% elif solicitud.estado == 'enviada_cliente' and tiene_items_cotizables %}
+    <button type="button" class="btn btn-outline-warning btn-dock-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
+        <i class="bi bi-arrow-clockwise me-1"></i>Reenviar
+    </button>
+    {% elif solicitud.estado == 'parcialmente_aprobada' and tiene_items_cotizables %}
     <button type="button" class="btn btn-outline-warning btn-dock-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
         <i class="bi bi-arrow-clockwise me-1"></i>Reenviar
     </button>

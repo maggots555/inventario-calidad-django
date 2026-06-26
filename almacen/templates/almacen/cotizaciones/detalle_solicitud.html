@@ -989,7 +989,8 @@ window.COTIZACION_CLIENTE_CONFIG = {
             descripcion:"{{ linea.descripcion_pieza|default_if_none:''|escapejs }}",
             cantidad:   {{ linea.cantidad }},
             costo:      {{ linea.costo_unitario|default:0 }},
-            es_necesaria: {{ linea.es_necesaria|yesno:"true,false" }}
+            es_necesaria: {{ linea.es_necesaria|yesno:"true,false" }},
+            estado_cliente: "{{ linea.estado_cliente }}"
         }{% if not forloop.last %},{% endif %}
         {% endfor %}
     ],
@@ -998,7 +999,8 @@ window.COTIZACION_CLIENTE_CONFIG = {
         {
             pk:   {{ svc.pk }},
             nombre: "{{ svc.get_tipo_servicio_display|escapejs }}",
-            costo: {{ svc.costo|default:0 }}
+            costo: {{ svc.costo|default:0 }},
+            estado_cliente: "{{ svc.estado_cliente }}"
         }{% if not forloop.last %},{% endif %}
         {% endfor %}
     ]

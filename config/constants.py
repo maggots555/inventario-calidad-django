@@ -610,6 +610,12 @@ ESTADO_LINEA_COTIZACION_CHOICES = [
     ('compra_generada', 'Compra Generada'),     # Ya se creó CompraProducto
 ]
 
+# Estados incluidos en cotización activa (reenvío / preview / calculadora modal)
+ESTADOS_LINEA_COTIZACION_ACTIVA = ('pendiente', 'aprobada')
+
+# Estados incluidos en el PDF final (solo lo que el cliente aceptó)
+ESTADOS_LINEA_COTIZACION_ACEPTADA = ('aprobada', 'compra_generada')
+
 # CLASIFICACIÓN DE ESTADOS PARA LÓGICA DE SOLICITUD DE COTIZACIÓN
 ESTADOS_SOLICITUD_ACTIVOS = ['borrador', 'enviada_front', 'enviada_cliente', 'parcialmente_aprobada', 'totalmente_aprobada', 'en_proceso']
 ESTADOS_SOLICITUD_FINALIZADOS = ['completada', 'totalmente_rechazada', 'cancelada']
