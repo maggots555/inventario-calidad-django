@@ -138,6 +138,18 @@
     --z-modal: 1050;
     --z-popover: 1060;
     --z-tooltip: 1070;
+
+    /*
+     * Safe Area — iPhone (notch / Dynamic Island) y Android con punch-hole.
+     * Con viewport-fit=cover + barra translúcida en PWA, el SO reporta el inset
+     * real; en desktop y Android sin notch devuelve 0px sin efecto visual.
+     */
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-right: env(safe-area-inset-right, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-left: env(safe-area-inset-left, 0px);
+    --navbar-height: 70px;
+    --navbar-total-height: calc(var(--navbar-height) + var(--safe-area-top));
 }
 
 /* =============================================================================
@@ -1334,10 +1346,11 @@ a:hover {
 .app-sidebar {
     position: fixed;
     left: 0;
-    top: 70px;
-    /* Altura del navbar */
+    top: var(--navbar-total-height);
+    /* Altura del navbar + safe area superior (iPhone / Android) */
     width: 260px;
-    height: calc(100vh - 70px);
+    height: calc(100vh - var(--navbar-total-height));
+    height: calc(100dvh - var(--navbar-total-height));
     background: linear-gradient(180deg, #2d3e50 0%, #34495e 100%);
     box-shadow: 2px 0 15px rgba(0, 0, 0, 0.2);
     transition: none;
@@ -1744,7 +1757,8 @@ body:not(.sidebar-loading) .app-sidebar {
     margin-left: 260px;
     transition: none;
     /* Sin transición inicial */
-    min-height: calc(100vh - 70px);
+    min-height: calc(100vh - var(--navbar-total-height));
+    min-height: calc(100dvh - var(--navbar-total-height));
 }
 
 /* Agregar transición después de la carga inicial */
@@ -2522,8 +2536,8 @@ footer::after {
 
 .scroll-to-top {
     position: fixed;
-    bottom: 30px;
-    right: 30px;
+    bottom: calc(30px + var(--safe-area-bottom));
+    right: calc(30px + var(--safe-area-right));
     width: 50px;
     height: 50px;
     background: linear-gradient(135deg, #2d3e50 0%, #34495e 100%);
@@ -2607,8 +2621,8 @@ footer::after {
     .scroll-to-top {
         width: 45px;
         height: 45px;
-        bottom: 20px;
-        right: 20px;
+        bottom: calc(20px + var(--safe-area-bottom));
+        right: calc(20px + var(--safe-area-right));
         font-size: 1.1rem;
     }
 }
@@ -2618,8 +2632,8 @@ footer::after {
     .scroll-to-top {
         width: 40px;
         height: 40px;
-        bottom: 15px;
-        right: 15px;
+        bottom: calc(15px + var(--safe-area-bottom));
+        right: calc(15px + var(--safe-area-right));
         font-size: 1rem;
     }
 }
@@ -2641,7 +2655,15 @@ footer::after {
 
 .modern-navbar {
     background: linear-gradient(135deg, #2d3e50 0%, #34495e 100%);
-    height: 70px;
+    /*
+     * padding-top empuja logo/menú debajo de status bar / Dynamic Island.
+     * El fondo del navbar sigue extendiéndose bajo la barra (PWA translúcida).
+     */
+    padding-top: var(--safe-area-top);
+    padding-left: var(--safe-area-left);
+    padding-right: var(--safe-area-right);
+    min-height: var(--navbar-total-height);
+    height: auto;
     position: sticky;
     top: 0;
     z-index: 1000;
@@ -2656,7 +2678,7 @@ footer::after {
     width: 100%;
     max-width: 100%;
     margin: 0;
-    height: 100%;
+    height: var(--navbar-height);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2764,6 +2786,10 @@ footer::after {
 }
 
 @media (max-width: 576px) {
+    :root {
+        --navbar-height: 56px;
+    }
+
     .navbar-logo-svg {
         width: 50px;
         /* Reducir más en móviles */
@@ -3422,30 +3448,38 @@ footer::after {
         text-overflow: ellipsis;
     }
 
-    /* Menú desplegable móvil */
+    /* Menú desplegable móvil — panel fijo con scroll táctil independiente */
     .navbar-menu {
         position: fixed;
-        top: 70px;
+        top: var(--navbar-total-height);
         left: 0;
         right: 0;
+        bottom: 0;
         background: #2d3e50;
         flex-direction: column;
+        align-items: stretch;
         gap: 0;
+        margin-left: 0;
         padding: 1rem 0;
-        max-height: calc(100vh - 70px);
+        padding-bottom: calc(1rem + var(--safe-area-bottom));
         overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
         opacity: 0;
         visibility: hidden;
-        transform: translateY(-20px);
-        transition: all 0.3s ease;
+        pointer-events: none;
+        /* Sin transform: en iOS Safari rompe el scroll dentro del contenedor */
+        transition: opacity 0.3s ease, visibility 0.3s ease;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        z-index: 1000;
+        z-index: 1100;
     }
 
     .navbar-menu.active {
         opacity: 1;
         visibility: visible;
-        transform: translateY(0);
+        pointer-events: auto;
     }
 
     .navbar-mobile-toggle {
@@ -3524,8 +3558,17 @@ footer::after {
     /* PREVENCIÓN DE OVERFLOW HORIZONTAL SOLO EN MÓVILES */
     .modern-navbar {
         overflow-x: hidden;
-        /* Solo aplicado en tablets y móviles */
+        /* Solo aplicado en tablets y móviles — NO overflow-y para no bloquear scroll del menú */
     }
+}
+
+/* Bloquear scroll del body cuando el menú móvil está abierto (fix iOS) */
+body.navbar-menu-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    left: 0;
+    right: 0;
 }
 
 @media (max-width: 768px) {
@@ -3615,17 +3658,6 @@ footer::after {
         gap: 0.4rem;
     }
 
-    .modern-navbar {
-        height: 56px;
-        /* Reducido de 60px */
-        padding: 0.4rem 0;
-    }
-
-    .navbar-menu {
-        top: 56px;
-        max-height: calc(100vh - 56px);
-    }
-
     /* Logo compacto pero visible */
     .navbar-logo {
         width: 34px;
@@ -3686,19 +3718,14 @@ footer::after {
 @media (max-width: 480px) {
 
     /* Pantallas muy pequeñas */
+    :root {
+        --navbar-height: 52px;
+    }
+
     .navbar-container {
         padding: 0 0.3rem;
         /* Muy compacto */
         gap: 0.3rem;
-    }
-
-    .modern-navbar {
-        height: 52px;
-    }
-
-    .navbar-menu {
-        top: 52px;
-        max-height: calc(100vh - 52px);
     }
 
     /* Solo logo, sin título */
@@ -3759,19 +3786,14 @@ footer::after {
 @media (max-width: 380px) {
 
     /* Pantallas extra pequeñas (iPhone SE, etc) */
+    :root {
+        --navbar-height: 50px;
+    }
+
     .navbar-container {
         padding: 0 0.25rem;
         /* Mínimo padding */
         gap: 0.25rem;
-    }
-
-    .modern-navbar {
-        height: 50px;
-    }
-
-    .navbar-menu {
-        top: 50px;
-        max-height: calc(100vh - 50px);
     }
 
     .navbar-logo {
@@ -3836,19 +3858,14 @@ footer::after {
 @media (max-width: 320px) {
 
     /* Pantallas ultra pequeñas */
+    :root {
+        --navbar-height: 48px;
+    }
+
     .navbar-container {
         padding: 0 0.2rem;
         /* Padding mínimo absoluto */
         gap: 0.2rem;
-    }
-
-    .modern-navbar {
-        height: 48px;
-    }
-
-    .navbar-menu {
-        top: 48px;
-        max-height: calc(100vh - 48px);
     }
 
     .navbar-logo {

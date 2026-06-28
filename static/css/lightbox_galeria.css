@@ -9,6 +9,7 @@
     left: 0;
     width: 100%;
     height: 100%;
+    height: 100dvh;
     z-index: 9999;
     display: none;
     opacity: 0;
@@ -42,13 +43,17 @@
     align-items: center;
     justify-content: center;
     padding: 20px;
+    padding-top: max(20px, env(safe-area-inset-top, 20px));
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
+    padding-left: max(20px, env(safe-area-inset-left, 20px));
+    padding-right: max(20px, env(safe-area-inset-right, 20px));
 }
 
-/* Botón cerrar — compacto y discreto */
+/* Botón cerrar — compacto y discreto; respeta safe area en iPhone */
 .lightbox-close {
     position: absolute;
-    top: 16px;
-    right: 16px;
+    top: max(1rem, env(safe-area-inset-top, 1rem));
+    right: max(1rem, env(safe-area-inset-right, 1rem));
     /* Área táctil real 44×44 para móvil; apariencia visual 32×32 */
     width: 44px;
     height: 44px;
@@ -317,7 +322,10 @@
 
 /* En modo zoom, ajustar el layout del lightbox */
 .custom-lightbox.zoom-mode .lightbox-content {
-    padding: 0;
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: max(0px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
     justify-content: center;
     align-items: center;
 }
@@ -325,7 +333,7 @@
 /* Controles de zoom: barra flotante en la parte inferior */
 .lightbox-zoom-controls {
     position: fixed;
-    bottom: 20px;
+    bottom: max(20px, env(safe-area-inset-bottom, 20px));
     left: 50%;
     transform: translateX(-50%);
     z-index: 20;
@@ -381,9 +389,7 @@
 /* Responsive */
 @media (max-width: 768px) {
     .lightbox-close {
-        top: 8px;
-        right: 8px;
-        /* En móvil siempre visible — no hay hover */
+        /* En móvil siempre visible — no hay hover; safe area ya aplicada arriba */
         color: rgba(255, 255, 255, 0.75);
     }
     
@@ -435,7 +441,7 @@
     
     /* Controles de zoom en móvil: más compactos */
     .lightbox-zoom-controls {
-        bottom: 10px;
+        bottom: max(10px, env(safe-area-inset-bottom, 10px));
         padding: 8px 12px;
         gap: 6px;
         border-radius: 10px;

@@ -219,10 +219,35 @@ function inicializarNavbarModerno() {
     // Toggle menú móvil
     const mobileToggle = document.getElementById('navbarToggle');
     const navbarMenu = document.getElementById('navbarMenu');
+    // Posición de scroll guardada al abrir el menú (fix iOS: body position fixed)
+    let scrollPosAlAbrirMenu = 0;
+    /**
+     * Abre o cierra el menú móvil y bloquea/libera el scroll del body.
+     * En iOS Safari, sin position:fixed en body el gesto de scroll se lo queda
+     * la página de fondo y el panel del menú no responde.
+     */
+    function setMenuMovilAbierto(abierto) {
+        if (!navbarMenu || !mobileToggle)
+            return;
+        if (abierto) {
+            scrollPosAlAbrirMenu = window.scrollY;
+            mobileToggle.classList.add('active');
+            navbarMenu.classList.add('active');
+            document.body.classList.add('navbar-menu-open');
+            document.body.style.top = `-${scrollPosAlAbrirMenu}px`;
+        }
+        else {
+            mobileToggle.classList.remove('active');
+            navbarMenu.classList.remove('active');
+            document.body.classList.remove('navbar-menu-open');
+            document.body.style.top = '';
+            window.scrollTo(0, scrollPosAlAbrirMenu);
+        }
+    }
     if (mobileToggle && navbarMenu) {
         mobileToggle.addEventListener('click', function () {
-            this.classList.toggle('active');
-            navbarMenu.classList.toggle('active');
+            const vaAbrir = !navbarMenu.classList.contains('active');
+            setMenuMovilAbierto(vaAbrir);
         });
     }
     // Dropdowns en desktop
@@ -253,20 +278,14 @@ function inicializarNavbarModerno() {
     navbarLinks.forEach(function (link) {
         link.addEventListener('click', function () {
             if (window.innerWidth <= 992) {
-                if (mobileToggle)
-                    mobileToggle.classList.remove('active');
-                if (navbarMenu)
-                    navbarMenu.classList.remove('active');
+                setMenuMovilAbierto(false);
             }
         });
     });
     // Cerrar menú móvil al hacer resize a desktop
     window.addEventListener('resize', function () {
         if (window.innerWidth > 992) {
-            if (mobileToggle)
-                mobileToggle.classList.remove('active');
-            if (navbarMenu)
-                navbarMenu.classList.remove('active');
+            setMenuMovilAbierto(false);
             document.querySelectorAll('.navbar-menu-item').forEach(function (item) {
                 item.classList.remove('active');
             });

@@ -2314,8 +2314,8 @@ thead.sticky-top {
 
 .btn-ir-galeria {
     position: fixed;
-    bottom: 95px; /* Justo arriba del botón scroll-to-top (30px + 50px + 15px gap) */
-    right: 30px;
+    bottom: calc(95px + env(safe-area-inset-bottom, 0px)); /* Justo arriba del botón scroll-to-top (30px + 50px + 15px gap) */
+    right: calc(30px + env(safe-area-inset-right, 0px));
     width: 50px;
     height: 50px;
     background: linear-gradient(135deg, #2d3e50 0%, #34495e 100%);
@@ -2412,8 +2412,8 @@ thead.sticky-top {
     .btn-ir-galeria {
         width: 45px;
         height: 45px;
-        bottom: 80px; /* Ajustar proporcionalmente (20px + 45px + 15px gap) */
-        right: 20px;
+        bottom: calc(80px + env(safe-area-inset-bottom, 0px)); /* Ajustar proporcionalmente (20px + 45px + 15px gap) */
+        right: calc(20px + env(safe-area-inset-right, 0px));
         font-size: 1.1rem;
     }
 }
@@ -2423,8 +2423,8 @@ thead.sticky-top {
     .btn-ir-galeria {
         width: 40px;
         height: 40px;
-        bottom: 70px; /* Ajustar proporcionalmente (15px + 40px + 15px gap) */
-        right: 15px;
+        bottom: calc(70px + env(safe-area-inset-bottom, 0px)); /* Ajustar proporcionalmente (15px + 40px + 15px gap) */
+        right: calc(15px + env(safe-area-inset-right, 0px));
         font-size: 1rem;
     }
 }
@@ -2443,8 +2443,8 @@ thead.sticky-top {
 
 .btn-ir-galeria-video {
     position: fixed;
-    bottom: 160px; /* Encima del botón de fotos (95px + 50px + 15px gap) */
-    right: 30px;
+    bottom: calc(160px + env(safe-area-inset-bottom, 0px)); /* Encima del botón de fotos (95px + 50px + 15px gap) */
+    right: calc(30px + env(safe-area-inset-right, 0px));
     width: 50px;
     height: 50px;
     background: linear-gradient(135deg, #2d3e50 0%, #34495e 100%);
@@ -2525,8 +2525,8 @@ thead.sticky-top {
     .btn-ir-galeria-video {
         width: 45px;
         height: 45px;
-        bottom: 145px; /* 80px botón fotos + 45px + 20px gap */
-        right: 20px;
+        bottom: calc(145px + env(safe-area-inset-bottom, 0px)); /* 80px botón fotos + 45px + 20px gap */
+        right: calc(20px + env(safe-area-inset-right, 0px));
         font-size: 1.1rem;
     }
 }
@@ -2536,8 +2536,8 @@ thead.sticky-top {
     .btn-ir-galeria-video {
         width: 40px;
         height: 40px;
-        bottom: 125px; /* 70px botón fotos + 40px + 15px gap */
-        right: 15px;
+        bottom: calc(125px + env(safe-area-inset-bottom, 0px)); /* 70px botón fotos + 40px + 15px gap */
+        right: calc(15px + env(safe-area-inset-right, 0px));
         font-size: 1rem;
     }
 }
@@ -2828,6 +2828,7 @@ thead.sticky-top {
     -webkit-backdrop-filter: blur(12px) saturate(150%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;  /* Borde sutil */
     padding: 0.75rem 1rem !important;  /* Más delgado: reducido de padding por defecto */
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0.75rem)) !important;
     min-height: auto !important;
 }
 
