@@ -216,31 +216,78 @@ function inicializarScrollToTop() {
  * Inicializa la funcionalidad del navbar moderno
  */
 function inicializarNavbarModerno() {
-    // Toggle menú móvil
     const mobileToggle = document.getElementById('navbarToggle');
     const navbarMenu = document.getElementById('navbarMenu');
-    // Posición de scroll guardada al abrir el menú (fix iOS: body position fixed)
+    // Referencias para devolver el menú a su lugar en el DOM al cerrar
+    let menuPadreOriginal = null;
+    let menuAnclaOriginal = null;
+    let bloqueadorTouchFondo = null;
     let scrollPosAlAbrirMenu = 0;
+    const esVistaMovil = () => window.innerWidth <= 992;
     /**
-     * Abre o cierra el menú móvil y bloquea/libera el scroll del body.
-     * En iOS Safari, sin position:fixed en body el gesto de scroll se lo queda
-     * la página de fondo y el panel del menú no responde.
+     * Mueve el panel del menú al <body> para escapar del overflow:hidden del navbar.
+     * Sin esto, el panel queda recortado dentro del navbar (~70px) y no scrollea.
+     */
+    function portalMenuAlBody() {
+        if (!navbarMenu || navbarMenu.classList.contains('navbar-menu--portal'))
+            return;
+        menuPadreOriginal = navbarMenu.parentElement;
+        if (!menuPadreOriginal)
+            return;
+        menuAnclaOriginal = document.createComment('navbar-menu-ancla');
+        menuPadreOriginal.insertBefore(menuAnclaOriginal, navbarMenu);
+        document.body.appendChild(navbarMenu);
+        navbarMenu.classList.add('navbar-menu--portal');
+    }
+    /** Devuelve el menú a su posición original dentro del navbar */
+    function restaurarMenuEnNavbar() {
+        if (!navbarMenu || !menuPadreOriginal || !menuAnclaOriginal)
+            return;
+        menuPadreOriginal.insertBefore(navbarMenu, menuAnclaOriginal);
+        menuAnclaOriginal.remove();
+        navbarMenu.classList.remove('navbar-menu--portal');
+        menuPadreOriginal = null;
+        menuAnclaOriginal = null;
+    }
+    /** Impide que el scroll táctil mueva la página de fondo (solo el panel del menú scrollea) */
+    function activarBloqueoScrollFondo() {
+        bloqueadorTouchFondo = (e) => {
+            const target = e.target;
+            if (navbarMenu && target && navbarMenu.contains(target))
+                return;
+            e.preventDefault();
+        };
+        document.addEventListener('touchmove', bloqueadorTouchFondo, { passive: false });
+    }
+    function desactivarBloqueoScrollFondo() {
+        if (bloqueadorTouchFondo) {
+            document.removeEventListener('touchmove', bloqueadorTouchFondo);
+            bloqueadorTouchFondo = null;
+        }
+    }
+    /**
+     * Abre o cierra el menú móvil.
+     * Efectos: portal DOM, bloqueo scroll fondo, clase en html/body.
      */
     function setMenuMovilAbierto(abierto) {
         if (!navbarMenu || !mobileToggle)
             return;
-        if (abierto) {
+        if (abierto && esVistaMovil()) {
             scrollPosAlAbrirMenu = window.scrollY;
+            portalMenuAlBody();
             mobileToggle.classList.add('active');
             navbarMenu.classList.add('active');
+            document.documentElement.classList.add('navbar-menu-open');
             document.body.classList.add('navbar-menu-open');
-            document.body.style.top = `-${scrollPosAlAbrirMenu}px`;
+            activarBloqueoScrollFondo();
         }
         else {
             mobileToggle.classList.remove('active');
             navbarMenu.classList.remove('active');
+            document.documentElement.classList.remove('navbar-menu-open');
             document.body.classList.remove('navbar-menu-open');
-            document.body.style.top = '';
+            desactivarBloqueoScrollFondo();
+            restaurarMenuEnNavbar();
             window.scrollTo(0, scrollPosAlAbrirMenu);
         }
     }
@@ -250,13 +297,11 @@ function inicializarNavbarModerno() {
             setMenuMovilAbierto(vaAbrir);
         });
     }
-    // Dropdowns en desktop
     const dropdownLinks = document.querySelectorAll('.navbar-menu-link[data-dropdown]');
     dropdownLinks.forEach(function (link) {
         link.addEventListener('click', function (e) {
             e.preventDefault();
-            // En móvil, toggle el dropdown
-            if (window.innerWidth <= 992) {
+            if (esVistaMovil()) {
                 const parentItem = this.closest('.navbar-menu-item');
                 if (parentItem) {
                     parentItem.classList.toggle('active');
@@ -264,27 +309,24 @@ function inicializarNavbarModerno() {
             }
         });
     });
-    // Cerrar dropdowns al hacer click fuera
     document.addEventListener('click', function (e) {
         const target = e.target;
-        if (target && !target.closest('.navbar-menu-item')) {
+        if (target && !target.closest('.navbar-menu-item') && !target.closest('#navbarToggle')) {
             document.querySelectorAll('.navbar-menu-item').forEach(function (item) {
                 item.classList.remove('active');
             });
         }
     });
-    // Cerrar menú móvil al hacer click en un enlace
     const navbarLinks = navbarMenu ? navbarMenu.querySelectorAll('a:not([data-dropdown])') : [];
     navbarLinks.forEach(function (link) {
         link.addEventListener('click', function () {
-            if (window.innerWidth <= 992) {
+            if (esVistaMovil()) {
                 setMenuMovilAbierto(false);
             }
         });
     });
-    // Cerrar menú móvil al hacer resize a desktop
     window.addEventListener('resize', function () {
-        if (window.innerWidth > 992) {
+        if (!esVistaMovil()) {
             setMenuMovilAbierto(false);
             document.querySelectorAll('.navbar-menu-item').forEach(function (item) {
                 item.classList.remove('active');

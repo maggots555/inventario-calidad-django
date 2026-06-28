@@ -3456,12 +3456,13 @@ footer::after {
         right: 0;
         bottom: 0;
         background: #2d3e50;
+        flex: none;
         flex-direction: column;
         align-items: stretch;
         gap: 0;
         margin-left: 0;
         padding: 1rem 0;
-        padding-bottom: calc(1rem + var(--safe-area-bottom));
+        padding-bottom: calc(1.5rem + var(--safe-area-bottom));
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
@@ -3470,10 +3471,18 @@ footer::after {
         opacity: 0;
         visibility: hidden;
         pointer-events: none;
-        /* Sin transform: en iOS Safari rompe el scroll dentro del contenedor */
+        /* Sin transform: en móviles rompe el scroll dentro del contenedor */
         transition: opacity 0.3s ease, visibility 0.3s ease;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         z-index: 1100;
+    }
+
+    /*
+     * Cuando el menú se mueve al <body> vía JS (clase --portal), escapa del
+     * overflow:hidden del navbar que recortaba el panel y bloqueaba el scroll.
+     */
+    .navbar-menu.navbar-menu--portal {
+        display: flex;
     }
 
     .navbar-menu.active {
@@ -3526,7 +3535,9 @@ footer::after {
     .navbar-menu-item.active .navbar-dropdown {
         opacity: 1;
         visibility: visible;
-        max-height: 800px;
+        /* Sin límite de altura: el scroll lo maneja el panel padre (.navbar-menu) */
+        max-height: none;
+        overflow: visible;
         margin-top: 0.5rem;
         margin-bottom: 0.5rem;
         padding: 0.5rem 0;
@@ -3560,15 +3571,19 @@ footer::after {
         overflow-x: hidden;
         /* Solo aplicado en tablets y móviles — NO overflow-y para no bloquear scroll del menú */
     }
+
+    /* Con el menú abierto, liberar overflow del navbar para no recortar el panel */
+    body.navbar-menu-open .modern-navbar,
+    body.navbar-menu-open .navbar-container {
+        overflow: visible;
+    }
 }
 
-/* Bloquear scroll del body cuando el menú móvil está abierto (fix iOS) */
+/* Bloquear scroll de la página cuando el menú móvil está abierto */
+html.navbar-menu-open,
 body.navbar-menu-open {
     overflow: hidden;
-    position: fixed;
-    width: 100%;
-    left: 0;
-    right: 0;
+    height: 100%;
 }
 
 @media (max-width: 768px) {
