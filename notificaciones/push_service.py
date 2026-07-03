@@ -146,3 +146,117 @@ def enviar_push_a_usuario(usuario: User, titulo: str, mensaje: str, url: str = '
         )
 
     return enviados
+
+
+def enviar_push_a_cliente(enlace, titulo: str, mensaje: str, url: str = '/') -> int:
+    """
+    Envía una notificación push a todas las suscripciones activas de un CLIENTE.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Es el equivalente de 'enviar_push_a_usuario', pero para clientes finales
+    que no tienen cuenta en el sistema. En vez de buscar por 'usuario',
+    buscamos por 'enlace' (el EnlaceSeguimientoCliente / token único que el
+    cliente abrió desde su correo).
+
+    Args:
+        enlace  : Instancia de EnlaceSeguimientoCliente dueña de las suscripciones
+        titulo  : Título corto (aparece en negrita en la notificación)
+        mensaje : Texto del cuerpo de la notificación
+        url     : URL a abrir al tocar la notificación (normalmente su propia
+                  página de seguimiento: /seguimiento/<token>/)
+
+    Returns:
+        Número de suscripciones a las que se envió exitosamente.
+    """
+    if not _vapid_ok():
+        logger.warning('[PUSH] VAPID keys no configuradas — notificación a cliente omitida.')
+        return 0
+
+    # Import perezoso: PushSubscriptionCliente vive en este mismo módulo de
+    # notificaciones, pero se importa aquí (no arriba) por consistencia con
+    # el resto del archivo y para evitar problemas de import circular si en
+    # el futuro el modelo depende de algo de servicio_tecnico.
+    from notificaciones.models import PushSubscriptionCliente  # noqa
+
+    suscripciones = PushSubscriptionCliente.objects.filter(enlace=enlace, activa=True)
+
+    if not suscripciones.exists():
+        return 0
+
+    payload = {
+        'titulo':  titulo,
+        'mensaje': mensaje,
+        'url':     url,
+    }
+
+    enviados = 0
+    for suscripcion in suscripciones:
+        if _enviar_una_suscripcion_cliente(suscripcion, payload):
+            enviados += 1
+
+    if enviados:
+        logger.info(
+            f'[PUSH] Enviado a cliente (token={enlace.token[:8]}...): "{titulo}" '
+            f'— {enviados}/{suscripciones.count()} dispositivos'
+        )
+
+    return enviados
+
+
+def _enviar_una_suscripcion_cliente(suscripcion, payload: dict) -> bool:
+    """
+    Igual que '_enviar_una_suscripcion', pero para PushSubscriptionCliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Se duplica esta función (en vez de reutilizar '_enviar_una_suscripcion')
+    únicamente porque, al desactivar una suscripción expirada (HTTP 404/410),
+    cada una debe actualizar su propio modelo — PushSubscription o
+    PushSubscriptionCliente. El envío en sí (pywebpush) es idéntico.
+    """
+    from notificaciones.models import PushSubscriptionCliente  # noqa
+
+    subscription_info = {
+        "endpoint": suscripcion.endpoint,
+        "keys": {
+            "p256dh": suscripcion.p256dh,
+            "auth": suscripcion.auth,
+        },
+    }
+
+    vapid_claims = {
+        "sub": f"mailto:{settings.VAPID_CLAIMS_EMAIL}",
+    }
+
+    try:
+        webpush(
+            subscription_info=subscription_info,
+            data=json.dumps(payload),
+            vapid_private_key=settings.VAPID_PRIVATE_KEY,
+            vapid_claims=vapid_claims,
+            content_encoding="aes128gcm",
+            ttl=86400,
+        )
+        return True
+
+    except WebPushException as exc:
+        codigo = exc.response.status_code if exc.response is not None else None
+
+        if codigo in (404, 410):
+            logger.info(
+                f"[PUSH] Suscripción de cliente expirada/revocada (HTTP {codigo}), "
+                f"desactivando id={suscripcion.pk}"
+            )
+            PushSubscriptionCliente.objects.filter(pk=suscripcion.pk).update(activa=False)
+        else:
+            logger.error(
+                f"[PUSH] Error al enviar a suscripción de cliente id={suscripcion.pk}: "
+                f"HTTP {codigo} — {exc}"
+            )
+        return False
+
+    except Exception as exc:
+        logger.error(
+            f"[PUSH] Error inesperado al enviar a suscripción de cliente id={suscripcion.pk}: {exc}",
+            exc_info=True,
+        )
+        return False

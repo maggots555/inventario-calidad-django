@@ -3562,6 +3562,216 @@ def seguimiento_orden_cliente(request, token):
 
 
 # ============================================================================
+# PWA — Manifest dinámico del seguimiento del cliente
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Un manifest.json le dice al navegador cómo debe verse la app cuando el
+# cliente la "instala" en su celular (ícono, nombre, color, y sobre todo
+# el 'start_url': la página que se abre al tocar el ícono).
+#
+# El manifest GLOBAL de SIGMA (static/manifest.json) tiene start_url="/",
+# que llevaría al cliente a la pantalla de login — no sirve para él.
+# Por eso generamos un manifest DIFERENTE para cada token: su start_url y
+# su scope apuntan exactamente a su propia página de seguimiento, así el
+# ícono que instale en su celular abre directo el estado de SU equipo.
+# ============================================================================
+
+@ratelimit(key='ip', rate='30/m', method=['GET'])
+def manifest_seguimiento(request, token):
+    """
+    Genera el manifest.json de la PWA para la página pública de seguimiento.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    No valida si el token existe o no — siempre devuelve un manifest válido.
+    Esto evita que alguien use esta URL para "adivinar" si un token es
+    correcto o no (la validación real de seguridad ocurre en la vista
+    'seguimiento_orden_cliente' al abrir la página).
+
+    Parámetros:
+        token (str): Token único del EnlaceSeguimientoCliente, tomado de la URL.
+
+    Retorna:
+        JsonResponse con el manifest, usando el content-type correcto
+        ('application/manifest+json') para que el navegador lo reconozca.
+    """
+    ruta_seguimiento = f"/seguimiento/{token}/"
+
+    manifest = {
+        "name": "Seguimiento de tu equipo — SIC",
+        "short_name": "Seguimiento SIC",
+        "description": "Consulta rápida y notificaciones del estado de tu equipo en reparación.",
+        # start_url + scope acotados a ESTE token: el ícono instalado abre
+        # directo el seguimiento de este cliente, nunca el login del sistema.
+        "start_url": ruta_seguimiento,
+        "scope": ruta_seguimiento,
+        "display": "standalone",
+        "background_color": "#0a1628",
+        "theme_color": "#1f6391",
+        "orientation": "portrait-primary",
+        "icons": [
+            {"src": "/static/images/icon-192x192.png", "type": "image/png", "sizes": "192x192", "purpose": "any"},
+            {"src": "/static/images/icon-192x192.png", "type": "image/png", "sizes": "192x192", "purpose": "maskable"},
+            {"src": "/static/images/icon-512x512.png", "type": "image/png", "sizes": "512x512", "purpose": "any"},
+            {"src": "/static/images/icon-512x512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable"},
+        ],
+        "categories": ["business"],
+        "lang": "es-MX",
+        "dir": "ltr",
+    }
+
+    return JsonResponse(manifest, content_type="application/manifest+json")
+
+
+# ============================================================================
+# PUSH — Suscripción de notificaciones del CLIENTE en el seguimiento público
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Estos 3 endpoints son la versión "para clientes" de los que ya existen en
+# notificaciones/views.py para empleados. La diferencia clave es la
+# identidad: un empleado se identifica con su sesión (request.user), pero
+# el cliente NO tiene cuenta — se identifica con el TOKEN de su enlace de
+# seguimiento. Por eso son públicos (sin @login_required) pero validan el
+# token en cada llamada, igual que el chat de IA (chat_seguimiento_cliente).
+# ============================================================================
+
+@csrf_exempt
+@ratelimit(key='ip', rate='10/m', method=['GET'])
+def vapid_key_seguimiento(request, token):
+    """
+    Entrega la llave pública VAPID al navegador del cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Es el mismo mecanismo que 'notificaciones.views.vapid_public_key',
+    pero sin exigir login. Antes de suscribirse a push, el navegador
+    necesita esta llave pública para cifrar los mensajes.
+    """
+    from .models import EnlaceSeguimientoCliente
+
+    try:
+        enlace = EnlaceSeguimientoCliente.objects.get(token=token)
+    except EnlaceSeguimientoCliente.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Enlace no válido.'}, status=404)
+
+    if not enlace.esta_disponible:
+        return JsonResponse({'ok': False, 'error': 'Enlace no disponible.'}, status=410)
+
+    return JsonResponse({'vapid_public_key': settings.VAPID_PUBLIC_KEY})
+
+
+@csrf_exempt
+@ratelimit(key='ip', rate='10/m', method=['POST'])
+def suscribir_push_seguimiento(request, token):
+    """
+    Guarda o reactiva la suscripción push de un cliente para su orden.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    El navegador del cliente ya obtuvo permiso y generó una suscripción
+    (endpoint + claves de cifrado). Aquí la guardamos en PushSubscriptionCliente,
+    ligada al 'enlace' (el token), NO a un usuario Django — el cliente no
+    tiene cuenta en el sistema.
+
+    Body esperado (JSON):
+        { "endpoint": "https://...", "keys": { "p256dh": "...", "auth": "..." } }
+    """
+    from .models import EnlaceSeguimientoCliente
+    from notificaciones.models import PushSubscriptionCliente
+
+    try:
+        enlace = EnlaceSeguimientoCliente.objects.get(token=token)
+    except EnlaceSeguimientoCliente.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Enlace no válido.'}, status=404)
+
+    if not enlace.esta_disponible:
+        return JsonResponse({'ok': False, 'error': 'Enlace no disponible.'}, status=410)
+
+    try:
+        data = json.loads(request.body)
+        endpoint = data.get('endpoint', '').strip()
+        keys = data.get('keys', {})
+        p256dh = keys.get('p256dh', '').strip()
+        auth = keys.get('auth', '').strip()
+
+        if not all([endpoint, p256dh, auth]):
+            return JsonResponse(
+                {'ok': False, 'error': 'Datos de suscripción incompletos'},
+                status=400
+            )
+
+        user_agent = request.META.get('HTTP_USER_AGENT', '')[:300]
+
+        # update_or_create: si el cliente ya tenía este mismo endpoint
+        # registrado (recargó la página, por ejemplo), lo reactivamos
+        # en vez de crear un duplicado.
+        suscripcion, creada = PushSubscriptionCliente.objects.update_or_create(
+            enlace=enlace,
+            endpoint=endpoint,
+            defaults={
+                'p256dh': p256dh,
+                'auth': auth,
+                'activa': True,
+                'user_agent': user_agent,
+            }
+        )
+
+        logger.info(
+            "[PushCliente] Suscripción %s para enlace token=%s... (id=%s)",
+            'creada' if creada else 'reactivada', token[:8], suscripcion.pk
+        )
+
+        return JsonResponse({'ok': True, 'accion': 'creada' if creada else 'reactivada'})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+    except Exception as exc:
+        logger.error(f'[PushCliente] Error al guardar suscripción: {exc}', exc_info=True)
+        return JsonResponse({'ok': False, 'error': 'Error interno'}, status=500)
+
+
+@csrf_exempt
+@ratelimit(key='ip', rate='10/m', method=['POST'])
+def cancelar_push_seguimiento(request, token):
+    """
+    Desactiva la suscripción push del cliente para su enlace de seguimiento.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    No borramos el registro (por si el cliente la reactiva después),
+    solo lo marcamos como 'activa=False' para dejar de enviarle notificaciones.
+
+    Body esperado (JSON): { "endpoint": "https://..." } (opcional)
+    Si no se envía 'endpoint', desactiva TODAS las suscripciones de ese enlace.
+    """
+    from .models import EnlaceSeguimientoCliente
+    from notificaciones.models import PushSubscriptionCliente
+
+    try:
+        enlace = EnlaceSeguimientoCliente.objects.get(token=token)
+    except EnlaceSeguimientoCliente.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Enlace no válido.'}, status=404)
+
+    try:
+        data = json.loads(request.body) if request.body else {}
+        endpoint = data.get('endpoint', '').strip()
+
+        qs = PushSubscriptionCliente.objects.filter(enlace=enlace, activa=True)
+        if endpoint:
+            qs = qs.filter(endpoint=endpoint)
+        desactivadas = qs.update(activa=False)
+
+        logger.info(
+            "[PushCliente] %s suscripción(es) desactivada(s) para token=%s...",
+            desactivadas, token[:8]
+        )
+
+        return JsonResponse({'ok': True, 'desactivadas': desactivadas})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+    except Exception as exc:
+        logger.error(f'[PushCliente] Error al cancelar suscripción: {exc}', exc_info=True)
+        return JsonResponse({'ok': False, 'error': 'Error interno'}, status=500)
+
+
+# ============================================================================
 # VISTA PÚBLICA: feedback_rechazo_view
 # Página accesible sin autenticación. El cliente abre el link desde el correo,
 # ve la información de su equipo y piezas, y puede escribir su comentario.

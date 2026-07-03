@@ -7,9 +7,14 @@
   <meta name="theme-color" content="#1f6391">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Seguimiento SIC">
   <title>Seguimiento de Orden — SIC</title>
   <link rel="icon" href="{% static 'images/logos/logo_sic.png' %}">
   <link rel="stylesheet" href="{% static 'css/seguimiento_cliente.css' %}">
+  {% if estado != 'invalido' %}
+  <!-- Manifest PWA propio de este token (no el manifest global del sistema interno) -->
+  <link rel="manifest" href="{% url 'manifest_seguimiento' token=token %}">
+  {% endif %}
   {# Script anti-flash: aplica el tema ANTES del render para evitar parpadeo blanco #}
   <script>
     (function () {
@@ -465,6 +470,21 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
 
   <div class="st-card-body">
 
+    <!-- Tarjeta para activar notificaciones push del navegador -->
+    <div class="st-push-card"
+         id="st-push-wrapper"
+         data-vapid-url="{% url 'push_vapid_key_seguimiento' token=token %}"
+         data-suscribir-url="{% url 'push_suscribir_seguimiento' token=token %}"
+         data-cancelar-url="{% url 'push_cancelar_seguimiento' token=token %}">
+      <span class="st-push-icon" id="st-push-icon" aria-hidden="true">🔔</span>
+      <div class="st-push-text">
+        <p class="st-push-label" id="st-push-label">Verificando notificaciones del navegador...</p>
+      </div>
+      <button id="st-push-btn" class="st-push-btn" type="button" disabled>
+        <span class="st-push-spinner" aria-hidden="true"></span>
+      </button>
+    </div>
+
     {# Banner para estado FINALIZADO #}
     {% if estado == 'finalizado' %}
     <div class="st-banner st-banner--warning">
@@ -900,6 +920,44 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
 
 {# === Toggle de modo oscuro (persistente vía localStorage) === #}
 <script src="{% static 'js/dark_mode.js' %}"></script>
+
+{% if estado != 'invalido' %}
+<!-- PWA: registro del Service Worker con scope acotado a esta URL de seguimiento -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service_worker.js', { scope: '/seguimiento/{{ token }}/' })
+      .then(function (registro) {
+        console.log('[Seguimiento SW] Registrado. Scope:', registro.scope);
+      })
+      .catch(function (error) {
+        console.warn('[Seguimiento SW] Error al registrar:', error);
+      });
+  }
+</script>
+
+<!-- Banner de instalación PWA (Android/Chrome/Edge + instrucciones iOS) -->
+<div id="st-pwa-install-banner" class="st-pwa-install-banner" role="dialog" aria-label="Instalar seguimiento como app" style="display:none;">
+  <div class="st-pwa-install-content">
+    <img src="{% static 'images/icon-192x192.png' %}" alt="SIC" class="st-pwa-install-icon">
+    <div class="st-pwa-install-text">
+      <strong>Instala el seguimiento de tu equipo</strong>
+      <span>Acceso directo desde tu pantalla de inicio, sin buscar el correo.</span>
+    </div>
+    <div id="st-pwa-android-wrapper">
+      <button id="st-pwa-install-btn" class="st-pwa-install-accept-btn" type="button">Instalar</button>
+    </div>
+    <button id="st-pwa-dismiss-btn" class="st-pwa-install-dismiss-btn" type="button" aria-label="Cerrar">✕</button>
+  </div>
+  <div id="st-pwa-ios-instructions" class="st-pwa-ios-instructions">
+    <span aria-hidden="true">📲</span>
+    <span>En iPhone: toca <strong>Compartir</strong> y luego <strong>"Agregar a pantalla de inicio"</strong>.</span>
+  </div>
+</div>
+<script src="{% static 'js/pwa_install_seguimiento.js' %}"></script>
+
+<!-- Toggle de notificaciones push del cliente -->
+<script src="{% static 'js/push_notifications_cliente.js' %}"></script>
+{% endif %}
 
 {# === Carrusel de banners promocionales (solo si hay banners activos) === #}
 {% if banners %}

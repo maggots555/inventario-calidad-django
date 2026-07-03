@@ -188,3 +188,73 @@ class PushSubscription(models.Model):
 
     def __str__(self):
         return f"Push [{self.usuario.username}] — {'activa' if self.activa else 'inactiva'}"
+
+
+class PushSubscriptionCliente(models.Model):
+    """
+    Suscripción Web Push de un CLIENTE FINAL (sin cuenta de usuario Django).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Este modelo es el "hermano" de PushSubscription, pero para clientes.
+    La diferencia clave: un empleado se identifica con su cuenta (usuario),
+    pero un cliente que consulta '/seguimiento/<token>/' NO tiene cuenta en
+    el sistema — solo existe el 'token' único de su enlace de seguimiento.
+
+    Por eso, en vez de una ForeignKey a User, usamos una ForeignKey a
+    'EnlaceSeguimientoCliente' (de la app servicio_tecnico). Así sabemos
+    exactamente a qué orden pertenece cada suscripción, sin necesidad de
+    inventar un sistema de cuentas para clientes.
+
+    Se usa un modelo SEPARADO de PushSubscription (y no se le agrega un
+    campo nullable a ese modelo) para no tocar la lógica de push existente
+    de empleados, que es sensible y ya está en producción.
+    """
+
+    enlace = models.ForeignKey(
+        'servicio_tecnico.EnlaceSeguimientoCliente',
+        on_delete=models.CASCADE,
+        related_name='push_subscriptions',
+        verbose_name="Enlace de seguimiento",
+        help_text="Enlace (token) del cliente dueño de esta suscripción",
+    )
+    endpoint = models.TextField(
+        verbose_name="Endpoint",
+        help_text="URL del servidor push del navegador (Google/Mozilla/Apple)",
+    )
+    p256dh = models.TextField(
+        verbose_name="Clave pública (p256dh)",
+        help_text="Clave pública de cifrado del navegador",
+    )
+    auth = models.TextField(
+        verbose_name="Auth secret",
+        help_text="Token secreto de autenticación del navegador",
+    )
+    activa = models.BooleanField(
+        default=True,
+        verbose_name="Activa",
+        help_text="False si el cliente desactivó las notificaciones o la suscripción expiró",
+    )
+    fecha_creada = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de suscripción",
+    )
+    user_agent = models.CharField(
+        max_length=300,
+        blank=True,
+        verbose_name="User Agent",
+        help_text="Navegador y dispositivo del cliente (informativo)",
+    )
+
+    class Meta:
+        verbose_name = "Suscripción Push de Cliente"
+        verbose_name_plural = "Suscripciones Push de Clientes"
+        ordering = ['-fecha_creada']
+        # Un mismo endpoint no puede repetirse para el mismo enlace — evita
+        # duplicados si el cliente se suscribe dos veces desde el mismo navegador.
+        unique_together = [('enlace', 'endpoint')]
+        indexes = [
+            models.Index(fields=['enlace', 'activa'], name='idx_push_cli_enlace_activa'),
+        ]
+
+    def __str__(self):
+        return f"Push cliente [{self.enlace.token[:8]}...] — {'activa' if self.activa else 'inactiva'}"

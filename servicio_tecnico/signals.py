@@ -299,6 +299,24 @@ import logging
 
 logger_push = logging.getLogger('notificaciones')
 
+# ── Estados que disparan push al CLIENTE final (además del push al técnico) ──
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# No todos los cambios de estado son relevantes para el cliente — algunos son
+# muy técnicos/internos (ej. 'wpb_pieza_incorrecta', 'rechazada'). Esta lista
+# define únicamente los hitos que el cliente pidió recibir por notificación,
+# usando los mismos códigos definidos en config.constants.ESTADO_ORDEN_CHOICES.
+ESTADOS_PUSH_CLIENTE = {
+    'espera',                        # En Espera
+    'recepcion',                     # En Recepción
+    'diagnostico',                   # En Diagnóstico
+    'diagnostico_enviado_cliente',   # Diagnóstico Enviado al Cliente
+    'cotizacion',                    # Esperando Aprobación del Cliente
+    'esperando_piezas',              # Esperando Llegada de Piezas
+    'reparacion',                    # En Reparación
+    'control_calidad',               # Control de Calidad
+    'finalizado',                    # Finalizado - Listo para Entrega
+}
+
 
 @receiver(post_save, sender=HistorialOrden)
 def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwargs):
@@ -356,6 +374,35 @@ def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwarg
                 mensaje=f'Estado actualizado → {estado_nuevo_label}',
                 url=url_orden,
             )
+
+        # ── Push al CLIENTE final ───────────────────────────────────────────
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Solo aplica a órdenes fuera de garantía, porque son las únicas que
+        # tienen un EnlaceSeguimientoCliente (el "orm.enlace_seguimiento" es
+        # el related_name definido en ese modelo). Además, solo se notifica
+        # si el nuevo estado está en la lista blanca ESTADOS_PUSH_CLIENTE —
+        # así evitamos saturar al cliente con estados poco relevantes para él.
+        estado_nuevo_codigo = instance.estado_nuevo
+        if estado_nuevo_codigo in ESTADOS_PUSH_CLIENTE:
+            enlace = getattr(orden, 'enlace_seguimiento', None)
+            # 'esta_disponible' ya valida: activo, no expirado y no cancelado.
+            if enlace and enlace.esta_disponible:
+                from notificaciones.push_service import enviar_push_a_cliente  # noqa
+                from config.constants import ESTADO_ORDEN_CHOICES
+
+                # A diferencia del mensaje al técnico (que usa el código interno),
+                # al cliente le mostramos el nombre legible del estado
+                # (ej. "En Diagnóstico" en vez de "diagnostico").
+                estado_nuevo_label = dict(ESTADO_ORDEN_CHOICES).get(
+                    estado_nuevo_codigo, estado_nuevo_codigo
+                )
+                _push_seguro(
+                    enviar_push_a_cliente,
+                    enlace=enlace,
+                    titulo=f'Tu equipo {etiqueta_orden}',
+                    mensaje=f'Nuevo estado: {estado_nuevo_label}',
+                    url=f'/seguimiento/{enlace.token}/',
+                )
 
     # ── CAMBIO DE TÉCNICO ────────────────────────────────────────────────────
     elif tipo == 'cambio_tecnico':

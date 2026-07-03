@@ -29,6 +29,10 @@ from servicio_tecnico.views import (
     feedback_satisfaccion_cliente,
     seguimiento_orden_cliente,
     chat_seguimiento_cliente,
+    manifest_seguimiento,
+    vapid_key_seguimiento,
+    suscribir_push_seguimiento,
+    cancelar_push_seguimiento,
 )
 
 urlpatterns = [
@@ -94,6 +98,20 @@ urlpatterns = [
     # Valida el mismo token de la vista padre. Rate limit: 5 req/min por IP.
     # Formato: POST /seguimiento/<token>/chat/
     path('seguimiento/<str:token>/chat/', chat_seguimiento_cliente, name='chat_seguimiento_publico'),
+
+    # ── PWA: Manifest dinámico del seguimiento del cliente (sin autenticación) ──
+    # A diferencia del manifest global (static/manifest.json, start_url="/"),
+    # este manifest apunta al token específico del cliente, para que al
+    # instalar la PWA el ícono abra directo SU página de seguimiento.
+    # Formato: GET /seguimiento/<token>/manifest.json
+    path('seguimiento/<str:token>/manifest.json', manifest_seguimiento, name='manifest_seguimiento'),
+
+    # ── URLS PÚBLICAS: Web Push del cliente en el seguimiento (sin autenticación) ──
+    # Versión "para clientes" de /notificaciones/push/*, identificando al
+    # suscriptor por el token del enlace en vez de una sesión de usuario.
+    path('seguimiento/<str:token>/push/vapid-key/', vapid_key_seguimiento, name='push_vapid_key_seguimiento'),
+    path('seguimiento/<str:token>/push/suscribir/', suscribir_push_seguimiento, name='push_suscribir_seguimiento'),
+    path('seguimiento/<str:token>/push/cancelar/', cancelar_push_seguimiento, name='push_cancelar_seguimiento'),
 ]
 
 # ============================================================================
