@@ -17170,6 +17170,35 @@ def _filtrar_enlaces_seguimiento(request):
     return qs
 
 
+def _anotar_push_enlaces(qs):
+    """
+    Anota un queryset de EnlaceSeguimientoCliente con métricas de push del cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cada enlace puede tener cero o más PushSubscriptionCliente (un dispositivo/navegador).
+    Aquí calculamos en una sola consulta SQL si hay al menos una suscripción activa,
+    cuántos dispositivos activos hay y la fecha más reciente de suscripción.
+    """
+    from django.db.models import Count, Exists, Max, OuterRef, Q
+    from notificaciones.models import PushSubscriptionCliente
+
+    subs_activas = PushSubscriptionCliente.objects.filter(
+        enlace=OuterRef('pk'),
+        activa=True,
+    )
+    return qs.annotate(
+        push_activo=Exists(subs_activas),
+        push_dispositivos=Count(
+            'push_subscriptions',
+            filter=Q(push_subscriptions__activa=True),
+        ),
+        push_fecha=Max(
+            'push_subscriptions__fecha_creada',
+            filter=Q(push_subscriptions__activa=True),
+        ),
+    )
+
+
 @login_required
 @permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 def dashboard_seguimiento_enlaces(request):
@@ -17195,7 +17224,7 @@ def api_seguimiento_enlaces_kpis(request):
     """
     from django.db.models import Sum, Avg, Count
 
-    qs = _filtrar_enlaces_seguimiento(request)
+    qs = _anotar_push_enlaces(_filtrar_enlaces_seguimiento(request))
 
     total_enlaces = qs.count()
     agregados = qs.aggregate(
@@ -17213,6 +17242,12 @@ def api_seguimiento_enlaces_kpis(request):
         ((total_enlaces - sin_visitas) / total_enlaces * 100) if total_enlaces > 0 else 0, 1
     )
 
+    push_suscritos = qs.filter(push_activo=True).count()
+    push_sin_suscripcion = total_enlaces - push_suscritos
+    tasa_push = round(
+        (push_suscritos / total_enlaces * 100) if total_enlaces > 0 else 0, 1
+    )
+
     return JsonResponse({
         'total_enlaces': total_enlaces,
         'total_accesos': total_accesos,
@@ -17221,6 +17256,9 @@ def api_seguimiento_enlaces_kpis(request):
         'correos_enviados': correos_enviados,
         'correos_no_enviados': correos_no_enviados,
         'tasa_apertura': tasa_apertura,
+        'push_suscritos': push_suscritos,
+        'push_sin_suscripcion': push_sin_suscripcion,
+        'tasa_push': tasa_push,
     })
 
 
@@ -17313,13 +17351,15 @@ def api_seguimiento_enlaces_tabla(request):
     from config.paises_config import fecha_local_pais, get_pais_actual
     pais = get_pais_actual()
 
-    qs = _filtrar_enlaces_seguimiento(request).order_by('-fecha_creacion')
+    qs = _anotar_push_enlaces(_filtrar_enlaces_seguimiento(request))
 
     # Ordenamiento
     order_by = request.GET.get('order_by', '-fecha_creacion')
     campos_validos = {'fecha_creacion', '-fecha_creacion', 'accesos_count', '-accesos_count'}
     if order_by in campos_validos:
         qs = qs.order_by(order_by)
+    else:
+        qs = qs.order_by('-fecha_creacion')
 
     paginator = Paginator(qs, 50)
     page_num = request.GET.get('page', 1)
@@ -17336,6 +17376,10 @@ def api_seguimiento_enlaces_tabla(request):
         if enlace.orden.responsable_seguimiento:
             responsable = enlace.orden.responsable_seguimiento.nombre_completo
 
+        push_fecha_str = '—'
+        if enlace.push_fecha:
+            push_fecha_str = fecha_local_pais(enlace.push_fecha, pais).strftime('%d/%m/%Y %H:%M')
+
         filas.append({
             'folio': orden_cliente or enlace.orden.numero_orden_interno,
             'orden_id': enlace.orden.id,
@@ -17348,6 +17392,9 @@ def api_seguimiento_enlaces_tabla(request):
             'estado': enlace.orden.get_estado_display(),
             'accesos': enlace.accesos_count,
             'correo_enviado': enlace.correo_enviado,
+            'push_activo': enlace.push_activo,
+            'push_dispositivos': enlace.push_dispositivos,
+            'push_fecha': push_fecha_str,
             'fecha_creacion': enlace.fecha_creacion.strftime('%d/%m/%Y'),
             'ultimo_acceso': fecha_local_pais(enlace.fecha_ultimo_acceso, pais).strftime('%d/%m/%Y %H:%M') if enlace.fecha_ultimo_acceso else '—',
         })

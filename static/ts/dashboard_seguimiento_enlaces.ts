@@ -19,6 +19,9 @@ interface KPIsEnlaces {
     correos_enviados: number;
     correos_no_enviados: number;
     tasa_apertura: number;
+    push_suscritos: number;
+    push_sin_suscripcion: number;
+    tasa_push: number;
 }
 
 interface PuntoDiario {
@@ -54,6 +57,9 @@ interface FilaEnlace {
     estado: string;
     accesos: number;
     correo_enviado: boolean;
+    push_activo: boolean;
+    push_dispositivos: number;
+    push_fecha: string;
     fecha_creacion: string;
     ultimo_acceso: string;
 }
@@ -177,6 +183,10 @@ class DashboardSeguimientoEnlaces {
 
         const noEnv = document.getElementById('kpiCorreosNoenviados');
         if (noEnv) noEnv.textContent = `${d.correos_no_enviados} sin enviar`;
+
+        set('kpiPushSuscritos', d.push_suscritos.toLocaleString('es-MX'));
+        set('kpiPushSin', d.push_sin_suscripcion.toLocaleString('es-MX'));
+        set('kpiTasaPush', `${d.tasa_push}%`);
     }
 
     // ── Tendencia ────────────────────────────────────────────────────────────
@@ -397,7 +407,7 @@ class DashboardSeguimientoEnlaces {
         } catch (_) {
             if (loader) loader.style.display = 'none';
             if (tbody)  tbody.innerHTML = `
-                <tr><td colspan="10" class="text-center text-danger py-3">
+                <tr><td colspan="11" class="text-center text-danger py-3">
                     <i class="bi bi-exclamation-circle me-1"></i>Error al cargar datos
                 </td></tr>`;
         }
@@ -409,7 +419,7 @@ class DashboardSeguimientoEnlaces {
 
         if (!filas.length) {
             tbody.innerHTML = `
-                <tr><td colspan="10" class="text-center text-muted py-4">
+                <tr><td colspan="11" class="text-center text-muted py-4">
                     <i class="bi bi-inbox me-2"></i>No hay enlaces que coincidan con los filtros
                 </td></tr>`;
             return;
@@ -424,6 +434,14 @@ class DashboardSeguimientoEnlaces {
                 ? `<span class="badge-correo-ok"><i class="bi bi-check-lg me-1"></i>Enviado</span>`
                 : `<span class="badge-correo-no"><i class="bi bi-x-lg me-1"></i>No enviado</span>`;
 
+            const pushTooltip = f.push_activo
+                ? `Activado${f.push_dispositivos > 1 ? ` (${f.push_dispositivos} dispositivos)` : ''}${f.push_fecha !== '—' ? ` — ${f.push_fecha}` : ''}`
+                : 'El cliente no ha activado notificaciones push';
+
+            const pushBadge = f.push_activo
+                ? `<span class="badge-push-ok" title="${pushTooltip}"><i class="bi bi-bell-fill me-1"></i>Activo</span>`
+                : `<span class="badge-push-no" title="${pushTooltip}"><i class="bi bi-bell-slash me-1"></i>No activado</span>`;
+
             return `
             <tr>
                 <td><a href="/servicio-tecnico/ordenes/${f.orden_id}/" class="fw-semibold text-decoration-none">${f.orden_cliente}</a></td>
@@ -434,6 +452,7 @@ class DashboardSeguimientoEnlaces {
                 <td><span class="badge bg-secondary" style="font-size:0.7rem">${f.estado}</span></td>
                 <td class="text-center">${accBadge}</td>
                 <td class="text-center">${correoBadge}</td>
+                <td class="text-center">${pushBadge}</td>
                 <td class="text-nowrap">${f.fecha_creacion}</td>
                 <td class="text-nowrap">${f.ultimo_acceso}</td>
             </tr>`;

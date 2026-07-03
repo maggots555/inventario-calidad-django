@@ -240,6 +240,28 @@
     padding: 2px 8px;
 }
 
+.badge-push-ok {
+    font-size: 0.7rem;
+    background: #d1fae5;
+    color: #065f46;
+    border-radius: 20px;
+    padding: 2px 8px;
+    cursor: help;
+}
+
+.badge-push-no {
+    font-size: 0.7rem;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 20px;
+    padding: 2px 8px;
+    cursor: help;
+}
+
+.se-push-resumen .se-kpi-card {
+    margin-bottom: 0;
+}
+
 /* ── RESPONSIVO ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
     .se-header { padding: 1.1rem 1rem; }
@@ -338,6 +360,20 @@
 [data-bs-theme="dark"] .badge-nuevo {
     background: #1e3a5f !important;
     color: #93c5fd !important;
+}
+
+[data-bs-theme="dark"] .badge-push-ok {
+    background: #064e3b;
+    color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .badge-push-no {
+    background: #451a03;
+    color: #fcd34d;
+}
+
+[data-bs-theme="dark"] #tablaEnlaces tbody tr:hover {
+    background: #334155;
 }
 
 /* Fondo #f8fafc → oscuro */
