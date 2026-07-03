@@ -1,0 +1,75 @@
+/**
+ * eventos_seguimiento.ts — Registro de eventos de producto en la vista pública del cliente.
+ *
+ * EXPLICACIÓN PARA PRINCIPIANTES:
+ * Cuando el cliente hace algo importante (ve el banner PWA, abre el chat, etc.),
+ * este módulo envía un POST silencioso al servidor para guardar ese evento.
+ * El token del enlace ya va en la URL — no necesitamos sesión de usuario.
+ *
+ * NOTA TÉCNICA: IIFE para no chocar con otros scripts al compilar juntos.
+ */
+/// <reference path="./eventos_seguimiento.d.ts" />
+(function (): void {
+
+const SESSION_KEY = 'sic_seguimiento_session';
+const DEDUP_PREFIX = 'sic_evt_dedup_';
+
+/** URL del endpoint POST, inyectada por Django en data-eventos-url del body */
+const EVENTOS_URL = document.body.dataset.eventosUrl ?? '';
+
+/**
+ * Genera o recupera un UUID de sesión en sessionStorage.
+ * Agrupa eventos de la misma visita en el dashboard.
+ */
+function obtenerSessionId(): string {
+    let id = sessionStorage.getItem(SESSION_KEY);
+    if (!id) {
+        id = crypto.randomUUID();
+        sessionStorage.setItem(SESSION_KEY, id);
+    }
+    return id;
+}
+
+/**
+ * Envía un evento al servidor sin bloquear la UI.
+ *
+ * @param tipo - Código del evento (ej. 'pwa_banner_mostrado')
+ * @param metadata - Datos extra opcionales (sin texto del chat)
+ * @param unaVezPorSesion - Si true, no reenvía el mismo tipo en esta pestaña
+ */
+function registrarEvento(
+    tipo: string,
+    metadata: Record<string, unknown> = {},
+    unaVezPorSesion = false,
+): void {
+    if (!EVENTOS_URL) return;
+
+    if (unaVezPorSesion) {
+        const clave = DEDUP_PREFIX + tipo;
+        if (sessionStorage.getItem(clave)) return;
+        sessionStorage.setItem(clave, '1');
+    }
+
+    const payload = {
+        tipo,
+        session_id: obtenerSessionId(),
+        metadata,
+    };
+
+    fetch(EVENTOS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true,
+    }).catch((err: unknown) => {
+        console.warn('[EventosSeg] No se pudo enviar evento', tipo, err);
+    });
+}
+
+// API global mínima para otros módulos de esta página
+(window as Window).EventosSeguimiento = {
+    registrarEvento,
+    obtenerSessionId,
+};
+
+})();

@@ -3282,6 +3282,9 @@ def seguimiento_orden_cliente(request, token):
     )
     enlace.registrar_acceso(ip=ip_cliente)
 
+    from servicio_tecnico.eventos_seguimiento import registrar_evento_seguimiento
+    registrar_evento_seguimiento(enlace, 'visita_pagina', request=request)
+
     # ── Construir timeline de cambios de estado ──
     historial_estados = HistorialOrden.objects.filter(
         orden=orden,
@@ -3709,9 +3712,13 @@ def suscribir_push_seguimiento(request, token):
                 'p256dh': p256dh,
                 'auth': auth,
                 'activa': True,
+                'fecha_desactivada': None,
                 'user_agent': user_agent,
             }
         )
+
+        from servicio_tecnico.eventos_seguimiento import registrar_evento_seguimiento
+        registrar_evento_seguimiento(enlace, 'push_activado', request=request)
 
         logger.info(
             "[PushCliente] Suscripción %s para enlace token=%s... (id=%s)",
@@ -3755,7 +3762,12 @@ def cancelar_push_seguimiento(request, token):
         qs = PushSubscriptionCliente.objects.filter(enlace=enlace, activa=True)
         if endpoint:
             qs = qs.filter(endpoint=endpoint)
-        desactivadas = qs.update(activa=False)
+        ahora = timezone.now()
+        desactivadas = qs.update(activa=False, fecha_desactivada=ahora)
+
+        from servicio_tecnico.eventos_seguimiento import registrar_evento_seguimiento
+        if desactivadas:
+            registrar_evento_seguimiento(enlace, 'push_desactivado', request=request)
 
         logger.info(
             "[PushCliente] %s suscripción(es) desactivada(s) para token=%s...",
@@ -3768,6 +3780,65 @@ def cancelar_push_seguimiento(request, token):
         return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
     except Exception as exc:
         logger.error(f'[PushCliente] Error al cancelar suscripción: {exc}', exc_info=True)
+        return JsonResponse({'ok': False, 'error': 'Error interno'}, status=500)
+
+
+@csrf_exempt
+@ratelimit(key='ip', rate='30/m', method=['POST'])
+def registrar_evento_seguimiento_cliente(request, token):
+    """
+    Endpoint público para que el navegador registre eventos de producto del cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    PWA, chat y permisos push ocurren en el navegador; este endpoint recibe
+    esos eventos y los guarda ligados al enlace (token) del cliente.
+
+    Body JSON: { "tipo": "pwa_banner_mostrado", "session_id": "uuid", "metadata": {} }
+    """
+    from .models import EnlaceSeguimientoCliente
+    from servicio_tecnico.eventos_seguimiento import (
+        TIPOS_EVENTO_CLIENTE,
+        registrar_evento_seguimiento,
+    )
+
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Método no permitido.'}, status=405)
+
+    try:
+        enlace = EnlaceSeguimientoCliente.objects.get(token=token)
+    except EnlaceSeguimientoCliente.DoesNotExist:
+        return JsonResponse({'ok': False, 'error': 'Enlace no válido.'}, status=404)
+
+    if not enlace.esta_disponible:
+        return JsonResponse({'ok': False, 'error': 'Enlace no disponible.'}, status=410)
+
+    try:
+        data = json.loads(request.body)
+        tipo = (data.get('tipo') or '').strip()
+        session_id = (data.get('session_id') or '')[:36]
+        metadata = data.get('metadata') or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        if tipo not in TIPOS_EVENTO_CLIENTE:
+            return JsonResponse({'ok': False, 'error': 'Tipo de evento no permitido.'}, status=400)
+
+        ok = registrar_evento_seguimiento(
+            enlace,
+            tipo,
+            request=request,
+            session_id=session_id,
+            metadata=metadata,
+        )
+        if not ok:
+            return JsonResponse({'ok': False, 'error': 'No se pudo registrar el evento.'}, status=400)
+
+        return JsonResponse({'ok': True})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'error': 'JSON inválido'}, status=400)
+    except Exception as exc:
+        logger.error('[EventosSeg] Error en endpoint público: %s', exc, exc_info=True)
         return JsonResponse({'ok': False, 'error': 'Error interno'}, status=500)
 
 
@@ -17265,6 +17336,19 @@ def api_seguimiento_enlaces_kpis(request):
 @login_required
 @permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
 @require_http_methods(['GET'])
+def api_seguimiento_enlaces_embudo(request):
+    """
+    API JSON: embudo de adopción (correo → visita → PWA → push → chat).
+    """
+    from servicio_tecnico.eventos_seguimiento import calcular_embudo_enlaces
+
+    datos = calcular_embudo_enlaces(_filtrar_enlaces_seguimiento(request))
+    return JsonResponse(datos)
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_dashboard_gerencial')
+@require_http_methods(['GET'])
 def api_seguimiento_enlaces_tendencia(request):
     """
     API JSON: tendencia de accesos agrupados por día (últimos 60 días).
@@ -17349,9 +17433,10 @@ def api_seguimiento_enlaces_tabla(request):
     """
     from django.core.paginator import Paginator
     from config.paises_config import fecha_local_pais, get_pais_actual
+    from servicio_tecnico.eventos_seguimiento import anotar_eventos_enlaces
     pais = get_pais_actual()
 
-    qs = _anotar_push_enlaces(_filtrar_enlaces_seguimiento(request))
+    qs = anotar_eventos_enlaces(_anotar_push_enlaces(_filtrar_enlaces_seguimiento(request)))
 
     # Ordenamiento
     order_by = request.GET.get('order_by', '-fecha_creacion')
@@ -17395,6 +17480,8 @@ def api_seguimiento_enlaces_tabla(request):
             'push_activo': enlace.push_activo,
             'push_dispositivos': enlace.push_dispositivos,
             'push_fecha': push_fecha_str,
+            'pwa_instalada': enlace.evento_pwa_instalada,
+            'chat_usado': enlace.evento_chat_usado,
             'fecha_creacion': enlace.fecha_creacion.strftime('%d/%m/%Y'),
             'ultimo_acceso': fecha_local_pais(enlace.fecha_ultimo_acceso, pais).strftime('%d/%m/%Y %H:%M') if enlace.fecha_ultimo_acceso else '—',
         })
@@ -18730,6 +18817,14 @@ def chat_seguimiento_cliente(request, token):
     tiempo_ms = int((_time.monotonic() - _t_inicio) * 1000)
 
     if resultado['success']:
+        from servicio_tecnico.eventos_seguimiento import registrar_evento_seguimiento
+        via_chip = request.POST.get('via_chip', '').lower() in ('1', 'true', 'yes')
+        registrar_evento_seguimiento(
+            enlace,
+            'chat_mensaje_enviado',
+            request=request,
+            metadata={'longitud': len(pregunta), 'via_chip': via_chip},
+        )
         logger.info(
             "[ChatSeg] Respuesta generada | Folio: %s | Modelo: %s | Tiempo: %dms",
             folio, resultado.get('modelo_usado', '?'), tiempo_ms

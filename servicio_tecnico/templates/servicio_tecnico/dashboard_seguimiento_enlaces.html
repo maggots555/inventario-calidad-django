@@ -191,16 +191,21 @@
     </div>
 </div>
 
-<!-- ── ADOPCIÓN PUSH ── -->
+<!-- ── EMBUDO DE ADOPCIÓN ── -->
 <div class="se-card card mb-4">
     <div class="card-header">
-        <span><i class="bi bi-bell me-2"></i>Adopción de notificaciones push</span>
+        <span><i class="bi bi-funnel me-2"></i>Embudo de adopción del cliente</span>
     </div>
     <div class="card-body">
         <p class="text-muted small mb-3">
-            Mide si el cliente activó notificaciones en su enlace de seguimiento; no indica instalación de la app.
+            Eventos registrados desde el despliegue de esta función. Mide correo enviado, visita, PWA, push y chat IA.
         </p>
-        <div class="row g-3 se-push-resumen">
+        <div class="se-embudo-loader text-center py-3" id="loaderEmbudo">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            <span class="ms-2">Cargando embudo...</span>
+        </div>
+        <div id="embudoContainer" class="se-embudo-list" style="display:none"></div>
+        <div class="row g-3 se-push-resumen mt-3 pt-3 border-top">
             <div class="col-md-4">
                 <div class="se-kpi-card border-green">
                     <div class="d-flex justify-content-between align-items-start">
@@ -219,7 +224,7 @@
                         <div>
                             <div class="kpi-label">Sin activar</div>
                             <div class="kpi-valor" id="kpiPushSin">—</div>
-                            <div class="kpi-sub">no han activado</div>
+                            <div class="kpi-sub">no han activado push</div>
                         </div>
                         <div class="kpi-icon" style="color:var(--se-amber)"><i class="bi bi-bell-slash"></i></div>
                     </div>
@@ -229,7 +234,7 @@
                 <div class="se-kpi-card border-purple">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <div class="kpi-label">Tasa de adopción</div>
+                            <div class="kpi-label">Tasa push</div>
                             <div class="kpi-valor" id="kpiTasaPush">—</div>
                             <div class="kpi-sub">% del total filtrado</div>
                         </div>
@@ -272,13 +277,15 @@
                         <th class="text-center">Accesos</th>
                         <th class="text-center">Correo</th>
                         <th class="text-center">Push</th>
+                        <th class="text-center">PWA</th>
+                        <th class="text-center">Chat</th>
                         <th>Creado</th>
                         <th>Último Acceso</th>
                     </tr>
                 </thead>
                 <tbody id="tablaBody">
                     <tr>
-                        <td colspan="11" class="text-center text-muted py-4">
+                        <td colspan="13" class="text-center text-muted py-4">
                             <i class="bi bi-hourglass-split me-2"></i>Cargando datos...
                         </td>
                     </tr>

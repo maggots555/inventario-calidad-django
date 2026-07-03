@@ -246,7 +246,11 @@ def _enviar_una_suscripcion_cliente(suscripcion, payload: dict) -> bool:
                 f"[PUSH] Suscripción de cliente expirada/revocada (HTTP {codigo}), "
                 f"desactivando id={suscripcion.pk}"
             )
-            PushSubscriptionCliente.objects.filter(pk=suscripcion.pk).update(activa=False)
+            from django.utils import timezone
+            PushSubscriptionCliente.objects.filter(pk=suscripcion.pk).update(
+                activa=False,
+                fecha_desactivada=timezone.now(),
+            )
         else:
             logger.error(
                 f"[PUSH] Error al enviar a suscripción de cliente id={suscripcion.pk}: "

@@ -82,7 +82,7 @@ class PushSubscriptionClienteAdmin(admin.ModelAdmin):
     (identificados por el token de su enlace de seguimiento, no por usuario).
     """
 
-    list_display = ('enlace', 'endpoint_corto', 'activa', 'user_agent', 'fecha_creada')
+    list_display = ('enlace', 'endpoint_corto', 'activa', 'user_agent', 'fecha_creada', 'fecha_desactivada')
     list_filter = ('activa', 'fecha_creada')
     search_fields = ('enlace__token', 'user_agent')
     ordering = ['-fecha_creada']

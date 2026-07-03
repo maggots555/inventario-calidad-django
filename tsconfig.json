@@ -15,6 +15,7 @@
   },
   /* Dónde buscará TypeScript */
   "include": [
-    "static/ts/**/*.ts" // ¡IMPORTANTE! Le dice que busque todos los archivos .ts dentro de una nueva carpeta 'static/ts'
+    "static/ts/**/*.ts",
+    "static/ts/**/*.d.ts"
   ]
 }

@@ -29,6 +29,7 @@ from .models import (
     FeedbackCliente,
     # NUEVO - SEGUIMIENTO PÚBLICO DE ORDEN (Marzo 2026)
     EnlaceSeguimientoCliente,
+    EventoSeguimientoCliente,
     # NUEVO - BANNERS PROMOCIONALES (Abril 2026)
     BannerPromocional,
     # NUEVO - ANÁLISIS DE SENTIMIENTO IA (Abril 2026)
@@ -1918,6 +1919,29 @@ class EnlaceSeguimientoClienteAdmin(admin.ModelAdmin):
     disponibilidad_info.short_description = 'Disponibilidad'
 
     def has_add_permission(self, request):
+        return False
+
+
+@admin.register(EventoSeguimientoCliente)
+class EventoSeguimientoClienteAdmin(admin.ModelAdmin):
+    """
+    Administración de eventos de producto del seguimiento público del cliente.
+    Útil para depurar que PWA, push y chat registran acciones correctamente.
+    """
+
+    list_display = ('id', 'enlace_id', 'tipo', 'fecha', 'session_id', 'ip')
+    list_filter = ('tipo', 'fecha')
+    search_fields = (
+        'enlace__orden__numero_orden_interno',
+        'enlace__orden__detalle_equipo__orden_cliente',
+        'session_id',
+    )
+    readonly_fields = ('enlace', 'tipo', 'fecha', 'session_id', 'metadata', 'user_agent', 'ip')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
 

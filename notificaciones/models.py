@@ -238,6 +238,12 @@ class PushSubscriptionCliente(models.Model):
         auto_now_add=True,
         verbose_name="Fecha de suscripción",
     )
+    fecha_desactivada = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de desactivación",
+        help_text="Momento en que el cliente desactivó push o la suscripción expiró",
+    )
     user_agent = models.CharField(
         max_length=300,
         blank=True,

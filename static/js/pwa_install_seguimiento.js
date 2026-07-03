@@ -37,6 +37,7 @@
  * y, sin este envoltorio, TypeScript los trataría como si compartieran el
  * mismo espacio global (ambos declaran nombres iguales).
  */
+/// <reference path="./eventos_seguimiento.d.ts" />
 (function () {
     // ── Tipos ──────────────────────────────────────────────────────────────────────
     // ── Constantes ─────────────────────────────────────────────────────────────────
@@ -71,6 +72,7 @@
     }
     // ── Animación del banner ───────────────────────────────────────────────────────
     function mostrarBanner() {
+        var _a;
         const banner = document.getElementById('st-pwa-install-banner');
         if (!banner)
             return;
@@ -78,6 +80,7 @@
         // Forzamos un reflow para que la transición CSS funcione correctamente.
         void banner.offsetHeight;
         banner.classList.add('is-visible');
+        (_a = window.EventosSeguimiento) === null || _a === void 0 ? void 0 : _a.registrarEvento('pwa_banner_mostrado', {}, true);
     }
     function ocultarBanner() {
         const banner = document.getElementById('st-pwa-install-banner');
@@ -89,7 +92,9 @@
         }, { once: true });
     }
     function guardarDismiss() {
+        var _a;
         localStorage.setItem(DISMISSED_KEY, Date.now().toString());
+        (_a = window.EventosSeguimiento) === null || _a === void 0 ? void 0 : _a.registrarEvento('pwa_banner_cerrado');
     }
     // ── Lógica principal ───────────────────────────────────────────────────────────
     let promptEvent = null;
@@ -101,6 +106,7 @@
         setTimeout(mostrarBanner, DELAY_MOSTRAR_MS);
     });
     document.addEventListener('DOMContentLoaded', () => {
+        var _a;
         if (yaEstaInstalada() || estaEnCooldown())
             return;
         const installBtn = document.getElementById('st-pwa-install-btn');
@@ -117,10 +123,12 @@
         }
         // ── Botón "Instalar" (Android / Chrome / Edge) ───────────────────────────
         installBtn === null || installBtn === void 0 ? void 0 : installBtn.addEventListener('click', async () => {
+            var _a;
             if (!promptEvent)
                 return;
             await promptEvent.prompt();
             const { outcome } = await promptEvent.userChoice;
+            (_a = window.EventosSeguimiento) === null || _a === void 0 ? void 0 : _a.registrarEvento(outcome === 'accepted' ? 'pwa_prompt_aceptado' : 'pwa_prompt_rechazado');
             if (outcome === 'accepted') {
                 ocultarBanner();
             }
@@ -133,8 +141,13 @@
         });
         // ── Ocultar automáticamente si la app se instala ─────────────────────────
         window.addEventListener('appinstalled', () => {
+            var _a;
+            (_a = window.EventosSeguimiento) === null || _a === void 0 ? void 0 : _a.registrarEvento('pwa_instalada');
             ocultarBanner();
         });
+        if (yaEstaInstalada()) {
+            (_a = window.EventosSeguimiento) === null || _a === void 0 ? void 0 : _a.registrarEvento('pwa_modo_standalone', {}, true);
+        }
     });
 })();
 //# sourceMappingURL=pwa_install_seguimiento.js.map

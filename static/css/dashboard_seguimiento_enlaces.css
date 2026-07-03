@@ -262,6 +262,78 @@
     margin-bottom: 0;
 }
 
+.se-embudo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.se-embudo-paso {
+    width: 100%;
+}
+
+.se-embudo-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gray-800, #1f2937);
+}
+
+.se-embudo-valor {
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.se-embudo-barra-track {
+    height: 8px;
+    background: var(--gray-200, #e5e7eb);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.se-embudo-barra-fill {
+    height: 100%;
+    background: #1f6391;
+    border-radius: 4px;
+    min-width: 2px;
+    transition: width 0.35s ease;
+}
+
+.badge-pwa-ok {
+    font-size: 0.7rem;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 20px;
+    padding: 2px 8px;
+    cursor: help;
+}
+
+.badge-pwa-no {
+    font-size: 0.7rem;
+    background: #f3f4f6;
+    color: #6b7280;
+    border-radius: 20px;
+    padding: 2px 8px;
+    cursor: help;
+}
+
+.badge-chat-ok {
+    font-size: 0.7rem;
+    background: #e0e7ff;
+    color: #3730a3;
+    border-radius: 20px;
+    padding: 2px 8px;
+    cursor: help;
+}
+
+.badge-chat-no {
+    font-size: 0.7rem;
+    background: #f3f4f6;
+    color: #6b7280;
+    border-radius: 20px;
+    padding: 2px 8px;
+    cursor: help;
+}
+
 /* ── RESPONSIVO ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
     .se-header { padding: 1.1rem 1rem; }
@@ -370,6 +442,34 @@
 [data-bs-theme="dark"] .badge-push-no {
     background: #451a03;
     color: #fcd34d;
+}
+
+[data-bs-theme="dark"] .se-embudo-label {
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .se-embudo-barra-track {
+    background: #334155;
+}
+
+[data-bs-theme="dark"] .se-embudo-barra-fill {
+    background: #60a5fa;
+}
+
+[data-bs-theme="dark"] .badge-pwa-ok {
+    background: #1e3a5f;
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .badge-pwa-no,
+[data-bs-theme="dark"] .badge-chat-no {
+    background: #334155;
+    color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .badge-chat-ok {
+    background: #312e81;
+    color: #c7d2fe;
 }
 
 [data-bs-theme="dark"] #tablaEnlaces tbody tr:hover {

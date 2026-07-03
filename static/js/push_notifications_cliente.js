@@ -24,6 +24,7 @@
  * sin este envoltorio, TypeScript los trataría como si compartieran el
  * mismo espacio global (ambos declaran nombres iguales).
  */
+/// <reference path="./eventos_seguimiento.d.ts" />
 (function () {
     // ── Tipos ────────────────────────────────────────────────────────────────────
     var _a, _b, _c;
@@ -98,6 +99,7 @@
     }
     // ── Lógica principal ─────────────────────────────────────────────────────────
     async function inicializar() {
+        var _a;
         if (!btn || !wrapper)
             return;
         if (!VAPID_URL || !SUSCRIBIR_URL || !CANCELAR_URL) {
@@ -112,6 +114,7 @@
         }
         const permiso = Notification.permission;
         if (permiso === 'denied') {
+            (_a = window.EventosSeguimiento) === null || _a === void 0 ? void 0 : _a.registrarEvento('push_permiso_denegado', {}, true);
             aplicarEstado('bloqueado');
             return;
         }
@@ -125,6 +128,7 @@
         }
     }
     async function activar() {
+        var _a;
         if (!btn)
             return;
         btn.disabled = true;
@@ -132,6 +136,9 @@
         try {
             const permiso = await Notification.requestPermission();
             if (permiso !== 'granted') {
+                if (permiso === 'denied') {
+                    (_a = window.EventosSeguimiento) === null || _a === void 0 ? void 0 : _a.registrarEvento('push_permiso_denegado');
+                }
                 aplicarEstado(permiso === 'denied' ? 'bloqueado' : 'inactivo');
                 return;
             }

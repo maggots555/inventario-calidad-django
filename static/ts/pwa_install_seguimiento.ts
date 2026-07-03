@@ -36,6 +36,7 @@
  * y, sin este envoltorio, TypeScript los trataría como si compartieran el
  * mismo espacio global (ambos declaran nombres iguales).
  */
+/// <reference path="./eventos_seguimiento.d.ts" />
 (function (): void {
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -96,6 +97,7 @@ function mostrarBanner(): void {
     // Forzamos un reflow para que la transición CSS funcione correctamente.
     void banner.offsetHeight;
     banner.classList.add('is-visible');
+    window.EventosSeguimiento?.registrarEvento('pwa_banner_mostrado', {}, true);
 }
 
 function ocultarBanner(): void {
@@ -109,6 +111,7 @@ function ocultarBanner(): void {
 
 function guardarDismiss(): void {
     localStorage.setItem(DISMISSED_KEY, Date.now().toString());
+    window.EventosSeguimiento?.registrarEvento('pwa_banner_cerrado');
 }
 
 // ── Lógica principal ───────────────────────────────────────────────────────────
@@ -144,6 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!promptEvent) return;
         await promptEvent.prompt();
         const { outcome } = await promptEvent.userChoice;
+        window.EventosSeguimiento?.registrarEvento(
+            outcome === 'accepted' ? 'pwa_prompt_aceptado' : 'pwa_prompt_rechazado',
+        );
         if (outcome === 'accepted') {
             ocultarBanner();
         }
@@ -158,8 +164,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Ocultar automáticamente si la app se instala ─────────────────────────
     window.addEventListener('appinstalled', () => {
+        window.EventosSeguimiento?.registrarEvento('pwa_instalada');
         ocultarBanner();
     });
+
+    if (yaEstaInstalada()) {
+        window.EventosSeguimiento?.registrarEvento('pwa_modo_standalone', {}, true);
+    }
 });
 
 })();

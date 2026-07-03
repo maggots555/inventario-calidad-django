@@ -7,7 +7,23 @@
  *   GET /servicio-tecnico/seguimiento-enlaces/api/tendencia/
  *   GET /servicio-tecnico/seguimiento-enlaces/api/top/
  *   GET /servicio-tecnico/seguimiento-enlaces/api/tabla/
+ *   GET /servicio-tecnico/seguimiento-enlaces/api/embudo/
  */
+
+interface PasoEmbudo {
+    id: string;
+    label: string;
+    total: number;
+    tasa: number;
+}
+
+interface EmbudoSeguimiento {
+    total_enlaces: number;
+    pasos: PasoEmbudo[];
+    push_suscritos: number;
+    push_sin_suscripcion: number;
+    tasa_push: number;
+}
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
@@ -60,6 +76,8 @@ interface FilaEnlace {
     push_activo: boolean;
     push_dispositivos: number;
     push_fecha: string;
+    pwa_instalada: boolean;
+    chat_usado: boolean;
     fecha_creacion: string;
     ultimo_acceso: string;
 }
@@ -151,6 +169,7 @@ class DashboardSeguimientoEnlaces {
 
     private cargarTodo(): void {
         this.cargarKPIs();
+        this.cargarEmbudo();
         this.cargarTendencia();
         this.cargarTop();
         this.cargarTabla();
@@ -184,6 +203,69 @@ class DashboardSeguimientoEnlaces {
         const noEnv = document.getElementById('kpiCorreosNoenviados');
         if (noEnv) noEnv.textContent = `${d.correos_no_enviados} sin enviar`;
 
+        set('kpiPushSuscritos', d.push_suscritos.toLocaleString('es-MX'));
+        set('kpiPushSin', d.push_sin_suscripcion.toLocaleString('es-MX'));
+        set('kpiTasaPush', `${d.tasa_push}%`);
+    }
+
+    // ── Embudo de adopción ───────────────────────────────────────────────────
+
+    private async cargarEmbudo(): Promise<void> {
+        const loader = document.getElementById('loaderEmbudo');
+        const container = document.getElementById('embudoContainer');
+
+        if (loader) loader.style.display = 'block';
+        if (container) container.style.display = 'none';
+
+        const url = `/servicio-tecnico/seguimiento-enlaces/api/embudo/?${this.buildParams()}`;
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('API error');
+            const data: EmbudoSeguimiento = await resp.json();
+            this.renderEmbudo(data);
+            this.renderPushDesdeEmbudo(data);
+        } catch (_) {
+            if (container) {
+                container.style.display = 'block';
+                container.innerHTML = '<p class="text-muted small mb-0">No se pudo cargar el embudo.</p>';
+            }
+        } finally {
+            if (loader) loader.style.display = 'none';
+        }
+    }
+
+    private renderEmbudo(d: EmbudoSeguimiento): void {
+        const container = document.getElementById('embudoContainer');
+        if (!container) return;
+
+        if (!d.pasos.length) {
+            container.innerHTML = '<p class="text-muted small mb-0">Sin datos para el embudo.</p>';
+            container.style.display = 'block';
+            return;
+        }
+
+        const maxTotal = Math.max(...d.pasos.map(p => p.total), 1);
+
+        container.innerHTML = d.pasos.map(p => `
+            <div class="se-embudo-paso">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="se-embudo-label">${p.label}</span>
+                    <span class="se-embudo-valor">${p.total.toLocaleString('es-MX')} <small class="text-muted">(${p.tasa}%)</small></span>
+                </div>
+                <div class="se-embudo-barra-track">
+                    <div class="se-embudo-barra-fill" style="width:${Math.round((p.total / maxTotal) * 100)}%"></div>
+                </div>
+            </div>
+        `).join('');
+
+        container.style.display = 'block';
+    }
+
+    private renderPushDesdeEmbudo(d: EmbudoSeguimiento): void {
+        const set = (id: string, val: string | number) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = String(val);
+        };
         set('kpiPushSuscritos', d.push_suscritos.toLocaleString('es-MX'));
         set('kpiPushSin', d.push_sin_suscripcion.toLocaleString('es-MX'));
         set('kpiTasaPush', `${d.tasa_push}%`);
@@ -407,7 +489,7 @@ class DashboardSeguimientoEnlaces {
         } catch (_) {
             if (loader) loader.style.display = 'none';
             if (tbody)  tbody.innerHTML = `
-                <tr><td colspan="11" class="text-center text-danger py-3">
+                <tr><td colspan="13" class="text-center text-danger py-3">
                     <i class="bi bi-exclamation-circle me-1"></i>Error al cargar datos
                 </td></tr>`;
         }
@@ -419,7 +501,7 @@ class DashboardSeguimientoEnlaces {
 
         if (!filas.length) {
             tbody.innerHTML = `
-                <tr><td colspan="11" class="text-center text-muted py-4">
+                <tr><td colspan="13" class="text-center text-muted py-4">
                     <i class="bi bi-inbox me-2"></i>No hay enlaces que coincidan con los filtros
                 </td></tr>`;
             return;
@@ -442,6 +524,14 @@ class DashboardSeguimientoEnlaces {
                 ? `<span class="badge-push-ok" title="${pushTooltip}"><i class="bi bi-bell-fill me-1"></i>Activo</span>`
                 : `<span class="badge-push-no" title="${pushTooltip}"><i class="bi bi-bell-slash me-1"></i>No activado</span>`;
 
+            const pwaBadge = f.pwa_instalada
+                ? `<span class="badge-pwa-ok" title="PWA instalada o abierta como app"><i class="bi bi-phone-fill me-1"></i>Sí</span>`
+                : `<span class="badge-pwa-no" title="Sin evento de instalación PWA"><i class="bi bi-phone me-1"></i>No</span>`;
+
+            const chatBadge = f.chat_usado
+                ? `<span class="badge-chat-ok" title="Envió al menos un mensaje al chat IA"><i class="bi bi-chat-dots-fill me-1"></i>Sí</span>`
+                : `<span class="badge-chat-no" title="No usó el chat IA"><i class="bi bi-chat me-1"></i>No</span>`;
+
             return `
             <tr>
                 <td><a href="/servicio-tecnico/ordenes/${f.orden_id}/" class="fw-semibold text-decoration-none">${f.orden_cliente}</a></td>
@@ -453,6 +543,8 @@ class DashboardSeguimientoEnlaces {
                 <td class="text-center">${accBadge}</td>
                 <td class="text-center">${correoBadge}</td>
                 <td class="text-center">${pushBadge}</td>
+                <td class="text-center">${pwaBadge}</td>
+                <td class="text-center">${chatBadge}</td>
                 <td class="text-nowrap">${f.fecha_creacion}</td>
                 <td class="text-nowrap">${f.ultimo_acceso}</td>
             </tr>`;

@@ -33,6 +33,7 @@ from servicio_tecnico.views import (
     vapid_key_seguimiento,
     suscribir_push_seguimiento,
     cancelar_push_seguimiento,
+    registrar_evento_seguimiento_cliente,
 )
 
 urlpatterns = [
@@ -112,6 +113,7 @@ urlpatterns = [
     path('seguimiento/<str:token>/push/vapid-key/', vapid_key_seguimiento, name='push_vapid_key_seguimiento'),
     path('seguimiento/<str:token>/push/suscribir/', suscribir_push_seguimiento, name='push_suscribir_seguimiento'),
     path('seguimiento/<str:token>/push/cancelar/', cancelar_push_seguimiento, name='push_cancelar_seguimiento'),
+    path('seguimiento/<str:token>/eventos/', registrar_evento_seguimiento_cliente, name='eventos_seguimiento_cliente'),
 ]
 
 # ============================================================================

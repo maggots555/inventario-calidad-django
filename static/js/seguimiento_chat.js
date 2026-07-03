@@ -20,6 +20,7 @@
  * El historial de conversación se guarda SOLO en memoria (no en localStorage
  * ni en la base de datos). Si el cliente recarga la página, el historial se borra.
  */
+/// <reference path="./eventos_seguimiento.d.ts" />
 // ============================================================================
 // CONSTANTES DE CONFIGURACIÓN
 // ============================================================================
@@ -40,6 +41,8 @@ class SeguimientoChat {
         this.historial = [];
         this.cargando = false;
         this.panelAbierto = false;
+        this.chatAbiertoRegistrado = false;
+        this.ultimoEnvioViaChip = false;
         this.bubble = bubble;
         this.panel = panel;
         this.closeBtn = closeBtn;
@@ -99,6 +102,7 @@ class SeguimientoChat {
                     var _a, _b;
                     const texto = (_b = (_a = chip.textContent) === null || _a === void 0 ? void 0 : _a.trim()) !== null && _b !== void 0 ? _b : '';
                     if (texto && !this.cargando) {
+                        this.ultimoEnvioViaChip = true;
                         this.inputEl.value = texto;
                         this.actualizarEstadoBotonEnviar();
                         this.enviarPregunta();
@@ -130,7 +134,12 @@ class SeguimientoChat {
         }
     }
     abrirPanel() {
+        var _a;
         this.panelAbierto = true;
+        if (!this.chatAbiertoRegistrado) {
+            this.chatAbiertoRegistrado = true;
+            (_a = window.EventosSeguimiento) === null || _a === void 0 ? void 0 : _a.registrarEvento('chat_abierto', {}, true);
+        }
         this.panel.classList.add('st-chat-panel--visible');
         this.panel.setAttribute('aria-hidden', 'false');
         this.bubble.classList.add('st-chat-bubble--active');
@@ -280,6 +289,8 @@ class SeguimientoChat {
             const formData = new FormData();
             formData.append('pregunta', pregunta);
             formData.append('historial', JSON.stringify(historialParaEnviar));
+            formData.append('via_chip', this.ultimoEnvioViaChip ? 'true' : 'false');
+            this.ultimoEnvioViaChip = false;
             const response = await fetch(this.chatEndpoint, {
                 method: 'POST',
                 body: formData,

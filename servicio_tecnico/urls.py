@@ -425,6 +425,8 @@ urlpatterns = [
          views.api_seguimiento_enlaces_top, name='api_seguimiento_enlaces_top'),
     path('seguimiento-enlaces/api/tabla/',
          views.api_seguimiento_enlaces_tabla, name='api_seguimiento_enlaces_tabla'),
+    path('seguimiento-enlaces/api/embudo/',
+         views.api_seguimiento_enlaces_embudo, name='api_seguimiento_enlaces_embudo'),
 
     # ── Mi Perfil ──────────────────────
     path('mi-perfil/', views.mi_perfil, name='mi_perfil'),

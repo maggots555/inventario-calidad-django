@@ -19,6 +19,7 @@
  * El historial de conversación se guarda SOLO en memoria (no en localStorage
  * ni en la base de datos). Si el cliente recarga la página, el historial se borra.
  */
+/// <reference path="./eventos_seguimiento.d.ts" />
 
 // ============================================================================
 // INTERFACES Y TIPOS
@@ -70,6 +71,8 @@ class SeguimientoChat {
     private historial:    MensajeChat[] = [];
     private cargando:     boolean = false;
     private panelAbierto: boolean = false;
+    private chatAbiertoRegistrado: boolean = false;
+    private ultimoEnvioViaChip: boolean = false;
     private chatEndpoint: string;
     private aiEnabled:    boolean;
 
@@ -150,6 +153,7 @@ class SeguimientoChat {
                 chip.addEventListener('click', () => {
                     const texto = chip.textContent?.trim() ?? '';
                     if (texto && !this.cargando) {
+                        this.ultimoEnvioViaChip = true;
                         this.inputEl.value = texto;
                         this.actualizarEstadoBotonEnviar();
                         this.enviarPregunta();
@@ -184,6 +188,10 @@ class SeguimientoChat {
 
     private abrirPanel(): void {
         this.panelAbierto = true;
+        if (!this.chatAbiertoRegistrado) {
+            this.chatAbiertoRegistrado = true;
+            window.EventosSeguimiento?.registrarEvento('chat_abierto', {}, true);
+        }
         this.panel.classList.add('st-chat-panel--visible');
         this.panel.setAttribute('aria-hidden', 'false');
         this.bubble.classList.add('st-chat-bubble--active');
@@ -355,6 +363,8 @@ class SeguimientoChat {
             const formData = new FormData();
             formData.append('pregunta', pregunta);
             formData.append('historial', JSON.stringify(historialParaEnviar));
+            formData.append('via_chip', this.ultimoEnvioViaChip ? 'true' : 'false');
+            this.ultimoEnvioViaChip = false;
 
             const response = await fetch(this.chatEndpoint, {
                 method: 'POST',

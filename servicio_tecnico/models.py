@@ -2924,6 +2924,85 @@ class EnlaceSeguimientoCliente(models.Model):
         self.save(update_fields=['accesos_count', 'fecha_ultimo_acceso', 'ip_ultimo_acceso'])
 
 
+class EventoSeguimientoCliente(models.Model):
+    """
+    Evento de producto registrado en la vista pública de seguimiento del cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cada fila es una acción concreta del cliente (abrió la página, vio el banner
+    PWA, activó push, envió un mensaje al chat, etc.). Con estos eventos podemos
+    armar embudos de adopción en el dashboard interno sin adivinar solo con
+    contadores agregados como accesos_count.
+  """
+
+    TIPO_CHOICES = [
+        ('visita_pagina', 'Visita a la página'),
+        ('pwa_banner_mostrado', 'Banner PWA mostrado'),
+        ('pwa_banner_cerrado', 'Banner PWA cerrado'),
+        ('pwa_prompt_aceptado', 'Prompt PWA aceptado'),
+        ('pwa_prompt_rechazado', 'Prompt PWA rechazado'),
+        ('pwa_instalada', 'PWA instalada'),
+        ('pwa_modo_standalone', 'Página abierta como app instalada'),
+        ('push_activado', 'Push activado'),
+        ('push_desactivado', 'Push desactivado'),
+        ('push_permiso_denegado', 'Permiso push denegado'),
+        ('chat_abierto', 'Chat abierto'),
+        ('chat_mensaje_enviado', 'Mensaje de chat enviado'),
+    ]
+
+    enlace = models.ForeignKey(
+        EnlaceSeguimientoCliente,
+        on_delete=models.CASCADE,
+        related_name='eventos',
+        verbose_name='Enlace de seguimiento',
+    )
+    tipo = models.CharField(
+        max_length=40,
+        choices=TIPO_CHOICES,
+        db_index=True,
+        verbose_name='Tipo de evento',
+    )
+    fecha = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        verbose_name='Fecha del evento',
+    )
+    session_id = models.CharField(
+        max_length=36,
+        blank=True,
+        verbose_name='ID de sesión',
+        help_text='UUID generado en el navegador para agrupar eventos de una misma visita',
+    )
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Metadatos',
+        help_text='Datos extra del evento (sin texto del chat del cliente)',
+    )
+    user_agent = models.CharField(
+        max_length=300,
+        blank=True,
+        verbose_name='User Agent',
+    )
+    ip = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name='Dirección IP',
+    )
+
+    class Meta:
+        verbose_name = 'Evento de seguimiento del cliente'
+        verbose_name_plural = 'Eventos de seguimiento del cliente'
+        ordering = ['-fecha']
+        indexes = [
+            models.Index(fields=['enlace', 'tipo'], name='idx_evt_seg_enlace_tipo'),
+            models.Index(fields=['enlace', 'fecha'], name='idx_evt_seg_enlace_fecha'),
+        ]
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} — enlace #{self.enlace_id}'
+
+
 # ============================================================================
 # BANNERS PROMOCIONALES — Sistema de publicidad dinámica para seguimiento
 # ============================================================================
