@@ -2858,6 +2858,27 @@ class FeedbackCliente(models.Model):
 # - Inmediatamente si la orden se cancela
 # - Mientras la orden está activa, el enlace NO expira
 
+
+def diagnostico_pdf_upload_path(instance, filename):
+    """
+    Genera la ruta de almacenamiento del PDF de diagnóstico enviado al cliente.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cuando el técnico envía el diagnóstico por correo, guardamos una copia del
+    PDF en el enlace público del cliente. Así el push y la página de seguimiento
+    pueden abrir el mismo documento sin depender del correo electrónico.
+
+    Args:
+        instance: Instancia de EnlaceSeguimientoCliente dueña del archivo
+        filename: Nombre sugerido del PDF (ej. DIAGNOSTICO_20260706_folio.pdf)
+
+    Returns:
+        str: Ruta relativa dentro de MEDIA_ROOT
+    """
+    orden_id = instance.orden_id
+    return f'seguimiento/{orden_id}/diagnostico/{filename}'
+
+
 class EnlaceSeguimientoCliente(models.Model):
     """
     Enlace público de seguimiento de orden para clientes.
@@ -2917,6 +2938,22 @@ class EnlaceSeguimientoCliente(models.Model):
         default=False,
         verbose_name="¿Correo enviado al cliente?",
         help_text="Se actualiza a True cuando la tarea Celery envía el correo."
+    )
+
+    # --- PDF de diagnóstico (para push y consulta desde la PWA) ---
+    folio_diagnostico = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Folio del diagnóstico enviado",
+        help_text="Folio usado al generar el PDF que se compartió con el cliente.",
+    )
+    pdf_diagnostico = models.FileField(
+        upload_to=diagnostico_pdf_upload_path,
+        null=True,
+        blank=True,
+        max_length=255,
+        verbose_name="PDF de diagnóstico",
+        help_text="Copia persistente del PDF enviado al cliente por correo.",
     )
 
     class Meta:
@@ -2999,6 +3036,7 @@ class EventoSeguimientoCliente(models.Model):
         ('push_permiso_denegado', 'Permiso push denegado'),
         ('chat_abierto', 'Chat abierto'),
         ('chat_mensaje_enviado', 'Mensaje de chat enviado'),
+        ('diagnostico_pdf_abierto', 'PDF de diagnóstico abierto'),
     ]
 
     enlace = models.ForeignKey(

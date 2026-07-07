@@ -124,6 +124,7 @@ def anotar_eventos_enlaces(qs: QuerySet) -> QuerySet:
         evento_pwa_banner_visto=Exists(_subquery_evento('pwa_banner_mostrado')),
         evento_pwa_instalada=Exists(pwa_instalada_qs),
         evento_chat_usado=Exists(_subquery_evento('chat_mensaje_enviado')),
+        evento_diagnostico_pdf_abierto=Exists(_subquery_evento('diagnostico_pdf_abierto')),
     )
 
 
@@ -149,6 +150,8 @@ def calcular_embudo_enlaces(qs: QuerySet) -> dict:
     pwa_inst = qs.filter(evento_pwa_instalada=True).count()
     push_act = qs.filter(push_activo=True).count()
     chat_uso = qs.filter(evento_chat_usado=True).count()
+    pdf_dx = qs.filter(evento_diagnostico_pdf_abierto=True).count()
+    con_pdf_dx = qs.exclude(pdf_diagnostico='').exclude(pdf_diagnostico__isnull=True).count()
 
     pasos = [
         {'id': 'correo_enviado', 'label': 'Correo enviado', 'total': correos, 'tasa': tasa(correos)},
@@ -156,6 +159,7 @@ def calcular_embudo_enlaces(qs: QuerySet) -> dict:
         {'id': 'pwa_banner_visto', 'label': 'Vio banner PWA', 'total': pwa_banner, 'tasa': tasa(pwa_banner)},
         {'id': 'pwa_instalada', 'label': 'PWA instalada / modo app', 'total': pwa_inst, 'tasa': tasa(pwa_inst)},
         {'id': 'push_activo', 'label': 'Push activo', 'total': push_act, 'tasa': tasa(push_act)},
+        {'id': 'diagnostico_pdf_abierto', 'label': 'Abrió PDF de diagnóstico', 'total': pdf_dx, 'tasa': tasa(pdf_dx)},
         {'id': 'chat_usado', 'label': 'Usó el chat IA', 'total': chat_uso, 'tasa': tasa(chat_uso)},
     ]
 
@@ -165,4 +169,6 @@ def calcular_embudo_enlaces(qs: QuerySet) -> dict:
         'push_suscritos': push_act,
         'push_sin_suscripcion': total - push_act,
         'tasa_push': tasa(push_act),
+        'con_pdf_diagnostico': con_pdf_dx,
+        'pdf_diagnostico_abiertos': pdf_dx,
     }

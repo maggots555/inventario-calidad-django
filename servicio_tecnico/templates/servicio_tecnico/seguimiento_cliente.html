@@ -26,7 +26,7 @@
     })();
   </script>
 </head>
-<body class="st-body"{% if estado != 'invalido' %} data-eventos-url="{% url 'eventos_seguimiento_cliente' token=token %}"{% endif %}>
+<body class="st-body"{% if estado != 'invalido' %} data-eventos-url="{% url 'eventos_seguimiento_cliente' token=token %}"{% if url_diagnostico_pdf %} data-diagnostico-pdf-url="{{ url_diagnostico_pdf }}"{% endif %}{% endif %}>
 
 <canvas id="particles-canvas"></canvas>
 
@@ -484,6 +484,22 @@ CHATBOT DE IA — Solo para estados con datos reales de la orden
         <span class="st-push-spinner" aria-hidden="true"></span>
       </button>
     </div>
+
+    {% if tiene_pdf_diagnostico %}
+    <div class="st-diagnostico-card">
+      <div class="st-diagnostico-header">
+        <span class="st-diagnostico-icon" aria-hidden="true">📄</span>
+        <div class="st-diagnostico-text">
+          <p class="st-diagnostico-label">Tu diagnóstico está disponible</p>
+          <p class="st-diagnostico-hint">Puedes consultarlo aquí cuando quieras.</p>
+        </div>
+      </div>
+      <a href="{{ url_diagnostico_pdf }}?origen=pagina"
+         class="st-diagnostico-btn">
+        Ver diagnóstico (PDF)
+      </a>
+    </div>
+    {% endif %}
 
     {# Banner para estado FINALIZADO #}
     {% if estado == 'finalizado' %}

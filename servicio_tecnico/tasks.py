@@ -1037,6 +1037,40 @@ def enviar_diagnostico_cliente_task(
         logger.info(f"[DIAGNOSTICO] Correo enviado a {email_cliente}")
 
         # ===================================================================
+        # PASO 5b: GUARDAR PDF EN EL ENLACE PÚBLICO (para push y PWA)
+        # ===================================================================
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # El PDF temporal se borra al final de la tarea. Si lo guardamos en el
+        # enlace del cliente ANTES de cambiar el estado, el push automático
+        # podrá incluir un link directo al diagnóstico.
+        if orden.es_fuera_garantia:
+            try:
+                from django.core.files import File
+
+                enlace = orden.enlace_seguimiento
+                if enlace:
+                    # Si ya había un PDF previo (reenvío), eliminar el archivo viejo
+                    if enlace.pdf_diagnostico:
+                        enlace.pdf_diagnostico.delete(save=False)
+
+                    with open(resultado_pdf['ruta'], 'rb') as pdf_lectura:
+                        enlace.pdf_diagnostico.save(
+                            resultado_pdf['archivo'],
+                            File(pdf_lectura),
+                            save=False,
+                        )
+                    enlace.folio_diagnostico = folio
+                    enlace.save(update_fields=['pdf_diagnostico', 'folio_diagnostico'])
+                    logger.info(
+                        f"[DIAGNOSTICO] PDF persistido en enlace de seguimiento "
+                        f"(orden {orden.numero_orden_interno})"
+                    )
+            except Exception as exc:
+                logger.warning(
+                    f"[DIAGNOSTICO] No se pudo guardar PDF en enlace público: {exc}"
+                )
+
+        # ===================================================================
         # PASO 6: CAMBIAR ESTADO DE LA ORDEN
         # ===================================================================
         estado_anterior = orden.estado

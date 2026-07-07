@@ -28,6 +28,7 @@ from servicio_tecnico.views import (
     feedback_rechazo_view,
     feedback_satisfaccion_cliente,
     seguimiento_orden_cliente,
+    diagnostico_pdf_seguimiento,
     chat_seguimiento_cliente,
     manifest_seguimiento,
     vapid_key_seguimiento,
@@ -93,6 +94,11 @@ urlpatterns = [
     # Muestra timeline del estado, info del equipo y contacto del responsable.
     # Caduca 3 días después de estado 'entregado'. Formato: /seguimiento/<token>/
     path('seguimiento/<str:token>/', seguimiento_orden_cliente, name='seguimiento_orden_publico'),
+
+    # ── URL PÚBLICA: PDF de diagnóstico del cliente (sin autenticación) ──
+    # Abre el PDF enviado al cliente. Se usa desde push y desde la PWA.
+    # Formato: GET /seguimiento/<token>/diagnostico/
+    path('seguimiento/<str:token>/diagnostico/', diagnostico_pdf_seguimiento, name='diagnostico_pdf_seguimiento'),
 
     # ── URL PÚBLICA: Chat de IA del seguimiento (sin autenticación) ──
     # Endpoint AJAX del chatbot de IA accesible desde la vista de seguimiento.

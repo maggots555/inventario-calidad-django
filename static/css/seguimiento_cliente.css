@@ -1712,6 +1712,82 @@
   color: #1e293b;
 }
 
+/* =====================================================================
+   TARJETA "VER DIAGNÓSTICO (PDF)"
+   ===================================================================== */
+
+.st-diagnostico-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background-color: var(--gray-50, #f8fafc);
+  border: 1px solid var(--gray-200, #e2e8f0);
+  border-left: 3px solid var(--st-primary-light, #1f6391);
+  border-radius: var(--st-radius-sm);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  animation: stSlideIn 0.5s ease both;
+}
+
+.st-diagnostico-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.st-diagnostico-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.st-diagnostico-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.st-diagnostico-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--gray-900, #0f172a);
+  margin: 0 0 0.2rem;
+  line-height: 1.35;
+}
+
+.st-diagnostico-hint {
+  font-size: 0.78rem;
+  color: var(--gray-600, #64748b);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.st-diagnostico-btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  background-color: #1f6391;
+  color: #ffffff;
+  font-family: var(--st-font-heading);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+  transition: var(--st-spring);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.st-diagnostico-btn:hover,
+.st-diagnostico-btn:focus {
+  background-color: #174f75;
+  color: #ffffff;
+  text-decoration: none;
+}
+
 /* ============================================================
    MODO OSCURO — Tarjeta de push + banner de instalación PWA
    ============================================================ */
@@ -1719,6 +1795,31 @@
 [data-bs-theme="dark"] .st-push-card {
   background: linear-gradient(135deg, #0f2942, #0c3556);
   border-color: rgba(96, 165, 250, 0.25);
+}
+
+[data-bs-theme="dark"] .st-diagnostico-card {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+[data-bs-theme="dark"] .st-diagnostico-label {
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .st-diagnostico-hint {
+  color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .st-diagnostico-btn {
+  background-color: #1e293b;
+  border: 1px solid #60a5fa;
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .st-diagnostico-btn:hover,
+[data-bs-theme="dark"] .st-diagnostico-btn:focus {
+  background-color: #334155;
+  color: #e2e8f0;
 }
 
 [data-bs-theme="dark"] .st-push-label {

@@ -406,7 +406,7 @@ class DashboardSeguimientoEnlaces {
                 loader.style.display = 'none';
             if (tbody)
                 tbody.innerHTML = `
-                <tr><td colspan="13" class="text-center text-danger py-3">
+                <tr><td colspan="14" class="text-center text-danger py-3">
                     <i class="bi bi-exclamation-circle me-1"></i>Error al cargar datos
                 </td></tr>`;
         }
@@ -417,7 +417,7 @@ class DashboardSeguimientoEnlaces {
             return;
         if (!filas.length) {
             tbody.innerHTML = `
-                <tr><td colspan="13" class="text-center text-muted py-4">
+                <tr><td colspan="14" class="text-center text-muted py-4">
                     <i class="bi bi-inbox me-2"></i>No hay enlaces que coincidan con los filtros
                 </td></tr>`;
             return;
@@ -441,6 +441,16 @@ class DashboardSeguimientoEnlaces {
             const chatBadge = f.chat_usado
                 ? `<span class="badge-chat-ok" title="Envió al menos un mensaje al chat IA"><i class="bi bi-chat-dots-fill me-1"></i>Sí</span>`
                 : `<span class="badge-chat-no" title="No usó el chat IA"><i class="bi bi-chat me-1"></i>No</span>`;
+            let pdfDxBadge;
+            if (!f.tiene_pdf_diagnostico) {
+                pdfDxBadge = `<span class="badge-pdf-dx-na" title="Aún no se ha enviado diagnóstico con PDF">—</span>`;
+            }
+            else if (f.diagnostico_pdf_abierto) {
+                pdfDxBadge = `<span class="badge-pdf-dx-ok" title="El cliente abrió el PDF de diagnóstico"><i class="bi bi-file-earmark-pdf-fill me-1"></i>Sí</span>`;
+            }
+            else {
+                pdfDxBadge = `<span class="badge-pdf-dx-no" title="Diagnóstico enviado pero el cliente no ha abierto el PDF"><i class="bi bi-file-earmark-pdf me-1"></i>No</span>`;
+            }
             return `
             <tr>
                 <td><a href="/servicio-tecnico/ordenes/${f.orden_id}/" class="fw-semibold text-decoration-none">${f.orden_cliente}</a></td>
@@ -452,6 +462,7 @@ class DashboardSeguimientoEnlaces {
                 <td class="text-center">${accBadge}</td>
                 <td class="text-center">${correoBadge}</td>
                 <td class="text-center">${pushBadge}</td>
+                <td class="text-center">${pdfDxBadge}</td>
                 <td class="text-center">${pwaBadge}</td>
                 <td class="text-center">${chatBadge}</td>
                 <td class="text-nowrap">${f.fecha_creacion}</td>

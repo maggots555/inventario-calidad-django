@@ -3525,6 +3525,13 @@ def seguimiento_orden_cliente(request, token):
         # ai_enabled: controla si se renderiza el widget del chatbot
         'token': token,
         'ai_enabled': getattr(settings, 'AI_ENABLED', False),
+        # PDF de diagnóstico persistente (para botón en la PWA)
+        'tiene_pdf_diagnostico': bool(enlace.pdf_diagnostico),
+        'url_diagnostico_pdf': reverse(
+            'diagnostico_pdf_seguimiento',
+            kwargs={'token': token},
+        ) if enlace.pdf_diagnostico else '',
+        'folio_diagnostico': enlace.folio_diagnostico or '',
     }
 
     if estado_orden == 'entregado':
@@ -3562,6 +3569,64 @@ def seguimiento_orden_cliente(request, token):
     context['banners'] = banners
 
     return render(request, TEMPLATE, context)
+
+
+@ratelimit(key='ip', rate='30/m', method=['GET'])
+def diagnostico_pdf_seguimiento(request, token):
+    """
+    Sirve el PDF de diagnóstico del cliente de forma pública (protegida por token).
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Cuando el técnico envía el diagnóstico por correo, guardamos una copia del
+    PDF en el enlace de seguimiento. Esta vista permite abrirlo desde:
+      - La notificación push (el cliente toca y se abre el PDF)
+      - El botón "Ver diagnóstico" en la página de seguimiento
+
+    Args:
+        request: HttpRequest del navegador del cliente
+        token: Token secreto del EnlaceSeguimientoCliente
+
+    Returns:
+        FileResponse con el PDF en modo inline (se abre en el navegador)
+        o HttpResponse 404/410 si el enlace o el archivo no están disponibles.
+    """
+    from django.http import FileResponse, HttpResponse
+    from .models import EnlaceSeguimientoCliente
+    from servicio_tecnico.eventos_seguimiento import registrar_evento_seguimiento
+
+    try:
+        enlace = EnlaceSeguimientoCliente.objects.select_related('orden').get(token=token)
+    except EnlaceSeguimientoCliente.DoesNotExist:
+        return HttpResponse('Enlace no válido.', status=404)
+
+    if not enlace.esta_disponible:
+        return HttpResponse('Enlace no disponible.', status=410)
+
+    if not enlace.pdf_diagnostico:
+        return HttpResponse('Diagnóstico no disponible.', status=404)
+
+    # Registrar apertura del PDF para métricas del dashboard interno
+    origen = request.GET.get('origen', 'directo')
+    if origen not in ('pagina', 'push', 'directo'):
+        origen = 'directo'
+
+    registrar_evento_seguimiento(
+        enlace,
+        'diagnostico_pdf_abierto',
+        request=request,
+        metadata={
+            'folio': enlace.folio_diagnostico or '',
+            'origen': origen,
+        },
+    )
+
+    nombre_archivo = enlace.pdf_diagnostico.name.rsplit('/', 1)[-1]
+    response = FileResponse(
+        enlace.pdf_diagnostico.open('rb'),
+        content_type='application/pdf',
+    )
+    response['Content-Disposition'] = f'inline; filename="{nombre_archivo}"'
+    return response
 
 
 # ============================================================================
@@ -17763,6 +17828,8 @@ def api_seguimiento_enlaces_tabla(request):
             'push_fecha': push_fecha_str,
             'pwa_instalada': enlace.evento_pwa_instalada,
             'chat_usado': enlace.evento_chat_usado,
+            'tiene_pdf_diagnostico': bool(enlace.pdf_diagnostico),
+            'diagnostico_pdf_abierto': enlace.evento_diagnostico_pdf_abierto,
             'fecha_creacion': enlace.fecha_creacion.strftime('%d/%m/%Y'),
             'ultimo_acceso': fecha_local_pais(enlace.fecha_ultimo_acceso, pais).strftime('%d/%m/%Y %H:%M') if enlace.fecha_ultimo_acceso else '—',
         })

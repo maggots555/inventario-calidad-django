@@ -63,5 +63,32 @@
         registrarEvento,
         obtenerSessionId,
     };
+    /**
+     * Si el cliente llegó desde una notificación push con ?abrir=diagnostico,
+     * abrimos el PDF dentro del mismo contexto de la PWA (no el navegador externo).
+     *
+     * EXPLICACIÓN PARA PRINCIPIANTES:
+     * El push no puede enlazar directo al PDF porque el celular lo abre fuera de
+     * la app instalada. Primero abrimos la página de seguimiento y desde aquí
+     * redirigimos al PDF, igual que si el cliente pulsara el botón manualmente.
+     */
+    function abrirDiagnosticoDesdePush() {
+        var _a;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('abrir') !== 'diagnostico')
+            return;
+        const pdfUrl = (_a = document.body.dataset.diagnosticoPdfUrl) !== null && _a !== void 0 ? _a : '';
+        if (!pdfUrl)
+            return;
+        // Quitar el parámetro para que un refresh no vuelva a abrir el PDF
+        const urlLimpia = new URL(window.location.href);
+        urlLimpia.searchParams.delete('abrir');
+        window.history.replaceState({}, '', urlLimpia.pathname + urlLimpia.hash);
+        const separador = pdfUrl.includes('?') ? '&' : '?';
+        window.location.href = `${pdfUrl}${separador}origen=push`;
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        abrirDiagnosticoDesdePush();
+    });
 })();
 //# sourceMappingURL=eventos_seguimiento.js.map

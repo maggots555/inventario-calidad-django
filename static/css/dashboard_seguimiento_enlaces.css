@@ -334,6 +334,33 @@
     cursor: help;
 }
 
+.badge-pdf-dx-ok {
+    font-size: 0.7rem;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 20px;
+    padding: 2px 8px;
+    cursor: help;
+}
+
+.badge-pdf-dx-no {
+    font-size: 0.7rem;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 20px;
+    padding: 2px 8px;
+    cursor: help;
+}
+
+.badge-pdf-dx-na {
+    font-size: 0.7rem;
+    background: #f3f4f6;
+    color: #9ca3af;
+    border-radius: 20px;
+    padding: 2px 8px;
+    cursor: help;
+}
+
 /* ── RESPONSIVO ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
     .se-header { padding: 1.1rem 1rem; }
@@ -470,6 +497,21 @@
 [data-bs-theme="dark"] .badge-chat-ok {
     background: #312e81;
     color: #c7d2fe;
+}
+
+[data-bs-theme="dark"] .badge-pdf-dx-ok {
+    background: #1e3a5f;
+    color: #93c5fd;
+}
+
+[data-bs-theme="dark"] .badge-pdf-dx-no {
+    background: #422006;
+    color: #fcd34d;
+}
+
+[data-bs-theme="dark"] .badge-pdf-dx-na {
+    background: #334155;
+    color: #94a3b8;
 }
 
 [data-bs-theme="dark"] #tablaEnlaces tbody tr:hover {

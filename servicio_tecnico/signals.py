@@ -399,7 +399,10 @@ def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwarg
         # si el nuevo estado está en la lista blanca ESTADOS_PUSH_CLIENTE —
         # así evitamos saturar al cliente con estados poco relevantes para él.
         if estado_nuevo_codigo in ESTADOS_PUSH_CLIENTE:
-            enlace = getattr(orden, 'enlace_seguimiento', None)
+            from servicio_tecnico.models import EnlaceSeguimientoCliente
+
+            # Recargar desde BD para leer pdf_diagnostico recién guardado por la tarea
+            enlace = EnlaceSeguimientoCliente.objects.filter(orden=orden).first()
             # 'esta_disponible' ya valida: activo, no expirado y no cancelado.
             if enlace and enlace.esta_disponible:
                 from notificaciones.push_service import enviar_push_a_cliente  # noqa
@@ -411,12 +414,29 @@ def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwarg
                 estado_nuevo_label = dict(ESTADO_ORDEN_CHOICES).get(
                     estado_nuevo_codigo, estado_nuevo_codigo
                 )
+
+                # Push especial: diagnóstico listo con link directo al PDF
+                if (
+                    estado_nuevo_codigo == 'diagnostico_enviado_cliente'
+                    and enlace.pdf_diagnostico
+                ):
+                    push_titulo = f'Tu diagnóstico está listo — {etiqueta_orden}'
+                    push_mensaje = (
+                        'Toca para ver el PDF de tu diagnóstico. '
+                        'También lo recibiste por correo.'
+                    )
+                    push_url = f'/seguimiento/{enlace.token}/?abrir=diagnostico'
+                else:
+                    push_titulo = f'Tu equipo {etiqueta_orden}'
+                    push_mensaje = f'Nuevo estado: {estado_nuevo_label}'
+                    push_url = f'/seguimiento/{enlace.token}/'
+
                 _push_seguro(
                     enviar_push_a_cliente,
                     enlace=enlace,
-                    titulo=f'Tu equipo {etiqueta_orden}',
-                    mensaje=f'Nuevo estado: {estado_nuevo_label}',
-                    url=f'/seguimiento/{enlace.token}/',
+                    titulo=push_titulo,
+                    mensaje=push_mensaje,
+                    url=push_url,
                 )
 
     # ── CAMBIO DE TÉCNICO ────────────────────────────────────────────────────
