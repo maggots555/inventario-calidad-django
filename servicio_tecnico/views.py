@@ -9004,7 +9004,7 @@ def exportar_analisis_rhitso(request):
     """
     from .utils_rhitso_analytics import (
         obtener_embudo_rhitso,
-        obtener_comentarios_rechazo_cotizacion,
+        obtener_filas_hoja_rechazos_y_no_aptos,
         obtener_detalle_todas_candidatas,
     )
 
@@ -9014,7 +9014,7 @@ def exportar_analisis_rhitso(request):
 
     embudo = obtener_embudo_rhitso(fecha_inicio, fecha_fin, sucursal_id)
     detalle_candidatos = obtener_detalle_todas_candidatas(fecha_inicio, fecha_fin, sucursal_id)
-    comentarios_rechazo = obtener_comentarios_rechazo_cotizacion(embudo['candidatos_qs'])
+    comentarios_rechazo = obtener_filas_hoja_rechazos_y_no_aptos(embudo['candidatos_qs'])
 
     wb = openpyxl.Workbook()
     if 'Sheet' in wb.sheetnames:
@@ -9169,6 +9169,9 @@ def exportar_analisis_rhitso(request):
         if seg.usuario_actualizacion:
             usuario_nombre = str(seg.usuario_actualizacion)
         estado_rhitso = seg.estado.estado if seg.estado else 'N/A'
+        observaciones = (seg.observaciones or '').strip()
+        if not observaciones:
+            observaciones = 'Sin comentario disponible'
         valores = [
             detalle.orden_cliente if detalle else 'N/A',
             detalle.numero_serie if detalle else 'N/A',
@@ -9178,7 +9181,7 @@ def exportar_analisis_rhitso(request):
             estado_rhitso,
             seg.fecha_actualizacion.strftime('%d/%m/%Y %H:%M'),
             usuario_nombre,
-            seg.observaciones,
+            observaciones,
         ]
         for col_idx, valor in enumerate(valores, start=1):
             celda = ws_rechazos.cell(row=row_idx, column=col_idx, value=valor)

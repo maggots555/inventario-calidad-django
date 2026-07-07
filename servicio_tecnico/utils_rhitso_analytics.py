@@ -226,11 +226,11 @@ def obtener_comentarios_rechazo_cotizacion(cohorte_qs):
     - CLIENTE NO ACEPTA COTIZACIÓN
     - NO APTO PARA REPARACIÓN
 
-    Solo registros manuales (es_cambio_automatico=False) donde el usuario
-    documentó el motivo en observaciones.
+    Solo registros manuales (es_cambio_automatico=False). Si no hay
+    observaciones, el reporte Excel muestra "Sin comentario disponible".
 
     Args:
-        cohorte_qs: QuerySet de órdenes (típicamente cohorte "aceptó envío").
+        cohorte_qs: QuerySet de órdenes candidatas RHITSO.
 
     Returns:
         QuerySet de SeguimientoRHITSO ordenado por fecha descendente.
@@ -239,8 +239,6 @@ def obtener_comentarios_rechazo_cotizacion(cohorte_qs):
         orden__in=cohorte_qs,
         estado__estado__in=[ESTADO_RECHAZA_COTIZ, ESTADO_NO_APTO],
         es_cambio_automatico=False,
-    ).exclude(
-        observaciones=''
     ).select_related(
         'orden',
         'orden__detalle_equipo',
@@ -248,6 +246,53 @@ def obtener_comentarios_rechazo_cotizacion(cohorte_qs):
         'usuario_actualizacion',
         'estado',
     ).order_by('-fecha_actualizacion')
+
+
+def obtener_filas_hoja_rechazos_y_no_aptos(candidatos_qs):
+    """
+    Lista seguimientos para la hoja Excel de rechazos y no aptos.
+
+    Incluye todos los cambios manuales aunque no tengan observaciones.
+    Si una orden solo tiene registro automático para ese estado, también
+    se incluye una fila (el Excel mostrará "Sin comentario disponible").
+
+    Args:
+        candidatos_qs: QuerySet de órdenes candidatas RHITSO.
+
+    Returns:
+        list[SeguimientoRHITSO]: Filas ordenadas por fecha descendente.
+    """
+    estados_cierre = [ESTADO_RECHAZA_COTIZ, ESTADO_NO_APTO]
+
+    manuales = list(obtener_comentarios_rechazo_cotizacion(candidatos_qs))
+
+    # Evitar duplicar orden+estado ya cubierto por un cambio manual
+    cubiertas = {(seg.orden_id, seg.estado.estado) for seg in manuales}
+
+    automaticos_sin_manual = SeguimientoRHITSO.objects.filter(
+        orden__in=candidatos_qs,
+        estado__estado__in=estados_cierre,
+        es_cambio_automatico=True,
+    ).select_related(
+        'orden',
+        'orden__detalle_equipo',
+        'orden__sucursal',
+        'usuario_actualizacion',
+        'estado',
+    ).order_by('-fecha_actualizacion')
+
+    extras = []
+    for seg in automaticos_sin_manual:
+        clave = (seg.orden_id, seg.estado.estado)
+        if clave not in cubiertas:
+            extras.append(seg)
+            cubiertas.add(clave)
+
+    return sorted(
+        manuales + extras,
+        key=lambda s: s.fecha_actualizacion,
+        reverse=True,
+    )
 
 
 def _orden_tiene_estado_historico(orden, nombre_estado):
