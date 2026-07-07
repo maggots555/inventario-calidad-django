@@ -18,6 +18,7 @@ from .models import (
     ImagenOrden,
     VideoOrden,
     HistorialOrden,
+    RecordatorioImagenOrden,
     # MODELOS RHITSO - Módulo de Reparación Especializada
     EstadoRHITSO,
     CategoriaDiagnostico,
@@ -1091,6 +1092,37 @@ class HistorialOrdenAdmin(admin.ModelAdmin):
     
     def has_add_permission(self, request):
         """El historial solo se crea automáticamente"""
+        return False
+
+
+# ============================================================================
+# ADMIN: RECORDATORIOS DE IMÁGENES PENDIENTES
+# ============================================================================
+
+@admin.register(RecordatorioImagenOrden)
+class RecordatorioImagenOrdenAdmin(admin.ModelAdmin):
+    """
+    Vista de auditoría para recordatorios push de fotos faltantes.
+    Solo consulta — no se crean ni editan manualmente desde el admin.
+    """
+
+    list_display = (
+        'orden',
+        'tipo',
+        'fecha_ultimo_envio',
+    )
+    list_filter = ('tipo', 'fecha_ultimo_envio')
+    search_fields = (
+        'orden__numero_orden_interno',
+        'orden__detalle_equipo__orden_cliente',
+    )
+    readonly_fields = ('orden', 'tipo', 'fecha_ultimo_envio')
+    date_hierarchy = 'fecha_ultimo_envio'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
 

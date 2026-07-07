@@ -552,6 +552,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'servicio_tecnico.verificar_encuestas_pendientes',
         'schedule': crontab(hour=8, minute=0),  # Diario a las 8:00 AM
     },
+    # ── Recordatorio de imágenes faltantes (ingreso / diagnóstico / reparación) ──
+    # Ejecuta diariamente a las 8:00 AM. Avisa a inspectores y técnicos si
+    # pasaron 48 h y aún faltan fotos obligatorias. Se repite cada día hasta
+    # que suban las evidencias (controlado por RecordatorioImagenOrden).
+    'recordatorio-imagenes-pendientes': {
+        'task': 'servicio_tecnico.verificar_recordatorios_imagenes',
+        'schedule': crontab(hour=8, minute=0),  # Diario a las 8:00 AM
+    },
 }
 
 # ============================================================================

@@ -2292,6 +2292,216 @@ def verificar_encuestas_pendientes_task():
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# TAREAS: Recordatorios de imágenes faltantes (push + campanita)
+# ═══════════════════════════════════════════════════════════════════════
+# Celery Beat ejecuta la orquestadora diariamente a las 8:00 AM.
+# Avisa a inspectores (ingreso faltante) y técnicos (diagnóstico/reparación
+# faltantes tras egreso), repitiendo cada día hasta subir las fotos.
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60, name='servicio_tecnico.enviar_recordatorio_imagen')
+def enviar_recordatorio_imagen_task(self, orden_id, tipo_recordatorio, db_alias='default'):
+    """
+    Envía push y campanita de recordatorio por imágenes pendientes en una orden.
+
+    Parámetros:
+        orden_id: PK de OrdenServicio.
+        tipo_recordatorio: 'ingreso_inspector' o 'tecnico_faltantes'.
+        db_alias: Alias de BD del país (configurado por task_prerun).
+
+    Efectos secundarios:
+        - Notifica inspectores o técnico según el tipo.
+        - Actualiza RecordatorioImagenOrden.
+        - Registra evento en HistorialOrden.
+    """
+    from django.urls import reverse
+
+    from inventario.models import Empleado
+    from notificaciones.push_service import enviar_push_a_usuario
+    from notificaciones.utils import notificar_warning
+
+    from .models import HistorialOrden, OrdenServicio
+    from .utils_recordatorio_imagenes import (
+        construir_mensaje_recordatorio_ingreso_inspector,
+        construir_mensaje_recordatorio_tecnico,
+        obtener_etiqueta_orden,
+        orden_requiere_recordatorio_ingreso_inspector,
+        orden_requiere_recordatorio_tecnico,
+        registrar_envio_recordatorio,
+        debe_recordar_hoy,
+    )
+
+    try:
+        orden = OrdenServicio.objects.select_related(
+            'tecnico_asignado_actual__user',
+            'detalle_equipo',
+        ).get(pk=orden_id)
+    except OrdenServicio.DoesNotExist:
+        return {'success': False, 'mensaje': f'Orden ID {orden_id} no encontrada.'}
+
+    if not debe_recordar_hoy(orden, tipo_recordatorio, db_alias):
+        return {'success': False, 'mensaje': 'Recordatorio ya enviado hoy.'}
+
+    url_orden = reverse('servicio_tecnico:detalle_orden', kwargs={'orden_id': orden.pk})
+    etiqueta = obtener_etiqueta_orden(orden)
+    destinatarios_notificados = 0
+
+    if tipo_recordatorio == 'ingreso_inspector':
+        if not orden_requiere_recordatorio_ingreso_inspector(orden):
+            return {'success': False, 'mensaje': 'La orden ya no requiere recordatorio de ingreso.'}
+
+        titulo, mensaje = construir_mensaje_recordatorio_ingreso_inspector(orden)
+        inspectores = Empleado.objects.filter(
+            rol='inspector',
+            user__is_active=True,
+        ).select_related('user')
+
+        for inspector in inspectores:
+            try:
+                enviar_push_a_usuario(
+                    usuario=inspector.user,
+                    titulo=titulo,
+                    mensaje=mensaje,
+                    url=url_orden,
+                )
+                notificar_warning(
+                    titulo=titulo,
+                    mensaje=mensaje,
+                    usuario=inspector.user,
+                    app_origen='servicio_tecnico',
+                    url=url_orden,
+                )
+                destinatarios_notificados += 1
+            except Exception as exc_push:
+                logger.warning(
+                    f'[RECORDATORIO-IMAGEN] Error notificando inspector '
+                    f'{inspector.pk} orden {orden_id}: {exc_push}'
+                )
+
+        comentario_historial = (
+            f'🔔 Recordatorio de fotos de ingreso enviado a {destinatarios_notificados} '
+            f'inspector(es) — Orden {etiqueta}'
+        )
+
+    elif tipo_recordatorio == 'tecnico_faltantes':
+        if not orden_requiere_recordatorio_tecnico(orden):
+            return {'success': False, 'mensaje': 'La orden ya no requiere recordatorio al técnico.'}
+
+        tecnico = orden.tecnico_asignado_actual
+        titulo, mensaje = construir_mensaje_recordatorio_tecnico(orden)
+
+        try:
+            enviar_push_a_usuario(
+                usuario=tecnico.user,
+                titulo=titulo,
+                mensaje=mensaje,
+                url=url_orden,
+            )
+            notificar_warning(
+                titulo=titulo,
+                mensaje=mensaje,
+                usuario=tecnico.user,
+                app_origen='servicio_tecnico',
+                url=url_orden,
+            )
+            destinatarios_notificados = 1
+        except Exception as exc_push:
+            logger.warning(
+                f'[RECORDATORIO-IMAGEN] Error notificando técnico orden {orden_id}: {exc_push}'
+            )
+            raise self.retry(exc=exc_push, countdown=60)
+
+        comentario_historial = (
+            f'🔔 Recordatorio de fotos pendientes enviado al técnico '
+            f'{tecnico.nombre_completo} — Orden {etiqueta}'
+        )
+
+    else:
+        return {'success': False, 'mensaje': f'Tipo de recordatorio inválido: {tipo_recordatorio}'}
+
+    if destinatarios_notificados == 0:
+        return {'success': False, 'mensaje': 'No se pudo notificar a ningún destinatario.'}
+
+    registrar_envio_recordatorio(orden, tipo_recordatorio, db_alias)
+
+    HistorialOrden.objects.create(
+        orden=orden,
+        tipo_evento='sistema',
+        comentario=comentario_historial,
+        es_sistema=True,
+    )
+
+    logger.info(
+        f'[RECORDATORIO-IMAGEN] [{db_alias}] {tipo_recordatorio} orden {orden_id} '
+        f'→ {destinatarios_notificados} destinatario(s)'
+    )
+    return {
+        'success': True,
+        'orden_id': orden_id,
+        'tipo_recordatorio': tipo_recordatorio,
+        'destinatarios': destinatarios_notificados,
+    }
+
+
+@shared_task(name='servicio_tecnico.verificar_recordatorios_imagenes')
+def verificar_recordatorios_imagenes_task():
+    """
+    Tarea periódica diaria (Celery Beat) que detecta órdenes con fotos faltantes
+    y encola recordatorios push/campanita para inspectores y técnicos.
+
+    MULTI-PAÍS: Itera PAISES_CONFIG y pasa db_alias a cada tarea hija.
+    """
+    from config.paises_config import PAISES_CONFIG
+
+    from .utils_recordatorio_imagenes import (
+        ordenes_pendientes_ingreso_inspector,
+        ordenes_pendientes_tecnico,
+    )
+
+    total_global = 0
+
+    for subdominio, pais_config in PAISES_CONFIG.items():
+        db_alias = pais_config['db_alias']
+        encoladas_pais = 0
+
+        for orden in ordenes_pendientes_ingreso_inspector(db_alias):
+            try:
+                enviar_recordatorio_imagen_task.delay(
+                    orden_id=orden.pk,
+                    tipo_recordatorio='ingreso_inspector',
+                    db_alias=db_alias,
+                )
+                encoladas_pais += 1
+            except Exception as exc:
+                logger.error(
+                    f'[VERIFICAR-RECORDATORIO-IMAGEN] [{subdominio}] '
+                    f'Error al encolar ingreso inspector orden {orden.pk}: {exc}'
+                )
+
+        for orden in ordenes_pendientes_tecnico(db_alias):
+            try:
+                enviar_recordatorio_imagen_task.delay(
+                    orden_id=orden.pk,
+                    tipo_recordatorio='tecnico_faltantes',
+                    db_alias=db_alias,
+                )
+                encoladas_pais += 1
+            except Exception as exc:
+                logger.error(
+                    f'[VERIFICAR-RECORDATORIO-IMAGEN] [{subdominio}] '
+                    f'Error al encolar técnico orden {orden.pk}: {exc}'
+                )
+
+        logger.info(
+            f'[VERIFICAR-RECORDATORIO-IMAGEN] [{subdominio}] '
+            f'{encoladas_pais} recordatorio(s) encolado(s).'
+        )
+        total_global += encoladas_pais
+
+    return {'procesadas': total_global}
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # TAREA: Enviar enlace de seguimiento público al cliente
 # ═══════════════════════════════════════════════════════════════════════
 

@@ -2110,6 +2110,57 @@ class HistorialOrden(models.Model):
 
 
 # ============================================================================
+# MODELO: RECORDATORIO DE IMÁGENES PENDIENTES
+# ============================================================================
+
+class RecordatorioImagenOrden(models.Model):
+    """
+    Registra el último envío de recordatorio push/campanita por imágenes faltantes.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Celery Beat revisa diariamente si hay órdenes sin fotos obligatorias.
+    Este modelo evita mandar más de un aviso el mismo día por orden y tipo,
+    pero permite repetir el recordatorio al día siguiente si aún faltan fotos.
+    """
+
+    TIPO_RECORDATORIO_CHOICES = [
+        ('ingreso_inspector', 'Ingreso pendiente — inspector'),
+        ('tecnico_faltantes', 'Evidencias pendientes — técnico'),
+    ]
+
+    orden = models.ForeignKey(
+        OrdenServicio,
+        on_delete=models.CASCADE,
+        related_name='recordatorios_imagen',
+        help_text="Orden que aún tiene evidencias fotográficas pendientes",
+    )
+    tipo = models.CharField(
+        max_length=20,
+        choices=TIPO_RECORDATORIO_CHOICES,
+        help_text="Tipo de recordatorio enviado (inspector o técnico)",
+    )
+    fecha_ultimo_envio = models.DateTimeField(
+        help_text="Fecha y hora del último recordatorio enviado",
+    )
+
+    def __str__(self):
+        return (
+            f"{self.orden.numero_orden_interno} — "
+            f"{self.get_tipo_display()} — "
+            f"{self.fecha_ultimo_envio.strftime('%d/%m/%Y %H:%M')}"
+        )
+
+    class Meta:
+        verbose_name = "Recordatorio de imagen pendiente"
+        verbose_name_plural = "Recordatorios de imágenes pendientes"
+        unique_together = [['orden', 'tipo']]
+        indexes = [
+            models.Index(fields=['orden', 'tipo']),
+            models.Index(fields=['-fecha_ultimo_envio']),
+        ]
+
+
+# ============================================================================
 # MÓDULO RHITSO - SISTEMA DE SEGUIMIENTO ESPECIALIZADO
 # ============================================================================
 
