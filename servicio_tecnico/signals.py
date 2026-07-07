@@ -317,12 +317,24 @@ ESTADOS_PUSH_CLIENTE = {
     'finalizado',                    # Finalizado - Listo para Entrega
 }
 
+# ── Estados que disparan push al TÉCNICO asignado (solo cambio de estado) ──
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Los técnicos recibían push en CADA cambio de estatus, lo que generaba
+# demasiadas notificaciones. Esta lista blanca limita los avisos a los dos
+# hitos que realmente requieren su atención inmediata. La asignación de
+# equipo y los comentarios se manejan en bloques separados (sin filtro).
+ESTADOS_PUSH_TECNICO = {
+    'cliente_acepta_cotizacion',   # Cliente aceptó la cotización
+    'piezas_recibidas',            # Piezas recibidas — listo para reparar
+}
+
 
 @receiver(post_save, sender=HistorialOrden)
 def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwargs):
     """
     Envía una notificación push al técnico asignado cuando:
-      - Cambia el estado de su orden
+      - Cambia el estado de su orden a un hito relevante (cliente acepta
+        cotización o piezas recibidas — ver ESTADOS_PUSH_TECNICO)
       - Es reasignado (nuevo técnico) o removido (técnico anterior)
       - Alguien comenta en una orden que tiene asignada
 
@@ -364,16 +376,20 @@ def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwarg
 
     # ── CAMBIO DE ESTADO ─────────────────────────────────────────────────────
     if tipo == 'cambio_estado':
-        tecnico = orden.tecnico_asignado_actual
-        if tecnico and tecnico.user:
-            estado_nuevo_label = instance.estado_nuevo or orden.estado
-            _push_seguro(
-                enviar_push_a_usuario,
-                usuario=tecnico.user,
-                titulo=f'Orden {etiqueta_orden}',
-                mensaje=f'Estado actualizado → {estado_nuevo_label}',
-                url=url_orden,
-            )
+        estado_nuevo_codigo = instance.estado_nuevo
+
+        # Push al técnico: solo en hitos relevantes (lista blanca)
+        if estado_nuevo_codigo in ESTADOS_PUSH_TECNICO:
+            tecnico = orden.tecnico_asignado_actual
+            if tecnico and tecnico.user:
+                estado_nuevo_label = estado_nuevo_codigo or orden.estado
+                _push_seguro(
+                    enviar_push_a_usuario,
+                    usuario=tecnico.user,
+                    titulo=f'Orden {etiqueta_orden}',
+                    mensaje=f'Estado actualizado → {estado_nuevo_label}',
+                    url=url_orden,
+                )
 
         # ── Push al CLIENTE final ───────────────────────────────────────────
         # EXPLICACIÓN PARA PRINCIPIANTES:
@@ -382,7 +398,6 @@ def enviar_push_tecnico(sender, instance: HistorialOrden, created: bool, **kwarg
         # el related_name definido en ese modelo). Además, solo se notifica
         # si el nuevo estado está en la lista blanca ESTADOS_PUSH_CLIENTE —
         # así evitamos saturar al cliente con estados poco relevantes para él.
-        estado_nuevo_codigo = instance.estado_nuevo
         if estado_nuevo_codigo in ESTADOS_PUSH_CLIENTE:
             enlace = getattr(orden, 'enlace_seguimiento', None)
             # 'esta_disponible' ya valida: activo, no expirado y no cancelado.
