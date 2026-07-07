@@ -220,20 +220,24 @@ def obtener_embudo_rhitso(fecha_inicio=None, fecha_fin=None, sucursal_id=None):
 
 def obtener_comentarios_rechazo_cotizacion(cohorte_qs):
     """
-    Obtiene seguimientos manuales con observaciones de rechazo de cotización.
+    Obtiene seguimientos manuales con observaciones de cierre negativo en RHITSO.
 
-    Solo incluye registros donde el técnico escribió observaciones al cambiar
-    el estado a CLIENTE NO ACEPTA COTIZACIÓN (es_cambio_automatico=False).
+    Incluye cambios de estado a:
+    - CLIENTE NO ACEPTA COTIZACIÓN
+    - NO APTO PARA REPARACIÓN
+
+    Solo registros manuales (es_cambio_automatico=False) donde el usuario
+    documentó el motivo en observaciones.
 
     Args:
-        cohorte_qs: QuerySet de órdenes de la cohorte "aceptó envío".
+        cohorte_qs: QuerySet de órdenes (típicamente cohorte "aceptó envío").
 
     Returns:
         QuerySet de SeguimientoRHITSO ordenado por fecha descendente.
     """
     return SeguimientoRHITSO.objects.filter(
         orden__in=cohorte_qs,
-        estado__estado=ESTADO_RECHAZA_COTIZ,
+        estado__estado__in=[ESTADO_RECHAZA_COTIZ, ESTADO_NO_APTO],
         es_cambio_automatico=False,
     ).exclude(
         observaciones=''

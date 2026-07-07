@@ -9014,7 +9014,7 @@ def exportar_analisis_rhitso(request):
 
     embudo = obtener_embudo_rhitso(fecha_inicio, fecha_fin, sucursal_id)
     detalle_candidatos = obtener_detalle_todas_candidatas(fecha_inicio, fecha_fin, sucursal_id)
-    comentarios_rechazo = obtener_comentarios_rechazo_cotizacion(embudo['cohorte_acepto_envio_qs'])
+    comentarios_rechazo = obtener_comentarios_rechazo_cotizacion(embudo['candidatos_qs'])
 
     wb = openpyxl.Workbook()
     if 'Sheet' in wb.sheetnames:
@@ -9154,12 +9154,12 @@ def exportar_analisis_rhitso(request):
     ws_detalle.freeze_panes = 'A2'
 
     # -------------------------------------------------------------------------
-    # HOJA 3: RECHAZOS COTIZACIÓN (con observaciones)
+    # HOJA 3: RECHAZOS COTIZACIÓN Y NO APTOS (con observaciones)
     # -------------------------------------------------------------------------
     ws_rechazos = wb.create_sheet('Rechazos Cotización')
     headers_rechazos = [
         'Orden Cliente', 'N° Serie', 'Marca', 'Modelo', 'Sucursal',
-        'Fecha Cambio Estado', 'Usuario', 'Observaciones / Motivo',
+        'Estado RHITSO', 'Fecha Cambio Estado', 'Usuario', 'Observaciones / Motivo',
     ]
     aplicar_encabezados(ws_rechazos, headers_rechazos)
 
@@ -9168,12 +9168,14 @@ def exportar_analisis_rhitso(request):
         usuario_nombre = ''
         if seg.usuario_actualizacion:
             usuario_nombre = str(seg.usuario_actualizacion)
+        estado_rhitso = seg.estado.estado if seg.estado else 'N/A'
         valores = [
             detalle.orden_cliente if detalle else 'N/A',
             detalle.numero_serie if detalle else 'N/A',
             detalle.marca if detalle else 'N/A',
             detalle.modelo if detalle else 'N/A',
             seg.orden.sucursal.nombre if seg.orden.sucursal else 'N/A',
+            estado_rhitso,
             seg.fecha_actualizacion.strftime('%d/%m/%Y %H:%M'),
             usuario_nombre,
             seg.observaciones,
@@ -9184,7 +9186,7 @@ def exportar_analisis_rhitso(request):
             celda.border = thin_border
             celda.alignment = wrap_alignment
 
-    ajustar_anchos(ws_rechazos, [22, 16, 14, 18, 14, 18, 22, 55])
+    ajustar_anchos(ws_rechazos, [22, 16, 14, 18, 14, 28, 18, 22, 55])
     ws_rechazos.freeze_panes = 'A2'
 
     # -------------------------------------------------------------------------
