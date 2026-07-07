@@ -3872,7 +3872,8 @@ def api_enviar_cotizacion_cliente(request, pk):
             return JsonResponse({'success': False, 'error': f'El email "{email_cliente}" no tiene formato válido.'})
 
         # --- 4. VALIDAR TIPO DE SERVICIO ---
-        tipos_validos = ['mostrador', 'estandar', 'express', 'alta_gama', 'server']
+        from .utils.pdf_cotizacion_cliente import PROFIT_CONFIG
+        tipos_validos = list(PROFIT_CONFIG.keys())
         if tipo_servicio not in tipos_validos:
             return JsonResponse({'success': False, 'error': f'Tipo de servicio "{tipo_servicio}" no válido.'})
 

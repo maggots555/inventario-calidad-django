@@ -2876,6 +2876,7 @@ class SolicitudCotizacion(models.Model):
         ('express', 'Express'),
         ('alta_gama', 'Alta Gama'),
         ('server', 'Server'),
+        ('rep_nivel_componente', 'Reparación a nivel componente'),
     ]
     tipo_servicio_cliente = models.CharField(
         max_length=20,

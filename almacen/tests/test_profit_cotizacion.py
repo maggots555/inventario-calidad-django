@@ -125,3 +125,14 @@ class ProfitCotizacionExcelTest(SimpleTestCase):
             calculo['items_calculados'][0]['descripcion'],
             'Servicio de reparación',
         )
+
+    def test_rep_nivel_componente_sin_diagnostico(self):
+        """Rep. nivel componente replica mostrador: sin cargo ni descuento de diagnóstico."""
+        resultado = calcular_precio_cliente(
+            costo_piezas=1000.0,
+            tipo_servicio='rep_nivel_componente',
+        )
+        self.assertEqual(resultado['diagnostico'], 0)
+        self.assertIsNone(resultado.get('precio_menos_diagnostico'))
+        # Mismo margen que mostrador por defecto: 1000 / 0.58 ≈ 1724.14
+        self.assertAlmostEqual(resultado['precio_sin_iva'], round(1000 / 0.58, 2), places=2)

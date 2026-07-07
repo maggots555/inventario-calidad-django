@@ -90,6 +90,7 @@ TIPO_SERVICIO_NOMBRES: Dict[str, str] = {
     'express':   'Diagnóstico + Reparación Express',
     'alta_gama': 'Diagnóstico + Reparación Alta Gama',
     'server':    'Cotización de Partes + Reparación de Servidor',
+    'rep_nivel_componente': 'Reparación a Nivel Componente',
 }
 
 def _fijos(val: str) -> List[float]:
@@ -135,6 +136,12 @@ def _cargar_profit_config() -> Dict[str, Dict]:
             'profit_target': env_config('PROFIT_SERVER',       cast=float, default=0.59),
             'costos_fijos':  _fijos(env_config('COSTOS_FIJOS_SERVER',     default='72,49,20,350')),
             'diagnostico':   env_config('DIAGNOSTICO_SERVER',   cast=float, default=1000),
+        },
+        # Misma lógica que mostrador: sin cargo de diagnóstico (DIAGNOSTICO=0)
+        'rep_nivel_componente': {
+            'profit_target': env_config('PROFIT_REP_NIVEL_COMPONENTE', cast=float, default=0.42),
+            'costos_fijos':  _fijos(env_config('COSTOS_FIJOS_REP_NIVEL_COMPONENTE', default='50,40')),
+            'diagnostico':   env_config('DIAGNOSTICO_REP_NIVEL_COMPONENTE', cast=float, default=0),
         },
     }
 

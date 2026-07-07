@@ -701,7 +701,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <label class="form-label fw-semibold mb-2" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-600);">
                                 <i class="bi bi-sliders me-1"></i>Tipo de Servicio (perfil de profit)
                             </label>
-                            <div class="d-flex flex-wrap gap-2" id="tipoServicioContainer">
+                            <div class="tipo-servicio-grid" id="tipoServicioContainer">
                                 {# Sin orden activa → Mostrador; con orden → según gama del equipo #}
                                 <div class="servicio-tipo-btn {% if not solicitud.sin_orden_activa and gama_equipo == 'ALTA' %}activo{% endif %}" data-tipo="alta_gama">
                                     <i class="bi bi-star-fill" style="font-size: 0.9rem; color: #f59e0b;"></i>
@@ -727,6 +727,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <i class="bi bi-server" style="font-size: 0.9rem; color: #8b5cf6;"></i>
                                     <span class="nombre-servicio">Server</span>
                                     <span class="profit-badge">59% profit</span>
+                                </div>
+                                <div class="servicio-tipo-btn" data-tipo="rep_nivel_componente">
+                                    <i class="bi bi-cpu" style="font-size: 0.9rem; color: #0ea5e9;"></i>
+                                    <span class="nombre-servicio">Rep. nivel componente</span>
+                                    <span class="profit-badge">42% profit</span>
                                 </div>
                             </div>
                             <input type="hidden" id="tipoServicioInput" name="tipo_servicio"
