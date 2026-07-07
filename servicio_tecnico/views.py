@@ -3622,7 +3622,12 @@ def manifest_seguimiento(request, token):
         "dir": "ltr",
     }
 
-    return JsonResponse(manifest, content_type="application/manifest+json")
+    # Cabecera anti-caché: obliga al navegador a revalidar el manifest en cada
+    # consulta (Chromium en móvil lo cachea de forma agresiva). Así, si el
+    # contenido del manifest cambia, el teléfono no usa una copia vieja.
+    response = JsonResponse(manifest, content_type="application/manifest+json")
+    response['Cache-Control'] = 'no-cache, must-revalidate'
+    return response
 
 
 # ============================================================================
