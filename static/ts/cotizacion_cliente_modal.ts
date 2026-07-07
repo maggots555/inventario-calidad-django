@@ -26,6 +26,9 @@
 // cuál es su tipo, sin usar 'any'.
 interface Window {
     COTIZACION_CLIENTE_CONFIG: CotizacionClienteConfig;
+    esModoReacondicionado?: () => boolean;
+    appendDatosReacondicionado?: (formData: FormData) => boolean;
+    buildPreviewParamsReac?: () => URLSearchParams;
 }
 
 /** Configuración inyectada por Django en el template */
@@ -520,6 +523,29 @@ document.addEventListener('DOMContentLoaded', () => {
     btnPreviewPDF?.addEventListener('click', () => {
         if (!tipoServicioInput || !iframePreview || !previewContainer || !previewPlaceholder) return;
 
+        // Modo reacondicionado: preview con parámetros del equipo ofertado
+        if (window.esModoReacondicionado?.()) {
+            const marca = document.querySelector<HTMLInputElement>('#reacMarca')?.value.trim();
+            const modelo = document.querySelector<HTMLInputElement>('#reacModelo')?.value.trim();
+            const costo = parseFloat(document.querySelector<HTMLInputElement>('#reacCostoProveedor')?.value ?? '0');
+            if (!marca || !modelo || !costo || costo <= 0) {
+                alert('Completa marca, modelo y costo de proveedor para previsualizar.');
+                return;
+            }
+            const params = window.buildPreviewParamsReac?.() ?? new URLSearchParams();
+            const url = `${config.urlPreview}?${params.toString()}`;
+            btnPreviewPDF.disabled = true;
+            btnPreviewPDF.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generando...';
+            iframePreview.src = url;
+            previewContainer.style.display = 'block';
+            previewPlaceholder.style.display = 'none';
+            iframePreview.onload = () => {
+                btnPreviewPDF.disabled = false;
+                btnPreviewPDF.innerHTML = '<i class="bi bi-eye me-1"></i>Actualizar preview';
+            };
+            return;
+        }
+
         const tipo      = tipoServicioInput.value || 'estandar';
         const descuento = checkDescuento?.checked ? '1' : '0';
 
@@ -584,24 +610,29 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnConfirmar) btnConfirmar.disabled = true;
 
         try {
-            // Recolectar todos los campos del modal en un FormData
             const formData = new FormData();
             formData.append('csrfmiddlewaretoken', config.csrfToken);
-            formData.append('tipo_servicio',         tipoServicioInput.value || 'estandar');
             formData.append('email_cliente',         emailParaEnvio);
             formData.append('mensaje_personalizado', document.querySelector<HTMLTextAreaElement>('#mensajePersonalizado')?.value ?? '');
             formData.append('asunto_correo',         document.querySelector<HTMLInputElement>('#asuntoCorreoInput')?.value ?? '');
-            // mano_de_obra_override = 0: la mano de obra es solo informativa en este flujo.
-            formData.append('mano_de_obra_override', '0');
 
-            // Descuento diagnóstico (si el checkbox existe y está marcado)
-            if (checkDescuento?.checked) {
-                formData.append('incluir_descuento_diagnostico', '1');
+            // Modo reacondicionado: datos del equipo + costeo Excel
+            if (window.esModoReacondicionado?.()) {
+                if (!window.appendDatosReacondicionado?.(formData)) {
+                    mostrarAlerta('warning', '<i class="bi bi-exclamation-triangle me-1"></i>Marca, modelo y costo de proveedor son obligatorios.');
+                    restaurarBoton();
+                    return;
+                }
+            } else {
+                formData.append('modo_cotizacion', 'reparacion');
+                formData.append('tipo_servicio',         tipoServicioInput.value || 'estandar');
+                formData.append('mano_de_obra_override', '0');
+                if (checkDescuento?.checked) {
+                    formData.append('incluir_descuento_diagnostico', '1');
+                }
+                const radioAgrupacion = document.querySelector<HTMLInputElement>('input[name="modo_agrupacion"]:checked');
+                formData.append('modo_agrupacion', radioAgrupacion?.value ?? 'todo_junto');
             }
-
-            // Modo de agrupación (radio seleccionado)
-            const radioAgrupacion = document.querySelector<HTMLInputElement>('input[name="modo_agrupacion"]:checked');
-            formData.append('modo_agrupacion', radioAgrupacion?.value ?? 'todo_junto');
 
             // CC de empleados (checkboxes marcados)
             const checksCopia = document.querySelectorAll<HTMLInputElement>('input[name="copia_empleados"]:checked');

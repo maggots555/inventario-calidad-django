@@ -22,6 +22,47 @@
    ============================================================ */
 
 /* ----------------------------------------------------------
+   Pestañas Reparación / Reacondicionado
+   ---------------------------------------------------------- */
+.nav-tabs-cotizacion {
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.nav-tabs-cotizacion .nav-link {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    padding: 0.5rem 0.75rem;
+}
+
+.nav-tabs-cotizacion .nav-link.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background: transparent;
+}
+
+.calc-row.reac-diferido .etq {
+    color: var(--gray-600);
+    font-size: 0.8rem;
+}
+
+[data-bs-theme="dark"] .nav-tabs-cotizacion {
+    border-bottom-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] .nav-tabs-cotizacion .nav-link {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .nav-tabs-cotizacion .nav-link.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+/* ----------------------------------------------------------
    Botones de selección de tipo de servicio
    Reemplazan los botones de radio nativos con tarjetas visuales.
    Grid 3×2 para 6 perfiles: evita que el texto largo se desborde.

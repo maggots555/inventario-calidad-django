@@ -499,6 +499,9 @@ def enviar_cotizacion_cliente_task(
     asunto_correo='',
     usuario_id=None,
     db_alias='default',
+    modo_cotizacion='reparacion',
+    datos_equipo_reac=None,
+    costeo_reac=None,
 ):
     """
     Genera el PDF de cotización y lo envía directamente al cliente por correo.
@@ -572,18 +575,31 @@ def enviar_cotizacion_cliente_task(
         _pais = get_pais_actual()
 
         # --- PASO 3: GENERAR EL PDF EN MEMORIA ---
-        logger.info(f"[COTIZACION-CLIENTE] Generando PDF con {len(items)} ítem(s)...")
+        es_reacondicionado = modo_cotizacion == 'reacondicionado'
 
-        generador = PDFCotizacionCliente(
-            solicitud=solicitud,
-            tipo_servicio=tipo_servicio,
-            items=items,
-            titulo_propuesta=titulo_propuesta,
-            incluir_descuento_diagnostico=incluir_descuento_diagnostico,
-            mano_de_obra_override=mano_de_obra_override,
-            pais_config=_pais,
-        )
-        resultado_pdf = generador.generar_pdf()
+        if es_reacondicionado:
+            from .utils.pdf_cotizacion_reacondicionado import PDFCotizacionReacondicionado
+
+            logger.info('[COTIZACION-CLIENTE] Generando PDF de equipo reacondicionado...')
+            generador_reac = PDFCotizacionReacondicionado(
+                solicitud=solicitud,
+                datos_equipo=datos_equipo_reac or {},
+                costeo=costeo_reac or {},
+                pais_config=_pais,
+            )
+            resultado_pdf = generador_reac.generar_pdf()
+        else:
+            logger.info(f"[COTIZACION-CLIENTE] Generando PDF con {len(items)} ítem(s)...")
+            generador = PDFCotizacionCliente(
+                solicitud=solicitud,
+                tipo_servicio=tipo_servicio,
+                items=items,
+                titulo_propuesta=titulo_propuesta,
+                incluir_descuento_diagnostico=incluir_descuento_diagnostico,
+                mano_de_obra_override=mano_de_obra_override,
+                pais_config=_pais,
+            )
+            resultado_pdf = generador.generar_pdf()
 
         if not resultado_pdf['success']:
             logger.error(f"[COTIZACION-CLIENTE] Error al generar PDF: {resultado_pdf.get('error')}")
@@ -638,23 +654,33 @@ def enviar_cotizacion_cliente_task(
             nombre_cliente = solicitud.nombre_cliente
 
         # Calcular total con IVA para mostrar en el email (sin abrir el PDF)
-        from .utils.pdf_cotizacion_cliente import calcular_precio_cliente
-        total_piezas_costo = sum(
-            float(item.get('costo_unitario', 0) or 0) * int(item.get('cantidad', 1) or 1)
-            for item in items
-            if not item.get('es_servicio')
-        )
-        servicios_con_iva = sum(
-            float(item.get('costo_unitario', 0) or 0) * int(item.get('cantidad', 1) or 1)
-            for item in items
-            if item.get('es_servicio')
-        )
-        calculo_resumen = calcular_precio_cliente(
-            costo_piezas=total_piezas_costo,
-            tipo_servicio=tipo_servicio,
-            incluir_descuento_diagnostico=incluir_descuento_diagnostico,
-            servicios_con_iva=servicios_con_iva,
-        )
+        if es_reacondicionado:
+            calculo_resumen = {
+                'servicio_nombre': titulo_propuesta or 'Propuesta de Equipo Reacondicionado',
+                'precio_con_iva': (costeo_reac or {}).get('total_precio_contado_mxn', 0),
+                'precio_menos_diagnostico': None,
+                'diagnostico': 0,
+            }
+            info_equipo_reac = datos_equipo_reac or {}
+        else:
+            from .utils.pdf_cotizacion_cliente import calcular_precio_cliente
+            total_piezas_costo = sum(
+                float(item.get('costo_unitario', 0) or 0) * int(item.get('cantidad', 1) or 1)
+                for item in items
+                if not item.get('es_servicio')
+            )
+            servicios_con_iva = sum(
+                float(item.get('costo_unitario', 0) or 0) * int(item.get('cantidad', 1) or 1)
+                for item in items
+                if item.get('es_servicio')
+            )
+            calculo_resumen = calcular_precio_cliente(
+                costo_piezas=total_piezas_costo,
+                tipo_servicio=tipo_servicio,
+                incluir_descuento_diagnostico=incluir_descuento_diagnostico,
+                servicios_con_iva=servicios_con_iva,
+            )
+            info_equipo_reac = None
 
         # Construir el nombre del título de la propuesta para el asunto del email
         titulo_display = titulo_propuesta or calculo_resumen['servicio_nombre']
@@ -697,6 +723,9 @@ def enviar_cotizacion_cliente_task(
             'whatsapp_empleado':     whatsapp_empleado,
             'nombre_usuario':        nombre_usuario,
             'incluir_descuento':     incluir_descuento_diagnostico,
+            'es_reacondicionado':    es_reacondicionado,
+            'costeo_reac':           costeo_reac or {},
+            'info_equipo_reac':      info_equipo_reac or {},
             **contexto_pais,
         }
 

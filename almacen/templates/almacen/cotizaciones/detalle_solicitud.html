@@ -696,6 +696,27 @@ document.addEventListener('DOMContentLoaded', function() {
                          ================================================== -->
                     <div class="col-lg-6 p-4 border-end">
 
+                        <!-- Selector de modo: reparación vs equipo reacondicionado -->
+                        <div class="mb-3">
+                            <ul class="nav nav-tabs nav-tabs-cotizacion" id="tabsModoCotizacion" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" type="button" role="tab"
+                                            id="tabReparacion" data-modo="reparacion" aria-selected="true">
+                                        <i class="bi bi-wrench me-1"></i>Reparación
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" type="button" role="tab"
+                                            id="tabReacondicionado" data-modo="reacondicionado" aria-selected="false">
+                                        <i class="bi bi-pc-display me-1"></i>Equipo reacondicionado
+                                    </button>
+                                </li>
+                            </ul>
+                            <input type="hidden" id="modoCotizacionInput" name="modo_cotizacion" value="reparacion">
+                        </div>
+
+                        <div id="panelReparacion">
+
                         <!-- --- 1. TIPO DE SERVICIO --- -->
                         <div class="mb-4">
                             <label class="form-label fw-semibold mb-2" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-600);">
@@ -829,6 +850,96 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                             </label>
                         </div>
+
+                        </div><!-- /panelReparacion -->
+
+                        <!-- ==================================================
+                             PANEL: Equipo reacondicionado (motor Excel Certificados SIC)
+                             ================================================== -->
+                        <div id="panelReacondicionado" style="display: none;">
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold mb-2" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-600);">
+                                    <i class="bi bi-pc-display me-1"></i>Equipo ofertado al cliente
+                                </label>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1" for="reacMarca">Marca <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control form-control-sm" id="reacMarca"
+                                               name="reac_marca" placeholder="Ej. Dell, HP, Lenovo" maxlength="100">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1" for="reacModelo">Modelo <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control form-control-sm" id="reacModelo"
+                                               name="reac_modelo" placeholder="Ej. Latitude 5420" maxlength="150">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1" for="reacProcesador">Procesador</label>
+                                        <input type="text" class="form-control form-control-sm" id="reacProcesador"
+                                               name="reac_procesador" placeholder="Ej. Intel Core i5-1135G7" maxlength="150">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1" for="reacRam">Memoria RAM</label>
+                                        <input type="text" class="form-control form-control-sm" id="reacRam"
+                                               name="reac_ram" placeholder="Ej. 16 GB DDR4" maxlength="80">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small mb-1" for="reacSO">Sistema operativo</label>
+                                        <input type="text" class="form-control form-control-sm" id="reacSO"
+                                               name="reac_sistema_operativo" placeholder="Ej. Windows 11 Pro" maxlength="100">
+                                    </div>
+                                    <div class="col-md-6 d-flex align-items-end">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="reacCargador"
+                                                   name="reac_incluye_cargador" value="1">
+                                            <label class="form-check-label small" for="reacCargador">
+                                                Incluye cargador
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small mb-1" for="reacEspecificaciones">Especificaciones adicionales</label>
+                                        <textarea class="form-control form-control-sm" id="reacEspecificaciones"
+                                                  name="reac_especificaciones" rows="2"
+                                                  placeholder="Almacenamiento, pantalla, batería, etc."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold mb-2" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gray-600);">
+                                    <i class="bi bi-currency-dollar me-1"></i>Costeo (matriz Certificados SIC)
+                                </label>
+                                <div class="row g-2">
+                                    <div class="col-md-7">
+                                        <label class="form-label small mb-1" for="reacCostoProveedor">
+                                            Costo proveedor (MXN sin IVA) <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="number" class="form-control form-control-sm" id="reacCostoProveedor"
+                                               name="reac_costo_proveedor" min="0" step="0.01" placeholder="5431.03">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label small mb-1" for="reacDiasFrontDesk">Días front desk</label>
+                                        <input type="number" class="form-control form-control-sm" id="reacDiasFrontDesk"
+                                               name="reac_dias_front_desk" min="1" step="1" value="1">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="calcReacContainer" class="mb-2">
+                                <div class="calc-resultado-panel">
+                                    <div class="calc-resultado-header">
+                                        <i class="bi bi-calculator me-1"></i>Resultado — Contado y financiamiento
+                                    </div>
+                                    <div class="calc-resultado-body" id="calcReacBody">
+                                        <div class="text-center py-3 text-muted" style="font-size: 0.82rem;">
+                                            Ingresa el costo de proveedor para ver los precios
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div><!-- /panelReacondicionado -->
 
                     </div>
 
@@ -1009,6 +1120,11 @@ window.COTIZACION_CLIENTE_CONFIG = {
         }{% if not forloop.last %},{% endif %}
         {% endfor %}
     ]
+};
+</script>
+<script>
+window.COTIZACION_REACONDICIONADO_CONFIG = {
+    costeoConfig: {{ costeo_reac_config_json|safe }}
 };
 </script>
 {% endif %}
@@ -1326,6 +1442,7 @@ window.COTIZACION_CLIENTE_CONFIG = {
 {% block extra_js %}
 <script src="{% static 'js/detalle_solicitud.js' %}"></script>
 {% if solicitud.estado in 'enviada_front,enviada_cliente,parcialmente_aprobada' %}
+<script src="{% static 'js/cotizacion_reacondicionado_modal.js' %}"></script>
 <script src="{% static 'js/cotizacion_cliente_modal.js' %}"></script>
 {% endif %}
 {% endblock extra_js %}

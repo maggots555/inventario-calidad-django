@@ -3497,6 +3497,110 @@ def _serializar_profit_config() -> str:
     return _json.dumps(datos, separators=(',', ':'))
 
 
+def _serializar_costeo_reacondicionado_config() -> str:
+    """
+    Serializa la configuración del costeo de reacondicionados para el modal TypeScript.
+
+    Returns:
+        str: JSON compacto con porcentajes y montos del .env.
+    """
+    from .utils.costeo_reacondicionado import serializar_config_costeo
+    return _json.dumps(serializar_config_costeo(), separators=(',', ':'))
+
+
+def _extraer_datos_reacondicionado_post(post) -> dict:
+    """
+    Lee del POST los campos del equipo reacondicionado capturados en el modal.
+
+    Args:
+        post: request.POST de Django.
+
+    Returns:
+        dict: Datos del equipo y parámetros de costeo.
+    """
+    return {
+        'costo_proveedor': post.get('reac_costo_proveedor', '').strip(),
+        'dias_front_desk': post.get('reac_dias_front_desk', '1').strip(),
+        'marca': post.get('reac_marca', '').strip(),
+        'modelo': post.get('reac_modelo', '').strip(),
+        'procesador': post.get('reac_procesador', '').strip(),
+        'ram': post.get('reac_ram', '').strip(),
+        'sistema_operativo': post.get('reac_sistema_operativo', '').strip(),
+        'incluye_cargador': post.get('reac_incluye_cargador') == '1',
+        'especificaciones': post.get('reac_especificaciones', '').strip(),
+    }
+
+
+def _validar_y_calcular_reacondicionado(datos: dict):
+    """
+    Valida campos obligatorios y ejecuta calcular_costeo().
+
+    Returns:
+        tuple: (ok: bool, resultado_o_error: dict|str)
+    """
+    from .utils.costeo_reacondicionado import calcular_costeo
+
+    if not datos.get('marca'):
+        return False, 'La marca del equipo es obligatoria.'
+    if not datos.get('modelo'):
+        return False, 'El modelo del equipo es obligatorio.'
+
+    try:
+        costo = float(datos.get('costo_proveedor') or 0)
+        if costo <= 0:
+            return False, 'El costo de proveedor debe ser mayor a cero.'
+    except ValueError:
+        return False, 'El costo de proveedor no es un número válido.'
+
+    try:
+        dias = int(datos.get('dias_front_desk') or 1)
+        if dias < 1:
+            dias = 1
+    except ValueError:
+        return False, 'Los días de front desk deben ser un número entero válido.'
+
+    costeo = calcular_costeo(costo_proveedor=costo, dias_front_desk=dias)
+    datos_equipo = {
+        'marca': datos['marca'],
+        'modelo': datos['modelo'],
+        'procesador': datos.get('procesador', ''),
+        'ram': datos.get('ram', ''),
+        'sistema_operativo': datos.get('sistema_operativo', ''),
+        'incluye_cargador': datos.get('incluye_cargador', False),
+        'especificaciones': datos.get('especificaciones', ''),
+    }
+    return True, {'costeo': costeo, 'datos_equipo': datos_equipo, 'dias_front_desk': dias, 'costo_proveedor': costo}
+
+
+def _guardar_snapshot_reacondicionado(solicitud, datos_equipo, costeo, dias, costo):
+    """Persiste en la solicitud el snapshot de la propuesta reacondicionada."""
+    from decimal import Decimal
+    solicitud.modo_cotizacion_cliente = 'reacondicionado'
+    solicitud.costo_proveedor_reac = Decimal(str(costo))
+    solicitud.dias_front_desk_reac = dias
+    solicitud.reac_marca = datos_equipo.get('marca', '')
+    solicitud.reac_modelo = datos_equipo.get('modelo', '')
+    solicitud.reac_procesador = datos_equipo.get('procesador', '')
+    solicitud.reac_ram = datos_equipo.get('ram', '')
+    solicitud.reac_sistema_operativo = datos_equipo.get('sistema_operativo', '')
+    solicitud.reac_incluye_cargador = bool(datos_equipo.get('incluye_cargador'))
+    solicitud.reac_especificaciones = datos_equipo.get('especificaciones', '')
+    solicitud.resultado_costeo_reac = costeo
+    solicitud.save(update_fields=[
+        'modo_cotizacion_cliente',
+        'costo_proveedor_reac',
+        'dias_front_desk_reac',
+        'reac_marca',
+        'reac_modelo',
+        'reac_procesador',
+        'reac_ram',
+        'reac_sistema_operativo',
+        'reac_incluye_cargador',
+        'reac_especificaciones',
+        'resultado_costeo_reac',
+    ])
+
+
 def _opciones_servicios_adicionales():
     """
     Construye la lista de servicios adicionales para el dropdown del modal.
@@ -3698,6 +3802,7 @@ def detalle_solicitud_cotizacion(request, pk):
         # template y leerla desde TypeScript. Los valores vienen del .env
         # (nunca del código fuente), así que no aparecen en el repositorio.
         'profit_config_json': _serializar_profit_config(),
+        'costeo_reac_config_json': _serializar_costeo_reacondicionado_config(),
         # Opciones del dropdown "Agregar Servicio Adicional" (precios desde constants.py)
         'servicios_adicionales_opciones': _opciones_servicios_adicionales(),
     }
@@ -3833,6 +3938,7 @@ def api_enviar_cotizacion_cliente(request, pk):
             })
 
         # --- 2. EXTRAER PARÁMETROS DEL POST ---
+        modo_cotizacion = request.POST.get('modo_cotizacion', 'reparacion')
         tipo_servicio  = request.POST.get('tipo_servicio', 'estandar')
         email_cliente  = request.POST.get('email_cliente', '').strip()
         modo_agrupacion = request.POST.get('modo_agrupacion', 'todo_junto')
@@ -3871,7 +3977,52 @@ def api_enviar_cotizacion_cliente(request, pk):
         if not _re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email_cliente):
             return JsonResponse({'success': False, 'error': f'El email "{email_cliente}" no tiene formato válido.'})
 
-        # --- 4. VALIDAR TIPO DE SERVICIO ---
+        # --- 4a. MODO REACONDICIONADO (propuesta de equipo certificado) ---
+        if modo_cotizacion == 'reacondicionado':
+            datos_post = _extraer_datos_reacondicionado_post(request.POST)
+            ok, resultado = _validar_y_calcular_reacondicionado(datos_post)
+            if not ok:
+                return JsonResponse({'success': False, 'error': resultado})
+
+            if solicitud.estado == 'enviada_front':
+                solicitud.enviar_a_cliente()
+
+            _guardar_snapshot_reacondicionado(
+                solicitud,
+                resultado['datos_equipo'],
+                resultado['costeo'],
+                resultado['dias_front_desk'],
+                resultado['costo_proveedor'],
+            )
+
+            _db = get_pais_actual()['db_alias']
+            enviar_cotizacion_cliente_task.delay(
+                solicitud_id=solicitud.pk,
+                email_cliente=email_cliente,
+                copia_empleados=copia_empleados,
+                tipo_servicio='reacondicionado',
+                items=[],
+                titulo_propuesta='Propuesta de Equipo Reacondicionado — Certificado SIC',
+                incluir_descuento_diagnostico=False,
+                mano_de_obra_override=None,
+                mensaje_personalizado=mensaje_personalizado,
+                asunto_correo=asunto_correo,
+                usuario_id=request.user.pk,
+                db_alias=_db,
+                modo_cotizacion='reacondicionado',
+                datos_equipo_reac=resultado['datos_equipo'],
+                costeo_reac=resultado['costeo'],
+            )
+            return JsonResponse({
+                'success': True,
+                'mensaje': (
+                    f'Propuesta de equipo reacondicionado enviada a {email_cliente}. '
+                    'El correo se procesa en segundo plano.'
+                ),
+                'grupos_enviados': 1,
+            })
+
+        # --- 4. VALIDAR TIPO DE SERVICIO (modo reparación) ---
         from .utils.pdf_cotizacion_cliente import PROFIT_CONFIG
         tipos_validos = list(PROFIT_CONFIG.keys())
         if tipo_servicio not in tipos_validos:
@@ -4010,9 +4161,52 @@ def preview_pdf_cotizacion(request, pk):
         )
 
         tipo_servicio     = request.GET.get('tipo_servicio', 'estandar')
+        modo_cotizacion   = request.GET.get('modo_cotizacion', 'reparacion')
         modo_agrupacion   = request.GET.get('modo_agrupacion', 'todo_junto')
         incluir_descuento = request.GET.get('incluir_descuento_diagnostico', '0') == '1'
         grupo_idx         = int(request.GET.get('grupo_idx', 0))
+
+        _pais = get_pais_actual()
+
+        # Preview de propuesta reacondicionada (motor distinto al de reparación)
+        if modo_cotizacion == 'reacondicionado':
+            from .utils.pdf_cotizacion_reacondicionado import PDFCotizacionReacondicionado
+
+            datos_post = {
+                'costo_proveedor': request.GET.get('reac_costo_proveedor', ''),
+                'dias_front_desk': request.GET.get('reac_dias_front_desk', '1'),
+                'marca': request.GET.get('reac_marca', ''),
+                'modelo': request.GET.get('reac_modelo', ''),
+                'procesador': request.GET.get('reac_procesador', ''),
+                'ram': request.GET.get('reac_ram', ''),
+                'sistema_operativo': request.GET.get('reac_sistema_operativo', ''),
+                'incluye_cargador': request.GET.get('reac_incluye_cargador', '0'),
+                'especificaciones': request.GET.get('reac_especificaciones', ''),
+            }
+            datos_post['incluye_cargador'] = datos_post['incluye_cargador'] == '1'
+            ok, resultado = _validar_y_calcular_reacondicionado(datos_post)
+            if not ok:
+                return HttpResponse(resultado.encode(), content_type='text/plain', status=400)
+
+            generador_reac = PDFCotizacionReacondicionado(
+                solicitud=solicitud,
+                datos_equipo=resultado['datos_equipo'],
+                costeo=resultado['costeo'],
+                pais_config=_pais,
+            )
+            resultado_pdf = generador_reac.generar_pdf()
+            if not resultado_pdf['success']:
+                return HttpResponse(
+                    f'Error al generar PDF: {resultado_pdf.get("error", "desconocido")}'.encode(),
+                    content_type='text/plain',
+                    status=500,
+                )
+            pdf_bytes = resultado_pdf['buffer'].getvalue()
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = (
+                f'inline; filename="{resultado_pdf["nombre_archivo"]}"'
+            )
+            return response
 
         from .utils.cotizacion_items_cliente import (
             construir_grupos_cotizacion,
@@ -4047,7 +4241,6 @@ def preview_pdf_cotizacion(request, pk):
         grupo_idx = min(grupo_idx, len(grupos) - 1)
         grupo = grupos[grupo_idx]
 
-        _pais = get_pais_actual()
         generador = PDFCotizacionCliente(
             solicitud=solicitud,
             tipo_servicio=tipo_servicio,

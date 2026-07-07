@@ -403,8 +403,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // Carga el PDF en el iframe usando la vista preview_pdf_cotizacion
     // --------------------------------------------------------
     btnPreviewPDF === null || btnPreviewPDF === void 0 ? void 0 : btnPreviewPDF.addEventListener('click', () => {
+        var _a, _b, _c, _d, _e, _f, _g;
         if (!tipoServicioInput || !iframePreview || !previewContainer || !previewPlaceholder)
             return;
+        // Modo reacondicionado: preview con parámetros del equipo ofertado
+        if ((_a = window.esModoReacondicionado) === null || _a === void 0 ? void 0 : _a.call(window)) {
+            const marca = (_b = document.querySelector('#reacMarca')) === null || _b === void 0 ? void 0 : _b.value.trim();
+            const modelo = (_c = document.querySelector('#reacModelo')) === null || _c === void 0 ? void 0 : _c.value.trim();
+            const costo = parseFloat((_e = (_d = document.querySelector('#reacCostoProveedor')) === null || _d === void 0 ? void 0 : _d.value) !== null && _e !== void 0 ? _e : '0');
+            if (!marca || !modelo || !costo || costo <= 0) {
+                alert('Completa marca, modelo y costo de proveedor para previsualizar.');
+                return;
+            }
+            const params = (_g = (_f = window.buildPreviewParamsReac) === null || _f === void 0 ? void 0 : _f.call(window)) !== null && _g !== void 0 ? _g : new URLSearchParams();
+            const url = `${config.urlPreview}?${params.toString()}`;
+            btnPreviewPDF.disabled = true;
+            btnPreviewPDF.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generando...';
+            iframePreview.src = url;
+            previewContainer.style.display = 'block';
+            previewPlaceholder.style.display = 'none';
+            iframePreview.onload = () => {
+                btnPreviewPDF.disabled = false;
+                btnPreviewPDF.innerHTML = '<i class="bi bi-eye me-1"></i>Actualizar preview';
+            };
+            return;
+        }
         const tipo = tipoServicioInput.value || 'estandar';
         const descuento = (checkDescuento === null || checkDescuento === void 0 ? void 0 : checkDescuento.checked) ? '1' : '0';
         // Construir la URL del preview con parámetros.
@@ -434,7 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // un FormData POST al endpoint API.
     // --------------------------------------------------------
     btnConfirmar === null || btnConfirmar === void 0 ? void 0 : btnConfirmar.addEventListener('click', async () => {
-        var _a, _b, _c, _d, _e, _f, _g, _h;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
         if (!tipoServicioInput || !alertaDiv)
             return;
         // Ocultar alerta previa
@@ -464,22 +487,29 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnConfirmar)
             btnConfirmar.disabled = true;
         try {
-            // Recolectar todos los campos del modal en un FormData
             const formData = new FormData();
             formData.append('csrfmiddlewaretoken', config.csrfToken);
-            formData.append('tipo_servicio', tipoServicioInput.value || 'estandar');
             formData.append('email_cliente', emailParaEnvio);
             formData.append('mensaje_personalizado', (_c = (_b = document.querySelector('#mensajePersonalizado')) === null || _b === void 0 ? void 0 : _b.value) !== null && _c !== void 0 ? _c : '');
             formData.append('asunto_correo', (_e = (_d = document.querySelector('#asuntoCorreoInput')) === null || _d === void 0 ? void 0 : _d.value) !== null && _e !== void 0 ? _e : '');
-            // mano_de_obra_override = 0: la mano de obra es solo informativa en este flujo.
-            formData.append('mano_de_obra_override', '0');
-            // Descuento diagnóstico (si el checkbox existe y está marcado)
-            if (checkDescuento === null || checkDescuento === void 0 ? void 0 : checkDescuento.checked) {
-                formData.append('incluir_descuento_diagnostico', '1');
+            // Modo reacondicionado: datos del equipo + costeo Excel
+            if ((_f = window.esModoReacondicionado) === null || _f === void 0 ? void 0 : _f.call(window)) {
+                if (!((_g = window.appendDatosReacondicionado) === null || _g === void 0 ? void 0 : _g.call(window, formData))) {
+                    mostrarAlerta('warning', '<i class="bi bi-exclamation-triangle me-1"></i>Marca, modelo y costo de proveedor son obligatorios.');
+                    restaurarBoton();
+                    return;
+                }
             }
-            // Modo de agrupación (radio seleccionado)
-            const radioAgrupacion = document.querySelector('input[name="modo_agrupacion"]:checked');
-            formData.append('modo_agrupacion', (_f = radioAgrupacion === null || radioAgrupacion === void 0 ? void 0 : radioAgrupacion.value) !== null && _f !== void 0 ? _f : 'todo_junto');
+            else {
+                formData.append('modo_cotizacion', 'reparacion');
+                formData.append('tipo_servicio', tipoServicioInput.value || 'estandar');
+                formData.append('mano_de_obra_override', '0');
+                if (checkDescuento === null || checkDescuento === void 0 ? void 0 : checkDescuento.checked) {
+                    formData.append('incluir_descuento_diagnostico', '1');
+                }
+                const radioAgrupacion = document.querySelector('input[name="modo_agrupacion"]:checked');
+                formData.append('modo_agrupacion', (_h = radioAgrupacion === null || radioAgrupacion === void 0 ? void 0 : radioAgrupacion.value) !== null && _h !== void 0 ? _h : 'todo_junto');
+            }
             // CC de empleados (checkboxes marcados)
             const checksCopia = document.querySelectorAll('input[name="copia_empleados"]:checked');
             checksCopia.forEach(chk => {
@@ -495,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (data.success) {
                 // Éxito: mostrar mensaje y cerrar modal después de 2 segundos
-                mostrarAlerta('success', `<i class="bi bi-check-circle me-1"></i>${(_g = data.mensaje) !== null && _g !== void 0 ? _g : 'Correo enviado correctamente.'}`);
+                mostrarAlerta('success', `<i class="bi bi-check-circle me-1"></i>${(_j = data.mensaje) !== null && _j !== void 0 ? _j : 'Correo enviado correctamente.'}`);
                 setTimeout(() => {
                     var _a, _b;
                     const modal = document.querySelector('#modalEnviarCotizacionCliente');
@@ -507,7 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             else {
                 // Error: mostrar el mensaje de error
-                mostrarAlerta('danger', `<i class="bi bi-exclamation-triangle me-1"></i>${(_h = data.error) !== null && _h !== void 0 ? _h : 'Error desconocido.'}`);
+                mostrarAlerta('danger', `<i class="bi bi-exclamation-triangle me-1"></i>${(_k = data.error) !== null && _k !== void 0 ? _k : 'Error desconocido.'}`);
                 restaurarBoton();
             }
         }

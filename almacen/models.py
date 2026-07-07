@@ -2921,6 +2921,74 @@ class SolicitudCotizacion(models.Model):
         verbose_name='Total cliente menos diagnóstico',
         help_text='Total con IVA restando diagnóstico ya pagado (si aplica)'
     )
+
+    # ========== COTIZACIÓN EQUIPO REACONDICIONADO ==========
+    MODO_COTIZACION_CLIENTE_CHOICES = [
+        ('reparacion', 'Reparación'),
+        ('reacondicionado', 'Equipo reacondicionado'),
+    ]
+    modo_cotizacion_cliente = models.CharField(
+        max_length=20,
+        choices=MODO_COTIZACION_CLIENTE_CHOICES,
+        blank=True,
+        default='reparacion',
+        verbose_name='Modo de cotización enviada',
+        help_text='Reparación por piezas o propuesta de equipo reacondicionado'
+    )
+    costo_proveedor_reac = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Costo proveedor (reacondicionado)',
+        help_text='Costo de adquisición del equipo sin IVA'
+    )
+    dias_front_desk_reac = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name='Días front desk (reacondicionado)',
+        help_text='Días proporcionales de recurso front desk para el costeo'
+    )
+    reac_marca = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Marca equipo ofertado',
+    )
+    reac_modelo = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name='Modelo equipo ofertado',
+    )
+    reac_procesador = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name='Procesador equipo ofertado',
+    )
+    reac_ram = models.CharField(
+        max_length=80,
+        blank=True,
+        verbose_name='RAM equipo ofertado',
+    )
+    reac_sistema_operativo = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Sistema operativo equipo ofertado',
+    )
+    reac_incluye_cargador = models.BooleanField(
+        default=False,
+        verbose_name='Incluye cargador',
+        help_text='Si el equipo reacondicionado incluye cargador original o compatible'
+    )
+    reac_especificaciones = models.TextField(
+        blank=True,
+        verbose_name='Especificaciones adicionales',
+        help_text='Detalles extra del equipo (almacenamiento, pantalla, etc.)'
+    )
+    resultado_costeo_reac = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='Snapshot costeo reacondicionado',
+        help_text='Resultado JSON de calcular_costeo al enviar la propuesta'
+    )
     
     # ========== AUDITORÍA ==========
     creado_por = models.ForeignKey(

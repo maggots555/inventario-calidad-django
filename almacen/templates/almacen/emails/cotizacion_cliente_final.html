@@ -462,6 +462,59 @@
         {% endif %}
 
         <!-- Resumen de Totales (lo que el cliente necesita ver) -->
+        {% if es_reacondicionado %}
+        <div class="equipo-card">
+            <div class="equipo-titulo">Equipo reacondicionado ofertado</div>
+            <p class="equipo-fila"><span class="equipo-label">Marca:</span> <span class="equipo-valor">{{ info_equipo_reac.marca }}</span></p>
+            <p class="equipo-fila"><span class="equipo-label">Modelo:</span> <span class="equipo-valor">{{ info_equipo_reac.modelo }}</span></p>
+            {% if info_equipo_reac.procesador %}
+            <p class="equipo-fila"><span class="equipo-label">Procesador:</span> <span class="equipo-valor">{{ info_equipo_reac.procesador }}</span></p>
+            {% endif %}
+            {% if info_equipo_reac.ram %}
+            <p class="equipo-fila"><span class="equipo-label">RAM:</span> <span class="equipo-valor">{{ info_equipo_reac.ram }}</span></p>
+            {% endif %}
+            {% if info_equipo_reac.sistema_operativo %}
+            <p class="equipo-fila"><span class="equipo-label">Sistema operativo:</span> <span class="equipo-valor">{{ info_equipo_reac.sistema_operativo }}</span></p>
+            {% endif %}
+            <p class="equipo-fila"><span class="equipo-label">Incluye cargador:</span> <span class="equipo-valor">{% if info_equipo_reac.incluye_cargador %}Sí{% else %}No{% endif %}</span></p>
+            {% if info_equipo_reac.especificaciones %}
+            <p class="equipo-fila"><span class="equipo-label">Especificaciones:</span> <span class="equipo-valor">{{ info_equipo_reac.especificaciones }}</span></p>
+            {% endif %}
+        </div>
+        <div class="totales-box">
+            <div class="totales-header">Inversión y opciones de pago</div>
+            <div class="totales-body">
+                <div class="total-row">
+                    <span class="etiqueta">Subtotal (sin IVA)</span>
+                    <span class="monto">${{ costeo_reac.subtotal_sin_iva|floatformat:2 }} MXN</span>
+                </div>
+                <div class="total-row">
+                    <span class="etiqueta">IVA (16%)</span>
+                    <span class="monto">${{ costeo_reac.iva|floatformat:2 }} MXN</span>
+                </div>
+                <div class="total-row destacado">
+                    <span class="etiqueta">TOTAL DE CONTADO (con IVA)</span>
+                    <span class="monto">${{ costeo_reac.total_precio_contado_mxn|floatformat:2 }} MXN</span>
+                </div>
+                <div class="total-row">
+                    <span class="etiqueta">Pago diferido a 3 meses (con IVA)</span>
+                    <span class="monto">${{ costeo_reac.opciones_diferidas_con_iva.diferido_3_meses|floatformat:2 }} MXN</span>
+                </div>
+                <div class="total-row">
+                    <span class="etiqueta">Pago diferido a 6 meses (con IVA)</span>
+                    <span class="monto">${{ costeo_reac.opciones_diferidas_con_iva.diferido_6_meses|floatformat:2 }} MXN</span>
+                </div>
+                <div class="total-row final">
+                    <span class="etiqueta">Pago diferido a 12 meses (con IVA)</span>
+                    <span class="monto">${{ costeo_reac.opciones_diferidas_con_iva.diferido_12_meses|floatformat:2 }} MXN</span>
+                </div>
+            </div>
+        </div>
+        <div class="pdf-notice">
+            <strong>📎 PDF adjunto:</strong> El archivo incluye las especificaciones del equipo
+            y el detalle de precios de contado y financiamiento.
+        </div>
+        {% else %}
         <div class="totales-box">
             <div class="totales-header">Resumen de Cotización</div>
             <div class="totales-body">
@@ -490,12 +543,13 @@
             </div>
         </div>
 
-        <!-- Aviso del PDF adjunto -->
+        <!-- Aviso del PDF adjunto (reparación) -->
         <div class="pdf-notice">
             <strong>📎 PDF adjunto:</strong> El archivo <em>{{ solicitud.numero_solicitud }}.pdf</em>
             incluye el desglose completo de piezas y servicios con precios individuales
             (sin IVA), días estimados de entrega y tipo de cada componente.
         </div>
+        {% endif %}
 
         <!-- Mensaje personalizado del técnico (si existe) -->
         {% if mensaje_personalizado %}
