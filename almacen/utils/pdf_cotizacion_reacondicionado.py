@@ -67,6 +67,13 @@ class PDFCotizacionReacondicionado:
         self.pais_config = pais_config or {}
         self._estilos = getSampleStyleSheet()
         self._configurar_estilos()
+        # Generador de referencia para reutilizar secciones compartidas (cliente, términos)
+        self._gen_ref = PDFCotizacionCliente(
+            solicitud=self.solicitud,
+            tipo_servicio='mostrador',
+            items=[],
+            pais_config=self.pais_config,
+        )
 
     def _configurar_estilos(self) -> None:
         """Define estilos de texto reutilizados en el documento."""
@@ -118,7 +125,8 @@ class PDFCotizacionReacondicionado:
             elementos += self._construir_datos_cliente()
             elementos += self._construir_equipo_ofertado()
             elementos += self._construir_precios()
-            elementos.append(Spacer(1, 4 * mm))
+            # Segunda hoja: mismos términos y condiciones que cotización de reparación
+            elementos += self._gen_ref._construir_terminos_condiciones()
             doc.build(elementos)
             buffer.seek(0)
             numero = self.solicitud.numero_solicitud.replace('/', '-')
@@ -133,13 +141,7 @@ class PDFCotizacionReacondicionado:
 
     def _construir_header(self) -> List:
         """Logo, empresa, fecha y folio (misma lógica visual que cotización de reparación)."""
-        gen_ref = PDFCotizacionCliente(
-            solicitud=self.solicitud,
-            tipo_servicio='mostrador',
-            items=[],
-            pais_config=self.pais_config,
-        )
-        return gen_ref._construir_header()
+        return self._gen_ref._construir_header()
 
     def _construir_titulo(self) -> List:
         return [
@@ -166,13 +168,7 @@ class PDFCotizacionReacondicionado:
 
     def _construir_datos_cliente(self) -> List:
         """Reutiliza la sección de cliente del PDF de reparación."""
-        gen_ref = PDFCotizacionCliente(
-            solicitud=self.solicitud,
-            tipo_servicio='mostrador',
-            items=[],
-            pais_config=self.pais_config,
-        )
-        return gen_ref._construir_datos_cliente()
+        return self._gen_ref._construir_datos_cliente()
 
     def _construir_equipo_ofertado(self) -> List:
         """
