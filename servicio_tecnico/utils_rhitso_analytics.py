@@ -88,7 +88,7 @@ def obtener_queryset_candidatos(fecha_inicio=None, fecha_fin=None, sucursal_id=N
     ).select_related(
         'detalle_equipo',
         'sucursal',
-        'tecnico_diagnostico',
+        'tecnico_asignado_actual',
     ).prefetch_related(
         Prefetch(
             'seguimientos_rhitso',
@@ -263,11 +263,11 @@ def construir_fila_detalle_orden(orden):
     """
     detalle = orden.detalle_equipo
 
-    # Técnico que registró el diagnóstico SIC (quien determinó candidatura RHITSO)
-    if orden.tecnico_diagnostico:
-        tecnico_diagnostico_nombre = orden.tecnico_diagnostico.nombre_completo
+    # Técnico asignado directamente en la orden de servicio
+    if orden.tecnico_asignado_actual:
+        tecnico_asignado_nombre = orden.tecnico_asignado_actual.nombre_completo
     else:
-        tecnico_diagnostico_nombre = 'Sin asignar'
+        tecnico_asignado_nombre = 'Sin asignar'
 
     return {
         'id': orden.id,
@@ -278,8 +278,7 @@ def construir_fila_detalle_orden(orden):
         'modelo': detalle.modelo if detalle else 'N/A',
         'sucursal': orden.sucursal.nombre if orden.sucursal else 'N/A',
         'fecha_ingreso': orden.fecha_ingreso,
-        'tecnico_diagnostico': tecnico_diagnostico_nombre,
-        'fecha_diagnostico_sic': orden.fecha_diagnostico_sic,
+        'tecnico_asignado': tecnico_asignado_nombre,
         'estado_rhitso_actual': orden.estado_rhitso or 'Pendiente',
         'estado_orden': orden.get_estado_display(),
         'acepto_envio': _orden_tiene_estado_historico(orden, ESTADO_ACEPTA_ENVIO),

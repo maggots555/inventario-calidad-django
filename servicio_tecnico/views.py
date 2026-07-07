@@ -9120,7 +9120,7 @@ def exportar_analisis_rhitso(request):
     ws_detalle = wb.create_sheet('Detalle Candidatos')
     headers_detalle = [
         'ID Orden', 'Orden Cliente', 'N° Serie', 'Marca', 'Modelo', 'Sucursal',
-        'Fecha Ingreso', 'Técnico Diagnóstico SIC', 'Fecha Diagnóstico SIC',
+        'Fecha Ingreso', 'Técnico Asignado',
         'Estado RHITSO Actual', 'Estado Orden SIC',
         'Aceptó Envío', 'Rechazó Envío', 'Aceptó Cotiz.', 'Rechazó Cotiz.', 'No Apto',
     ]
@@ -9135,8 +9135,7 @@ def exportar_analisis_rhitso(request):
             fila['modelo'],
             fila['sucursal'],
             fila['fecha_ingreso'].strftime('%d/%m/%Y %H:%M') if fila['fecha_ingreso'] else '',
-            fila['tecnico_diagnostico'],
-            fila['fecha_diagnostico_sic'].strftime('%d/%m/%Y %H:%M') if fila.get('fecha_diagnostico_sic') else '',
+            fila['tecnico_asignado'],
             fila['estado_rhitso_actual'],
             fila['estado_orden'],
             'Sí' if fila['acepto_envio'] else 'No',
@@ -9151,7 +9150,7 @@ def exportar_analisis_rhitso(request):
             celda.border = thin_border
             celda.alignment = wrap_alignment
 
-    ajustar_anchos(ws_detalle, [10, 22, 16, 14, 18, 14, 18, 26, 18, 30, 18, 12, 12, 12, 12, 10])
+    ajustar_anchos(ws_detalle, [10, 22, 16, 14, 18, 14, 18, 26, 30, 18, 12, 12, 12, 12, 10])
     ws_detalle.freeze_panes = 'A2'
 
     # -------------------------------------------------------------------------
