@@ -45,6 +45,44 @@
     </div>
 
     <!-- ============================================================ -->
+    <!-- FILTROS DE FECHA (compartidos con reporte de análisis) -->
+    <!-- ============================================================ -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end" id="filtrosEmbudoRhitso">
+                <div class="col-md-4">
+                    <label for="fecha_inicio" class="form-label">
+                        <i class="bi bi-calendar-event me-1"></i>Fecha ingreso desde
+                    </label>
+                    <input type="date"
+                           class="form-control"
+                           id="fecha_inicio"
+                           name="fecha_inicio"
+                           value="{{ filtro_fecha_inicio }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="fecha_fin" class="form-label">
+                        <i class="bi bi-calendar-check me-1"></i>Fecha ingreso hasta
+                    </label>
+                    <input type="date"
+                           class="form-control"
+                           id="fecha_fin"
+                           name="fecha_fin"
+                           value="{{ filtro_fecha_fin }}">
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-funnel me-1"></i>Filtrar
+                    </button>
+                    <a href="{% url 'servicio_tecnico:dashboard_rhitso' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle me-1"></i>Limpiar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
     <!-- SECCIÓN DE ESTADÍSTICAS (STATS CARDS) -->
     <!-- ============================================================ -->
     <div class="stats-grid mb-4">
@@ -151,6 +189,77 @@
     </div>
 
     <!-- ============================================================ -->
+    <!-- EMBUDO DE CONVERSIÓN RHITSO -->
+    <!-- ============================================================ -->
+    <div class="mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <h2 class="h5 mb-0">
+                <i class="bi bi-funnel text-primary me-2"></i>
+                Embudo de Conversión RHITSO
+            </h2>
+            <a href="{% url 'servicio_tecnico:exportar_analisis_rhitso' %}?fecha_inicio={{ filtro_fecha_inicio }}&fecha_fin={{ filtro_fecha_fin }}{% if filtro_sucursal %}&sucursal={{ filtro_sucursal }}{% endif %}"
+               class="btn btn-info btn-sm">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i>
+                Descargar Análisis Excel
+            </a>
+        </div>
+        <p class="text-muted small mb-3">
+            Basado en estados RHITSO del historial de seguimiento.
+            Cohorte nivel 3: {{ embudo.total_cohorte_acepto }} equipos que aceptaron envío.
+        </p>
+        <div class="stats-grid">
+            <div class="stat-card stat-success" data-stat="embudo-acepto-envio">
+                <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ embudo.acepto_envio_count }}</div>
+                    <div class="stat-label">Aceptaron Envío</div>
+                    <div class="stat-description">{{ embudo.acepto_envio_pct }}% de candidatos</div>
+                </div>
+            </div>
+            <div class="stat-card stat-danger" data-stat="embudo-rechazo-envio">
+                <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ embudo.rechazo_envio_count }}</div>
+                    <div class="stat-label">Rechazaron Envío</div>
+                    <div class="stat-description">{{ embudo.rechazo_envio_pct }}% de candidatos</div>
+                </div>
+            </div>
+            <div class="stat-card stat-success" data-stat="embudo-acepto-cotiz">
+                <div class="stat-icon"><i class="bi bi-hand-thumbs-up"></i></div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ embudo.acepto_cotiz_count }}</div>
+                    <div class="stat-label">Aceptaron Cotización</div>
+                    <div class="stat-description">{{ embudo.acepto_cotiz_pct }}% de cohorte envío</div>
+                </div>
+            </div>
+            <div class="stat-card stat-warning" data-stat="embudo-rechazo-cotiz">
+                <div class="stat-icon"><i class="bi bi-hand-thumbs-down"></i></div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ embudo.rechazo_cotiz_count }}</div>
+                    <div class="stat-label">No Aceptan Cotización</div>
+                    <div class="stat-description">{{ embudo.rechazo_cotiz_pct }}% de cohorte envío</div>
+                </div>
+            </div>
+            <div class="stat-card stat-danger" data-stat="embudo-no-apto">
+                <div class="stat-icon"><i class="bi bi-slash-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ embudo.no_apto_count }}</div>
+                    <div class="stat-label">No Apto Reparación</div>
+                    <div class="stat-description">{{ embudo.no_apto_pct }}% de cohorte envío</div>
+                </div>
+            </div>
+            <div class="stat-card stat-secondary" data-stat="embudo-sin-decision">
+                <div class="stat-icon"><i class="bi bi-question-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ embudo.sin_decision_envio_count }}</div>
+                    <div class="stat-label">Sin Decisión Envío</div>
+                    <div class="stat-description">{{ embudo.sin_decision_envio_pct }}% de candidatos</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
     <!-- TABLA DE CANDIDATOS RHITSO CON PESTAÑAS -->
     <!-- ============================================================ -->
     <div class="data-table-container">
@@ -170,15 +279,17 @@
                 </span>
             </div>
             <div class="table-actions">
-                <!-- Botón Excel ahora usa openpyxl en el backend -->
-                <a href="{% url 'servicio_tecnico:exportar_excel_rhitso' %}" class="btn btn-success" type="button">
+                <!-- Botón Excel operativo (listado de candidatos) -->
+                <a href="{% url 'servicio_tecnico:exportar_excel_rhitso' %}?fecha_inicio={{ filtro_fecha_inicio }}&fecha_fin={{ filtro_fecha_fin }}{% if filtro_sucursal %}&sucursal={{ filtro_sucursal }}{% endif %}"
+                   class="btn btn-success" type="button">
                     <i class="bi bi-file-earmark-excel me-2"></i>
                     Exportar Excel
                 </a>
-                <button id="reporteRhitso" class="btn btn-info" type="button">
+                <a href="{% url 'servicio_tecnico:exportar_analisis_rhitso' %}?fecha_inicio={{ filtro_fecha_inicio }}&fecha_fin={{ filtro_fecha_fin }}{% if filtro_sucursal %}&sucursal={{ filtro_sucursal }}{% endif %}"
+                   class="btn btn-info" type="button">
                     <i class="bi bi-file-earmark-spreadsheet me-2"></i>
-                    Reporte RHITSO
-                </button>
+                    Reporte Análisis RHITSO
+                </a>
             </div>
         </div>
 

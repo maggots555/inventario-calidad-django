@@ -8330,13 +8330,27 @@ def dashboard_rhitso(request):
     Returns:
         HttpResponse con el dashboard renderizado
     """
+    from .utils_rhitso_analytics import obtener_embudo_rhitso
+
+    # Filtros compartidos con el reporte de análisis (GET params)
+    fecha_inicio = request.GET.get('fecha_inicio', '')
+    fecha_fin = request.GET.get('fecha_fin', '')
+    sucursal_id = request.GET.get('sucursal', '') or None
+
+    embudo = obtener_embudo_rhitso(
+        fecha_inicio=fecha_inicio or None,
+        fecha_fin=fecha_fin or None,
+        sucursal_id=sucursal_id,
+    )
+
     # =======================================================================
     # PASO 1: CONSULTA OPTIMIZADA DE CANDIDATOS RHITSO
     # =======================================================================
 
     # Esto evita el "N+1 problem" (hacer una consulta por cada relación)
     candidatos_rhitso = OrdenServicio.objects.filter(
-        es_candidato_rhitso=True
+        es_candidato_rhitso=True,
+        id__in=embudo['candidatos_qs'].values_list('id', flat=True),
     ).select_related(
         'detalle_equipo',              # Información del equipo
         'sucursal',                    # Sucursal de la orden
@@ -8603,6 +8617,12 @@ def dashboard_rhitso(request):
         
         # Información adicional
         'fecha_actualizacion': timezone.now(),
+
+        # Embudo de conversión RHITSO
+        'embudo': embudo,
+        'filtro_fecha_inicio': fecha_inicio,
+        'filtro_fecha_fin': fecha_fin,
+        'filtro_sucursal': sucursal_id or '',
     }
     
     return render(request, 'servicio_tecnico/rhitso/dashboard_rhitso.html', context)
@@ -8629,8 +8649,14 @@ def exportar_excel_rhitso(request):
     # =========================================================================
     
     # EXPLICACIÓN: Reutilizamos la misma consulta optimizada del dashboard
-    candidatos_rhitso = OrdenServicio.objects.filter(
-        es_candidato_rhitso=True
+    from .utils_rhitso_analytics import obtener_queryset_candidatos
+
+    fecha_inicio = request.GET.get('fecha_inicio', '') or None
+    fecha_fin = request.GET.get('fecha_fin', '') or None
+    sucursal_id = request.GET.get('sucursal', '') or None
+
+    candidatos_rhitso = obtener_queryset_candidatos(
+        fecha_inicio, fecha_fin, sucursal_id
     ).select_related(
         'detalle_equipo',
         'sucursal',
@@ -8958,6 +8984,252 @@ def exportar_excel_rhitso(request):
     # Guardar el workbook en la respuesta
     wb.save(response)
     
+    return response
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+def exportar_analisis_rhitso(request):
+    """
+    Genera y descarga el reporte Excel del embudo de conversión RHITSO.
+
+    Incluye resumen de KPIs, detalle de candidatos, rechazos de cotización
+    con observaciones y órdenes sin decisión de envío.
+
+    Args:
+        request: HttpRequest con filtros opcionales fecha_inicio, fecha_fin, sucursal.
+
+    Returns:
+        HttpResponse con archivo Excel (.xlsx) para descarga.
+    """
+    from .utils_rhitso_analytics import (
+        obtener_embudo_rhitso,
+        obtener_comentarios_rechazo_cotizacion,
+        obtener_detalle_todas_candidatas,
+    )
+
+    fecha_inicio = request.GET.get('fecha_inicio', '') or None
+    fecha_fin = request.GET.get('fecha_fin', '') or None
+    sucursal_id = request.GET.get('sucursal', '') or None
+
+    embudo = obtener_embudo_rhitso(fecha_inicio, fecha_fin, sucursal_id)
+    detalle_candidatos = obtener_detalle_todas_candidatas(fecha_inicio, fecha_fin, sucursal_id)
+    comentarios_rechazo = obtener_comentarios_rechazo_cotizacion(embudo['cohorte_acepto_envio_qs'])
+
+    wb = openpyxl.Workbook()
+    if 'Sheet' in wb.sheetnames:
+        del wb['Sheet']
+
+    header_font = Font(name='Calibri', bold=True, color='FFFFFF', size=11)
+    header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+    header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin', color='000000'),
+        right=Side(style='thin', color='000000'),
+        top=Side(style='thin', color='000000'),
+        bottom=Side(style='thin', color='000000'),
+    )
+    normal_font = Font(name='Calibri', size=10)
+    wrap_alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
+    title_font = Font(name='Calibri', bold=True, size=14, color='FFFFFF')
+    title_fill = PatternFill(start_color='212529', end_color='212529', fill_type='solid')
+    kpi_label_font = Font(name='Calibri', bold=True, size=11)
+    kpi_value_font = Font(name='Calibri', bold=True, size=12, color='366092')
+
+    filtros_texto = f"Período ingreso: {fecha_inicio or 'Inicio'} — {fecha_fin or 'Hoy'}"
+    if sucursal_id:
+        filtros_texto += f" | Sucursal ID: {sucursal_id}"
+
+    def aplicar_encabezados(ws, headers, fila=1):
+        """Escribe encabezados con estilo corporativo en la hoja indicada."""
+        for col_idx, titulo in enumerate(headers, start=1):
+            celda = ws.cell(row=fila, column=col_idx, value=titulo)
+            celda.font = header_font
+            celda.fill = header_fill
+            celda.alignment = header_alignment
+            celda.border = thin_border
+
+    def ajustar_anchos(ws, anchos):
+        """Configura ancho de columnas según lista de caracteres."""
+        for idx, ancho in enumerate(anchos, start=1):
+            ws.column_dimensions[get_column_letter(idx)].width = ancho
+
+    # -------------------------------------------------------------------------
+    # HOJA 1: RESUMEN DEL EMBUDO
+    # -------------------------------------------------------------------------
+    ws_resumen = wb.create_sheet('Resumen')
+    ws_resumen.merge_cells('A1:D1')
+    titulo = ws_resumen['A1']
+    titulo.value = 'Análisis RHITSO — Embudo de Conversión'
+    titulo.font = title_font
+    titulo.fill = title_fill
+    titulo.alignment = Alignment(horizontal='center', vertical='center')
+
+    ws_resumen.merge_cells('A2:D2')
+    subtitulo = ws_resumen['A2']
+    subtitulo.value = filtros_texto
+    subtitulo.font = Font(name='Calibri', italic=True, size=10, color='666666')
+    subtitulo.alignment = Alignment(horizontal='center')
+
+    fila_kpi = 4
+    resumen_filas = [
+        ('NIVEL 1 — Candidatos RHITSO', embudo['total_candidatos'], '100%', ''),
+        ('', '', '', ''),
+        ('NIVEL 2 — Decisión de envío a RHITSO', '', '', ''),
+        ('  Aceptaron envío', embudo['acepto_envio_count'], f"{embudo['acepto_envio_pct']}%", 'sobre candidatos'),
+        ('  Rechazaron envío', embudo['rechazo_envio_count'], f"{embudo['rechazo_envio_pct']}%", 'sobre candidatos'),
+        ('  Sin decisión de envío', embudo['sin_decision_envio_count'], f"{embudo['sin_decision_envio_pct']}%", 'sobre candidatos'),
+        ('', '', '', ''),
+        ('NIVEL 3 — Cohorte: aceptaron envío', embudo['total_cohorte_acepto'], '', 'base cohorte'),
+        ('  Cliente acepta cotización', embudo['acepto_cotiz_count'], f"{embudo['acepto_cotiz_pct']}%", 'sobre cohorte'),
+        ('  Cliente no acepta cotización', embudo['rechazo_cotiz_count'], f"{embudo['rechazo_cotiz_pct']}%", 'sobre cohorte'),
+        ('  No apto para reparación', embudo['no_apto_count'], f"{embudo['no_apto_pct']}%", 'sobre cohorte'),
+        ('  En proceso (sin esos estados)', embudo['en_proceso_cohorte_count'], f"{embudo['en_proceso_cohorte_pct']}%", 'sobre cohorte'),
+    ]
+
+    ws_resumen.cell(row=3, column=1, value='Métrica').font = kpi_label_font
+    ws_resumen.cell(row=3, column=2, value='Cantidad').font = kpi_label_font
+    ws_resumen.cell(row=3, column=3, value='%').font = kpi_label_font
+    ws_resumen.cell(row=3, column=4, value='Referencia').font = kpi_label_font
+
+    for etiqueta, cantidad, pct, ref in resumen_filas:
+        ws_resumen.cell(row=fila_kpi, column=1, value=etiqueta).font = normal_font
+        if cantidad != '':
+            celda_cnt = ws_resumen.cell(row=fila_kpi, column=2, value=cantidad)
+            celda_cnt.font = kpi_value_font
+        ws_resumen.cell(row=fila_kpi, column=3, value=pct).font = normal_font
+        ws_resumen.cell(row=fila_kpi, column=4, value=ref).font = Font(name='Calibri', size=9, color='888888')
+        fila_kpi += 1
+
+    nota_fila = fila_kpi + 1
+    ws_resumen.merge_cells(f'A{nota_fila}:D{nota_fila + 2}')
+    nota = ws_resumen[f'A{nota_fila}']
+    nota.value = (
+        'Nota: Las métricas se basan en estados RHITSO registrados en SeguimientoRHITSO. '
+        'Si el técnico no actualiza el estado en el panel RHITSO, el embudo puede mostrar '
+        '"sin decisión" aunque exista respuesta en el flujo SIC de cotización.'
+    )
+    nota.font = Font(name='Calibri', italic=True, size=9, color='666666')
+    nota.alignment = wrap_alignment
+
+    ajustar_anchos(ws_resumen, [42, 14, 10, 22])
+
+    # -------------------------------------------------------------------------
+    # HOJA 2: DETALLE CANDIDATOS
+    # -------------------------------------------------------------------------
+    ws_detalle = wb.create_sheet('Detalle Candidatos')
+    headers_detalle = [
+        'ID Orden', 'Orden Cliente', 'N° Serie', 'Marca', 'Modelo', 'Sucursal',
+        'Fecha Ingreso', 'Técnico Diagnóstico SIC', 'Fecha Diagnóstico SIC',
+        'Estado RHITSO Actual', 'Estado Orden SIC',
+        'Aceptó Envío', 'Rechazó Envío', 'Aceptó Cotiz.', 'Rechazó Cotiz.', 'No Apto',
+    ]
+    aplicar_encabezados(ws_detalle, headers_detalle)
+
+    for row_idx, fila in enumerate(detalle_candidatos, start=2):
+        valores = [
+            fila['id'],
+            fila['orden_cliente'],
+            fila['numero_serie'],
+            fila['marca'],
+            fila['modelo'],
+            fila['sucursal'],
+            fila['fecha_ingreso'].strftime('%d/%m/%Y %H:%M') if fila['fecha_ingreso'] else '',
+            fila['tecnico_diagnostico'],
+            fila['fecha_diagnostico_sic'].strftime('%d/%m/%Y %H:%M') if fila.get('fecha_diagnostico_sic') else '',
+            fila['estado_rhitso_actual'],
+            fila['estado_orden'],
+            'Sí' if fila['acepto_envio'] else 'No',
+            'Sí' if fila['rechazo_envio'] else 'No',
+            'Sí' if fila['acepto_cotiz'] else 'No',
+            'Sí' if fila['rechazo_cotiz'] else 'No',
+            'Sí' if fila['no_apto'] else 'No',
+        ]
+        for col_idx, valor in enumerate(valores, start=1):
+            celda = ws_detalle.cell(row=row_idx, column=col_idx, value=valor)
+            celda.font = normal_font
+            celda.border = thin_border
+            celda.alignment = wrap_alignment
+
+    ajustar_anchos(ws_detalle, [10, 22, 16, 14, 18, 14, 18, 26, 18, 30, 18, 12, 12, 12, 12, 10])
+    ws_detalle.freeze_panes = 'A2'
+
+    # -------------------------------------------------------------------------
+    # HOJA 3: RECHAZOS COTIZACIÓN (con observaciones)
+    # -------------------------------------------------------------------------
+    ws_rechazos = wb.create_sheet('Rechazos Cotización')
+    headers_rechazos = [
+        'Orden Cliente', 'N° Serie', 'Marca', 'Modelo', 'Sucursal',
+        'Fecha Cambio Estado', 'Usuario', 'Observaciones / Motivo',
+    ]
+    aplicar_encabezados(ws_rechazos, headers_rechazos)
+
+    for row_idx, seg in enumerate(comentarios_rechazo, start=2):
+        detalle = seg.orden.detalle_equipo
+        usuario_nombre = ''
+        if seg.usuario_actualizacion:
+            usuario_nombre = str(seg.usuario_actualizacion)
+        valores = [
+            detalle.orden_cliente if detalle else 'N/A',
+            detalle.numero_serie if detalle else 'N/A',
+            detalle.marca if detalle else 'N/A',
+            detalle.modelo if detalle else 'N/A',
+            seg.orden.sucursal.nombre if seg.orden.sucursal else 'N/A',
+            seg.fecha_actualizacion.strftime('%d/%m/%Y %H:%M'),
+            usuario_nombre,
+            seg.observaciones,
+        ]
+        for col_idx, valor in enumerate(valores, start=1):
+            celda = ws_rechazos.cell(row=row_idx, column=col_idx, value=valor)
+            celda.font = normal_font
+            celda.border = thin_border
+            celda.alignment = wrap_alignment
+
+    ajustar_anchos(ws_rechazos, [22, 16, 14, 18, 14, 18, 22, 55])
+    ws_rechazos.freeze_panes = 'A2'
+
+    # -------------------------------------------------------------------------
+    # HOJA 4: SIN DECISIÓN DE ENVÍO
+    # -------------------------------------------------------------------------
+    ws_sin_decision = wb.create_sheet('Sin Decisión Envío')
+    headers_sin = [
+        'ID Orden', 'Orden Cliente', 'N° Serie', 'Marca', 'Modelo',
+        'Sucursal', 'Fecha Ingreso', 'Estado RHITSO Actual',
+    ]
+    aplicar_encabezados(ws_sin_decision, headers_sin)
+
+    sin_decision_filas = [
+        construir_fila
+        for construir_fila in detalle_candidatos
+        if not construir_fila['acepto_envio'] and not construir_fila['rechazo_envio']
+    ]
+
+    for row_idx, fila in enumerate(sin_decision_filas, start=2):
+        valores = [
+            fila['id'],
+            fila['orden_cliente'],
+            fila['numero_serie'],
+            fila['marca'],
+            fila['modelo'],
+            fila['sucursal'],
+            fila['fecha_ingreso'].strftime('%d/%m/%Y %H:%M') if fila['fecha_ingreso'] else '',
+            fila['estado_rhitso_actual'],
+        ]
+        for col_idx, valor in enumerate(valores, start=1):
+            celda = ws_sin_decision.cell(row=row_idx, column=col_idx, value=valor)
+            celda.font = normal_font
+            celda.border = thin_border
+            celda.alignment = wrap_alignment
+
+    ajustar_anchos(ws_sin_decision, [10, 22, 16, 14, 18, 14, 18, 30])
+    ws_sin_decision.freeze_panes = 'A2'
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    nombre_archivo = f'Analisis_RHITSO_{timezone.now().strftime("%Y%m%d_%H%M")}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+    wb.save(response)
     return response
 
 

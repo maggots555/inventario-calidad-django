@@ -7,9 +7,7 @@
  * PARA PRINCIPIANTES - ¿Qué hace este archivo?
  * - Inicializa DataTables para las 3 pestañas (activos, pendientes, excluidos)
  * - Implementa filtros dinámicos por estado RHITSO
- * - Maneja la exportación a Excel de todas las órdenes
- * - Maneja la generación del reporte RHITSO (solo órdenes "En RHITSO")
- * - Agrega estados de carga a los botones durante operaciones
+ * - La exportación Excel y el reporte de análisis se generan en el backend (openpyxl)
  *
  * EXPLICACIÓN TÉCNICA:
  * - DOMContentLoaded: Espera a que el HTML esté completamente cargado
@@ -546,102 +544,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
     /**
-     * PASO 5: GENERAR REPORTE RHITSO (SOLO ÓRDENES "EN RHITSO")
-     * ===================================================================
-     *
-     * EXPLICACIÓN PARA PRINCIPIANTES:
-     * Este reporte es más específico: solo incluye equipos que están
-     * actualmente en proceso RHITSO (enviados pero no regresados).
-     *
-     * ¿Cómo identificamos equipos "En RHITSO"?
-     * - Tienen fecha de envío a RHITSO
-     * - La columna "Tiempo" muestra días en RHITSO (badge con color)
-     * - El badge NO dice "Solo SIC" ni "Completado"
-     */
-    const btnReporteRhitso = document.getElementById('reporteRhitso');
-    if (btnReporteRhitso) {
-        btnReporteRhitso.addEventListener('click', function () {
-            const boton = this;
-            const contenidoOriginal = boton.innerHTML;
-            // Mostrar estado de carga
-            boton.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Generando Reporte...';
-            boton.disabled = true;
-            boton.classList.add('loading');
-            try {
-                // Extraer solo datos de ACTIVOS (los que están en proceso)
-                const datosActivos = extraerDatosTabla('candidatosRhitsoTableActivos');
-                // Filtrar solo los que tienen días en RHITSO (no cero)
-                // Esto se identifica porque la columna "Tiempo" contiene "RHITSO"
-                const datosEnRhitso = datosActivos.filter(fila => {
-                    const columnaTiempo = fila[10]; // Índice de la columna "Tiempo"
-                    return columnaTiempo.includes('RHITSO') && !columnaTiempo.includes('Completado');
-                });
-                if (datosEnRhitso.length === 0) {
-                    alert('⚠️ No hay equipos con estado "En RHITSO" para generar el reporte.');
-                    return;
-                }
-                // Preparar datos para Excel
-                const datosReporte = [
-                    // Encabezados
-                    [
-                        'Servicio',
-                        'N° Serie',
-                        'Marca',
-                        'Modelo',
-                        'Fecha Ingreso',
-                        'Sucursal',
-                        'Estado SIC',
-                        'Estado RHITSO',
-                        'Incidencias',
-                        'Fecha Envío',
-                        'Tiempo',
-                        'Días sin actualizar'
-                    ],
-                    // Datos filtrados
-                    ...datosEnRhitso
-                ];
-                // Crear libro de Excel
-                const libroTrabajo = XLSX.utils.book_new();
-                const hojaTrabajo = XLSX.utils.aoa_to_sheet(datosReporte);
-                // Configurar ancho de columnas
-                hojaTrabajo['!cols'] = [
-                    { wch: 30 }, // Servicio
-                    { wch: 15 }, // N° Serie
-                    { wch: 15 }, // Marca
-                    { wch: 20 }, // Modelo
-                    { wch: 12 }, // Fecha Ingreso
-                    { wch: 15 }, // Sucursal
-                    { wch: 15 }, // Estado SIC
-                    { wch: 25 }, // Estado RHITSO
-                    { wch: 20 }, // Incidencias
-                    { wch: 12 }, // Fecha Envío
-                    { wch: 25 }, // Tiempo
-                    { wch: 18 } // Días sin actualizar
-                ];
-                // Agregar hoja al libro
-                XLSX.utils.book_append_sheet(libroTrabajo, hojaTrabajo, "Reporte RHITSO");
-                // Generar nombre de archivo con fecha actual
-                const fechaHoy = new Date().toISOString().split('T')[0];
-                const nombreArchivo = `Reporte_RHITSO_${fechaHoy}.xlsx`;
-                // Descargar archivo
-                XLSX.writeFile(libroTrabajo, nombreArchivo);
-                // Mostrar mensaje de éxito
-                alert(`✅ Reporte generado exitosamente: ${nombreArchivo}\n${datosEnRhitso.length} equipos en RHITSO`);
-            }
-            catch (error) {
-                console.error('Error al generar reporte:', error);
-                alert('❌ Error al generar el reporte RHITSO. Por favor, inténtelo de nuevo.');
-            }
-            finally {
-                // Restaurar botón
-                boton.innerHTML = contenidoOriginal;
-                boton.disabled = false;
-                boton.classList.remove('loading');
-            }
-        });
-    }
-    /**
-     * PASO 6: ANIMACIONES DE ENTRADA PARA STATS CARDS
+     * PASO 5: ANIMACIONES DE ENTRADA PARA STATS CARDS
      * ===================================================================
      *
      * EXPLICACIÓN PARA PRINCIPIANTES:
@@ -670,7 +573,7 @@ document.addEventListener('DOMContentLoaded', function () {
         observer.observe(card);
     });
     /**
-     * PASO 7: LOGS DE DEPURACIÓN (SOLO DESARROLLO)
+     * PASO 6: LOGS DE DEPURACIÓN (SOLO DESARROLLO)
      * ===================================================================
      *
      * EXPLICACIÓN PARA PRINCIPIANTES:

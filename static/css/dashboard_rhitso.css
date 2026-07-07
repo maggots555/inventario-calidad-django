@@ -281,6 +281,19 @@
     color: var(--warning-color);
 }
 
+/* Tarjeta de peligro (rojo) */
+.stat-card.stat-danger {
+    border-left: 4px solid var(--danger-color);
+}
+
+.stat-card.stat-danger .stat-icon {
+    color: var(--danger-color);
+}
+
+.stat-card.stat-danger .stat-number {
+    color: var(--danger-color);
+}
+
 /* Tarjeta secundaria (gris) */
 .stat-card.stat-secondary {
     border-left: 4px solid var(--gray-500);
@@ -705,6 +718,14 @@
 
 [data-bs-theme="dark"] .stat-card.stat-secondary .stat-icon {
     color: #94a3b8;
+}
+
+[data-bs-theme="dark"] .stat-card.stat-danger .stat-number {
+    color: #f87171;
+}
+
+[data-bs-theme="dark"] .stat-card.stat-danger .stat-icon {
+    color: #f87171;
 }
 
 /* Contenedor de tabla */
