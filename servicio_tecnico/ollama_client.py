@@ -1453,11 +1453,14 @@ severidad aproximada (superficial / moderado / severo) y extensión si es apreci
 7. Tono formal, tercera persona, lenguaje técnico pero comprensible.
 8. Escribe un único párrafo fluido, sin listas ni encabezados. Puede ser corto \
 si hay pocas observaciones relevantes — la brevedad con precisión es la meta.
-9. Si el equipo presenta buen estado general sin daños notables, indícalo en \
+9. LONGITUD MÁXIMA: redacta un reporte breve, idealmente entre 50 y 90 palabras. \
+Solo supera ese rango si es estrictamente necesario para describir daños múltiples \
+claramente visibles.
+10. Si el equipo presenta buen estado general sin daños notables, indícalo en \
 una sola oración directa y concisa.
-10. Responde ÚNICAMENTE con el párrafo del reporte. Sin prefijos, sin títulos, \
+11. Responde ÚNICAMENTE con el párrafo del reporte. Sin prefijos, sin títulos, \
 sin "Reporte:", sin comillas.
-11. IDIOMA: el reporte debe estar escrito EXCLUSIVAMENTE en español. \
+12. IDIOMA: el reporte debe estar escrito EXCLUSIVAMENTE en español. \
 Independientemente del idioma que aparezca en el equipo, en etiquetas o en \
 cualquier texto visible en las imágenes, tu respuesta siempre debe ser en español.\
 """

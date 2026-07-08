@@ -958,6 +958,17 @@ CHAT_SEGUIMIENTO_MAX_TOKENS: int = config('CHAT_SEGUIMIENTO_MAX_TOKENS', default
 #   Default 8192 — ajustar según la RAM del servidor y el modelo usado.
 CHAT_SEGUIMIENTO_NUM_CTX: int = config('CHAT_SEGUIMIENTO_NUM_CTX', default=8192, cast=int)
 
+# GEMINI_INSPECCION_MAX_TOKENS:
+#   Límite de salida para el inspector visual IA de imágenes de ingreso.
+#   Aunque el prompt pide un párrafo breve, algunos modelos Gemini se extienden
+#   demasiado y pueden cortar la respuesta al llegar al tope. Se deja configurable
+#   para afinarlo en producción sin tocar código.
+GEMINI_INSPECCION_MAX_TOKENS: int = config(
+    'GEMINI_INSPECCION_MAX_TOKENS',
+    default=3072,
+    cast=int,
+)
+
 # ----------------------------------------------------------------------------
 # WEB PUSH — VAPID KEYS
 # ----------------------------------------------------------------------------

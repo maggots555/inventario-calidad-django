@@ -655,6 +655,7 @@ def analizar_imagenes_ingreso_gemini(
     # porque el payload de imágenes es más grande y la red puede ser el cuello.
     timeout = getattr(settings, 'OLLAMA_VISION_TIMEOUT', 600)
     max_imgs = getattr(settings, 'OLLAMA_MAX_IMAGENES_IA', 8)
+    max_output_tokens = getattr(settings, 'GEMINI_INSPECCION_MAX_TOKENS', 3072)
 
     imagenes_limitadas = imagenes_bytes[:max_imgs]
 
@@ -691,7 +692,7 @@ def analizar_imagenes_ingreso_gemini(
             # Temperatura muy baja = descripciones objetivas (igual que Ollama)
             "temperature": 0.15,
             "topP": 0.9,
-            "maxOutputTokens": 2048,
+            "maxOutputTokens": max_output_tokens,
             # thinkingBudget=-1: permite al modelo decidir cuánto razonamiento
             # interno necesita (modo dinámico). Para inspección visual esto es
             # ideal — el modelo puede tomarse más tiempo examinando cada zona
@@ -710,6 +711,7 @@ def analizar_imagenes_ingreso_gemini(
         f"[InspeccionIA][Gemini] Iniciando análisis visual | "
         f"Modelo: {model} | Imágenes: {len(imagenes_limitadas)} | "
         f"Equipo: {marca_eq} {modelo_eq} | Timeout: {timeout}s | "
+        f"maxOutputTokens: {max_output_tokens} | "
         f"URL: {url_log}"
     )
 
@@ -764,6 +766,13 @@ def analizar_imagenes_ingreso_gemini(
         if not analisis:
             logger.warning("[InspeccionIA][Gemini] Texto extraído vacío.")
             return {'success': False, 'error': 'Gemini devolvió una respuesta vacía.', 'error_type': 'server_error'}
+
+        if finish_reason == 'MAX_TOKENS':
+            logger.warning(
+                f"[InspeccionIA][Gemini] Respuesta truncada por límite de salida | "
+                f"Modelo: {model} | maxOutputTokens: {max_output_tokens} | "
+                f"{len(analisis)} chars"
+            )
 
         logger.info(
             f"[InspeccionIA][Gemini] Análisis completado | "
