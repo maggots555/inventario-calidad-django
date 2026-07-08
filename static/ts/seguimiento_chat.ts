@@ -8,16 +8,13 @@
  *
  * Características:
  * - Burbuja flotante que se expande en un panel de chat
- * - Historial de conversación (hasta 6 turnos = 12 mensajes)
- * - Chips de sugerencias rápidas al inicio
- * - Animación de "escribiendo..." mientras espera respuesta
- * - Auto-resize del textarea al escribir
- * - Compatible con modo oscuro del sistema
- * - Badge "Nuevo" que desaparece después de la primera apertura
- * - Sin CSRF token (endpoint público protegido por rate limiting + token de sesión)
- *
- * El historial de conversación se guarda SOLO en memoria (no en localStorage
- * ni en la base de datos). Si el cliente recarga la página, el historial se borra.
+ * - Historial persistente en localStorage (por token del enlace)
+ * - Efecto visual de escritura letra a letra en respuestas del bot
+ * - Markdown básico seguro en respuestas del bot (negrita, listas)
+ * - Chips de sugerencias dinámicos según estado de la orden (renderizados en Django)
+ * - Indicador de procesamiento por etapas ("Consultando...", "Preparando...")
+ * - Botón para borrar la conversación
+ * - Compatible con modo oscuro y prefers-reduced-motion
  */
 /// <reference path="./eventos_seguimiento.d.ts" />
 
@@ -28,6 +25,12 @@
 interface MensajeChat {
     role: 'user' | 'assistant';
     content: string;
+}
+
+interface HistorialPersistido {
+    version: number;
+    mensajes: MensajeChat[];
+    ultimaActualizacion: string;
 }
 
 interface RespuestaChat {
@@ -47,39 +50,152 @@ const CHAT_MAX_TURNOS: number = 6;
 /** Máximo de caracteres por pregunta del usuario */
 const CHAT_MAX_CHARS: number = 500;
 
-/** Nombre de la clave en localStorage para recordar si el usuario ya abrió el chat */
+/** Clave localStorage para el badge "Nuevo" */
 const CHAT_BADGE_KEY: string = 'sic_chat_opened';
+
+/** Prefijo de la clave localStorage del historial (se concatena con el token) */
+const CHAT_HIST_PREFIX: string = 'sic_chat_hist_';
+
+/** Versión del formato guardado en localStorage */
+const CHAT_HIST_VERSION: number = 1;
+
+/** Días antes de descartar un historial guardado */
+const CHAT_HIST_TTL_DIAS: number = 30;
+
+/** Velocidad base de la animación de escritura (ms por carácter) */
+const CHAT_TYPING_MS: number = 18;
+
+/** Mensaje de bienvenida fijo del bot (no forma parte del historial enviado a la IA) */
+const CHAT_WELCOME_MSG: string =
+    '👋 Hola, soy el asistente virtual de SIC Fix. Puedo responder preguntas sobre tu equipo en reparación. ¿En qué puedo ayudarte?';
+
+/** Control del indicador de procesamiento con etapas de texto */
+interface IndicadorProcesando {
+    elemento: HTMLElement;
+    setEtapa: (texto: string) => void;
+}
+
+/**
+ * Aplica negrita (**texto**) y cursiva (*texto*) de forma segura vía DOM.
+ * No usa innerHTML para evitar XSS con contenido del modelo.
+ */
+function aplicarFormatoInline(texto: string, padre: HTMLElement): void {
+    const regex = /\*\*([^*]+)\*\*|\*([^*]+)\*/g;
+    let ultimo = 0;
+    let coincidencia: RegExpExecArray | null;
+
+    while ((coincidencia = regex.exec(texto)) !== null) {
+        if (coincidencia.index > ultimo) {
+            padre.appendChild(document.createTextNode(texto.slice(ultimo, coincidencia.index)));
+        }
+        if (coincidencia[1] !== undefined) {
+            const strong = document.createElement('strong');
+            strong.textContent = coincidencia[1];
+            padre.appendChild(strong);
+        } else if (coincidencia[2] !== undefined) {
+            const em = document.createElement('em');
+            em.textContent = coincidencia[2];
+            padre.appendChild(em);
+        }
+        ultimo = coincidencia.index + coincidencia[0].length;
+    }
+
+    if (ultimo < texto.length) {
+        padre.appendChild(document.createTextNode(texto.slice(ultimo)));
+    }
+}
+
+/**
+ * Renderiza markdown básico en burbujas del bot: saltos de línea, listas y énfasis.
+ */
+function renderizarMarkdownBot(contenedor: HTMLElement, texto: string): void {
+    contenedor.textContent = '';
+    contenedor.classList.add('st-chat-msg-bubble--md');
+
+    const lineas = texto.split('\n');
+    let primeraLinea = true;
+
+    for (const linea of lineas) {
+        const trimmed = linea.trim();
+
+        if (!trimmed) {
+            contenedor.appendChild(document.createElement('br'));
+            continue;
+        }
+
+        const esLista = /^[-•*]\s+/.test(trimmed);
+        const lineaEl = document.createElement(esLista ? 'div' : 'span');
+
+        if (esLista) {
+            lineaEl.className = 'st-chat-md-item';
+            aplicarFormatoInline(trimmed.replace(/^[-•*]\s+/, '• '), lineaEl);
+        } else {
+            if (!primeraLinea) {
+                contenedor.appendChild(document.createElement('br'));
+            }
+            aplicarFormatoInline(trimmed, lineaEl);
+        }
+
+        contenedor.appendChild(lineaEl);
+        primeraLinea = false;
+    }
+}
+
+/**
+ * Renderiza markdown parcial durante la animación de escritura y opcionalmente el cursor.
+ */
+function renderizarBurbujaBotEnStreaming(
+    contenedor: HTMLElement,
+    textoParcial: string,
+    mostrarCursor: boolean,
+): void {
+    renderizarMarkdownBot(contenedor, textoParcial);
+    if (mostrarCursor) {
+        const cursor = document.createElement('span');
+        cursor.className = 'st-chat-cursor';
+        cursor.setAttribute('aria-hidden', 'true');
+        cursor.textContent = '▌';
+        contenedor.appendChild(cursor);
+    }
+}
+
+/** Pausa breve para que el usuario perciba el cambio de etapa */
+function pausaMs(ms: number): Promise<void> {
+    return new Promise(resolve => window.setTimeout(resolve, ms));
+}
 
 // ============================================================================
 // MÓDULO PRINCIPAL: SeguimientoChat
-// Encapsula toda la lógica del chatbot en un objeto para evitar variables globales.
 // ============================================================================
 
 class SeguimientoChat {
-    // Referencias al DOM
-    private bubble:     HTMLButtonElement;
-    private panel:      HTMLElement;
-    private closeBtn:   HTMLButtonElement;
-    private messagesEl: HTMLElement;
-    private inputEl:    HTMLTextAreaElement;
-    private sendBtn:    HTMLButtonElement;
-    private suggestEl:  HTMLElement | null;
-    private badge:      HTMLElement | null;
+    private bubble:      HTMLButtonElement;
+    private panel:       HTMLElement;
+    private closeBtn:    HTMLButtonElement;
+    private clearBtn:    HTMLButtonElement | null;
+    private messagesEl:  HTMLElement;
+    private inputEl:     HTMLTextAreaElement;
+    private sendBtn:     HTMLButtonElement;
+    private suggestEl:   HTMLElement | null;
+    private badge:       HTMLElement | null;
     private statusLabel: HTMLElement | null;
 
-    // Estado interno
-    private historial:    MensajeChat[] = [];
-    private cargando:     boolean = false;
-    private panelAbierto: boolean = false;
-    private chatAbiertoRegistrado: boolean = false;
-    private ultimoEnvioViaChip: boolean = false;
-    private chatEndpoint: string;
-    private aiEnabled:    boolean;
+    private historial:              MensajeChat[] = [];
+    private cargando:               boolean = false;
+    private panelAbierto:           boolean = false;
+    private chatAbiertoRegistrado:  boolean = false;
+    private ultimoEnvioViaChip:     boolean = false;
+    private chatEndpoint:           string;
+    private chatToken:              string;
+    private aiEnabled:              boolean;
+    private animacionActiva:        boolean = false;
+    private cancelarAnimacion:      (() => void) | null = null;
 
     constructor(
         bubble: HTMLButtonElement,
         panel: HTMLElement,
         closeBtn: HTMLButtonElement,
+        clearBtn: HTMLButtonElement | null,
         messagesEl: HTMLElement,
         inputEl: HTMLTextAreaElement,
         sendBtn: HTMLButtonElement,
@@ -87,67 +203,159 @@ class SeguimientoChat {
         badge: HTMLElement | null,
         statusLabel: HTMLElement | null,
     ) {
-        this.bubble       = bubble;
-        this.panel        = panel;
-        this.closeBtn     = closeBtn;
-        this.messagesEl   = messagesEl;
-        this.inputEl      = inputEl;
-        this.sendBtn      = sendBtn;
-        this.suggestEl    = suggestEl;
-        this.badge        = badge;
-        this.statusLabel  = statusLabel;
+        this.bubble      = bubble;
+        this.panel       = panel;
+        this.closeBtn    = closeBtn;
+        this.clearBtn    = clearBtn;
+        this.messagesEl  = messagesEl;
+        this.inputEl     = inputEl;
+        this.sendBtn     = sendBtn;
+        this.suggestEl   = suggestEl;
+        this.badge       = badge;
+        this.statusLabel = statusLabel;
 
-        // Leer el endpoint y si la IA está habilitada desde el atributo data-* del botón
         this.chatEndpoint = bubble.dataset['chatEndpoint'] ?? '';
+        this.chatToken    = bubble.dataset['chatToken'] ?? '';
         this.aiEnabled    = bubble.dataset['aiEnabled'] === 'true';
 
-        // Gestionar visibilidad del badge "Nuevo"
         this.inicializarBadge();
-
-        // Registrar todos los listeners
+        this.restaurarHistorial();
         this.registrarEventListeners();
     }
 
     // ========================================================================
-    // INICIALIZACIÓN DEL BADGE "NUEVO"
-    // Se oculta permanentemente una vez que el usuario abre el chat por primera vez.
+    // CLAVE DE localStorage ACOTADA AL TOKEN DEL ENLACE
+    // ========================================================================
+    private claveHistorial(): string {
+        return `${CHAT_HIST_PREFIX}${this.chatToken}`;
+    }
+
+    // ========================================================================
+    // BADGE "NUEVO"
     // ========================================================================
     private inicializarBadge(): void {
         if (!this.badge) return;
-        const yaAbrio = localStorage.getItem(CHAT_BADGE_KEY);
-        if (yaAbrio) {
+        if (localStorage.getItem(CHAT_BADGE_KEY)) {
             this.badge.style.display = 'none';
         }
     }
 
     // ========================================================================
-    // REGISTRO DE EVENT LISTENERS
+    // PERSISTENCIA DEL HISTORIAL EN localStorage
+    // ========================================================================
+    private guardarHistorial(): void {
+        if (!this.chatToken) return;
+        const payload: HistorialPersistido = {
+            version: CHAT_HIST_VERSION,
+            mensajes: this.historial.slice(-(CHAT_MAX_TURNOS * 2)),
+            ultimaActualizacion: new Date().toISOString(),
+        };
+        try {
+            localStorage.setItem(this.claveHistorial(), JSON.stringify(payload));
+        } catch {
+            // Si localStorage está lleno, ignoramos sin romper el chat
+        }
+    }
+
+    private restaurarHistorial(): void {
+        if (!this.chatToken) return;
+
+        const raw = localStorage.getItem(this.claveHistorial());
+        if (!raw) return;
+
+        try {
+            const data = JSON.parse(raw) as HistorialPersistido;
+            if (data.version !== CHAT_HIST_VERSION || !Array.isArray(data.mensajes)) return;
+
+            // Descartar historiales muy antiguos
+            const fecha = new Date(data.ultimaActualizacion);
+            const limiteMs = CHAT_HIST_TTL_DIAS * 24 * 60 * 60 * 1000;
+            if (Date.now() - fecha.getTime() > limiteMs) {
+                localStorage.removeItem(this.claveHistorial());
+                return;
+            }
+
+            const mensajesValidos = data.mensajes.filter(
+                (m): m is MensajeChat =>
+                    (m.role === 'user' || m.role === 'assistant') &&
+                    typeof m.content === 'string' &&
+                    m.content.length > 0 &&
+                    m.content.length <= 2000,
+            );
+
+            if (mensajesValidos.length === 0) return;
+
+            this.historial = mensajesValidos.slice(-(CHAT_MAX_TURNOS * 2));
+            this.renderizarHistorialRestaurado();
+        } catch {
+            localStorage.removeItem(this.claveHistorial());
+        }
+    }
+
+    private renderizarHistorialRestaurado(): void {
+        // Quitar solo el mensaje de bienvenida; conservar el contenedor
+        const welcome = this.messagesEl.querySelector('[data-welcome="1"]');
+        welcome?.remove();
+
+        for (const msg of this.historial) {
+            const rol = msg.role === 'user' ? 'user' : 'bot';
+            this.agregarMensaje(msg.content, rol, false);
+        }
+
+        if (this.historial.length > 0) {
+            this.ocultarSugerencias();
+        }
+    }
+
+    private limpiarHistorial(): void {
+        if (!confirm('¿Borrar toda la conversación con el asistente?')) return;
+
+        this.detenerAnimacionEscritura();
+
+        if (this.chatToken) {
+            localStorage.removeItem(this.claveHistorial());
+        }
+
+        this.historial = [];
+        this.messagesEl.innerHTML = '';
+
+        const welcome = document.createElement('div');
+        welcome.classList.add('st-chat-msg', 'st-chat-msg--bot');
+        welcome.setAttribute('data-welcome', '1');
+        const bubble = document.createElement('div');
+        bubble.classList.add('st-chat-msg-bubble');
+        bubble.textContent = CHAT_WELCOME_MSG;
+        welcome.appendChild(bubble);
+        this.messagesEl.appendChild(welcome);
+
+        if (this.suggestEl) {
+            this.suggestEl.style.display = '';
+        }
+
+        this.scrollAlFinal();
+    }
+
+    // ========================================================================
+    // EVENT LISTENERS
     // ========================================================================
     private registrarEventListeners(): void {
-        // Clic en la burbuja: toggle del panel
         this.bubble.addEventListener('click', () => this.togglePanel());
-
-        // Botón de cerrar dentro del panel
         this.closeBtn.addEventListener('click', () => this.cerrarPanel());
-
-        // Botón de enviar
+        this.clearBtn?.addEventListener('click', () => this.limpiarHistorial());
         this.sendBtn.addEventListener('click', () => this.enviarPregunta());
 
-        // Enter sin Shift en textarea: enviar
         this.inputEl.addEventListener('keydown', (e: KeyboardEvent) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (!this.cargando) this.enviarPregunta();
+                if (!this.cargando) void this.enviarPregunta();
             }
         });
 
-        // Input: habilitar/deshabilitar botón de enviar + auto-resize
         this.inputEl.addEventListener('input', () => {
             this.actualizarEstadoBotonEnviar();
             this.autoResizeTextarea();
         });
 
-        // Chips de sugerencias rápidas
         if (this.suggestEl) {
             this.suggestEl.querySelectorAll<HTMLButtonElement>('.st-chat-chip').forEach(chip => {
                 chip.addEventListener('click', () => {
@@ -156,13 +364,12 @@ class SeguimientoChat {
                         this.ultimoEnvioViaChip = true;
                         this.inputEl.value = texto;
                         this.actualizarEstadoBotonEnviar();
-                        this.enviarPregunta();
+                        void this.enviarPregunta();
                     }
                 });
             });
         }
 
-        // Cerrar el panel si el usuario toca fuera de él (solo en mobile)
         document.addEventListener('click', (e: MouseEvent) => {
             if (!this.panelAbierto) return;
             const target = e.target as Node;
@@ -171,12 +378,11 @@ class SeguimientoChat {
             }
         });
 
-        // Ajustar la posición en resize (especialmente al aparecer el teclado en móvil)
         window.addEventListener('resize', () => this.ajustarPosicion());
     }
 
     // ========================================================================
-    // TOGGLE DEL PANEL
+    // PANEL
     // ========================================================================
     private togglePanel(): void {
         if (this.panelAbierto) {
@@ -197,18 +403,12 @@ class SeguimientoChat {
         this.bubble.classList.add('st-chat-bubble--active');
         this.bubble.setAttribute('aria-expanded', 'true');
 
-        // Ocultar badge "Nuevo" permanentemente
         if (this.badge) {
             this.badge.style.display = 'none';
             localStorage.setItem(CHAT_BADGE_KEY, '1');
         }
 
-        // Enfocar el input (con pequeño delay para esperar la animación CSS)
-        setTimeout(() => {
-            this.inputEl.focus();
-        }, 200);
-
-        // Scroll al final de los mensajes
+        setTimeout(() => this.inputEl.focus(), 200);
         this.scrollAlFinal();
     }
 
@@ -220,12 +420,7 @@ class SeguimientoChat {
         this.bubble.setAttribute('aria-expanded', 'false');
     }
 
-    // ========================================================================
-    // AJUSTE DINÁMICO DE POSICIÓN (cuando aparece el teclado en móvil)
-    // ========================================================================
     private ajustarPosicion(): void {
-        // Si el Visual Viewport API está disponible, lo usamos para detectar
-        // cuánto sube el teclado en pantalla y ajustamos el panel
         if (window.visualViewport) {
             const vv = window.visualViewport;
             const keyboardOffset = window.innerHeight - vv.height - vv.offsetTop;
@@ -237,53 +432,46 @@ class SeguimientoChat {
         }
     }
 
-    // ========================================================================
-    // AUTO-RESIZE DEL TEXTAREA
-    // El textarea crece hasta 5 líneas y luego hace scroll.
-    // ========================================================================
     private autoResizeTextarea(): void {
         this.inputEl.style.height = 'auto';
-        const maxHeight: number = 5 * 24; // ~5 líneas de texto
+        const maxHeight = 5 * 24;
         this.inputEl.style.height = Math.min(this.inputEl.scrollHeight, maxHeight) + 'px';
     }
 
-    // ========================================================================
-    // GESTIÓN DEL BOTÓN DE ENVIAR
-    // ========================================================================
     private actualizarEstadoBotonEnviar(): void {
         const texto = this.inputEl.value.trim();
         this.sendBtn.disabled = texto.length === 0 || this.cargando || !this.aiEnabled;
     }
 
     // ========================================================================
-    // RENDERIZAR UN MENSAJE EN EL CHAT
+    // RENDERIZADO DE MENSAJES
     // ========================================================================
-    private agregarMensaje(texto: string, rol: 'user' | 'bot'): HTMLElement {
+    private agregarMensaje(texto: string, rol: 'user' | 'bot', scroll: boolean = true): HTMLElement {
         const msgEl = document.createElement('div');
         msgEl.classList.add('st-chat-msg', `st-chat-msg--${rol}`);
 
         const bubble = document.createElement('div');
         bubble.classList.add('st-chat-msg-bubble');
-        // Usamos textContent (no innerHTML) para evitar XSS con contenido del LLM
-        bubble.textContent = texto;
+
+        if (rol === 'bot') {
+            renderizarMarkdownBot(bubble, texto);
+        } else {
+            bubble.textContent = texto;
+        }
 
         msgEl.appendChild(bubble);
         this.messagesEl.appendChild(msgEl);
-        this.scrollAlFinal();
+        if (scroll) this.scrollAlFinal();
         return msgEl;
     }
 
-    // ========================================================================
-    // MOSTRAR INDICADOR "ESCRIBIENDO..."
-    // ========================================================================
-    private mostrarIndicadorEscribiendo(): HTMLElement {
+    private crearBurbujaBotVacia(): HTMLElement {
         const msgEl = document.createElement('div');
-        msgEl.classList.add('st-chat-msg', 'st-chat-msg--bot', 'st-chat-msg--typing');
-        msgEl.setAttribute('aria-label', 'El asistente está escribiendo');
+        msgEl.classList.add('st-chat-msg', 'st-chat-msg--bot', 'st-chat-msg--streaming');
 
         const bubble = document.createElement('div');
-        bubble.classList.add('st-chat-msg-bubble', 'st-chat-typing-indicator');
-        bubble.innerHTML = '<span></span><span></span><span></span>';
+        bubble.classList.add('st-chat-msg-bubble', 'st-chat-msg-bubble--md');
+        // El contenido y el cursor los agrega escribirProgresivo en cada paso
 
         msgEl.appendChild(bubble);
         this.messagesEl.appendChild(msgEl);
@@ -291,27 +479,55 @@ class SeguimientoChat {
         return msgEl;
     }
 
-    // ========================================================================
-    // SCROLL AL FINAL DEL HISTORIAL DE MENSAJES
-    // ========================================================================
+    /**
+     * Indicador de procesamiento con etapa de texto + puntos animados.
+     * Muestra mensajes como "Consultando tu orden..." mientras espera al servidor.
+     */
+    private mostrarIndicadorProcesando(textoInicial: string): IndicadorProcesando {
+        const msgEl = document.createElement('div');
+        msgEl.classList.add('st-chat-msg', 'st-chat-msg--bot', 'st-chat-msg--typing');
+        msgEl.setAttribute('aria-label', textoInicial);
+
+        const bubble = document.createElement('div');
+        bubble.classList.add('st-chat-msg-bubble', 'st-chat-typing-box');
+
+        const label = document.createElement('span');
+        label.className = 'st-chat-thinking-label';
+        label.textContent = textoInicial;
+
+        const dots = document.createElement('span');
+        dots.className = 'st-chat-typing-indicator';
+        dots.setAttribute('aria-hidden', 'true');
+        dots.innerHTML = '<span></span><span></span><span></span>';
+
+        bubble.appendChild(label);
+        bubble.appendChild(dots);
+        msgEl.appendChild(bubble);
+        this.messagesEl.appendChild(msgEl);
+        this.scrollAlFinal();
+
+        return {
+            elemento: msgEl,
+            setEtapa: (texto: string): void => {
+                label.textContent = texto;
+                msgEl.setAttribute('aria-label', texto);
+                this.scrollAlFinal();
+            },
+        };
+    }
+
     private scrollAlFinal(): void {
         requestAnimationFrame(() => {
             this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
         });
     }
 
-    // ========================================================================
-    // OCULTAR LOS CHIPS DE SUGERENCIAS (después del primer mensaje)
-    // ========================================================================
     private ocultarSugerencias(): void {
         if (this.suggestEl) {
             this.suggestEl.style.display = 'none';
         }
     }
 
-    // ========================================================================
-    // ACTUALIZAR EL LABEL DE ESTADO EN EL HEADER DEL PANEL
-    // ========================================================================
     private setEstadoLabel(texto: string, tipo: 'normal' | 'pensando' | 'error'): void {
         if (!this.statusLabel) return;
         this.statusLabel.textContent = texto;
@@ -321,43 +537,102 @@ class SeguimientoChat {
     }
 
     // ========================================================================
-    // ENVIAR PREGUNTA AL BACKEND Y PROCESAR RESPUESTA
+    // EFECTO DE ESCRITURA SIMULADO (letra a letra)
+    // ========================================================================
+    private detenerAnimacionEscritura(): void {
+        if (this.cancelarAnimacion) {
+            this.cancelarAnimacion();
+            this.cancelarAnimacion = null;
+        }
+        this.animacionActiva = false;
+    }
+
+    private escribirProgresivo(msgEl: HTMLElement, texto: string): Promise<void> {
+        const bubble = msgEl.querySelector<HTMLElement>('.st-chat-msg-bubble');
+        if (!bubble) return Promise.resolve();
+
+        const reducirMovimiento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        if (reducirMovimiento) {
+            renderizarMarkdownBot(bubble, texto);
+            msgEl.classList.remove('st-chat-msg--streaming');
+            return Promise.resolve();
+        }
+
+        return new Promise(resolve => {
+            this.animacionActiva = true;
+            let indice = 0;
+            let cancelado = false;
+
+            // Cierra la animación: markdown final sin cursor + transición suave
+            const finalizar = (): void => {
+                renderizarMarkdownBot(bubble, texto);
+                msgEl.classList.remove('st-chat-msg--streaming');
+                bubble.classList.add('st-chat-msg-bubble--md-done');
+                this.animacionActiva = false;
+                this.cancelarAnimacion = null;
+                resolve();
+            };
+
+            this.cancelarAnimacion = (): void => {
+                cancelado = true;
+                finalizar();
+            };
+
+            const tick = (): void => {
+                if (cancelado) return;
+
+                if (indice >= texto.length) {
+                    finalizar();
+                    return;
+                }
+
+                // Mismo formato markdown durante toda la animación (evita salto brusco al final)
+                const parcial = texto.slice(0, indice + 1);
+                renderizarBurbujaBotEnStreaming(bubble, parcial, true);
+
+                indice += 1;
+                this.scrollAlFinal();
+
+                const char = texto[indice - 1];
+                const pausa = (char === '.' || char === '?' || char === '!') ? 120 : CHAT_TYPING_MS;
+                window.setTimeout(tick, pausa);
+            };
+
+            tick();
+        });
+    }
+
+    // ========================================================================
+    // ENVIAR PREGUNTA AL BACKEND
     // ========================================================================
     async enviarPregunta(): Promise<void> {
         const pregunta = this.inputEl.value.trim();
         if (!pregunta || this.cargando || !this.aiEnabled) return;
 
-        // Validación de longitud (también validada en el backend)
         if (pregunta.length > CHAT_MAX_CHARS) {
             this.agregarMensaje(
                 `La pregunta es demasiado larga (máx. ${CHAT_MAX_CHARS} caracteres).`,
-                'bot'
+                'bot',
             );
             return;
         }
 
-        // Ocultar sugerencias al primer envío
-        this.ocultarSugerencias();
+        // Si hay una animación en curso, completarla antes de seguir
+        this.detenerAnimacionEscritura();
 
-        // Mostrar el mensaje del usuario en el chat
+        this.ocultarSugerencias();
         this.agregarMensaje(pregunta, 'user');
 
-        // Limpiar y resetear el textarea
         this.inputEl.value = '';
         this.inputEl.style.height = 'auto';
 
-        // Bloquear UI mientras se espera la respuesta
         this.cargando = true;
         this.actualizarEstadoBotonEnviar();
-        this.setEstadoLabel('Escribiendo...', 'pensando');
+        this.setEstadoLabel('Consultando tu orden...', 'pensando');
 
-        // Mostrar indicador de "escribiendo"
-        const indicador = this.mostrarIndicadorEscribiendo();
-
-        // Preparar el historial a enviar (solo los últimos CHAT_MAX_TURNOS turnos)
-        // IMPORTANTE: Solo mandamos los mensajes role:user/assistant del historial
-        // (no el mensaje de bienvenida hardcoded del DOM)
-        const historialParaEnviar: MensajeChat[] = this.historial.slice(-(CHAT_MAX_TURNOS * 2));
+        const indicador = this.mostrarIndicadorProcesando('Consultando tu orden...');
+        const historialParaEnviar = this.historial.slice(-(CHAT_MAX_TURNOS * 2));
 
         try {
             const formData = new FormData();
@@ -369,36 +644,40 @@ class SeguimientoChat {
             const response = await fetch(this.chatEndpoint, {
                 method: 'POST',
                 body: formData,
-                // Sin CSRF: endpoint público, protegido por rate limiting + token
             });
 
             const data = await response.json() as RespuestaChat;
 
-            // Eliminar el indicador de "escribiendo"
-            indicador.remove();
+            // Segunda etapa visible antes de mostrar la respuesta
+            indicador.setEtapa('Preparando respuesta...');
+            this.setEstadoLabel('Preparando respuesta...', 'pensando');
+            await pausaMs(450);
+            indicador.elemento.remove();
 
             if (data.success && data.respuesta) {
-                // Mostrar la respuesta del asistente
-                this.agregarMensaje(data.respuesta, 'bot');
+                this.setEstadoLabel('Escribiendo respuesta...', 'pensando');
 
-                // Agregar ambos mensajes al historial en memoria
-                this.historial.push({ role: 'user',      content: pregunta });
+                const msgEl = this.crearBurbujaBotVacia();
+                await this.escribirProgresivo(msgEl, data.respuesta);
+
+                this.historial.push({ role: 'user', content: pregunta });
                 this.historial.push({ role: 'assistant', content: data.respuesta });
+                this.guardarHistorial();
 
-                this.setEstadoLabel('IA · Responde al instante', 'normal');
+                const modelo = data.modelo_usado ? ` · ${data.modelo_usado}` : '';
+                this.setEstadoLabel(`IA · Listo${modelo}`, 'normal');
             } else {
                 const mensajeError = data.error ?? 'No pude procesar tu pregunta. Intenta de nuevo.';
                 this.agregarMensaje(mensajeError, 'bot');
                 this.setEstadoLabel('Error al responder', 'error');
-                // Restaurar label normal después de 3 segundos
                 setTimeout(() => this.setEstadoLabel('IA · Responde al instante', 'normal'), 3000);
             }
-        } catch (err: unknown) {
-            indicador.remove();
-            const msgError = err instanceof Error && err.message.includes('fetch')
-                ? 'Sin conexión a internet. Verifica tu red e intenta de nuevo.'
-                : 'Error de conexión. Intenta de nuevo en unos momentos.';
-            this.agregarMensaje(msgError, 'bot');
+        } catch {
+            indicador.elemento.remove();
+            this.agregarMensaje(
+                'Error de conexión. Intenta de nuevo en unos momentos.',
+                'bot',
+            );
             this.setEstadoLabel('Error de conexión', 'error');
             setTimeout(() => this.setEstadoLabel('IA · Responde al instante', 'normal'), 3000);
         } finally {
@@ -410,15 +689,15 @@ class SeguimientoChat {
 }
 
 // ============================================================================
-// INICIALIZACIÓN — Ejecutar cuando el DOM esté completamente cargado
+// INICIALIZACIÓN
 // ============================================================================
 document.addEventListener('DOMContentLoaded', function (): void {
-    // Verificar que existe el botón de la burbuja (solo se renderiza si ai_enabled=True)
     const bubble = document.querySelector<HTMLButtonElement>('#chat-ia-bubble');
-    if (!bubble) return; // La IA no está habilitada o es vista inválida — no hacer nada
+    if (!bubble) return;
 
     const panel      = document.querySelector<HTMLElement>('#chat-ia-panel');
     const closeBtn   = document.querySelector<HTMLButtonElement>('#chat-ia-close');
+    const clearBtn   = document.querySelector<HTMLButtonElement>('#chat-ia-clear');
     const messagesEl = document.querySelector<HTMLElement>('#chat-ia-messages');
     const inputEl    = document.querySelector<HTMLTextAreaElement>('#chat-ia-input');
     const sendBtn    = document.querySelector<HTMLButtonElement>('#chat-ia-send');
@@ -426,17 +705,16 @@ document.addEventListener('DOMContentLoaded', function (): void {
     const badge      = document.querySelector<HTMLElement>('#chat-ia-badge');
     const statusLabel = document.querySelector<HTMLElement>('#chat-ia-status-label');
 
-    // Guardia de seguridad: si falta cualquier elemento crítico, no inicializar
     if (!panel || !closeBtn || !messagesEl || !inputEl || !sendBtn) {
-        console.warn('[SeguimientoChat] Faltan elementos del DOM del chatbot. Verificar el template.');
+        console.warn('[SeguimientoChat] Faltan elementos del DOM del chatbot.');
         return;
     }
 
-    // Inicializar el módulo del chat
     new SeguimientoChat(
         bubble,
         panel,
         closeBtn,
+        clearBtn,
         messagesEl,
         inputEl,
         sendBtn,

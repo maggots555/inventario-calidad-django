@@ -102,7 +102,7 @@ urlpatterns = [
 
     # ── URL PÚBLICA: Chat de IA del seguimiento (sin autenticación) ──
     # Endpoint AJAX del chatbot de IA accesible desde la vista de seguimiento.
-    # Valida el mismo token de la vista padre. Rate limit: 5 req/min por IP.
+    # Valida el mismo token de la vista padre. Rate limit: 10 req/min por IP.
     # Formato: POST /seguimiento/<token>/chat/
     path('seguimiento/<str:token>/chat/', chat_seguimiento_cliente, name='chat_seguimiento_publico'),
 

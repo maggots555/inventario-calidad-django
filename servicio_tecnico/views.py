@@ -3244,7 +3244,10 @@ def seguimiento_orden_cliente(request, token):
       - 'invalido': Token no existe, orden cancelada o link expirado
     """
     from .models import EnlaceSeguimientoCliente, FeedbackCliente, BannerPromocional
-    from config.constants import ESTADO_ORDEN_CHOICES
+    from .chat_seguimiento_helpers import (
+        construir_timeline_seguimiento_cliente,
+        obtener_chips_chat_seguimiento,
+    )
     from config.paises_config import PAISES_CONFIG
 
     TEMPLATE = 'servicio_tecnico/seguimiento_cliente.html'
@@ -3285,7 +3288,9 @@ def seguimiento_orden_cliente(request, token):
     from servicio_tecnico.eventos_seguimiento import registrar_evento_seguimiento
     registrar_evento_seguimiento(enlace, 'visita_pagina', request=request)
 
-    # ── Construir timeline de cambios de estado ──
+    # ── Construir timeline de cambios de estado (lógica compartida con el chat IA) ──
+    from .chat_seguimiento_helpers import construir_timeline_seguimiento_cliente
+
     historial_estados = HistorialOrden.objects.filter(
         orden=orden,
         tipo_evento='cambio_estado',
@@ -3293,98 +3298,17 @@ def seguimiento_orden_cliente(request, token):
         'estado_nuevo', 'fecha_evento'
     )
 
-    estado_dict = dict(ESTADO_ORDEN_CHOICES)
     ahora = timezone.now()
+    timeline_ctx = construir_timeline_seguimiento_cliente(
+        historial_estados,
+        orden.estado,
+        ahora=ahora,
+    )
+    timeline = timeline_ctx['timeline']
+    siguiente_paso_texto = timeline_ctx['siguiente_paso_texto']
+    estado_es_hito = timeline_ctx['estado_es_hito']
 
-    # ── Estados que son "hitos completados" (ya sucedieron, no son procesos activos) ──
-    # Si el estado actual de la orden es uno de estos, TODOS los nodos del timeline
-    # van con palomita ✓ y se agrega un nodo auxiliar indicando qué sigue.
-    ESTADOS_HITO = {
-        'equipo_diagnosticado',
-        'diagnostico_enviado_cliente',
-        'cotizacion_enviada_proveedor',
-        'cotizacion_recibida_proveedor',
-        'cliente_acepta_cotizacion',
-        'rechazada',
-        'partes_solicitadas_proveedor',
-        'piezas_recibidas',
-        'wpb_pieza_incorrecta',
-        'doa_pieza_danada',
-        'pnc_parte_no_disponible',
-        'finalizado',
-        'entregado',
-    }
-
-    # Texto que describe qué viene después de cada hito
-    SIGUIENTE_PASO = {
-        'equipo_diagnosticado': 'El diagnóstico será enviado para tu revisión',
-        'diagnostico_enviado_cliente': 'Envío de Cotización a Proveedor',
-        'cotizacion_enviada_proveedor': 'En espera de cotización del proveedor',
-        'cotizacion_recibida_proveedor': 'Tu cotización está siendo preparada',
-        'cliente_acepta_cotizacion': 'Gestionando las piezas necesarias para tu equipo',
-        'rechazada': 'En espera de indicaciones',
-        'partes_solicitadas_proveedor': 'En espera de llegada de piezas',
-        'piezas_recibidas': 'Tu equipo entrará a reparación próximamente',
-        'wpb_pieza_incorrecta': 'Gestionando reemplazo de pieza',
-        'doa_pieza_danada': 'Gestionando reemplazo de pieza dañada',
-        'pnc_parte_no_disponible': 'Buscando alternativas de disponibilidad',
-    }
-
-    # Nombres alternativos para el cliente en la vista pública
-    # (no modifica los nombres internos usados en el panel de administración)
-    NOMBRES_PUBLICOS = {
-        'cotizacion': 'Cotización enviada, en espera de aprobación',
-        'control_calidad': 'Equipo reparado, en control de calidad',
-    }
-
-    timeline_raw = []
-    for h in historial_estados:
-        codigo = h['estado_nuevo']
-        if not codigo:
-            continue
-        fecha = h['fecha_evento']
-        delta = ahora - fecha
-        if delta.days > 0:
-            hace = f"Hace {delta.days} día{'s' if delta.days != 1 else ''}"
-        elif delta.seconds >= 3600:
-            horas = delta.seconds // 3600
-            hace = f"Hace {horas} hora{'s' if horas != 1 else ''}"
-        else:
-            hace = "Hace unos minutos"
-
-        timeline_raw.append({
-            'codigo': codigo,
-            'nombre': NOMBRES_PUBLICOS.get(codigo, estado_dict.get(codigo, codigo)),
-            'fecha': fecha,
-            'hace': hace,
-        })
-
-    # ── Eliminar estados duplicados consecutivos ──
-    timeline = []
-    for paso in timeline_raw:
-        if timeline and timeline[-1]['codigo'] == paso['codigo']:
-            continue
-        timeline.append(paso)
-
-    # ── Determinar si el estado actual es un hito o un proceso activo ──
-    # Si es hito → todos completados + nodo "siguiente paso" con pulse
-    # Si es proceso activo → el último nodo tiene pulse (está en progreso)
     estado_orden = orden.estado
-    estado_es_hito = estado_orden in ESTADOS_HITO
-    siguiente_paso_texto = SIGUIENTE_PASO.get(estado_orden) if estado_es_hito else None
-
-    # Marcar cada nodo del timeline como completado o actual
-    for i, paso in enumerate(timeline):
-        es_ultimo = (i == len(timeline) - 1)
-        if estado_es_hito:
-            # Hito: TODOS los nodos son completados (ya sucedieron)
-            paso['completado'] = True
-            paso['es_actual'] = False
-        else:
-            # Proceso activo: el último nodo es "actual" (en progreso)
-            paso['completado'] = not es_ultimo
-            paso['es_actual'] = es_ultimo
-
     if estado_orden == 'cancelado':
         return render(request, TEMPLATE, {'estado': 'invalido'})
 
@@ -3511,7 +3435,7 @@ def seguimiento_orden_cliente(request, token):
         'orden': orden,
         'detalle': detalle,
         'timeline': timeline,
-        'estado_actual_nombre': estado_dict.get(estado_orden, estado_orden),
+        'estado_actual_nombre': timeline_ctx['estado_actual_texto'],
         'folio_display': folio_display,
         'nombre_responsable': nombre_responsable,
         'email_responsable': email_responsable,
@@ -3532,6 +3456,12 @@ def seguimiento_orden_cliente(request, token):
             kwargs={'token': token},
         ) if enlace.pdf_diagnostico else '',
         'folio_diagnostico': enlace.folio_diagnostico or '',
+        # Chips dinámicos del chat según estado de la orden
+        'chat_chips': obtener_chips_chat_seguimiento(
+            estado_orden,
+            tiene_pdf_diagnostico=bool(enlace.pdf_diagnostico),
+            tiene_seguimientos_piezas=bool(seguimientos_piezas),
+        ),
     }
 
     if estado_orden == 'entregado':
@@ -18822,7 +18752,7 @@ def pulir_diagnostico_sic_ia(request):
 # Esta vista es PÚBLICA (no requiere @login_required) porque la abre el cliente
 # desde su enlace de seguimiento por token. La seguridad se basa en:
 #   1. Validación del token (mismo mecanismo que seguimiento_orden_cliente)
-#   2. Rate limiting estricto por IP (5 req/minuto — más restrictivo que el resto)
+#   2. Rate limiting estricto por IP (10 req/minuto — conversaciones más largas)
 #   3. El contexto del prompt se construye EXCLUSIVAMENTE con los datos de esa orden
 #   4. El prompt prohíbe explícitamente revelar datos de otras órdenes
 #
@@ -18838,7 +18768,7 @@ def pulir_diagnostico_sic_ia(request):
 # ============================================================================
 
 @csrf_exempt
-@ratelimit(key='ip', rate='5/m', method=['POST'])
+@ratelimit(key='ip', rate='10/m', method=['POST'])
 def chat_seguimiento_cliente(request, token):
     """
     API AJAX del chatbot de IA en la vista pública de seguimiento del cliente.
@@ -18849,15 +18779,19 @@ def chat_seguimiento_cliente(request, token):
 
     SEGURIDAD:
     - Valida el token antes de procesar cualquier pregunta
-    - Rate limit: 5 peticiones/minuto por IP (protección contra abuso)
+    - Rate limit: 10 peticiones/minuto por IP (protección contra abuso)
     - El contexto del prompt está acotado a los datos de esta orden específica
     - Prompt con instrucciones explícitas anti-prompt-injection
     """
     import json as _json
     import time as _time
     from .models import EnlaceSeguimientoCliente
-    from .ollama_client import construir_prompt_seguimiento, chat_seguimiento_dispatch
-    from config.constants import ESTADO_ORDEN_CHOICES
+    from .ollama_client import (
+        construir_prompt_seguimiento,
+        chat_seguimiento_dispatch,
+        formatear_contexto_sucursales_chat,
+    )
+    from .chat_seguimiento_helpers import construir_timeline_seguimiento_cliente
 
     # ── Verificar que al menos un proveedor de IA está habilitado ──
     if not getattr(settings, 'AI_ENABLED', False):
@@ -18927,38 +18861,20 @@ def chat_seguimiento_cliente(request, token):
     orden = enlace.orden
     detalle = orden.detalle_equipo
 
-    # Estado actual en texto público amigable (mismo dict que la vista padre)
-    estado_dict = dict(ESTADO_ORDEN_CHOICES)
-    NOMBRES_PUBLICOS = {
-        'cotizacion': 'Cotización enviada, en espera de aprobación',
-        'control_calidad': 'Equipo reparado, en control de calidad',
-        'finalizado': 'Finalizado — pendiente de confirmación de entrega por el responsable de seguimiento',
-    }
-    estado_codigo = orden.estado or ''
-    estado_actual_texto = NOMBRES_PUBLICOS.get(
-        estado_codigo,
-        estado_dict.get(estado_codigo, estado_codigo.replace('_', ' ').title())
-    )
-
-    # Timeline en texto para el prompt (simplificado, sin HTML)
+    # ── Timeline y estado actual (misma lógica que la página pública de seguimiento) ──
     historial_estados_qs = HistorialOrden.objects.filter(
         orden=orden,
         tipo_evento='cambio_estado',
     ).order_by('fecha_evento').values('estado_nuevo', 'fecha_evento')
 
-    timeline_lineas = []
-    for h in historial_estados_qs:
-        codigo = h['estado_nuevo']
-        fecha = h['fecha_evento']
-        if not codigo:
-            continue
-        nombre = NOMBRES_PUBLICOS.get(
-            codigo,
-            estado_dict.get(codigo, codigo.replace('_', ' ').title())
-        )
-        fecha_str = fecha.strftime('%d/%m/%Y %H:%M') if fecha else '?'
-        timeline_lineas.append(f"  • {nombre} ({fecha_str})")
-    timeline_texto = "\n".join(timeline_lineas) if timeline_lineas else "  Sin registros aún"
+    timeline_ctx = construir_timeline_seguimiento_cliente(
+        historial_estados_qs,
+        orden.estado or '',
+    )
+    estado_actual_texto = timeline_ctx['estado_actual_texto']
+    timeline_texto = timeline_ctx['timeline_texto']
+    siguiente_paso_texto = timeline_ctx['siguiente_paso_texto']
+    aclaraciones_cotizacion_texto = timeline_ctx['aclaraciones_cotizacion_texto']
 
     # Nombre del responsable de seguimiento
     nombre_responsable = ""
@@ -19135,6 +19051,11 @@ def chat_seguimiento_cliente(request, token):
     folio = (detalle.orden_cliente if detalle and detalle.orden_cliente else None) \
             or orden.numero_orden_interno or str(orden.pk)
 
+    # ── Sucursal de la orden + catálogo de sucursales activas ──
+    sucursal_texto, sucursales_catalogo_texto = formatear_contexto_sucursales_chat(
+        orden.sucursal
+    )
+
     # ── Construir los mensajes para el modelo ──
     mensajes = construir_prompt_seguimiento(
         pregunta=pregunta,
@@ -19147,16 +19068,25 @@ def chat_seguimiento_cliente(request, token):
         diagnostico_sic=getattr(detalle, 'diagnostico_sic', '') or '',
         estado_actual=estado_actual_texto,
         timeline_texto=timeline_texto,
+        siguiente_paso_texto=siguiente_paso_texto,
+        aclaraciones_cotizacion_texto=aclaraciones_cotizacion_texto,
         nombre_responsable=nombre_responsable,
         piezas_texto=piezas_texto,
         historial_mensajes=historial_mensajes,
         cotizacion_texto=cotizacion_texto,
         venta_mostrador_texto=venta_mostrador_texto,
+        sucursal_texto=sucursal_texto,
+        sucursales_catalogo_texto=sucursales_catalogo_texto,
+        dias_restantes=enlace.dias_restantes,
+        tiene_pdf_diagnostico=bool(enlace.pdf_diagnostico),
     )
 
     logger.info(
-        "[ChatSeg] Pregunta del cliente | Folio: %s | IP: %s | Turns: %d | Pregunta: %.80s...",
-        folio, _ip, len(historial_mensajes) // 2, pregunta
+        "[ChatSeg] Pregunta del cliente | Folio: %s | IP: %s | Turns: %d | Sucursal: %s | Catálogo: %d chars | Pregunta: %.80s...",
+        folio, _ip, len(historial_mensajes) // 2,
+        (orden.sucursal.nombre if orden.sucursal_id else 'N/A'),
+        len(sucursales_catalogo_texto),
+        pregunta,
     )
 
     # ── Llamar al dispatcher (Ollama o Gemini según el modelo configurado) ──

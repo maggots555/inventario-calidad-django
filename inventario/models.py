@@ -25,6 +25,11 @@ class Sucursal(models.Model):
     responsable = models.CharField(max_length=100, blank=True, help_text="Persona responsable/encargado")
     telefono = models.CharField(max_length=20, blank=True, help_text="Teléfono de contacto")
     email = models.EmailField(blank=True, help_text="Correo electrónico de contacto")
+    horario_atencion = models.TextField(
+        blank=True,
+        verbose_name="Horario de atención",
+        help_text="Horario público para clientes. Ej: Lunes a viernes 9:00 - 18:00, Sábados 9:00 - 14:00",
+    )
     
     # Estado y observaciones
     activa = models.BooleanField(default=True, help_text="Sucursal activa")

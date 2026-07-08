@@ -223,7 +223,7 @@ class SucursalForm(forms.ModelForm):
         fields = [
             'codigo', 'nombre', 
             'direccion', 'ciudad', 'estado_provincia',
-            'responsable', 'telefono', 'email', 
+            'responsable', 'telefono', 'email', 'horario_atencion',
             'activa', 'observaciones'
         ]
         widgets = {
@@ -259,6 +259,11 @@ class SucursalForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'correo@ejemplo.com'
+            }),
+            'horario_atencion': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Ej: Lunes a viernes 9:00 - 18:00, Sábados 9:00 - 14:00'
             }),
             'activa': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'

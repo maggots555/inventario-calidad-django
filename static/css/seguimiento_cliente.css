@@ -2470,6 +2470,29 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.st-chat-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.st-chat-panel-clear {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.st-chat-panel-clear:hover,
 .st-chat-panel-close:hover {
   background: rgba(255, 255, 255, 0.25);
 }
@@ -2535,13 +2558,44 @@
   border-bottom-left-radius: 5px;
 }
 
-/* ── Indicador de "escribiendo" (tres puntos animados) ── */
+/* Markdown básico en respuestas del bot */
+.st-chat-msg-bubble--md strong {
+  font-weight: 700;
+}
+
+.st-chat-msg-bubble--md em {
+  font-style: italic;
+}
+
+.st-chat-md-item {
+  display: block;
+  padding-left: 2px;
+  margin-top: 4px;
+}
+
+.st-chat-md-item:first-child {
+  margin-top: 0;
+}
+
+/* ── Indicador de "escribiendo" (etapa + tres puntos animados) ── */
+.st-chat-typing-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  min-width: 160px;
+}
+
+.st-chat-thinking-label {
+  font-size: 13px;
+  color: var(--chat-text-bot);
+  line-height: 1.4;
+}
+
 .st-chat-typing-indicator {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 12px 16px;
-  min-width: 52px;
 }
 
 .st-chat-typing-indicator span {
@@ -2677,6 +2731,50 @@
   line-height: 1.4;
 }
 
+.st-chat-whatsapp-link {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--chat-primary);
+  text-decoration: none;
+  padding: 6px 0;
+  min-height: 44px;
+  line-height: 32px;
+}
+
+.st-chat-whatsapp-link:hover {
+  text-decoration: underline;
+}
+
+/* Cursor parpadeante durante el efecto de escritura simulado */
+.st-chat-cursor {
+  display: inline-block;
+  margin-left: 1px;
+  color: var(--chat-primary);
+  animation: chatCursorBlink 0.9s step-end infinite;
+}
+
+@keyframes chatCursorBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.st-chat-msg--streaming .st-chat-msg-bubble {
+  min-height: 1.5em;
+  transition: opacity 0.2s ease;
+}
+
+.st-chat-msg-bubble--md-done {
+  animation: chatMdSettle 0.25s ease;
+}
+
+@keyframes chatMdSettle {
+  from { opacity: 0.92; }
+  to   { opacity: 1; }
+}
+
 /* ── Responsive: en mobile el panel ocupa más pantalla ── */
 @media (max-width: 480px) {
   .st-chat-panel {
@@ -2734,6 +2832,24 @@
 
 [data-bs-theme="dark"] .st-chat-chip:hover {
   background: rgba(96, 165, 250, 0.18);
+}
+
+[data-bs-theme="dark"] .st-chat-whatsapp-link {
+  color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .st-chat-cursor {
+  color: #60a5fa;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-chat-msg-bubble--md-done {
+    animation: none;
+  }
+
+  .st-chat-msg--streaming .st-chat-msg-bubble {
+    transition: none;
+  }
 }
 
 [data-bs-theme="dark"] .st-chat-send-btn:disabled {

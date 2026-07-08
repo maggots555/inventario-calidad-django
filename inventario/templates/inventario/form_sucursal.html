@@ -136,6 +136,20 @@
                                 {% endif %}
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label for="{{ form.horario_atencion.id_for_label }}" class="form-label">
+                                    <i class="bi bi-clock"></i> Horario de atención
+                                </label>
+                                {{ form.horario_atencion }}
+                                <div class="form-text">Horario visible para clientes (chat de seguimiento y consultas)</div>
+                                {% if form.horario_atencion.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.horario_atencion.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
