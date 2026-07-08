@@ -618,6 +618,7 @@ def _llamar_ollama_chat(mensajes: list[dict], modelo: str, timeout: int) -> dict
     from django.conf import settings
 
     max_tokens = getattr(settings, 'CHAT_SEGUIMIENTO_MAX_TOKENS', 1200)
+    num_ctx = getattr(settings, 'CHAT_SEGUIMIENTO_NUM_CTX', 8192)
 
     base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
     url = f"{base_url}/api/chat"
@@ -629,6 +630,9 @@ def _llamar_ollama_chat(mensajes: list[dict], modelo: str, timeout: int) -> dict
         "options": {
             "temperature": 0.6,  # Ligeramente más alto que el corrector SIC — respuestas más naturales
             "num_predict": max_tokens,
+            # Ventana total prompt+respuesta; sin esto Ollama usa ~2048 y el system prompt largo
+            # deja muy poco espacio para generar (respuestas cortadas a ~200-300 caracteres).
+            "num_ctx": num_ctx,
         },
         # Desactivar el thinking para modelos que lo soporten (reduce latencia)
         "think": False,
@@ -644,8 +648,14 @@ def _llamar_ollama_chat(mensajes: list[dict], modelo: str, timeout: int) -> dict
             method='POST',
         )
         logger.info(
-            "[ChatSeg/Ollama] Enviando mensaje | Modelo: %s | Turns: %d | URL: %s",
-            modelo, len(mensajes), url
+            "[ChatSeg/Ollama] Enviando mensaje | Modelo: %s | Turns: %d | num_ctx=%d | "
+            "num_predict=%d | prompt_chars=%d | URL: %s",
+            modelo,
+            len(mensajes),
+            num_ctx,
+            max_tokens,
+            sum(len(m.get('content', '')) for m in mensajes),
+            url,
         )
         with urllib.request.urlopen(req, timeout=timeout) as response:
             response_data = json.loads(response.read().decode('utf-8'))
@@ -658,13 +668,29 @@ def _llamar_ollama_chat(mensajes: list[dict], modelo: str, timeout: int) -> dict
             logger.warning("[ChatSeg/Ollama] Respuesta vacía del modelo %s", modelo)
             return {'success': False, 'error': 'El asistente no generó una respuesta. Intenta de nuevo.'}
 
-        # Ollama indica done_reason=length cuando se alcanzó num_predict (respuesta cortada)
+        # Ollama: done_reason=length puede ser num_predict O ventana de contexto llena
         done_reason = response_data.get('done_reason', '')
+        prompt_tokens = response_data.get('prompt_eval_count', 0)
+        output_tokens = response_data.get('eval_count', 0)
         if done_reason == 'length':
+            espacio_ctx = num_ctx - prompt_tokens if num_ctx else 0
+            causa = (
+                'ventana de contexto llena (prompt muy largo)'
+                if output_tokens < max_tokens * 0.25 and prompt_tokens > 0
+                else 'límite num_predict alcanzado'
+            )
             logger.warning(
-                "[ChatSeg/Ollama] Respuesta truncada por límite de tokens | Modelo: %s | "
-                "num_predict=%d | chars=%d",
-                modelo, max_tokens, len(contenido),
+                "[ChatSeg/Ollama] Respuesta truncada (%s) | Modelo: %s | "
+                "num_ctx=%d | num_predict=%d | prompt_tokens=%d | output_tokens=%d | "
+                "espacio_restante_ctx≈%d | chars=%d",
+                causa,
+                modelo,
+                num_ctx,
+                max_tokens,
+                prompt_tokens,
+                output_tokens,
+                espacio_ctx,
+                len(contenido),
             )
 
         return {'success': True, 'respuesta': contenido, 'modelo_usado': modelo}

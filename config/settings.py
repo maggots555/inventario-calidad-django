@@ -951,6 +951,13 @@ CHAT_SEGUIMIENTO_MODEL: str = config('CHAT_SEGUIMIENTO_MODEL', default='gemma4:e
 #   a mitad de frase. Default 1200 — suficiente para listas sin ser excesivo.
 CHAT_SEGUIMIENTO_MAX_TOKENS: int = config('CHAT_SEGUIMIENTO_MAX_TOKENS', default=1200, cast=int)
 
+# CHAT_SEGUIMIENTO_NUM_CTX:
+#   Tamaño de la ventana de contexto en Ollama (prompt + respuesta combinados).
+#   Si el system prompt es largo (orden + sucursales + reglas) y num_ctx es bajo
+#   (p. ej. 2048 por defecto), la respuesta se corta aunque num_predict sea alto.
+#   Default 8192 — ajustar según la RAM del servidor y el modelo usado.
+CHAT_SEGUIMIENTO_NUM_CTX: int = config('CHAT_SEGUIMIENTO_NUM_CTX', default=8192, cast=int)
+
 # ----------------------------------------------------------------------------
 # WEB PUSH — VAPID KEYS
 # ----------------------------------------------------------------------------
