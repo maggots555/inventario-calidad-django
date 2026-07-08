@@ -945,6 +945,12 @@ AI_ENABLED: bool = bool(_ai_models)
 
 CHAT_SEGUIMIENTO_MODEL: str = config('CHAT_SEGUIMIENTO_MODEL', default='gemma4:e2b')
 
+# CHAT_SEGUIMIENTO_MAX_TOKENS:
+#   Máximo de tokens que el modelo puede generar por respuesta del chat público.
+#   Si es muy bajo, las respuestas largas (ej. listar varias sucursales) se cortan
+#   a mitad de frase. Default 1200 — suficiente para listas sin ser excesivo.
+CHAT_SEGUIMIENTO_MAX_TOKENS: int = config('CHAT_SEGUIMIENTO_MAX_TOKENS', default=1200, cast=int)
+
 # ----------------------------------------------------------------------------
 # WEB PUSH — VAPID KEYS
 # ----------------------------------------------------------------------------

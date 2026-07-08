@@ -617,6 +617,8 @@ def _llamar_ollama_chat(mensajes: list[dict], modelo: str, timeout: int) -> dict
     """
     from django.conf import settings
 
+    max_tokens = getattr(settings, 'CHAT_SEGUIMIENTO_MAX_TOKENS', 1200)
+
     base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434').rstrip('/')
     url = f"{base_url}/api/chat"
 
@@ -626,7 +628,7 @@ def _llamar_ollama_chat(mensajes: list[dict], modelo: str, timeout: int) -> dict
         "stream": False,
         "options": {
             "temperature": 0.6,  # Ligeramente más alto que el corrector SIC — respuestas más naturales
-            "num_predict": 650,  # Suficiente para listar sucursales con dirección y teléfono
+            "num_predict": max_tokens,
         },
         # Desactivar el thinking para modelos que lo soporten (reduce latencia)
         "think": False,
@@ -655,6 +657,15 @@ def _llamar_ollama_chat(mensajes: list[dict], modelo: str, timeout: int) -> dict
         if not contenido:
             logger.warning("[ChatSeg/Ollama] Respuesta vacía del modelo %s", modelo)
             return {'success': False, 'error': 'El asistente no generó una respuesta. Intenta de nuevo.'}
+
+        # Ollama indica done_reason=length cuando se alcanzó num_predict (respuesta cortada)
+        done_reason = response_data.get('done_reason', '')
+        if done_reason == 'length':
+            logger.warning(
+                "[ChatSeg/Ollama] Respuesta truncada por límite de tokens | Modelo: %s | "
+                "num_predict=%d | chars=%d",
+                modelo, max_tokens, len(contenido),
+            )
 
         return {'success': True, 'respuesta': contenido, 'modelo_usado': modelo}
 
@@ -704,6 +715,8 @@ def _llamar_gemini_chat(mensajes: list[dict], modelo: str, timeout: int, api_key
     import ssl
     from django.conf import settings
 
+    max_tokens = getattr(settings, 'CHAT_SEGUIMIENTO_MAX_TOKENS', 1200)
+
     # Separar el system prompt del historial de conversación
     system_content = ""
     historial_gemini = []
@@ -728,7 +741,7 @@ def _llamar_gemini_chat(mensajes: list[dict], modelo: str, timeout: int, api_key
         "generationConfig": {
             "temperature": 0.6,
             "topP": 0.9,
-            "maxOutputTokens": 768,
+            "maxOutputTokens": max_tokens,
             "thinkingConfig": {"thinkingBudget": 0},
         },
     }
@@ -778,6 +791,14 @@ def _llamar_gemini_chat(mensajes: list[dict], modelo: str, timeout: int, api_key
         contenido = parts[0].get('text', '').strip()
         if not contenido:
             return {'success': False, 'error': 'El asistente generó una respuesta vacía. Intenta de nuevo.'}
+
+        finish_reason = candidate.get('finishReason', '')
+        if finish_reason == 'MAX_TOKENS':
+            logger.warning(
+                "[ChatSeg/Gemini] Respuesta truncada por límite de tokens | Modelo: %s | "
+                "maxOutputTokens=%d | chars=%d",
+                modelo, max_tokens, len(contenido),
+            )
 
         return {'success': True, 'respuesta': contenido, 'modelo_usado': modelo}
 
