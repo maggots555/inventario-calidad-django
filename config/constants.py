@@ -186,6 +186,75 @@ COMPONENTES_DIAGNOSTICO_ORDEN = [
 ]
 
 # ============================================================================
+# NORMALIZACIÓN PRODUCTO ALMACÉN → ComponenteEquipo (cotizaciones / ST)
+# ============================================================================
+# EXPLICACIÓN PARA PRINCIPIANTES:
+# Los productos del catálogo de almacén tienen nombres largos como
+# "BATERÍA / PILA DELL 40 W". Al sincronizar con Servicio Técnico necesitamos
+# mapearlos al nombre canónico de ComponenteEquipo ("Batería", "Cargador", etc.)
+# para que reportes y consultas usen categorías normalizadas.
+#
+# Cada tupla: (lista de palabras clave en MAYÚSCULAS, nombre exacto en ComponenteEquipo)
+# IMPORTANTE: las keywords más largas deben ir primero en la lista global
+# (el resolver las ordena por longitud antes de evaluar).
+NOMBRE_COMPONENTE_EQUIPO_REACONDICIONADO = 'Equipo reacondicionado'
+
+PALABRAS_CLAVE_COMPONENTE = [
+    (['SSD M.2', 'SSD M2', 'M.2 SSD', 'M2 SSD', 'NVME', 'NVME SSD'], 'SSD M.2'),
+    (['KEYBOARD WITH PALMREST', 'TECLADO CON PALMREST', 'KEYBOARD PALMREST'], 'Keyboard with Palmrest Assy'),
+    (['FUENTE DE PODER', 'FUENTE DE ALIMENTACION', 'FUENTE DE ALIMENTACIÓN', 'POWER SUPPLY', 'PSU'], 'Fuente de Poder'),
+    (['TARJETA GRAFICA', 'TARJETA GRÁFICA', 'TARJETA DE VIDEO', 'GRAPHICS CARD', 'GPU'], 'Tarjeta Gráfica (GPU)'),
+    (['DISCO DURO', 'HARD DRIVE', 'UNIDAD DE ESTADO SOLIDO', 'SOLID STATE'], 'Disco Duro / SSD'),
+    (['DISCO', 'SSD', 'HDD', 'STORAGE'], 'Disco Duro / SSD'),
+    (['TARJETA MADRE', 'MOTHERBOARD', 'MAINBOARD', 'MOBO', 'PLACA MADRE'], 'Motherboard'),
+    (['MEMORIA RAM', 'SODIMM', 'SO-DIMM', 'MODULO DE MEMORIA', 'MÓDULO DE MEMORIA'], 'RAM'),
+    (['VENTILADOR', 'COOLER', 'COOLING', 'SISTEMA DE ENFRIAMIENTO'], 'Ventilador / Cooling'),
+    (['DISIPADOR DE CALOR', 'HEATSINK', 'HEAT SINK', 'PASTA TERMICA', 'PASTA TÉRMICA'], 'Disipador de calor'),
+    (['REFRIGERACION LIQUIDA', 'REFRIGERACIÓN LIQUIDA', 'LIQUID COOLING', 'WATER COOLING'], 'Refrigeración liquida'),
+    (['SISTEMA OPERATIVO', 'WINDOWS', 'REINSTALACION', 'REINSTALACIÓN', 'FORMATEO'], 'Sistema Operativo'),
+    (['LIMPIEZA Y MANTENIMIENTO', 'KIT DE LIMPIEZA', 'MANTENIMIENTO'], 'Limpieza y mantenimiento'),
+    (['CARGADOR', 'ADAPTADOR', 'ELIMINADOR', 'AC ADAPTER', 'POWER ADAPTER', 'CHARGER'], 'Cargador'),
+    (['BATERÍA', 'BATERIA', 'PILA', 'BATTERY', 'ACUMULADOR'], 'Batería'),
+    (['PANTALLA', 'LCD', 'DISPLAY', 'SCREEN', 'PANEL LCD', 'PANEL LED', 'MONITOR'], 'Pantalla'),
+    (['TECLADO USB', 'USB KEYBOARD'], 'Teclado USB'),
+    (['TECLADO', 'KEYBOARD', 'PALMREST'], 'Teclado'),
+    (['TOUCHPAD', 'TOUCH PAD', 'TRACKPAD', 'TRACK PAD'], 'Touchpad'),
+    (['PROCESADOR', 'CPU', 'PROCESSOR', 'MICROPROCESADOR'], 'Procesador (CPU)'),
+    (['CABLE DE VIDEO', 'CABLE LVDS', 'LVDS', 'VIDEO CABLE', 'EDP CABLE'], 'Cable de video/LVDS'),
+    (['CABLE FLEX', 'FLEX CABLE', 'FLAT CABLE', 'RIBBON'], 'Cable Flex'),
+    (['CABLE DE BATERIA', 'CABLE DE BATERÍA', 'BATTERY CABLE'], 'Cable de Batería'),
+    (['CABLE DE IO', 'CABLE IO BOARD', 'CABLE I/O', 'I/O CABLE'], 'Cable de I/O Board'),
+    (['CABLE LECTOR DE HUELLAS', 'FINGERPRINT CABLE'], 'Cable lector de huellas'),
+    (['PUERTO DE RED', 'ETHERNET', 'RJ45', 'LAN PORT', 'NETWORK PORT'], 'Puerto de Red (Ethernet)'),
+    (['PUERTO HDMI', 'HDMI PORT', 'CONECTOR HDMI'], 'Puerto HDMI'),
+    (['PUERTO USB', 'USB PORT', 'CONECTOR USB'], 'Puerto USB'),
+    (['LECTOR DE HUELLAS', 'FINGERPRINT READER', 'HUELLA DIGITAL'], 'Lector de huellas'),
+    (['LECTOR DE TARJETAS', 'CARD READER', 'LECTOR SD', 'SD READER'], 'Lector de Tarjetas'),
+    (['WIRELESS ANTENNAS', 'ANTENAS WIRELESS', 'ANTENAS WIFI'], 'Wireless Antennas'),
+    (['TARJETA WIFI', 'TARJETA INALAMBRICA', 'TARJETA INALÁMBRICA', 'WLAN', 'MODULO WIFI', 'MÓDULO WIFI'], 'WiFi / Bluetooth'),
+    (['WIFI', 'WI-FI', 'BLUETOOTH', 'WIRELESS'], 'WiFi / Bluetooth'),
+    (['BOTON DE ENCENDIDO', 'BOTÓN DE ENCENDIDO', 'POWER BUTTON', 'BUTTON POWER'], 'Button Power'),
+    (['BOTON', 'BOTÓN', 'BUTTON'], 'Botón'),
+    (['DC-IN', 'DCIN', 'DC IN', 'JACK DE CARGA', 'POWER JACK', 'CONECTOR DE CARGA'], 'DC-IN cable'),
+    (['PILA CMOS', 'CMOS BATTERY', 'BIOS BATTERY', 'COIN CELL'], 'Pila CMOS'),
+    (['BISEL LCD', 'LCD BEZEL', 'BEZEL LCD', 'MARCO LCD'], 'Bisel LCD'),
+    (['BOTTOM COVER', 'BOTTOM CASE', 'TAPA INFERIOR', 'BASE INFERIOR'], 'Bottom Cover/Case'),
+    (['TOP COVER', 'LCD COVER', 'BACK LID', 'TAPA SUPERIOR'], 'Top Cover'),
+    (['CUBRE BISAGRAS', 'HINGE COVER', 'TAPA BISAGRAS'], 'Cubre Bisagras'),
+    (['CARCASA', 'CHASIS', 'HOUSING', 'CUBIERTA', 'PLASTICOS', 'PLÁSTICOS'], 'Carcasa / Chasis'),
+    (['BASE DE COMPUTADORA', 'DESKTOP BASE', 'COMPUTER BASE'], 'Base de computadora'),
+    (['BISAGRA', 'BISAGRAS', 'HINGE', 'HINGES', 'CHARNELA'], 'Bisagras'),
+    (['BOCINA', 'BOCINAS', 'SPEAKER', 'SPEAKERS', 'ALTAVOZ', 'PARLANTE'], 'Bocinas / Audio'),
+    (['MICROFONO', 'MICRÓFONO', 'MICROPHONE'], 'Micrófono'),
+    (['CAMARA', 'CÁMARA', 'WEBCAM', 'WEB CAM'], 'Webcam'),
+    (['MOUSE', 'RATON', 'RATÓN'], 'Mouse'),
+    (['I/O BOARD', 'IO BOARD', 'PLACA IO'], 'I/O Board'),
+    (['CABLE', 'BUS', 'HUB', 'CONVERTIDOR'], 'Cable'),
+    (['RAM', 'MEMORIA', 'DIMM'], 'RAM'),
+    (['ANTENA', 'ANTENAS', 'ANTENNA'], 'Wireless Antennas'),
+]
+
+# ============================================================================
 # TIPO DE IMÁGENES - Para clasificación de evidencias
 # ============================================================================
 TIPO_IMAGEN_CHOICES = [

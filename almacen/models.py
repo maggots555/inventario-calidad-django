@@ -3742,6 +3742,7 @@ class SolicitudCotizacion(models.Model):
 
         from decimal import Decimal
         from servicio_tecnico.models import VentaMostrador, PiezaVentaMostrador
+        from almacen.utils.resolver_componente import resolver_componente_desde_producto
 
         es_orden_fl = self.orden_servicio.tipo_servicio == 'venta_mostrador'
 
@@ -3805,8 +3806,23 @@ class SolicitudCotizacion(models.Model):
                     f"Proveedor: {linea.proveedor.nombre if linea.proveedor else 'N/A'}."
                 )
 
+            # Normalizar componente desde el catálogo de productos de almacén
+            componente = resolver_componente_desde_producto(
+                nombre_producto,
+                descripcion_extra,
+                es_reacondicionado=linea.es_linea_reacondicionado,
+            )
+            if not componente and not linea.es_linea_reacondicionado:
+                logger.warning(
+                    "PiezaVentaMostrador sin componente normalizado: producto='%s' "
+                    "(solicitud %s)",
+                    nombre_producto,
+                    self.numero_solicitud,
+                )
+
             PiezaVentaMostrador.objects.create(
                 venta_mostrador=vm,
+                componente=componente,
                 descripcion_pieza=descripcion_completa,
                 cantidad=linea.cantidad,
                 precio_unitario=precio_venta,
@@ -4266,7 +4282,7 @@ class LineaCotizacion(models.Model):
         en el módulo de Servicio Técnico. Este método asegura que estén sincronizadas.
         
         MAPEO DE CAMPOS:
-        - LineaCotizacion.producto.nombre → busca ComponenteEquipo por nombre
+        - LineaCotizacion.producto.nombre → resolver_componente_desde_producto()
         - LineaCotizacion.descripcion_pieza → PiezaCotizada.descripcion_adicional
         - LineaCotizacion.cantidad → PiezaCotizada.cantidad
         - LineaCotizacion.costo_unitario → PiezaCotizada.costo_unitario
@@ -4284,7 +4300,7 @@ class LineaCotizacion(models.Model):
         SolicitudCotizacion.generar_piezas_venta_mostrador().
         """
         from servicio_tecnico.models import Cotizacion, PiezaCotizada
-        from scorecard.models import ComponenteEquipo
+        from almacen.utils.resolver_componente import resolver_componente_desde_producto
         from decimal import Decimal
         
         if not self.solicitud.orden_servicio:
@@ -4309,19 +4325,25 @@ class LineaCotizacion(models.Model):
             )
             return
         
-        # Buscar ComponenteEquipo que coincida con el producto
-        componente = ComponenteEquipo.objects.filter(
-            nombre__icontains=self.producto.nombre,
-            activo=True
-        ).first()
-        
-        if not componente:
-            # Intentar búsqueda más amplia
-            componente = ComponenteEquipo.objects.filter(activo=True).first()
-        
+        # Resolver ComponenteEquipo desde el catálogo de productos de almacén
+        componente = None
+        if self.pieza_cotizada_origen_id and self.pieza_cotizada_origen.componente_id:
+            # Conservar componente si la pieza ya venía correctamente desde ST
+            componente = self.pieza_cotizada_origen.componente
+        else:
+            nombre_producto = self.producto.nombre if self.producto_id else ''
+            componente = resolver_componente_desde_producto(
+                nombre_producto,
+                self.descripcion_pieza or '',
+            )
+
         if not componente:
             logger.warning(
-                f"No se encontró ComponenteEquipo para producto '{self.producto.nombre}'"
+                "No se pudo normalizar ComponenteEquipo para línea #%s "
+                "(producto='%s', descripcion='%s')",
+                self.pk,
+                self.producto.nombre if self.producto_id else '',
+                self.descripcion_pieza,
             )
             return
         
@@ -4332,12 +4354,11 @@ class LineaCotizacion(models.Model):
         if self.pieza_cotizada_origen:
             pieza = self.pieza_cotizada_origen
         
-        # 2. Buscar por coincidencia en la misma cotización
-        if not pieza:
+        # 2. Buscar por descripción en la misma cotización (no por componente erróneo previo)
+        if not pieza and self.descripcion_pieza:
             pieza = PiezaCotizada.objects.filter(
                 cotizacion=cotizacion,
-                componente=componente,
-                descripcion_adicional__icontains=self.descripcion_pieza[:50]
+                descripcion_adicional__icontains=self.descripcion_pieza[:50],
             ).first()
         
         # 3. Crear nueva si no existe
@@ -4348,8 +4369,7 @@ class LineaCotizacion(models.Model):
             )
         
         # Actualizar campos — sincronización completa con LineaCotizacion de Almacén.
-        # Los campos es_necesaria y sugerida_por_tecnico se toman del campo real
-        # en lugar de hardcodear valores (antes era False/True fijo).
+        pieza.componente = componente
         pieza.descripcion_adicional = self.descripcion_pieza
         pieza.cantidad = self.cantidad
         pieza.costo_unitario = self.costo_unitario or Decimal('0.00')
