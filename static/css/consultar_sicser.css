@@ -1,0 +1,113 @@
+/* ============================================================
+   CONSULTAR SICSER — Estilos base (modo claro)
+   ============================================================ */
+
+.consultar-sicser-page {
+    max-width: 1400px;
+}
+
+.sicser-titulo {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.sicser-tabs .nav-link {
+    color: var(--gray-700);
+    font-weight: 500;
+}
+
+.sicser-tabs .nav-link.active {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.sicser-card-header {
+    background-color: var(--gray-50);
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.sicser-table thead th {
+    background-color: var(--gray-100);
+    color: var(--gray-800);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.sicser-table tbody td {
+    vertical-align: middle;
+    font-size: 0.9rem;
+}
+
+.sicser-folio {
+    font-size: 0.78rem;
+    word-break: break-all;
+    color: var(--gray-800);
+    background-color: var(--gray-100);
+    padding: 0.15rem 0.35rem;
+    border-radius: 0.25rem;
+}
+
+.sicser-acciones {
+    white-space: nowrap;
+}
+
+.sicser-acciones .btn-sm {
+    min-height: 36px;
+    min-width: 36px;
+}
+
+@media (max-width: 575.98px) {
+    .sicser-acciones .btn-sm {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .sicser-table .btn-sm {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* ============================================================
+   MODO OSCURO — Overrides [data-bs-theme="dark"]
+   ============================================================ */
+
+[data-bs-theme="dark"] .sicser-titulo {
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .sicser-card-header {
+    background-color: #1e293b;
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] .sicser-table thead th {
+    background-color: #0f172a;
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .sicser-folio {
+    color: var(--text-primary);
+    background-color: #334155;
+}
+
+[data-bs-theme="dark"] .sicser-tabs .nav-link {
+    color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .sicser-tabs .nav-link.active {
+    color: #60a5fa;
+}
+
+[data-bs-theme="dark"] .badge.bg-light {
+    background-color: #334155 !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}

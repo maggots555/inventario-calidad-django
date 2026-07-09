@@ -841,6 +841,28 @@ class DetalleEquipo(models.Model):
         blank=True,
         help_text="Número de orden del cliente (identificador interno del cliente)"
     )
+
+    # Integración SICSER (Fase 2 — importación desde APIs externas)
+    folio_sicser = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text="Folio completo en SICSER (ej. MX_CIS_MX_DROPOFF_11954) para formato digital"
+    )
+    sicser_id_externo = models.CharField(
+        max_length=50,
+        blank=True,
+        db_index=True,
+        help_text="ID único del registro en SICSER (id_orden OOW o numero_dps garantía)"
+    )
+    sicser_origen = models.CharField(
+        max_length=20,
+        blank=True,
+        choices=[
+            ('oow', 'SICSER OOW'),
+            ('garantia', 'SICSER Garantía Dell'),
+        ],
+        help_text="Tipo de registro SICSER del que se importó esta orden"
+    )
     
     # ✅ NUEVO CAMPO: Email del Cliente (Noviembre 2025)
     # Agregado para facilitar el envío de fotos de ingreso y notificaciones

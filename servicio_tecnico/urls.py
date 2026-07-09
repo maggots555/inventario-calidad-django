@@ -335,6 +335,14 @@ urlpatterns = [
          views.exportar_concentrado_pdf,
          name='exportar_concentrado_pdf'),
 
+    # Consulta SICSER (Fase 1: listar + Fase 2: importar órdenes)
+    path('sicser/consultar/',
+         views.consultar_sicser,
+         name='consultar_sicser'),
+    path('sicser/importar/',
+         views.importar_orden_sicser,
+         name='importar_orden_sicser'),
+
     # URLs futuras para funcionalidad completa
     # path('dashboard/', views.dashboard, name='dashboard'),
 

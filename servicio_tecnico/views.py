@@ -19515,3 +19515,189 @@ def estado_compresion_resumen(request, task_id):
             respuesta['error'] = 'Error desconocido al comprimir el video.'
 
     return JsonResponse(respuesta)
+
+
+# ============================================================================
+# CONSULTA E IMPORTACIÓN SICSER — Fase 1 (consulta) + Fase 2 (importar a SIGMA)
+# ============================================================================
+
+@login_required
+@permission_required_with_message('servicio_tecnico.view_ordenservicio')
+def consultar_sicser(request):
+    """
+    Pantalla de consulta en tiempo real de órdenes SICSER (OOW y garantía Dell).
+
+    Fase 1: listar y abrir formato digital en SICSER.
+    Fase 2: importar registros como órdenes nuevas en SIGMA (botón por fila).
+
+    Parámetros GET:
+        tab (str): 'oow' o 'garantia' — pestaña activa.
+        q (str): Texto de búsqueda (folio, service tag, cliente, DPS).
+        refrescar (str): Si es '1', omite caché y vuelve a consultar SICSER.
+    """
+    from config.paises_config import get_pais_actual
+    from inventario.models import Sucursal
+    from .sicser_client import (
+        SicserAPIError,
+        fetch_listado_garantias,
+        fetch_listado_oow,
+    )
+    from .sicser_import import mapa_importaciones_sicser
+
+    pais = get_pais_actual()
+    codigo_pais = pais.get('codigo', 'MX')
+    tab = request.GET.get('tab', 'oow').strip().lower()
+    if tab not in ('oow', 'garantia'):
+        tab = 'oow'
+
+    texto_busqueda = request.GET.get('q', '').strip()
+    usar_cache = request.GET.get('refrescar') != '1'
+
+    ordenes_oow = []
+    ordenes_garantia = []
+    total_oow_pais = 0
+    total_garantia_pais = 0
+    error_oow = ''
+    error_garantia = ''
+
+    if tab == 'oow':
+        try:
+            ordenes_oow, total_oow_pais = fetch_listado_oow(
+                codigo_pais=codigo_pais,
+                texto_busqueda=texto_busqueda,
+                usar_cache=usar_cache,
+            )
+        except SicserAPIError as exc:
+            error_oow = str(exc)
+            logger.warning('Error consultando API OOW SICSER: %s', exc)
+    else:
+        try:
+            ordenes_garantia, total_garantia_pais = fetch_listado_garantias(
+                codigo_pais=codigo_pais,
+                texto_busqueda=texto_busqueda,
+                usar_cache=usar_cache,
+            )
+        except SicserAPIError as exc:
+            error_garantia = str(exc)
+            logger.warning('Error consultando API Garantías SICSER: %s', exc)
+
+    mapa_oow, mapa_garantia = mapa_importaciones_sicser()
+    sucursales = Sucursal.objects.filter(activa=True).order_by('nombre')
+    puede_importar = request.user.has_perm('servicio_tecnico.add_ordenservicio')
+
+    filas_oow = [
+        {
+            'registro': orden,
+            'sigma': mapa_oow.get(str(orden.id_orden)),
+        }
+        for orden in ordenes_oow
+    ]
+    filas_garantia = [
+        {
+            'registro': orden,
+            'sigma': mapa_garantia.get(str(orden.numero_dps)),
+        }
+        for orden in ordenes_garantia
+    ]
+
+    context = {
+        'page_title': 'Consultar SICSER',
+        'tab_activa': tab,
+        'texto_busqueda': texto_busqueda,
+        'pais_nombre': pais.get('nombre', ''),
+        'codigo_pais': codigo_pais,
+        'filas_oow': filas_oow,
+        'filas_garantia': filas_garantia,
+        'total_oow_pais': total_oow_pais,
+        'total_garantia_pais': total_garantia_pais,
+        'total_oow_mostrado': len(filas_oow),
+        'total_garantia_mostrado': len(filas_garantia),
+        'error_oow': error_oow,
+        'error_garantia': error_garantia,
+        'refresco_forzado': not usar_cache,
+        'sucursales': sucursales,
+        'puede_importar': puede_importar,
+    }
+
+    return render(request, 'servicio_tecnico/consultar_sicser.html', context)
+
+
+@login_required
+@permission_required_with_message('servicio_tecnico.add_ordenservicio')
+@require_http_methods(['POST'])
+def importar_orden_sicser(request):
+    """
+    Importa un registro de SICSER como orden nueva en SIGMA.
+
+    Parámetros POST:
+        tipo (str): 'oow' o 'garantia'.
+        id_externo (str): id_orden (OOW) o numero_dps (garantía).
+        sucursal_id (str, opcional): Sucursal SIGMA a asignar.
+        tab (str): Pestaña para redirigir tras importar.
+        q (str): Filtro de búsqueda a preservar en la redirección.
+
+    Efectos secundarios:
+        Crea OrdenServicio + DetalleEquipo en la base de datos.
+    """
+    from config.paises_config import get_pais_actual
+    from .sicser_client import (
+        SicserAPIError,
+        buscar_registro_garantia_por_dps,
+        buscar_registro_oow_por_id,
+    )
+    from .sicser_import import (
+        SicserImportError,
+        importar_orden_garantia_desde_sicser,
+        importar_orden_oow_desde_sicser,
+    )
+
+    tipo = request.POST.get('tipo', '').strip().lower()
+    id_externo = request.POST.get('id_externo', '').strip()
+    tab = request.POST.get('tab', 'oow').strip().lower() or 'oow'
+    texto_busqueda = request.POST.get('q', '').strip()
+    sucursal_id_raw = request.POST.get('sucursal_id', '').strip()
+
+    sucursal_id = int(sucursal_id_raw) if sucursal_id_raw.isdigit() else None
+    codigo_pais = get_pais_actual().get('codigo', 'MX')
+
+    redirect_url = 'servicio_tecnico:consultar_sicser'
+    query_parts = [f'tab={tab}']
+    if texto_busqueda:
+        from urllib.parse import quote
+        query_parts.append(f'q={quote(texto_busqueda)}')
+    redirect_suffix = '?' + '&'.join(query_parts)
+
+    if tipo not in ('oow', 'garantia') or not id_externo:
+        messages.error(request, 'Datos de importación SICSER incompletos o inválidos.')
+        return redirect(redirect_url + redirect_suffix)
+
+    try:
+        if tipo == 'oow':
+            registro = buscar_registro_oow_por_id(int(id_externo), codigo_pais)
+            if not registro:
+                raise SicserImportError(
+                    'No se encontró la orden OOW en SICSER. Actualice el listado e intente de nuevo.'
+                )
+            resultado = importar_orden_oow_desde_sicser(
+                registro,
+                request.user,
+                sucursal_id=sucursal_id,
+            )
+        else:
+            registro = buscar_registro_garantia_por_dps(int(id_externo), codigo_pais)
+            if not registro:
+                raise SicserImportError(
+                    'No se encontró la garantía en SICSER. Actualice el listado e intente de nuevo.'
+                )
+            resultado = importar_orden_garantia_desde_sicser(
+                registro,
+                request.user,
+                sucursal_id=sucursal_id,
+            )
+
+        messages.success(request, resultado.mensaje)
+        return redirect('servicio_tecnico:detalle_orden', orden_id=resultado.orden.pk)
+
+    except (SicserImportError, SicserAPIError, ValueError) as exc:
+        messages.error(request, f'No se pudo importar desde SICSER: {exc}')
+        return redirect(redirect_url + redirect_suffix)
