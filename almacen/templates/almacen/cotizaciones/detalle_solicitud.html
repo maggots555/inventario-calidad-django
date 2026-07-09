@@ -50,6 +50,42 @@ Muestra toda la información y acciones según el estado
     </div>
 </div>
 
+<!-- Modal: Aprobar línea de equipo reacondicionado (elegir forma de pago) -->
+<div class="modal fade" id="aprobarLineaReacModal" tabindex="-1" aria-labelledby="aprobarLineaReacModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="aprobarLineaReacForm">
+                {% csrf_token %}
+                <input type="hidden" name="decision" value="aprobar">
+
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="aprobarLineaReacModalLabel">
+                        <i class="bi bi-pc-display me-2"></i>Aprobar equipo reacondicionado
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">El cliente aceptó el equipo:</p>
+                    <p class="fw-semibold mb-3" id="aprobarReacLineaDesc"></p>
+                    <p class="small text-muted mb-3">
+                        Selecciona la forma de pago que eligió el cliente. El monto se guardará en la cotización y en Venta Mostrador.
+                    </p>
+                    <div id="aprobarReacOpcionesPago" class="d-flex flex-column gap-2" role="radiogroup" aria-label="Forma de pago"></div>
+                    <div id="aprobarReacSinCosteo" class="alert alert-warning d-none mb-0">
+                        No hay costeo de reacondicionado guardado. Reenvía la propuesta al cliente antes de aprobar.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success" id="btnConfirmarAprobarReac">
+                        <i class="bi bi-check-lg me-1"></i>Confirmar aprobación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: Rechazar todas las líneas -->
 <div class="modal fade" id="rechazarTodasModal" tabindex="-1">
     <div class="modal-dialog">
@@ -658,6 +694,9 @@ document.addEventListener('DOMContentLoaded', function() {
     "csrfToken": "{{ csrf_token }}"
 }
 </script>
+{% if solicitud.resultado_costeo_reac %}
+{{ solicitud.resultado_costeo_reac|json_script:"costeoReacAprobarData" }}
+{% endif %}
 
 <!-- ================================================================
      MODAL: Enviar Cotización al Cliente

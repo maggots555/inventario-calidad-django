@@ -50,6 +50,7 @@ from config.constants import (
     ESTADO_UNIDAD_COMPRA_CHOICES,
     ESTADO_SOLICITUD_COTIZACION_CHOICES,
     ESTADO_LINEA_COTIZACION_CHOICES,
+    OPCION_PAGO_REAC_CHOICES,
     TIPO_SERVICIO_ADICIONAL_CHOICES,
     PRECIOS_SERVICIOS_ADICIONALES,
 )
@@ -2278,6 +2279,15 @@ class RespuestaLineaCotizacionForm(forms.Form):
             'placeholder': 'Motivo del rechazo (obligatorio si rechaza)...',
         }),
         label='Motivo del Rechazo',
+    )
+
+    opcion_pago_reac = forms.ChoiceField(
+        required=False,
+        choices=OPCION_PAGO_REAC_CHOICES,
+        widget=forms.RadioSelect(attrs={
+            'class': 'form-check-input',
+        }),
+        label='Forma de pago del equipo reacondicionado',
     )
     
     def clean(self):

@@ -62,6 +62,23 @@ interface BootstrapModalEvent extends Event {
     relatedTarget: HTMLElement | undefined;
 }
 
+/** Snapshot de costeo reacondicionado para modal de aprobación */
+interface CosteoReacAprobar {
+    total_precio_contado_mxn?: number;
+    opciones_diferidas_con_iva?: {
+        diferido_3_meses?: number;
+        diferido_6_meses?: number;
+        diferido_12_meses?: number;
+    };
+}
+
+/** Opción de forma de pago al aprobar equipo reac */
+interface OpcionPagoReac {
+    valor: string;
+    etiqueta: string;
+    monto: number;
+}
+
 /** Respuesta del servidor al notificar a front */
 interface NotificarFrontResponse {
     success: boolean;
@@ -101,6 +118,7 @@ class DetalleSolicitud {
     public init(): void {
         this.initImagenesModal();
         this.initRechazarModal();
+        this.initAprobarReacModal();
         this.initNotificarFront();
         this.initToggleCostosInternos();
         this.initScrollShadow();
@@ -320,6 +338,117 @@ class DetalleSolicitud {
             // Actualizar el texto
             const descEl = document.getElementById('lineaDescModal');
             if (descEl) descEl.textContent = lineaDesc || '';
+        });
+    }
+
+    // ====================================================================
+    // MODAL DE APROBACIÓN — EQUIPO REACONDICIONADO (forma de pago)
+    // ====================================================================
+
+    /**
+     * Lee el snapshot de costeo inyectado por Django (json_script).
+     */
+    private obtenerCosteoReacAprobar(): CosteoReacAprobar | null {
+        const el = document.getElementById('costeoReacAprobarData');
+        if (!el?.textContent) return null;
+        try {
+            return JSON.parse(el.textContent) as CosteoReacAprobar;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Arma las 4 opciones de pago con etiqueta y monto con IVA.
+     */
+    private construirOpcionesPagoReac(costeo: CosteoReacAprobar): OpcionPagoReac[] {
+        const dif = costeo.opciones_diferidas_con_iva || {};
+        return [
+            {
+                valor: 'contado',
+                etiqueta: 'Pago de contado',
+                monto: Number(costeo.total_precio_contado_mxn || 0),
+            },
+            {
+                valor: 'diferido_3_meses',
+                etiqueta: 'Financiamiento 3 meses',
+                monto: Number(dif.diferido_3_meses || 0),
+            },
+            {
+                valor: 'diferido_6_meses',
+                etiqueta: 'Financiamiento 6 meses',
+                monto: Number(dif.diferido_6_meses || 0),
+            },
+            {
+                valor: 'diferido_12_meses',
+                etiqueta: 'Financiamiento 12 meses',
+                monto: Number(dif.diferido_12_meses || 0),
+            },
+        ];
+    }
+
+    private formatearPesoReac(monto: number): string {
+        return new Intl.NumberFormat('es-MX', {
+            style: 'currency',
+            currency: 'MXN',
+        }).format(monto);
+    }
+
+    /**
+     * Configura el modal de aprobación reac: forma de pago obligatoria.
+     */
+    private initAprobarReacModal(): void {
+        const modal = document.getElementById('aprobarLineaReacModal');
+        if (!modal) return;
+
+        modal.addEventListener('show.bs.modal', (event: Event) => {
+            const bsEvent = event as BootstrapModalEvent;
+            const button = bsEvent.relatedTarget;
+            if (!button) return;
+
+            const lineaPk = button.getAttribute('data-linea-pk');
+            const lineaDesc = button.getAttribute('data-linea-desc') || '';
+
+            const form = document.getElementById('aprobarLineaReacForm') as HTMLFormElement | null;
+            if (form && lineaPk) {
+                form.action = this.config.urlResponderLinea.replace('/0/', `/${lineaPk}/`);
+            }
+
+            const descEl = document.getElementById('aprobarReacLineaDesc');
+            if (descEl) descEl.textContent = lineaDesc;
+
+            const contenedor = document.getElementById('aprobarReacOpcionesPago');
+            const alertaSinCosteo = document.getElementById('aprobarReacSinCosteo');
+            const btnConfirmar = document.getElementById('btnConfirmarAprobarReac') as HTMLButtonElement | null;
+            const costeo = this.obtenerCosteoReacAprobar();
+
+            if (!contenedor) return;
+            contenedor.innerHTML = '';
+
+            if (!costeo) {
+                if (alertaSinCosteo) alertaSinCosteo.classList.remove('d-none');
+                if (btnConfirmar) btnConfirmar.disabled = true;
+                return;
+            }
+
+            if (alertaSinCosteo) alertaSinCosteo.classList.add('d-none');
+            if (btnConfirmar) btnConfirmar.disabled = false;
+
+            const opciones = this.construirOpcionesPagoReac(costeo);
+            opciones.forEach((opcion, index) => {
+                const id = `opcionPagoReac_${opcion.valor}`;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'form-check border rounded p-2';
+                wrapper.innerHTML = `
+                    <input class="form-check-input" type="radio" name="opcion_pago_reac"
+                           id="${id}" value="${opcion.valor}" ${index === 0 ? 'checked' : ''} required>
+                    <label class="form-check-label w-100 d-flex justify-content-between align-items-center" for="${id}">
+                        <span>${opcion.etiqueta}</span>
+                        <strong class="text-success">${this.formatearPesoReac(opcion.monto)}</strong>
+                    </label>
+                `;
+                contenedor.appendChild(wrapper);
+            });
         });
     }
 

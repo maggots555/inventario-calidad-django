@@ -3601,6 +3601,117 @@ def _guardar_snapshot_reacondicionado(solicitud, datos_equipo, costeo, dias, cos
     ])
 
 
+# SKU del catálogo para equipos reacondicionados ofertados al cliente
+CODIGO_PRODUCTO_REACONDICIONADO = 'P0125'
+
+
+def _construir_descripcion_linea_reac(datos_equipo: dict) -> str:
+    """
+    Arma una descripción compacta del equipo para LineaCotizacion.descripcion_pieza.
+
+    Args:
+        datos_equipo: dict con marca, modelo, procesador, ram, sistema_operativo, incluye_cargador.
+
+    Returns:
+        str: Texto truncado a 255 caracteres (límite del campo).
+    """
+    partes = []
+    marca = (datos_equipo.get('marca') or '').strip()
+    modelo = (datos_equipo.get('modelo') or '').strip()
+    if marca or modelo:
+        partes.append(f'{marca} {modelo}'.strip())
+    if datos_equipo.get('procesador'):
+        partes.append(str(datos_equipo['procesador']).strip())
+    if datos_equipo.get('ram'):
+        partes.append(str(datos_equipo['ram']).strip())
+    if datos_equipo.get('sistema_operativo'):
+        partes.append(str(datos_equipo['sistema_operativo']).strip())
+    if datos_equipo.get('incluye_cargador'):
+        partes.append('Con cargador')
+    return ' | '.join(partes)[:255]
+
+
+def _crear_o_actualizar_linea_reacondicionado(solicitud, datos_equipo, costeo, costo_proveedor):
+    """
+    Crea o actualiza la LineaCotizacion P0125 al enviar propuesta de equipo reacondicionado.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    Esta línea permite a Front aprobar/rechazar la oferta de equipo igual que las piezas
+    de reparación. Al aprobar y generar compras, el equipo va a PiezaVentaMostrador en ST.
+
+    Args:
+        solicitud: SolicitudCotizacion vinculada.
+        datos_equipo: Especificaciones capturadas en el modal.
+        costeo: Resultado de calcular_costeo().
+        costo_proveedor: float, costo de adquisición sin IVA.
+
+    Returns:
+        tuple: (ok: bool, error: str|None)
+    """
+    from decimal import Decimal
+    from .models import LineaCotizacion, ProductoAlmacen
+
+    try:
+        producto = ProductoAlmacen.objects.get(codigo_producto=CODIGO_PRODUCTO_REACONDICIONADO)
+    except ProductoAlmacen.DoesNotExist:
+        logger.error(
+            f'[REAC] Producto {CODIGO_PRODUCTO_REACONDICIONADO} no existe en ProductoAlmacen. '
+            f'Solicitud {solicitud.numero_solicitud}'
+        )
+        return False, (
+            f'El producto {CODIGO_PRODUCTO_REACONDICIONADO} (equipo reacondicionado) '
+            'no está en el catálogo de almacén. Contacte al administrador.'
+        )
+
+    subtotal_sin_iva = Decimal(str(costeo.get('subtotal_sin_iva', 0)))
+    descripcion = _construir_descripcion_linea_reac(datos_equipo)
+
+    notas_partes = []
+    especificaciones = (datos_equipo.get('especificaciones') or '').strip()
+    if especificaciones:
+        notas_partes.append(especificaciones)
+    total_contado = costeo.get('total_precio_contado_mxn')
+    if total_contado is not None:
+        notas_partes.append(f'Precio contado (IVA incl.): ${total_contado}')
+
+    defaults = {
+        'descripcion_pieza': descripcion,
+        'cantidad': 1,
+        'costo_unitario': Decimal(str(costo_proveedor)),
+        'precio_unitario_cliente': subtotal_sin_iva,
+        'subtotal_cliente_sin_iva': subtotal_sin_iva,
+        'es_linea_reacondicionado': True,
+        'es_necesaria': False,
+        'estado_cliente': 'pendiente',
+        'opcion_pago_reac': '',
+        'notas': '\n'.join(notas_partes),
+    }
+
+    linea = solicitud.lineas.filter(
+        producto=producto,
+        es_linea_reacondicionado=True,
+    ).first()
+
+    if linea:
+        for campo, valor in defaults.items():
+            setattr(linea, campo, valor)
+        linea.save()
+        logger.info(
+            f'[REAC] Línea reacondicionado actualizada en solicitud {solicitud.numero_solicitud}'
+        )
+    else:
+        LineaCotizacion.objects.create(
+            solicitud=solicitud,
+            producto=producto,
+            **defaults,
+        )
+        logger.info(
+            f'[REAC] Línea reacondicionado creada en solicitud {solicitud.numero_solicitud}'
+        )
+
+    return True, None
+
+
 def _opciones_servicios_adicionales():
     """
     Construye la lista de servicios adicionales para el dropdown del modal.
@@ -3995,6 +4106,15 @@ def api_enviar_cotizacion_cliente(request, pk):
                 resultado['costo_proveedor'],
             )
 
+            ok_linea, error_linea = _crear_o_actualizar_linea_reacondicionado(
+                solicitud,
+                resultado['datos_equipo'],
+                resultado['costeo'],
+                resultado['costo_proveedor'],
+            )
+            if not ok_linea:
+                return JsonResponse({'success': False, 'error': error_linea})
+
             _db = get_pais_actual()['db_alias']
             enviar_cotizacion_cliente_task.delay(
                 solicitud_id=solicitud.pk,
@@ -4278,10 +4398,8 @@ def descargar_pdf_cotizacion_final(request, pk):
     """
     Genera y descarga el PDF final con piezas/servicios aceptados y precios persistidos.
 
-    EXPLICACIÓN PARA PRINCIPIANTES:
-    --------------------------------
-    Cuando el cliente ya aprobó líneas y se generaron compras, este PDF muestra
-    únicamente lo aceptado con los precios guardados al aprobar (sin recalcular profit).
+    Si solo se aceptó el equipo reacondicionado (línea P0125), genera el PDF de
+    propuesta reacondicionada en lugar del PDF de piezas de reparación.
 
     Args:
         request: HttpRequest GET.
@@ -4295,6 +4413,8 @@ def descargar_pdf_cotizacion_final(request, pk):
     from .utils.cotizacion_items_cliente import (
         construir_items_cotizacion_final,
         solicitud_puede_descargar_pdf_final,
+        solicitud_pdf_final_es_solo_reacondicionado,
+        extraer_datos_equipo_desde_solicitud,
     )
     from .utils.cotizacion_precios_cliente import obtener_tipo_servicio_solicitud
     from config.paises_config import get_pais_actual
@@ -4315,6 +4435,39 @@ def descargar_pdf_cotizacion_final(request, pk):
                 status=400,
             )
 
+        _pais = get_pais_actual()
+
+        # PDF final de equipo reacondicionado (solo línea P0125 aceptada)
+        if solicitud_pdf_final_es_solo_reacondicionado(solicitud):
+            from .utils.pdf_cotizacion_reacondicionado import PDFCotizacionReacondicionado
+            from .utils.cotizacion_items_cliente import obtener_lineas_aceptadas_final
+
+            linea_reac = obtener_lineas_aceptadas_final(solicitud).filter(
+                es_linea_reacondicionado=True,
+            ).first()
+
+            generador_reac = PDFCotizacionReacondicionado(
+                solicitud=solicitud,
+                datos_equipo=extraer_datos_equipo_desde_solicitud(solicitud),
+                costeo=solicitud.resultado_costeo_reac or {},
+                pais_config=_pais,
+                opcion_pago_aceptada=linea_reac.opcion_pago_reac if linea_reac else 'contado',
+                modo_final=True,
+            )
+            resultado = generador_reac.generar_pdf()
+            if not resultado['success']:
+                return HttpResponse(
+                    f'Error al generar PDF: {resultado.get("error", "desconocido")}'.encode(),
+                    content_type='text/plain',
+                    status=500,
+                )
+            pdf_bytes = resultado['buffer'].getvalue()
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = (
+                f'inline; filename="{resultado["nombre_archivo"]}"'
+            )
+            return response
+
         items = construir_items_cotizacion_final(solicitud)
         if not items:
             return HttpResponse(
@@ -4333,7 +4486,7 @@ def descargar_pdf_cotizacion_final(request, pk):
             tipo_servicio=tipo_servicio,
             items=items,
             incluir_descuento_diagnostico=incluir_descuento,
-            pais_config=get_pais_actual(),
+            pais_config=_pais,
             modo_final=True,
         )
 
@@ -4493,13 +4646,31 @@ def responder_linea_cotizacion(request, solicitud_pk, linea_pk):
             motivo = form.cleaned_data.get('motivo_rechazo', '')
             
             if decision == 'aprobar':
-                if linea.aprobar():
+                if linea.es_linea_reacondicionado:
+                    opcion = form.cleaned_data.get('opcion_pago_reac', '')
+                    if not opcion:
+                        messages.error(
+                            request,
+                            'Debes seleccionar la forma de pago del equipo reacondicionado.',
+                        )
+                        return redirect('almacen:detalle_solicitud_cotizacion', pk=solicitud_pk)
+                    aprobado = linea.aprobar(opcion_pago_reac=opcion)
+                else:
+                    aprobado = linea.aprobar()
+                if aprobado:
                     messages.success(
                         request,
                         f'Línea #{linea.numero_linea} aprobada por el cliente.'
                     )
                 else:
-                    messages.error(request, 'No se pudo aprobar la línea.')
+                    if linea.es_linea_reacondicionado:
+                        messages.error(
+                            request,
+                            'No se pudo aprobar el equipo reacondicionado. '
+                            'Verifica el costeo guardado y la forma de pago.',
+                        )
+                    else:
+                        messages.error(request, 'No se pudo aprobar la línea.')
             else:  # rechazar
                 if linea.rechazar(motivo=motivo):
                     messages.warning(
@@ -4528,7 +4699,10 @@ def aprobar_todas_lineas(request, pk):
     solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
     
     if request.method == 'POST':
-        lineas_pendientes = solicitud.lineas.filter(estado_cliente='pendiente')
+        lineas_pendientes = solicitud.lineas.filter(
+            estado_cliente='pendiente',
+            es_linea_reacondicionado=False,
+        )
         aprobadas = 0
         
         for linea in lineas_pendientes:
@@ -4540,7 +4714,17 @@ def aprobar_todas_lineas(request, pk):
                 request,
                 f'Se aprobaron {aprobadas} línea(s) de la cotización.'
             )
-        else:
+        reac_pendientes = solicitud.lineas.filter(
+            estado_cliente='pendiente',
+            es_linea_reacondicionado=True,
+        ).count()
+        if reac_pendientes > 0:
+            messages.info(
+                request,
+                f'Quedan {reac_pendientes} equipo(s) reacondicionado(s) pendiente(s). '
+                'Apruébalos uno por uno para elegir la forma de pago.',
+            )
+        elif aprobadas == 0:
             messages.info(request, 'No había líneas pendientes por aprobar.')
     
     return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
@@ -4819,17 +5003,21 @@ def generar_compras_solicitud(request, pk):
         
         mensajes_exito = []
 
-        # ====== PASO ESPECIAL: Órdenes FL- (Venta Mostrador) ======
-        # Para cotizaciones vinculadas a órdenes de tipo 'venta_mostrador', las piezas
-        # aprobadas se crean como PiezaVentaMostrador en ST en lugar de PiezaCotizada.
-        # IMPORTANTE: se llama ANTES de generar_compras() porque generar_compras() cambia
-        # el estado de las líneas de 'aprobada' a 'compra_generada', y generar_piezas_venta_mostrador()
-        # filtra exclusivamente por estado='aprobada' para evitar duplicados.
-        if (
+        # ====== Piezas en Venta Mostrador (FL- o equipos reacondicionados en OOW) ======
+        # Se llama ANTES de generar_compras() porque generar_compras() pasa las líneas
+        # a estado 'compra_generada' y este método filtra por estado='aprobada'.
+        necesita_piezas_vm = (
             puede_generar_compras
             and solicitud.orden_servicio
-            and solicitud.orden_servicio.tipo_servicio == 'venta_mostrador'
-        ):
+            and (
+                solicitud.orden_servicio.tipo_servicio == 'venta_mostrador'
+                or solicitud.lineas.filter(
+                    es_linea_reacondicionado=True,
+                    estado_cliente='aprobada',
+                ).exists()
+            )
+        )
+        if necesita_piezas_vm:
             n_piezas = solicitud.generar_piezas_venta_mostrador()
             if n_piezas:
                 mensajes_exito.append(

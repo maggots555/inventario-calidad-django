@@ -40,6 +40,7 @@ class DetalleSolicitud {
     init() {
         this.initImagenesModal();
         this.initRechazarModal();
+        this.initAprobarReacModal();
         this.initNotificarFront();
         this.initToggleCostosInternos();
         this.initScrollShadow();
@@ -238,6 +239,113 @@ class DetalleSolicitud {
             const descEl = document.getElementById('lineaDescModal');
             if (descEl)
                 descEl.textContent = lineaDesc || '';
+        });
+    }
+    // ====================================================================
+    // MODAL DE APROBACIÓN — EQUIPO REACONDICIONADO (forma de pago)
+    // ====================================================================
+    /**
+     * Lee el snapshot de costeo inyectado por Django (json_script).
+     */
+    obtenerCosteoReacAprobar() {
+        const el = document.getElementById('costeoReacAprobarData');
+        if (!(el === null || el === void 0 ? void 0 : el.textContent))
+            return null;
+        try {
+            return JSON.parse(el.textContent);
+        }
+        catch {
+            return null;
+        }
+    }
+    /**
+     * Arma las 4 opciones de pago con etiqueta y monto con IVA.
+     */
+    construirOpcionesPagoReac(costeo) {
+        const dif = costeo.opciones_diferidas_con_iva || {};
+        return [
+            {
+                valor: 'contado',
+                etiqueta: 'Pago de contado',
+                monto: Number(costeo.total_precio_contado_mxn || 0),
+            },
+            {
+                valor: 'diferido_3_meses',
+                etiqueta: 'Financiamiento 3 meses',
+                monto: Number(dif.diferido_3_meses || 0),
+            },
+            {
+                valor: 'diferido_6_meses',
+                etiqueta: 'Financiamiento 6 meses',
+                monto: Number(dif.diferido_6_meses || 0),
+            },
+            {
+                valor: 'diferido_12_meses',
+                etiqueta: 'Financiamiento 12 meses',
+                monto: Number(dif.diferido_12_meses || 0),
+            },
+        ];
+    }
+    formatearPesoReac(monto) {
+        return new Intl.NumberFormat('es-MX', {
+            style: 'currency',
+            currency: 'MXN',
+        }).format(monto);
+    }
+    /**
+     * Configura el modal de aprobación reac: forma de pago obligatoria.
+     */
+    initAprobarReacModal() {
+        const modal = document.getElementById('aprobarLineaReacModal');
+        if (!modal)
+            return;
+        modal.addEventListener('show.bs.modal', (event) => {
+            const bsEvent = event;
+            const button = bsEvent.relatedTarget;
+            if (!button)
+                return;
+            const lineaPk = button.getAttribute('data-linea-pk');
+            const lineaDesc = button.getAttribute('data-linea-desc') || '';
+            const form = document.getElementById('aprobarLineaReacForm');
+            if (form && lineaPk) {
+                form.action = this.config.urlResponderLinea.replace('/0/', `/${lineaPk}/`);
+            }
+            const descEl = document.getElementById('aprobarReacLineaDesc');
+            if (descEl)
+                descEl.textContent = lineaDesc;
+            const contenedor = document.getElementById('aprobarReacOpcionesPago');
+            const alertaSinCosteo = document.getElementById('aprobarReacSinCosteo');
+            const btnConfirmar = document.getElementById('btnConfirmarAprobarReac');
+            const costeo = this.obtenerCosteoReacAprobar();
+            if (!contenedor)
+                return;
+            contenedor.innerHTML = '';
+            if (!costeo) {
+                if (alertaSinCosteo)
+                    alertaSinCosteo.classList.remove('d-none');
+                if (btnConfirmar)
+                    btnConfirmar.disabled = true;
+                return;
+            }
+            if (alertaSinCosteo)
+                alertaSinCosteo.classList.add('d-none');
+            if (btnConfirmar)
+                btnConfirmar.disabled = false;
+            const opciones = this.construirOpcionesPagoReac(costeo);
+            opciones.forEach((opcion, index) => {
+                const id = `opcionPagoReac_${opcion.valor}`;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'form-check border rounded p-2';
+                wrapper.innerHTML = `
+                    <input class="form-check-input" type="radio" name="opcion_pago_reac"
+                           id="${id}" value="${opcion.valor}" ${index === 0 ? 'checked' : ''} required>
+                    <label class="form-check-label w-100 d-flex justify-content-between align-items-center" for="${id}">
+                        <span>${opcion.etiqueta}</span>
+                        <strong class="text-success">${this.formatearPesoReac(opcion.monto)}</strong>
+                    </label>
+                `;
+                contenedor.appendChild(wrapper);
+            });
         });
     }
     // ====================================================================

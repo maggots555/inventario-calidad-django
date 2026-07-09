@@ -60,11 +60,15 @@ class PDFCotizacionReacondicionado:
         datos_equipo: Dict[str, Any],
         costeo: Dict[str, Any],
         pais_config: Optional[Dict] = None,
+        opcion_pago_aceptada: Optional[str] = None,
+        modo_final: bool = False,
     ):
         self.solicitud = solicitud
         self.datos_equipo = datos_equipo or {}
         self.costeo = costeo or {}
         self.pais_config = pais_config or {}
+        self.opcion_pago_aceptada = opcion_pago_aceptada
+        self.modo_final = modo_final
         self._estilos = getSampleStyleSheet()
         self._configurar_estilos()
         # Generador de referencia para reutilizar secciones compartidas (cliente, términos)
@@ -130,10 +134,11 @@ class PDFCotizacionReacondicionado:
             doc.build(elementos)
             buffer.seek(0)
             numero = self.solicitud.numero_solicitud.replace('/', '-')
+            sufijo = '_Final' if self.modo_final else ''
             return {
                 'success': True,
                 'buffer': buffer,
-                'nombre_archivo': f'Propuesta_Reacondicionado_{numero}.pdf',
+                'nombre_archivo': f'Propuesta_Reacondicionado{sufijo}_{numero}.pdf',
             }
         except Exception as exc:
             logger.error(f'[PDF_REACONDICIONADO] Error: {exc}', exc_info=True)
@@ -227,7 +232,51 @@ class PDFCotizacionReacondicionado:
 
     def _construir_precios(self) -> List:
         """Totales de contado y opciones de pago diferido con IVA."""
+        from almacen.utils.costeo_reacondicionado import (
+            obtener_etiqueta_opcion_pago_reac,
+            obtener_precio_reac_con_iva,
+        )
+
         c = self.costeo
+
+        # PDF final: solo la forma de pago acordada con el cliente
+        if self.opcion_pago_aceptada:
+            opcion = self.opcion_pago_aceptada
+            etiqueta = obtener_etiqueta_opcion_pago_reac(opcion)
+            total_acordado = float(obtener_precio_reac_con_iva(c, opcion))
+            elementos = [self._crear_header_seccion('Inversión acordada')]
+            estilo_etq = ParagraphStyle(
+                'Etq',
+                fontName='Helvetica-Bold',
+                fontSize=10,
+                textColor=COLOR_BLANCO,
+                alignment=TA_LEFT,
+            )
+            estilo_val = ParagraphStyle(
+                'Val',
+                fontName='Helvetica-Bold',
+                fontSize=10,
+                textColor=COLOR_BLANCO,
+                alignment=TA_RIGHT,
+            )
+            filas = [[
+                Paragraph(f'{etiqueta} (con IVA):', estilo_etq),
+                Paragraph(f'${total_acordado:,.2f}', estilo_val),
+            ]]
+            ancho = letter[0] - 2 * MARGEN
+            tabla = Table(filas, colWidths=[ancho * 0.62, ancho * 0.38])
+            tabla.setStyle(TableStyle([
+                ('GRID', (0, 0), (-1, -1), 0.5, COLOR_GRIS_BORDE),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ('BACKGROUND', (0, 0), (-1, -1), COLOR_AZUL_TOTAL),
+            ]))
+            elementos.append(tabla)
+            return elementos
+
         diferidos = c.get('opciones_diferidas_con_iva') or {}
 
         elementos = [self._crear_header_seccion('Inversión y opciones de pago')]

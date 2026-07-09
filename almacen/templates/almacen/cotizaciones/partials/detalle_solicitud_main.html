@@ -343,11 +343,22 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                             <td class="text-muted fw-bold">{{ linea.numero_linea }}</td>
                                             <td class="pieza-cell">
                                                 <span class="pieza-nombre">{{ linea.producto.nombre }}</span>
+                                                {% if linea.es_linea_reacondicionado %}
+                                                <span class="badge bg-info text-dark badge-compact ms-1" title="Propuesta de equipo reacondicionado — va a Venta Mostrador en ST">
+                                                    <i class="bi bi-pc-display"></i> Equipo reac.
+                                                </span>
+                                                {% endif %}
                                                 <span class="pieza-desc d-block">{{ linea.descripcion_pieza }}</span>
                                                 <span class="pieza-meta">
                                                     {% if linea.proveedor %}{{ linea.proveedor.nombre }}{% if linea.tiempo_entrega_estimado %} · <i class="bi bi-clock"></i> {{ linea.tiempo_entrega_estimado }}d{% endif %}{% else %}Sin proveedor{% endif %}
                                                     · {% if linea.es_necesaria %}<span class="badge bg-danger badge-compact">Necesaria</span>{% else %}<span class="badge bg-secondary badge-compact">Opcional</span>{% endif %}
                                                 </span>
+                                                {% if linea.opcion_pago_reac %}
+                                                <span class="badge bg-primary badge-compact d-inline-block mt-1" title="Forma de pago acordada">
+                                                    <i class="bi bi-credit-card"></i> {{ linea.get_opcion_pago_reac_display }}
+                                                    {% if linea.precio_reac_aceptado_con_iva %}— ${{ linea.precio_reac_aceptado_con_iva|floatformat:2 }} IVA incl.{% endif %}
+                                                </span>
+                                                {% endif %}
                                                 {% if linea.notas %}<span class="pieza-notas d-block"><i class="bi bi-chat-text"></i> {{ linea.notas|truncatechars:60 }}</span>{% endif %}
                                             </td>
                                             <td class="text-center">{{ linea.cantidad }}</td>
@@ -386,11 +397,19 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                                     </button>
                                                     {% endwith %}
                                                     {% if linea.estado_cliente == 'pendiente' and solicitud.estado in 'enviada_cliente,parcialmente_aprobada' %}
+                                                    {% if linea.es_linea_reacondicionado and solicitud.resultado_costeo_reac %}
+                                                    <button type="button" class="btn btn-sm btn-outline-success" title="Aprobar equipo reacondicionado"
+                                                            data-bs-toggle="modal" data-bs-target="#aprobarLineaReacModal"
+                                                            data-linea-pk="{{ linea.pk }}" data-linea-desc="{{ linea.descripcion_pieza }}">
+                                                        <i class="bi bi-check-lg"></i>
+                                                    </button>
+                                                    {% elif not linea.es_linea_reacondicionado %}
                                                     <form method="post" action="{% url 'almacen:responder_linea_cotizacion' solicitud.pk linea.pk %}" class="d-inline">
                                                         {% csrf_token %}
                                                         <input type="hidden" name="decision" value="aprobar">
                                                         <button type="submit" class="btn btn-sm btn-outline-success" title="Aprobar"><i class="bi bi-check-lg"></i></button>
                                                     </form>
+                                                    {% endif %}
                                                     <button type="button" class="btn btn-sm btn-outline-danger" title="Rechazar"
                                                             data-bs-toggle="modal" data-bs-target="#rechazarLineaModal"
                                                             data-linea-pk="{{ linea.pk }}" data-linea-desc="{{ linea.descripcion_pieza }}">
@@ -416,7 +435,18 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                     <span class="linea-card-num">#{{ linea.numero_linea }}</span>
                                     <div class="flex-grow-1">
                                         <strong>{{ linea.producto.nombre }}</strong>
+                                        {% if linea.es_linea_reacondicionado %}
+                                        <span class="badge bg-info text-dark badge-compact ms-1"><i class="bi bi-pc-display"></i> Reac.</span>
+                                        {% endif %}
                                         <div class="small text-muted">{{ linea.descripcion_pieza }}</div>
+                                        {% if linea.opcion_pago_reac %}
+                                        <div class="small mt-1">
+                                            <span class="badge bg-primary badge-compact">
+                                                <i class="bi bi-credit-card"></i> {{ linea.get_opcion_pago_reac_display }}
+                                                {% if linea.precio_reac_aceptado_con_iva %}— ${{ linea.precio_reac_aceptado_con_iva|floatformat:2 }}{% endif %}
+                                            </span>
+                                        </div>
+                                        {% endif %}
                                     </div>
                                     {% if linea.es_necesaria %}<span class="badge bg-danger badge-compact">Nec.</span>{% else %}<span class="badge bg-secondary badge-compact">Opc.</span>{% endif %}
                                 </div>
@@ -448,11 +478,19 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
                                     {% endwith %}
                                     <div class="linea-card-acciones">
                                         {% if linea.estado_cliente == 'pendiente' and solicitud.estado in 'enviada_cliente,parcialmente_aprobada' %}
+                                        {% if linea.es_linea_reacondicionado and solicitud.resultado_costeo_reac %}
+                                        <button type="button" class="btn btn-sm btn-success"
+                                                data-bs-toggle="modal" data-bs-target="#aprobarLineaReacModal"
+                                                data-linea-pk="{{ linea.pk }}" data-linea-desc="{{ linea.descripcion_pieza }}">
+                                            <i class="bi bi-check-lg"></i>
+                                        </button>
+                                        {% elif not linea.es_linea_reacondicionado %}
                                         <form method="post" action="{% url 'almacen:responder_linea_cotizacion' solicitud.pk linea.pk %}" class="d-inline">
                                             {% csrf_token %}
                                             <input type="hidden" name="decision" value="aprobar">
                                             <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button>
                                         </form>
+                                        {% endif %}
                                         <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rechazarLineaModal"
                                                 data-linea-pk="{{ linea.pk }}" data-linea-desc="{{ linea.descripcion_pieza }}">
                                             <i class="bi bi-x-lg"></i>

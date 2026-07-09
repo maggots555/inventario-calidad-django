@@ -4,7 +4,12 @@ Tests del motor de costeo de equipos reacondicionados (Excel Certificados SIC).
 
 from django.test import SimpleTestCase
 
-from almacen.utils.costeo_reacondicionado import calcular_costeo
+from almacen.utils.costeo_reacondicionado import (
+    calcular_costeo,
+    obtener_etiqueta_opcion_pago_reac,
+    obtener_precio_reac_con_iva,
+    obtener_precio_reac_sin_iva,
+)
 
 
 class CosteoReacondicionadoTest(SimpleTestCase):
@@ -31,3 +36,19 @@ class CosteoReacondicionadoTest(SimpleTestCase):
         resultado = calcular_costeo(costo_proveedor=1000.0, dias_front_desk=1)
         self.assertNotIn('diagnostico', resultado)
         self.assertGreater(resultado['total_precio_contado_mxn'], 1000.0)
+
+    def test_obtener_precio_por_opcion_pago(self):
+        """Cada forma de pago resuelve el monto correcto del snapshot."""
+        costeo = calcular_costeo(costo_proveedor=5431.03, dias_front_desk=1)
+        contado = float(obtener_precio_reac_con_iva(costeo, 'contado'))
+        dif_6 = float(obtener_precio_reac_con_iva(costeo, 'diferido_6_meses'))
+        self.assertAlmostEqual(contado, costeo['total_precio_contado_mxn'], places=2)
+        self.assertGreater(dif_6, contado)
+        sin_iva = float(obtener_precio_reac_sin_iva(costeo, 'contado'))
+        self.assertAlmostEqual(sin_iva, costeo['subtotal_sin_iva'], places=2)
+
+    def test_etiqueta_opcion_pago(self):
+        self.assertEqual(
+            obtener_etiqueta_opcion_pago_reac('diferido_6_meses'),
+            'Financiamiento 6 meses',
+        )

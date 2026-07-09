@@ -53,6 +53,9 @@ def construir_items_desde_solicitud(solicitud) -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
 
     for linea in solicitud.lineas.select_related('producto').all():
+        # Las líneas de equipo reacondicionado tienen precio fijado por costeo Excel, no profit
+        if getattr(linea, 'es_linea_reacondicionado', False):
+            continue
         costo = float(linea.costo_unitario or 0)
         if costo <= 0:
             continue

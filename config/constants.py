@@ -616,6 +616,14 @@ ESTADOS_LINEA_COTIZACION_ACTIVA = ('pendiente', 'aprobada')
 # Estados incluidos en el PDF final (solo lo que el cliente aceptó)
 ESTADOS_LINEA_COTIZACION_ACEPTADA = ('aprobada', 'compra_generada')
 
+# Forma de pago al aceptar equipo reacondicionado (línea P0125)
+OPCION_PAGO_REAC_CHOICES = [
+    ('contado', 'Pago de contado'),
+    ('diferido_3_meses', 'Financiamiento 3 meses'),
+    ('diferido_6_meses', 'Financiamiento 6 meses'),
+    ('diferido_12_meses', 'Financiamiento 12 meses'),
+]
+
 # CLASIFICACIÓN DE ESTADOS PARA LÓGICA DE SOLICITUD DE COTIZACIÓN
 ESTADOS_SOLICITUD_ACTIVOS = ['borrador', 'enviada_front', 'enviada_cliente', 'parcialmente_aprobada', 'totalmente_aprobada', 'en_proceso']
 ESTADOS_SOLICITUD_FINALIZADOS = ['completada', 'totalmente_rechazada', 'cancelada']

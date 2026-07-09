@@ -123,6 +123,43 @@ def obtener_lineas_aceptadas_final(solicitud):
     ).select_related('producto')
 
 
+def extraer_datos_equipo_desde_solicitud(solicitud) -> Dict[str, Any]:
+    """
+    Reconstruye el dict de especificaciones del equipo desde el snapshot de la solicitud.
+
+    Args:
+        solicitud: SolicitudCotizacion con campos reac_* guardados al enviar la propuesta.
+
+    Returns:
+        dict compatible con PDFCotizacionReacondicionado.
+    """
+    return {
+        'marca': getattr(solicitud, 'reac_marca', '') or '',
+        'modelo': getattr(solicitud, 'reac_modelo', '') or '',
+        'procesador': getattr(solicitud, 'reac_procesador', '') or '',
+        'ram': getattr(solicitud, 'reac_ram', '') or '',
+        'sistema_operativo': getattr(solicitud, 'reac_sistema_operativo', '') or '',
+        'incluye_cargador': bool(getattr(solicitud, 'reac_incluye_cargador', False)),
+        'especificaciones': getattr(solicitud, 'reac_especificaciones', '') or '',
+    }
+
+
+def solicitud_pdf_final_es_solo_reacondicionado(solicitud) -> bool:
+    """
+    True si el PDF final debe ser el de equipo reacondicionado (no el de piezas).
+
+    Condición: hay al menos una línea reac aceptada y ninguna pieza de reparación
+    ni servicio adicional aceptado.
+    """
+    lineas_aceptadas = obtener_lineas_aceptadas_final(solicitud)
+    tiene_reac = lineas_aceptadas.filter(es_linea_reacondicionado=True).exists()
+    if not tiene_reac:
+        return False
+    tiene_reparacion = lineas_aceptadas.filter(es_linea_reacondicionado=False).exists()
+    tiene_servicios = obtener_servicios_aceptados_final(solicitud).exists()
+    return not tiene_reparacion and not tiene_servicios
+
+
 def obtener_servicios_aceptados_final(solicitud):
     """Servicios aceptados para el PDF final."""
     return solicitud.servicios_adicionales.filter(
@@ -144,10 +181,22 @@ def solicitud_puede_descargar_pdf_final(solicitud) -> bool:
     True si la solicitud puede generar el PDF final con precios aceptados.
 
     Requiere precios persistidos y al menos un ítem aceptado.
+    Excepción: solo equipo reacondicionado aceptado usa snapshot reac + precios en línea.
     """
-    if not getattr(solicitud, 'fecha_precios_cliente', None):
-        return False
     if solicitud.estado not in ESTADOS_SOLICITUD_PDF_FINAL:
+        return False
+
+    if solicitud_pdf_final_es_solo_reacondicionado(solicitud):
+        linea_reac = obtener_lineas_aceptadas_final(solicitud).filter(
+            es_linea_reacondicionado=True,
+        ).first()
+        return bool(
+            linea_reac
+            and linea_reac.precio_unitario_cliente is not None
+            and getattr(solicitud, 'resultado_costeo_reac', None)
+        )
+
+    if not getattr(solicitud, 'fecha_precios_cliente', None):
         return False
     tiene_piezas = obtener_lineas_aceptadas_final(solicitud).exists()
     tiene_servicios = obtener_servicios_aceptados_final(solicitud).exists()
@@ -233,6 +282,9 @@ def construir_items_cotizacion_final(solicitud) -> List[Dict[str, Any]]:
     """
     items: List[Dict[str, Any]] = []
     for linea in obtener_lineas_aceptadas_final(solicitud):
+        # El equipo reacondicionado tiene PDF propio; no entra al de piezas
+        if getattr(linea, 'es_linea_reacondicionado', False):
+            continue
         item = serializar_linea_final(linea)
         if item:
             items.append(item)

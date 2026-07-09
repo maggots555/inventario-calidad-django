@@ -153,3 +153,73 @@ def calcular_costeo(
 def serializar_config_costeo() -> Dict[str, float]:
     """Expone la configuración para inyectarla en el modal (TypeScript)."""
     return dict(COSTEO_REACONDICIONADO_CONFIG)
+
+
+IVA_FACTOR_REAC = 1.16
+
+
+def obtener_precio_reac_con_iva(costeo: Optional[Dict[str, Any]], opcion: str):
+    """
+    Obtiene el monto con IVA según la forma de pago elegida por el cliente.
+
+    Args:
+        costeo: Snapshot resultado_costeo_reac de la solicitud.
+        opcion: Clave de OPCION_PAGO_REAC_CHOICES (contado, diferido_3_meses, etc.).
+
+    Returns:
+        Decimal: Precio con IVA; 0 si no hay datos válidos.
+    """
+    from decimal import Decimal
+
+    if not costeo or not opcion:
+        return Decimal('0.00')
+
+    if opcion == 'contado':
+        valor = costeo.get('total_precio_contado_mxn')
+    else:
+        diferidos = costeo.get('opciones_diferidas_con_iva') or {}
+        valor = diferidos.get(opcion)
+
+    if valor is None:
+        return Decimal('0.00')
+    return Decimal(str(valor))
+
+
+def obtener_precio_reac_sin_iva(costeo: Optional[Dict[str, Any]], opcion: str):
+    """
+    Convierte el precio con IVA a monto sin IVA (coherente con LineaCotizacion).
+
+    Args:
+        costeo: Snapshot de costeo reacondicionado.
+        opcion: Forma de pago elegida.
+
+    Returns:
+        Decimal: Precio unitario al cliente sin IVA.
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+
+    con_iva = obtener_precio_reac_con_iva(costeo, opcion)
+    if con_iva <= 0:
+        return Decimal('0.00')
+    return (con_iva / Decimal(str(IVA_FACTOR_REAC))).quantize(
+        Decimal('0.01'), rounding=ROUND_HALF_UP
+    )
+
+
+def obtener_etiqueta_opcion_pago_reac(opcion: str) -> str:
+    """
+    Texto legible para mostrar en UI, PDF y notas de Venta Mostrador.
+
+    Args:
+        opcion: Valor de opcion_pago_reac.
+
+    Returns:
+        str: Etiqueta en español.
+    """
+    etiquetas = {
+        'contado': 'Pago de contado',
+        'diferido_3_meses': 'Financiamiento 3 meses',
+        'diferido_6_meses': 'Financiamiento 6 meses',
+        'diferido_12_meses': 'Financiamiento 12 meses',
+    }
+    return etiquetas.get(opcion, opcion or 'Sin especificar')

@@ -50,6 +50,7 @@ from config.constants import (
     # Constantes para SolicitudCotizacion (nuevo)
     ESTADO_SOLICITUD_COTIZACION_CHOICES,
     ESTADO_LINEA_COTIZACION_CHOICES,
+    OPCION_PAGO_REAC_CHOICES,
     # Constantes para datos del cliente en cotizaciones
     MARCAS_EQUIPOS_CHOICES,
     TIPO_EQUIPO_CHOICES,
@@ -3716,100 +3717,109 @@ class SolicitudCotizacion(models.Model):
     
     def generar_piezas_venta_mostrador(self):
         """
-        Crea registros PiezaVentaMostrador en ST a partir de las LineaCotizacion aprobadas.
+        Crea registros PiezaVentaMostrador en ST a partir de LineaCotizacion aprobadas.
 
         EXPLICACIÓN PARA PRINCIPIANTES:
         --------------------------------
-        Este método es exclusivo para cotizaciones vinculadas a órdenes FL-
-        (tipo_servicio='venta_mostrador' / Servicio Directo sin Diagnóstico).
+        Hay dos escenarios que convergen en PiezaVentaMostrador:
 
-        En el flujo de diagnóstico (OOW-), las piezas cotizadas van a PiezaCotizada
-        dentro de la Cotizacion de servicio_tecnico. Pero en Venta Mostrador, no hay
-        diagnóstico ni cotización de ST; las piezas vendidas se registran directamente
-        en PiezaVentaMostrador, que es la sección "Piezas Vendidas Individualmente" que
-        aparece en el detalle de la orden en Servicio Técnico.
+        1. Órdenes FL- (venta_mostrador): TODAS las líneas aprobadas van aquí.
+        2. Órdenes OOW (diagnóstico): SOLO las líneas con es_linea_reacondicionado=True
+           (equipo P0125 ofertado como alternativa a reparación por piezas).
 
-        Flujo:
-        1. Verifica que la orden vinculada sea tipo 'venta_mostrador'
-        2. Obtiene o crea el VentaMostrador de la orden (debe existir)
-        3. Por cada LineaCotizacion con estado 'aprobada' (aún no procesada como compra),
-           crea una PiezaVentaMostrador con los datos de la pieza
-        4. Retorna el conteo de piezas creadas
+        Las piezas de reparación en OOW siguen yendo a PiezaCotizada vía _sincronizar_pieza_st.
 
         Diseño anti-duplicados:
-        - Solo procesa líneas con estado_cliente='aprobada'. Una vez que generar_compras()
-          las marca como 'compra_generada', ya no vuelven a procesarse aquí.
-        - Por eso este método SIEMPRE debe llamarse ANTES de generar_compras() en la vista.
-
-        Args:
-            (ninguno, usa self)
+        - Solo procesa líneas con estado_cliente='aprobada'.
+        - generar_compras() las marca 'compra_generada' después; este método debe
+          llamarse ANTES de generar_compras() en la vista.
 
         Returns:
             int: Número de PiezaVentaMostrador creadas (0 si no aplica o no hay líneas)
         """
-        # Solo aplica para órdenes de tipo Venta Mostrador
         if not self.orden_servicio:
             return 0
 
-        if self.orden_servicio.tipo_servicio != 'venta_mostrador':
-            return 0
-
-        # Importación local de Decimal y modelos de ST (evitar circular imports)
         from decimal import Decimal
         from servicio_tecnico.models import VentaMostrador, PiezaVentaMostrador
 
-        # Obtener el VentaMostrador de la orden — debe existir (lo crea crear_orden_fl)
-        # Si por algún motivo no existe, lo creamos aquí como medida de seguridad
+        es_orden_fl = self.orden_servicio.tipo_servicio == 'venta_mostrador'
+
+        # Líneas aprobadas pendientes de procesar como compra
+        lineas_pendientes = self.lineas.filter(estado_cliente='aprobada')
+
+        if es_orden_fl:
+            # FL-: todas las líneas aprobadas van a Venta Mostrador
+            lineas_a_procesar = lineas_pendientes
+        else:
+            # OOW: solo equipos reacondicionados (no piezas de reparación)
+            lineas_a_procesar = lineas_pendientes.filter(es_linea_reacondicionado=True)
+            if not lineas_a_procesar.exists():
+                return 0
+
         vm, _ = VentaMostrador.objects.get_or_create(
             orden=self.orden_servicio,
             defaults={'fecha_venta': timezone.now()}
         )
 
-        # Obtener las líneas aprobadas que aún no han sido procesadas como compra
-        # El estado 'aprobada' indica que el cliente aprobó la pieza pero aún no se
-        # generó la CompraProducto (ni por ende la PiezaVentaMostrador)
-        lineas_pendientes = self.lineas.filter(estado_cliente='aprobada')
-
-        if not lineas_pendientes.exists():
-            return 0
-
         piezas_creadas = 0
+        IVA_FACTOR = Decimal('1.16')
 
-        for linea in lineas_pendientes:
-            # Construir descripción combinando nombre del producto y descripción de pieza
+        for linea in lineas_a_procesar:
             nombre_producto = linea.producto.nombre if linea.producto else 'Pieza sin nombre'
             descripcion_extra = linea.descripcion_pieza or ''
             if descripcion_extra:
                 descripcion_completa = f"{nombre_producto} — {descripcion_extra}"
             else:
                 descripcion_completa = nombre_producto
-
-            # Truncar a 200 caracteres (límite del campo descripcion_pieza)
             descripcion_completa = descripcion_completa[:200]
 
-            # precio_unitario = precio cotizado al cliente; fallback a costo proveedor
-            precio_venta = (
-                linea.precio_unitario_cliente
-                if linea.precio_unitario_cliente is not None
-                else (linea.costo_unitario or Decimal('0.00'))
-            )
+            # Equipos reac: precio con IVA según forma de pago elegida al aprobar
+            if linea.es_linea_reacondicionado:
+                from almacen.utils.costeo_reacondicionado import (
+                    obtener_etiqueta_opcion_pago_reac,
+                    obtener_precio_reac_con_iva,
+                )
+                costeo = self.resultado_costeo_reac or {}
+                opcion = linea.opcion_pago_reac or 'contado'
+                precio_venta = obtener_precio_reac_con_iva(costeo, opcion)
+                if precio_venta <= 0 and linea.precio_unitario_cliente is not None:
+                    precio_venta = linea.precio_unitario_cliente * IVA_FACTOR
+                elif precio_venta <= 0:
+                    precio_venta = (linea.costo_unitario or Decimal('0.00')) * IVA_FACTOR
+                etiqueta_pago = obtener_etiqueta_opcion_pago_reac(opcion)
+                notas_pieza = (
+                    f"Equipo reacondicionado — cotización {self.numero_solicitud}. "
+                    f"Forma de pago: {etiqueta_pago}. "
+                    f"{linea.notas[:400] if linea.notas else ''}"
+                ).strip()
+            else:
+                # FL- piezas normales: precio cotizado al cliente (fallback costo proveedor)
+                precio_venta = (
+                    linea.precio_unitario_cliente
+                    if linea.precio_unitario_cliente is not None
+                    else (linea.costo_unitario or Decimal('0.00'))
+                )
+                notas_pieza = (
+                    f"Generada desde cotización {self.numero_solicitud}. "
+                    f"Proveedor: {linea.proveedor.nombre if linea.proveedor else 'N/A'}."
+                )
+
             PiezaVentaMostrador.objects.create(
                 venta_mostrador=vm,
                 descripcion_pieza=descripcion_completa,
                 cantidad=linea.cantidad,
                 precio_unitario=precio_venta,
-                notas=(
-                    f"Generada desde cotización {self.numero_solicitud}. "
-                    f"Proveedor: {linea.proveedor.nombre if linea.proveedor else 'N/A'}."
-                ),
+                notas=notas_pieza,
             )
             piezas_creadas += 1
 
-        logger.info(
-            f"SolicitudCotizacion {self.numero_solicitud}: "
-            f"{piezas_creadas} PiezaVentaMostrador creada(s) en orden "
-            f"{self.orden_servicio.numero_orden_interno}"
-        )
+        if piezas_creadas:
+            logger.info(
+                f"SolicitudCotizacion {self.numero_solicitud}: "
+                f"{piezas_creadas} PiezaVentaMostrador creada(s) en orden "
+                f"{self.orden_servicio.numero_orden_interno}"
+            )
 
         return piezas_creadas
 
@@ -4120,6 +4130,22 @@ class LineaCotizacion(models.Model):
         verbose_name='¿Sugerida por técnico?',
         help_text='¿Fue sugerida por el técnico en su diagnóstico? (normalmente False para líneas de Almacén)'
     )
+    es_linea_reacondicionado = models.BooleanField(
+        default=False,
+        verbose_name='¿Es equipo reacondicionado?',
+        help_text=(
+            'True si esta línea representa una propuesta de equipo reacondicionado (P0125). '
+            'No se sincroniza a PiezaCotizada; al aprobar va a PiezaVentaMostrador en ST.'
+        ),
+    )
+    opcion_pago_reac = models.CharField(
+        max_length=20,
+        choices=OPCION_PAGO_REAC_CHOICES,
+        blank=True,
+        default='',
+        verbose_name='Forma de pago reacondicionado',
+        help_text='Opción de pago elegida por el cliente al aprobar la línea reac (contado o meses)',
+    )
 
     # ========== INFORMACIÓN ADICIONAL ==========
     notas = models.TextField(
@@ -4214,6 +4240,21 @@ class LineaCotizacion(models.Model):
         if self.precio_unitario_cliente is not None:
             return self.cantidad * self.precio_unitario_cliente
         return None
+
+    @property
+    def precio_reac_aceptado_con_iva(self):
+        """
+        Monto con IVA de la forma de pago elegida al aprobar equipo reacondicionado.
+
+        Returns:
+            Decimal o None si no aplica o no hay opción guardada.
+        """
+        if not self.es_linea_reacondicionado or not self.opcion_pago_reac:
+            return None
+        from almacen.utils.costeo_reacondicionado import obtener_precio_reac_con_iva
+        costeo = getattr(self.solicitud, 'resultado_costeo_reac', None) or {}
+        precio = obtener_precio_reac_con_iva(costeo, self.opcion_pago_reac)
+        return precio if precio > 0 else None
     
     def _sincronizar_pieza_st(self):
         """
@@ -4247,6 +4288,10 @@ class LineaCotizacion(models.Model):
         from decimal import Decimal
         
         if not self.solicitud.orden_servicio:
+            return
+
+        # Equipos reacondicionados van a PiezaVentaMostrador, no a PiezaCotizada
+        if self.es_linea_reacondicionado:
             return
 
         # Para órdenes de Venta Mostrador (FL-), las piezas van a PiezaVentaMostrador,
@@ -4393,27 +4438,50 @@ class LineaCotizacion(models.Model):
         """Verifica si la línea puede ser rechazada"""
         return self.estado_cliente == 'pendiente'
     
-    def aprobar(self):
+    def aprobar(self, opcion_pago_reac=None):
         """
         Marca la línea como aprobada por el cliente.
         
         Efectos:
         - Cambia estado_cliente a 'aprobada'
+        - En líneas reacondicionadas, aplica forma de pago y precio acordado
         - Calcula y persiste precios al cliente (primera aprobación de la solicitud)
         - Sincroniza con PiezaCotizada en ST (aceptada_por_cliente=True)
         - Actualiza estado general de Cotizacion en ST si todas tienen respuesta
+        
+        Args:
+            opcion_pago_reac: Forma de pago elegida (solo líneas es_linea_reacondicionado).
         
         Returns:
             bool: True si se aprobó exitosamente
         """
         if not self.puede_aprobar():
             return False
+
+        # Equipo reacondicionado: precio según contado o financiamiento elegido
+        if self.es_linea_reacondicionado:
+            from almacen.utils.costeo_reacondicionado import obtener_precio_reac_sin_iva
+            opcion = opcion_pago_reac or self.opcion_pago_reac
+            if not opcion:
+                return False
+            costeo = getattr(self.solicitud, 'resultado_costeo_reac', None) or {}
+            precio_sin_iva = obtener_precio_reac_sin_iva(costeo, opcion)
+            if precio_sin_iva <= 0:
+                return False
+            self.opcion_pago_reac = opcion
+            self.precio_unitario_cliente = precio_sin_iva
+            self.subtotal_cliente_sin_iva = precio_sin_iva
         
         self.estado_cliente = 'aprobada'
         self.fecha_respuesta = timezone.now()
 
-        # Calcular y guardar precios al cliente la primera vez que se aprueba una línea
+        # EXPLICACIÓN PARA PRINCIPIANTES:
+        # Primera aprobación de la solicitud: bloquear precios de TODAS las líneas de reparación.
+        # Hay que guardar estado 'aprobada' en BD ANTES de persistir_precios_cliente(), porque
+        # después hacemos refresh_from_db() y si el estado aún era 'pendiente' en BD, se revertía
+        # y el usuario tenía que aprobar dos veces.
         if not self.solicitud.fecha_precios_cliente:
+            self.save()
             self.solicitud.persistir_precios_cliente()
             self.refresh_from_db()
 
