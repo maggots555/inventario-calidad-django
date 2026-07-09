@@ -4990,6 +4990,14 @@ def generar_compras_solicitud(request, pk):
     solicitud = get_object_or_404(SolicitudCotizacion, pk=pk)
     
     if request.method == 'POST':
+        # Bloquear compras en modo sin orden activa hasta vincular orden de servicio
+        if solicitud.compras_pendientes_sin_orden():
+            messages.error(
+                request,
+                'Debes crear o vincular una orden de servicio antes de generar las compras.'
+            )
+            return redirect('almacen:detalle_solicitud_cotizacion', pk=pk)
+
         puede_generar_compras = solicitud.puede_generar_compras()
         puede_generar_venta = solicitud.puede_generar_venta_mostrador()
         

@@ -501,6 +501,14 @@
     flex: 1;
 }
 
+/* Aviso cuando Generar Compras está bloqueado por falta de orden */
+.detalle-compras-bloqueadas {
+    color: var(--gray-600);
+    padding: 0.35rem 0.5rem;
+    border-left: 3px solid var(--warning-color);
+    background-color: var(--gray-50);
+}
+
 /* Espacio inferior para que el dock no tape contenido */
 @media (max-width: 991.98px) {
     .detalle-solicitud-page {
@@ -665,4 +673,10 @@
 
 [data-bs-theme="dark"] .detalle-header-lineas .toggle-costos-label {
     color: var(--text-secondary);
+}
+
+[data-bs-theme="dark"] .detalle-compras-bloqueadas {
+    color: var(--text-secondary);
+    background-color: #1e293b;
+    border-left-color: #fbbf24;
 }

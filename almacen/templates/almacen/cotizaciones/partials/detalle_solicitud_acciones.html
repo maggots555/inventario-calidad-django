@@ -46,16 +46,6 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
     </a>
     {% endif %}
 
-    {% if solicitud.puede_generar_compras %}
-    <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary w-100"
-                onclick="return confirm('¿Generar compras para las líneas aprobadas?')">
-            <i class="bi bi-cart-plus me-2"></i>Generar Compras
-        </button>
-    </form>
-    {% endif %}
-
     {% if solicitud.puede_vincular_orden %}
     <button type="button" class="btn btn-success w-100"
             data-solicitud-pk="{{ solicitud.pk }}"
@@ -67,6 +57,26 @@ Panel de acciones reutilizable — sidebar desktop y offcanvas móvil (clonado v
     <a href="{% url 'almacen:vincular_orden_solicitud' solicitud.pk %}" class="btn btn-outline-info btn-sm w-100">
         <i class="bi bi-link-45deg me-1"></i>Vincular orden existente
     </a>
+    {% endif %}
+
+    {% if solicitud.puede_generar_compras %}
+    <form method="post" action="{% url 'almacen:generar_compras_solicitud' solicitud.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary w-100"
+                onclick="return confirm('¿Generar compras para las líneas aprobadas?')">
+            <i class="bi bi-cart-plus me-2"></i>Generar Compras
+        </button>
+    </form>
+    {% elif solicitud.compras_pendientes_sin_orden %}
+    <button type="button" class="btn btn-primary w-100" disabled
+            aria-disabled="true"
+            title="Primero crea o vincula una orden de servicio">
+        <i class="bi bi-cart-plus me-2"></i>Generar Compras
+    </button>
+    <p class="detalle-compras-bloqueadas small mb-0">
+        <i class="bi bi-info-circle me-1"></i>
+        Primero crea o vincula una orden de servicio para dar seguimiento en Servicio Técnico.
+    </p>
     {% endif %}
 
     {% if solicitud.estado not in 'completada,cancelada,totalmente_rechazada' %}

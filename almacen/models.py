@@ -3545,10 +3545,35 @@ class SolicitudCotizacion(models.Model):
         Condiciones:
         - Estado debe ser 'totalmente_aprobada' o 'parcialmente_aprobada'
         - Debe haber al menos una línea aprobada sin compra generada
+        - En modo sin_orden_activa debe existir orden_servicio vinculada
+        """
+        tiene_lineas_pendientes = (
+            self.estado in ['totalmente_aprobada', 'parcialmente_aprobada']
+            and self.lineas.filter(
+                estado_cliente='aprobada', compra_generada__isnull=True
+            ).exists()
+        )
+        if not tiene_lineas_pendientes:
+            return False
+        # En modo sin orden activa, exigir orden vinculada antes de generar compras
+        if self.sin_orden_activa and not self.orden_servicio:
+            return False
+        return True
+
+    def compras_pendientes_sin_orden(self):
+        """
+        Indica si hay líneas listas para comprar pero falta crear/vincular orden.
+        
+        Solo aplica en modo sin_orden_activa. La UI usa este método para mostrar
+        el botón "Generar Compras" deshabilitado con un mensaje explicativo.
         """
         return (
-            self.estado in ['totalmente_aprobada', 'parcialmente_aprobada'] and
-            self.lineas.filter(estado_cliente='aprobada', compra_generada__isnull=True).exists()
+            self.sin_orden_activa
+            and not self.orden_servicio
+            and self.estado in ['totalmente_aprobada', 'parcialmente_aprobada']
+            and self.lineas.filter(
+                estado_cliente='aprobada', compra_generada__isnull=True
+            ).exists()
         )
     
     def generar_compras(self, usuario=None):

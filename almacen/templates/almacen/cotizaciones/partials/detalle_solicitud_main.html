@@ -692,6 +692,20 @@ Layout: sidebar sticky + tabs + tabla compacta / tarjetas móviles.
             <i class="bi bi-cart-plus me-1"></i>Generar Compras
         </button>
     </form>
+    {% elif solicitud.compras_pendientes_sin_orden and solicitud.puede_vincular_orden %}
+    <button type="button" class="btn btn-success btn-dock-primary flex-grow-1"
+            data-solicitud-pk="{{ solicitud.pk }}"
+            data-url-datos="{% url 'almacen:crear_orden_fl_desde_cotizacion' solicitud.pk %}"
+            data-url-post="{% url 'almacen:crear_orden_fl_desde_cotizacion' solicitud.pk %}"
+            data-bs-toggle="modal" data-bs-target="#modalCrearOrdenFL">
+        <i class="bi bi-plus-circle me-1"></i>Crear Orden
+    </button>
+    {% elif solicitud.compras_pendientes_sin_orden %}
+    <button type="button" class="btn btn-primary btn-dock-primary flex-grow-1" disabled
+            aria-disabled="true"
+            title="Primero crea o vincula una orden de servicio">
+        <i class="bi bi-cart-plus me-1"></i>Generar Compras
+    </button>
     {% elif solicitud.estado == 'enviada_cliente' and tiene_items_cotizables %}
     <button type="button" class="btn btn-outline-warning btn-dock-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarCotizacionCliente">
         <i class="bi bi-arrow-clockwise me-1"></i>Reenviar
