@@ -214,6 +214,8 @@
                             <th>Service Tag</th>
                             <th>Contacto</th>
                             <th>Modelo</th>
+                            <th>Ciudad</th>
+                            <th>CIS (estimado)</th>
                             <th>Grupo</th>
                             <th>Fecha</th>
                             <th class="text-center">Acciones</th>
@@ -235,6 +237,26 @@
                             <td><strong>{{ orden.service_tag }}</strong></td>
                             <td>{{ orden.contacto|truncatechars:30 }}</td>
                             <td>{{ orden.especificaciones }}</td>
+                            <td>
+                                {% if orden.ciudad %}
+                                <span>{{ orden.ciudad|truncatechars:22 }}</span>
+                                {% if orden.estado %}
+                                <span class="small d-block text-muted">{{ orden.estado|truncatechars:20 }}</span>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if orden.cis_etiqueta %}
+                                <span class="badge bg-light text-dark border"
+                                      title="Inferido desde ciudad/estado (la API de garantías no envía CIS)">
+                                    {{ orden.cis_etiqueta }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <td><span class="badge bg-secondary">{{ orden.nombre_grupo }}</span></td>
                             <td class="small text-muted">{{ orden.fecha_recepcion|truncatechars:19 }}</td>
                             <td class="text-center sicser-acciones">
@@ -358,6 +380,7 @@
         <i class="bi bi-info-circle"></i>
         Los badges <strong>nuevas</strong> son registros en SICSER aún no importados.
         La pestaña <strong>Importadas</strong> muestra el histórico en SIGMA aunque ya no aparezcan en SICSER.
+        En garantías, el <strong>CIS</strong> se estima por ciudad/estado (la API no lo envía).
     </p>
 </div>
 {% endblock %}

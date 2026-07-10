@@ -530,8 +530,8 @@ def importar_orden_garantia_desde_sicser(
     if not registro.service_tag:
         raise SicserImportError('El registro SICSER no trae service tag; no se puede importar.')
 
-    # Garantías Dell: usar Satélite por defecto si no hay mapeo CIS en el registro.
-    sucursal = resolver_sucursal_por_cis('SAT', sucursal_id)
+    # Garantías Dell: CIS inferido desde ciudad/estado (la API no envía CIS explícito).
+    sucursal = resolver_sucursal_por_cis(registro.codigo_cis_url or 'SAT', sucursal_id)
     tecnico = resolver_tecnico(usuario)
     modelo = (registro.especificaciones or 'Latitude')[:100]
     email = registro.email_contacto or 'cliente@ejemplo.com'

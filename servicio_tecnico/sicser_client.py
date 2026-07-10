@@ -156,6 +156,10 @@ class OrdenGarantiaSicser:
         fecha_recepcion: Fecha de recepción en SICSER.
         pais_texto: País tal como lo devuelve la API.
         codigo_pais: Código ISO para filtrar por tenant.
+        ciudad: Ciudad reportada por SICSER (base para inferir CIS).
+        estado: Estado/provincia reportado por SICSER.
+        codigo_cis_url: CIS inferido desde ciudad/estado (DROP, SAT, GDL, MTR…).
+        cis_etiqueta: Nombre legible del CIS inferido.
         url_formato_digital: Hipervínculo al formulario de garantías.
     """
 
@@ -171,6 +175,10 @@ class OrdenGarantiaSicser:
     fecha_recepcion: str
     pais_texto: str
     codigo_pais: str
+    ciudad: str
+    estado: str
+    codigo_cis_url: str
+    cis_etiqueta: str
     url_formato_digital: str
 
 
@@ -244,6 +252,76 @@ def parsear_codigo_pais_garantia(pais_texto: str) -> str:
     """
     clave = (pais_texto or '').strip().lower()
     return PAIS_SICSER_A_CODIGO.get(clave, '')
+
+
+def inferir_cis_desde_ciudad_estado(ciudad: str, estado: str = '') -> str:
+    """
+    Infiere el código CIS (sucursal) a partir de ciudad/estado de la API de garantías.
+
+    EXPLICACIÓN PARA PRINCIPIANTES:
+    La API de garantías Dell NO envía el campo CIS (a diferencia de OOW).
+    Usamos ciudad y estado para estimar Satélite, Drop Off, Guadalajara, etc.
+    Si no hay coincidencia clara, se usa Satélite (SAT) como valor por defecto en México.
+
+    Args:
+        ciudad: Ciudad reportada por SICSER (ej. ZAPOPAN).
+        estado: Estado/provincia (ej. JALISCO). Opcional.
+
+    Returns:
+        str: Código corto CIS (DROP, SAT, MTR, GDL, BUA, BOG, MED, SAN).
+    """
+    ciudad_n = (ciudad or '').strip().upper()
+    estado_n = (estado or '').strip().upper()
+    texto = f'{ciudad_n} {estado_n}'
+
+    # --- México: Guadalajara ---
+    if any(p in texto for p in (
+        'GUADALAJARA', 'ZAPOPAN', 'TLAQUEPAQUE', 'TONALA', 'TONALÁ',
+        'TLAJOMULCO', 'JALISCO',
+    )):
+        return 'GDL'
+
+    # --- México: Monterrey ---
+    if any(p in texto for p in (
+        'MONTERREY', 'SAN PEDRO', 'APODACA', 'GUADALUPE', 'SANTA CATARINA',
+        'SAN NICOLAS', 'SAN NICOLÁS', 'NUEVO LEON', 'NUEVO LEÓN',
+    )):
+        return 'MTR'
+
+    # --- México: Satélite / zona norte Edomex ---
+    if any(p in texto for p in (
+        'SATELITE', 'SATÉLITE', 'NAUCALPAN', 'CUAUTITLAN', 'CUAUTITLÁN',
+        'TLALNEPANTLA', 'ATIZAPAN', 'ATIZAPÁN', 'ECATEPEC', 'COACALCO',
+        'TECAMAC', 'TECAMAC', 'HUIXQUILUCAN',
+    )):
+        return 'SAT'
+
+    # --- México: Drop Off / CDMX centro ---
+    if any(p in texto for p in (
+        'CIUDAD DE MEXICO', 'CIUDAD DE MÉXICO', 'CDMX', 'DISTRITO FEDERAL',
+        'MEXICO D F', 'MEXICO DF', 'BENITO JUAREZ', 'BENITO JUÁREZ',
+        'CUAUHTEMOC', 'CUAUHTÉMOC', 'COYOACAN', 'COYOACÁN', 'IZTAPALAPA',
+        'ALVARO OBREGON', 'ÁLVARO OBREGÓN', 'TLALPAN', 'MIGUEL HIDALGO',
+        'VENUSTIANO CARRANZA', 'GUSTAVO A MADERO',
+    )):
+        return 'DROP'
+
+    # Estado de México genérico (sin ciudad más específica) → Satélite
+    if estado_n in ('MEXICO', 'MÉXICO', 'EDOMEX', 'ESTADO DE MEXICO', 'ESTADO DE MÉXICO'):
+        return 'SAT'
+
+    # --- Otros países (manual SICSER) ---
+    if any(p in texto for p in ('BUENOS AIRES', 'CABA')):
+        return 'BUA'
+    if any(p in texto for p in ('BOGOTA', 'BOGOTÁ', 'CUNDINAMARCA')):
+        return 'BOG'
+    if any(p in texto for p in ('MEDELLIN', 'MEDELLÍN', 'ANTIOQUIA')):
+        return 'MED'
+    if 'SANTIAGO' in texto:
+        return 'SAN'
+
+    # Fallback conservador: Satélite (comportamiento previo de importación).
+    return 'SAT'
 
 
 def url_formato_oow(folio: str, codigo_cis: str, codigo_pais: str) -> str:
@@ -380,6 +458,9 @@ def _normalizar_registro_garantia(item: dict[str, Any]) -> OrdenGarantiaSicser:
     """Transforma un dict crudo de la API de garantías en OrdenGarantiaSicser."""
     numero_dps = int(item.get('numero_dps') or 0)
     pais_texto = str(item.get('pais') or '').strip()
+    ciudad = str(item.get('ciudad') or '').strip()
+    estado = str(item.get('estado') or '').strip()
+    codigo_cis = inferir_cis_desde_ciudad_estado(ciudad, estado)
 
     return OrdenGarantiaSicser(
         numero_dps=numero_dps,
@@ -394,6 +475,10 @@ def _normalizar_registro_garantia(item: dict[str, Any]) -> OrdenGarantiaSicser:
         fecha_recepcion=str(item.get('fecha_recepcion') or '').strip(),
         pais_texto=pais_texto,
         codigo_pais=parsear_codigo_pais_garantia(pais_texto),
+        ciudad=ciudad,
+        estado=estado,
+        codigo_cis_url=codigo_cis,
+        cis_etiqueta=etiqueta_cis_legible(codigo_cis),
         url_formato_digital=url_formato_garantia(numero_dps),
     )
 
@@ -485,6 +570,9 @@ def fetch_listado_garantias(
                 orden.contacto,
                 orden.empresa,
                 orden.especificaciones,
+                orden.ciudad,
+                orden.estado,
+                orden.cis_etiqueta,
             )
         ]
 
