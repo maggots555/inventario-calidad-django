@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 24" width="32" height="24">
+  <defs>
+    <style>
+      /* Animación de ondulación en franjas */
+      @keyframes wave-float {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(-0.5px); }
+        100% { transform: translateY(0); }
+      }
+
+      @keyframes star-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); opacity: 0.92; }
+      }
+
+      @keyframes star-twinkle {
+        0%, 100% { opacity: 0.85; }
+        50% { opacity: 1; }
+      }
+
+      .stripe-white {
+        animation: wave-float 2.8s ease-in-out infinite;
+      }
+
+      .stripe-red {
+        animation: wave-float 2.8s ease-in-out infinite 0.2s;
+      }
+
+      .canton {
+        animation: wave-float 2.8s ease-in-out infinite 0.1s;
+      }
+
+      .star-core {
+        animation: star-pulse 3.5s ease-in-out infinite;
+        transform-origin: 8px 6px;
+      }
+
+      .star-glow {
+        animation: star-twinkle 2s ease-in-out infinite;
+      }
+    </style>
+
+    <!-- Degradados para profundidad -->
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a52c4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0039A6;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="redGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#e63b2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#D52B1E;stop-opacity:1" />
+    </linearGradient>
+
+    <radialGradient id="starGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#f5f5f5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e8e8e8;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+
+  <!-- Fondo base blanco -->
+  <rect width="32" height="24" fill="#FFFFFF"/>
+
+  <!-- Mitad superior blanca -->
+  <rect class="stripe-white" x="0" y="0" width="32" height="12" fill="#FFFFFF"/>
+
+  <!-- Mitad inferior roja -->
+  <rect class="stripe-red" x="0" y="12" width="32" height="12" fill="url(#redGrad)"/>
+
+  <!-- Cantón azul (cuadrado superior izquierdo: 50% ancho × 50% alto) -->
+  <rect class="canton" x="0" y="0" width="16" height="12" fill="url(#blueGrad)"/>
+
+  <!-- Estrella blanca de 5 puntas centrada en el cantón -->
+  <g class="star-core">
+    <polygon
+      class="star-glow"
+      points="8,2.8 9.1,5.4 11.9,5.4 9.6,7.1 10.5,9.8 8,8.2 5.5,9.8 6.4,7.1 4.1,5.4 6.9,5.4"
+      fill="url(#starGrad)"
+      stroke="#ffffff"
+      stroke-width="0.2"
+    />
+  </g>
+</svg>
