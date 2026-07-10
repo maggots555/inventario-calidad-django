@@ -863,6 +863,21 @@ class DetalleEquipo(models.Model):
         ],
         help_text="Tipo de registro SICSER del que se importó esta orden"
     )
+    sicser_ciudad = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Ciudad reportada por SICSER al importar (útil en garantías Dell)"
+    )
+    sicser_estado = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Estado/provincia reportado por SICSER al importar"
+    )
+    sicser_cis = models.CharField(
+        max_length=10,
+        blank=True,
+        help_text="Código CIS (DROP, SAT, GDL, MTR…) del folio OOW o inferido por ciudad en garantías"
+    )
     
     # ✅ NUEVO CAMPO: Email del Cliente (Noviembre 2025)
     # Agregado para facilitar el envío de fotos de ingreso y notificaciones

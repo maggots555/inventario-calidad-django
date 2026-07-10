@@ -319,6 +319,7 @@ def listar_ordenes_importadas_sicser(
     from django.db.models import Q
 
     from .sicser_client import (
+        etiqueta_cis_legible,
         parsear_codigo_cis_para_url,
         parsear_codigo_pais_desde_folio_oow,
         url_formato_garantia,
@@ -344,6 +345,9 @@ def listar_ordenes_importadas_sicser(
             | Q(numero_serie__icontains=filtro)
             | Q(nombre_cliente__icontains=filtro)
             | Q(orden__numero_orden_interno__icontains=filtro)
+            | Q(sicser_ciudad__icontains=filtro)
+            | Q(sicser_estado__icontains=filtro)
+            | Q(sicser_cis__icontains=filtro)
         )
 
     filas: list[dict] = []
@@ -351,14 +355,21 @@ def listar_ordenes_importadas_sicser(
         origen = detalle.sicser_origen
         folio = (detalle.folio_sicser or detalle.sicser_id_externo or '').strip()
 
-        # Reconstruir hipervínculo de formato digital con los datos guardados.
+        # CIS: guardado al importar; si falta en OOW, se deduce del folio.
+        codigo_cis = (detalle.sicser_cis or '').strip().upper()
+        if not codigo_cis and origen == 'oow' and folio:
+            codigo_cis = parsear_codigo_cis_para_url(folio)
+
         url_formato = ''
         if origen == 'garantia' and folio:
             url_formato = url_formato_garantia(folio)
         elif origen == 'oow' and folio:
             codigo_pais = parsear_codigo_pais_desde_folio_oow(folio) or 'MX'
-            codigo_cis = parsear_codigo_cis_para_url(folio)
-            url_formato = url_formato_oow(folio, codigo_cis, codigo_pais)
+            url_formato = url_formato_oow(
+                folio,
+                codigo_cis or parsear_codigo_cis_para_url(folio),
+                codigo_pais,
+            )
 
         filas.append({
             'orden_id': detalle.orden_id,
@@ -372,6 +383,10 @@ def listar_ordenes_importadas_sicser(
             'nombre_cliente': detalle.nombre_cliente,
             'fecha_ingreso': detalle.orden.fecha_ingreso,
             'sucursal': detalle.orden.sucursal.nombre if detalle.orden.sucursal else '',
+            'ciudad': (detalle.sicser_ciudad or '').strip(),
+            'estado': (detalle.sicser_estado or '').strip(),
+            'codigo_cis': codigo_cis,
+            'cis_etiqueta': etiqueta_cis_legible(codigo_cis) if codigo_cis else '',
             'url_formato_digital': url_formato,
         })
 
@@ -464,6 +479,7 @@ def importar_orden_oow_desde_sicser(
         folio_sicser=registro.folio,
         sicser_id_externo=id_externo,
         sicser_origen='oow',
+        sicser_cis=registro.codigo_cis_url or '',
         email_cliente=email,
         nombre_cliente=registro.nombre_cliente[:200],
         rfc_cliente=registro.rfc[:13],
@@ -559,6 +575,9 @@ def importar_orden_garantia_desde_sicser(
         folio_sicser=id_externo,
         sicser_id_externo=id_externo,
         sicser_origen='garantia',
+        sicser_ciudad=(registro.ciudad or '')[:100],
+        sicser_estado=(registro.estado or '')[:100],
+        sicser_cis=registro.codigo_cis_url or '',
         email_cliente=email,
         nombre_cliente=nombre_cliente,
         telefono_cliente=(registro.telefono or '')[:20],

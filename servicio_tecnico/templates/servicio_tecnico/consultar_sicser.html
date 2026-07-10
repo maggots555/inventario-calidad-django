@@ -319,6 +319,8 @@
                             <th>Orden SIGMA</th>
                             <th>Service Tag</th>
                             <th>Cliente</th>
+                            <th>Ciudad</th>
+                            <th>CIS</th>
                             <th>Fecha ingreso</th>
                             <th class="text-center">Acciones</th>
                         </tr>
@@ -340,19 +342,41 @@
                             </td>
                             <td><strong>{{ fila.service_tag }}</strong></td>
                             <td>{{ fila.nombre_cliente|truncatechars:35|default:"—" }}</td>
+                            <td>
+                                {% if fila.ciudad %}
+                                <span>{{ fila.ciudad|truncatechars:22 }}</span>
+                                {% if fila.estado %}
+                                <span class="small d-block text-muted">{{ fila.estado|truncatechars:20 }}</span>
+                                {% endif %}
+                                {% elif fila.sucursal %}
+                                <span class="small text-muted" title="Sucursal asignada en SIGMA">{{ fila.sucursal }}</span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if fila.cis_etiqueta %}
+                                <span class="badge bg-light text-dark border">{{ fila.cis_etiqueta }}</span>
+                                {% elif fila.sucursal %}
+                                <span class="small text-muted">{{ fila.sucursal }}</span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <td class="small text-muted">{{ fila.fecha_ingreso|date:"d/m/Y H:i" }}</td>
                             <td class="text-center sicser-acciones">
                                 <a href="{% url 'servicio_tecnico:detalle_orden' fila.orden_id %}"
                                    class="btn btn-sm btn-primary"
-                                   title="Ver orden en SIGMA">
+                                   title="Ver orden en SIGMA"
+                                   aria-label="Ver orden en SIGMA">
                                     <i class="bi bi-eye"></i>
-                                    <span class="d-none d-lg-inline">Ver orden</span>
                                 </a>
                                 {% if fila.url_formato_digital %}
                                 <a href="{{ fila.url_formato_digital }}"
                                    class="btn btn-sm btn-outline-success"
                                    target="_blank" rel="noopener noreferrer"
-                                   title="Formato digital SICSER">
+                                   title="Formato digital SICSER"
+                                   aria-label="Formato digital SICSER">
                                     <i class="bi bi-box-arrow-up-right"></i>
                                 </a>
                                 {% endif %}
