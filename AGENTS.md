@@ -1,7 +1,7 @@
 # AGENTS.md - Development Guide for AI Coding Agents
 
 > **Project**: Sistema Integrado de Gestión Técnica y Control de Calidad (SIGMA)  
-> **Framework**: Django 5.2.5 | Python 3.10+ | TypeScript 5.9.3  
+> **Framework**: Django 5.2.5 | Python 3.12+ | TypeScript 5.9.3  
 > **Purpose**: Enterprise technical service management with ML analytics  
 > **Deployment**: PWA (Progressive Web App) — instalable en móviles como app nativa
 
@@ -61,9 +61,16 @@ tsc                # Direct TypeScript compilation
 ```
 
 ### Testing
-**No formal test framework configured** - Uses manual test scripts:
+Hay **suite formal en `almacen/tests/`** (profit, sync componente, compras sin orden, reacondicionado, totales) más scripts manuales en `scripts/testing/`:
 ```bash
-# Run individual test scripts
+# Suite Django de Almacén (preferir al tocar cotizaciones / sync ST)
+python manage.py test almacen
+python manage.py test almacen.tests.test_profit_cotizacion
+python manage.py test almacen.tests.test_sincronizar_componente_st
+python manage.py test almacen.tests.test_generar_compras_sin_orden
+python manage.py test almacen.tests.test_costeo_reacondicionado
+
+# Scripts manuales de verificación
 python scripts/testing/test_email_config.py
 python scripts/testing/test_pdf_rhitso.py
 python scripts/testing/test_dashboard_ml.py
@@ -72,7 +79,7 @@ python scripts/testing/test_dynamic_storage.py
 # Permission testing
 ./scripts/test_permisos.sh
 
-# Django's built-in tests (minimal coverage currently)
+# Django's built-in tests
 python manage.py test                           # All tests
 python manage.py test inventario                # App-specific
 python manage.py test inventario.tests.MyTest   # Single test
@@ -297,40 +304,58 @@ function handleSubmit(event: Event): void {
 ```
 inventario-calidad-django/
 ├── config/                    # Project configuration (NOT an app)
-│   ├── settings.py           # Main settings
-│   ├── urls.py              # Root URL configuration
+│   ├── settings.py           # Main settings (Celery Beat, Redis cache, CSRF)
+│   ├── urls.py              # Root URL + rutas públicas (/seguimiento/, feedback)
 │   ├── storage_utils.py      # Dynamic file storage
-│   ├── constants.py          # Global constants
+│   ├── constants.py          # Global constants (keywords sync piezas, etc.)
 │   ├── paises_config.py      # Multi-country config
 │   ├── middleware_pais.py    # Country detection middleware
 │   ├── db_router.py          # Multi-country DB router
 │   ├── context_processors.py
-│   └── pwa_views.py          # Service worker & manifest views
+│   └── pwa_views.py          # Service worker & manifest views (staff + seguimiento)
 ├── inventario/               # App: Product inventory & employees
+│   └── middleware.py         # ForcePasswordChangeMiddleware (tras PaisMiddleware)
 ├── servicio_tecnico/         # App: Service orders (MAIN)
-│   ├── models.py            # 20+ models (OrdenServicio, etc.)
-│   ├── plotly_visualizations.py  # 3900+ lines of charts
+│   ├── models.py            # ~23 models (OrdenServicio, EnlaceSeguimientoCliente, etc.)
+│   ├── plotly_visualizations.py  # ~4600 lines of charts
 │   ├── ml_predictor.py      # ML predictions
 │   ├── ml_advanced/         # Advanced ML modules
 │   ├── ollama_client.py     # Ollama + Gemini AI dispatcher
 │   ├── gemini_client.py     # Google Gemini client (módulo propio)
-│   ├── tasks.py             # Celery tasks (email, video, push)
-│   └── signals.py           # Django signals (push notifications)
+│   ├── sicser_client.py     # Cliente HTTP SICSER (solo lectura + caché Redis)
+│   ├── sicser_import.py     # Importación de órdenes SICSER → SIGMA
+│   ├── chat_seguimiento_helpers.py  # Lógica del chat IA público
+│   ├── concentrado_semanal.py       # Concentrado semanal CIS
+│   ├── utils_rhitso_analytics.py    # Análisis candidatos RHITSO
+│   ├── tasks.py             # Celery tasks (email, video, push, recordatorios)
+│   └── signals.py           # Push (listas blancas ESTADOS_PUSH_*)
 ├── scorecard/                # App: Quality control system
-├── almacen/                  # App: Central warehouse
+├── almacen/                  # App: Central warehouse + cotizador
+│   ├── utils/               # profit, PDF cliente, reacondicionado, resolver_componente
+│   ├── tasks.py             # notificar front/compras, enviar cotización cliente
+│   └── tests/               # Suite formal (profit, sync, compras, reacondicionado)
 ├── notificaciones/           # App: Notifications + Web Push
-│   ├── models.py            # Notificacion + PushSubscription
-│   ├── push_service.py      # pywebpush VAPID service
+│   ├── models.py            # Notificacion + PushSubscription + PushSubscriptionCliente
+│   ├── push_service.py      # pywebpush VAPID (staff y cliente)
 │   └── views.py             # Push endpoints + suscripción
 ├── static/
-│   ├── ts/                  # TypeScript source (EDIT THESE — ~43 módulos)
+│   ├── ts/                  # TypeScript source (EDIT THESE — ~55 módulos)
 │   │   ├── base.ts
-│   │   ├── service_worker.ts      # Service worker (compilado aparte)
-│   │   ├── pwa_install.ts         # Custom PWA install prompt
-│   │   ├── push_notifications.ts  # Web Push UI
-│   │   ├── video_resumen.ts       # Video summary generator (FFmpeg)
-│   │   ├── upload_video.ts        # Video evidence upload
-│   │   ├── voz_diagnostico.ts     # Voice dictation (Speech API → Whisper → Gemini)
+│   │   ├── service_worker.ts              # Service worker (compilado aparte)
+│   │   ├── pwa_install.ts                 # PWA install prompt (STAFF)
+│   │   ├── pwa_install_seguimiento.ts     # PWA install prompt (CLIENTE)
+│   │   ├── push_notifications.ts          # Web Push UI (STAFF)
+│   │   ├── push_notifications_cliente.ts  # Web Push UI (CLIENTE)
+│   │   ├── seguimiento_chat.ts            # Chat IA en portal público
+│   │   ├── eventos_seguimiento.ts         # Analytics / embudo de adopción
+│   │   ├── galeria_seguimiento.ts         # Galería en portal cliente
+│   │   ├── consultar_sicser.ts            # UI consulta SICSER
+│   │   ├── cotizacion_cliente_modal.ts    # Cotizador profit + PDF
+│   │   ├── cotizacion_reacondicionado_modal.ts
+│   │   ├── camara_integrada.ts / camara_video.ts
+│   │   ├── compartir_video.ts             # Envío evidencia video + IA
+│   │   ├── video_resumen.ts / upload_video.ts
+│   │   ├── voz_diagnostico.ts / ollama_sic.ts
 │   │   └── [otros módulos...]
 │   ├── js/                  # Compiled JavaScript (AUTO-GENERATED)
 │   ├── css/                 # Organized CSS files
@@ -357,6 +382,8 @@ inventario-calidad-django/
 ├── tsconfig.json
 └── tsconfig.sw.json          # TypeScript config separado para service worker
 ```
+
+**Orden de middleware (no reordenar):** Auth → `PaisMiddleware` → `ForcePasswordChangeMiddleware`.
 
 ---
 
@@ -407,7 +434,7 @@ Settings automatically optimize based on `DB_ENGINE` value.
 - Use `python-decouple` for all sensitive config
 - Never commit `.env` file (use `.env.example`)
 - Django-Axes enabled for brute-force protection
-- CSRF protection always active
+- CSRF protection always active (`CSRF_COOKIE_NAME = 'sigma_csrftoken'` en producción)
 - HSTS enabled in production (`DEBUG=False`)
 
 ---
@@ -421,10 +448,11 @@ Settings automatically optimize based on `DB_ENGINE` value.
 - **Storage**: Trained models in `ml_models/` directory
 
 ### Analytics Dashboard
-- **File**: `servicio_tecnico/plotly_visualizations.py` (3939 lines)
+- **File**: `servicio_tecnico/plotly_visualizations.py` (~4607 lines)
 - **Charts**: 50+ interactive Plotly visualizations
 - **Types**: Line, bar, scatter, heatmap, sunburst, treemap
 - **Data**: Pandas DataFrames from Django QuerySets
+- **Extras**: Concentrado semanal CIS (`concentrado_semanal.py` + `concentrado_semanal.ts`); análisis candidatos RHITSO (`utils_rhitso_analytics.py`); dashboard embudo seguimiento (`dashboard_seguimiento_enlaces.ts`)
 
 ### RHITSO Integration
 External laboratory management system:
@@ -432,6 +460,7 @@ External laboratory management system:
 - PDF generation with ReportLab
 - Status synchronization
 - Color-coded states system
+- Analytics de candidatos aptos/no aptos (`utils_rhitso_analytics.py`)
 
 ### Dynamic Storage
 Intelligent file storage with disk failover:
@@ -440,9 +469,12 @@ Intelligent file storage with disk failover:
 - Images organized by order ID
 - Custom Django storage backend
 
-### Video Gallery & Video Resumen (FFmpeg)
+### Video Gallery, Cámaras & Video Resumen (FFmpeg)
 Sistema de video de evidencia implementado en `detalle_orden`:
 - **Galería de videos**: Subida y reproducción de videos de evidencia por orden (`upload_video.ts`)
+- **Cámaras in-browser**: `camara_integrada.ts` (fotos) y `camara_video.ts` (MediaRecorder, ~90 MB / 720p, selector de lentes)
+- **Compartir evidencia al cliente**: `compartir_video.ts` + task `enviar_evidencia_video_task` (mensaje personalizado + análisis IA opcional)
+- **Rewind de egreso**: task `enviar_rewind_egreso_email_task` al finalizar
 - **Compresión automática**: FFmpeg vía Celery task al subir video
 - **Video Resumen**: Genera un video resumen de la galería de imágenes (`video_resumen.ts`):
   - Efecto Ken Burns en cada imagen
@@ -461,6 +493,11 @@ Botón de micrófono junto al campo de texto de Diagnóstico en `detalle_orden`:
 - Deduplicación de segmentos finales para evitar repeticiones
 - Inserción de texto con detección de solapamiento
 
+### Pulir Diagnóstico SIC con IA
+Modal “Mejorar Diag. con IA” — **distinto** de `voz_diagnostico.ts`:
+- **Módulo**: `static/ts/ollama_sic.ts` + API `pulir_diagnostico_sic_ia`
+- Mejora redacción sin cambiar el contenido técnico del diagnóstico
+
 ### Inspector Visual IA — Imágenes de Ingreso
 Al enviar imágenes de ingreso al cliente, un análisis IA opcional evalúa la condición estética:
 - Selector de modelo en el modal (Ollama / Gemini), ruteo sin fallback cruzado
@@ -474,6 +511,43 @@ Al enviar imágenes de ingreso al cliente, un análisis IA opcional evalúa la c
 - Selector de modelo (múltiples opciones Gemini / Ollama)
 - Dashboard de encuestas extendido con esta funcionalidad
 
+### Cita Diaria (Home)
+- Cita generada por IA en el dashboard home (`inventario/views.py`)
+- Cascada de fallback Gemini → Ollama; botón regenerar para superusuarios
+
+### Integración SICSER (Fase 1 — solo lectura)
+Consulta e importación de órdenes desde el sistema externo SICSER (OOW / garantías):
+- **Cliente HTTP**: `servicio_tecnico/sicser_client.py` (caché Redis, TTL `SICSER_CACHE_TTL`)
+- **Importación**: `servicio_tecnico/sicser_import.py` → crea órdenes en SIGMA
+- **UI**: `static/ts/consultar_sicser.ts` + URLs `sicser/consultar/` e `importar/`
+- **Campos**: `folio_sicser` y relacionados en `DetalleEquipo`
+- **Env**: `SICSER_BASE_URL`, `SICSER_TOKEN_OOW`, `SICSER_TOKEN_GARANTIAS`, `SICSER_CACHE_TTL`
+
+**Reglas para agentes:**
+- ❌ NUNCA inventar endpoints de escritura hacia SICSER (Fase 1 es solo lectura + import a SIGMA)
+- ✅ Usar el cliente existente; no hardcodear URLs/tokens (van en `.env`)
+
+### Portal de Seguimiento del Cliente (ecosistema dual)
+Página pública **sin login** para que el cliente vea el estado de su orden (OOW):
+- **URL**: `/seguimiento/<token>/` (definida en `config/urls.py`)
+- **Modelo**: `EnlaceSeguimientoCliente` — caduca tras entrega
+- **Chat IA**: `seguimiento_chat.ts` + `chat_seguimiento_helpers.py` + vars `CHAT_SEGUIMIENTO_*`
+- **Galería / PDF diagnóstico**: visibles en el enlace; push al cliente al haber novedades
+- **Analytics / embudo**: modelo `EventoSeguimientoCliente` + `eventos_seguimiento.ts` + dashboard `dashboard_seguimiento_enlaces.ts`
+- **Banners**: `BannerPromocional` + `banner_carousel.ts`
+
+**Dos PWAs / dos canales de Push — NO mezclar:**
+
+| Canal | Manifest / Install | Push TS | Modelo suscripción |
+|-------|-------------------|---------|-------------------|
+| **Staff** (interno) | `manifest.json` + `pwa_install.ts` | `push_notifications.ts` | `PushSubscription` (FK a `User`) |
+| **Cliente** (público) | `manifest_seguimiento` + `pwa_install_seguimiento.ts` | `push_notifications_cliente.ts` | `PushSubscriptionCliente` (FK a `EnlaceSeguimientoCliente`) |
+
+**Reglas para agentes:**
+- ❌ NUNCA reutilizar scripts/modelos de staff en el portal cliente (ni al revés)
+- ❌ NUNCA asumir que todo cambio de estado notifica: solo estados en `ESTADOS_PUSH_TECNICO` / `ESTADOS_PUSH_CLIENTE` (`servicio_tecnico/signals.py`)
+- ✅ Al editar seguimiento, preservar hooks de `eventos_seguimiento.ts` (embudo de adopción)
+
 ### Sincronización Almacén ↔ Servicio Técnico (Cotizaciones)
 Sistema bidireccional de sincronización entre cotizaciones de Almacén y Servicio Técnico:
 
@@ -482,28 +556,51 @@ Sistema bidireccional de sincronización entre cotizaciones de Almacén y Servic
 - Al agregar `LineaCotizacion` → crea/actualiza `PiezaCotizada` en ST
 - Al aprobar/rechazar en Almacén → refleja en `PiezaCotizada.aceptada_por_cliente`
 - Cuando todas las piezas tienen respuesta → actualiza `Cotizacion.usuario_acepto`
+- **`precio_unitario_cliente`**: se sincroniza a ST; los totales de cotización en ST priorizan este precio (no solo el costo interno)
+
+**Cotizador al cliente (profit + PDF + correo):**
+- Modal `cotizacion_cliente_modal.ts` con calculadora de profit
+- PDF ReportLab: `almacen/utils/pdf_cotizacion_cliente.py`
+- Task Celery: `almacen/tasks.enviar_cotizacion_cliente_task`
+- Márgenes/costos **solo desde `.env`**: `PROFIT_*`, `COSTOS_FIJOS_*`, `DIAGNOSTICO_*` — ❌ no hardcodear
+
+**Cotización de equipos reacondicionados (flujo paralelo):**
+- Costeo: `almacen/utils/costeo_reacondicionado.py`
+- PDF: `almacen/utils/pdf_cotizacion_reacondicionado.py`
+- Modal TS: `cotizacion_reacondicionado_modal.ts`
+- Flags en líneas (`es_linea_reacondicionado`, financiamiento / opción de pago)
+- ❌ No reutilizar a ciegas la lógica de profit de reparación
 
 **Servicios Adicionales (Venta Mostrador en cotizaciones):**
 - Modelo `LineaServicioAdicional` en Almacén para cotizar servicios (limpieza, reinstalación SO, paquetes)
+- Campo `es_necesaria` controla qué servicios pasan a Venta Mostrador
 - Al aprobar y generar compras → crea/actualiza `VentaMostrador` en ST
 - Mapeo automático: tipo_servicio → campos booleanos de VentaMostrador
 
-**Vinculación de cotizaciones sin orden activa:**
+**Vinculación / creación de orden:**
 - `SolicitudCotizacion` puede crearse sin orden (modo `sin_orden_activa`)
 - Vista de búsqueda para vincular cuando el equipo ingresa formalmente
+- Alternativa: **crear orden FL desde cotización** (`crear_orden_fl_desde_cotizacion`)
 - Sincroniza datos del cliente y service tag
+
+**Catálogo piezas Almacén → `ComponenteEquipo`:**
+- `almacen/utils/resolver_componente.py` + keywords en `config/constants.py`
+- La sync ST no es solo “copiar nombre”: hay mapeo semántico
 
 **Archivos clave:**
 - `almacen/models.py`: `SolicitudCotizacion`, `LineaCotizacion`, `LineaServicioAdicional`
-- `almacen/views.py`: `vincular_orden_solicitud`, `generar_compras_solicitud`
+- `almacen/views.py`: `vincular_orden_solicitud`, `generar_compras_solicitud`, `crear_orden_fl_desde_cotizacion`
+- `almacen/utils/`: profit, PDF, reacondicionado, `resolver_componente`
 - `servicio_tecnico/templates/.../detalle_orden.html`: Indicador de piezas de Almacén
 
 **Reglas para agentes:**
 - Las piezas con `pieza.linea_cotizacion_almacen` NO deben editarse/eliminarse desde ST
 - El campo `costo_mano_obra` de `Cotizacion` se crea en $0, el técnico lo edita después
 - La sincronización es automática en `save()`, no requiere intervención manual
+- ❌ `generar_compras_solicitud` exige `orden_servicio` vinculada — no generar compras en modo `sin_orden_activa`
+- ✅ Al tocar cotizaciones/sync, correr `python manage.py test almacen`
 
-### PWA (Progressive Web App)
+### PWA (Progressive Web App) — Staff
 The app is installable on Android and iOS as a native-like app:
 - **Manifest**: `static/manifest.json` — name, icons, theme color, `display: standalone`
 - **iOS support**: `apple-mobile-web-app-capable` + `apple-mobile-web-app-status-bar-style` in `templates/base.html`
@@ -511,13 +608,17 @@ The app is installable on Android and iOS as a native-like app:
 - **Theme color**: `#1f6391` (matches brand)
 - **Service Worker**: `static/ts/service_worker.ts` → compilado con `tsconfig.sw.json` separado. Registrado en `base.html`. Incluye página `templates/offline.html` para modo sin conexión.
 - **Prompt de instalación personalizado**: `static/ts/pwa_install.ts` — reemplaza el prompt nativo del navegador con UI de marca
-- **Web Push Notifications**: Sistema completo con VAPID keys y `pywebpush`. Modelo `PushSubscription` en `notificaciones/`. Signal en `HistorialOrden` dispara push al técnico asignado. Push de ingreso/egreso para dispatchers. Toggle en "Mi Perfil".
+- **Web Push Notifications (staff)**: Sistema completo con VAPID keys y `pywebpush`. Modelo `PushSubscription` en `notificaciones/`. Signal en `HistorialOrden` dispara push al técnico asignado **solo si el estado está en `ESTADOS_PUSH_TECNICO`**. Push de ingreso/egreso para dispatchers. Toggle en "Mi Perfil".
+- **Recordatorio imágenes**: Celery Beat diario (8:00) → `verificar_recordatorios_imagenes` si faltan fotos a las 48 h (modelo `RecordatorioImagenOrden`)
+
+**Ver también:** subsección *Portal de Seguimiento del Cliente* (PWA/push del cliente son un canal separado).
 
 **PWA Rules for AI agents**:
 - NEVER remove the `<link rel="manifest">` tag from `base.html`
 - NEVER remove or alter the `apple-mobile-web-app-*` meta tags
 - NEVER set `maximum-scale` > 1.0 or remove `viewport-fit=cover`
 - NEVER modify the service worker registration script in `base.html`
+- NEVER mezclar `pwa_install.ts` / `push_notifications.ts` con los módulos `*_seguimiento` / `*_cliente`
 - All UI must be **mobile-first** — test layouts at 375px width minimum
 - Touch targets must be at least **44x44px** (iOS HIG standard)
 - Avoid hover-only interactions — use tap/click equivalents
@@ -692,7 +793,34 @@ EMAIL_HOST_PASSWORD=your-app-password
 PRIMARY_MEDIA_ROOT=/path/to/primary
 ALTERNATE_MEDIA_ROOT=/path/to/alternate
 MIN_FREE_SPACE_GB=10
+
+# Redis — Celery usa /0 y /1; el cache de Django usa /2
+REDIS_CACHE_URL=redis://127.0.0.1:6379/2
+
+# Chat IA del portal de seguimiento (cliente)
+CHAT_SEGUIMIENTO_MODEL=gemma4:e2b
+CHAT_SEGUIMIENTO_MAX_TOKENS=1200
+CHAT_SEGUIMIENTO_NUM_CTX=8192
+
+# Cotizador Almacén — márgenes y costos (NO hardcodear en código)
+PROFIT_MOSTRADOR=
+PROFIT_ESTANDAR=
+PROFIT_EXPRESS=
+PROFIT_ALTA_GAMA=
+PROFIT_SERVER=
+COSTOS_FIJOS_MOSTRADOR=
+COSTOS_FIJOS_ESTANDAR=
+DIAGNOSTICO_MOSTRADOR=
+# ... ver .env.example para el resto de perfiles (incl. reacondicionado / nivel componente)
+
+# SICSER (Fase 1 — solo lectura + import a SIGMA)
+SICSER_BASE_URL=
+SICSER_TOKEN_OOW=
+SICSER_TOKEN_GARANTIAS=
+SICSER_CACHE_TTL=120
 ```
+
+**Nota CSRF:** en producción `CSRF_COOKIE_NAME = 'sigma_csrftoken'`. Todo `fetch`/TypeScript debe leer esa cookie (no asumir el nombre default `csrftoken`).
 
 ---
 
@@ -778,22 +906,24 @@ df = pd.DataFrame(list(queryset.values()))
 ## 9. TESTING & VALIDATION
 
 ### Current Approach
-- **Unit tests**: Minimal (default boilerplate in `tests.py`)
-- **Integration tests**: Manual scripts in `scripts/testing/`
-- **Validation**: Standalone Python scripts
+- **Unit / integration tests (Almacén)**: suite formal en `almacen/tests/` (profit, sync componente, compras sin orden, reacondicionado, totales)
+- **Scripts manuales**: `scripts/testing/` (email, PDF RHITSO, ML, storage)
+- **Otras apps**: cobertura aún mínima en `tests.py` por defecto
 
-### Running Manual Tests
+### Running Tests
 ```bash
-# Email configuration
+# Suite Almacén (preferir al tocar cotizaciones / sync ST / reacondicionados)
+python manage.py test almacen
+python manage.py test almacen.tests.test_profit_cotizacion
+python manage.py test almacen.tests.test_sincronizar_componente_st
+python manage.py test almacen.tests.test_generar_compras_sin_orden
+python manage.py test almacen.tests.test_costeo_reacondicionado
+python manage.py test almacen.tests.test_totales_cotizacion
+
+# Scripts manuales
 python scripts/testing/test_email_config.py
-
-# PDF generation
 python scripts/testing/test_pdf_rhitso.py
-
-# ML dashboard
 python scripts/testing/test_dashboard_ml.py
-
-# Dynamic storage
 python scripts/testing/test_dynamic_storage.py
 ```
 
@@ -804,6 +934,7 @@ Consider adding:
 - coverage.py for test coverage
 - Factory Boy for test data
 - Pre-commit hooks for quality checks
+- Ampliar suite formal a `servicio_tecnico` (seguimiento, SICSER, push)
 
 ---
 
@@ -825,6 +956,12 @@ Consider adding:
 14. **Don't touch the anti-flash script in base.html** - The inline `<script>` in `<head>` that sets `data-bs-theme` before render prevents white flash — never modify or remove it.
 15. **Don't use gradients** — No `linear-gradient`, `radial-gradient` ni efectos de glassmorphism genéricos. El diseño del proyecto es limpio y directo. Los gradientes se ven como "IA Slop" y están prohibidos salvo que el usuario los pida explícitamente.
 16. **Don't call `.delay()` without `db_alias`** — Toda tarea Celery que acceda a la base de datos DEBE recibir `db_alias=get_pais_actual()['db_alias']`. Sin este parámetro, el worker siempre usa la BD `default` (México), rompiendo el multi-tenant para Chile, Argentina y Colombia. Ver Sección 12 → Celery Multi-Tenant.
+17. **Don't mezclar PWA/push staff con cliente** — `PushSubscription` ≠ `PushSubscriptionCliente`; `pwa_install.ts` ≠ `pwa_install_seguimiento.ts`.
+18. **Don't hardcodear PROFIT_*/COSTOS_FIJOS_*/DIAGNOSTICO_*** — viven en `.env`; el cotizador y el reacondicionado los leen desde settings.
+19. **Don't generar compras sin orden vinculada** — `generar_compras_solicitud` exige `orden_servicio`.
+20. **Don't inventar writes a SICSER** — Fase 1 es solo lectura + import a SIGMA.
+21. **Don't asumir que todo cambio de estado dispara push** — solo estados en `ESTADOS_PUSH_TECNICO` / `ESTADOS_PUSH_CLIENTE`.
+22. **Don't usar cookie CSRF default** — en producción la cookie se llama `sigma_csrftoken`.
 
 ---
 
@@ -840,6 +977,7 @@ Consider adding:
 | Compile TypeScript | `pnpm run build` |
 | Watch TypeScript | `pnpm run watch` |
 | Run tests | `python manage.py test` |
+| Run Almacén tests | `python manage.py test almacen` |
 | Seed data | `python scripts/poblado/poblar_sistema.py` |
 
 ---
@@ -913,14 +1051,47 @@ cadena.delay()
 | Chile | `chile.sigmasystem.work` | `chile` |
 | Colombia | `colombia.sigmasystem.work` | `colombia` |
 
-### Tareas Celery existentes (referencia)
+### Celery Beat (tareas programadas)
+
+Definido en `CELERY_BEAT_SCHEDULE` dentro de `config/settings.py`. Las tareas periódicas **también** deben respetar multi-tenant (cuando acceden a BD por país, iterar tenants o recibir `db_alias`).
+
+| Job | Task | Schedule |
+|-----|------|----------|
+| Limpiar notificaciones antiguas | `notificaciones.limpiar_antiguas` | Cada 24 h |
+| Recordatorio encuestas satisfacción | `servicio_tecnico.verificar_encuestas_pendientes` | Diario 8:00 |
+| Recordatorio imágenes faltantes | `servicio_tecnico.verificar_recordatorios_imagenes` | Diario 8:00 |
+
+### Redis: broker Celery vs cache Django
+
+| Uso | Redis DB | Config |
+|-----|----------|--------|
+| Celery broker / results | `/0` y `/1` | Settings Celery |
+| Cache Django (dashboards, SICSER, etc.) | `/2` | `REDIS_CACHE_URL` + `django_redis` |
+
+Si Redis cae, el cache está configurado con `IGNORE_EXCEPTIONS=True` (la app sigue sin cache). No mezclar DBs.
+
+### CSRF en fetch / TypeScript
+
+En producción: `CSRF_COOKIE_NAME = 'sigma_csrftoken'`. Al hacer `POST`/`PUT`/`DELETE` desde TS, leer esa cookie (ver patrón en `ollama_sic.ts` y módulos de seguimiento).
+
+### Inventario breve de tareas Celery
+
+**`servicio_tecnico/tasks.py` (selección):**
+- Correos RHITSO, feedback rechazo/satisfacción, vigencia vencida
+- Diagnóstico / imágenes ingreso-egreso al cliente
+- `enviar_seguimiento_cliente_task`, recordatorios encuesta e imágenes
+- Video: `generar_video_resumen_task`, `comprimir_video_*`, `enviar_evidencia_video_task`, `enviar_rewind_egreso_email_task`
+
+**`almacen/tasks.py`:**
+- `notificar_front_cotizacion_task`, `notificar_compras_nueva_cotizacion_task`
+- `enviar_cotizacion_cliente_task` (PDF reparación o reacondicionado)
 
 Todas las tareas en `servicio_tecnico/tasks.py` y `almacen/tasks.py` ya tienen `db_alias` en su firma.
 Al agregar una tarea nueva, seguir el mismo patrón.
 
 ---
 
-**Last Updated**: Junio 2026  
+**Last Updated**: Julio 2026  
 **Django Version**: 5.2.5  
 **Python Version**: 3.12+  
 **TypeScript Version**: 5.9.3
