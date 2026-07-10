@@ -298,6 +298,99 @@ def mapa_importaciones_sicser() -> tuple[dict[str, dict], dict[str, dict]]:
     return mapa_oow, mapa_garantia
 
 
+def listar_ordenes_importadas_sicser(
+    texto_busqueda: str = '',
+    limite: int = 100,
+) -> list[dict]:
+    """
+    Lista órdenes ya creadas en SIGMA desde SICSER (histórico local).
+
+    Objetivo de negocio:
+        Mostrar en la pestaña Importadas las órdenes que ya existen en SIGMA,
+        aunque el registro ya no aparezca en la API de SICSER.
+
+    Args:
+        texto_busqueda: Filtro opcional por folio, DPS, service tag, cliente u orden.
+        limite: Máximo de filas a devolver (más recientes primero).
+
+    Returns:
+        list[dict]: Filas listas para el template (origen, folio, ids, URLs).
+    """
+    from django.db.models import Q
+
+    from .sicser_client import (
+        parsear_codigo_cis_para_url,
+        parsear_codigo_pais_desde_folio_oow,
+        url_formato_garantia,
+        url_formato_oow,
+    )
+
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # El histórico vive en DetalleEquipo: si sicser_origen y sicser_id_externo
+    # están llenos, la orden se creó desde SICSER (manual o futura sync).
+    queryset = (
+        DetalleEquipo.objects
+        .filter(sicser_origen__in=['oow', 'garantia'], sicser_id_externo__gt='')
+        .select_related('orden', 'orden__sucursal')
+        .order_by('-orden__fecha_ingreso')
+    )
+
+    filtro = (texto_busqueda or '').strip()
+    if filtro:
+        queryset = queryset.filter(
+            Q(orden_cliente__icontains=filtro)
+            | Q(folio_sicser__icontains=filtro)
+            | Q(sicser_id_externo__icontains=filtro)
+            | Q(numero_serie__icontains=filtro)
+            | Q(nombre_cliente__icontains=filtro)
+            | Q(orden__numero_orden_interno__icontains=filtro)
+        )
+
+    filas: list[dict] = []
+    for detalle in queryset[:limite]:
+        origen = detalle.sicser_origen
+        folio = (detalle.folio_sicser or detalle.sicser_id_externo or '').strip()
+
+        # Reconstruir hipervínculo de formato digital con los datos guardados.
+        url_formato = ''
+        if origen == 'garantia' and folio:
+            url_formato = url_formato_garantia(folio)
+        elif origen == 'oow' and folio:
+            codigo_pais = parsear_codigo_pais_desde_folio_oow(folio) or 'MX'
+            codigo_cis = parsear_codigo_cis_para_url(folio)
+            url_formato = url_formato_oow(folio, codigo_cis, codigo_pais)
+
+        filas.append({
+            'orden_id': detalle.orden_id,
+            'numero_orden_interno': detalle.orden.numero_orden_interno,
+            'orden_cliente': detalle.orden_cliente,
+            'origen': origen,
+            'origen_etiqueta': 'OOW' if origen == 'oow' else 'Garantía Dell',
+            'folio_sicser': folio,
+            'sicser_id_externo': detalle.sicser_id_externo,
+            'service_tag': detalle.numero_serie,
+            'nombre_cliente': detalle.nombre_cliente,
+            'fecha_ingreso': detalle.orden.fecha_ingreso,
+            'sucursal': detalle.orden.sucursal.nombre if detalle.orden.sucursal else '',
+            'url_formato_digital': url_formato,
+        })
+
+    return filas
+
+
+def contar_ordenes_importadas_sicser() -> int:
+    """
+    Cuenta cuántas órdenes de SIGMA fueron importadas desde SICSER.
+
+    Returns:
+        int: Total de DetalleEquipo con origen SICSER.
+    """
+    return DetalleEquipo.objects.filter(
+        sicser_origen__in=['oow', 'garantia'],
+        sicser_id_externo__gt='',
+    ).count()
+
+
 def _calcular_gama(marca: str, modelo: str) -> str:
     """Obtiene gama desde tabla de referencia o 'media' por defecto."""
     referencia = ReferenciaGamaEquipo.obtener_gama(marca, modelo)

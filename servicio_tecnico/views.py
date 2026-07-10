@@ -19529,9 +19529,10 @@ def consultar_sicser(request):
 
     Fase 1: listar y abrir formato digital en SICSER.
     Fase 2: importar registros como órdenes nuevas en SIGMA (botón por fila).
+    UI: badges de «nuevas» en pestañas + pestaña Importadas (histórico local).
 
     Parámetros GET:
-        tab (str): 'oow' o 'garantia' — pestaña activa.
+        tab (str): 'oow', 'garantia' o 'importadas' — pestaña activa.
         q (str): Texto de búsqueda (folio, service tag, cliente, DPS).
         refrescar (str): Si es '1', omite caché y vuelve a consultar SICSER.
     """
@@ -19542,48 +19543,87 @@ def consultar_sicser(request):
         fetch_listado_garantias,
         fetch_listado_oow,
     )
-    from .sicser_import import mapa_importaciones_sicser
+    from .sicser_import import (
+        contar_ordenes_importadas_sicser,
+        listar_ordenes_importadas_sicser,
+        mapa_importaciones_sicser,
+    )
 
     pais = get_pais_actual()
     codigo_pais = pais.get('codigo', 'MX')
     tab = request.GET.get('tab', 'oow').strip().lower()
-    if tab not in ('oow', 'garantia'):
+    if tab not in ('oow', 'garantia', 'importadas'):
         tab = 'oow'
 
     texto_busqueda = request.GET.get('q', '').strip()
     usar_cache = request.GET.get('refrescar') != '1'
 
-    ordenes_oow = []
-    ordenes_garantia = []
+    # EXPLICACIÓN PARA PRINCIPIANTES:
+    # Pedimos AMBAS APIs sin filtro de búsqueda para calcular badges de «N nuevas».
+    # La búsqueda `q` se aplica después solo a la pestaña activa.
+    ordenes_oow_todas = []
+    ordenes_garantia_todas = []
     total_oow_pais = 0
     total_garantia_pais = 0
     error_oow = ''
     error_garantia = ''
+    api_oow_ok = False
+    api_garantia_ok = False
 
-    if tab == 'oow':
-        try:
-            ordenes_oow, total_oow_pais = fetch_listado_oow(
-                codigo_pais=codigo_pais,
-                texto_busqueda=texto_busqueda,
-                usar_cache=usar_cache,
-            )
-        except SicserAPIError as exc:
-            error_oow = str(exc)
-            logger.warning('Error consultando API OOW SICSER: %s', exc)
-    else:
-        try:
-            ordenes_garantia, total_garantia_pais = fetch_listado_garantias(
-                codigo_pais=codigo_pais,
-                texto_busqueda=texto_busqueda,
-                usar_cache=usar_cache,
-            )
-        except SicserAPIError as exc:
-            error_garantia = str(exc)
-            logger.warning('Error consultando API Garantías SICSER: %s', exc)
+    try:
+        ordenes_oow_todas, total_oow_pais = fetch_listado_oow(
+            codigo_pais=codigo_pais,
+            texto_busqueda='',
+            usar_cache=usar_cache,
+        )
+        api_oow_ok = True
+    except SicserAPIError as exc:
+        error_oow = str(exc)
+        logger.warning('Error consultando API OOW SICSER: %s', exc)
+
+    try:
+        ordenes_garantia_todas, total_garantia_pais = fetch_listado_garantias(
+            codigo_pais=codigo_pais,
+            texto_busqueda='',
+            usar_cache=usar_cache,
+        )
+        api_garantia_ok = True
+    except SicserAPIError as exc:
+        error_garantia = str(exc)
+        logger.warning('Error consultando API Garantías SICSER: %s', exc)
 
     mapa_oow, mapa_garantia = mapa_importaciones_sicser()
     sucursales = Sucursal.objects.filter(activa=True).order_by('nombre')
     puede_importar = request.user.has_perm('servicio_tecnico.add_ordenservicio')
+
+    # Badges: pendientes = en SICSER y aún no importadas a SIGMA.
+    nuevas_oow = (
+        sum(1 for o in ordenes_oow_todas if str(o.id_orden) not in mapa_oow)
+        if api_oow_ok else 0
+    )
+    nuevas_garantia = (
+        sum(1 for o in ordenes_garantia_todas if str(o.numero_dps) not in mapa_garantia)
+        if api_garantia_ok else 0
+    )
+
+    # Aplicar búsqueda solo a la pestaña activa (reutiliza el filtro del cliente).
+    if tab == 'oow' and texto_busqueda and api_oow_ok:
+        ordenes_oow, _ = fetch_listado_oow(
+            codigo_pais=codigo_pais,
+            texto_busqueda=texto_busqueda,
+            usar_cache=True,
+        )
+    else:
+        ordenes_oow = ordenes_oow_todas if tab == 'oow' else []
+
+    if tab == 'garantia' and texto_busqueda and api_garantia_ok:
+        ordenes_garantia, _ = fetch_listado_garantias(
+            codigo_pais=codigo_pais,
+            texto_busqueda=texto_busqueda,
+            usar_cache=True,
+        )
+    else:
+        ordenes_garantia = ordenes_garantia_todas if tab == 'garantia' else []
 
     filas_oow = [
         {
@@ -19600,6 +19640,14 @@ def consultar_sicser(request):
         for orden in ordenes_garantia
     ]
 
+    total_importadas = contar_ordenes_importadas_sicser()
+    filas_importadas = []
+    if tab == 'importadas':
+        filas_importadas = listar_ordenes_importadas_sicser(
+            texto_busqueda=texto_busqueda,
+            limite=100,
+        )
+
     context = {
         'page_title': 'Consultar SICSER',
         'tab_activa': tab,
@@ -19608,10 +19656,16 @@ def consultar_sicser(request):
         'codigo_pais': codigo_pais,
         'filas_oow': filas_oow,
         'filas_garantia': filas_garantia,
+        'filas_importadas': filas_importadas,
         'total_oow_pais': total_oow_pais,
         'total_garantia_pais': total_garantia_pais,
         'total_oow_mostrado': len(filas_oow),
         'total_garantia_mostrado': len(filas_garantia),
+        'nuevas_oow': nuevas_oow,
+        'nuevas_garantia': nuevas_garantia,
+        'total_importadas': total_importadas,
+        'api_oow_ok': api_oow_ok,
+        'api_garantia_ok': api_garantia_ok,
         'error_oow': error_oow,
         'error_garantia': error_garantia,
         'refresco_forzado': not usar_cache,

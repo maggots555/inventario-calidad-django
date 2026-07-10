@@ -42,7 +42,7 @@
                            value="{{ texto_busqueda }}"
                            placeholder="Folio, service tag, cliente, DPS...">
                 </div>
-                {% if puede_importar and sucursales %}
+                {% if puede_importar and sucursales and tab_activa != 'importadas' %}
                 <div class="col-md-4 col-lg-3">
                     <label for="sicser-sucursal-import" class="form-label fw-semibold small mb-1">
                         <i class="bi bi-building"></i> Sucursal al importar
@@ -78,12 +78,29 @@
             <a class="nav-link {% if tab_activa == 'oow' %}active{% endif %}"
                href="?tab=oow{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
                 <i class="bi bi-tools"></i> Órdenes OOW
+                {% if api_oow_ok and nuevas_oow > 0 %}
+                <span class="badge sicser-badge-nuevas">{{ nuevas_oow }} nuevas</span>
+                {% elif not api_oow_ok %}
+                <span class="badge sicser-badge-error" title="{{ error_oow }}">—</span>
+                {% endif %}
             </a>
         </li>
         <li class="nav-item">
             <a class="nav-link {% if tab_activa == 'garantia' %}active{% endif %}"
                href="?tab=garantia{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
                 <i class="bi bi-shield-check"></i> Garantías Dell
+                {% if api_garantia_ok and nuevas_garantia > 0 %}
+                <span class="badge sicser-badge-nuevas">{{ nuevas_garantia }} nuevas</span>
+                {% elif not api_garantia_ok %}
+                <span class="badge sicser-badge-error" title="{{ error_garantia }}">—</span>
+                {% endif %}
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if tab_activa == 'importadas' %}active{% endif %}"
+               href="?tab=importadas{% if texto_busqueda %}&q={{ texto_busqueda|urlencode }}{% endif %}">
+                <i class="bi bi-check2-square"></i> Importadas
+                <span class="badge sicser-badge-importadas">{{ total_importadas }}</span>
             </a>
         </li>
     </ul>
@@ -92,7 +109,7 @@
     <div class="card shadow-sm">
         <div class="card-header sicser-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span><i class="bi bi-list-ul"></i> Órdenes fuera de garantía (OOW)</span>
-            <span class="badge bg-primary">{{ total_oow_mostrado }} mostradas en {{ codigo_pais }}</span>
+            <span class="badge bg-primary">{{ total_oow_mostrado }} mostradas · {{ nuevas_oow }} nuevas</span>
         </div>
         <div class="card-body p-0">
             {% if error_oow %}
@@ -182,7 +199,7 @@
     <div class="card shadow-sm">
         <div class="card-header sicser-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span><i class="bi bi-shield-check"></i> Garantías Dell</span>
-            <span class="badge bg-success">{{ total_garantia_mostrado }} mostradas en {{ codigo_pais }}</span>
+            <span class="badge bg-success">{{ total_garantia_mostrado }} mostradas · {{ nuevas_garantia }} nuevas</span>
         </div>
         <div class="card-body p-0">
             {% if error_garantia %}
@@ -263,9 +280,84 @@
     </div>
     {% endif %}
 
+    {% if tab_activa == 'importadas' %}
+    <div class="card shadow-sm">
+        <div class="card-header sicser-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span><i class="bi bi-check2-square"></i> Órdenes ya importadas a SIGMA</span>
+            <span class="badge bg-secondary">{{ filas_importadas|length }} mostradas · {{ total_importadas }} en total</span>
+        </div>
+        <div class="card-body p-0">
+            {% if filas_importadas %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm sicser-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Origen</th>
+                            <th>Folio / DPS</th>
+                            <th>Orden SIGMA</th>
+                            <th>Service Tag</th>
+                            <th>Cliente</th>
+                            <th>Fecha ingreso</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fila in filas_importadas %}
+                        <tr>
+                            <td>
+                                {% if fila.origen == 'oow' %}
+                                <span class="badge bg-warning text-dark">{{ fila.origen_etiqueta }}</span>
+                                {% else %}
+                                <span class="badge bg-info text-dark">{{ fila.origen_etiqueta }}</span>
+                                {% endif %}
+                            </td>
+                            <td><code class="sicser-folio">{{ fila.folio_sicser }}</code></td>
+                            <td>
+                                <strong>{{ fila.orden_cliente }}</strong>
+                                <span class="small d-block text-muted">{{ fila.numero_orden_interno }}</span>
+                            </td>
+                            <td><strong>{{ fila.service_tag }}</strong></td>
+                            <td>{{ fila.nombre_cliente|truncatechars:35|default:"—" }}</td>
+                            <td class="small text-muted">{{ fila.fecha_ingreso|date:"d/m/Y H:i" }}</td>
+                            <td class="text-center sicser-acciones">
+                                <a href="{% url 'servicio_tecnico:detalle_orden' fila.orden_id %}"
+                                   class="btn btn-sm btn-primary"
+                                   title="Ver orden en SIGMA">
+                                    <i class="bi bi-eye"></i>
+                                    <span class="d-none d-lg-inline">Ver orden</span>
+                                </a>
+                                {% if fila.url_formato_digital %}
+                                <a href="{{ fila.url_formato_digital }}"
+                                   class="btn btn-sm btn-outline-success"
+                                   target="_blank" rel="noopener noreferrer"
+                                   title="Formato digital SICSER">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                {% if texto_busqueda %}
+                No hay importadas que coincidan con «{{ texto_busqueda }}».
+                {% else %}
+                Aún no hay órdenes importadas desde SICSER.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <p class="small text-muted mt-3 mb-0">
         <i class="bi bi-info-circle"></i>
-        Importar crea la orden en SIGMA: OOW → <code>OOW-número</code>; garantía → DPS numérico (Dell).
+        Los badges <strong>nuevas</strong> son registros en SICSER aún no importados.
+        La pestaña <strong>Importadas</strong> muestra el histórico en SIGMA aunque ya no aparezcan en SICSER.
     </p>
 </div>
 {% endblock %}
