@@ -681,13 +681,13 @@ textarea.form-control {
 
 /* =============================================================================
    IMPORTANTE: Mantener cursor personalizado con Select2
+   Solo cuando el JS activó el cursor custom (html.custom-cursor-active).
+   Si no, Select2 debe usar el cursor normal del sistema (fallback).
    ============================================================================= */
-
-/* Forzar que Select2 use cursor none para mantener el cursor personalizado */
-.select2-container *,
-.select2-dropdown *,
-.select2-results *,
-.select2-selection * {
+html.custom-cursor-active .select2-container *,
+html.custom-cursor-active .select2-dropdown *,
+html.custom-cursor-active .select2-results *,
+html.custom-cursor-active .select2-selection * {
     cursor: none !important;
 }
 

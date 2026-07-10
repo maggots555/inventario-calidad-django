@@ -827,22 +827,26 @@ body {
     /* overflow-x: hidden aplicado solo en móviles ahora */
     width: 100%;
     max-width: 100%;
-    /* Ocultar cursor por defecto para usar el personalizado JS */
-    cursor: none;
+    /* EXPLICACIÓN PARA PRINCIPIANTES:
+       NO ocultamos el cursor aquí por defecto.
+       Antes se usaba cursor: none siempre en desktop, pero en laptops con
+       pantalla táctil el JS desactiva el cursor personalizado y la persona
+       se quedaba SIN cursor visible. El fallback es el cursor del sistema. */
 }
 
-/* REGLA MAESTRA: Ocultar cursor del sistema en TODO el sitio (solo en desktop) */
-/* En móviles y tablets, usar el cursor normal del sistema */
+/* REGLA MAESTRA: Ocultar cursor del sistema SOLO cuando el JS activó el custom.
+   La clase html.custom-cursor-active la pone inicializarCursorPersonalizado()
+   en base.ts. Si no se activa (touch, error, etc.), se ve el cursor normal. */
 @media (hover: hover) and (pointer: fine) {
-    *,
-    *::before,
-    *::after,
-    .select2-container,
-    .select2-container *,
-    .select2-selection,
-    .select2-dropdown,
-    .select2-results,
-    .select2-results__option {
+    html.custom-cursor-active *,
+    html.custom-cursor-active *::before,
+    html.custom-cursor-active *::after,
+    html.custom-cursor-active .select2-container,
+    html.custom-cursor-active .select2-container *,
+    html.custom-cursor-active .select2-selection,
+    html.custom-cursor-active .select2-dropdown,
+    html.custom-cursor-active .select2-results,
+    html.custom-cursor-active .select2-results__option {
         cursor: none !important;
     }
 }

@@ -610,28 +610,60 @@ function crearParticulaTrail(x, y) {
     }, 510); // Un poco más que la transición CSS (0.5s)
 }
 /**
- * Inicializa el comportamiento del cursor personalizado
- * Solo se activa en dispositivos no táctiles (desktop con mouse)
+ * Oculta el SVG del cursor personalizado y deja el cursor del sistema.
+ * Se usa cuando el dispositivo es táctil/híbrido o falla la inicialización.
+ *
+ * Efectos secundarios:
+ * - Quita html.custom-cursor-active (el CSS deja de forzar cursor: none)
+ * - Oculta #tech-cursor para que no quede un SVG flotante
+ */
+function desactivarCursorPersonalizado(motivo) {
+    // EXPLICACIÓN PARA PRINCIPIANTES:
+    // Sin esta clase, base.css NO oculta el cursor del sistema.
+    // Así las laptops con pantalla táctil ven el puntero normal (fallback).
+    document.documentElement.classList.remove('custom-cursor-active');
+    const cursor = document.getElementById('tech-cursor');
+    if (cursor) {
+        cursor.style.display = 'none';
+    }
+    console.log(`Cursor personalizado deshabilitado (${motivo}) — fallback al cursor del sistema`);
+}
+/**
+ * Inicializa el comportamiento del cursor personalizado.
+ * Solo se activa en desktop con mouse real (sin touch).
+ *
+ * Si no se puede activar (laptop táctil, tablet, error), cae en fallback:
+ * el cursor normal del sistema permanece visible porque NO se agrega
+ * la clase html.custom-cursor-active que el CSS usa para cursor: none.
  */
 function inicializarCursorPersonalizado() {
     // EXPLICACIÓN PARA PRINCIPIANTES:
-    // Detectamos si el dispositivo es táctil (móvil/tablet) para NO mostrar el cursor personalizado
-    // En dispositivos táctiles no tiene sentido tener un cursor personalizado ya que no hay mouse
-    // Detectar si es un dispositivo táctil
+    // Muchas laptops Windows tienen pantalla táctil. El navegador reporta
+    // maxTouchPoints > 0 aunque también tengan mouse. Antes el JS salía
+    // sin activar el cursor custom, pero el CSS igual ocultaba el del sistema
+    // → la persona no veía ningún cursor. Ahora solo ocultamos el del sistema
+    // cuando este método confirma que el custom está activo.
+    // Detectar si es un dispositivo táctil o híbrido (touch + mouse)
     const isTouchDevice = (('ontouchstart' in window) ||
         (navigator.maxTouchPoints > 0) ||
         (window.matchMedia('(hover: none)').matches) ||
         (window.matchMedia('(pointer: coarse)').matches) ||
         (window.innerWidth <= 1024) // Tablets y móviles
     );
-    // Si es un dispositivo táctil, no inicializar el cursor personalizado
+    // Si es táctil/híbrido: no custom → cursor del sistema (fallback)
     if (isTouchDevice) {
-        console.log('Dispositivo táctil detectado - Cursor personalizado deshabilitado');
+        desactivarCursorPersonalizado('dispositivo táctil o híbrido');
         return;
     }
     const cursor = document.getElementById('tech-cursor');
-    if (!cursor)
+    if (!cursor) {
+        // Sin el elemento DOM no hay cursor custom; no ocultar el del sistema
+        desactivarCursorPersonalizado('elemento #tech-cursor no encontrado');
         return;
+    }
+    // Confirmar al CSS que el custom está vivo → ahora sí cursor: none
+    document.documentElement.classList.add('custom-cursor-active');
+    cursor.style.display = '';
     // Variable para controlar la creación de partículas (throttling)
     let lastTrailTime = 0;
     const trailInterval = 30; // Crear partícula cada 30ms
