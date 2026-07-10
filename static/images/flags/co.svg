@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 24" width="32" height="24">
   <defs>
     <style>
-      /* Animación de ondulación  misma lógica que Argentina */
+      /* Animacion de ondulacion - misma logica que Argentina */
       @keyframes wave-float {
         0% { transform: translateY(0); }
         50% { transform: translateY(-0.5px); }

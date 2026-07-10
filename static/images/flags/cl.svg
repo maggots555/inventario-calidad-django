@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 24" width="32" height="24">
   <defs>
     <style>
-      /* Animación de ondulación en franjas */
+      /* Animacion de ondulacion en franjas */
       @keyframes wave-float {
         0% { transform: translateY(0); }
         50% { transform: translateY(-0.5px); }
@@ -67,10 +67,10 @@
   <!-- Mitad inferior roja -->
   <rect class="stripe-red" x="0" y="12" width="32" height="12" fill="url(#redGrad)"/>
 
-  <!-- Cantón azul (cuadrado superior izquierdo: 50% ancho × 50% alto) -->
+  <!-- Canton azul (cuadrado superior izquierdo: 50% ancho x 50% alto) -->
   <rect class="canton" x="0" y="0" width="16" height="12" fill="url(#blueGrad)"/>
 
-  <!-- Estrella blanca de 5 puntas centrada en el cantón -->
+  <!-- Estrella blanca de 5 puntas centrada en el canton -->
   <g class="star-core">
     <polygon
       class="star-glow"
