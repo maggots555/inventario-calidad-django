@@ -19,7 +19,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Production-success?style=for-the-badge" alt="Status">
-  <img src="https://img.shields.io/badge/Version-5.1-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-5.2-blue?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/Modules-6-orange?style=for-the-badge" alt="Modules">
 </p>
@@ -28,7 +28,7 @@
 
 **Sistema empresarial de última generación** para centros de servicio técnico de equipos de cómputo con **Machine Learning**, **Analytics avanzado**, **TypeScript frontend** y **arquitectura multi-país**.
 
-Combina gestión de órdenes de servicio, control de calidad, **predicciones con IA**, **dashboards interactivos tipo Power BI**, seguimiento de incidencias, sistema RHITSO para casos complejos, **procesamiento en segundo plano con Celery + Redis**, **encuestas de satisfacción**, **evidencia en video con análisis IA** y **seguimiento público para clientes fuera de garantía**.
+Combina gestión de órdenes de servicio, control de calidad, **predicciones con IA**, **dashboards interactivos tipo Power BI**, seguimiento de incidencias, sistema RHITSO para casos complejos, **procesamiento en segundo plano con Celery + Redis**, **encuestas de satisfacción**, **evidencia en video con análisis IA**, **seguimiento público PWA con push para clientes fuera de garantía**, **cotización de equipos reacondicionados** e **integración SICSER** (consulta e importación de órdenes).
 
 ---
 
@@ -110,7 +110,9 @@ Sistema completo de órdenes de servicio técnico con flujo dual:
 - ✅ Sistema de imágenes con tipos (ingreso, diagnóstico, reparación, entrega, packing)
 - ✅ **Cámara Integrada**: Captura de fotos directamente desde dispositivos móviles con selector de lentes, orientación híbrida y UI minimalista
 - ✅ **Envío de Diagnóstico por PDF**: Generación automática de PDF con componentes dinámicos y mano de obra editable, enviado al cliente por correo
-- ✅ **Seguimiento Público OOW/FL**: Portal de seguimiento para clientes de órdenes fuera de garantía con galería de imágenes y timeline
+- ✅ **Seguimiento Público OOW/FL**: Portal de seguimiento para clientes de órdenes fuera de garantía con galería de imágenes, timeline y PDF de diagnóstico
+- ✅ **PWA + Web Push del Cliente**: Portal instalable en móvil con `PushSubscriptionCliente` (sin cuenta Django), distinto del push interno de staff
+- ✅ **Analytics de Adopción**: Eventos de producto (`EventoSeguimientoCliente`) + embudo PWA/push/chat + KPIs de notificaciones push
 - ✅ **Dashboard OOW/FL**: Panel de métricas para seguimiento de clientes fuera de garantía con filtros avanzados
 - ✅ **Encuestas de Satisfacción**: Sistema NPS con envío automático por correo y dashboard de resultados
 - ✅ **Concentrado Semanal CIS**: Reporte semanal con exportación a Excel mensual
@@ -131,7 +133,10 @@ Sistema completo de órdenes de servicio técnico con flujo dual:
 - ✅ **Envío de Evidencia en Video al Cliente**: Extracción de frames + análisis IA opcional (Ollama/Gemini) + correo
 - ✅ **Dictado por Voz en Diagnóstico SIC**: Web Speech API → Ollama Whisper → Google Gemini con deduplicación de segmentos
 - ✅ **Inspector Visual IA**: Análisis estético opcional de imágenes de ingreso antes de enviar al cliente
-- ✅ **Web Push Notifications**: Alertas push a técnicos e inspectores (llegada de piezas, control de calidad, etc.)
+- ✅ **Web Push Notifications (staff)**: Alertas push a técnicos e inspectores (listas blancas de estados en `signals.py`)
+- ✅ **Recordatorio de Imágenes**: Celery Beat diario avisa si faltan fotos de ingreso/diagnóstico/reparación
+- ✅ **Integración SICSER (Fase 1)**: Consulta de listados OOW/garantías e importación de órdenes a SIGMA (solo lectura + caché Redis)
+- ✅ **Análisis de Candidatos RHITSO**: Reporte/analytics de equipos aptos y no aptos para envío externo
 
 **Estados del flujo:**
 
@@ -209,6 +214,7 @@ Subsistema especializado para reparaciones que requieren seguimiento externo con
 - ✅ Generación de PDFs con resumen completo
 - ✅ Cálculo de días hábiles para SLA
 - ✅ Paleta de colores distintiva para identificación visual
+- ✅ **Análisis de Candidatos RHITSO**: Reporte de equipos aptos/no aptos con filtros y exportación
 
 **Estados RHITSO:**
 
@@ -262,10 +268,13 @@ Sistema avanzado para el control de inventario de almacén central, compras y tr
 - ✅ **Cotizaciones sin Orden Activa**: Flujo comercial previo al ingreso formal, con vinculación posterior a `OrdenServicio`
 - ✅ **Servicios Adicionales en Cotización**: `LineaServicioAdicional` para cotizar limpieza, SO, paquetes y crear/actualizar `VentaMostrador`
 - ✅ **Modal de Cotización al Cliente**: Calculadora de profit, preview PDF y envío por correo con plantilla personalizada por país
+- ✅ **Cotización de Equipos Reacondicionados**: Costeo propio, PDF dedicado, financiamiento/opción de pago y términos específicos
 - ✅ **Estado `enviada_front`**: Notificación a front desk y aviso de vigencia con edición de líneas en `enviada_cliente`
 - ✅ **Creación de Orden FL desde Cotización**: Generación directa de orden fuera de línea al aprobar servicios FL
 - ✅ **Precios Cliente y Términos**: Campos de costo cliente, RFC, datos de facturación y términos y condiciones en PDF/correo
 - ✅ **Plantilla México para Cotización**: Correo y PDF con datos bancarios, CLABE y formulario de facturación específicos de México
+- ✅ **Protección de Compras**: No se generan compras sin orden de servicio vinculada
+- ✅ **Resolver Catálogo → ComponenteEquipo**: Mapeo semántico de piezas de almacén al catálogo de ST
 
 **Workflow de Adquisición:**
 ```
@@ -342,11 +351,11 @@ El sistema soporta operaciones en múltiples países con bases de datos independ
 
 ### Tareas Asíncronas y Cache
 
-- ✅ **Celery Workers**: Procesamiento de correos electrónicos en segundo plano (RHITSO, diagnóstico, imágenes, encuestas, cotizaciones)
-- ✅ **Celery Beat**: Tareas programadas (notificación automática de encuestas pendientes)
-- ✅ **Redis Cache**: Cache de dashboards pesados (RHITSO, OOW/FL, cotizaciones, piezas) para respuesta inmediata
+- ✅ **Celery Workers**: Procesamiento de correos electrónicos en segundo plano (RHITSO, diagnóstico, imágenes, encuestas, cotizaciones, evidencia video)
+- ✅ **Celery Beat**: Tareas programadas diarias a las 8:00 (encuestas pendientes + recordatorio de imágenes faltantes) y limpieza de notificaciones cada 24 h
+- ✅ **Redis Cache**: Cache de dashboards pesados y respuestas SICSER (DB Redis `/2`, separada del broker Celery `/0`–`/1`)
 - ✅ **Panel de Notificaciones (🔔)**: Campanita con polling adaptativo, URLs navegables, soporte móvil y eliminación individual
-- ✅ **App `notificaciones`**: Módulo dedicado con modelo `Notificacion`, `PushSubscription` y vistas REST
+- ✅ **App `notificaciones`**: Módulo dedicado con `Notificacion`, `PushSubscription` (staff) y `PushSubscriptionCliente` (portal público)
 - ✅ **Compresión de Video Asíncrona**: FFmpeg vía Celery al subir videos de evidencia o generar video resumen
 - ✅ **Envío de Evidencia en Video**: Tarea Celery con extracción de frames, análisis IA opcional y correo al cliente
 - ✅ **Multi-Tenant en Workers**: Señal `task_prerun` configura el país activo antes de ejecutar cada tarea Celery
@@ -363,7 +372,8 @@ El sistema soporta operaciones en múltiples países con bases de datos independ
 - **Backup en la Nube con rclone**: Sincronización automática de backups a Google Drive vía rclone (guía de configuración incluida)
 - **Soporte SVG**: Visualización optimizada de gráficos vectoriales en todo el sistema
 - **ManifestStaticFilesStorage**: Cache busting automático de archivos estáticos
-- **PWA (Progressive Web App)**: Instalable en Android e iOS como app nativa con soporte para notch/Dynamic Island, service worker, favicons PNG y Web Push
+- **PWA (Progressive Web App)**: Instalable en Android e iOS como app nativa (staff) con soporte para notch/Dynamic Island, service worker, favicons PNG y Web Push
+- **PWA del Cliente (seguimiento)**: Manifest dinámico por token (`/seguimiento/<token>/manifest.json`) + install prompt y push propios, sin cuenta de usuario
 
 ---
 
@@ -452,6 +462,16 @@ Capacidades de visión y análisis multimedia integradas en flujos de ingreso y 
 - **Módulos TypeScript**: `compartir_video.ts`, `voz_diagnostico.ts`
 - **Módulos Backend**: `servicio_tecnico/ollama_client.py`, `servicio_tecnico/gemini_client.py`
 
+#### 4. **Integración SICSER (Fase 1)**
+
+Consulta e importación de órdenes desde el sistema externo SICSER:
+
+- **Cliente HTTP** con caché Redis: `sicser_client.py`
+- **Importación a SIGMA**: `sicser_import.py`
+- **UI**: `consultar_sicser.ts` — listados OOW/garantías
+- **Alcance**: solo lectura + import; no escribe de vuelta a SICSER
+- **Config**: variables `SICSER_*` en `.env`
+
 #### Proveedores Soportados
 
 | Proveedor | Tipo | Variable `.env` | Modelos recomendados |
@@ -471,7 +491,7 @@ Capacidades de visión y análisis multimedia integradas en flujos de ingreso y 
 
 ### Sistema de Visualizaciones Interactivas con Plotly
 
-**Archivo**: `plotly_visualizations.py` (3939 líneas, 148KB)
+**Archivo**: `plotly_visualizations.py` (~4,607 líneas)
 
 Clase `DashboardCotizacionesVisualizer` con **50+ métodos de visualización** que generan gráficos HTML interactivos profesionales:
 
@@ -515,7 +535,7 @@ El sistema utiliza **TypeScript 5.9.3** para desarrollo frontend profesional y m
 - Source maps para debugging
 - Types de Bootstrap incluidos (@types/bootstrap)
 
-**Módulos TypeScript** (48 archivos, ~29,849 líneas):
+**Módulos TypeScript** (~55 archivos, ~31,200 líneas):
 
 1. **`base.ts`** (718 líneas) - Funcionalidad base compartida, utilities y helpers
 2. **`camara_integrada.ts`** (1,579 líneas) - Sistema de cámara nativa con selector de lentes y orientación híbrida
@@ -533,7 +553,7 @@ El sistema utiliza **TypeScript 5.9.3** para desarrollo frontend profesional y m
 14. **`concentrado_semanal.ts`** (584 líneas) - Concentrado CIS con reporte mensual
 15. **`notificaciones.ts`** (570 líneas) - Panel de notificaciones con polling adaptativo
 16. **`dashboard_feedback_rechazo.ts`** (531 líneas) - Análisis de rechazos por costo y piezas
-17. **`dashboard_seguimiento_enlaces.ts`** (464 líneas) - Dashboard de seguimiento público OOW
+17. **`dashboard_seguimiento_enlaces.ts`** (464 líneas) - Dashboard de seguimiento público OOW + embudo de adopción
 18. **`modelo_autocomplete.ts`** (364 líneas) - Autocompletado de modelos de equipos
 19. **`modelo_autocomplete_modal.ts`** (460 líneas) - Modal de autocompletado avanzado
 20. **`form_compra.ts`** (600 líneas) - Formularios de compra de almacén
@@ -561,10 +581,15 @@ El sistema utiliza **TypeScript 5.9.3** para desarrollo frontend profesional y m
 42. **`upload_video.ts`** (líneas variables) - Subida y gestión de videos de evidencia en galería *(nuevo v5.1)*
 43. **`video_resumen.ts`** - Generación y descarga de video resumen de galería *(nuevo v5.1)*
 44. **`voz_diagnostico.ts`** - Dictado por voz en diagnóstico SIC (Speech API → Whisper → Gemini) *(nuevo v5.1)*
-45. **`push_notifications.ts`** - Suscripción y gestión de Web Push en Mi Perfil *(nuevo v5.1)*
-46. **`pwa_install.ts`** - Prompt personalizado de instalación PWA *(nuevo v5.1)*
+45. **`push_notifications.ts`** - Suscripción y gestión de Web Push en Mi Perfil (staff) *(nuevo v5.1)*
+46. **`pwa_install.ts`** - Prompt personalizado de instalación PWA (staff) *(nuevo v5.1)*
 47. **`service_worker.ts`** - Service worker para PWA y modo offline *(nuevo v5.1)*
-48. **`globals.d.ts`** - Declaraciones de tipos globales
+48. **`pwa_install_seguimiento.ts`** - Prompt de instalación PWA del portal cliente *(nuevo v5.2)*
+49. **`push_notifications_cliente.ts`** - Web Push del cliente ligado al enlace de seguimiento *(nuevo v5.2)*
+50. **`eventos_seguimiento.ts`** - Registro de eventos de adopción (PWA, push, chat, PDF) *(nuevo v5.2)*
+51. **`cotizacion_reacondicionado_modal.ts`** - Cotización de equipos reacondicionados *(nuevo v5.2)*
+52. **`consultar_sicser.ts`** - UI de consulta e importación SICSER *(nuevo v5.2)*
+53. **`globals.d.ts`** / **`eventos_seguimiento.d.ts`** - Declaraciones de tipos globales
 
 **Ventajas del TypeScript:**
 
@@ -597,12 +622,14 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - Seguimiento de éxito/fallo de envíos
 - **URLs navegables en campanita**: Cada notificación puede enlazar directo a la pantalla relevante
 - **Web Push Notifications**: Alertas push a técnicos e inspectores vía VAPID (`pywebpush`)
+- **Web Push del Cliente**: Suscripciones ligadas al enlace de seguimiento (sin cuenta Django)
 - **Correo de diagnóstico**: PDF adjunto con componentes y mano de obra
 - **Correo de cotización rechazada**: Con token seguro para feedback
 - **Correo de encuesta de satisfacción**: Enlace con token único
 - **Correo de imágenes de egreso**: Notificación al finalizar
 - **Correo de evidencia en video**: Frames extraídos con análisis IA opcional adjunto al cliente
-- **Correo de cotización al cliente (Almacén)**: PDF con precios, términos y plantilla personalizada por país
+- **Correo de cotización al cliente (Almacén)**: PDF con precios, términos y plantilla personalizada por país (reparación o reacondicionado)
+- **Recordatorio push de imágenes**: Beat diario si faltan evidencias fotográficas
 
 ### 📊 Sistema de Reportes y Análisis
 
@@ -619,10 +646,12 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **Distribución Multi-Sucursal**: Vista con exportación Excel
 - **Nuevo Tab de Aceptaciones**: Análisis avanzado de aceptaciones en Dashboard de Cotizaciones
 - **Vista de Carga Animada**: Pantalla de espera para dashboards pesados (cotizaciones, OOW/FL)
+- **Embudo de Adopción (seguimiento)**: KPIs de PWA, push y chat del portal cliente
+- **Análisis de Candidatos RHITSO**: Aptos / no aptos con filtros
 
 ### 📱 Interfaz de Usuario Moderna
 
-- **TypeScript 5.9.3**: Frontend type-safe con 48 módulos (~29,849 líneas)
+- **TypeScript 5.9.3**: Frontend type-safe con ~55 módulos (~31,200 líneas)
 - **Modo Oscuro Completo**: Toggle en navbar con anti-flash y persistencia en localStorage
 - **Glassmorphism UI**: Efectos 3D y transparencias modernas
 - **Particle Effects**: Canvas interactivo en login/logout y encuestas
@@ -633,7 +662,7 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - Autocompletado inteligente en formularios
 - Pestañas dinámicas para organización de datos
 - **Lightbox Gallery**: Sistema completo con modo inspección y navegación (TypeScript)
-- **PWA Nativa**: Instalable en Android e iOS con soporte para notch/Dynamic Island, service worker y Web Push
+- **PWA Nativa (staff + cliente)**: Instalable en Android e iOS; el portal de seguimiento tiene manifest y push propios
 - **Banderas SVG Animadas**: Indicador visual de país en navbar
 - **Redes Sociales Dinámicas**: Links de RRSS (Instagram, Facebook, TikTok) configurados por sucursal
 - Sistema de badges con colores semánticos
@@ -668,7 +697,7 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 
 ### Frontend Moderno
 
-- **TypeScript 5.9.3** - Type-safe development (48 módulos, ~29,849 líneas)
+- **TypeScript 5.9.3** - Type-safe development (~55 módulos, ~31,200 líneas)
 - **Plotly.js** - Dashboards interactivos tipo Power BI
 - **Bootstrap 5.3.2** - Framework CSS responsivo
 - **Bootstrap Icons** - Iconografía consistente
@@ -699,15 +728,16 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 
 ### Seguridad
 
-- **CSRF Protection** habilitada
+- **CSRF Protection** habilitada (`CSRF_COOKIE_NAME = 'sigma_csrftoken'` en producción)
 - **Sanitización de inputs** con validadores Django
 - **Permisos granulares** por modelo con Django Groups
 - **Passwords hasheados** con PBKDF2
 - **Variables de entorno** (.env) para configuración sensible
 - **django-axes**: Bloqueo ante múltiples intentos fallidos
 - **django-ratelimit**: Protección de vistas públicas contra abuso
-- **Tokens seguros**: Para enlaces de feedback y encuestas
+- **Tokens seguros**: Para enlaces de feedback, encuestas y seguimiento
 - **Cloudflare SSL**: Validación estricta en producción
+- **ForcePasswordChange**: Middleware que obliga cambio de contraseña en el primer login
 
 ---
 
@@ -733,7 +763,11 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **ConfiguracionRHITSO**: Configuración del subsistema RHITSO
 - **FeedbackCliente**: Encuestas de satisfacción NPS con comentarios
 - **EnlaceSeguimientoCliente**: Enlaces de seguimiento público para órdenes OOW/FL
+- **EventoSeguimientoCliente**: Analytics de adopción (visitas, PWA, push, chat, PDF)
+- **RecordatorioImagenOrden**: Control de recordatorios por imágenes faltantes
 - **BannerPromocional**: Banners promocionales con carrusel en portal público (gestionados desde admin)
+- **AnalisisSentimientoEncuesta**: Resultados del análisis de sentimientos con IA
+- **VideoOrden**: Videos de evidencia y video resumen por orden
 
 ### Score Card
 
@@ -751,8 +785,8 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - **Proveedor**: Catálogo de proveedores y contactos
 - **CompraProducto**: Registro de adquisiciones
 - **SolicitudCotizacion**: Gestión multi-proveedor con sincronización a Servicio Técnico
-- **LineaCotizacion**: Líneas de piezas con precios cliente y vinculación a `PiezaCotizada`
-- **LineaServicioAdicional**: Servicios adicionales (Venta Mostrador) dentro de cotizaciones de almacén
+- **LineaCotizacion**: Líneas de piezas con precios cliente, reacondicionado y vinculación a `PiezaCotizada`
+- **LineaServicioAdicional**: Servicios adicionales (Venta Mostrador) dentro de cotizaciones de almacén (`es_necesaria`)
 - **AuditoriaInventario**: Control de stock físico
 - **SolicitudBaja**: Descarte de material con aprobación
 
@@ -765,7 +799,8 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 ### Notificaciones
 
 - **Notificacion**: Notificaciones internas del sistema con polling adaptativo y URL navegable
-- **PushSubscription**: Suscripciones Web Push por usuario para alertas en tiempo real
+- **PushSubscription**: Suscripciones Web Push por usuario (staff)
+- **PushSubscriptionCliente**: Suscripciones Web Push ligadas al enlace de seguimiento (cliente, sin cuenta)
 
 ---
 
@@ -810,8 +845,12 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - `/servicio/rhitso/` - Gestión RHITSO
 - `/servicio/concentrado-semanal/` - Concentrado Semanal CIS
 - `/servicio/dashboard/seguimiento-oow-fl/` - Dashboard de seguimiento OOW/FL
-- `/servicio/seguimiento/<token>/` - Seguimiento público para clientes (OOW)
+- `/servicio/seguimiento/<token>/` - Seguimiento público para clientes (OOW) — también en `/seguimiento/<token>/`
 - `/servicio/seguimiento/<token>/chat/` - Chatbot IA público del cliente *(nuevo v5.0)*
+- `/seguimiento/<token>/diagnostico/` - PDF de diagnóstico en el enlace público *(nuevo v5.2)*
+- `/seguimiento/<token>/manifest.json` - Manifest PWA del cliente *(nuevo v5.2)*
+- `/seguimiento/<token>/push/*` - Suscripción / cancelación Web Push del cliente *(nuevo v5.2)*
+- `/seguimiento/<token>/eventos/` - Registro de eventos de adopción *(nuevo v5.2)*
 - `/servicio/encuesta/<token>/` - Encuesta de satisfacción (público)
 - `/servicio/encuestas/dashboard/` - Dashboard de encuestas NPS
 - `/servicio/feedback-rechazo/dashboard/` - Análisis de rechazos
@@ -820,6 +859,8 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - `/servicio/api/pulir-diagnostico-sic/` - Mejorador de diagnóstico con IA *(nuevo v5.0)*
 - `/servicio/ordenes/<id>/video-resumen/generar/` - Generar video resumen de galería *(nuevo v5.1)*
 - `/servicio/orden/<id>/enviar-evidencia-video/` - Enviar evidencia en video al cliente *(nuevo v5.1)*
+- `/servicio/sicser/consultar/` - Consulta de listados SICSER *(nuevo v5.2)*
+- `/servicio/sicser/importar/` - Importar orden SICSER a SIGMA *(nuevo v5.2)*
 
 ### Score Card
 
@@ -839,6 +880,7 @@ pnpm run watch  # Modo watch para desarrollo (recompila automáticamente)
 - `/almacen/solicitudes-cotizacion/<pk>/vincular-orden/` - Vincular cotización sin orden activa *(nuevo v5.1)*
 - `/almacen/solicitudes-cotizacion/<pk>/crear-orden-fl/` - Crear orden FL desde cotización *(nuevo v5.1)*
 - `/almacen/solicitudes-cotizacion/<pk>/preview-pdf-cotizacion/` - Preview PDF de cotización al cliente *(nuevo v5.1)*
+- `/almacen/solicitudes-cotizacion/<pk>/pdf-cotizacion-final/` - Descarga PDF final (reparación o reacondicionado) *(nuevo v5.2)*
 - `/almacen/auditorias/` - Control de inventario físico
 
 ### Sistema
@@ -913,11 +955,21 @@ CORREO_REMITENTE_EMAIL=sistema@tuempresa.com
 # Celery + Redis (producción)
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/0
+REDIS_CACHE_URL=redis://localhost:6379/2
 
 # Almacenamiento
 PRIMARY_MEDIA_ROOT=/path/to/primary
 ALTERNATE_MEDIA_ROOT=/path/to/alternate
 MIN_FREE_SPACE_GB=10
+
+# Cotizador Almacén (márgenes — ver .env.example completo)
+# PROFIT_MOSTRADOR= / COSTOS_FIJOS_* / DIAGNOSTICO_*
+
+# Chat IA del portal de seguimiento
+# CHAT_SEGUIMIENTO_MODEL= / CHAT_SEGUIMIENTO_MAX_TOKENS=
+
+# SICSER (Fase 1 — solo lectura + import)
+# SICSER_BASE_URL= / SICSER_TOKEN_OOW= / SICSER_TOKEN_GARANTIAS=
 ```
 
 **Obtener App Password de Gmail:**
@@ -1110,6 +1162,9 @@ Ver índice completo en [`docs/README.md`](./docs/README.md)
 - [x] ~~Chatbot para clientes en portal público~~ ✅ (Chatbot IA en seguimiento con seguridad y dark mode)
 - [x] ~~Sincronización Almacén ↔ Servicio Técnico~~ ✅ (Cotizaciones, piezas y servicios adicionales bidireccionales)
 - [x] ~~Cotización al cliente con PDF desde Almacén~~ ✅ (Modal con calculadora de profit y envío por correo)
+- [x] ~~PWA + Push del portal de seguimiento~~ ✅ (Manifest por token, push sin cuenta)
+- [x] ~~Cotización de equipos reacondicionados~~ ✅ (Costeo + PDF propio)
+- [x] ~~Integración SICSER (consulta/import)~~ ✅ (Fase 1 solo lectura)
 
 ### Mediano Plazo
 
@@ -1145,20 +1200,22 @@ inventario-calidad-django/
 │   ├── media_views.py     # Servicio seguro de media
 │   └── wsgi.py / asgi.py
 ├── servicio_tecnico/      # App principal de servicio técnico
-│   ├── models.py          # 19 modelos
+│   ├── models.py          # ~23 modelos
 │   ├── views.py           # Vistas principales
-│   ├── plotly_visualizations.py  # 3,949 líneas - Dashboards Plotly
+│   ├── plotly_visualizations.py  # ~4,607 líneas - Dashboards Plotly
+│   ├── sicser_client.py / sicser_import.py  # Integración SICSER
+│   ├── chat_seguimiento_helpers.py          # Chat IA público
 │   ├── ml_predictor.py    # Predictor ML
 │   ├── ml_advanced/       # ML avanzado (4 módulos)
 │   ├── excel_exporters.py # Exportación Excel
 │   └── templates/         # Templates del módulo
 ├── scorecard/             # App de control de calidad
 ├── inventario/            # App de inventario base
-├── almacen/               # App de gestión de almacén central (incl. tasks.py Celery)
-├── notificaciones/        # App de notificaciones internas (Celery + Web Push)
+├── almacen/               # App de gestión de almacén central (utils/, tasks.py, tests/)
+├── notificaciones/        # App de notificaciones internas (Celery + Web Push dual)
 ├── templates/             # Templates globales (base.html)
 ├── static/
-│   ├── ts/                # 48 módulos TypeScript fuente (~29,849 líneas)
+│   ├── ts/                # ~55 módulos TypeScript fuente (~31,200 líneas)
 │   ├── js/                # JavaScript compilado (auto-generado)
 │   ├── css/               # CSS organizado (base, components, forms)
 │   └── images/            # Imágenes, favicons PNG y SVGs
@@ -1210,7 +1267,7 @@ inventario-calidad-django/
 
 ### Frontend
 
-- **TypeScript 5.9.3** - Type-safe development (48 módulos)
+- **TypeScript 5.9.3** - Type-safe development (~55 módulos)
 - **Plotly.js** - Dashboards interactivos tipo Power BI
 - **Bootstrap 5.3.2** - Framework CSS
 - **Bootstrap Icons** - Iconografía
@@ -1286,21 +1343,24 @@ Este sistema integra las mejores prácticas de:
 
 ## 📈 Estado del Proyecto
 
-**Versión Actual**: 5.1 (Junio 2026)  
-**Estado**: ✅ Producción (6 módulos integrados + ML/Analytics/Multi-País/Celery/IA/Video)  
-**Última Actualización**: Junio 25, 2026
+**Versión Actual**: 5.2 (Julio 2026)  
+**Estado**: ✅ Producción (6 módulos integrados + ML/Analytics/Multi-País/Celery/IA/Video/PWA dual/SICSER)  
+**Última Actualización**: Julio 10, 2026
 
 ### Módulos Completados
 
 - ✅ **Inventario** (v1.0) - Sistema base
-- ✅ **Servicio Técnico** (v4.0) - Con RHITSO, cámara integrada, seguimiento OOW/FL, encuestas NPS, diagnóstico PDF, mejorador IA, chatbot público, banners, Mi Perfil
+- ✅ **Servicio Técnico** (v4.1) - RHITSO, cámara, seguimiento OOW/FL PWA+push, encuestas, SICSER, video evidencia
 - ✅ **Score Card** (v2.2) - Con reportes avanzados y notificaciones optimizadas
-- ✅ **RHITSO** (v1.5) - Seguimiento externo con motivos detallados
-- ✅ **Almacén Central** (v1.5) - Compras, cotizaciones cliente, sincronización ST y stock único
-- ✅ **Notificaciones** (v1.1) - Panel campanita con Celery, URLs navegables y Web Push
+- ✅ **RHITSO** (v1.6) - Seguimiento externo + análisis de candidatos
+- ✅ **Almacén Central** (v1.6) - Cotizaciones cliente, reacondicionados, sync ST y stock único
+- ✅ **Notificaciones** (v1.2) - Campanita Celery + Web Push staff y cliente
 - ✅ **IA Integrada** (v1.0) - Mejorador de diagnóstico y chatbot público (Ollama + Gemini) *(nuevo v5.0)*
 - ✅ **Modo Oscuro** (v1.0) - Dark mode completo con toggle en navbar y anti-flash *(nuevo v5.0)*
 - ✅ **Video Evidencia** (v1.0) - Cámara de video, compresión Celery, video resumen y envío con IA *(nuevo v5.1)*
+- ✅ **PWA Cliente + Analytics** (v1.0) - Install/push del portal + embudo de adopción *(nuevo v5.2)*
+- ✅ **SICSER** (v1.0) - Consulta e importación de órdenes (Fase 1) *(nuevo v5.2)*
+- ✅ **Reacondicionados** (v1.0) - Cotización y PDF de equipos reacondicionados *(nuevo v5.2)*
 
 ### Estadísticas del Sistema
 
@@ -1308,17 +1368,17 @@ Este sistema integra las mejores prácticas de:
 - **12 estados** RHITSO
 - **4 niveles** de severidad de incidencias
 - **7 tabs** de reportes avanzados
-- **50+ visualizaciones** Plotly interactivas tipo Power BI
-- **48 módulos** TypeScript (~29,849 líneas)
+- **50+ visualizaciones** Plotly interactivas tipo Power BI (~4,607 líneas)
+- **~55 módulos** TypeScript (~31,200 líneas)
 - **4 sistemas** ML/IA especializados (con soporte para etiquetas nuevas)
 - **2 asistentes IA** conversacionales (Ollama local + Google Gemini)
 - **80 documentos** técnicos
 - **77 scripts** de utilidades
 - **86,000+ líneas** de código Python
-- **29,849+ líneas** de TypeScript
+- **31,200+ líneas** de TypeScript
 - **45,700+ líneas** de templates Django
 - **4 países** en producción (México, Argentina, Chile y Colombia)
-- **19 modelos** en servicio técnico
+- **~23 modelos** en servicio técnico
 
 ---
 
@@ -1327,17 +1387,18 @@ Este sistema integra las mejores prácticas de:
 Si eres nuevo en el proyecto, sigue este orden:
 
 1. **Leer**: [`docs/guias/setup/SETUP_NUEVA_MAQUINA.md`](./docs/guias/setup/SETUP_NUEVA_MAQUINA.md)
-2. **Configurar**: Entorno local siguiendo la instalación arriba
-3. **Explorar**: Navega por cada módulo en orden:
+2. **Guía para agentes/IA**: [`AGENTS.md`](./AGENTS.md) — reglas críticas (Celery multi-tenant, PWA dual, SICSER, dark mode)
+3. **Configurar**: Entorno local siguiendo la instalación arriba
+4. **Explorar**: Navega por cada módulo en orden:
    - Inventario (más simple)
    - Servicio Técnico (core del sistema)
    - Score Card (análisis de calidad)
    - RHITSO (seguimiento externo)
    - Almacén Central (gestión de suministros)
    - Notificaciones (sistema de alertas)
-4. **Documentar**: Lee la documentación de cada módulo en [`docs/implementaciones/`](./docs/implementaciones/)
-5. **Practicar**: Usa los scripts de poblado para crear datos de prueba
-6. **Verificar**: Ejecuta los scripts de testing para validar tu setup
+5. **Documentar**: Lee la documentación de cada módulo en [`docs/implementaciones/`](./docs/implementaciones/)
+6. **Practicar**: Usa los scripts de poblado para crear datos de prueba
+7. **Verificar**: Ejecuta `python manage.py test almacen` y los scripts de testing
 
 ---
 
